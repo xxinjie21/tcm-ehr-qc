@@ -32,3 +32,13 @@ logs/
 *.bin
 *.pt
 *.onnx
+
+# Node
+node_modules/
+frontend/dist/
+
+# 运行日志（.log，含前端/后端运行日志）
+*.log
+
+# 本机 npm 全局工具（非项目代码）
+nodejs-global/
