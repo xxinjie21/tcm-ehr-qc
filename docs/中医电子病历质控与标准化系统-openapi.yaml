@@ -1,4 +1,4 @@
-openapi: 3.0.3
+﻿openapi: 3.0.3
 info:
   title: 中医电子病历质控与标准化系统
   description: |
@@ -26,7 +26,7 @@ tags:
     description: 病历导入、新增、查看、修改、删除、查询
   - name: NLP抽取
     description: 中医四诊实体抽取
-  - name: 数据治理
+  - name: 清洗与导出
     description: 术语标准化、数据清洗规整、数据集导出
   - name: 质控
     description: 事前质控、诊疗逻辑校验、终末评分
@@ -35,7 +35,7 @@ tags:
   - name: 词典管理
     description: 术语库导入、查询、回滚
   - name: 统计查询
-    description: 症状频次/证型分布/方剂中药频次
+    description: 症状频次/证候分布/方剂中药频次
   - name: 日志
     description: 操作日志导出
 security:
@@ -150,7 +150,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Entity'
-        syndromeList:
+        patternList:
           type: array
           items:
             $ref: '#/components/schemas/Entity'
@@ -201,7 +201,7 @@ components:
             - 结构化解析
             - 质控校验
             - 人工复核
-            - 数据治理
+            - 清洗与导出
             - 术语词典
             - 日志审计
     # ========== 病历管理 DTO / VO ==========
@@ -292,7 +292,7 @@ components:
         physicalExam:
           type: string
           description: 查体
-        syndrome:
+        pattern:
           type: string
           description: 辨证结论
         prescription:
@@ -368,7 +368,7 @@ components:
         physicalExam:
           type: string
           description: 查体
-        syndrome:
+        pattern:
           type: string
           description: 辨证结论
         prescription:
@@ -437,7 +437,7 @@ components:
             type: string
             format: date
           description: [开始日期, 结束日期]
-        syndrome:
+        pattern:
           type: string
           description: 辨证结论关键词
         status:
@@ -490,7 +490,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Entity'
-        syndromeList:
+        patternList:
           type: array
           items:
             $ref: '#/components/schemas/Entity'
@@ -510,7 +510,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Herb'
-    # ========== 数据治理 DTO / VO ==========
+    # ========== 清洗与导出 DTO / VO ==========
     NormalizeDTO:
       type: object
       description: 术语标准化请求（入参）
@@ -522,10 +522,10 @@ components:
           type: string
           enum:
             - symptom
-            - syndrome
+            - pattern
             - herb
             - formula
-          description: symptom症状 / syndrome证型 / herb中药 / formula方剂
+          description: disease疾病 / pattern证候 / symptom症状 / herb中药 / formula方剂
         term:
           type: string
           description: 口语化/非标准术语
@@ -604,7 +604,7 @@ components:
       type: object
       description: 诊疗逻辑一致性检查请求（入参，数组形式）
       properties:
-        syndromeList:
+        patternList:
           type: array
           items:
             $ref: '#/components/schemas/Entity'
@@ -738,7 +738,7 @@ components:
           type: string
           enum:
             - symptom
-            - syndrome
+            - pattern
             - herb
             - formula
         file:
@@ -794,7 +794,7 @@ components:
           type: string
           enum:
             - symptom
-            - syndrome
+            - pattern
             - herb
             - formula
         backupFilename:
@@ -812,9 +812,9 @@ components:
           type: string
           enum:
             - symptom
-            - syndrome
+            - pattern
             - prescription
-          description: symptom症状频次 / syndrome证型分布 / prescription方剂中药频次
+          description: disease疾病频次 / pattern证候分布 / symptom症状频次 / prescription方剂中药频次
         recordIds:
           type: array
           items:
@@ -835,11 +835,11 @@ components:
                 type: integer
         distribution:
           type: array
-          description: type=syndrome
+          description: type=pattern
           items:
             type: object
             properties:
-              syndrome:
+              pattern:
                 type: string
               count:
                 type: integer
@@ -1068,7 +1068,7 @@ paths:
               pulse: 脉浮数
               tongue: 舌红苔黄
               physicalExam: 咽部充血
-              syndrome: 风热犯肺证
+              pattern: 风热犯肺证
               prescription: 银翘散加减，细辛3g,桂枝6g,黄连10g
               followUp: 无
               treatmentEffect: 好转
@@ -1208,7 +1208,7 @@ paths:
                 pulseList:
                   - content: 脉浮数
                     sourceText: 脉浮数
-                syndromeList:
+                patternList:
                   - content: 风热犯肺证
                     sourceText: 风热犯肺证
       responses:
@@ -1249,7 +1249,7 @@ paths:
       tags:
         - NLP抽取
       summary: NLP实体抽取
-      description: NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证型病因治法/方剂中药）
+      description: NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）
       requestBody:
         required: true
         content:
@@ -1284,7 +1284,7 @@ paths:
   /api/governance/normalize:
     post:
       tags:
-        - 数据治理
+        - 清洗与导出
       summary: 术语标准化
       description: 将口语化/非标准中医术语归一国标标准术语。未命中时 standardTerm 返回原词、source 返回空字符串
       requestBody:
@@ -1310,7 +1310,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/NormalizeVO'
         '400':
-          description: 术语类型非法（type 不在 symptom/syndrome/herb/formula 范围）
+          description: 术语类型非法（type 不在 disease/pattern/symptom/herb/formula 范围）
           content:
             application/json:
               schema:
@@ -1359,7 +1359,7 @@ paths:
       tags:
         - 质控
       summary: 诊疗逻辑一致性检查
-      description: 事中质控，校验证型、治法、方剂、中药的诊疗逻辑一致性（入参为数组）
+      description: 事中质控，校验证候、治法、方剂、中药的诊疗逻辑一致性（入参为数组）
       requestBody:
         required: true
         content:
@@ -1474,7 +1474,7 @@ paths:
   /api/export/dataset:
     post:
       tags:
-        - 数据治理
+        - 清洗与导出
       summary: 标准数据集导出
       description: 按条件导出质控合格的标准化病历数据集，支持 CSV/JSON 格式。文件流下载，不套 Result 包装，导出自动脱敏
       requestBody:
@@ -1507,7 +1507,7 @@ paths:
   /api/governance/clean:
     post:
       tags:
-        - 数据治理
+        - 清洗与导出
       summary: 数据清洗规整
       description: 批量清洗病历数据，完成去重、修复、规整、脏数据隔离
       requestBody:
@@ -1629,7 +1629,7 @@ paths:
             type: string
             enum:
               - symptom
-              - syndrome
+              - pattern
               - herb
               - formula
         - name: keyword
@@ -1710,7 +1710,7 @@ paths:
       tags:
         - 统计查询
       summary: 数据统计
-      description: 按 type 批量统计：symptom 症状频次 / syndrome 证型分布 / prescription 方剂中药频次。上层控制 recordIds 数量上限，接口内部不分页
+      description: 按 type 批量统计：disease 疾病频次 / pattern 证候分布 / symptom 症状频次 / prescription 方剂中药频次。上层控制 recordIds 数量上限，接口内部不分页
       requestBody:
         required: true
         content:
@@ -1792,7 +1792,7 @@ paths:
               dateRange:
                 - '2024-01-01'
                 - '2024-12-31'
-              syndrome: ''
+              pattern: ''
               status: ''
               page: 1
               pageSize: 20

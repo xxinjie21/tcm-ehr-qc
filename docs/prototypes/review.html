@@ -1,0 +1,340 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人工复核 - 中医电子病历质控与标准化系统</title>
+<style>
+:root{
+  --ink:#2f4639;
+  --ink-mid:#3d5a4c;
+  --ink-light:#e6ede8;
+  --ochre:#96714f;
+  --ochre-light:#f3ecdf;
+  --paper:#f5f3ed;
+  --line:#ddd7c9;
+  --text:#33322e;
+  --text-sub:#807c72;
+  --danger:#a04335;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:14px/1.65 "Microsoft YaHei","PingFang SC",sans-serif;color:var(--text);background:var(--paper)}
+select,input,textarea,button{font-family:inherit;font-size:13px;color:var(--text)}
+
+/* ===== 顶部导航 ===== */
+.topbar{height:52px;background:var(--ink);display:flex;align-items:center;padding:0 20px;color:#fff}
+.brand{font-size:16px;letter-spacing:1px;margin-right:36px}
+.brand em{font-style:normal;color:#c9b99a;margin-left:8px;font-size:12px}
+.topbar .user{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:#d8dfd9}
+.topbar .avatar{width:28px;height:28px;border-radius:50%;background:#4d6b58;text-align:center;line-height:28px;font-size:12px}
+
+/* ===== 布局 ===== */
+.layout{display:flex;min-height:calc(100vh - 52px)}
+aside{width:176px;background:#fbfaf6;border-right:1px solid var(--line);flex-shrink:0}
+.menu{list-style:none;padding-top:8px}
+.menu a{display:block;padding:11px 18px;color:#55534c;text-decoration:none;font-size:13.5px;border-left:3px solid transparent}
+.menu a:hover{background:var(--ink-light);color:var(--ink)}
+.menu a.on{background:var(--ink-light);color:var(--ink);border-left-color:var(--ink);font-weight:bold}
+.menu .sec{padding:14px 18px 4px;font-size:12px;color:#a09c90}
+
+main{flex:1;padding:16px 20px;min-width:0}
+
+/* ===== 面板通用 ===== */
+.panel{background:#fff;border:1px solid var(--line);border-radius:6px;margin-bottom:14px}
+.panel-hd{padding:10px 16px;border-bottom:1px solid #eee9dd;font-size:14px;font-weight:bold;color:var(--ink);
+          display:flex;align-items:center;gap:10px}
+.panel-hd::before{content:"";width:3px;height:14px;background:var(--ink-mid)}
+.panel-bd{padding:14px 16px}
+.mini-tag{font-size:11.5px;font-weight:normal;color:var(--text-sub);border:1px solid var(--line);border-radius:2px;padding:0 6px;line-height:18px}
+
+/* ===== 任务列表 ===== */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 10px;border-bottom:1px solid #efece3;text-align:left;white-space:nowrap}
+thead th{background:#f4f1e8;color:#55534c;font-weight:bold;font-size:12.5px;border-top:1px solid var(--line)}
+tbody tr:hover td{background:#faf8f1}
+tr.cur td{background:var(--ink-light)}
+.tag{display:inline-block;padding:1px 8px;font-size:12px;border-radius:2px;line-height:20px}
+.tag-doing{color:var(--ink-mid);background:var(--ink-light);border:1px solid #c6d6cb}
+.tag-wait{color:var(--ochre);background:var(--ochre-light);border:1px solid #e0cdb0}
+.rx{color:var(--ink-mid);text-decoration:none;margin-right:8px}
+.rx:hover{text-decoration:underline}
+.pager{display:flex;justify-content:flex-end;align-items:center;gap:6px;padding:11px 4px 2px;font-size:13px;color:var(--text-sub)}
+.pager button{min-width:26px;height:25px;border:1px solid var(--line);background:#fff;border-radius:2px;color:#55534c;cursor:pointer}
+.pager button.cur{background:var(--ink-mid);color:#fff;border-color:var(--ink-mid)}
+.pager button:hover:not(.cur){background:var(--paper)}
+
+/* ===== 任务卡 ===== */
+.task-card{border-left-color:var(--ochre)}
+.task-card,.result-bar{background:#fff;border:1px solid var(--line);border-radius:6px;
+      padding:12px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.task-id{font-size:15px;font-weight:bold}
+.task-card .tag-score{color:var(--ochre);background:var(--ochre-light);border:1px solid #e0cdb0}
+.task-card .tag-issue{color:var(--danger);background:#f6e9e6;border:1px solid #e3c3bb}
+.deadline{margin-left:auto;font-size:13px;color:var(--text-sub)}
+.deadline b{color:var(--danger)}
+
+/* ===== 原文折叠 ===== */
+details.raw-panel{background:#fff;border:1px solid var(--line);border-radius:6px;margin-bottom:14px}
+details.raw-panel summary{padding:10px 16px;font-size:14px;font-weight:bold;color:var(--ink);cursor:pointer;
+      display:flex;align-items:center;gap:10px;list-style:none}
+details.raw-panel summary::-webkit-details-marker{display:none}
+details.raw-panel summary::before{content:"▸";color:var(--ink-mid);transition:transform .15s}
+details.raw-panel[open] summary::before{content:"▾"}
+details.raw-panel summary:hover{background:#faf8f1}
+.raw-bd{padding:4px 20px 16px;border-top:1px solid #eee9dd}
+.raw-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+.raw-item{padding:7px 0;border-bottom:1px dashed #ece8dc;font-size:13px;display:flex}
+.raw-item .k{width:76px;flex-shrink:0;color:var(--text-sub)}
+.raw-item .v{flex:1;color:var(--text)}
+.raw-item.full{grid-column:1 / -1}
+
+/* ===== 对比面板 ===== */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.panel-hd.hd-left{border-bottom-color:#eee4d3;background:#faf6ee;color:var(--ochre)}
+.panel-hd.hd-right{border-bottom-color:#d9e3dc;background:#f2f6f3;color:var(--ink-mid)}
+
+.panel-bd{padding:6px 18px 16px}
+.field-row{display:flex;align-items:flex-start;min-height:44px;padding:8px 0;border-bottom:1px dashed #ece8dc}
+.field-row:last-child{border-bottom:none}
+.flabel{width:78px;flex-shrink:0;font-size:13px;color:var(--text-sub);padding-top:5px}
+.fvalue{flex:1;font-size:13.5px}
+.miss{color:var(--danger);background:#f6e9e6;padding:2px 10px;border-radius:2px;font-size:12.5px;display:inline-block}
+
+input[type=text],textarea{width:100%;height:30px;border:1px solid var(--line);border-radius:2px;padding:0 8px;background:#fdfcf9}
+textarea{height:56px;padding:6px 8px;resize:vertical}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ink-mid)}
+select{width:100%;height:30px;border:1px solid var(--line);border-radius:2px;padding:0 6px;background:#fdfcf9}
+.fixed input,.fixed select{border-color:var(--ink-mid);background:#f2f6f3}
+
+.ded-hd{font-size:12.5px;color:var(--text-sub);margin:13px 0 8px}
+.ded-item{display:flex;justify-content:space-between;background:var(--ochre-light);
+          border-radius:2px;padding:6px 12px;margin-bottom:6px;font-size:12.5px}
+.ded-item .pts{color:var(--danger);font-weight:bold}
+
+/* 术语搜索输入（datalist 自动补全，对接 GET /api/dictionary/terms?keyword=） */
+.term-wrap{position:relative}
+.term-wrap::after{content:"▾";position:absolute;right:9px;top:50%;transform:translateY(-50%);
+                  color:var(--text-sub);pointer-events:none;font-size:11px}
+.term-note{font-size:11.5px;color:#a09c90;margin-top:3px}
+
+/* 预估评分 */
+.preview{margin-top:12px;background:var(--ink-light);border:1px solid #cddcd2;border-radius:2px;
+         padding:9px 14px;font-size:13px;color:var(--ink-mid);display:flex;align-items:center;gap:8px}
+.preview b{font-size:17px}
+.preview .tag-ok{color:var(--ink-mid);background:#fff;border:1px solid var(--ink-mid);border-radius:2px;
+                 padding:1px 8px;font-size:12px}
+
+/* ===== 提交反馈条（ReviewResultVO） ===== */
+.result-bar{border-left:4px solid var(--ink-mid)}
+.result-bar .rk{font-weight:bold;color:var(--ink-mid)}
+.result-bar .rv{color:var(--text-sub);font-size:13px}
+.result-bar b{color:var(--ink-mid)}
+
+/* ===== 底部操作 ===== */
+.footer-bar{background:#fff;border:1px solid var(--line);border-radius:6px;padding:13px 20px;
+            display:flex;align-items:center;justify-content:space-between}
+.tip{font-size:12.5px;color:var(--text-sub)}
+.btns{display:flex;gap:10px}
+.btn{height:32px;padding:0 22px;border:1px solid var(--line);border-radius:2px;background:#fff;color:#55534c;font-size:13.5px;cursor:pointer}
+.btn:hover{background:var(--paper)}
+.btn-primary{background:var(--ink-mid);border-color:var(--ink-mid);color:#fff}
+.btn-primary:hover{background:var(--ink)}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">中医电子病历质控与标准化系统<em>TCM EHR Quality Control & Standardization</em></div>
+  <div class="user"><span class="avatar">审</span>病历审核员 李静</div>
+</header>
+
+<div class="layout">
+  <aside>
+    <ul class="menu">
+      <li class="sec">数据处理</li>
+      <li><a href="#">首页看板</a></li>
+      <li><a href="#">病历数据</a></li>
+      <li><a href="#">结构化解析</a></li>
+      <li><a href="#">质控校验</a></li>
+      <li><a href="#" class="on">人工复核</a></li>
+      <li><a href="#">数据治理</a></li>
+      <li class="sec">系统配置</li>
+      <li><a href="#">术语词典</a></li>
+      <li><a href="#">日志审计</a></li>
+    </ul>
+  </aside>
+
+  <main>
+    <!-- ① 待复核任务列表 GET /api/review/tasks -->
+    <section class="panel">
+      <div class="panel-hd">待复核任务列表 <span class="mini-tag">共 23 条</span></div>
+      <div class="panel-bd" style="padding-top:6px">
+        <table>
+          <thead>
+            <tr>
+              <th>任务ID</th><th>病历ID</th><th>问题类型</th><th>当前评分</th>
+              <th>创建时间</th><th>截止时间</th><th>状态</th><th style="width:90px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="cur">
+              <td>TASK000201</td><td>REC202601120002</td><td>缺失字段；逻辑冲突</td><td>78</td>
+              <td>2026-01-12 10:21</td><td>2026-01-19 18:00</td><td><span class="tag tag-doing">复核中</span></td>
+              <td><a class="rx warn" href="#" style="color:var(--ochre)">当前</a></td>
+            </tr>
+            <tr>
+              <td>TASK000202</td><td>REC202601120009</td><td>评分不达标</td><td>72</td>
+              <td>2026-01-12 11:03</td><td>2026-01-19 18:00</td><td><span class="tag tag-wait">待复核</span></td>
+              <td><a class="rx" href="#">进入复核</a></td>
+            </tr>
+            <tr>
+              <td>TASK000203</td><td>REC202601130015</td><td>逻辑冲突</td><td>80</td>
+              <td>2026-01-13 09:40</td><td>2026-01-20 18:00</td><td><span class="tag tag-wait">待复核</span></td>
+              <td><a class="rx" href="#">进入复核</a></td>
+            </tr>
+            <tr>
+              <td>TASK000204</td><td>REC202601130018</td><td>缺失字段</td><td>74</td>
+              <td>2026-01-13 15:27</td><td>2026-01-20 18:00</td><td><span class="tag tag-wait">待复核</span></td>
+              <td><a class="rx" href="#">进入复核</a></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pager">
+          共 23 条　每页 20 条
+          <button>‹</button><button class="cur">1</button><button>2</button><button>›</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ② 当前任务卡 -->
+    <section class="task-card">
+      <span class="task-id">REC202601120002</span>
+      <span class="tag tag-score">当前评分：78 分</span>
+      <span class="tag tag-issue">缺失字段：脉象</span>
+      <span class="tag tag-issue">逻辑冲突：证候与治法不符</span>
+      <span class="deadline">复核截止：<b>2026-01-19 18:00</b>（剩余 3 天）</span>
+    </section>
+
+    <!-- ③ 病历原文对照 GET /api/records/raw/{recordId} -->
+    <details class="raw-panel" open>
+      <summary>病历原文对照 · REC202601120002（张某　男 / 45岁　内科　2026-01-12 就诊）</summary>
+      <div class="raw-bd raw-grid">
+        <div class="raw-item"><span class="k">登记号</span><span class="v">R202601120002</span></div>
+        <div class="raw-item"><span class="k">门诊号</span><span class="v">O202601120002</span></div>
+        <div class="raw-item full"><span class="k">主诉</span><span class="v">发热、咳嗽3天，加重伴咽痛1天。</span></div>
+        <div class="raw-item full"><span class="k">现病史</span><span class="v">患者3天前受凉后出现发热，体温最高38.6℃，伴咳嗽、咳黄黏痰，咽痛明显，自行服用感冒药效果欠佳。今晨症状加重，遂来就诊。发病以来神清，纳差，夜寐欠安，二便尚调。</span></div>
+        <div class="raw-item"><span class="k">自诉</span><span class="v">发热咳嗽咽痛三天。</span></div>
+        <div class="raw-item"><span class="k">查体</span><span class="v">咽部充血，双侧扁桃体Ⅰ度肿大，双肺呼吸音粗，未闻及干湿性啰音。</span></div>
+        <div class="raw-item"><span class="k">望诊</span><span class="v">面红，形体适中，咽部红肿。</span></div>
+        <div class="raw-item"><span class="k">舌诊</span><span class="v">舌红苔黄。</span></div>
+        <div class="raw-item"><span class="k">脉诊（原文）</span><span class="v">脉来浮数，寸部尤甚。（NLP抽取为空，需补充）</span></div>
+        <div class="raw-item"><span class="k">西医诊断</span><span class="v">急性上呼吸道感染</span></div>
+        <div class="raw-item"><span class="k">辨证结论</span><span class="v">风热犯肺证，治宜辛凉解表、宣肺利咽。</span></div>
+        <div class="raw-item full"><span class="k">草药</span><span class="v">银翘散加减（4付）：金银花15g，连翘10g，薄荷6g，牛蒡子10g，桔梗10g，甘草6g。</span></div>
+        <div class="raw-item"><span class="k">随访</span><span class="v">3天后电话回访。</span></div>
+        <div class="raw-item"><span class="k">治疗效果</span><span class="v">—（未回填）</span></div>
+      </div>
+    </details>
+
+    <!-- ④ 左右对比修正 -->
+    <div class="compare">
+      <!-- 左：原始结构化数据 -->
+      <section class="panel">
+        <div class="panel-hd hd-left">原始结构化数据（NLP 抽取）<span class="mini-tag">只读锁定</span></div>
+        <div class="panel-bd">
+          <div class="field-row"><div class="flabel">证候</div><div class="fvalue">风寒感冒</div></div>
+          <div class="field-row"><div class="flabel">治法</div><div class="fvalue">辛凉解表</div></div>
+          <div class="field-row"><div class="flabel">方剂</div><div class="fvalue">银翘散</div></div>
+          <div class="field-row"><div class="flabel">舌象</div><div class="fvalue">舌红苔黄</div></div>
+          <div class="field-row"><div class="flabel">脉象</div><div class="fvalue"><span class="miss">缺失（抽取为空）</span></div></div>
+          <div class="field-row"><div class="flabel">中药</div><div class="fvalue">金银花 15g，连翘 10g，薄荷 6g</div></div>
+
+          <p class="ded-hd">质控扣分明细（合计 -25 分）</p>
+          <div class="ded-item"><span>核心字段缺失：脉象</span><span class="pts">-15</span></div>
+          <div class="ded-item"><span>诊疗逻辑冲突：证候与治法不符</span><span class="pts">-10</span></div>
+        </div>
+      </section>
+
+      <!-- 右：人工修正（术语下拉数据源 GET /api/dictionary/terms?keyword= ） -->
+      <section class="panel">
+        <form class="panel-bd" onsubmit="return false">
+          <div class="field-row fixed">
+            <div class="flabel">证候 *</div>
+            <div class="fvalue term-wrap">
+              <input type="text" list="dl-pattern" value="风热犯肺证">
+              <datalist id="dl-pattern">
+                <option>风寒感冒</option><option>风热感冒</option><option>风热犯肺证</option>
+                <option>暑湿感冒</option><option>气虚感冒</option><option>阴虚感冒</option>
+              </datalist>
+            </div>
+          </div>
+          <p class="term-note" style="margin:-4px 0 4px 78px">↑ 输入可搜索国标术语（GB/T 15657-2021）</p>
+
+          <div class="field-row fixed">
+            <div class="flabel">治法</div>
+            <div class="fvalue term-wrap">
+              <input type="text" list="dl-treatment" value="辛凉解表">
+              <datalist id="dl-treatment">
+                <option>辛温解表</option><option>辛凉解表</option>
+                <option>清暑祛湿</option><option>益气固表</option><option>宣肺利咽</option>
+              </datalist>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="flabel">方剂</div>
+            <div class="fvalue term-wrap">
+              <input type="text" list="dl-formula" value="银翘散">
+              <datalist id="dl-formula">
+                <option>麻黄汤</option><option>桂枝汤</option><option>银翘散</option>
+                <option>桑菊饮</option><option>新加香薷饮</option>
+              </datalist>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="flabel">舌象</div>
+            <div class="fvalue"><input type="text" value="舌红苔黄"></div>
+          </div>
+
+          <div class="field-row fixed">
+            <div class="flabel">脉象 * 补充</div>
+            <div class="fvalue term-wrap">
+              <input type="text" list="dl-pulse" placeholder="原值为空，请输入或选择" value="脉浮数">
+              <datalist id="dl-pulse">
+                <option>脉浮数</option><option>脉浮紧</option><option>脉沉迟</option>
+                <option>脉滑数</option><option>脉弦细</option>
+              </datalist>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="flabel">复核备注</div>
+            <div class="fvalue"><textarea>已对照原文「脉来浮数」补充脉象；辨证结论为风热犯肺证，证候相应修正。</textarea></div>
+          </div>
+
+          <div class="preview">复核后预估评分：<b>100</b> 分　预计分级：<span class="tag-ok">合格 → 进入数据治理</span></div>
+        </form>
+      </section>
+    </div>
+
+    <!-- ⑤ 上次提交结果反馈 POST /api/records/{id}/review → ReviewResultVO -->
+    <section class="result-bar">
+      <span class="rk">提交反馈：</span>
+      <span class="rv">状态：<b>已完成</b>　·　重新评分：<b>100 分</b>　·　剩余错误：无（errors 为空）　·　该病历已流转至数据治理模块</span>
+      <span class="deadline" style="margin-left:auto">2026-01-16 15:42</span>
+    </section>
+
+    <!-- ⑥ 底部操作 -->
+    <section class="footer-bar">
+      <span class="tip">点击「复核通过」后系统将自动重新执行质控评分与诊疗逻辑校验；correctedData 可为空表示仅裁定不修改</span>
+      <div class="btns">
+        <button class="btn">保存修改</button>
+        <button class="btn btn-primary">✓ 复核通过</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+</body>
+</html>
