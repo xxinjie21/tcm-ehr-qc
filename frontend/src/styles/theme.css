@@ -1,0 +1,95 @@
+/* ============================================================
+   中医电子病历质控与标准化系统 — 全局主题（源自HTML原型定稿）
+   中式配色：墨绿 / 赭石 / 宣纸
+   ============================================================ */
+:root {
+  /* 原型基础变量 */
+  --ink: #2f4639;          /* 墨绿（标题/顶栏） */
+  --ink-mid: #3d5a4c;      /* 墨绿中（主色） */
+  --ink-light: #e6ede8;    /* 墨绿浅（选中底） */
+  --ochre: #96714f;        /* 赭石 */
+  --ochre-light: #f3ecdf;  /* 赭石浅 */
+  --paper: #f5f3ed;        /* 宣纸（页面背景） */
+  --line: #ddd7c9;         /* 边框线 */
+  --text: #33322e;         /* 主文本 */
+  --text-sub: #807c72;     /* 次文本 */
+  --danger: #a04335;       /* 警示红 */
+
+  /* ===== Element Plus 变量覆盖 ===== */
+  --el-color-primary: var(--ink-mid);
+  --el-color-primary-light-3: #6b8a79;
+  --el-color-primary-light-5: #93a99e;
+  --el-color-primary-light-7: #c2cfc7;
+  --el-color-primary-light-8: #d9e3dc;
+  --el-color-primary-light-9: #f2f6f3;
+  --el-color-primary-dark-2: var(--ink);
+  --el-color-success: var(--ink-mid);
+  --el-color-warning: var(--ochre);
+  --el-color-danger: var(--danger);
+  --el-color-error: var(--danger);
+  --el-border-radius-base: 2px;
+  --el-border-radius-small: 2px;
+  --el-border-color: var(--line);
+  --el-border-color-light: #e8e3d6;
+  --el-border-color-lighter: #eee9dd;
+  --el-bg-color-page: var(--paper);
+  --el-fill-color-light: #faf8f1;
+  --el-fill-color-lighter: var(--paper);
+  --el-text-color-primary: var(--text);
+  --el-text-color-regular: #55534c;
+  --el-text-color-secondary: var(--text-sub);
+  --el-font-size-base: 13px;
+}
+
+/* ===== 全局基础 ===== */
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+  background: var(--paper);
+}
+
+/* ===== 表格（原型表格风格） ===== */
+.el-table {
+  --el-table-border-color: #eee9dd;
+  --el-table-header-bg-color: #fbfaf6;
+  --el-table-header-text-color: var(--ink);
+  --el-table-row-hover-bg-color: #f7f5ee;
+  font-size: 13px;
+}
+.el-table th.el-table__cell {
+  font-weight: bold;
+  font-size: 12.5px;
+}
+
+/* ===== 按钮（原型 btn 风格） ===== */
+.el-button {
+  font-size: 13px;
+}
+
+/* ===== 标签（原型 tag 风格：小圆角方标签） ===== */
+.el-tag {
+  border-radius: 2px;
+}
+
+/* ===== 弹窗/消息圆角统一收紧 ===== */
+.el-dialog {
+  border-radius: 6px;
+}
+.el-message {
+  border-radius: 2px;
+}
+
+/* ===== 滚动条 ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9c3b4;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
