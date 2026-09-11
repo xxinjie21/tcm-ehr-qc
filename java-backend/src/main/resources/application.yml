@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: tcm-ehr-governance
+
+  # 数据源（连接 Docker 中的 windows-mysql 容器，宿主机端口3306）
+  datasource:
+    url: jdbc:mysql://localhost:3306/tcm_ehr?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: "123456"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # Redis（连接 Docker 中的 windows-redis 容器，宿主机端口6379）
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: "123456"
+      database: 0
+      timeout: 5000
+
+  # 文件上传限制
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+
+# Elasticsearch（连接 Docker 中的 windows-es 容器，宿主机端口9200）
+elasticsearch:
+  host: localhost
+  port: 9200
+  scheme: http
+  score-threshold: 0.8
+
+# 术语词典目录（JSON文件存储，项目根/data/dictionaries）
+dictionary:
+  dir: D:/ZISHIKU/AI/tcm-ehr-governance/data/dictionaries
+
+# MyBatis
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.tcm.ehr.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+server:
+  port: 8080
+
+# JWT配置
+jwt:
+  secret: tcm-ehr-governance-jwt-secret-key-2026-course-design
+  expire-hours: 24
+
+# Python NLP服务
+nlp:
+  service-url: http://localhost:8001
+  timeout: 30000
+
+logging:
+  level:
+    com.tcm.ehr: debug
+    org.springframework.web: info

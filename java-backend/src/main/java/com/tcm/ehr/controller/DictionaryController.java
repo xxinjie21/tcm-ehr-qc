@@ -1,0 +1,98 @@
+package com.tcm.ehr.controller;
+
+import com.tcm.ehr.common.Result;
+import com.tcm.ehr.dictionary.DictionaryStore;
+import com.tcm.ehr.service.DictionaryService;
+import com.tcm.ehr.util.OperationLogger;
+import com.tcm.ehr.vo.ImportResultVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 术语词典：导入 / 查询 / 版本回滚 / 备份列表
+ * type非法统一返回 HTTP 400 + code=4001（附录B错误码表）
+ */
+@RestController
+@RequestMapping("/api/dictionary")
+@RequiredArgsConstructor
+public class DictionaryController {
+
+    private final DictionaryService dictionaryService;
+    private final OperationLogger operationLogger;
+
+    /** 当前操作人（JwtInterceptor写入request属性） */
+    private String operator() {
+        try {
+            return (String) org.springframework.web.context.request.RequestContextHolder
+                    .currentRequestAttributes()
+                    .getAttribute("currentUsername",
+                            org.springframework.web.context.request.RequestAttributes.SCOPE_REQUEST);
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    /** 上传术语库文件（Excel/CSV），解析校验后写入词典（自动备份旧版本） */
+    @PostMapping("/import")
+    public ResponseEntity<Result<ImportResultVO>> importDict(@RequestParam("file") MultipartFile file,
+                                                             @RequestParam("type") String type) throws IOException {
+        if (!DictionaryStore.TYPES.contains(type)) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+        }
+        try {
+            ImportResultVO vo = dictionaryService.importDictionary(type, file);
+            operationLogger.log(operator(), "导入" + type + "术语库：成功" + vo.getImported()
+                    + "条，失败" + vo.getFailed() + "条");
+            return ResponseEntity.ok(Result.ok(vo));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
+        }
+    }
+
+    /** 只读查询/自动补全（内存词典，标准词+别名关键字模糊匹配） */
+    @GetMapping("/terms")
+    public ResponseEntity<Result<Map<String, Object>>> terms(@RequestParam("type") String type,
+                                                             @RequestParam(value = "keyword", required = false) String keyword)
+            throws IOException {
+        if (!DictionaryStore.TYPES.contains(type)) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+        }
+        return ResponseEntity.ok(Result.ok(Map.of("terms", dictionaryService.searchTerms(type, keyword))));
+    }
+
+    /** 版本回滚：从备份文件恢复指定版本 */
+    @PostMapping("/rollback")
+    public ResponseEntity<Result<Void>> rollback(@RequestBody Map<String, String> body) throws IOException {
+        String type = body.get("type");
+        String backupFilename = body.get("backupFilename");
+        if (!DictionaryStore.TYPES.contains(type)) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+        }
+        if (backupFilename == null || !dictionaryService.backupExists(type, backupFilename)) {
+            return ResponseEntity.badRequest().body(Result.error("备份文件不存在"));
+        }
+        dictionaryService.rollback(type, backupFilename);
+        operationLogger.log(operator(), "回滚" + type + "词典到备份：" + backupFilename);
+        return ResponseEntity.ok(Result.ok(null));
+    }
+
+    /** 备份版本列表 */
+    @GetMapping("/backups")
+    public ResponseEntity<Result<Map<String, Object>>> backups(@RequestParam("type") String type) throws IOException {
+        if (!DictionaryStore.TYPES.contains(type)) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+        }
+        return ResponseEntity.ok(Result.ok(Map.of("backups", dictionaryService.listBackups(type))));
+    }
+}
