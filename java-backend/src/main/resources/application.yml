@@ -39,10 +39,8 @@ elasticsearch:
 dictionary:
   dir: D:/ZISHIKU/AI/tcm-ehr-governance/data/dictionaries
 
-# MyBatis
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.tcm.ehr.entity
+# MyBatis-Plus（实体/Mapper由注解与BaseMapper自动管理）
+mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

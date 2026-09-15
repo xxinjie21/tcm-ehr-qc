@@ -52,7 +52,7 @@ public class GovernanceService {
      */
     public CleanResultVO clean(List<String> recordIds) {
         List<Record> records = (recordIds == null || recordIds.isEmpty())
-                ? recordMapper.findAll() : recordMapper.findByIds(recordIds);
+                ? recordMapper.selectList(null) : recordMapper.selectBatchIds(recordIds);
 
         CleanResultVO vo = new CleanResultVO();
         vo.setTotal(records.size());
@@ -264,7 +264,7 @@ public class GovernanceService {
         final String dateStart = start;
         final String dateEnd = end;
 
-        return recordMapper.findAll().stream()
+        return recordMapper.selectList(null).stream()
                 // 仅质控合格（分级路由：合格→导出；待复核/无效禁止进入数据集）
                 .filter(r -> "合格".equals(r.getGrade()))
                 .filter(r -> dep == null || dep.equals(r.getDepartment()))

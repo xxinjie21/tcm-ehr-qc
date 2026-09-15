@@ -1,12 +1,17 @@
 package com.tcm.ehr.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
+@TableName("review_tasks")
 public class ReviewTask {
 
+    @TableId(value = "id", type = IdType.ASSIGN_UUID)
     private String id;
     private String recordId;
     /** 状态：pending/completed */

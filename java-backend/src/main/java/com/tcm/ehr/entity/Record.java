@@ -1,5 +1,8 @@
 package com.tcm.ehr.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -8,8 +11,10 @@ import java.time.LocalDateTime;
  * 病历表：21个原始字段 + NLP/质控结果
  */
 @Data
+@TableName("records")
 public class Record {
 
+    @TableId(value = "id", type = IdType.ASSIGN_UUID)
     private String id;
     private String registrationNo;
     private String outpatientNo;

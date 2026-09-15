@@ -46,12 +46,12 @@ public class StatsService {
         List<Record> records;
         if (dto.getRecordIds() != null && !dto.getRecordIds().isEmpty()) {
             // 优先：按病历ID圈定（文档契约）
-            records = recordMapper.findByIds(dto.getRecordIds());
+            records = recordMapper.selectBatchIds(dto.getRecordIds());
         } else if (dto.getFilters() != null && !dto.getFilters().isEmpty()) {
             // 次选：按筛选条件（department/dateRange/syndrome，复用查询1字段）
             records = filterByFilters(dto.getFilters());
         } else {
-            records = recordMapper.findAll();
+            records = recordMapper.selectList(null);
         }
 
         StatsVO vo = new StatsVO();
@@ -83,7 +83,7 @@ public class StatsService {
         final String dateStart = start;
         final String dateEnd = end;
 
-        return recordMapper.findAll().stream()
+        return recordMapper.selectList(null).stream()
                 .filter(r -> dep == null || dep.equals(r.getDepartment()))
                 .filter(r -> {
                     if (dateStart == null && dateEnd == null) return true;
