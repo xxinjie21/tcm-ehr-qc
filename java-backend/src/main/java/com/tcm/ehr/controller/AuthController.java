@@ -27,9 +27,9 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * 用户注册：用户名/密码/角色（管理员、审核员）。
+     * 用户注册：仅可注册为「审核员」（不开放管理员注册，管理员由数据库预置）。
      * 成功：HTTP 200 + code=200；
-     * 参数非法（用户名/密码/角色为空或角色非法）：HTTP 400 + code=400；
+     * 参数非法（用户名/密码为空）：HTTP 400 + code=400；
      * 用户名已存在：HTTP 400 + code=400。
      */
     @PostMapping("/register")
@@ -44,9 +44,10 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Result.error(400, msg));
         }
         try {
-            authService.register(dto.getUsername(), dto.getPassword(), dto.getRole());
+            // 角色由后端固定为审核员，忽略请求体中可能伪造的 role
+            authService.register(dto.getUsername(), dto.getPassword());
             return ResponseEntity.ok(Result.ok("注册成功",
-                    Map.of("username", dto.getUsername(), "role", dto.getRole())));
+                    Map.of("username", dto.getUsername(), "role", "审核员")));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Result.error(400, e.getMessage()));
         }

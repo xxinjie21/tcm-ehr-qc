@@ -19,6 +19,10 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
+    /** 角色常量：管理员 / 审核员 */
+    private static final String ROLE_ADMIN = "管理员";
+    private static final String ROLE_AUDITOR = "审核员";
+
     /**
      * 管理员菜单（功能设计文档第五章 + 登录响应示例，共 8 项，名称与前端路由一致）
      */
@@ -30,18 +34,19 @@ public class AuthService {
     private static final List<String> AUDITOR_MENUS = List.of("首页看板", "人工复核");
 
     /**
-     * 用户注册：用户名查重、密码 BCrypt 加密入库，角色由用户指定（管理员/审核员，RegisterDTO 已校验）。
+     * 用户注册：仅可注册为「审核员」，不允许自助注册管理员（管理员由数据库预置）。
+     * 用户名查重、密码 BCrypt 加密入库。
      *
      * @throws IllegalArgumentException 用户名已存在
      */
-    public void register(String username, String password, String role) {
+    public void register(String username, String password) {
         if (userMapper.findByUsername(username) != null) {
             throw new IllegalArgumentException("用户名已存在");
         }
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
-        user.setRole(role);
+        user.setRole(ROLE_AUDITOR);
         userMapper.insert(user);
     }
 
@@ -54,7 +59,7 @@ public class AuthService {
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole()));
         vo.setRole(user.getRole());
-        vo.setMenus("管理员".equals(user.getRole()) ? ADMIN_MENUS : AUDITOR_MENUS);
+        vo.setMenus(ROLE_ADMIN.equals(user.getRole()) ? ADMIN_MENUS : AUDITOR_MENUS);
         return vo;
     }
 }

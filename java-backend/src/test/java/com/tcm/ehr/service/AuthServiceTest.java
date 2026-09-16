@@ -118,7 +118,7 @@ class AuthServiceTest {
             return 1;
         }).when(userMapper).insert(Mockito.any(User.class));
 
-        authService.register("newuser", "123456", "审核员");
+        authService.register("newuser", "123456");
 
         User saved = savedRef.get();
         assertNotNull(saved);
@@ -135,7 +135,7 @@ class AuthServiceTest {
                 .thenReturn(user("admin-0001", "admin", "管理员"));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.register("admin", "123456", "管理员"));
+                () -> authService.register("admin", "123456"));
         assertEquals("用户名已存在", ex.getMessage());
         // 查重失败时不应插入任何数据
         Mockito.verify(userMapper, Mockito.never()).insert(Mockito.any(User.class));
