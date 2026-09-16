@@ -884,6 +884,61 @@ components:
           type: integer
           description: 无效数（隔离归档）
 paths:
+  /api/auth/register:
+    post:
+      tags:
+        - 认证
+      summary: 用户注册
+      description: 注册账号角色固定为「审核员」，不开放管理员注册（请求体传入的 role 会被忽略）；管理员账号由 database-init.sql 预置
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+            example:
+              username: newuser
+              password: '123456'
+      responses:
+        '200':
+          description: 注册成功（角色固定为审核员）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                    example: 注册成功
+                  data:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                      role:
+                        type: string
+                        example: 审核员
+        '400':
+          description: 参数非法或用户名已存在（code=400）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /api/auth/login:
     post:
       tags:
