@@ -561,6 +561,19 @@ components:
           type: integer
         total:
           type: integer
+        normalized:
+          type: integer
+          description: 术语归一命中总数
+        normByLevel:
+          type: object
+          description: 术语归一三级命中分布（精确/包含/模糊）
+          properties:
+            exact:
+              type: integer
+            contain:
+              type: integer
+            fuzzy:
+              type: integer
     ExportDatasetDTO:
       type: object
       description: 数据集导出请求（入参）
@@ -1374,6 +1387,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/governance/stats:
+    get:
+      tags:
+        - 清洗与导出
+      summary: 治理状态统计
+      description: 返回质控合格病历数量、待治理、已治理统计（清洗与导出页顶部状态行）
+      responses:
+        '200':
+          description: 治理状态统计
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      qualified:
+                        type: integer
+                      pendingGovern:
+                        type: integer
+                      governedCount:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/qc/check:
     post:
       tags:
@@ -1628,6 +1671,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/qc/score/batch:
+    post:
+      tags:
+        - 质控
+      summary: 全库质控评分重算
+      description: 对全库病历批量重算质控评分与分级（覆盖现有分数），生成AI预检单（records.qc_results），并对待复核病历自动创建复核任务。管理员操作
+      responses:
+        '200':
+          description: 重算完成，返回分级分布
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      qualified:
+                        type: integer
+                      pendingReview:
+                        type: integer
+                      invalid:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/qc/agreement:
+    get:
+      tags:
+        - 质控
+      summary: AI与人工复核一致性评估（后续实现）
+      description: 统计AI初评分级与人工复核分级的吻合率与Cohen's Kappa，输出三级混淆矩阵。【线C科研评估，暂未实现，后续开发】
+      responses:
+        '200':
+          description: 一致性评估结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      sampleCount:
+                        type: integer
+                      overallAgreement:
+                        type: number
+                        format: double
+                      kappa:
+                        type: number
+                        format: double
+                      confusionMatrix:
+                        type: object
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
