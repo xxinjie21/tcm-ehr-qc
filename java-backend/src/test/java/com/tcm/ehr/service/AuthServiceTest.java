@@ -8,10 +8,13 @@ import com.tcm.ehr.vo.LoginVO;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -103,5 +106,38 @@ class AuthServiceTest {
         // 与密码错误完全相同的异常，避免泄露账号是否存在
         assertThrows(BadCredentialsException.class,
                 () -> authService.login("ghost", "123456"));
+    }
+
+    @Test
+    void registerInsertsEncryptedPassword() {
+        when(userMapper.findByUsername("newuser")).thenReturn(null);
+
+        AtomicReference<User> savedRef = new AtomicReference<>();
+        Mockito.doAnswer(inv -> {
+            savedRef.set(inv.getArgument(0, User.class));
+            return 1;
+        }).when(userMapper).insert(Mockito.any(User.class));
+
+        authService.register("newuser", "123456", "审核员");
+
+        User saved = savedRef.get();
+        assertNotNull(saved);
+        assertEquals("newuser", saved.getUsername());
+        assertEquals("审核员", saved.getRole());
+        // 密码必须 BCrypt 加密存储，且与明文匹配
+        assertFalse(saved.getPassword().equals("123456"));
+        assertTrue(new BCryptPasswordEncoder().matches("123456", saved.getPassword()));
+    }
+
+    @Test
+    void registerDuplicateThrows() {
+        when(userMapper.findByUsername("admin"))
+                .thenReturn(user("admin-0001", "admin", "管理员"));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.register("admin", "123456", "管理员"));
+        assertEquals("用户名已存在", ex.getMessage());
+        // 查重失败时不应插入任何数据
+        Mockito.verify(userMapper, Mockito.never()).insert(Mockito.any(User.class));
     }
 }

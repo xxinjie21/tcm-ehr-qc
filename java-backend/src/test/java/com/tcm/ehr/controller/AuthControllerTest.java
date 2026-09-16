@@ -3,6 +3,7 @@ package com.tcm.ehr.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.BadCredentialsException;
 import com.tcm.ehr.dto.LoginDTO;
+import com.tcm.ehr.dto.RegisterDTO;
 import com.tcm.ehr.service.AuthService;
 import com.tcm.ehr.vo.LoginVO;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +41,14 @@ class AuthControllerTest {
         LoginDTO dto = new LoginDTO();
         dto.setUsername(username);
         dto.setPassword(password);
+        return objectMapper.writeValueAsString(dto);
+    }
+
+    private String registerJson(String username, String password, String role) throws Exception {
+        RegisterDTO dto = new RegisterDTO();
+        dto.setUsername(username);
+        dto.setPassword(password);
+        dto.setRole(role);
         return objectMapper.writeValueAsString(dto);
     }
 
@@ -97,5 +106,50 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg").value("密码不能为空"));
+    }
+
+    @Test
+    void registerSuccess() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("newuser", "123456", "审核员")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.msg").value("注册成功"))
+                .andExpect(jsonPath("$.data.username").value("newuser"))
+                .andExpect(jsonPath("$.data.role").value("审核员"));
+    }
+
+    @Test
+    void registerBlankUsernameReturns400() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("", "123456", "审核员")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("用户名不能为空"));
+    }
+
+    @Test
+    void registerInvalidRoleReturns400() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("newuser", "123456", "超级管理员")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("角色只能为管理员或审核员"));
+    }
+
+    @Test
+    void registerDuplicateUsernameReturns400() throws Exception {
+        Mockito.doThrow(new IllegalArgumentException("用户名已存在"))
+                .when(authService).register("admin", "123456", "管理员");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("admin", "123456", "管理员")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("用户名已存在"));
     }
 }
