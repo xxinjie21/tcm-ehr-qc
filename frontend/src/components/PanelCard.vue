@@ -21,6 +21,11 @@ defineProps({
   border: 1px solid var(--line);
   border-radius: 6px;
   margin-bottom: 14px;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.panel:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(47, 70, 57, 0.08);
 }
 .panel-hd {
   padding: 10px 16px;

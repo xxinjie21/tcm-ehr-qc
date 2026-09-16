@@ -3,10 +3,10 @@
     <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilter" />
 
     <div class="stats">
-      <StatCard label="病历总数" :value="overview.totalRecords" />
-      <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" />
-      <StatCard label="待复核" :value="overview.pendingReviewCount" tone="ochre" />
-      <StatCard label="无效数据" :value="overview.invalidCount" tone="red" />
+      <StatCard label="病历总数" :value="overview.totalRecords" icon="record" />
+      <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate" />
+      <StatCard label="待复核" :value="overview.pendingReviewCount" tone="ochre" icon="pending" />
+      <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid" />
     </div>
 
     <div class="grid-2 mb">
@@ -18,18 +18,23 @@
       </PanelCard>
     </div>
 
-    <div class="grid-2 mb">
+    <div class="grid-2">
       <PanelCard title="证候分布">
         <div ref="pieRef" class="pie" />
       </PanelCard>
-      <PanelCard title="方剂频次 TOP5">
-        <BarList :items="formulaStats.map((s) => ({ name: s.formula, value: s.count }))" color="var(--ochre)" />
+      <PanelCard title="方剂 / 中药频次 TOP5">
+        <div class="dual">
+          <div class="dual-col">
+            <div class="dual-hd">方剂</div>
+            <BarList :items="formulaStats.map((s) => ({ name: s.formula, value: s.count }))" color="var(--ochre)" />
+          </div>
+          <div class="dual-col">
+            <div class="dual-hd">中药</div>
+            <BarList :items="herbStats.map((s) => ({ name: s.herb, value: s.count }))" />
+          </div>
+        </div>
       </PanelCard>
     </div>
-
-    <PanelCard title="中药频次 TOP5">
-      <BarList :items="herbStats.map((s) => ({ name: s.herb, value: s.count }))" />
-    </PanelCard>
   </div>
 </template>
 
@@ -157,5 +162,15 @@ onBeforeUnmount(() => {
 .pie {
   width: 100%;
   height: 260px;
+}
+.dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.dual-hd {
+  font-size: 12.5px;
+  color: var(--text-sub);
+  margin-bottom: 8px;
 }
 </style>
