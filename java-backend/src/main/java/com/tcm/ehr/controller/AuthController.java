@@ -28,8 +28,9 @@ public class AuthController {
      */
     @PostMapping("/register")
     public Result<Map<String, String>> register(@Valid @RequestBody RegisterDTO dto) {
-        authService.register(dto.getUsername(), dto.getPassword(), dto.getRole());
-        return Result.ok("注册成功", Map.of("username", dto.getUsername(), "role", dto.getRole()));
+        // 注册角色后端固定为「审核员」，不接受前端传入的角色（伪传 role 也会被忽略）
+        authService.register(dto.getUsername(), dto.getPassword());
+        return Result.ok("注册成功", Map.of("username", dto.getUsername(), "role", "审核员"));
     }
 
     /**

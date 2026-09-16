@@ -23,6 +23,10 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
+    /** 角色常量：管理员 / 审核员 */
+    private static final String ROLE_ADMIN = "管理员";
+    private static final String ROLE_AUDITOR = "审核员";
+
     /**
      * 管理员菜单（功能设计文档第五章 + 登录响应示例，共 8 项，名称与前端路由一致）
      */
@@ -34,14 +38,15 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private static final List<String> AUDITOR_MENUS = List.of("首页看板", "人工复核");
 
     @Override
-    public void register(String username, String password, String role) {
+    public void register(String username, String password) {
         if (baseMapper.findByUsername(username) != null) {
             throw new IllegalArgumentException("用户名已存在");
         }
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
-        user.setRole(role);
+        // 安全约束：注册账号角色固定为审核员，不开放管理员注册
+        user.setRole(ROLE_AUDITOR);
         baseMapper.insert(user);
     }
 
@@ -55,7 +60,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole()));
         vo.setRole(user.getRole());
-        vo.setMenus("管理员".equals(user.getRole()) ? ADMIN_MENUS : AUDITOR_MENUS);
+        vo.setMenus(ROLE_ADMIN.equals(user.getRole()) ? ADMIN_MENUS : AUDITOR_MENUS);
         return vo;
     }
 }

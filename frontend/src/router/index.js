@@ -3,6 +3,7 @@ import { useUserStore } from '@/store/user'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
+  { path: '/register', name: 'Register', component: () => import('@/views/Register.vue') },
   {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
@@ -27,7 +28,7 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const userStore = useUserStore()
-  if (to.path !== '/login' && !userStore.token) {
+  if (to.path !== '/login' && to.path !== '/register' && !userStore.token) {
     return '/login'
   }
 })

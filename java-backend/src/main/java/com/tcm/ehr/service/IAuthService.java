@@ -10,11 +10,12 @@ import com.tcm.ehr.domain.vo.LoginVO;
 public interface IAuthService extends IService<User> {
 
     /**
-     * 用户注册：用户名查重、密码 BCrypt 加密入库
+     * 用户注册：仅可注册为「审核员」，不允许自助注册管理员（管理员由数据库预置）；
+     * 用户名查重、密码 BCrypt 加密入库
      *
      * @throws IllegalArgumentException 用户名已存在
      */
-    void register(String username, String password, String role);
+    void register(String username, String password);
 
     /**
      * 用户登录：校验账号密码，返回 JWT、角色与按角色分配的菜单

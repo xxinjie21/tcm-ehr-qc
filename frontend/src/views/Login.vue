@@ -25,6 +25,9 @@
         >
           登 录
         </el-button>
+        <div class="to-register">
+          还没有账号？<router-link to="/register">立即注册</router-link>
+        </div>
       </el-form>
     </el-card>
   </div>
@@ -81,5 +84,16 @@ const handleLogin = async () => {
   margin-bottom: 24px;
   color: #1f4e3d;
   font-size: 18px;
+}
+.to-register {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #7a786f;
+}
+
+.to-register a {
+  color: #2d6a4f;
+  text-decoration: none;
 }
 </style>
