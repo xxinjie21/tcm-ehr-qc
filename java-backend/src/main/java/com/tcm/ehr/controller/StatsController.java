@@ -1,10 +1,10 @@
 package com.tcm.ehr.controller;
 
-import com.tcm.ehr.common.Result;
-import com.tcm.ehr.dto.StatsDTO;
-import com.tcm.ehr.service.StatsService;
-import com.tcm.ehr.vo.OverviewVO;
-import com.tcm.ehr.vo.StatsVO;
+import com.tcm.ehr.common.domain.Result;
+import com.tcm.ehr.domain.dto.StatsDTO;
+import com.tcm.ehr.service.IStatsService;
+import com.tcm.ehr.domain.vo.OverviewVO;
+import com.tcm.ehr.domain.vo.StatsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class StatsController {
 
-    private final StatsService statsService;
+    private final IStatsService statsService;
 
     /** 首页四个指标卡一次获取 */
     @GetMapping("/overview")
@@ -28,13 +28,9 @@ public class StatsController {
         return Result.ok(statsService.overview());
     }
 
-    /** 按type统计（recordIds圈定范围，空=全量） */
+    /** 按type统计（recordIds圈定范围，空=全量）；type非法由 GlobalExceptionHandler 统一返回 400 */
     @PostMapping
     public Result<StatsVO> stats(@RequestBody StatsDTO dto) {
-        try {
-            return Result.ok(statsService.stats(dto));
-        } catch (IllegalArgumentException e) {
-            return Result.error(e.getMessage());
-        }
+        return Result.ok(statsService.stats(dto));
     }
 }

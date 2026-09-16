@@ -1,13 +1,13 @@
 package com.tcm.ehr.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tcm.ehr.common.Result;
-import com.tcm.ehr.dto.CleanDTO;
-import com.tcm.ehr.dto.ExportDTO;
-import com.tcm.ehr.dto.NormalizeDTO;
-import com.tcm.ehr.service.GovernanceService;
-import com.tcm.ehr.util.OperationLogger;
-import com.tcm.ehr.vo.CleanResultVO;
+import com.tcm.ehr.common.domain.Result;
+import com.tcm.ehr.domain.dto.CleanDTO;
+import com.tcm.ehr.domain.dto.ExportDTO;
+import com.tcm.ehr.domain.dto.NormalizeDTO;
+import com.tcm.ehr.service.IGovernanceService;
+import com.tcm.ehr.common.utils.OperationLogger;
+import com.tcm.ehr.domain.vo.CleanResultVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -32,7 +32,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GovernanceController {
 
-    private final GovernanceService governanceService;
+    private final IGovernanceService governanceService;
     private final OperationLogger operationLogger;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -74,7 +74,7 @@ public class GovernanceController {
      */
     @PostMapping("/api/export/dataset")
     public ResponseEntity<byte[]> export(@RequestBody ExportDTO dto) throws IOException {
-        GovernanceService.ExportedFile file = governanceService.export(dto);
+        IGovernanceService.ExportedFile file = governanceService.export(dto);
         if (file == null) {
             operationLogger.log(operator(), "导出标准数据集被拒（筛选范围内无合格病历）");
             Result<Void> err = Result.error(2001, "质控未通过，禁止导出数据集（筛选范围内无合格病历）");

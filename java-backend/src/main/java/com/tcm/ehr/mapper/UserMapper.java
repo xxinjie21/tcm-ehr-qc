@@ -1,7 +1,7 @@
 package com.tcm.ehr.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.tcm.ehr.entity.User;
+import com.tcm.ehr.domain.po.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;

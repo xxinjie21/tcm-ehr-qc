@@ -1,11 +1,12 @@
 package com.tcm.ehr.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tcm.ehr.common.BadCredentialsException;
-import com.tcm.ehr.dto.LoginDTO;
-import com.tcm.ehr.dto.RegisterDTO;
-import com.tcm.ehr.service.AuthService;
-import com.tcm.ehr.vo.LoginVO;
+import com.tcm.ehr.common.exception.BadCredentialsException;
+import com.tcm.ehr.common.exception.GlobalExceptionHandler;
+import com.tcm.ehr.domain.dto.LoginDTO;
+import com.tcm.ehr.domain.dto.RegisterDTO;
+import com.tcm.ehr.domain.vo.LoginVO;
+import com.tcm.ehr.service.IAuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -28,13 +29,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerTest {
 
     private MockMvc mockMvc;
-    private AuthService authService;
+    private IAuthService authService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        authService = Mockito.mock(AuthService.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService)).build();
+        authService = Mockito.mock(IAuthService.class);
+        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService))
+                // 注册全局异常处理器：异常统一返回 Result（401/400）
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     private String json(String username, String password) throws Exception {

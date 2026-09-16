@@ -1,10 +1,10 @@
 package com.tcm.ehr.controller;
 
-import com.tcm.ehr.common.Result;
-import com.tcm.ehr.dictionary.DictionaryStore;
-import com.tcm.ehr.service.DictionaryService;
-import com.tcm.ehr.util.OperationLogger;
-import com.tcm.ehr.vo.ImportResultVO;
+import com.tcm.ehr.common.domain.Result;
+import com.tcm.ehr.common.utils.DictionaryStore;
+import com.tcm.ehr.service.IDictionaryService;
+import com.tcm.ehr.common.utils.OperationLogger;
+import com.tcm.ehr.domain.vo.ImportResultVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +28,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DictionaryController {
 
-    private final DictionaryService dictionaryService;
+    private final IDictionaryService dictionaryService;
     private final OperationLogger operationLogger;
 
     /** 当前操作人（JwtInterceptor写入request属性） */
@@ -50,14 +50,11 @@ public class DictionaryController {
         if (!DictionaryStore.TYPES.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
-        try {
-            ImportResultVO vo = dictionaryService.importDictionary(type, file);
-            operationLogger.log(operator(), "导入" + type + "术语库：成功" + vo.getImported()
-                    + "条，失败" + vo.getFailed() + "条");
-            return ResponseEntity.ok(Result.ok(vo));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
-        }
+        // 文件格式不支持等 IllegalArgumentException 由 GlobalExceptionHandler 统一返回 400
+        ImportResultVO vo = dictionaryService.importDictionary(type, file);
+        operationLogger.log(operator(), "导入" + type + "术语库：成功" + vo.getImported()
+                + "条，失败" + vo.getFailed() + "条");
+        return ResponseEntity.ok(Result.ok(vo));
     }
 
     /** 只读查询/自动补全（内存词典，标准词+别名关键字模糊匹配） */

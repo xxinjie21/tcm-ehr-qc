@@ -1,10 +1,11 @@
 package com.tcm.ehr.service;
 
-import com.tcm.ehr.common.BadCredentialsException;
-import com.tcm.ehr.entity.User;
+import com.tcm.ehr.common.exception.BadCredentialsException;
+import com.tcm.ehr.common.utils.JwtUtil;
+import com.tcm.ehr.domain.po.User;
+import com.tcm.ehr.domain.vo.LoginVO;
 import com.tcm.ehr.mapper.UserMapper;
-import com.tcm.ehr.util.JwtUtil;
-import com.tcm.ehr.vo.LoginVO;
+import com.tcm.ehr.service.impl.AuthServiceImpl;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class AuthServiceTest {
 
     private UserMapper userMapper;
     private JwtUtil jwtUtil;
-    private AuthService authService;
+    private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
@@ -44,7 +45,9 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(jwtUtil, "secret",
                 "tcm-ehr-governance-jwt-secret-key-2026-course-design");
         ReflectionTestUtils.setField(jwtUtil, "expireHours", 24L);
-        authService = new AuthService(userMapper, jwtUtil);
+        authService = new AuthServiceImpl(jwtUtil);
+        // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置
+        ReflectionTestUtils.setField(authService, "baseMapper", userMapper);
     }
 
     private User user(String id, String username, String role) {
