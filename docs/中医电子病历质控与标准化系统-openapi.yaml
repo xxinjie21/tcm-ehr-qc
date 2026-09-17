@@ -1711,8 +1711,8 @@ paths:
     get:
       tags:
         - 质控
-      summary: AI与人工复核一致性评估（后续实现）
-      description: 统计AI初评分级与人工复核分级的吻合率与Cohen's Kappa，输出三级混淆矩阵。【线C科研评估，暂未实现，后续开发】
+      summary: 管理员质控评估报告（一致性 Kappa）
+      description: 规则初检分级 vs 人工复核的吻合率 + Cohen's Kappa + 三级混淆矩阵；响应带 details（原始标注明细前 50 条）。【管理员使用；小样本 20、置信区间弱、仅作演示；LLM 预检意见不参与计算】
       responses:
         '200':
           description: 一致性评估结果
