@@ -1726,6 +1726,7 @@ paths:
                     example: 200
                   data:
                     type: object
+                    description: 质控评估数据——样本为演示小样本（20），置信区间弱，非正式临床验证结论，仅作平台自评估与演示
                     properties:
                       sampleCount:
                         type: integer
