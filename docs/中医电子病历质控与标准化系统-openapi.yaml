@@ -1607,7 +1607,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 数据清洗规整
-      description: 批量清洗病历数据，完成去重、修复、规整、脏数据隔离
+      description: 批量清洗病历数据，完成去重、修复、规整、脏数据隔离【长耗时同步接口（3 万上限）；前端放宽超时、勿重复提交】
       requestBody:
         required: true
         content:
@@ -1680,7 +1680,7 @@ paths:
       tags:
         - 质控
       summary: 全库质控评分重算
-      description: 对全库病历批量重算质控评分与分级（覆盖现有分数），生成AI预检单（records.qc_results），并对待复核病历自动创建复核任务。管理员操作
+      description: 对全库病历批量重算质控评分与分级（覆盖现有分数），生成AI预检单（records.qc_results），并对待复核病历自动创建复核任务。管理员操作。【长耗时同步接口（3 万上限 ≤3min）：前端放宽超时、勿重复提交；失败明细仅返回前 50 条示例，完整失败数见 failed】
       responses:
         '200':
           description: 重算完成，返回分级分布
@@ -1703,6 +1703,20 @@ paths:
                         type: integer
                       invalid:
                         type: integer
+                      failed:
+                        type: integer
+                        description: 失败条数
+                      failureSamples:
+                        type: array
+                        maxItems: 50
+                        description: 失败明细示例（前 50 条），完整失败清单不入库
+                        items:
+                          type: object
+                          properties:
+                            recordId:
+                              type: integer
+                            reason:
+                              type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
