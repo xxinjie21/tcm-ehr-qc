@@ -676,7 +676,7 @@ components:
     # ========== 复核 DTO / VO ==========
     ReviewTaskVO:
       type: object
-      description: 复核任务（出参）
+      description: 复核任务（出参；超时仅前端高亮提醒，系统不自动变更任务状态）
       properties:
         taskId:
           type: string
