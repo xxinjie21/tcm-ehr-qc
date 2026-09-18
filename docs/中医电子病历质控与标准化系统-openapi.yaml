@@ -1707,41 +1707,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
-  /api/qc/agreement:
-    get:
-      tags:
-        - 质控
-      summary: 管理员质控评估报告（一致性 Kappa）
-      description: 规则初检分级 vs 人工复核的吻合率 + Cohen's Kappa + 三级混淆矩阵；响应带 details（原始标注明细前 50 条）。【管理员使用；小样本 20、置信区间弱、仅作演示；LLM 预检意见不参与计算】
-      responses:
-        '200':
-          description: 一致性评估结果
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 200
-                  data:
-                    type: object
-                    description: 质控评估数据——样本为演示小样本（20），置信区间弱，非正式临床验证结论，仅作平台自评估与演示
-                    properties:
-                      sampleCount:
-                        type: integer
-                      overallAgreement:
-                        type: number
-                        format: double
-                      kappa:
-                        type: number
-                        format: double
-                      confusionMatrix:
-                        type: object
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
   /api/dictionary/import:
     post:
       tags:
