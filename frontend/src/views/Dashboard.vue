@@ -2,19 +2,37 @@
   <div>
     <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilter" />
 
-    <!-- 待办快捷条（点击跳转） -->
+    <!-- 待办快捷条（点击跳转）；无权限的卡片置灰并标注，避免点了才被 403 弹回（UX-02） -->
     <section class="todo-bar">
-      <div class="todo" :class="{ warn: overview.pendingReviewCount > 0 }" @click="$router.push('/review')">
+      <div
+        class="todo"
+        :class="{ warn: overview.pendingReviewCount > 0 }"
+        @click="go('/review', '人工复核')"
+      >
         <div class="todo-num">{{ overview.pendingReviewCount }}</div>
         <div class="todo-lbl">待复核 ›</div>
       </div>
-      <div class="todo" :class="{ warn: govern.pendingGovern > 0 }" @click="$router.push('/governance')">
+      <div
+        class="todo"
+        :class="{ warn: govern.pendingGovern > 0, readonly: !canVisit('清洗与导出') }"
+        @click="go('/governance', '清洗与导出')"
+      >
         <div class="todo-num">{{ govern.pendingGovern }}</div>
-        <div class="todo-lbl">待治理 ›</div>
+        <div class="todo-lbl">
+          待治理 <span v-if="canVisit('清洗与导出')">›</span>
+          <span v-else class="todo-lock">仅管理员</span>
+        </div>
       </div>
-      <div class="todo" @click="$router.push('/qc-check')">
+      <div
+        class="todo"
+        :class="{ readonly: !canVisit('质控校验') }"
+        @click="go('/qc-check', '质控校验')"
+      >
         <div class="todo-num">{{ overview.totalRecords }}</div>
-        <div class="todo-lbl">病历总数 ›</div>
+        <div class="todo-lbl">
+          病历总数 <span v-if="canVisit('质控校验')">›</span>
+          <span v-else class="todo-lock">仅管理员</span>
+        </div>
       </div>
     </section>
 
@@ -30,13 +48,13 @@
       <!-- 质控趋势（跨整行） -->
       <PanelCard title="质控趋势（按月）" class="mb">
         <div v-if="extra.trend.length" ref="trendRef" class="chart-tall" />
-        <el-empty v-else-if="!loading" description="暂无趋势数据" :image-size="80" />
+        <EmptyState v-else :failed="failed" :loading="loading" text="暂无趋势数据" @retry="loadAll" />
       </PanelCard>
 
       <div class="grid-2 mb">
         <PanelCard title="评分分布">
           <div v-if="hasScores" ref="distRef" class="chart" />
-          <el-empty v-else-if="!loading" description="暂无评分数据" :image-size="80" />
+          <EmptyState v-else :failed="failed" :loading="loading" text="暂无评分数据" @retry="loadAll" />
         </PanelCard>
         <PanelCard title="科室合格率">
           <div v-if="extra.departmentRates.length" class="rate-list">
@@ -49,7 +67,13 @@
               <span class="rate-sub">/{{ d.total }}</span>
             </div>
           </div>
-          <el-empty v-else-if="!loading" description="暂无科室数据" :image-size="80" />
+          <EmptyState
+            v-else
+            :failed="failed"
+            :loading="loading"
+            text="暂无科室数据"
+            @retry="loadAll"
+          />
         </PanelCard>
       </div>
 
@@ -65,7 +89,7 @@
       <div class="grid-2 mb">
         <PanelCard title="证候分布">
           <div v-if="patternDist.length" ref="pieRef" class="chart" />
-          <el-empty v-else-if="!loading" description="暂无证候分布数据" :image-size="80" />
+          <EmptyState v-else :failed="failed" :loading="loading" text="暂无证候分布数据" @retry="loadAll" />
         </PanelCard>
         <PanelCard title="方剂 / 中药频次 TOP5">
           <div class="dual">
@@ -96,21 +120,46 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import StatsFilter from '@/components/StatsFilter.vue'
 import StatCard from '@/components/StatCard.vue'
 import BarList from '@/components/BarList.vue'
 import PanelCard from '@/components/PanelCard.vue'
-import { getAllStats, getExtraStats } from '@/api/stats'
+import EmptyState from '@/components/EmptyState.vue'
+import { getAllStats, getExtraStats, getDepartments } from '@/api/stats'
 import { governanceStats } from '@/api/governance'
 import { useUserStore } from '@/stores/user'
 
+const router = useRouter()
 const userStore = useUserStore()
-const departments = ['内科', '外科', '儿科', '针灸科']
+
+// 科室选项取自后端，与站内其他筛选器同一数据源（UX-03）
+const departments = ref([])
+const loadDepartments = async () => {
+  try {
+    const res = await getDepartments()
+    departments.value = res.data || []
+  } catch {
+    departments.value = []
+  }
+}
+
+// 待办卡片按登录返回的菜单判断可达性；无权限时置灰并说明原因（UX-02）
+const canVisit = (menuTitle) => (userStore.menus || []).includes(menuTitle)
+const go = (path, menuTitle) => {
+  if (!canVisit(menuTitle)) {
+    ElMessage.info(`「${menuTitle}」仅管理员可访问`)
+    return
+  }
+  router.push(path)
+}
 
 const filter = reactive({ department: '', start: '', end: '' })
 const loading = ref(false)
+// 区分「加载失败」与「确实为空」（UX-05）
+const failed = ref(false)
 
 const overview = ref({
   totalRecords: 0,
@@ -227,6 +276,7 @@ const params = () => ({
 
 const loadAll = async () => {
   loading.value = true
+  failed.value = false
   try {
     const [all, ex] = await Promise.all([getAllStats(params()), getExtraStats(params())])
     overview.value = all.data.overview
@@ -247,7 +297,8 @@ const loadAll = async () => {
       }
     }
   } catch {
-    // 拦截器已提示，这里只保证 loading 收口
+    // 拦截器已提示；标记失败态，空态区据此给出重试入口（UX-05）
+    failed.value = true
   } finally {
     await nextTick()
     renderTrend()
@@ -265,6 +316,7 @@ const resetFilter = () => {
 }
 
 onMounted(() => {
+  loadDepartments()
   loadAll()
   window.addEventListener('resize', handleResize)
 })
@@ -300,6 +352,24 @@ onBeforeUnmount(() => {
 .todo:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(47, 70, 57, 0.1);
+}
+/* 无权限卡片：置灰、取消悬浮反馈，并标注原因（UX-02） */
+.todo.readonly {
+  cursor: default;
+  opacity: 0.72;
+}
+.todo.readonly:hover {
+  transform: none;
+  box-shadow: none;
+}
+.todo-lock {
+  font-size: 11.5px;
+  font-weight: normal;
+  color: var(--text-sub);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0 5px;
+  margin-left: 4px;
 }
 .todo-num {
   font-size: 22px;

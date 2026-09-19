@@ -13,6 +13,9 @@ public interface ILogService {
     /** 分页查询：返回 {list, total} */
     Map<String, Object> page(String action, String keyword, int page, int size);
 
+    /** 库中实际出现过的操作类型（筛选下拉的动态取值，UX-19） */
+    List<String> actions();
+
     /** 导出（按同样筛选，不分页） */
     List<OperationLog> listForExport(String action, String keyword);
 

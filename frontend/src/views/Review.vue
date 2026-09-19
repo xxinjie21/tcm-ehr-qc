@@ -43,11 +43,13 @@
 
     <el-pagination
       v-model:current-page="page"
-      :page-size="pageSize"
+      v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50]"
       :total="total"
-      layout="total, prev, pager, next"
+      layout="total, sizes, prev, pager, next"
       style="margin-top: 12px; justify-content: flex-end"
       @current-change="load"
+      @size-change="handleSizeChange"
     />
   </PanelCard>
 
@@ -147,14 +149,14 @@ const status = ref('待复核')
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 10
+const pageSize = ref(10)
 const loading = ref(false)
 
 const load = async (p) => {
   if (typeof p === 'number') page.value = p
   loading.value = true
   try {
-    const res = await listReviewTasks({ page: page.value, pageSize, status: status.value })
+    const res = await listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value })
     rows.value = res.data?.tasks || []
     total.value = res.data?.total || 0
   } catch {
@@ -165,6 +167,12 @@ const load = async (p) => {
 }
 
 const rowClass = ({ row }) => (row.overdue ? 'row-overdue' : '')
+
+/** 每页条数变化回到第 1 页（UX-24） */
+const handleSizeChange = () => {
+  page.value = 1
+  load()
+}
 
 // ===== 复核弹窗 =====
 const visible = ref(false)

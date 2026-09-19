@@ -18,9 +18,11 @@ request.interceptors.request.use((config) => {
 
 // 401：清登录态（token / role / menus）并回登录页；403：仅提示无权限，不跳转
 function redirectToLogin() {
+  const current = router.currentRoute.value
   useUserStore().logout()
-  if (router.currentRoute.value.path !== '/login') {
-    router.push('/login')
+  if (current.path !== '/login') {
+    // 带上被中断的目标页（含 query），登录成功后由 Login.vue 还原（UX-07）
+    router.push({ path: '/login', query: { redirect: current.fullPath } })
   }
 }
 

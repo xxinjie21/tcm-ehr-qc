@@ -5,6 +5,11 @@
       <span class="gs"><b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
       <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待治理</span>
       <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已治理</span>
+      <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果（UX-21） -->
+      <span v-if="statsFailed" class="gs-fail">
+        统计加载失败{{ statsLoadedAt ? `（上次成功 ${statsLoadedAt}）` : '' }}
+        <el-button link type="primary" size="small" @click="loadStats">重试</el-button>
+      </span>
     </section>
 
     <!-- 当前范围（先选范围 → 后续操作只作用于范围内） -->
@@ -83,21 +88,22 @@
     <PanelCard title="标准数据集导出">
       <div class="export-row">
         <div>
-          <label>导出格式</label>
-          <el-radio-group v-model="format">
+          <label for="ex-format">导出格式</label>
+          <el-radio-group id="ex-format" v-model="format">
             <el-radio-button value="csv">CSV</el-radio-button>
             <el-radio-button value="json">JSON</el-radio-button>
           </el-radio-group>
         </div>
         <div>
-          <label>科室</label>
-          <el-select v-model="filters.department" placeholder="全部科室" clearable style="width: 130px">
-            <el-option label="中医内科" value="中医内科" />
+          <label for="ex-department">科室</label>
+          <el-select id="ex-department" v-model="filters.department" placeholder="全部科室" clearable style="width: 130px">
+            <el-option v-for="d in departments" :key="d" :label="d" :value="d" />
           </el-select>
         </div>
         <div>
-          <label>就诊时间</label>
+          <label for="ex-date">就诊时间</label>
           <el-date-picker
+            id="ex-date"
             v-model="filters.dateRange"
             type="daterange"
             value-format="YYYY-MM-DD"
@@ -107,8 +113,8 @@
           />
         </div>
         <div>
-          <label>证候</label>
-          <TermInput v-model="filters.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
+          <label for="ex-pattern">证候</label>
+          <TermInput id="ex-pattern" v-model="filters.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
         </div>
         <el-button @click="handlePreview" :loading="preview.loading">预览数据集</el-button>
         <el-button type="primary" :loading="exporting" @click="handleExport">导出下载</el-button>
@@ -184,6 +190,7 @@ import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import AiInterpretCard from '@/components/AiInterpretCard.vue'
 import { clean as cleanApi, exportDataset, previewDataset, governanceStats, recomputeQc } from '@/api/governance'
+import { getDepartments } from '@/api/stats'
 import { saveBlob } from '@/utils/download'
 import { useAiStore } from '@/stores/ai'
 
@@ -228,6 +235,10 @@ const fieldOf = (row, key) => {
 
 const stats = reactive({ qualified: 0, pendingGovern: 0, governedCount: 0 })
 const statsLoading = ref(false)
+// 写操作失败后数字会停在旧值，需显式失败态 + 上次成功时间，
+// 否则用户会把这些数字当成最新结果（UX-21）
+const statsFailed = ref(false)
+const statsLoadedAt = ref('')
 
 // 当前范围（批B·4.1）：清洗 / 质控重算 只作用于该范围（filters 见下方声明）
 const scopeText = computed(() => {
@@ -265,12 +276,15 @@ const handleRecompute = async () => {
 
 const loadStats = async () => {
   statsLoading.value = true
+  statsFailed.value = false
   try {
     const res = await governanceStats()
     Object.assign(stats, res.data)
     aiStore.setStats(res.data)
+    statsLoadedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
   } catch {
-    // 拦截器已提示，这里只保证状态收敛
+    // 标记失败态，状态行据此提示「显示的可能不是最新值」（UX-21）
+    statsFailed.value = true
   } finally {
     statsLoading.value = false
   }
@@ -363,7 +377,21 @@ const handleExport = async () => {
   }
 }
 
-onMounted(loadStats)
+// 导出区科室选项取后端实际值，避免写死科室与库中数据对不上（同 UX-03）
+const departments = ref([])
+const loadDepartments = async () => {
+  try {
+    const res = await getDepartments()
+    departments.value = res.data || []
+  } catch {
+    departments.value = []
+  }
+}
+
+onMounted(() => {
+  loadStats()
+  loadDepartments()
+})
 </script>
 
 <style scoped>
@@ -385,6 +413,12 @@ onMounted(loadStats)
   font-size: 22px;
   color: var(--ink);
   margin-right: 6px;
+}
+/* 统计失败提示（UX-21） */
+.gs-fail {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--danger);
 }
 
 /* 当前范围条（批B·4.1） */

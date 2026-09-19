@@ -7,9 +7,17 @@
       </div>
 
       <div class="load-row">
-        <el-input v-model="regNo" placeholder="输入登记号载入病历原文" clearable style="width: 240px" @keyup.enter="loadRecord" />
+        <el-input
+          v-model="regNo"
+          placeholder="输入登记号载入病历原文"
+          clearable
+          style="width: 240px"
+          @keyup.enter="loadRecord"
+        />
         <el-button :loading="loadingRaw" @click="loadRecord">载入病历</el-button>
-        <span v-if="recordId" class="tip">已载入病历：{{ recordId }}</span>
+        <span v-if="recordId" class="tip">
+          已载入病历：<b>{{ loadedLabel }}</b>
+        </span>
       </div>
 
       <div class="split">
@@ -23,7 +31,10 @@
           />
           <div class="actions">
             <el-button type="primary" :loading="extracting" :disabled="!text" @click="runExtract">执行抽取</el-button>
-            <el-button :disabled="!recordId || !result" @click="save">保存到病历</el-button>
+            <!-- 禁用时说明原因，而不是让用户猜（UX-01） -->
+            <el-button :disabled="!canSave" @click="save">保存到病历</el-button>
+            <span v-if="!recordId" class="tip">先载入一份病历才能保存</span>
+            <span v-else-if="!result" class="tip">先执行抽取才能保存</span>
           </div>
         </div>
 
@@ -39,12 +50,26 @@
         </div>
       </div>
     </PanelCard>
+
+    <!-- 同登记号命中多条时由用户选择，不默认取第一条（UX-39） -->
+    <el-dialog v-model="pickVisible" title="登记号命中多份病历" width="min(620px, 92vw)">
+      <div class="tip">该登记号匹配到 {{ matches.length }} 份病历，请选择要载入的一份：</div>
+      <el-table :data="matches" border size="small" max-height="320" style="margin-top: 10px">
+        <el-table-column prop="id" label="病历ID" width="300" show-overflow-tooltip />
+        <el-table-column prop="summary" label="摘要" show-overflow-tooltip />
+        <el-table-column label="操作" width="90" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="pickRecord(row.id)">载入</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import { extractNlp } from '@/api/nlp'
@@ -52,10 +77,17 @@ import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 
 const regNo = ref('')
 const recordId = ref('')
+/** 已载入病历的展示标识（优先登记号），保存确认与成功提示都要回显它（UX-01） */
+const loadedLabel = ref('')
 const text = ref('')
 const result = ref(null)
 const loadingRaw = ref(false)
 const extracting = ref(false)
+
+const matches = ref([])
+const pickVisible = ref(false)
+
+const canSave = computed(() => !!recordId.value && !!result.value)
 
 const PARTS = ['chiefComplaint', 'selfReport', 'presentIllness', 'inspection', 'tongue', 'pulse',
   'physicalExam', 'tcmDiagnosis', 'pattern', 'prescription', 'followUp', 'treatmentEffect']
@@ -66,19 +98,44 @@ const composeText = (raw) => PARTS
   .map((s) => String(s).trim())
   .join('。')
 
+/** 载入一份病历：换病历时必须清空上一次抽取结果，否则会把 A 的结果存进 B（UX-01） */
+const applyRecord = async (id) => {
+  const raw = await getRawRecord(id)
+  recordId.value = id
+  loadedLabel.value = raw.data?.registrationNo || id
+  text.value = composeText(raw.data)
+  result.value = null
+}
+
 const loadRecord = async () => {
   if (!regNo.value) return
   loadingRaw.value = true
   try {
-    const res = await searchRecords({ registrationNo: regNo.value, page: 1, pageSize: 1 })
-    const first = res.data?.records?.[0]
-    if (!first) {
+    const res = await searchRecords({ registrationNo: regNo.value, page: 1, pageSize: 20 })
+    const list = res.data?.records || []
+    if (!list.length) {
       ElMessage.warning('未找到该登记号对应病历')
       return
     }
-    const raw = await getRawRecord(first.id)
-    recordId.value = first.id
-    text.value = composeText(raw.data)
+    if (list.length > 1) {
+      // 后端按登记号模糊匹配，可能同时命中「A01」与「A010」；交给用户选（UX-39）
+      matches.value = list
+      pickVisible.value = true
+      return
+    }
+    await applyRecord(list[0].id)
+  } catch {
+    // 拦截器已提示
+  } finally {
+    loadingRaw.value = false
+  }
+}
+
+const pickRecord = async (id) => {
+  pickVisible.value = false
+  loadingRaw.value = true
+  try {
+    await applyRecord(id)
   } catch {
     // 拦截器已提示
   } finally {
@@ -100,9 +157,19 @@ const runExtract = async () => {
 }
 
 const save = async () => {
+  const label = loadedLabel.value || recordId.value
+  try {
+    await ElMessageBox.confirm(
+      `将本次抽取结果写入病历「${label}」的结构化数据，覆盖原有内容。确认？`,
+      '保存到病历',
+      { type: 'warning', confirmButtonText: '确认保存', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
   try {
     await updateRecord(recordId.value, { structuredData: result.value })
-    ElMessage.success('已保存到病历')
+    ElMessage.success(`已保存到病历「${label}」`)
   } catch {
     // 拦截器已提示
   }
@@ -116,6 +183,6 @@ const save = async () => {
 .pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 8px; }
 .src-note { font-size: 11.5px; color: var(--ink-mid); font-weight: normal; margin-left: 8px; }
 .src-note.warn { color: var(--danger); }
-.actions { margin-top: 12px; display: flex; gap: 10px; }
+.actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 1200px) { .split { grid-template-columns: 1fr; } }
 </style>

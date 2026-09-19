@@ -51,11 +51,13 @@
       </el-table>
       <el-pagination
         v-model:current-page="precheckPage"
-        :page-size="precheckSize"
+        v-model:page-size="precheckSize"
+        :page-sizes="[10, 20, 50]"
         :total="precheckTotal"
-        layout="total, prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         style="margin-top: 12px; justify-content: flex-end"
         @current-change="loadPrecheck"
+        @size-change="handleSizeChange"
       />
     </PanelCard>
 
@@ -223,14 +225,14 @@ const grade = ref('待复核')
 const precheckRows = ref([])
 const precheckTotal = ref(0)
 const precheckPage = ref(1)
-const precheckSize = 10
+const precheckSize = ref(10)
 const precheckLoading = ref(false)
 
 const loadPrecheck = async (p) => {
   if (typeof p === 'number') precheckPage.value = p
   precheckLoading.value = true
   try {
-    const res = await searchRecords({ grade: grade.value, page: precheckPage.value, pageSize: precheckSize })
+    const res = await searchRecords({ grade: grade.value, page: precheckPage.value, pageSize: precheckSize.value })
     precheckRows.value = res.data?.records || []
     precheckTotal.value = res.data?.total || 0
   } catch {
@@ -238,6 +240,11 @@ const loadPrecheck = async (p) => {
   } finally {
     precheckLoading.value = false
   }
+}
+
+const handleSizeChange = () => {
+  precheckPage.value = 1
+  loadPrecheck()
 }
 
 const detailVisible = ref(false)

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,6 +31,16 @@ public class LogController {
                                             @RequestParam(defaultValue = "1") int page,
                                             @RequestParam(defaultValue = "10") int size) {
         return Result.ok(logService.page(action, keyword, page, size));
+    }
+
+    /**
+     * 操作类型选项：取库中实际出现过的值，前端下拉据此渲染，
+     * 避免前端写死清单与后端调用点漂移（UX-19）；【权限：仅管理员】
+     */
+    @RequireRole(roles = {"管理员"})
+    @GetMapping("/api/logs/actions")
+    public Result<List<String>> actions() {
+        return Result.ok(logService.actions());
     }
 
     /** 操作日志导出（CSV 文件流，不套 Result）；【权限：仅管理员】 */

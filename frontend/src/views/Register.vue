@@ -5,7 +5,8 @@
 
     <div class="auth-role-tip">注册账号角色为「审核员」，管理员账号由系统预置。</div>
 
-    <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+    <!-- 回车提交提到表单容器，任一输入框回车都生效（UX-43） -->
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @keyup.enter="handleRegister">
       <el-form-item label="用户名" prop="username">
         <el-input
           v-model="form.username"
@@ -32,7 +33,6 @@
           size="large"
           show-password
           autocomplete="new-password"
-          @keyup.enter="handleRegister"
         />
       </el-form-item>
       <el-button
@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AuthShell from '@/components/AuthShell.vue'
@@ -62,6 +62,16 @@ const formRef = ref(null)
 const loading = ref(false)
 
 const form = reactive({ username: '', password: '', confirmPassword: '' })
+
+// 密码变了，上一次「确认密码」的一致性结论就失效，需要重新判定（UX-25）
+watch(
+  () => form.password,
+  () => {
+    if (form.confirmPassword) {
+      formRef.value?.validateField('confirmPassword').catch(() => {})
+    }
+  }
+)
 
 const validateConfirm = (rule, value, callback) => {
   if (!value) {
@@ -77,11 +87,10 @@ const rules = {
   username: [
     // whitespace: true 让纯空白按「空」处理，与后端 @NotBlank 的判定口径一致
     { required: true, whitespace: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 2, max: 20, message: '用户名长度须为 2~20 个字符', trigger: 'blur' },
     {
-      // 字符集与后端 RegisterDTO.USERNAME_PATTERN 一致（后端那份额外放行空白，为的是让 @NotBlank 报错更准确）
-      pattern: /^[A-Za-z0-9_\u4e00-\u9fa5]+$/,
-      message: '用户名只能包含字母、数字、下划线或中文',
+      // 长度与字符集写在同一条正则里，文案与后端 RegisterDTO 保持一致
+      pattern: /^[A-Za-z0-9_\u4e00-\u9fa5]{2,20}$/,
+      message: '用户名须为 2~20 位字母、数字、下划线或中文',
       trigger: 'blur'
     }
   ],
@@ -100,7 +109,8 @@ const handleRegister = async () => {
     // 仅提交用户名与密码；角色由后端固定为审核员
     await register({ username: form.username, password: form.password })
     ElMessage.success('注册成功，请登录')
-    router.push('/login')
+    // 带上用户名回填登录页，用户只需再输密码（UX-42）
+    router.push({ path: '/login', query: { username: form.username } })
   } catch {
     // 拦截器已提示（如用户名已存在）
   } finally {

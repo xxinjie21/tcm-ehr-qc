@@ -3,7 +3,7 @@
     <PanelCard title="操作日志">
       <div class="filter-row">
         <el-select v-model="query.action" placeholder="操作类型" clearable style="width: 150px">
-          <el-option v-for="a in ACTION_OPTIONS" :key="a" :label="a" :value="a" />
+          <el-option v-for="a in actionOptions" :key="a" :label="a" :value="a" />
         </el-select>
         <el-input
           v-model="query.keyword"
@@ -43,11 +43,13 @@
 
       <el-pagination
         v-model:current-page="query.page"
-        :page-size="query.size"
+        v-model:page-size="query.size"
+        :page-sizes="[10, 20, 50]"
         :total="total"
-        layout="total, prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         style="margin-top: 12px; justify-content: flex-end"
         @current-change="loadLogs"
+        @size-change="handleSizeChange"
       />
     </PanelCard>
   </div>
@@ -56,16 +58,10 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
-import { getLogs, exportLogs } from '@/api/log'
+import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 
-/**
- * 操作类型选项。取值来自后端 OperationLogger 的实际调用点：
- * GovernanceController「数据清洗」「数据集导出」、DictionaryController「词典导入」「词典回滚」「词典转换」、
- * RecordController「病历导入」「病历修改」「病历删除」。展示直接用 action 原文，故这里只列选项、不做翻译。
- */
-const ACTION_OPTIONS = ['数据清洗', '数据集导出', '词典导入', '词典回滚', '词典转换', '病历导入', '病历修改', '病历删除']
-
+/** 图例配色；具体选项由后端返回（UX-19），未匹配到的走默认色 */
 const TAG_TYPES = {
   数据清洗: 'warning',
   数据集导出: 'primary',
@@ -75,6 +71,17 @@ const TAG_TYPES = {
   病历导入: 'success',
   病历修改: 'primary',
   病历删除: 'danger'
+}
+
+const actionOptions = ref([])
+
+const loadActions = async () => {
+  try {
+    const res = await getLogActions()
+    actionOptions.value = res.data || []
+  } catch {
+    actionOptions.value = []
+  }
 }
 
 const query = reactive({ action: '', keyword: '', page: 1, size: 10 })
@@ -104,6 +111,12 @@ const loadLogs = async () => {
   }
 }
 
+/** 每页条数变化回到第 1 页（UX-24） */
+const handleSizeChange = () => {
+  query.page = 1
+  loadLogs()
+}
+
 const handleExport = async () => {
   exporting.value = true
   try {
@@ -116,7 +129,10 @@ const handleExport = async () => {
   }
 }
 
-onMounted(loadLogs)
+onMounted(() => {
+  loadActions()
+  loadLogs()
+})
 </script>
 
 <style scoped>

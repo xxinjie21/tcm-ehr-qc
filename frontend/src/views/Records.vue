@@ -24,11 +24,13 @@
 
       <el-pagination
         v-model:current-page="page"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
         :total="total"
-        layout="total, prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         style="margin-top: 12px; justify-content: flex-end"
         @current-change="handleSearch"
+        @size-change="handleSizeChange"
       />
     </PanelCard>
 
@@ -46,6 +48,7 @@
         :auto-upload="false"
         :limit="20"
         accept=".xlsx,.xls"
+        :on-change="onFileChange"
         :on-exceed="onExceed"
       >
         <div class="up-inner">
@@ -59,6 +62,11 @@
           {{ importing ? '导入中…' : '开始导入' }}
         </el-button>
         <el-button :disabled="!fileList.length || importing" @click="fileList = []">清空</el-button>
+      </div>
+
+      <!-- 失败态独立于上一次结果，避免误读为「本次结果」（UX-22） -->
+      <div v-if="importFailed" class="import-failed">
+        本次导入失败，请根据上方提示排查后重试（上一次结果已清除）。
       </div>
 
       <div v-if="summary" class="result">
@@ -76,11 +84,22 @@
     </PanelCard>
 
     <PanelCard title="单条新增病历">
-      <el-form :model="form" label-width="88px">
+      <el-form ref="createFormRef" :model="form" :rules="FORM_RULES" label-width="88px">
         <div class="form-grid">
-          <el-form-item v-for="f in FIELDS" :key="f.key" :label="f.label" :class="{ wide: f.wide }">
+          <el-form-item v-for="f in FIELDS" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
+            <!-- 性别改枚举下拉：自由文本会写进脏数据（UX-10） -->
+            <el-select
+              v-if="f.key === 'gender'"
+              v-model="form.gender"
+              placeholder="请选择"
+              clearable
+              style="width: 100%"
+            >
+              <el-option label="男" value="男" />
+              <el-option label="女" value="女" />
+            </el-select>
             <el-date-picker
-              v-if="f.key === 'visitTime'"
+              v-else-if="f.key === 'visitTime'"
               v-model="form.visitTime"
               type="datetime"
               value-format="YYYY-MM-DDTHH:mm:ss"
@@ -162,13 +181,13 @@ const query = reactive({ department: '', dateRange: null, pattern: '', grade: ''
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 10
+const pageSize = ref(10)
 const searching = ref(false)
 
 const handleSearch = async () => {
   searching.value = true
   try {
-    const res = await searchRecords({ ...query, page: page.value, pageSize })
+    const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
     rows.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch {
@@ -176,6 +195,12 @@ const handleSearch = async () => {
   } finally {
     searching.value = false
   }
+}
+
+/** 每页条数变化回到第 1 页（UX-24） */
+const handleSizeChange = () => {
+  page.value = 1
+  handleSearch()
 }
 
 const handleReset = () => {
@@ -221,25 +246,50 @@ const handleDelete = async (id) => {
 }
 
 // ===== F·7.1 导入 =====
+const MAX_FILE_MB = 50
 const fileList = ref([])
 const importing = ref(false)
 const summary = ref(null)
+const importFailed = ref(false)
 
 const onExceed = () => ElMessage.warning('单次最多上传 20 个文件')
+
+/** 前端预校验：类型与大小不合法直接剔除，不用等服务端返回（UX-27） */
+const onFileChange = (file, list) => {
+  const raw = file.raw
+  if (!raw) return
+  const name = (raw.name || '').toLowerCase()
+  const reject = (reason) => {
+    ElMessage.error(`「${raw.name}」${reason}`)
+    const i = list.indexOf(file)
+    if (i >= 0) list.splice(i, 1)
+  }
+  if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+    reject('格式不支持，仅支持 .xlsx / .xls')
+    return
+  }
+  if (raw.size > MAX_FILE_MB * 1024 * 1024) {
+    reject(`超过 ${MAX_FILE_MB}MB 上限`)
+  }
+}
 
 const handleImport = async () => {
   const formData = new FormData()
   fileList.value.forEach((f) => {
     if (f.raw) formData.append('files', f.raw)
   })
+  // 发起即清空上一次结果并复位失败态，避免把旧结果误读成本次结果（UX-22）
+  summary.value = null
+  importFailed.value = false
   importing.value = true
   try {
     const res = await importRecords(formData)
     summary.value = res.data.summary
     ElMessage.success(`导入完成：成功 ${res.data.summary.success} 条，失败 ${res.data.summary.failed} 条`)
     fileList.value = []
+    handleSearch()
   } catch {
-    // 拦截器已提示
+    importFailed.value = true
   } finally {
     importing.value = false
   }
@@ -249,26 +299,63 @@ const handleImport = async () => {
 const emptyForm = () => FIELDS.reduce((o, f) => ({ ...o, [f.key]: '' }), {})
 const form = reactive(emptyForm())
 const creating = ref(false)
+const createFormRef = ref(null)
 
-const resetForm = () => Object.assign(form, emptyForm())
+/** 字段级校验（UX-10）：必填口径 + 数值范围 + 枚举 + 长度上限 */
+const FORM_RULES = {
+  registrationNo: [
+    { required: true, message: '登记号不能为空', trigger: 'blur' },
+    { max: 64, message: '登记号不超过 64 字', trigger: 'blur' }
+  ],
+  outpatientNo: [
+    { required: true, message: '门诊号不能为空', trigger: 'blur' },
+    { max: 64, message: '门诊号不超过 64 字', trigger: 'blur' }
+  ],
+  gender: [{ pattern: /^(男|女)$/, message: '性别只能选「男」或「女」', trigger: 'change' }],
+  age: [
+    {
+      validator: (rule, value, cb) => {
+        if (value === '' || value == null) return cb()
+        const n = Number(value)
+        if (!Number.isFinite(n) || n < 0 || n > 150) return cb(new Error('年龄需为 0~150 的数值'))
+        cb()
+      },
+      trigger: 'blur'
+    }
+  ],
+  visitCount: [
+    {
+      validator: (rule, value, cb) => {
+        if (value === '' || value == null) return cb()
+        const n = Number(value)
+        if (!Number.isInteger(n) || n < 1) return cb(new Error('就诊次数需为不小于 1 的整数'))
+        cb()
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+
+const resetForm = () => {
+  Object.assign(form, emptyForm())
+  createFormRef.value?.clearValidate()
+}
 
 const handleCreate = async () => {
-  if (!form.registrationNo) {
-    ElMessage.warning('登记号不能为空')
-    return
-  }
-  if (!form.outpatientNo) {
-    ElMessage.warning('门诊号不能为空')
-    return
-  }
+  const valid = await createFormRef.value.validate().catch(() => false)
+  if (!valid) return
   creating.value = true
   try {
     const payload = { ...form }
     if (!payload.visitTime) delete payload.visitTime
     if (payload.visitCount === '' || payload.visitCount == null) delete payload.visitCount
+    if (payload.age === '' || payload.age == null) delete payload.age
     await createRecord(payload)
-    ElMessage.success('新增成功')
+    ElMessage.success(`新增成功：登记号 ${payload.registrationNo}`)
     resetForm()
+    // 回到第 1 页并刷新，让用户立刻确认已入库（UX-09）
+    page.value = 1
+    await handleSearch()
   } catch {
     // 拦截器已提示
   } finally {
@@ -297,6 +384,15 @@ onMounted(handleSearch)
 .up-sub { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
 .result { margin-top: 18px; border-top: 1px dashed #ece8dc; padding-top: 14px; }
+.import-failed {
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: #fdf6f4;
+  border: 1px solid #e3c3bb;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--danger);
+}
 .result-hd { font-size: 14px; font-weight: bold; color: var(--ink); margin-bottom: 12px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
 .stat-item { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; text-align: center; }

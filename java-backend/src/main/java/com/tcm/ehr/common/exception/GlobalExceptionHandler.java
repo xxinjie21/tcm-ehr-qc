@@ -16,6 +16,10 @@ import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 /**
  * 全局异常处理：统一异常出口，全部返回 Result 错误体
  */
@@ -47,14 +51,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(e.getCode(), e.getMessage()));
     }
 
-    /** 请求体校验失败（@Valid） -> HTTP 400 + code=400 */
+    /**
+     * 请求体校验失败（@Valid） -> HTTP 400 + code=400。
+     *
+     * <p>单条错误直接用校验消息原文（消息本身已含中文字段说明，再拼英文字段名反而冗长）；
+     * <b>多条错误才补字段名并一次全部返回</b>，否则用户无法判断是哪一项出错（UX-06）。</p>
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Result<Void>> handleValidation(MethodArgumentNotValidException e) {
-        String msg = e.getBindingResult().getFieldErrors().stream()
-                .map(FieldError::getDefaultMessage)
-                .findFirst()
-                .orElse("请求参数非法");
+        List<FieldError> errors = e.getBindingResult().getFieldErrors();
+        if (errors.isEmpty()) {
+            return ResponseEntity.badRequest().body(Result.error(400, "请求参数非法"));
+        }
+        if (errors.size() == 1) {
+            return ResponseEntity.badRequest().body(Result.error(400, messageOf(errors.get(0))));
+        }
+        String msg = errors.stream()
+                .map(fe -> fe.getField() + "：" + messageOf(fe))
+                .distinct()
+                .collect(Collectors.joining("；"));
         return ResponseEntity.badRequest().body(Result.error(400, msg));
+    }
+
+    private static String messageOf(FieldError fe) {
+        return fe.getDefaultMessage() == null ? "不合法" : fe.getDefaultMessage();
     }
 
     /**
@@ -109,11 +129,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(404, "接口不存在"));
     }
 
-    /** 兜底异常 -> HTTP 500 + code=500 */
+    /**
+     * 兜底异常 -> HTTP 500 + code=500。
+     *
+     * <p>响应里带一个**追踪码**，与日志中的 trace 一致，用户可直接复制给管理员定位（UX-06）。
+     * 追踪码不含任何业务信息，仅用于关联日志。</p>
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleException(Exception e) {
-        log.error("[全局异常] {}", e.getMessage(), e);
+        String traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        log.error("[全局异常][trace={}] {}", traceId, e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Result.error(500, "系统异常"));
+                .body(Result.error(500, "系统异常，请联系管理员（追踪码 " + traceId + "）"));
     }
 }

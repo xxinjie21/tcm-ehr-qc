@@ -47,11 +47,13 @@
       <div class="import-row">
         <el-upload
           ref="uploadRef"
+          v-model:file-list="dictFileList"
           drag
           :auto-upload="false"
           :limit="1"
           :on-change="onFileChange"
-          :on-remove="() => (importFile = null)"
+          :on-remove="onFileRemove"
+          :on-exceed="onFileExceed"
           accept=".xlsx,.xls,.csv,.json,.pdf"
         >
           <div class="upload-tip">
@@ -163,7 +165,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
 import { getTerms, importDict, convertDict, rollback, getBackups } from '@/api/dictionary'
@@ -190,18 +192,65 @@ const loadTerms = async () => {
 
 watch(activeTab, () => {
   keyword.value = ''
+  // 切换词典类型时清空上一次的导入/转换结果与已选文件，
+  // 否则会把「上一类词典的结果」误读成本次的结果（UX-23）
+  importResult.value = null
+  convert.candidates = []
+  convert.failed = []
+  convertVisible.value = false
+  dictFileList.value = []
+  importFile.value = null
   loadTerms()
+  loadBackups()
 })
 
 const uploadRef = ref(null)
+const dictFileList = ref([])
 const importFile = ref(null)
 const importing = ref(false)
 const importResult = ref(null)
 
 const isPdfFile = computed(() => (importFile.value?.name || '').toLowerCase().endsWith('.pdf'))
 
+const MAX_FILE_MB = 50
+const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.json', '.pdf']
+
+/** 预校验扩展名与大小，不合格直接剔除并说明原因（UX-27） */
+const rejectFile = (raw, reason) => {
+  ElMessage.error(`「${raw.name}」${reason}`)
+  dictFileList.value = []
+  importFile.value = null
+}
+
 const onFileChange = (file) => {
-  importFile.value = file.raw
+  const raw = file.raw
+  if (!raw) return
+  const name = (raw.name || '').toLowerCase()
+  if (!ALLOWED_EXT.some((ext) => name.endsWith(ext))) {
+    rejectFile(raw, `格式不支持，仅支持 ${ALLOWED_EXT.join(' / ')}`)
+    return
+  }
+  if (raw.size > MAX_FILE_MB * 1024 * 1024) {
+    rejectFile(raw, `超过 ${MAX_FILE_MB}MB 上限`)
+    return
+  }
+  importFile.value = raw
+}
+
+const onFileRemove = () => {
+  importFile.value = null
+}
+
+/** limit=1 时再次选择会走这里；主动替换旧文件，避免「换了文件却没反应」（UX-28） */
+const onFileExceed = (files) => {
+  const file = files[0]
+  uploadRef.value?.clearFiles()
+  dictFileList.value = []
+  importFile.value = null
+  if (file) {
+    file.uid = genFileId()
+    uploadRef.value?.handleStart(file)
+  }
 }
 
 /** 统一入口：PDF 先走智能转换出预览，其余格式直接入库 */
@@ -240,12 +289,13 @@ const handleConvert = async () => {
       ElMessage.warning('未转换出可入库的候选，请查看失败明细')
     }
     convertVisible.value = true
-  } catch {
-    // 拦截器已提示，含「转换未启用」的友好文案
-  } finally {
-    converting.value = false
+    // 转换成功、候选已进预览框，这时才清空已选文件（UX-28）
     uploadRef.value?.clearFiles()
     importFile.value = null
+  } catch {
+    // 拦截器已提示，含「转换未启用」的友好文案；失败时保留已选文件以便直接重试
+  } finally {
+    converting.value = false
   }
 }
 

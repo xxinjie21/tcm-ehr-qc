@@ -36,6 +36,11 @@ public class LogServiceImpl implements ILogService {
     }
 
     @Override
+    public List<String> actions() {
+        return operationLogMapper.selectDistinctActions();
+    }
+
+    @Override
     public List<OperationLog> listForExport(String action, String keyword) {
         return operationLogMapper.selectList(buildWrapper(action, keyword));
     }

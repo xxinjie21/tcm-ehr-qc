@@ -147,7 +147,21 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.msg").value("用户名不能为空"));
     }
 
-    /** 长度约束（批A·1.5 U14）：2~20 字符 */
+    /**
+     * 空字符串用户名：只应报一条。
+     * 若长度约束单用 @Size，会与 @NotBlank 同时触发，用户拿到两条重复提示。
+     */
+    @Test
+    void registerEmptyUsernameReportsSingleError() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("", "123456")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("用户名不能为空"));
+    }
+
+    /** 长度约束：2~20 字符（长度写在正则可避免与 @NotBlank 重复报错） */
     @Test
     void registerTooShortUsernameReturns400() throws Exception {
         mockMvc.perform(post("/api/auth/register")
@@ -155,10 +169,10 @@ class AuthControllerTest {
                         .content(registerJson("a", "123456")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("用户名长度须为 2~20 个字符"));
+                .andExpect(jsonPath("$.msg").value("用户名须为 2~20 位字母、数字、下划线或中文"));
     }
 
-    /** 字符集约束（批A·1.5 U14）：仅字母/数字/下划线/中文 */
+    /** 字符集约束：仅字母/数字/下划线/中文 */
     @Test
     void registerIllegalCharUsernameReturns400() throws Exception {
         mockMvc.perform(post("/api/auth/register")
@@ -166,7 +180,7 @@ class AuthControllerTest {
                         .content(registerJson("admin@1", "123456")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("用户名只能包含字母、数字、下划线或中文"));
+                .andExpect(jsonPath("$.msg").value("用户名须为 2~20 位字母、数字、下划线或中文"));
     }
 
     /** 中文用户名合法（字符集含 \u4e00-\u9fa5） */

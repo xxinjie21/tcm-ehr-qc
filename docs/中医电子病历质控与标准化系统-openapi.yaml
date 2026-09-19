@@ -1404,6 +1404,33 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/logs/actions:
+    get:
+      tags:
+        - 日志
+      summary: 操作类型选项
+      description: 【权限：仅管理员】返回 operation_log 中实际出现过的 action 值，供前端筛选下拉动态渲染，避免前端写死清单与后端调用点漂移
+      responses:
+        '200':
+          description: 操作类型列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/logs/export:
     get:
       tags:
