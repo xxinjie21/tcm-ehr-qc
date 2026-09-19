@@ -1,0 +1,40 @@
+package com.tcm.ehr.domain.vo;
+
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 终末质控评分结果（批B·2.3，对应 openapi QcScoreVO 的超集，入 records.qc_results 可溯源）。
+ */
+@Data
+public class ScoreResultVO {
+
+    private int score;
+    /** 合格 / 待复核 / 无效 */
+    private String grade;
+    private List<Deduction> deductions = new ArrayList<>();
+    private List<String> logicConflicts = new ArrayList<>();
+    private boolean serious;
+    private LocalDateTime checkedAt;
+
+    @Data
+    public static class Deduction {
+        private String type;
+        private String item;
+        private int points;
+        private String reason;
+
+        public Deduction() {
+        }
+
+        public Deduction(String type, String item, int points, String reason) {
+            this.type = type;
+            this.item = item;
+            this.points = points;
+            this.reason = reason;
+        }
+    }
+}

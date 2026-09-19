@@ -2,7 +2,9 @@
   <div class="range-filter">
     <div class="rf-item">
       <label>科室</label>
-      <el-input v-model="inner.department" placeholder="如：中医内科" clearable style="width: 130px" />
+      <el-select v-model="inner.department" placeholder="全部科室" clearable style="width: 140px">
+        <el-option v-for="d in departments" :key="d" :label="d" :value="d" />
+      </el-select>
     </div>
     <div class="rf-item">
       <label>就诊时间</label>
@@ -31,8 +33,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import TermInput from '@/components/TermInput.vue'
+import { getDepartments } from '@/api/stats'
 
 const props = defineProps({
   modelValue: {
@@ -45,6 +48,17 @@ const emit = defineEmits(['update:modelValue'])
 const inner = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v)
+})
+
+// U11：科室选项由后端动态获取（records.department DISTINCT）
+const departments = ref([])
+onMounted(async () => {
+  try {
+    const res = await getDepartments()
+    departments.value = res.data || []
+  } catch {
+    departments.value = []
+  }
 })
 </script>
 

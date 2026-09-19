@@ -31,6 +31,11 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     private final ObjectMapper objectMapper;
 
     @Override
+    public List<String> departments() {
+        return baseMapper.selectDepartments();
+    }
+
+    @Override
     public OverviewVO overview() {
         Map<String, Object> row = baseMapper.selectOverview();
         OverviewVO vo = new OverviewVO();

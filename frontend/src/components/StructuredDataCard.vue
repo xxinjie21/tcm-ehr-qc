@@ -62,7 +62,13 @@ const list = (key) => {
 }
 
 const hasAny = computed(() => SECTIONS.some((s) => list(s.key).length > 0))
-const tip = (it) => (it.sourceText && it.sourceText !== it.content ? `原文：${it.sourceText}` : '')
+const LEVEL = { 1: '精确', 2: '包含', 3: '模糊' }
+const tip = (it) => {
+  const parts = []
+  if (it.sourceText && it.sourceText !== it.content) parts.push(`原文：${it.sourceText} → 标准词：${it.content}`)
+  if (it.normLevel) parts.push(`命中层级：${LEVEL[it.normLevel] || it.normLevel}`)
+  return parts.join('；')
+}
 </script>
 
 <style scoped>

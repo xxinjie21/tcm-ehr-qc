@@ -6,6 +6,8 @@ import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.OverviewVO;
 import com.tcm.ehr.domain.vo.StatsVO;
 
+import java.util.List;
+
 /**
  * 统计服务：首页指标卡 + 按type统计（疾病/证候/症状/方剂中药频次）
  */
@@ -16,4 +18,7 @@ public interface IStatsService extends IService<Record> {
 
     /** 按 type 统计（recordIds 圈定范围，空则按 filters 或全量） */
     StatsVO stats(StatsDTO dto);
+
+    /** 科室动态选项（批B·4.1 U11） */
+    List<String> departments();
 }

@@ -23,4 +23,10 @@ public class ReviewTask {
     private LocalDateTime createTime;
     /** 复核截止时间（创建时间+7个工作日） */
     private LocalDateTime deadlineTime;
+    /** 复核人用户名 */
+    private String reviewedBy;
+    /** 复核完成时间 */
+    private LocalDateTime completedTime;
+    /** 作废标记：病历重新评分后不再是待复核则置 1（查询/统计统一过滤 is_obsolete=0） */
+    private Integer isObsolete;
 }

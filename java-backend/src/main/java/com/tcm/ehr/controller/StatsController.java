@@ -28,6 +28,12 @@ public class StatsController {
         return Result.ok(statsService.overview());
     }
 
+    /** 科室动态选项（批B·4.1 U11）；【权限：登录即可】 */
+    @GetMapping("/departments")
+    public Result<java.util.List<String>> departments() {
+        return Result.ok(statsService.departments());
+    }
+
     /** 按type统计（recordIds圈定范围，空=全量）；type非法由 GlobalExceptionHandler 统一返回 400 */
     @PostMapping
     public Result<StatsVO> stats(@RequestBody StatsDTO dto) {

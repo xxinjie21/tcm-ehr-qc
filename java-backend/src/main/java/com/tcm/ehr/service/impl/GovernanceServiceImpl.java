@@ -53,9 +53,15 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * ⑤ 术语归一（兜底） —— 解析环节已首次归一，此处按最新词典对合格病历全库实体补归一
      */
     @Override
-    public CleanResultVO clean(List<String> recordIds) {
-        List<Record> records = (recordIds == null || recordIds.isEmpty())
-                ? baseMapper.selectList(null) : baseMapper.selectBatchIds(recordIds);
+    public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters) {
+        List<Record> records;
+        if (recordIds != null && !recordIds.isEmpty()) {
+            records = baseMapper.selectBatchIds(recordIds);
+        } else {
+            records = baseMapper.selectList(
+                    com.tcm.ehr.common.utils.RecordFilter.build(
+                            com.tcm.ehr.common.utils.RequestUtils.currentRole(), filters));
+        }
 
         CleanResultVO vo = new CleanResultVO();
         vo.setTotal(records.size());
@@ -110,8 +116,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
             // ⑤ 术语归一（兜底）：仅对合格病历执行，归一后标记已治理
             if ("合格".equals(grade) && r.getStructuredData() != null && !r.getStructuredData().isBlank()) {
-                int normalized = normalizeStructuredData(r);
-                vo.setNormalized(vo.getNormalized() + normalized);
+                int[] norm = normalizeStructuredData(r);
+                vo.setNormalized(vo.getNormalized() + norm[0]);
+                vo.getNormByLevel().setExact(vo.getNormByLevel().getExact() + norm[1]);
+                vo.getNormByLevel().setContain(vo.getNormByLevel().getContain() + norm[2]);
+                vo.getNormByLevel().setFuzzy(vo.getNormByLevel().getFuzzy() + norm[3]);
                 baseMapper.markGoverned(r.getId());
             }
         }
@@ -134,16 +143,17 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 对structuredData（附录A结构）全实体做术语归一：content替换为标准词，sourceText保留原文
+     * 对structuredData（附录A结构）全实体做术语归一：content替换为标准词，sourceText保留原文；
+     * 命中实体写入 normLevel(1/2/3) 与 normSource（批B·2.2），供前端溯源与三级分布统计。
      *
-     * @return 实际被替换的实体数
+     * @return {被替换实体数, 精确数, 包含数, 模糊数}
      */
-    private int normalizeStructuredData(Record r) {
+    private int[] normalizeStructuredData(Record r) {
+        int[] stat = {0, 0, 0, 0};
         try {
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
                     new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
-            int[] replaced = {0};
             // Entity数组：content归一（diseases/symptoms/patternList/formulaList有对应词典）
             for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
                     "causeList", "treatmentList", "formulaList")) {
@@ -160,7 +170,13 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     if (result.source() != null && !result.source().isBlank()
                             && !result.standardTerm().equals(String.valueOf(content))) {
                         entity.put("content", result.standardTerm());
-                        replaced[0]++;
+                        entity.put("normLevel", result.level());
+                        entity.put("normSource", result.source());
+                        if (result.code() != null) {
+                            entity.put("normCode", result.code());
+                        }
+                        stat[0]++;
+                        if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
                     }
                 }
             }
@@ -176,7 +192,13 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     if (result.source() != null && !result.source().isBlank()
                             && !result.standardTerm().equals(String.valueOf(name))) {
                         herb.put("name", result.standardTerm());
-                        replaced[0]++;
+                        herb.put("normLevel", result.level());
+                        herb.put("normSource", result.source());
+                        if (result.code() != null) {
+                            herb.put("normCode", result.code());
+                        }
+                        stat[0]++;
+                        if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
                     }
                     if (herb.get("dosage") != null) {
                         String d = String.valueOf(herb.get("dosage")).trim().toLowerCase();
@@ -185,11 +207,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 }
             }
             baseMapper.updateStructuredData(r.getId(), objectMapper.writeValueAsString(data));
-            return replaced[0];
         } catch (JacksonException e) {
             log.warn("[治理] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
-            return 0;
         }
+        return stat;
     }
 
     private String mapEntityType(String key) {

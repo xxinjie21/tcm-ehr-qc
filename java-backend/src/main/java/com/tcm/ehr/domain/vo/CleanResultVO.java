@@ -2,6 +2,9 @@ package com.tcm.ehr.domain.vo;
 
 import lombok.Data;
 
+/**
+ * 数据清洗结果（批B·2.2 增三级命中分布）。
+ */
 @Data
 public class CleanResultVO {
 
@@ -9,7 +12,16 @@ public class CleanResultVO {
     private int repaired;
     private int cleared;
     private int isolated;
-    /** 术语归一：content被替换为标准词的实体数 */
+    /** 归一命中实体总数 */
     private int normalized;
     private int total;
+    /** 三级命中分布（批B·2.2）：精确 / 包含 / 模糊 */
+    private NormByLevel normByLevel = new NormByLevel();
+
+    @Data
+    public static class NormByLevel {
+        private int exact;
+        private int contain;
+        private int fuzzy;
+    }
 }

@@ -7,6 +7,15 @@
       <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已治理</span>
     </section>
 
+    <!-- 当前范围（先选范围 → 后续操作只作用于范围内） -->
+    <section class="scope-bar">
+      <RangeFilter v-model="filters" />
+      <div class="scope-row">
+        <span class="scope-tip">当前范围：<b>{{ scopeText }}</b></span>
+        <el-button type="warning" :loading="recomputing" @click="handleRecompute">质控评分重算</el-button>
+      </div>
+    </section>
+
     <!-- 数据清洗与术语归一（流程图） -->
     <PanelCard title="数据清洗与术语自动归一">
       <div class="flow-tip">
@@ -61,6 +70,12 @@
             <div class="lbl">术语归一命中</div>
           </div>
         </div>
+        <div v-if="clean.result.normByLevel" class="level-dist">
+          <span class="ld-lbl">三级命中分布</span>
+          <span class="ld exact">精确 {{ clean.result.normByLevel.exact ?? 0 }}</span>
+          <span class="ld contain">包含 {{ clean.result.normByLevel.contain ?? 0 }}</span>
+          <span class="ld fuzzy">模糊 {{ clean.result.normByLevel.fuzzy ?? 0 }}</span>
+        </div>
       </div>
     </PanelCard>
 
@@ -108,7 +123,7 @@
           :data="preview.result.sample"
           border
           size="small"
-          max-height="300"
+          max-height="520"
           highlight-current-row
           @row-click="(row) => (detail = row)"
         >
@@ -153,7 +168,7 @@
           <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
         </el-descriptions>
         <div class="sd-title">结构化数据（术语已归一，sourceText为原文溯源）</div>
-        <pre class="sd-json">{{ prettyStructured(detail.structuredData) }}</pre>
+        <StructuredDataCard :data="detail.structuredData" />
       </template>
     </el-dialog>
   </div>
@@ -164,7 +179,9 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
-import { clean as cleanApi, exportDataset, previewDataset, governanceStats } from '@/api/governance'
+import StructuredDataCard from '@/components/StructuredDataCard.vue'
+import RangeFilter from '@/components/RangeFilter.vue'
+import { clean as cleanApi, exportDataset, previewDataset, governanceStats, recomputeQc } from '@/api/governance'
 import { saveBlob } from '@/utils/download'
 
 const STEPS = [
@@ -204,17 +221,42 @@ const fieldOf = (row, key) => {
   return row[key]
 }
 
-const prettyStructured = (s) => {
-  if (!s) return '（无结构化数据）'
-  try {
-    return JSON.stringify(JSON.parse(s), null, 2)
-  } catch {
-    return s
-  }
-}
-
 const stats = reactive({ qualified: 0, pendingGovern: 0, governedCount: 0 })
 const statsLoading = ref(false)
+
+// 当前范围（批B·4.1）：清洗 / 质控重算 只作用于该范围（filters 见下方声明）
+const scopeText = computed(() => {
+  const parts = []
+  if (filters.department) parts.push(filters.department)
+  if (filters.dateRange && filters.dateRange.length === 2) parts.push(`${filters.dateRange[0]}~${filters.dateRange[1]}`)
+  if (filters.pattern) parts.push(filters.pattern)
+  if (filters.grade) parts.push(filters.grade)
+  return parts.length ? parts.join(' · ') : '全部'
+})
+
+const recomputing = ref(false)
+const handleRecompute = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `将对「${scopeText.value}」范围内的病历按质控规则重算评分与分级（覆盖现有分数），确认？`,
+      '质控评分重算',
+      { type: 'warning', confirmButtonText: '确认重算', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  recomputing.value = true
+  try {
+    const res = await recomputeQc({ filters: { ...filters } })
+    const d = res.data
+    ElMessage.success(`重算完成：合格 ${d.qualified}，待复核 ${d.pendingReview}，无效 ${d.invalid}，失败 ${d.failed}`)
+    loadStats()
+  } catch {
+    // 拦截器已提示
+  } finally {
+    recomputing.value = false
+  }
+}
 
 const loadStats = async () => {
   statsLoading.value = true
@@ -242,7 +284,7 @@ const handleClean = async () => {
   }
   clean.loading = true
   try {
-    const res = await cleanApi({})
+    const res = await cleanApi({ filters: { ...filters } })
     clean.result = res.data
     ElMessage.success(`清洗完成：归一命中 ${res.data.normalized} 处`)
     loadStats()
@@ -253,7 +295,7 @@ const handleClean = async () => {
   }
 }
 
-const filters = reactive({ department: '', dateRange: null, pattern: '' })
+const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const format = ref('csv')
 const exporting = ref(false)
 
@@ -331,6 +373,23 @@ onMounted(loadStats)
   color: var(--ink);
   margin-right: 6px;
 }
+
+/* 当前范围条（批B·4.1） */
+.scope-bar {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px 24px;
+  margin-bottom: 20px;
+}
+.scope-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.scope-tip { font-size: 13px; color: var(--text-sub); }
+.scope-tip b { color: var(--ink); }
 
 /* ===== 流程说明条 ===== */
 .flow-tip {
@@ -451,6 +510,21 @@ onMounted(loadStats)
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.ochre .num { color: var(--ochre); }
 .stat-item.red .num { color: var(--danger); }
+
+/* 三级命中分布（批B·2.2） */
+.level-dist {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.level-dist .ld-lbl { font-weight: bold; color: var(--text-sub); font-weight: normal; font-size: 12.5px; }
+.level-dist .ld { padding: 2px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.level-dist .ld.exact { color: var(--ink-mid); }
+.level-dist .ld.contain { color: var(--ochre); }
+.level-dist .ld.fuzzy { color: var(--danger); }
 
 /* ===== 导出区 ===== */
 .export-row {

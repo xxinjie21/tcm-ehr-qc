@@ -18,8 +18,8 @@ public interface IGovernanceService extends IService<Record> {
     /** 术语归一（疾病/证候/症状/中药/方剂 -> 标准术语） */
     EsTermNormalizer.NormalizeResult normalize(String type, String term);
 
-    /** 数据清洗5步流水线（去重/字段清理/格式规整/隔离/术语归一兜底） */
-    CleanResultVO clean(List<String> recordIds);
+    /** 数据清洗5步流水线（去重/字段清理/格式规整/隔离/术语归一兜底）；filters 圈定范围，空=全量 */
+    CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters);
 
     /** 标准数据集导出（仅合格病历 + 脱敏）；无合格数据返回 null */
     ExportedFile export(ExportDTO dto) throws IOException;

@@ -38,7 +38,7 @@ public class GovernanceController {
 
     /** 术语归一（疾病/证候/症状/中药/方剂 -> 标准术语）；type非法返回 HTTP 400 + code=4001 */
     @PostMapping("/api/governance/normalize")
-    public ResponseEntity<Result<Map<String, String>>> normalize(@RequestBody NormalizeDTO dto) {
+    public ResponseEntity<Result<Map<String, Object>>> normalize(@RequestBody NormalizeDTO dto) {
         if (dto.getTerm() == null || dto.getTerm().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error("term不能为空"));
         }
@@ -46,14 +46,19 @@ public class GovernanceController {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         var r = governanceService.normalize(dto.getType(), dto.getTerm());
-        return ResponseEntity.ok(Result.ok(Map.of("standardTerm", r.standardTerm(), "source", r.source())));
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("standardTerm", r.standardTerm());
+        data.put("source", r.source());
+        data.put("level", r.level());
+        data.put("code", r.code());
+        return ResponseEntity.ok(Result.ok(data));
     }
 
     /** 数据清洗（去重/字段清理/格式规整/隔离/术语归一）；【权限：仅管理员】 */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/governance/clean")
     public Result<CleanResultVO> clean(@RequestBody CleanDTO dto) {
-        CleanResultVO result = governanceService.clean(dto.getRecordIds());
+        CleanResultVO result = governanceService.clean(dto.getRecordIds(), dto.getFilters());
         operationLogger.log("数据清洗", null, "共" + result.getTotal() + "条，去重" + result.getDeduped()
                 + "，隔离" + result.getIsolated() + "，归一" + result.getNormalized());
         return Result.ok(result);

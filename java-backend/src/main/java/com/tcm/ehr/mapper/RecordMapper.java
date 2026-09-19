@@ -17,13 +17,13 @@ import java.util.Map;
 @Mapper
 public interface RecordMapper extends BaseMapper<Record> {
 
-    /** 指标卡聚合 */
+    /** 指标卡聚合（按 grade 口径，与质控分级一致） */
     @Select("""
             SELECT
                 COUNT(*) AS totalRecords,
                 COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualifiedCount,
-                COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pendingReviewCount,
-                COALESCE(SUM(CASE WHEN status = 'invalid' THEN 1 ELSE 0 END), 0) AS invalidCount
+                COALESCE(SUM(CASE WHEN grade = '待复核' THEN 1 ELSE 0 END), 0) AS pendingReviewCount,
+                COALESCE(SUM(CASE WHEN grade = '无效' THEN 1 ELSE 0 END), 0) AS invalidCount
             FROM records
             """)
     Map<String, Object> selectOverview();
@@ -60,4 +60,24 @@ public interface RecordMapper extends BaseMapper<Record> {
     /** 更新结构化数据（清洗归一回写） */
     @Update("UPDATE records SET structured_data = #{structuredData} WHERE id = #{id}")
     int updateStructuredData(@Param("id") String id, @Param("structuredData") String structuredData);
+
+    /** 科室动态选项（批B·4.1 U11）：distinct 非空科室 */
+    @Select("""
+            SELECT DISTINCT department FROM records
+            WHERE department IS NOT NULL AND department <> ''
+            ORDER BY department
+            """)
+    List<String> selectDepartments();
+
+    /** 质控评分结果回写（批B·2.3）：分数 / 分级 / 状态 / 预检单 */
+    @Update("""
+            UPDATE records
+            SET score = #{score}, grade = #{grade}, status = #{status}, qc_results = #{qcResults}
+            WHERE id = #{id}
+            """)
+    int updateScoreFields(@Param("id") String id,
+                          @Param("score") Integer score,
+                          @Param("grade") String grade,
+                          @Param("status") String status,
+                          @Param("qcResults") String qcResults);
 }

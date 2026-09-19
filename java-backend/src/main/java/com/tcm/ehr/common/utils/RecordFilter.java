@@ -1,6 +1,7 @@
 package com.tcm.ehr.common.utils;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.po.Record;
 
@@ -69,6 +70,29 @@ public final class RecordFilter {
         if (ROLE_AUDITOR.equals(role)) {
             wrapper.eq("grade", "待复核");
         }
+    }
+
+    /** 批B·4.1：按 filters{department,dateRange,pattern,grade} 构建（数据域→用户筛选） */
+    public static QueryWrapper<Record> build(String role, FiltersDTO f) {
+        QueryWrapper<Record> wrapper = new QueryWrapper<>();
+        operatorScope(wrapper, role);
+        if (f != null) {
+            if (notBlank(f.getDepartment())) {
+                wrapper.eq("department", f.getDepartment().trim());
+            }
+            if (notBlank(f.getPattern())) {
+                wrapper.like("pattern", f.getPattern().trim());
+            }
+            if (notBlank(f.getGrade())) {
+                wrapper.eq("grade", f.getGrade().trim());
+            }
+            if (f.getDateRange() != null && f.getDateRange().size() == 2
+                    && notBlank(f.getDateRange().get(0)) && notBlank(f.getDateRange().get(1))) {
+                wrapper.ge("visit_time", f.getDateRange().get(0).trim() + " 00:00:00");
+                wrapper.le("visit_time", f.getDateRange().get(1).trim() + " 23:59:59");
+            }
+        }
+        return wrapper;
     }
 
     private static boolean notBlank(String s) {
