@@ -114,6 +114,16 @@ components:
         sourceText:
           type: string
           description: 原文片段
+        confidence:
+          type: number
+          format: double
+          description: 置信度（0~1）；模型实体提供，规则兜底可省
+        source:
+          type: string
+          description: 来源：model（NER 模型）/ rule（规则兜底）
+          enum:
+            - model
+            - rule
     Herb:
       type: object
       description: 中药实体（含剂量），共享模型
@@ -580,6 +590,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Herb'
+        modelAvailable:
+          type: boolean
+          description: NLP 服务/模型是否可用；false 表示为降级结果（可能仅规则兜底或为空）
     # ========== 清洗与导出 DTO / VO ==========
     NormalizeDTO:
       type: object
@@ -1478,7 +1491,7 @@ paths:
       tags:
         - NLP抽取
       summary: NLP实体抽取
-      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）
+      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）。Java 端转发至 Python FastAPI 服务（:8001），服务/模型不可用时降级（modelAvailable=false）
       requestBody:
         required: true
         content:
