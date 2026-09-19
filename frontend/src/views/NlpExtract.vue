@@ -53,17 +53,22 @@
       </div>
     </PanelCard>
 
-    <!-- 批量解析（UX-52）：按范围取前 N 条逐条抽取并保存，带进度与取消 -->
-    <el-dialog v-model="batchVisible" title="批量结构化解析" width="min(560px, 92vw)">
+    <!-- 批量解析（UX-52）：先按条件筛范围，再逐条抽取并保存，带进度与取消 -->
+    <el-dialog v-model="batchVisible" title="批量结构化解析" width="min(720px, 92vw)">
       <div class="tip">
-        对病历列表逐条执行抽取并保存到病历。条数较多时耗时较长，<b>请勿关闭页面</b>；
-        需要中断可点「取消」，已处理的不回滚。
+        先按条件选定病历范围，再逐条执行抽取并保存到病历。条数较多时耗时较长，
+        <b>请勿关闭页面</b>；需要中断可点「取消」，已处理的不回滚。
+      </div>
+
+      <div class="batch-filter">
+        <div class="bf-title">筛选范围</div>
+        <RangeFilter v-model="batchFilters" />
       </div>
 
       <div class="batch-row">
-        <span>处理条数</span>
+        <span>处理条数上限</span>
         <el-input-number v-model="batchLimit" :min="1" :max="500" size="small" :disabled="batchRunning" />
-        <span class="tip">（取病历列表前 N 条）</span>
+        <span class="tip">（最多处理符合条件的前 N 条）</span>
       </div>
 
       <div v-if="batchRunning || batchProgress.done" class="batch-progress">
@@ -106,6 +111,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
+import RangeFilter from '@/components/RangeFilter.vue'
 import { extractNlp } from '@/api/nlp'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 
@@ -215,9 +221,11 @@ const batchLimit = ref(50)
 const batchRunning = ref(false)
 const batchCancelled = ref(false)
 const batchProgress = reactive({ done: 0, total: 0, current: '', success: 0, failed: 0 })
+/** 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选 */
+const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 
 /**
- * 按「病历列表前 N 条」逐条抽取并保存。
+ * 按筛选条件取病历，逐条抽取并保存。
  *
  * <p>后端暂无批量接口，这里在前端串行推进 —— 相比人工逐条点开仍是质变，
  * 且能给出真实进度与取消入口。若后续补批量任务接口，替换此循环即可。</p>
@@ -227,10 +235,10 @@ const runBatch = async () => {
   batchCancelled.value = false
   Object.assign(batchProgress, { done: 0, total: 0, current: '', success: 0, failed: 0 })
   try {
-    const res = await searchRecords({ page: 1, pageSize: batchLimit.value })
+    const res = await searchRecords({ ...batchFilters, page: 1, pageSize: batchLimit.value })
     const list = res.data?.records || []
     if (!list.length) {
-      ElMessage.warning('没有可解析的病历')
+      ElMessage.warning('当前筛选范围内没有可解析的病历')
       return
     }
     batchProgress.total = list.length
@@ -273,6 +281,18 @@ const runBatch = async () => {
 .src-note.warn { color: var(--danger); }
 .actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 /* 批量解析（UX-52） */
+.batch-filter {
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.bf-title {
+  font-size: 12.5px;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+}
 .batch-row {
   display: flex;
   align-items: center;

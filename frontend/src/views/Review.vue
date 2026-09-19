@@ -1,135 +1,197 @@
 <template>
-  <PanelCard title="人工复核工作台">
-    <div class="rv-bar">
-      <span>状态</span>
-      <el-select v-model="status" size="small" style="width: 130px" @change="load(1)">
-        <el-option label="待复核" value="待复核" />
-        <el-option label="已完成" value="已完成" />
-      </el-select>
-      <el-button size="small" @click="load()">刷新</el-button>
-      <span class="tip">超时仅视觉提醒、不自动流转</span>
-    </div>
+  <div>
+    <!-- ① 待复核任务列表 -->
+    <PanelCard title="待复核任务列表">
+      <div class="rv-bar">
+        <span>状态</span>
+        <el-select v-model="status" size="small" style="width: 130px" @change="load(1)">
+          <el-option label="待复核" value="待复核" />
+          <el-option label="已完成" value="已完成" />
+        </el-select>
+        <el-button size="small" @click="load()">刷新</el-button>
+        <span class="tip">超时仅视觉提醒、不自动流转；点击「进入复核」在下方展开对照</span>
+      </div>
 
-    <el-table
-      v-loading="loading"
-      :data="rows"
-      border
-      size="small"
-      max-height="520"
-      :row-class-name="rowClass"
-    >
-      <el-table-column prop="recordId" label="病历ID" width="320" show-overflow-tooltip />
-      <el-table-column prop="issueType" label="问题类型" width="110" />
-      <el-table-column prop="score" label="评分" width="70" />
-      <el-table-column label="创建时间" width="160">
-        <template #default="{ row }">{{ fmt(row.createTime) }}</template>
-      </el-table-column>
-      <el-table-column label="复核截止" width="180">
-        <template #default="{ row }">
-          <span :class="{ overdue: row.overdue }">{{ fmt(row.deadlineTime) }}</span>
-          <el-tag v-if="row.overdue" type="danger" size="small" effect="plain" class="od-tag">超时</el-tag>
+      <el-table
+        v-loading="loading"
+        :data="rows"
+        border
+        size="small"
+        max-height="360"
+        :row-class-name="rowClass"
+        highlight-current-row
+      >
+        <el-table-column prop="taskId" label="任务ID" width="180" show-overflow-tooltip />
+        <el-table-column prop="recordId" label="病历ID" width="300" show-overflow-tooltip />
+        <el-table-column prop="issueType" label="问题类型" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="score" label="当前评分" width="90" />
+        <el-table-column label="创建时间" width="150">
+          <template #default="{ row }">{{ fmt(row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column label="截止时间" width="190">
+          <template #default="{ row }">
+            <span :class="{ overdue: row.overdue }">{{ fmt(row.deadlineTime) }}</span>
+            <el-tag v-if="row.overdue" type="danger" size="small" effect="plain" class="od-tag">超时</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="90" />
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="current && current.taskId === row.taskId" link type="warning" disabled>当前</el-button>
+            <el-button v-else link type="primary" @click="openReview(row)">进入复核</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无复核任务" :image-size="80" />
         </template>
-      </el-table-column>
-      <el-table-column prop="status" label="状态" width="90" />
-      <el-table-column label="操作" width="100" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openReview(row)">复核</el-button>
-        </template>
-      </el-table-column>
-      <template #empty>
-        <el-empty description="暂无复核任务" :image-size="80" />
-      </template>
-    </el-table>
+      </el-table>
 
-    <el-pagination
-      v-model:current-page="page"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50]"
-      :total="total"
-      layout="total, sizes, prev, pager, next"
-      style="margin-top: 12px; justify-content: flex-end"
-      @current-change="load"
-      @size-change="handleSizeChange"
-    />
-  </PanelCard>
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        layout="total, sizes, prev, pager, next"
+        style="margin-top: 12px; justify-content: flex-end"
+        @current-change="load"
+        @size-change="handleSizeChange"
+      />
+    </PanelCard>
 
-  <el-dialog v-model="visible" title="复核对照（原始病历 / AI预检单）" width="min(1040px, 94vw)" top="6vh">
-    <div v-loading="detailLoading" class="rv-grid">
-      <!-- 左：原始病历 + 结构化 -->
-      <section class="rv-col">
-        <div class="col-hd">原始病历（只读）</div>
-        <el-descriptions v-if="record" :column="2" border size="small">
-          <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
-            {{ fieldOf(record, f.key) || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="评分">{{ record.score ?? '—' }}</el-descriptions-item>
-          <el-descriptions-item label="分级">{{ record.grade || '—' }}</el-descriptions-item>
-        </el-descriptions>
-        <div class="sd-title">结构化数据</div>
-        <StructuredDataCard :data="record?.structuredData" />
+    <div v-loading="detailLoading">
+      <!-- ② 当前任务卡 -->
+      <section v-if="current" class="task-card">
+        <span class="task-id">{{ current.recordId }}</span>
+        <span class="tag tag-score">当前评分：{{ current.score ?? '—' }} 分</span>
+        <span v-for="t in issueTags" :key="t" class="tag tag-issue">{{ t }}</span>
+        <span class="deadline">
+          复核截止：<b>{{ fmt(current.deadlineTime) }}</b>（{{ remainText }}）
+        </span>
       </section>
 
-      <!-- 右：AI 预检 + 修正 -->
-      <section class="rv-col">
-        <div class="col-hd">AI 预检意见</div>
-        <div class="ai-box">
-          <p v-for="(l, i) in aiLines" :key="i">{{ l }}</p>
-          <span class="ai-src">{{ aiSource === 'rule' ? '规则预检（LLM 未启用）' : 'AI 建议' }}</span>
-        </div>
-
-        <div class="blk-title">扣分明细</div>
-        <ul class="ded">
-          <li v-for="(d, i) in (precheck?.deductions || [])" :key="i">
-            {{ d.type }} · {{ d.item }}（-{{ d.points }}）：{{ d.reason }}
-          </li>
-          <li v-if="!(precheck?.deductions || []).length && precheck" class="ok">无扣分项</li>
-        </ul>
-
-        <!-- 人工修正：字段级表单为主路径（UX-11 / UX-56）。
-             原实现是裸 JSON 文本域，要求审核员手写 9 类实体数组，实际不可操作 -->
-        <div class="blk-title">人工修正（按术语填写，多个用「、」分隔；留空表示该类无内容）</div>
-        <div class="edit-grid">
-          <div v-for="f in EDIT_FIELDS" :key="f.key" class="edit-item">
-            <label :for="'rv-' + f.key">{{ f.label }}</label>
-            <el-input
-              :id="'rv-' + f.key"
-              v-model="editValues[f.key]"
-              size="small"
-              :placeholder="originalText(f.key) || '无'"
-              clearable
-            />
+      <!-- ③ 病历原文对照（可折叠） -->
+      <details v-if="record" class="raw-panel" open>
+        <summary>病历原文对照 · {{ record.registrationNo || record.id }}（{{ patientSummary }}）</summary>
+        <div class="raw-bd raw-grid">
+          <div
+            v-for="f in FIELDS"
+            :key="f.key"
+            class="raw-item"
+            :class="{ full: f.wide }"
+          >
+            <span class="k">{{ f.label }}</span>
+            <span class="v">{{ fieldOf(record, f.key) || '—' }}</span>
           </div>
         </div>
+      </details>
 
-        <el-collapse class="json-mode">
-          <el-collapse-item title="高级模式：直接编辑结构化 JSON">
-            <el-input v-model="corrected" type="textarea" :rows="6" />
-          </el-collapse-item>
-        </el-collapse>
+      <!-- ④ 左右对比：左原始只读 / 右人工修正 -->
+      <div v-if="record" class="compare">
+        <section class="panel">
+          <h2 class="panel-hd hd-left">
+            原始结构化数据（NLP 抽取）<span class="mini-tag">只读锁定</span>
+          </h2>
+          <div class="panel-bd">
+            <div v-for="f in COMPARE_FIELDS" :key="f.key" class="field-row">
+              <div class="flabel">{{ f.label }}</div>
+              <div class="fvalue">
+                <span v-if="originalText(f.key)">{{ originalText(f.key) }}</span>
+                <span v-else class="miss">缺失（抽取为空）</span>
+              </div>
+            </div>
 
-        <div class="rv-actions">
-          <el-button type="primary" :loading="submitting" @click="submit(true)">提交修正并复核</el-button>
-          <el-button :loading="submitting" @click="submit(false)">仅重算评分</el-button>
-        </div>
-        <div class="tip">
-          「仅重算评分」不修改病历数据；任务是否结束由重算结果判定（不填修正内容时即等同此操作）。
-        </div>
-        <div v-if="result" class="rv-result">
-          复核结果：<b>{{ result.status }}</b>，评分 {{ result.score }}
-          <ul v-if="result.errors && result.errors.length" class="ded">
-            <li v-for="(e, i) in result.errors" :key="i">{{ e.type }}：{{ e.msg }}</li>
-          </ul>
+            <p class="ded-hd">质控扣分明细（合计 -{{ totalDeduct }} 分）</p>
+            <div v-for="(d, i) in deductions" :key="i" class="ded-item">
+              <span>{{ d.type }}：{{ d.reason }}</span>
+              <span class="pts">-{{ d.points }}</span>
+            </div>
+            <div v-if="!deductions.length && precheck" class="ok">无扣分项</div>
+
+            <template v-if="aiLines.length">
+              <p class="ded-hd">AI 预检建议</p>
+              <div class="ai-box">
+                <p v-for="(l, i) in aiLines" :key="i">{{ l }}</p>
+                <span class="ai-src">{{ aiSource === 'rule' ? '规则预检（LLM 未启用）' : 'AI 建议' }}</span>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-hd hd-right">人工修正</h2>
+          <div class="panel-bd">
+            <div
+              v-for="f in COMPARE_FIELDS"
+              :key="f.key"
+              class="field-row"
+              :class="{ fixed: isFixed(f.key) }"
+            >
+              <div class="flabel">{{ f.label }}</div>
+              <div class="fvalue term-wrap">
+                <TermInput
+                  v-if="f.termType"
+                  v-model="editValues[f.key]"
+                  :type="f.termType"
+                  :placeholder="originalText(f.key) || '原值为空，请输入或选择'"
+                />
+                <el-input
+                  v-else
+                  v-model="editValues[f.key]"
+                  size="small"
+                  :placeholder="originalText(f.key) || '原值为空，请输入'"
+                  clearable
+                />
+              </div>
+            </div>
+            <div class="term-note">↑ 带下拉的字段可直接搜索国标术语；多个词用「、」分隔</div>
+
+            <div class="field-row">
+              <div class="flabel">复核备注</div>
+              <div class="fvalue">
+                <el-input v-model="remark" type="textarea" :rows="3" placeholder="留痕用，例如：已对照原文补充脉象" />
+              </div>
+            </div>
+
+            <div class="preview">
+              复核后预估评分：<b>{{ estimate.score }}</b> 分　预计分级：<span class="tag-ok">{{ estimate.grade }}</span>
+              <span class="est-note">（按已补齐的核心字段扣分回算，最终以服务端重算为准）</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ⑤ 提交反馈 -->
+      <section v-if="result" class="result-bar">
+        <span class="rk">提交反馈：</span>
+        <span class="rv">
+          状态：<b>{{ result.status }}</b>　·　重新评分：<b>{{ result.score }} 分</b>　·　
+          {{ result.errors && result.errors.length ? '剩余问题：' : '剩余问题：无' }}
+          <template v-if="result.errors && result.errors.length">
+            <span v-for="(e, i) in result.errors" :key="i">{{ i ? '；' : '' }}{{ e.type }}：{{ e.msg }}</span>
+          </template>
+        </span>
+        <span class="deadline">{{ submittedAt }}</span>
+      </section>
+
+      <!-- ⑥ 底部操作 -->
+      <section v-if="record" class="footer-bar">
+        <span class="tip">
+          点击「复核通过」后系统会自动重新执行质控评分与诊疗逻辑校验；不填修正内容表示仅裁定不修改数据。
+        </span>
+        <div class="btns">
+          <el-button :loading="submitting" @click="submit(false)">保存修改</el-button>
+          <el-button type="primary" :loading="submitting" @click="submit(true)">复核通过</el-button>
         </div>
       </section>
     </div>
-  </el-dialog>
+  </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
-import StructuredDataCard from '@/components/StructuredDataCard.vue'
+import TermInput from '@/components/TermInput.vue'
 import { listReviewTasks, submitReview } from '@/api/review'
 import { getRawRecord } from '@/api/records'
 import { aiReview } from '@/api/ai'
@@ -147,7 +209,7 @@ const FIELDS = [
   { key: 'selfReport', label: '自诉', wide: true },
   { key: 'presentIllness', label: '现病史', wide: true },
   { key: 'inspection', label: '望诊', wide: true },
-  { key: 'pulse', label: '脉诊' },
+  { key: 'pulse', label: '脉诊', wide: true },
   { key: 'tongue', label: '舌诊', wide: true },
   { key: 'physicalExam', label: '查体', wide: true },
   { key: 'pattern', label: '辨证结论', wide: true },
@@ -158,12 +220,42 @@ const FIELDS = [
   { key: 'doctorId', label: '医生工号' },
   { key: 'visitTime', label: '接诊时间' }
 ]
+
 const fieldOf = (row, key) => {
-  if (key === 'visitTime') return (row.visitTime || '').replace('T', ' ').substring(0, 19)
+  if (!row) return ''
+  if (key === 'visitTime') return row.visitTime ? String(row.visitTime).replace('T', ' ').substring(0, 19) : ''
   return row[key]
 }
-const fmt = (v) => (v ? String(v).replace('T', ' ').substring(0, 19) : '—')
 
+/**
+ * 对照区的字段（功能设计附录A 的 9 类实体）。
+ * termType 指向词典类型；治法/病因在现有词典里没有对应类别，故用普通输入框。
+ */
+const COMPARE_FIELDS = [
+  { key: 'patternList', label: '证候', termType: 'pattern' },
+  { key: 'treatmentList', label: '治法', termType: '' },
+  { key: 'formulaList', label: '方剂', termType: 'formula' },
+  { key: 'tongueList', label: '舌象', termType: 'symptom' },
+  { key: 'pulseList', label: '脉象', termType: 'symptom' },
+  { key: 'herbs', label: '中药', termType: 'herb' },
+  { key: 'diseases', label: '疾病', termType: 'disease' },
+  { key: 'symptoms', label: '症状', termType: 'symptom' },
+  { key: 'causeList', label: '病因', termType: '' }
+]
+
+/** 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算 */
+const FIELD_BY_ITEM = {
+  脉象: 'pulseList',
+  舌象: 'tongueList',
+  证候: 'patternList',
+  治法: 'treatmentList',
+  方剂: 'formulaList',
+  中药: 'herbs'
+}
+
+const fmt = (t) => (t ? String(t).replace('T', ' ').substring(0, 16) : '—')
+
+// ===== ① 任务列表 =====
 const status = ref('待复核')
 const rows = ref([])
 const total = ref(0)
@@ -185,49 +277,64 @@ const load = async (p) => {
   }
 }
 
-const rowClass = ({ row }) => (row.overdue ? 'row-overdue' : '')
-
-/** 每页条数变化回到第 1 页（UX-24） */
 const handleSizeChange = () => {
   page.value = 1
   load()
 }
 
-// ===== 复核弹窗 =====
-const visible = ref(false)
+const rowClass = ({ row }) => (row.overdue ? 'row-overdue' : '')
+
+// ===== ②~⑥ 同页复核 =====
 const detailLoading = ref(false)
+const current = ref(null)
 const record = ref(null)
 const precheck = ref(null)
 const aiAnswer = ref('')
 const aiSource = ref('')
-const corrected = ref('')
+const remark = ref('')
 const submitting = ref(false)
 const result = ref(null)
-const currentId = ref('')
-
-const aiLines = computed(() => (aiAnswer.value || '').split('\n').filter((l) => l.trim() !== ''))
-
-/**
- * 可编辑的 9 类实体（UX-11 / UX-56）。
- * herbs 取 `name`，其余取 `content`，与后端 structuredData 契约（功能设计附录A）一致。
- */
-const EDIT_FIELDS = [
-  { key: 'diseases', label: '疾病' },
-  { key: 'symptoms', label: '症状' },
-  { key: 'patternList', label: '证候' },
-  { key: 'tongueList', label: '舌象' },
-  { key: 'pulseList', label: '脉象' },
-  { key: 'causeList', label: '病因' },
-  { key: 'treatmentList', label: '治法' },
-  { key: 'formulaList', label: '方剂' },
-  { key: 'herbs', label: '中药' }
-]
+const submittedAt = ref('')
 
 const editValues = reactive({})
 const originalMap = ref({})
 
+const aiLines = computed(() => (aiAnswer.value || '').split('\n').filter((l) => l.trim() !== ''))
+const deductions = computed(() => precheck.value?.deductions || [])
+const totalDeduct = computed(() => deductions.value.reduce((s, d) => s + (d.points || 0), 0))
+
+const issueTags = computed(() =>
+  String(current.value?.issueType || '')
+    .split(/[；;，,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+)
+
+const patientSummary = computed(() => {
+  const r = record.value
+  if (!r) return ''
+  return [
+    r.gender,
+    r.age ? `${r.age} 岁` : '',
+    r.department,
+    r.visitTime ? `${String(r.visitTime).replace('T', ' ').substring(0, 10)} 就诊` : ''
+  ]
+    .filter(Boolean)
+    .join('　')
+})
+
+const remainText = computed(() => {
+  const t = current.value?.deadlineTime
+  if (!t) return ''
+  const days = Math.ceil((new Date(t).getTime() - Date.now()) / 86400000)
+  if (days < 0) return `已超时 ${-days} 天`
+  if (days === 0) return '今天截止'
+  return `剩余 ${days} 天`
+})
+
 const textOf = (entry) => entry?.content || entry?.name || ''
 const originalText = (key) => (originalMap.value[key] || []).map(textOf).filter(Boolean).join('、')
+const isFixed = (key) => String(editValues[key] || '') !== originalText(key)
 
 const safeParse = (sd) => {
   if (!sd) return {}
@@ -239,12 +346,10 @@ const safeParse = (sd) => {
   }
 }
 
-/** 用病历的原始结构化数据回填字段级表单（同时保留 JSON 高级模式的内容） */
 const fillEditors = (sd) => {
   const data = safeParse(sd)
   const map = {}
-  editValues && Object.keys(editValues).forEach((k) => delete editValues[k])
-  EDIT_FIELDS.forEach((f) => {
+  COMPARE_FIELDS.forEach((f) => {
     const list = Array.isArray(data[f.key]) ? data[f.key] : []
     map[f.key] = list
     editValues[f.key] = list.map(textOf).filter(Boolean).join('、')
@@ -252,10 +357,10 @@ const fillEditors = (sd) => {
   originalMap.value = map
 }
 
-/** 字段级表单 → structuredData；原存在的条目沿用原文溯源 sourceText */
+/** 字段级表单 → structuredData；原存在的术语沿用原文溯源 sourceText */
 const buildCorrected = () => {
   const out = {}
-  EDIT_FIELDS.forEach((f) => {
+  COMPARE_FIELDS.forEach((f) => {
     const words = String(editValues[f.key] || '')
       .split(/[、,，;；|]/)
       .map((s) => s.trim())
@@ -271,23 +376,40 @@ const buildCorrected = () => {
   return out
 }
 
+/**
+ * 复核后预估评分（原型「复核后预估评分」区）。
+ * 只做「已补齐的核心字段把对应扣分加回」这一条，且明确标注以服务端重算为准 ——
+ * 前端不复制规则表，避免与服务端判定口径漂移。
+ */
+const estimate = computed(() => {
+  const base = precheck.value?.score ?? current.value?.score ?? 0
+  let gain = 0
+  deductions.value.forEach((d) => {
+    if (d.type !== '核心字段缺失') return
+    const key = FIELD_BY_ITEM[d.item]
+    if (key && String(editValues[key] || '').trim()) gain += d.points || 0
+  })
+  const score = Math.max(0, Math.min(100, base + gain))
+  const grade = score >= 90 ? '合格 → 进入数据治理' : score >= 60 ? '待复核' : '无效'
+  return { score, grade }
+})
+
 const openReview = async (row) => {
-  currentId.value = row.recordId
-  visible.value = true
+  current.value = row
   detailLoading.value = true
   record.value = null
   precheck.value = null
   aiAnswer.value = ''
   result.value = null
-  corrected.value = ''
+  remark.value = ''
+  Object.keys(editValues).forEach((k) => delete editValues[k])
+  originalMap.value = {}
   try {
     const [raw, sr] = await Promise.all([getRawRecord(row.recordId), qcScore({ recordId: row.recordId })])
     record.value = raw.data
     precheck.value = sr.data
-    const sd = raw.data?.structuredData
-    corrected.value = sd ? (typeof sd === 'string' ? sd : JSON.stringify(sd, null, 1)) : ''
-    fillEditors(sd)
-    // AI 预检意见（LLM 关时为规则预检原文）
+    // 任务列表已带 structuredData，但以病历详情为准（列表数据可能滞后）
+    fillEditors(raw.data?.structuredData ?? row.structuredData)
     try {
       const ai = await aiReview({ recordId: row.recordId })
       aiAnswer.value = ai.data?.answer || ''
@@ -295,6 +417,9 @@ const openReview = async (row) => {
     } catch {
       aiAnswer.value = '（AI 预检不可用，请以左侧扣分明细为准）'
     }
+    // 展开后滚动到任务卡，避免用户以为「点了没反应」
+    await Promise.resolve()
+    document.querySelector('.task-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } catch {
     // 拦截器已提示
   } finally {
@@ -306,16 +431,14 @@ const submit = async (withCorrection) => {
   submitting.value = true
   result.value = null
   try {
-    // 以字段级表单为准组装 structuredData；JSON 高级模式仍可用（UX-11）
-    let correctedData = null
-    if (withCorrection) {
-      correctedData = buildCorrected()
-    }
-    const body = correctedData ? { correctedData } : {}
-    const res = await submitReview(currentId.value, body)
+    const body = {}
+    if (withCorrection) body.correctedData = buildCorrected()
+    if (remark.value.trim()) body.comment = remark.value.trim()
+    const res = await submitReview(current.value.recordId, body)
     result.value = res.data
+    submittedAt.value = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
     ElMessage.success(`复核完成：${res.data.status}`)
-    load()
+    await load()
   } catch {
     // 拦截器已提示
   } finally {
@@ -332,6 +455,7 @@ onMounted(() => load(1))
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 .rv-bar > span:first-child {
   font-size: 13px;
@@ -351,58 +475,217 @@ onMounted(() => load(1))
 :deep(.row-overdue) {
   background: #fdf6f4;
 }
-.rv-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  min-height: 420px;
-  /* 视口相关的最大高度 + 内部滚动：1366×768 等矮屏下弹窗顶部不再被裁切（UX-12） */
-  max-height: calc(92vh - 150px);
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.rv-col {
-  min-width: 0;
-}
-.col-hd {
-  font-size: 13.5px;
-  font-weight: bold;
-  color: var(--ink);
-  border-left: 3px solid var(--ink-mid);
-  padding-left: 8px;
-  margin-bottom: 10px;
-}
-.sd-title,
-.blk-title {
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--ink);
-  margin: 14px 0 8px;
-}
-/* 字段级人工修正（UX-11 / UX-56） */
-.edit-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
-  margin-bottom: 10px;
-}
-.edit-item {
+
+/* ===== ② 当前任务卡 ===== */
+.task-card {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ochre);
+  border-radius: 6px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
 }
-.edit-item label {
-  width: 42px;
+.task-id {
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--ink);
+}
+.tag {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 12px;
+  border-radius: 2px;
+  line-height: 20px;
+}
+.tag-score {
+  color: var(--ochre);
+  background: var(--ochre-light);
+  border: 1px solid #e0cdb0;
+}
+.tag-issue {
+  color: var(--danger);
+  background: #f6e9e6;
+  border: 1px solid #e3c3bb;
+}
+.deadline {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.deadline b {
+  color: var(--danger);
+}
+
+/* ===== ③ 原文折叠 ===== */
+.raw-panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+.raw-panel summary {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+}
+.raw-panel summary::-webkit-details-marker {
+  display: none;
+}
+.raw-panel summary::before {
+  content: '▸ ';
+  color: var(--ink-mid);
+}
+.raw-panel[open] summary::before {
+  content: '▾ ';
+}
+.raw-panel summary:hover {
+  background: #faf8f1;
+}
+.raw-bd {
+  padding: 4px 20px 16px;
+  border-top: 1px solid #eee9dd;
+}
+.raw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 28px;
+}
+.raw-item {
+  display: flex;
+  padding: 7px 0;
+  border-bottom: 1px dashed #ece8dc;
+  font-size: 13px;
+}
+.raw-item.full {
+  grid-column: 1 / -1;
+}
+.raw-item .k {
+  width: 76px;
   flex-shrink: 0;
-  font-size: 12.5px;
   color: var(--text-sub);
 }
-.json-mode {
-  margin-bottom: 12px;
+.raw-item .v {
+  flex: 1;
+  color: var(--text);
+  word-break: break-all;
 }
-.json-mode :deep(.el-collapse-item__header) {
+
+/* ===== ④ 左右对比 ===== */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.compare .panel {
+  margin-bottom: 0;
+}
+.panel-hd {
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid #eee9dd;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.panel-hd.hd-left {
+  border-bottom-color: #eee4d3;
+  background: #faf6ee;
+  color: var(--ochre);
+}
+.panel-hd.hd-right {
+  border-bottom-color: #d9e3dc;
+  background: #f2f6f3;
+  color: var(--ink-mid);
+}
+.mini-tag {
+  font-size: 11.5px;
+  font-weight: normal;
+  color: var(--text-sub);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0 6px;
+  line-height: 18px;
+}
+.panel-bd {
+  padding: 6px 16px 16px;
+}
+.field-row {
+  display: flex;
+  align-items: flex-start;
+  min-height: 40px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #ece8dc;
+}
+.field-row:last-of-type {
+  border-bottom: none;
+}
+/* 修正过的字段整行高亮，与原型一致 */
+.field-row.fixed {
+  background: #f2f6f3;
+  border-radius: 2px;
+  padding-left: 8px;
+  padding-right: 8px;
+  margin: 0 -8px;
+}
+.flabel {
+  width: 78px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-sub);
+  padding-top: 6px;
+}
+.fvalue {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+}
+.miss {
+  color: var(--danger);
+  background: #f6e9e6;
+  padding: 2px 10px;
+  border-radius: 2px;
+  font-size: 12.5px;
+  display: inline-block;
+}
+.term-note {
+  font-size: 11.5px;
+  color: #a09c90;
+  margin: 6px 0 8px 78px;
+}
+.ded-hd {
   font-size: 12.5px;
   color: var(--text-sub);
+  margin: 13px 0 8px;
+}
+.ded-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--ochre-light);
+  border-radius: 2px;
+  padding: 6px 12px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+.ded-item .pts {
+  color: var(--danger);
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.ok {
+  padding: 6px 0;
+  color: var(--ink-mid);
+  font-size: 12.5px;
 }
 .ai-box {
   background: var(--paper);
@@ -422,40 +705,84 @@ onMounted(() => load(1))
   font-size: 11px;
   color: var(--text-sub);
 }
-.ded {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 12.5px;
-  color: var(--text);
-  line-height: 1.8;
-}
-.ded .ok {
-  list-style: none;
-  margin-left: -18px;
-  color: var(--ink-mid);
-}
-.rv-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-  /* 吸底：右列内容滚动时操作按钮始终可见（UX-12） */
-  position: sticky;
-  bottom: 0;
-  background: #fff;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-}
-.rv-result {
+.preview {
   margin-top: 12px;
   background: var(--ink-light);
   border: 1px solid #cddcd2;
-  border-radius: 4px;
-  padding: 8px 12px;
-  font-size: 12.5px;
-  color: var(--ink);
+  border-radius: 2px;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--ink-mid);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
+.preview b {
+  font-size: 17px;
+}
+.tag-ok {
+  color: var(--ink-mid);
+  background: #fff;
+  border: 1px solid var(--ink-mid);
+  border-radius: 2px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+.est-note {
+  font-size: 11.5px;
+  color: var(--text-sub);
+}
+
+/* ===== ⑤ 提交反馈条 ===== */
+.result-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ink-mid);
+  border-radius: 6px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.result-bar .rk {
+  font-weight: bold;
+  color: var(--ink-mid);
+}
+.result-bar .rv {
+  color: var(--text-sub);
+  font-size: 13px;
+}
+.result-bar b {
+  color: var(--ink-mid);
+}
+
+/* ===== ⑥ 底部操作 ===== */
+.footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 13px 20px;
+  flex-wrap: wrap;
+}
+.footer-bar .tip {
+  flex: 1;
+  min-width: 240px;
+}
+.btns {
+  display: flex;
+  gap: 10px;
+}
+
 @media (max-width: 1200px) {
-  .rv-grid {
+  .compare,
+  .raw-grid {
     grid-template-columns: 1fr;
   }
 }

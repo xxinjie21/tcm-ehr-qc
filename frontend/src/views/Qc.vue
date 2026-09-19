@@ -12,6 +12,20 @@
 
       <div v-if="graph.truncated" class="trunc-hint">{{ graph.hint }}</div>
 
+      <!-- 结论条：直接回答「这张图发现了什么」，而不是只描述怎么算的（UX-53） -->
+      <div v-if="graph.nodes.length" class="graph-summary">
+        <span class="gsum"><b>{{ graphSummary.records }}</b> 份病历</span>
+        <span class="gsum"><b>{{ graphSummary.nodes }}</b> 个实体节点</span>
+        <span class="gsum" :class="{ bad: graphSummary.conflicts > 0 }">
+          <b>{{ graphSummary.conflicts }}</b> 处规则冲突
+        </span>
+        <span class="gsum-hint">
+          {{ graphSummary.conflicts
+            ? '红色虚线条就是冲突所在，放大后可看清涉及的证候与治法/方剂'
+            : '未发现规则冲突；节点大小代表出现频次，放大可查看实体与病历的关联' }}
+        </span>
+      </div>
+
       <div v-loading="graphLoading" class="graph-wrap">
         <div
           v-if="graph.nodes.length"
@@ -150,6 +164,13 @@ const graphLabel = computed(() => {
   const conflicts = graph.edges.filter((e) => e.type === 'conflict').length
   return `质控关系图谱：${graph.nodes.length} 个节点、${graph.edges.length} 条关系，其中冲突 ${conflicts} 条`
 })
+
+/** 结论条数据：把图里的规模与冲突数直接摆出来（UX-53） */
+const graphSummary = computed(() => ({
+  records: graph.nodes.filter((n) => n.type === 'record').length,
+  nodes: graph.nodes.length,
+  conflicts: graph.edges.filter((e) => e.type === 'conflict').length
+}))
 const graphRef = ref(null)
 let chart = null
 
@@ -174,8 +195,11 @@ const loadGraph = async () => {
 /**
  * 按实体类型固定分区的环形布局（UX-53）。
  *
- * <p>每类实体占一个扇区、同类型节点在扇区内均匀铺开，替换原来的 `layout:'force'` ——
+ * <p>每类实体占一个扇区、同类型节点在扇区内铺开，替换原来的 `layout:'force'` ——
  * 力导向每次刷新图形都不同，既无法对比也无法截图留档，且 50+ 节点时会散成一团。</p>
+ *
+ * <p>半径用黄金比 `idx * 0.618 % 1` 错开：截断后单类可达 60+ 节点，
+ * 固定 3 环会把同扇区节点挤在一起重叠，黄金比能在连续半径上均匀铺开且无需分环。</p>
  */
 const layoutNodes = () => {
   const byType = new Map()
@@ -185,22 +209,21 @@ const layoutNodes = () => {
     byType.get(t).push(n)
   })
   const sector = (2 * Math.PI) / categories.length
-  const R_OUTER = 250
-  const R_INNER = 90
-  const RINGS = 3
+  const R_INNER = 80
+  const R_OUTER = 320
   return graph.nodes.map((n) => {
     const ci = CAT_INDEX[n.type] ?? 0
     const list = byType.get(n.type) || [n]
     const idx = list.indexOf(n)
-    const ratio = list.length <= 1 ? 0.5 : idx / (list.length - 1)
-    const angle = ci * sector + 0.1 * sector + ratio * 0.8 * sector
-    // 同扇区内按序号错开半径，避免同类型节点重叠
-    const r = R_INNER + ((idx % RINGS) / (RINGS - 1)) * (R_OUTER - R_INNER)
+    const total = list.length
+    const ratio = total <= 1 ? 0.5 : idx / (total - 1)
+    const angle = ci * sector + 0.08 * sector + ratio * 0.84 * sector
+    const r = R_INNER + ((idx * 0.618) % 1) * (R_OUTER - R_INNER)
     return {
       id: n.id,
       name: n.name,
       category: ci,
-      symbolSize: n.type === 'record' ? 10 : Math.min(28, 7 + (n.size || 1) * 1.6),
+      symbolSize: n.type === 'record' ? 12 : Math.min(36, 10 + (n.size || 1) * 2.4),
       value: n.size,
       x: Math.cos(angle) * r,
       y: Math.sin(angle) * r
@@ -226,10 +249,10 @@ const renderGraph = () => {
     target: e.target,
     value: e.label || '',
     lineStyle: e.type === 'conflict'
-      ? { color: '#c0392b', type: 'dashed', width: 1.6 }
+      ? { color: '#c0392b', type: 'dashed', width: 2.6 }
       : e.type === 'rule'
-        ? { color: '#96714f', type: 'dotted', width: 1.2 }
-        : { color: '#cfd6cf', width: 0.8, curveness: 0.06 }
+        ? { color: '#96714f', type: 'dotted', width: 1.4 }
+        : { color: '#dfe4df', width: 0.8, curveness: 0.06 }
   }))
   chart.setOption(
     {
@@ -345,6 +368,35 @@ onBeforeUnmount(() => {
   padding: 6px 12px;
   font-size: 12.5px;
   margin-bottom: 8px;
+}
+/* 图谱结论条（UX-53） */
+.graph-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+}
+.gsum {
+  font-size: 12.5px;
+  color: var(--text-sub);
+}
+.gsum b {
+  font-size: 17px;
+  color: var(--ink);
+  margin-right: 4px;
+}
+.gsum.bad b {
+  color: var(--danger);
+}
+.gsum-hint {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-left: auto;
 }
 .graph-wrap {
   min-height: 420px;
