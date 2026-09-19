@@ -1,9 +1,9 @@
 package com.tcm.ehr.service.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.service.IDictionaryFileService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -26,11 +26,12 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DictionaryFileServiceImpl implements IDictionaryFileService {
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
-    private final ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    private final ObjectMapper mapper;
 
     @Value("${dictionary.dir:data/dictionaries}")
     private String dictDir;
@@ -71,7 +72,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     public void write(String type, List<TermEntry> entries) throws IOException {
         Files.createDirectories(dir());
         Path file = dir().resolve(fileNameOf(type));
-        mapper.writeValue(file.toFile(), entries);
+        mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), entries);
     }
 
     @Override

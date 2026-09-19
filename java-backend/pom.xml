@@ -7,20 +7,35 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.4</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
     <groupId>com.tcm.ehr</groupId>
-    <artifactId>tcm-ehr-governance</artifactId>
+    <artifactId>tcm-ehr-qc</artifactId>
     <version>1.0.0</version>
-    <name>tcm-ehr-governance</name>
+    <name>tcm-ehr-qc</name>
     <description>中医电子病历质控与标准化系统</description>
 
     <properties>
         <java.version>17</java.version>
         <elasticsearch.version>7.17.22</elasticsearch.version>
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <spring-ai.version>2.0.1</spring-ai.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring AI 2.0（基线：Spring Boot 4.1 + Framework 7 + Jackson 3） -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Spring Boot Web -->
@@ -41,7 +56,7 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!-- MySQL + MyBatis-Plus -->
+        <!-- MySQL + MyBatis-Plus（Boot 4 专用 starter，artifactId 与 Boot 3 不同） -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
@@ -49,17 +64,17 @@
         </dependency>
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <version>3.5.12</version>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
         </dependency>
         <!-- MyBatis-Plus 分页插件（PaginationInnerInterceptor 所在模块） -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-jsqlparser</artifactId>
-            <version>3.5.12</version>
+            <version>${mybatis-plus.version}</version>
         </dependency>
 
-        <!-- Elasticsearch Rest High Level Client（ES 7.17.22） -->
+        <!-- Elasticsearch Rest High Level Client（ES 7.17.22；该客户端 ES 7.15 起已废弃，迁移风险项） -->
         <dependency>
             <groupId>org.elasticsearch.client</groupId>
             <artifactId>elasticsearch-rest-high-level-client</artifactId>
@@ -76,6 +91,18 @@
             <version>7.17.22</version>
         </dependency>
 
+        <!-- Spring AI 2.0：OpenAI 兼容协议（DeepSeek / 通义 / 智谱等均可走 base-url 接入） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
+        <!-- Spring AI 2.0：Ollama 本机通道（llm.provider=ollama，离线可用、无需 api-key） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-ollama</artifactId>
+        </dependency>
+
         <!-- BCrypt密码校验（仅crypto模块，不引入完整Security） -->
         <dependency>
             <groupId>org.springframework.security</groupId>
@@ -87,6 +114,13 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.5</version>
+        </dependency>
+
+        <!-- PDFBox（国标 PDF 术语库抽文本 → 交给 LLM 转换，批A·1.4） -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.7</version>
         </dependency>
 
         <!-- JWT -->
@@ -106,12 +140,6 @@
             <artifactId>jjwt-jackson</artifactId>
             <version>0.11.5</version>
             <scope>runtime</scope>
-        </dependency>
-
-        <!-- JSON处理 -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
         </dependency>
 
         <!-- Lombok -->

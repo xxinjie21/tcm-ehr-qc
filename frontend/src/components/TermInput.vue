@@ -11,6 +11,7 @@
 </template>
 
 <script setup>
+import { onBeforeUnmount } from 'vue'
 import { getTerms } from '@/api/dictionary'
 
 const props = defineProps({
@@ -21,16 +22,34 @@ const props = defineProps({
 
 defineEmits(['update:modelValue'])
 
-const querySearch = async (keyword, cb) => {
-  if (!keyword) {
+const DEBOUNCE_MS = 200
+
+let timer = null
+// latest-wins：每次真正发起请求时取号，回来时号不是最新就丢弃，
+// 避免慢的旧响应覆盖快的新结果
+let seq = 0
+
+const querySearch = (keyword, cb) => {
+  if (keyword === null || keyword === undefined || keyword === '') {
     cb([])
     return
   }
-  try {
-    const res = await getTerms({ type: props.type, keyword })
-    cb(res.data.terms || [])
-  } catch {
-    cb([])
-  }
+  if (timer) clearTimeout(timer)
+  timer = setTimeout(async () => {
+    timer = null
+    const mine = ++seq
+    try {
+      const res = await getTerms({ type: props.type, keyword })
+      if (mine !== seq) return
+      cb(res.data.terms || [])
+    } catch {
+      if (mine !== seq) return
+      cb([])
+    }
+  }, DEBOUNCE_MS)
 }
+
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer)
+})
 </script>

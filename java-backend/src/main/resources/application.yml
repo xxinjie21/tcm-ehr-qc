@@ -1,6 +1,6 @@
 spring:
   application:
-    name: tcm-ehr-governance
+    name: tcm-ehr-qc
 
   # 数据源（连接 Docker 中的 windows-mysql 容器，宿主机端口3306）
   datasource:
@@ -28,6 +28,23 @@ spring:
     default-property-inclusion: non_null
     time-zone: Asia/Shanghai
 
+  # Spring AI 2.0：默认关闭全部模型自动装配。
+  # 六个 OpenAi*AutoConfiguration 的开关默认值均为 openai（matchIfMissing=true），
+  # 只要 spring-ai-starter-model-openai 在类路径上就会急切构造 ChatModel / EmbeddingModel /
+  # ImageModel / AudioSpeechModel / AudioTranscriptionModel / ModerationModel，
+  # 未配置 api-key 时会在上下文刷新阶段直接抛 IllegalStateException 导致启动失败。
+  # 本项目 LLM 属可选增强（见 llm.enabled），默认关闭，故此处一律置 none，
+  # 需要启用时由 LlmConfig 自行构造 ChatModel（避免被迫填假 api-key）。
+  ai:
+    model:
+      chat: none
+      embedding: none
+      image: none
+      audio:
+        speech: none
+        transcription: none
+      moderation: none
+
 # Elasticsearch（连接 Docker 中的 windows-es 容器，宿主机端口9200）
 elasticsearch:
   host: localhost
@@ -35,9 +52,9 @@ elasticsearch:
   scheme: http
   score-threshold: 0.8
 
-# 术语词典目录（JSON文件存储，项目根/data/dictionaries）
+# 术语词典目录（JSON文件存储，本仓库 data/dictionaries）
 dictionary:
-  dir: D:/ZISHIKU/AI/tcm-ehr-governance/data/dictionaries
+  dir: D:/ZISHIKU/AI/tcm-ehr-qc/data/dictionaries
 
 # MyBatis-Plus（实体/Mapper由注解与BaseMapper自动管理）
 mybatis-plus:
@@ -50,13 +67,33 @@ server:
 
 # JWT配置
 jwt:
-  secret: tcm-ehr-governance-jwt-secret-key-2026-course-design
+  secret: tcm-ehr-qc-jwt-secret-key-2026-course-design
   expire-hours: 24
 
-# Python NLP服务
+# NLP 抽取引擎（Java 进程内：DJL 读 tokenizer.json 分词 + ONNX Runtime 推理，无独立服务/端口）
 nlp:
-  service-url: http://localhost:8001
-  timeout: 30000
+  enabled: false            # 模型抽取总开关；false 或模型缺失时回退规则兜底（舌象/脉象/病因/治法）
+  model-dir: D:/ZISHIKU/AI/tcm-ehr-qc/java-backend/nlp-model
+  max-length: 512           # 单条最大 token 数（模型 max_position_embeddings = 514）
+  batch-size: 16            # 批量送推理的批大小
+  convert-enabled: false    # 词典 PDF 智能转换子开关（② LLM 即 ETL）；依赖 llm.enabled=true，关闭时 PDF 上传提示走离线脚本/JSON 直传
+
+# LLM 增强（Spring AI 2.0；provider 二选一：ollama 本机 / openai 及兼容三方）
+# 默认关闭，口径与 nlp.enabled 一致：关闭或调用失败时回退规则兜底，不阻塞主流程。
+# 关闭时 Spring AI 的模型自动装配也一并置 none（见上方 spring.ai.model），
+# 因此无需配置 api-key 即可启动；启用需同时设 llm.enabled=true。
+llm:
+  enabled: false
+  provider: ollama            # ollama | openai
+  base-url: ""                # 留空用通道默认：ollama=http://localhost:11434，openai=https://api.openai.com/v1
+  api-key: ""                 # provider=openai 时必填；留空则该通道降级（不影响启动）
+  model: ""                   # 留空用通道默认模型；ollama 例 qwen2.5:7b，openai 例 gpt-4o-mini
+  temperature: 0.2
+  timeout: 60000              # 毫秒
+
+# 操作日志（绝对路径，避免随启动目录漂移）
+log:
+  operation-file: D:/ZISHIKU/AI/tcm-ehr-qc/logs/operation.log
 
 logging:
   level:

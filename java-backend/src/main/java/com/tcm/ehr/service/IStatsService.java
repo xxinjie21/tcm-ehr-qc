@@ -1,6 +1,6 @@
 package com.tcm.ehr.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import com.tcm.ehr.domain.dto.StatsDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.OverviewVO;

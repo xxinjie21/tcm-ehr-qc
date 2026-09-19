@@ -3,6 +3,16 @@ info:
   title: 中医电子病历质控与标准化系统
   description: |
     中医电子病历质控与标准化系统接口文档。
+
+    ## 权限约定
+    接口分四档权限，各接口在 description 首部以【权限：…】标注：
+    - **仅管理员**：管理类操作（词典导入/回滚、数据清洗、数据集导出、日志审计、质控评分与重算）。
+    - **登录即可**：只读查询与业务计算（术语查询/归一、统计看板、NLP 抽取、原始病历查看）。
+    - **管理员 / 审核员**：复核相关接口（复核任务列表、提交复核）。
+    - **公开**：用户登录、用户注册。
+    审核员另受**数据域（行级权限）**约束：仅可读取 grade='待复核' 的病历；管理员为全库。
+    执行顺序固定为「先数据域、后用户筛选」取交集，用户筛选条件不得绕过数据域。
+    权限不足统一返回 HTTP 403（code=403）。
     ## 实体分层命名约定
     - **DTO**（后缀 DTO）：请求体入参模型，接口入参统一使用。
     - **VO**（后缀 VO）：响应体出参模型，接口出参统一使用。
@@ -138,6 +148,10 @@ components:
       type: object
       description: 结构化病历数据模型（共享模型：NLP 提取结果出参 / 质控评分与复核入参复用；未识别实体返回空数组 []）
       properties:
+        diseases:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
         symptoms:
           type: array
           items:
@@ -478,6 +492,10 @@ components:
       type: object
       description: NLP 抽取响应（出参，结构同 StructuredData）
       properties:
+        diseases:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entity'
         symptoms:
           type: array
           items:
@@ -521,6 +539,7 @@ components:
         type:
           type: string
           enum:
+            - disease
             - symptom
             - pattern
             - herb
@@ -750,6 +769,7 @@ components:
         type:
           type: string
           enum:
+            - disease
             - symptom
             - pattern
             - herb
@@ -757,6 +777,7 @@ components:
         file:
           type: string
           format: binary
+          description: import 支持 Excel(.xlsx/.xls) / CSV / JSON；convert 支持 PDF
     DictionaryImportVO:
       type: object
       description: 术语库导入结果（出参）
@@ -776,6 +797,37 @@ components:
             properties:
               row:
                 type: integer
+              reason:
+                type: string
+    DictionaryConvertVO:
+      type: object
+      description: 术语库 PDF 转换预览（出参）；预览不落库，确认后调 /api/dictionary/import 入库
+      properties:
+        type:
+          type: string
+        candidates:
+          type: array
+          items:
+            type: object
+            properties:
+              standardTerm:
+                type: string
+              aliases:
+                type: array
+                items:
+                  type: string
+              source:
+                type: string
+              code:
+                type: string
+                description: 可选国标代码（GB/T 15657 / GB/T 16751）
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
               reason:
                 type: string
     DictionaryTermVO:
@@ -806,6 +858,7 @@ components:
         type:
           type: string
           enum:
+            - disease
             - symptom
             - pattern
             - herb
@@ -824,6 +877,7 @@ components:
         type:
           type: string
           enum:
+            - disease
             - symptom
             - pattern
             - prescription
@@ -902,7 +956,7 @@ paths:
       tags:
         - 认证
       summary: 用户注册
-      description: 注册账号角色固定为「审核员」，不开放管理员注册（请求体传入的 role 会被忽略）；管理员账号由 database-init.sql 预置
+      description: 【权限：公开】注册账号角色固定为「审核员」，不开放管理员注册（请求体传入的 role 会被忽略）；管理员账号由 database-init.sql 预置
       security: []
       requestBody:
         required: true
@@ -957,7 +1011,7 @@ paths:
       tags:
         - 认证
       summary: 用户登录
-      description: 账号密码登录鉴权，下发令牌与角色信息，登录成功按角色返回菜单列表
+      description: 【权限：公开】账号密码登录鉴权，下发令牌与角色信息，登录成功按角色返回菜单列表
       security: []
       requestBody:
         required: true
@@ -1011,7 +1065,7 @@ paths:
       tags:
         - 日志
       summary: 操作日志导出
-      description: 读取 logs/operation.log 日志文件，作为文件流返回下载（不套 Result 包装）
+      description: 【权限：仅管理员】读取 logs/operation.log 日志文件，作为文件流返回下载（不套 Result 包装）
       responses:
         '200':
           description: 日志文件流
@@ -1034,6 +1088,7 @@ paths:
         - 病历管理
       summary: 病历批量导入
       description: |
+        【权限：仅管理员】
         批量上传病历Excel文件（.xlsx），校验格式并创建导入任务。
         约束：单文件最大50MB，单次最多20个文件。
       requestBody:
@@ -1079,7 +1134,7 @@ paths:
       tags:
         - 病历管理
       summary: 导入进度查询
-      description: 查询批量导入任务处理进度。任务状态暂存服务内存，服务重启后丢失
+      description: 【权限：仅管理员】查询批量导入任务处理进度。任务状态暂存服务内存，服务重启后丢失
       parameters:
         - name: taskId
           in: path
@@ -1114,7 +1169,7 @@ paths:
       tags:
         - 病历管理
       summary: 单条新增病历
-      description: 手动新增病历并绑定元数据，完成单条病历入库
+      description: 【权限：仅管理员】手动新增病历并绑定元数据，完成单条病历入库
       requestBody:
         required: true
         content:
@@ -1173,7 +1228,7 @@ paths:
       tags:
         - 病历管理
       summary: 批量删除病历
-      description: 按病历ID列表批量删除
+      description: 【权限：仅管理员】按病历ID列表批量删除
       requestBody:
         required: true
         content:
@@ -1217,7 +1272,7 @@ paths:
       tags:
         - 病历管理
       summary: 病历数据查看
-      description: 根据病历ID只读查询完整病历数据（21个字段），原始字段只读锁定
+      description: 【权限：登录即可】根据病历ID只读查询完整病历数据（21个字段），原始字段只读锁定
       parameters:
         - name: recordId
           in: path
@@ -1252,7 +1307,7 @@ paths:
       tags:
         - 病历管理
       summary: 病历修改（仅元数据）
-      description: 修改病历元数据（就诊时间、科室、标签、归档状态），原始文本不可修改
+      description: 【权限：仅管理员】修改病历元数据（就诊时间、科室、标签、归档状态），原始文本不可修改
       parameters:
         - name: recordId
           in: path
@@ -1317,7 +1372,7 @@ paths:
       tags:
         - NLP抽取
       summary: NLP实体抽取
-      description: NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）
+      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）
       requestBody:
         required: true
         content:
@@ -1354,7 +1409,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 术语标准化
-      description: 将口语化/非标准中医术语归一国标标准术语。未命中时 standardTerm 返回原词、source 返回空字符串
+      description: 【权限：登录即可】将口语化/非标准中医术语归一国标标准术语。未命中时 standardTerm 返回原词、source 返回空字符串
       requestBody:
         required: true
         content:
@@ -1392,7 +1447,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 治理状态统计
-      description: 返回质控合格病历数量、待治理、已治理统计（清洗与导出页顶部状态行）
+      description: 【权限：仅管理员】返回质控合格病历数量、待治理、已治理统计（清洗与导出页顶部状态行）
       responses:
         '200':
           description: 治理状态统计
@@ -1422,7 +1477,7 @@ paths:
       tags:
         - 质控
       summary: 质控检查（缺失/格式/查重）
-      description: 事前质控统一入口，一次返回缺失字段、格式错误、查重结果
+      description: 【权限：仅管理员】事前质控统一入口，一次返回缺失字段、格式错误、查重结果
       requestBody:
         required: true
         content:
@@ -1457,7 +1512,7 @@ paths:
       tags:
         - 质控
       summary: 诊疗逻辑一致性检查
-      description: 事中质控，校验证候、治法、方剂、中药的诊疗逻辑一致性（入参为数组）
+      description: 【权限：仅管理员】事中质控，校验证候、治法、方剂、中药的诊疗逻辑一致性（入参为数组）
       requestBody:
         required: true
         content:
@@ -1486,7 +1541,7 @@ paths:
       tags:
         - 复核
       summary: 待复核任务列表
-      description: 分页查询待复核病历任务，展示复核时限
+      description: 【权限：管理员 / 审核员】分页查询待复核病历任务，展示复核时限
       parameters:
         - name: page
           in: query
@@ -1527,7 +1582,7 @@ paths:
       tags:
         - 复核
       summary: 人工校正与复核
-      description: 合并「人工校正 + 提交复核」，修改数据并复核通过后系统自动重新执行评分与逻辑校验
+      description: 【权限：管理员 / 审核员】合并「人工校正 + 提交复核」，修改数据并复核通过后系统自动重新执行评分与逻辑校验
       parameters:
         - name: recordId
           in: path
@@ -1574,7 +1629,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 标准数据集导出
-      description: 按条件导出质控合格的标准化病历数据集，支持 CSV/JSON 格式。文件流下载，不套 Result 包装，导出自动脱敏
+      description: 【权限：仅管理员】按条件导出质控合格的标准化病历数据集，支持 CSV/JSON 格式。文件流下载，不套 Result 包装，导出自动脱敏
       requestBody:
         required: true
         content:
@@ -1607,7 +1662,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 数据清洗规整
-      description: 批量清洗病历数据，完成去重、修复、规整、脏数据隔离【长耗时同步接口（3 万上限）；前端放宽超时、勿重复提交】
+      description: 【权限：仅管理员】批量清洗病历数据，完成去重、修复、规整、脏数据隔离【长耗时同步接口（3 万上限）；前端放宽超时、勿重复提交】
       requestBody:
         required: true
         content:
@@ -1645,7 +1700,7 @@ paths:
       tags:
         - 质控
       summary: 终末质控评分
-      description: 自动对病历打分、扣分并完成质量分级（合格/待复核/无效）
+      description: 【权限：仅管理员】自动对病历打分、扣分并完成质量分级（合格/待复核/无效）
       requestBody:
         required: true
         content:
@@ -1680,7 +1735,7 @@ paths:
       tags:
         - 质控
       summary: 全库质控评分重算
-      description: 对全库病历批量重算质控评分与分级（覆盖现有分数），生成AI预检单（records.qc_results），并对待复核病历自动创建复核任务。管理员操作。【长耗时同步接口（3 万上限 ≤3min）：前端放宽超时、勿重复提交；失败明细仅返回前 50 条示例，完整失败数见 failed】
+      description: 【权限：仅管理员】对全库病历批量重算质控评分与分级（覆盖现有分数），生成AI预检单（records.qc_results），并对待复核病历自动创建复核任务。【长耗时同步接口（3 万上限 ≤3min）：前端放宽超时、勿重复提交；失败明细仅返回前 50 条示例，完整失败数见 failed】
       responses:
         '200':
           description: 重算完成，返回分级分布
@@ -1726,7 +1781,7 @@ paths:
       tags:
         - 词典管理
       summary: 术语库导入
-      description: 上传国标术语文件（Excel/CSV），由 LLM 转换为标准 JSON 并写入术语库文件，写入前自动备份旧文件
+      description: 【权限：仅管理员】上传术语文件（Excel .xlsx/.xls、CSV、JSON），解析校验后写入术语库文件，写入前自动备份旧文件；PDF 请先走 /api/dictionary/convert
       requestBody:
         required: true
         content:
@@ -1759,12 +1814,49 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/dictionary/convert:
+    post:
+      tags:
+        - 词典管理
+      summary: 术语库 PDF 智能转换（预览）
+      description: 【权限：仅管理员】上传国标 PDF，抽取文本后由 LLM 提取术语候选；不写入术语库，确认后再调 /api/dictionary/import 入库。llm.enabled 或 nlp.convert-enabled 关闭时返回 400
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DictionaryImportDTO'
+      responses:
+        '200':
+          description: 转换完成（仅预览，不落库）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/DictionaryConvertVO'
+        '400':
+          description: 术语类型非法（code=4001）；或转换未启用 / LLM 不可用 / PDF 未抽到文本（code=400，msg 给出替代路径）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/dictionary/terms:
     get:
       tags:
         - 词典管理
       summary: 术语查询/自动补全
-      description: 从内存术语库按类型与关键词过滤，只读查询
+      description: 【权限：登录即可】从内存术语库按类型与关键词过滤，只读查询
       parameters:
         - name: type
           in: query
@@ -1772,6 +1864,7 @@ paths:
           schema:
             type: string
             enum:
+              - disease
               - symptom
               - pattern
               - herb
@@ -1809,7 +1902,7 @@ paths:
       tags:
         - 词典管理
       summary: 术语库版本回滚
-      description: 根据备份文件名将术语库恢复到指定版本，恢复后自动重新加载内存术语库
+      description: 【权限：仅管理员】根据备份文件名将术语库恢复到指定版本，恢复后自动重新加载内存术语库
       requestBody:
         required: true
         content:
@@ -1854,7 +1947,7 @@ paths:
       tags:
         - 统计查询
       summary: 数据统计
-      description: 按 type 批量统计：disease 疾病频次 / pattern 证候分布 / symptom 症状频次 / prescription 方剂中药频次。上层控制 recordIds 数量上限，接口内部不分页
+      description: 【权限：登录即可】按 type 批量统计：disease 疾病频次 / pattern 证候分布 / symptom 症状频次 / prescription 方剂中药频次。上层控制 recordIds 数量上限，接口内部不分页
       requestBody:
         required: true
         content:
@@ -1889,7 +1982,7 @@ paths:
       tags:
         - 统计查询
       summary: 看板指标卡
-      description: 首页看板四个指标卡数据（病历总数/合格率/待复核数/无效数），一次请求返回，免多次分状态查询
+      description: 【权限：登录即可】首页看板四个指标卡数据（病历总数/合格率/待复核数/无效数），一次请求返回，免多次分状态查询
       responses:
         '200':
           description: 指标卡数据
@@ -1921,7 +2014,7 @@ paths:
       tags:
         - 病历管理
       summary: 多条件病历查询
-      description: 组合条件分页检索病历，返回病历摘要与总数（summary 为原始病历截取片段）
+      description: 【权限：登录即可】组合条件分页检索病历，返回病历摘要与总数（summary 为原始病历截取片段）
       requestBody:
         required: true
         content:

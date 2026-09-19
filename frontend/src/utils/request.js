@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
+import { useUserStore } from '@/stores/user'
 
 const request = axios.create({
   baseURL: '/api',
@@ -15,6 +16,14 @@ request.interceptors.request.use((config) => {
   return config
 })
 
+// 401：清登录态（token / role / menus）并回登录页；403：仅提示无权限，不跳转
+function redirectToLogin() {
+  useUserStore().logout()
+  if (router.currentRoute.value.path !== '/login') {
+    router.push('/login')
+  }
+}
+
 request.interceptors.response.use(
   (response) => {
     // 文件流（blob）不套 Result，直接返回
@@ -25,15 +34,24 @@ request.interceptors.response.use(
     if (res.code !== 200) {
       ElMessage.error(res.msg || '请求失败')
       if (res.code === 401) {
-        localStorage.removeItem('token')
-        router.push('/login')
+        redirectToLogin()
       }
       return Promise.reject(new Error(res.msg))
     }
     return res
   },
   (error) => {
-    ElMessage.error(error.message || '网络异常')
+    const status = error.response && error.response.status
+    const msg = error.response && error.response.data && error.response.data.msg
+    if (status === 401) {
+      // 凭证错误 / token 过期：以后端 msg 为准（登录页密码错误也走这里）
+      ElMessage.error(msg || '登录已过期，请重新登录')
+      redirectToLogin()
+    } else if (status === 403) {
+      ElMessage.error(msg || '无权限执行该操作')
+    } else {
+      ElMessage.error(msg || error.message || '网络异常')
+    }
     return Promise.reject(error)
   }
 )

@@ -1,0 +1,198 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AuthShell 登录 / 注册 预览桩 - 中医电子病历质控与标准化系统</title>
+<style>
+:root{
+  --ink:#2f4639;
+  --ink-mid:#3d5a4c;
+  --ink-light:#e6ede8;
+  --ochre:#96714f;
+  --ochre-light:#f3ecdf;
+  --paper:#f5f3ed;
+  --line:#ddd7c9;
+  --text:#33322e;
+  --text-sub:#807c72;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font:14px/1.65 "Microsoft YaHei","PingFang SC",sans-serif;
+  color:var(--text);
+  background-color:var(--paper);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='0.9' fill='%232f4639' fill-opacity='0.05'/></svg>");
+  padding:30px 20px 44px;
+}
+input,button{font-family:inherit;font-size:13px;color:var(--text)}
+
+/* ===== 预览桩自身的说明框（非产品 UI，落地时不进代码） ===== */
+.stub-head{max-width:1180px;margin:0 auto 30px;border-left:3px solid var(--ochre);padding-left:14px}
+.stub-head h1{font-size:16px;color:var(--ink);font-weight:normal;letter-spacing:1px}
+.stub-head p{font-size:12px;color:var(--text-sub);margin-top:5px;line-height:1.8}
+.stub-head code{font-family:Consolas,monospace;color:var(--ochre)}
+.stub-label{max-width:1180px;margin:0 auto 10px;font-size:12px;color:var(--text-sub);letter-spacing:1.5px}
+.stub-wrap{max-width:1180px;margin:0 auto 42px}
+
+/* ===== AuthShell：登录/注册共用外壳 ===== */
+.auth-shell{display:flex;background:#fffdf9;border:1px solid var(--line);min-height:470px}
+
+/* 左品牌区 */
+.auth-brand{width:336px;flex-shrink:0;background:var(--ink-light);border-right:1px solid var(--line);padding:56px 36px;display:flex;flex-direction:column}
+.ornament{width:44px;height:1px;background:var(--ink);opacity:.5;position:relative;margin-bottom:28px}
+.ornament::after{content:"";position:absolute;right:-7px;top:-2.5px;width:6px;height:6px;border-radius:50%;background:var(--ink);opacity:.5}
+.auth-brand h2{font-size:21px;line-height:1.6;color:var(--ink);font-weight:normal;letter-spacing:2px}
+.auth-brand .en{margin-top:14px;font-size:11px;line-height:1.75;color:var(--ochre);letter-spacing:1.2px;text-transform:uppercase}
+.auth-brand .ver{margin-top:auto;font-size:11px;color:var(--text-sub);letter-spacing:.5px}
+
+/* 右表单区 */
+.auth-form{flex:1;padding:52px 56px;display:flex;flex-direction:column;min-width:0}
+.auth-form h3{font-size:16px;color:var(--ink);font-weight:normal;letter-spacing:1px}
+.auth-form .hint{font-size:12px;color:var(--text-sub);margin:7px 0 26px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:var(--text-sub);margin-bottom:6px;letter-spacing:.5px}
+.field input{width:100%;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:2px;background:#fff;outline:none}
+.field input:focus{border-color:var(--ink-mid);background:#fdfdfb}
+.field input::placeholder{color:#b3aea2}
+.btn-main{width:100%;height:40px;margin-top:10px;border:none;border-radius:2px;background:var(--ink-mid);color:#fff;font-size:14px;letter-spacing:4px;cursor:pointer}
+.btn-main:hover{background:var(--ink)}
+.switch-line{margin-top:18px;font-size:12px;color:var(--text-sub)}
+.switch-line a{color:var(--ink-mid);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px}
+
+/* U13：演示账号提示（登录页底部小字） */
+.demo-line{margin-top:auto;padding-top:20px;border-top:1px dashed var(--line);font-size:12px;color:var(--text-sub);line-height:2}
+.demo-line b{color:var(--ink);font-weight:normal}
+.demo-line code{font-family:Consolas,monospace;color:var(--ochre)}
+
+/* 注册页：角色固定提示 */
+.role-tip{border:1px solid var(--line);border-left:3px solid var(--ochre);background:var(--ochre-light);padding:9px 12px;font-size:12px;color:#6b5a44;margin:0 0 16px}
+
+/* 底部版权行 */
+.copyright{max-width:1180px;margin:0 auto;text-align:center;font-size:11px;color:var(--text-sub);letter-spacing:.5px}
+
+/* ===== 窄屏示意（375px） ===== */
+.phone-frame{width:375px;height:667px;border:1px solid var(--line);background:#fffdf9;overflow:hidden;display:flex;flex-direction:column;margin:0 auto}
+.phone-frame .auth-shell{flex-direction:column;border:none;min-height:0;flex:1}
+.phone-frame .auth-brand{width:auto;border-right:none;border-bottom:1px solid var(--line);padding:26px 22px 22px}
+.phone-frame .auth-brand h2{font-size:17px;letter-spacing:1px}
+.phone-frame .auth-brand .en{font-size:10px;margin-top:9px;letter-spacing:.8px}
+.phone-frame .auth-brand .ver{display:none}
+.phone-frame .ornament{margin-bottom:16px}
+.phone-frame .auth-form{padding:24px 22px}
+.phone-frame .auth-form h3{font-size:15px}
+.phone-frame .auth-form .hint{margin:5px 0 18px}
+.phone-frame .demo-line{padding-top:15px;font-size:11px;line-height:1.9}
+
+/* 真实窄屏：左品牌区转为顶部横条 */
+@media (max-width:900px){
+  .auth-shell{flex-direction:column;min-height:0}
+  .auth-brand{width:auto;border-right:none;border-bottom:1px solid var(--line);padding:30px 24px 26px}
+  .auth-brand h2{font-size:18px}
+  .auth-brand .ver{margin-top:16px}
+  .auth-form{padding:30px 24px}
+}
+</style>
+</head>
+<body>
+
+<div class="stub-head">
+  <h1>AuthShell 登录 / 注册 — 设计记录（2026-09-19 已确认）</h1>
+  <p>对应「后续开发方案 §1.3」。左品牌区（系统名 / 英文副题 / 细线墨点装饰 / 版本）+ 右表单 + 底部版权行。<br>
+     宣纸底 + 极淡墨点纹理，<b>无渐变、无动画、无 emoji</b>，色值全走 <code>theme.css</code> 令牌。<br>
+     观感已确认，实现见 <code>frontend/src/components/AuthShell.vue</code>（登录 / 注册两页共用）；本文件保留为设计记录，不参与构建。</p>
+</div>
+
+<div class="stub-label">① 登录页（桌面）</div>
+<div class="stub-wrap">
+  <div class="auth-shell">
+    <div class="auth-brand">
+      <div class="ornament"></div>
+      <h2>中医电子病历<br>质控与标准化系统</h2>
+      <div class="en">TCM EHR Quality Control<br>&amp; Standardization</div>
+      <div class="ver">v1.0 · 2026-09</div>
+    </div>
+    <div class="auth-form">
+      <h3>登 录</h3>
+      <p class="hint">请使用系统分配的账号登录</p>
+      <div class="field">
+        <label for="lu">用户名</label>
+        <input id="lu" type="text" placeholder="请输入用户名" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="lp">密码</label>
+        <input id="lp" type="password" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+      <button class="btn-main">登 录</button>
+      <div class="switch-line">还没有账号？<a href="#">立即注册</a></div>
+      <div class="demo-line">
+        <b>演示账号</b>　管理员 <code>admin / 123456</code>　｜　审核员 <code>auditor / 123456</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stub-label">② 注册页（桌面）</div>
+<div class="stub-wrap">
+  <div class="auth-shell">
+    <div class="auth-brand">
+      <div class="ornament"></div>
+      <h2>中医电子病历<br>质控与标准化系统</h2>
+      <div class="en">TCM EHR Quality Control<br>&amp; Standardization</div>
+      <div class="ver">v1.0 · 2026-09</div>
+    </div>
+    <div class="auth-form">
+      <h3>注册新账号</h3>
+      <p class="hint">注册后可直接登录系统</p>
+      <div class="role-tip">注册账号角色为「审核员」，管理员账号由系统预置。</div>
+      <div class="field">
+        <label for="ru">用户名</label>
+        <input id="ru" type="text" placeholder="请输入用户名" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="rp">密码</label>
+        <input id="rp" type="password" placeholder="密码（至少 6 位）" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="rc">确认密码</label>
+        <input id="rc" type="password" placeholder="请再次输入密码" autocomplete="new-password">
+      </div>
+      <button class="btn-main">注 册</button>
+      <div class="switch-line">已有账号？<a href="#">返回登录</a></div>
+    </div>
+  </div>
+</div>
+
+<div class="stub-label">③ 窄屏（375 × 667，左品牌区转顶部横条）</div>
+<div class="stub-wrap">
+  <div class="phone-frame">
+    <div class="auth-shell">
+      <div class="auth-brand">
+        <div class="ornament"></div>
+        <h2>中医电子病历质控与标准化系统</h2>
+        <div class="en">TCM EHR Quality Control &amp; Standardization</div>
+      </div>
+      <div class="auth-form">
+        <h3>登 录</h3>
+        <p class="hint">请使用系统分配的账号登录</p>
+        <div class="field">
+          <label>用户名</label>
+          <input type="text" placeholder="请输入用户名">
+        </div>
+        <div class="field">
+          <label>密码</label>
+          <input type="password" placeholder="请输入密码">
+        </div>
+        <button class="btn-main">登 录</button>
+        <div class="switch-line">还没有账号？<a href="#">立即注册</a></div>
+        <div class="demo-line">
+          <b>演示账号</b>　管理员 <code>admin / 123456</code><br>审核员 <code>auditor / 123456</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="copyright">© 2026 中医电子病历质控与标准化系统 · 课程设计</div>
+
+</body>
+</html>

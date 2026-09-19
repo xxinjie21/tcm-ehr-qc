@@ -43,7 +43,7 @@ class AuthServiceTest {
         userMapper = Mockito.mock(UserMapper.class);
         jwtUtil = new JwtUtil();
         ReflectionTestUtils.setField(jwtUtil, "secret",
-                "tcm-ehr-governance-jwt-secret-key-2026-course-design");
+                "tcm-ehr-qc-jwt-secret-key-2026-course-design");
         ReflectionTestUtils.setField(jwtUtil, "expireHours", 24L);
         authService = new AuthServiceImpl(jwtUtil);
         // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置

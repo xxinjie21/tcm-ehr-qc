@@ -1,39 +1,43 @@
 <template>
-  <div v-loading="loading" element-loading-text="数据加载中…">
+  <div>
     <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilter" />
 
-    <div class="stats">
-      <StatCard label="病历总数" :value="overview.totalRecords" icon="record" />
-      <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate" />
-      <StatCard label="待复核" :value="overview.pendingReviewCount" tone="ochre" icon="pending" />
-      <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid" />
-    </div>
+    <!-- 只遮数据区：筛选条保持可交互，避免整页白屏 -->
+    <div v-loading="loading" element-loading-text="数据加载中…">
+      <div class="stats">
+        <StatCard label="病历总数" :value="overview.totalRecords" icon="record" />
+        <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate" />
+        <StatCard label="待复核" :value="overview.pendingReviewCount" tone="ochre" icon="pending" />
+        <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid" />
+      </div>
 
-    <div class="grid-2 mb">
-      <PanelCard title="疾病频次 TOP10">
-        <BarList :items="diseaseStats.map((s) => ({ name: s.disease, value: s.count }))" />
-      </PanelCard>
-      <PanelCard title="症状频次 TOP10">
-        <BarList :items="symptomStats.map((s) => ({ name: s.symptom, value: s.count }))" />
-      </PanelCard>
-    </div>
+      <div class="grid-2 mb">
+        <PanelCard title="疾病频次 TOP10">
+          <BarList :items="diseaseStats.map((s) => ({ name: s.disease, value: s.count }))" />
+        </PanelCard>
+        <PanelCard title="症状频次 TOP10">
+          <BarList :items="symptomStats.map((s) => ({ name: s.symptom, value: s.count }))" />
+        </PanelCard>
+      </div>
 
-    <div class="grid-2">
-      <PanelCard title="证候分布">
-        <div ref="pieRef" class="pie" />
-      </PanelCard>
-      <PanelCard title="方剂 / 中药频次 TOP5">
-        <div class="dual">
-          <div class="dual-col">
-            <div class="dual-hd">方剂</div>
-            <BarList :items="formulaStats.map((s) => ({ name: s.formula, value: s.count }))" color="var(--ochre)" />
+      <div class="grid-2">
+        <PanelCard title="证候分布">
+          <div v-if="patternDist.length" ref="pieRef" class="pie" />
+          <el-empty v-else-if="!loading" description="暂无证候分布数据" :image-size="80" />
+        </PanelCard>
+        <PanelCard title="方剂 / 中药频次 TOP5">
+          <div class="dual">
+            <div class="dual-col">
+              <div class="dual-hd">方剂</div>
+              <BarList :items="formulaStats.map((s) => ({ name: s.formula, value: s.count }))" color="var(--ochre)" />
+            </div>
+            <div class="dual-col">
+              <div class="dual-hd">中药</div>
+              <BarList :items="herbStats.map((s) => ({ name: s.herb, value: s.count }))" />
+            </div>
           </div>
-          <div class="dual-col">
-            <div class="dual-hd">中药</div>
-            <BarList :items="herbStats.map((s) => ({ name: s.herb, value: s.count }))" />
-          </div>
-        </div>
-      </PanelCard>
+        </PanelCard>
+      </div>
     </div>
   </div>
 </template>
@@ -71,7 +75,9 @@ const PIE_COLORS = ['#3d5a4c', '#96714f', '#b39a77', '#7a9184', '#8fa0a8', '#cdc
 
 const renderPie = () => {
   if (!pieRef.value) return
-  if (!chart) {
+  // 空态与图表之间切换时容器是新的 DOM，旧实例必须丢弃重建，否则画到已卸载节点上
+  if (!chart || chart.getDom() !== pieRef.value) {
+    if (chart) chart.dispose()
     chart = echarts.init(pieRef.value)
   }
   chart.setOption({
@@ -106,6 +112,8 @@ const loadAll = async () => {
     patternDist.value = (pat.data.distribution || []).slice(0, 6)
     formulaStats.value = (pres.data.formulaStats || []).slice(0, 5)
     herbStats.value = (pres.data.herbStats || []).slice(0, 5)
+  } catch {
+    // 拦截器已提示，这里只保证 loading 收口
   } finally {
     await nextTick()
     renderPie()

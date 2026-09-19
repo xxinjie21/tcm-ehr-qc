@@ -3,11 +3,17 @@ target/
 *.class
 *.jar
 *.war
+hs_err_pid*
+*.hprof
 
 # Python
 __pycache__/
 *.pyc
 venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
 .env
 
 # IDE
@@ -36,9 +42,13 @@ logs/
 # Node
 node_modules/
 frontend/dist/
+.vite/
 
 # 运行日志（.log，含前端/后端运行日志）
 *.log
 
 # 本机 npm 全局工具（非项目代码）
 nodejs-global/
+
+# AI 工具目录（非项目代码）
+.workbuddy-ai/

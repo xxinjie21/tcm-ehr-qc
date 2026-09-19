@@ -1,7 +1,8 @@
 package com.tcm.ehr.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.domain.dto.ExportDTO;
 import com.tcm.ehr.domain.po.Record;
@@ -15,10 +16,13 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,9 +36,7 @@ import java.util.Set;
 public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> implements IGovernanceService {
 
     private final EsTermNormalizer termNormalizer;
-    private final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private final ObjectMapper objectMapper;
 
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
@@ -90,9 +92,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (changed(r.getPattern(), pattern)) repaired++;
             if (changed(r.getPrescription(), prescription)) repaired++;
             vo.setRepaired(vo.getRepaired() + repaired);
+            // 空值规整：非空但仅由空白字符构成（trim 后为空）的字段，计为一次"空值规整"
             vo.setCleared(vo.getCleared()
                     + (int) Arrays.asList(r.getGender(), r.getAge(), r.getPattern(), r.getPrescription())
-                    .stream().filter(v -> v != null && !v.isBlank() && v.trim().isEmpty()).count());
+                    .stream().filter(v -> v != null && !v.isEmpty() && v.trim().isEmpty()).count());
 
             // ④ 脏数据隔离（收紧：仅"无法修复"）——核心文本全空 或 structuredData存在但无法解析
             boolean unrecoverable = (isBlank(r.getChiefComplaint()) && isBlank(r.getTcmDiagnosis())
@@ -127,12 +130,23 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         try {
             objectMapper.readTree(s);
             return true;
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             return false;
         }
     }
 
-    /** 原始文本哈希（21字段拼接，用于去重） */
+    /**
+     * 原始文本哈希（21 字段固定顺序拼接 → MD5，用于去重）
+     *
+     * <p><b>字段顺序（勿改，变更需回归去重，否则历史数据会被误判）</b>：
+     * registrationNo → outpatientNo → gender → age → westernDiagnosis → tcmDiagnosis →
+     * presentIllness → chiefComplaint → selfReport → inspection → pulse → tongue →
+     * physicalExam → pattern → prescription → followUp → treatmentEffect → department →
+     * doctorId → visitCount → visitTime
+     *
+     * <p>原实现用 {@code String.hashCode()}（32 位 int，碰撞率高，不同病历会被误判重复），
+     * 改为 MD5(UTF-8) 32 位十六进制。
+     */
     private String textHash(Record r) {
         String joined = String.join("|",
                 nvl(r.getRegistrationNo()), nvl(r.getOutpatientNo()), nvl(r.getGender()), nvl(r.getAge()),
@@ -140,8 +154,21 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 nvl(r.getChiefComplaint()), nvl(r.getSelfReport()), nvl(r.getInspection()),
                 nvl(r.getPulse()), nvl(r.getTongue()), nvl(r.getPhysicalExam()), nvl(r.getPattern()),
                 nvl(r.getPrescription()), nvl(r.getFollowUp()), nvl(r.getTreatmentEffect()),
-                nvl(r.getDepartment()), nvl(r.getDoctorId()));
-        return Integer.toHexString(joined.hashCode());
+                nvl(r.getDepartment()), nvl(r.getDoctorId()),
+                nvl(r.getVisitCount() == null ? null : String.valueOf(r.getVisitCount())),
+                nvl(r.getVisitTime() == null ? null : r.getVisitTime().toString()));
+        return md5Hex(joined);
+    }
+
+    /** MD5(UTF-8) → 32 位小写十六进制 */
+    private String md5Hex(String s) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            return HexFormat.of().formatHex(md.digest(s.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            // MD5 为 JDK 必备算法，正常不会发生
+            throw new IllegalStateException("MD5 算法不可用", e);
+        }
     }
 
     private String nvl(String s) {
@@ -156,7 +183,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private int normalizeStructuredData(Record r) {
         try {
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                    new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
             int[] replaced = {0};
             // Entity数组：content归一（diseases/symptoms/patternList/formulaList有对应词典）
@@ -201,7 +228,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             }
             baseMapper.updateStructuredData(r.getId(), objectMapper.writeValueAsString(data));
             return replaced[0];
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             log.warn("[治理] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
             return 0;
         }
@@ -287,7 +314,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         if (r.getStructuredData() == null) return false;
         try {
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                    new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
             if (data.get("patternList") instanceof List<?> list) {
                 for (Object item : list) {
@@ -298,7 +325,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 }
             }
             return r.getPattern() != null && r.getPattern().contains(pattern);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             return false;
         }
     }
@@ -323,11 +350,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     private byte[] toCsv(List<Record> records) throws IOException {
         String[] headers = {"id", "挂号号", "门诊号", "性别", "年龄", "就诊次数", "西医诊断", "中医诊断",
-                "现病史", "主诉", "自述", "望诊", "脉象", "舌象", "体格检查", "证型", "处方",
+                "现病史", "主诉", "自述", "望诊", "脉象", "舌象", "体格检查", "辨证结论", "处方",
                 "随访", "治疗效果", "科室", "医生ID", "就诊时间"};
         List<String> cols = List.of("id", "registrationNo", "outpatientNo", "gender", "age", "visitCount",
                 "westernDiagnosis", "tcmDiagnosis", "presentIllness", "chiefComplaint",
-                "selfReport", "inspection", "pulse", "tongue", "physicalExam", "syndrome",
+                "selfReport", "inspection", "pulse", "tongue", "physicalExam", "pattern",
                 "prescription", "followUp", "treatmentEffect", "department", "doctorId", "visitTime");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF}); // UTF-8 BOM

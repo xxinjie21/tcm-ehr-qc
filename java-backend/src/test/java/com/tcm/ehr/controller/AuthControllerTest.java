@@ -1,6 +1,6 @@
 package com.tcm.ehr.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.exception.BadCredentialsException;
 import com.tcm.ehr.common.exception.GlobalExceptionHandler;
 import com.tcm.ehr.domain.dto.LoginDTO;
@@ -145,6 +145,38 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg").value("用户名不能为空"));
+    }
+
+    /** 长度约束（批A·1.5 U14）：2~20 字符 */
+    @Test
+    void registerTooShortUsernameReturns400() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("a", "123456")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("用户名长度须为 2~20 个字符"));
+    }
+
+    /** 字符集约束（批A·1.5 U14）：仅字母/数字/下划线/中文 */
+    @Test
+    void registerIllegalCharUsernameReturns400() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("admin@1", "123456")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("用户名只能包含字母、数字、下划线或中文"));
+    }
+
+    /** 中文用户名合法（字符集含 \u4e00-\u9fa5） */
+    @Test
+    void registerChineseUsernameReturns200() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson("张三", "123456")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
     }
 
     @Test

@@ -1,10 +1,12 @@
 """种子词典生成 + 500行病历灌入 tcm_ehr.records
 五实体术语库：疾病(disease)/证候(pattern)/症状(symptom)/中药(herb)/方剂(formula)
 """
-import openpyxl, pymysql, re, json, uuid, random, collections
+import os, openpyxl, pymysql, re, json, uuid, random, collections
 
-XLSX = r'D:\ZISHIKU\AI\tcm-ehr-governance\docs\电子病历精简脱敏数据_500行.xlsx'
-DICT_DIR = r'D:\ZISHIKU\AI\tcm-ehr-governance\data\dictionaries'
+# 路径以脚本自身位置为基准（data/ 的上一级 = 仓库根），换机/换目录无需修改
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+XLSX = os.path.join(ROOT, 'docs', '电子病历精简脱敏数据_500行.xlsx')
+DICT_DIR = os.path.join(ROOT, 'data', 'dictionaries')
 
 wb = openpyxl.load_workbook(XLSX)
 ws = wb.active

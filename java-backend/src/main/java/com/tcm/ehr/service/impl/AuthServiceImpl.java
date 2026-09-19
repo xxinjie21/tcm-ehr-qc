@@ -1,6 +1,6 @@
 package com.tcm.ehr.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.tcm.ehr.common.exception.BadCredentialsException;
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.domain.po.User;
@@ -8,6 +8,7 @@ import com.tcm.ehr.domain.vo.LoginVO;
 import com.tcm.ehr.mapper.UserMapper;
 import com.tcm.ehr.service.IAuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -47,7 +48,12 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         user.setPassword(passwordEncoder.encode(password));
         // 安全约束：注册账号角色固定为审核员，不开放管理员注册
         user.setRole(ROLE_AUDITOR);
-        baseMapper.insert(user);
+        try {
+            baseMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            // 并发注册竞态：两个请求同时通过上面的存在性检查，靠 users.username 唯一索引兜底
+            throw new IllegalArgumentException("用户名已存在");
+        }
     }
 
     @Override

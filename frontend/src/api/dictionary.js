@@ -7,6 +7,14 @@ export function importDict(formData) {
   })
 }
 
+// PDF 智能转换（LLM 即 ETL）：只返回候选预览，不落库；LLM 调用可能较慢故超时放宽
+export function convertDict(formData) {
+  return request.post('/dictionary/convert', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000
+  })
+}
+
 export function getTerms(params) {
   return request.get('/dictionary/terms', { params })
 }

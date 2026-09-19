@@ -23,4 +23,12 @@ public class TermEntry {
 
     /** 来源标准（如：中国药典2025年版） */
     private String source = "";
+
+    /** 可选国标代码（GB/T 15657 / GB/T 16751 等）；未收录为 null，不入 ES 索引 */
+    private String code;
+
+    /** 兼容原三参调用（国标代码缺省为空） */
+    public TermEntry(String standardTerm, List<String> aliases, String source) {
+        this(standardTerm, aliases, source, null);
+    }
 }

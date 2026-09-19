@@ -1,44 +1,55 @@
 <template>
-  <div class="login-page">
-    <el-card class="login-card">
-      <h2 class="login-title">中医电子病历质控与标准化系统</h2>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="0">
-        <el-form-item prop="username">
-          <el-input v-model="form.username" placeholder="用户名" size="large" />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input
-            v-model="form.password"
-            type="password"
-            placeholder="密码"
-            size="large"
-            show-password
-            @keyup.enter="handleLogin"
-          />
-        </el-form-item>
-        <el-button
-          type="primary"
+  <AuthShell>
+    <h3>登 录</h3>
+    <p class="hint">请使用系统分配的账号登录</p>
+
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+      <el-form-item label="用户名" prop="username">
+        <el-input
+          v-model="form.username"
+          placeholder="请输入用户名"
           size="large"
-          style="width: 100%"
-          :loading="loading"
-          @click="handleLogin"
-        >
-          登 录
-        </el-button>
-        <div class="to-register">
-          还没有账号？<router-link to="/register">立即注册</router-link>
-        </div>
-      </el-form>
-    </el-card>
-  </div>
+          autocomplete="username"
+        />
+      </el-form-item>
+      <el-form-item label="密码" prop="password">
+        <el-input
+          v-model="form.password"
+          type="password"
+          placeholder="请输入密码"
+          size="large"
+          show-password
+          autocomplete="current-password"
+          @keyup.enter="handleLogin"
+        />
+      </el-form-item>
+      <el-button
+        type="primary"
+        size="large"
+        class="auth-submit"
+        :loading="loading"
+        @click="handleLogin"
+      >
+        登 录
+      </el-button>
+    </el-form>
+
+    <div class="auth-switch">还没有账号？<router-link to="/register">立即注册</router-link></div>
+
+    <!-- U13：演示账号提示 -->
+    <div class="auth-demo">
+      <b>演示账号</b>　管理员 <code>admin / 123456</code>　｜　审核员 <code>auditor / 123456</code>
+    </div>
+  </AuthShell>
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import AuthShell from '@/components/AuthShell.vue'
 import { login } from '@/api/auth'
-import { useUserStore } from '@/store/user'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -64,36 +75,3 @@ const handleLogin = async () => {
   }
 }
 </script>
-
-<style scoped>
-.login-page {
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1f4e3d 0%, #2d6a4f 100%);
-}
-
-.login-card {
-  width: 400px;
-  padding: 12px 8px;
-}
-
-.login-title {
-  text-align: center;
-  margin-bottom: 24px;
-  color: #1f4e3d;
-  font-size: 18px;
-}
-.to-register {
-  margin-top: 16px;
-  text-align: center;
-  font-size: 13px;
-  color: #7a786f;
-}
-
-.to-register a {
-  color: #2d6a4f;
-  text-decoration: none;
-}
-</style>

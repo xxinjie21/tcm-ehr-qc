@@ -35,33 +35,38 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '@/store/user'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-// 菜单全量展示（角色权限由后端接口控制）；未开发页面显示占位页
-const menuGroups = [
-  {
-    title: '数据处理',
-    items: [
-      { title: '首页看板', path: '/dashboard' },
-      { title: '病历数据', path: '/records' },
-      { title: '结构化解析', path: '/nlp-extract' },
-      { title: '质控校验', path: '/qc-check' },
-      { title: '人工复核', path: '/review' },
-      { title: '清洗与导出', path: '/governance' }
-    ]
-  },
-  {
-    title: '系统配置',
-    items: [
-      { title: '术语词典', path: '/dictionary' },
-      { title: '日志审计', path: '/audit-log' }
-    ]
-  }
+// 菜单项全量定义；实际渲染项由登录返回的 menus 过滤（批A·1.2 双角色），
+// 未开发页面显示占位页
+const ALL_MENUS = [
+  { group: '数据处理', title: '首页看板', path: '/dashboard' },
+  { group: '数据处理', title: '病历数据', path: '/records' },
+  { group: '数据处理', title: '结构化解析', path: '/nlp-extract' },
+  { group: '数据处理', title: '质控校验', path: '/qc-check' },
+  { group: '数据处理', title: '人工复核', path: '/review' },
+  { group: '数据处理', title: '清洗与导出', path: '/governance' },
+  { group: '系统配置', title: '术语词典', path: '/dictionary' },
+  { group: '系统配置', title: '日志审计', path: '/audit-log' }
 ]
+
+const GROUP_ORDER = ['数据处理', '系统配置']
+
+// 管理员 8 项全量；审核员仅「首页看板 + 人工复核」（与 AuthServiceImpl 一致）；空分组不渲染
+const menuGroups = computed(() => {
+  const allowed = userStore.menus || []
+  return GROUP_ORDER
+    .map((title) => ({
+      title,
+      items: ALL_MENUS.filter((m) => m.group === title && allowed.includes(m.title))
+    }))
+    .filter((group) => group.items.length > 0)
+})
 
 const handleLogout = () => {
   userStore.logout()

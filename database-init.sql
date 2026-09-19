@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS records (
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_registration_no (registration_no),
   INDEX idx_status (status),
-  INDEX idx_grade (grade)
+  INDEX idx_grade (grade),
+  INDEX idx_department_visit_time (department, visit_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='病历表';
 
 -- 3. 复核任务表
@@ -62,9 +63,29 @@ CREATE TABLE IF NOT EXISTS review_tasks (
   score INT COMMENT '当前评分',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   deadline_time DATETIME COMMENT '复核截止时间（创建时间+7个工作日）',
+  reviewed_by VARCHAR(50) COMMENT '复核人用户名',
+  completed_time DATETIME COMMENT '复核完成时间',
+  is_obsolete TINYINT NOT NULL DEFAULT 0 COMMENT '作废标记：病历重新评分后不再是待复核则置1（查询/统计/看板统一过滤 is_obsolete=0）',
   INDEX idx_record_id (record_id),
+  INDEX idx_obsolete (is_obsolete),
   CONSTRAINT fk_review_record FOREIGN KEY (record_id) REFERENCES records(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='复核任务表';
+
+-- 4. 操作日志表（批A·C5：OperationLogger 文件 + 入库双写；审计页 GET /api/logs 读本表做分页筛选）
+--    文件 logs/operation.log 为兜底备份，本表为审计查询数据源；库写失败不阻塞业务
+CREATE TABLE IF NOT EXISTS operation_log (
+  id VARCHAR(36) PRIMARY KEY COMMENT '主键UUID',
+  log_time DATETIME NOT NULL COMMENT '操作时间',
+  operator VARCHAR(50) COMMENT '操作人用户名',
+  role VARCHAR(20) COMMENT '操作人角色：管理员/审核员',
+  action VARCHAR(50) COMMENT '操作类型：数据清洗/数据集导出/词典导入/词典回滚/人工复核/批量重算',
+  target VARCHAR(255) COMMENT '操作对象：筛选范围/文件名/词典类型/病历ID',
+  detail TEXT COMMENT '操作明细',
+  ip VARCHAR(45) COMMENT '客户端IP（兼容IPv6）',
+  INDEX idx_log_time (log_time),
+  INDEX idx_operator (operator),
+  INDEX idx_action (action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
 
 -- 初始化账号（密码均为123456的BCrypt加密）
 -- admin/123456 = 管理员；auditor/123456 = 审核员

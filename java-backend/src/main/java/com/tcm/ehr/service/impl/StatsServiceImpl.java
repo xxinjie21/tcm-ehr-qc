@@ -1,8 +1,9 @@
 package com.tcm.ehr.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.domain.dto.StatsDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.OverviewVO;
@@ -13,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -28,7 +28,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implements IStatsService {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     public OverviewVO overview() {
@@ -150,7 +150,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             if (val instanceof String s) {
                 return List.of(s);
             }
-        } catch (IOException ignored) {
+        } catch (JacksonException ignored) {
         }
         return null;
     }

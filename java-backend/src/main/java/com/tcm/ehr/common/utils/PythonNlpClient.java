@@ -1,6 +1,6 @@
 package com.tcm.ehr.common.utils;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -21,7 +21,7 @@ import java.util.Map;
 public class PythonNlpClient {
 
     private final HttpClient httpClient;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
 
     @Value("${nlp.service-url:http://localhost:8001}")
     private String serviceUrl;
@@ -32,7 +32,8 @@ public class PythonNlpClient {
     @Value("${nlp.enabled:false}")
     private boolean enabled;
 
-    public PythonNlpClient() {
+    public PythonNlpClient(ObjectMapper mapper) {
+        this.mapper = mapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
@@ -63,7 +64,7 @@ public class PythonNlpClient {
                 return null;
             }
             return mapper.readValue(response.body(),
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                    new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
         } catch (Exception e) {
             log.warn("[NLP] 调用异常: {}", e.getMessage());

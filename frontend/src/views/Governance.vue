@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- 治理状态行（顶部） -->
-    <section class="gov-stats">
+    <section v-loading="statsLoading" class="gov-stats">
       <span class="gs"><b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
       <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待治理</span>
       <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已治理</span>
@@ -135,6 +135,9 @@
           </el-table-column>
           <el-table-column prop="score" label="评分" width="60" fixed="right" />
           <el-table-column prop="grade" label="分级" width="70" fixed="right" />
+          <template #empty>
+            <el-empty description="筛选范围内没有质控合格的病历" :image-size="80" />
+          </template>
         </el-table>
       </div>
     </PanelCard>
@@ -158,7 +161,7 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
 import { clean as cleanApi, exportDataset, previewDataset, governanceStats } from '@/api/governance'
@@ -211,21 +214,40 @@ const prettyStructured = (s) => {
 }
 
 const stats = reactive({ qualified: 0, pendingGovern: 0, governedCount: 0 })
+const statsLoading = ref(false)
 
 const loadStats = async () => {
-  const res = await governanceStats()
-  Object.assign(stats, res.data)
+  statsLoading.value = true
+  try {
+    const res = await governanceStats()
+    Object.assign(stats, res.data)
+  } catch {
+    // 拦截器已提示，这里只保证状态收敛
+  } finally {
+    statsLoading.value = false
+  }
 }
 
 const clean = reactive({ loading: false, result: null })
 
 const handleClean = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定执行数据清洗吗？将处理全部病历（不做子集筛选）：去重仅标记无效、不删除记录，且绝不填充医生未书写的内容。当前已治理 ${stats.governedCount ?? 0} 条，本次会按最新词典重新兜底归一。`,
+      '数据清洗',
+      { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
   clean.loading = true
   try {
     const res = await cleanApi({})
     clean.result = res.data
     ElMessage.success(`清洗完成：归一命中 ${res.data.normalized} 处`)
     loadStats()
+  } catch {
+    // 拦截器已提示
   } finally {
     clean.loading = false
   }
@@ -257,6 +279,8 @@ const handlePreview = async () => {
     const res = await previewDataset(buildPayload())
     preview.result = res.data
     if (!res.data.total) ElMessage.warning('筛选范围内无质控合格病历')
+  } catch {
+    // 拦截器已提示
   } finally {
     preview.loading = false
   }
@@ -277,6 +301,8 @@ const handleExport = async () => {
     }
     saveBlob(blob, `tcm_ehr_dataset_${Date.now()}.${format.value}`)
     ElMessage.success('导出成功')
+  } catch {
+    // 拦截器已提示
   } finally {
     exporting.value = false
   }

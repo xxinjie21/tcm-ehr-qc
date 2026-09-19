@@ -1,6 +1,6 @@
 package com.tcm.ehr.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.domain.dto.ExportDTO;
 import com.tcm.ehr.domain.po.Record;

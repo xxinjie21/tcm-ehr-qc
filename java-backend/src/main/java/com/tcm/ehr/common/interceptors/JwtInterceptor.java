@@ -1,6 +1,6 @@
 package com.tcm.ehr.common.interceptors;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
@@ -19,7 +19,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class JwtInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
