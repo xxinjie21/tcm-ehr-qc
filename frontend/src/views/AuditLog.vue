@@ -18,8 +18,10 @@
       </div>
 
       <el-table v-loading="loading" :data="logs" border stripe style="margin-top: 12px">
-        <el-table-column prop="time" label="操作时间" width="160" />
-        <el-table-column prop="username" label="操作人" width="100" />
+        <el-table-column label="操作时间" width="170">
+          <template #default="{ row }">{{ (row.logTime || '').replace('T', ' ').substring(0, 19) }}</template>
+        </el-table-column>
+        <el-table-column prop="operator" label="操作人" width="100" />
         <el-table-column prop="role" label="角色" width="90" />
         <el-table-column label="操作类型" width="110">
           <template #default="{ row }">
@@ -61,14 +63,17 @@ import { saveBlob } from '@/utils/download'
  * GovernanceController「数据清洗」「数据集导出」、DictionaryController「词典导入」「词典回滚」「词典转换」。
  * 展示直接用 action 原文，故这里只列选项、不做翻译。
  */
-const ACTION_OPTIONS = ['数据清洗', '数据集导出', '词典导入', '词典回滚', '词典转换']
+const ACTION_OPTIONS = ['数据清洗', '数据集导出', '词典导入', '词典回滚', '词典转换', '病历导入', '病历修改', '病历删除']
 
 const TAG_TYPES = {
   数据清洗: 'warning',
   数据集导出: 'primary',
   词典导入: 'success',
   词典回滚: 'info',
-  词典转换: 'primary'
+  词典转换: 'primary',
+  病历导入: 'success',
+  病历修改: 'primary',
+  病历删除: 'danger'
 }
 
 const query = reactive({ action: '', keyword: '', page: 1, size: 10 })

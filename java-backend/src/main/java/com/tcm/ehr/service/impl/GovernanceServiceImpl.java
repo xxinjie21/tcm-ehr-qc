@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
+import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.domain.dto.ExportDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CleanResultVO;
@@ -16,13 +17,10 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -73,7 +71,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             }
 
             // ① 去重：原始文本哈希（21字段拼接）
-            String textHash = textHash(r);
+            String textHash = RecordUtil.textHash(r);
             if (!seenTextHash.add(textHash)) {
                 baseMapper.updateCleanFields(r.getId(), trim(r.getGender()), trim(r.getAge()),
                         trim(r.getPattern()), trim(r.getPrescription()), "invalid", "无效");
@@ -133,46 +131,6 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         } catch (JacksonException e) {
             return false;
         }
-    }
-
-    /**
-     * 原始文本哈希（21 字段固定顺序拼接 → MD5，用于去重）
-     *
-     * <p><b>字段顺序（勿改，变更需回归去重，否则历史数据会被误判）</b>：
-     * registrationNo → outpatientNo → gender → age → westernDiagnosis → tcmDiagnosis →
-     * presentIllness → chiefComplaint → selfReport → inspection → pulse → tongue →
-     * physicalExam → pattern → prescription → followUp → treatmentEffect → department →
-     * doctorId → visitCount → visitTime
-     *
-     * <p>原实现用 {@code String.hashCode()}（32 位 int，碰撞率高，不同病历会被误判重复），
-     * 改为 MD5(UTF-8) 32 位十六进制。
-     */
-    private String textHash(Record r) {
-        String joined = String.join("|",
-                nvl(r.getRegistrationNo()), nvl(r.getOutpatientNo()), nvl(r.getGender()), nvl(r.getAge()),
-                nvl(r.getWesternDiagnosis()), nvl(r.getTcmDiagnosis()), nvl(r.getPresentIllness()),
-                nvl(r.getChiefComplaint()), nvl(r.getSelfReport()), nvl(r.getInspection()),
-                nvl(r.getPulse()), nvl(r.getTongue()), nvl(r.getPhysicalExam()), nvl(r.getPattern()),
-                nvl(r.getPrescription()), nvl(r.getFollowUp()), nvl(r.getTreatmentEffect()),
-                nvl(r.getDepartment()), nvl(r.getDoctorId()),
-                nvl(r.getVisitCount() == null ? null : String.valueOf(r.getVisitCount())),
-                nvl(r.getVisitTime() == null ? null : r.getVisitTime().toString()));
-        return md5Hex(joined);
-    }
-
-    /** MD5(UTF-8) → 32 位小写十六进制 */
-    private String md5Hex(String s) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            return HexFormat.of().formatHex(md.digest(s.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            // MD5 为 JDK 必备算法，正常不会发生
-            throw new IllegalStateException("MD5 算法不可用", e);
-        }
-    }
-
-    private String nvl(String s) {
-        return s == null ? "" : s.trim();
     }
 
     /**

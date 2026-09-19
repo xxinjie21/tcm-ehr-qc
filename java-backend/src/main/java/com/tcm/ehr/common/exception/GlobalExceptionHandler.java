@@ -31,6 +31,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Result.error(400, e.getMessage()));
     }
 
+    /** 数据域越权（行级权限） -> HTTP 403 + code=403 */
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Result<Void>> handleForbidden(ForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.error(403, e.getMessage()));
+    }
+
     /** 请求体校验失败（@Valid） -> HTTP 400 + code=400 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Result<Void>> handleValidation(MethodArgumentNotValidException e) {

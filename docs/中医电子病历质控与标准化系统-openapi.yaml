@@ -257,6 +257,28 @@ components:
           enum:
             - 处理中
             - 已完成
+        total:
+          type: integer
+          description: 有效数据行总数
+        processed:
+          type: integer
+          description: 已处理行数
+        success:
+          type: integer
+          description: 成功入库数
+        failed:
+          type: integer
+          description: 失败数
+        failures:
+          type: array
+          description: 失败明细（文件名 + 原因）
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              reason:
+                type: string
     CreateRecordDTO:
       type: object
       description: 单条新增病历请求（入参，21个字段）
@@ -426,6 +448,33 @@ components:
       properties:
         deletedCount:
           type: integer
+    OperationLogVO:
+      type: object
+      description: 操作日志（出参，operation_log 表字段）
+      properties:
+        id:
+          type: string
+        logTime:
+          type: string
+          format: date-time
+          description: 操作时间
+        operator:
+          type: string
+          description: 操作人用户名
+        role:
+          type: string
+          description: 操作人角色
+        action:
+          type: string
+          description: 操作类型
+        target:
+          type: string
+          description: 操作对象
+        detail:
+          type: string
+          description: 操作明细
+        ip:
+          type: string
     SearchDTO:
       type: object
       description: 多条件查询请求（入参）
@@ -454,6 +503,9 @@ components:
         pattern:
           type: string
           description: 辨证结论关键词
+        grade:
+          type: string
+          description: 分级（合格/待复核/无效）
         status:
           type: string
           description: 病历状态，如 invalid 查询无效数据
@@ -1060,6 +1112,60 @@ paths:
                   data:
                     type: object
                     nullable: true
+  /api/logs:
+    get:
+      tags:
+        - 日志
+      summary: 操作日志分页查询
+      description: 【权限：仅管理员】读 operation_log 表（批A·C5 双写入库）分页筛选；文件 logs/operation.log 为兜底备份
+      parameters:
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          required: false
+          description: 操作人 / 操作对象 / 详情 关键字
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 分页结果 {list, total}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      list:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/OperationLogVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/logs/export:
     get:
       tags:
