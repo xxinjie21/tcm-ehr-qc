@@ -2001,6 +2001,42 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/export/dataset/preview:
+    post:
+      tags:
+        - 清洗与导出
+      summary: 标准数据集预览
+      description: 【权限：仅管理员】按条件返回质控合格病历的总数与前 10 条样本（供导出前预览，不下载文件）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportDatasetDTO'
+      responses:
+        '200':
+          description: 预览结果（total + sample 前 10 条）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      sample:
+                        type: array
+                        items:
+                          type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/governance/clean:
     post:
       tags:
@@ -2337,6 +2373,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorVO'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/dictionary/backups:
+    get:
+      tags:
+        - 词典管理
+      summary: 词典备份版本列表
+      description: 【权限：登录即可】列出指定术语类型的备份文件名（回滚可选版本）
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - disease
+              - symptom
+              - pattern
+              - herb
+              - formula
+      responses:
+        '200':
+          description: 备份列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      backups:
+                        type: array
+                        items:
+                          type: object
+        '400':
+          description: 术语类型非法（code=4001）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
   /api/stats:
