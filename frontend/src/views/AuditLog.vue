@@ -33,9 +33,11 @@
         <el-table-column prop="ip" label="IP" width="130" />
         <template #empty>
           <el-empty
-            :description="available ? '暂无日志记录' : '日志接口待接入'"
+            :description="available ? '暂无日志记录' : '日志加载失败'"
             :image-size="80"
-          />
+          >
+            <el-button v-if="!available" size="small" @click="loadLogs">重 试</el-button>
+          </el-empty>
         </template>
       </el-table>
 
@@ -53,15 +55,14 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import { getLogs, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 
 /**
  * 操作类型选项。取值来自后端 OperationLogger 的实际调用点：
- * GovernanceController「数据清洗」「数据集导出」、DictionaryController「词典导入」「词典回滚」「词典转换」。
- * 展示直接用 action 原文，故这里只列选项、不做翻译。
+ * GovernanceController「数据清洗」「数据集导出」、DictionaryController「词典导入」「词典回滚」「词典转换」、
+ * RecordController「病历导入」「病历修改」「病历删除」。展示直接用 action 原文，故这里只列选项、不做翻译。
  */
 const ACTION_OPTIONS = ['数据清洗', '数据集导出', '词典导入', '词典回滚', '词典转换', '病历导入', '病历修改', '病历删除']
 
@@ -81,8 +82,8 @@ const logs = ref([])
 const total = ref(0)
 const loading = ref(false)
 const exporting = ref(false)
-// 读侧接口（批F·7.5）尚未实现：调用失败即置 false 并显示空态提示，
-// 绝不退化成展示编造的日志
+// 加载失败（超时 / 服务异常 / 无权限）置 false，空态给出「重试」入口；
+// 无论何种情况都不退化成展示编造的日志
 const available = ref(true)
 
 const tagType = (action) => TAG_TYPES[action] || 'primary'
@@ -109,7 +110,7 @@ const handleExport = async () => {
     const blob = await exportLogs(query)
     saveBlob(blob, `audit_logs_${Date.now()}.csv`)
   } catch {
-    ElMessage.error('日志导出接口待接入')
+    // 拦截器已按实际状态（超时 / 无权限 / 服务异常）给出提示，这里不再叠加泛化文案
   } finally {
     exporting.value = false
   }

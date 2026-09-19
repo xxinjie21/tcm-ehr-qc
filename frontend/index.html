@@ -5,9 +5,56 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>中医电子病历质控与标准化系统</title>
+    <!-- 首屏占位样式内联：需早于打包 CSS 生效，避免加载期白屏（UX-13 / UX-47） -->
+    <style>
+      .boot-placeholder {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: #f5f3ed;
+        color: #33322e;
+        font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      }
+      .boot-mark {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        background: #2f4639;
+        color: #f5f3ed;
+        font-size: 30px;
+        line-height: 56px;
+        text-align: center;
+        font-family: 'Songti SC', 'SimSun', serif;
+      }
+      .boot-title {
+        font-size: 15px;
+        letter-spacing: 1px;
+        color: #2f4639;
+      }
+      .boot-hint {
+        font-size: 13px;
+        color: #726d63;
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Vue 挂载后会被替换；加载期即显示品牌与提示，不再是纯白屏 -->
+      <div class="boot-placeholder">
+        <div class="boot-mark">医</div>
+        <div class="boot-title">中医电子病历质控与标准化系统</div>
+        <div class="boot-hint">正在加载…</div>
+      </div>
+    </div>
+    <noscript>
+      <div class="boot-placeholder">
+        <div class="boot-title">需要启用 JavaScript</div>
+        <div class="boot-hint">本系统为交互式应用，请在浏览器设置中启用 JavaScript 后刷新页面。</div>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

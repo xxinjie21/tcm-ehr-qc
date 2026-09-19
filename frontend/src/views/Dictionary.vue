@@ -57,9 +57,15 @@
           <div class="upload-tip">
             拖拽文件到此处，或 <em>点击选择</em>
             <div class="sub">
-              Excel(.xlsx/.xls) / CSV：需含「标准术语」「别名」两列，可选第 3 列「国标代码」（别名用 、或; 分隔多个）<br />
-              JSON：TermEntry 数组 [{standardTerm, aliases[], source?, code?}]<br />
-              PDF：走 LLM 智能转换 → 预览确认后入库（需开启 llm.enabled 与 nlp.convert-enabled）
+              支持 Excel(.xlsx/.xls) / CSV / JSON；PDF 可智能转换为术语
+              <details class="fmt-detail">
+                <summary>查看格式说明</summary>
+                <div class="fmt-body">
+                  · Excel / CSV：第 1 列「标准术语」、第 2 列「别名」（多个用 、或 ; 分隔），可选第 3 列「国标代码」<br />
+                  · JSON：条目数组，每项含「标准术语」「别名」，可选「来源」「国标代码」<br />
+                  · PDF：上传后先转换为候选术语，确认无误再入库
+                </div>
+              </details>
             </div>
           </div>
         </el-upload>
@@ -67,7 +73,7 @@
           <el-button type="primary" :loading="importing || converting" :disabled="!importFile" @click="handleImport">
             {{ isPdfFile ? '智能转换（预览）' : '开始导入' }}
           </el-button>
-          <div class="tip" style="margin-top: 8px">导入时自动备份当前词典到 backup/ 目录，可在下方回滚。</div>
+          <div class="tip" style="margin-top: 8px">导入前会自动备份，可在下方「版本回滚」恢复。</div>
         </div>
       </div>
       <div v-if="importResult" class="import-result">
@@ -85,7 +91,7 @@
 
     <PanelCard title="版本回滚">
       <div class="rollback-row">
-        <span class="tip">回滚将使用备份文件覆盖当前词典，并重建内存缓存与 ES 索引。</span>
+        <span class="tip">回滚会用该备份覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新备份列表</el-button>
       </div>
       <el-table :data="backups" border style="margin-top: 12px" max-height="280">
@@ -105,7 +111,7 @@
     </PanelCard>
 
     <!-- PDF 智能转换预览：预览阶段不落库，确认后才写入 -->
-    <el-dialog v-model="convertVisible" title="PDF 转换预览" width="860px">
+    <el-dialog v-model="convertVisible" title="PDF 转换预览" width="min(860px, 92vw)">
       <div class="convert-hd">
         转换出候选 <b>{{ convert.candidates.length }}</b> 条，失败 <b>{{ convert.failed.length }}</b> 条。
         确认后将写入【{{ typeLabel }}】词典（入库前自动备份，可在「版本回滚」恢复）。
@@ -345,6 +351,34 @@ onMounted(() => {
   font-size: 12px;
   color: var(--text-sub);
   margin-top: 4px;
+}
+/* 详细格式收进折叠说明，避免一上来把数据结构摊给用户（UX-58） */
+.fmt-detail {
+  margin-top: 6px;
+}
+.fmt-detail summary {
+  display: inline-block;
+  cursor: pointer;
+  color: var(--ink-mid);
+  list-style: none;
+}
+.fmt-detail summary::-webkit-details-marker {
+  display: none;
+}
+.fmt-detail summary::before {
+  content: '▸ ';
+}
+.fmt-detail[open] summary::before {
+  content: '▾ ';
+}
+.fmt-body {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  text-align: left;
+  line-height: 1.8;
 }
 .import-actions {
   flex: 1;

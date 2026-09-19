@@ -97,7 +97,7 @@
       </el-form>
     </PanelCard>
 
-    <el-dialog v-model="detailVisible" title="病历详情（原始字段只读）" width="780px">
+    <el-dialog v-model="detailVisible" title="病历详情（原始字段只读）" width="min(780px, 92vw)">
       <template v-if="raw">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">

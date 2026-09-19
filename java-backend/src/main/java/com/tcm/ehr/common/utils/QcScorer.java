@@ -111,14 +111,21 @@ public final class QcScorer {
         };
     }
 
+    /**
+     * 缺失原因文案。
+     *
+     * <p><b>返回值会直接展示给最终用户</b>（质控扣分明细的「原因」列），
+     * 因此只能写业务措辞，<b>不得出现 structuredData 字段名</b>（如 `formulaList` / `patternList`）——
+     * 医生看不懂字段名，也无法据此判断该补什么（见 UX-55）。</p>
+     */
     private static String reasonFor(String field) {
         return switch (field) {
-            case "脉象" -> "pulseList 与 pulse 均为空";
-            case "舌象" -> "tongueList 与 tongue 均为空";
-            case "证候" -> "patternList 与 pattern 均为空";
-            case "治法" -> "treatmentList 为空";
-            case "方剂" -> "formulaList 为空";
-            case "中药" -> "herbs 与 prescription 均为空";
+            case "脉象" -> "结构化数据与原始病历均无脉象记录";
+            case "舌象" -> "结构化数据与原始病历均无舌象记录";
+            case "证候" -> "结构化数据与原始病历均无证候结论";
+            case "治法" -> "结构化数据中无治法";
+            case "方剂" -> "结构化数据中无方剂";
+            case "中药" -> "结构化数据与原始病历均无中药记录";
             default -> "缺失";
         };
     }

@@ -51,7 +51,7 @@
     />
   </PanelCard>
 
-  <el-dialog v-model="visible" title="复核对照（原始病历 / AI预检单）" width="1040px" top="6vh">
+  <el-dialog v-model="visible" title="复核对照（原始病历 / AI预检单）" width="min(1040px, 94vw)" top="6vh">
     <div v-loading="detailLoading" class="rv-grid">
       <!-- 左：原始病历 + 结构化 -->
       <section class="rv-col">
@@ -88,7 +88,10 @@
 
         <div class="rv-actions">
           <el-button type="primary" :loading="submitting" @click="submit(true)">提交修正并复核</el-button>
-          <el-button :loading="submitting" @click="submit(false)">保持待复核（仅重算）</el-button>
+          <el-button :loading="submitting" @click="submit(false)">仅重算评分</el-button>
+        </div>
+        <div class="tip">
+          「仅重算评分」不修改病历数据；任务是否结束由重算结果判定（不填修正内容时即等同此操作）。
         </div>
         <div v-if="result" class="rv-result">
           复核结果：<b>{{ result.status }}</b>，评分 {{ result.score }}
@@ -265,6 +268,10 @@ onMounted(() => load(1))
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   min-height: 420px;
+  /* 视口相关的最大高度 + 内部滚动：1366×768 等矮屏下弹窗顶部不再被裁切（UX-12） */
+  max-height: calc(92vh - 150px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .rv-col {
   min-width: 0;
@@ -318,6 +325,12 @@ onMounted(() => load(1))
   margin-top: 12px;
   display: flex;
   gap: 10px;
+  /* 吸底：右列内容滚动时操作按钮始终可见（UX-12） */
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
 }
 .rv-result {
   margin-top: 12px;

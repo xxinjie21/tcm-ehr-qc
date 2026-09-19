@@ -20,9 +20,9 @@
         <span v-for="c in categories" :key="c.name" class="lg">
           <i :style="{ background: c.color }" />{{ c.label }}
         </span>
-        <span class="lg"><i class="line" />病历-实体</span>
-        <span class="lg"><i class="line rule" />证候-治法/方剂</span>
-        <span class="lg"><i class="line conflict" />冲突</span>
+        <span v-for="l in edgeLegend" :key="l.type" class="lg">
+          <i class="line" :class="l.cls" />{{ l.label }}
+        </span>
       </div>
     </PanelCard>
 
@@ -59,7 +59,7 @@
       />
     </PanelCard>
 
-    <el-dialog v-model="detailVisible" title="规则预检单（扣分明细）" width="620px">
+    <el-dialog v-model="detailVisible" title="规则预检单（扣分明细）" width="min(620px, 92vw)">
       <template v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
@@ -85,7 +85,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -107,6 +107,13 @@ const categories = [
 ]
 const CAT_INDEX = categories.reduce((m, c, i) => ({ ...m, [c.name]: i }), {})
 
+/** 边类型图例：只在当前数据里真的出现过的边类型才渲染，避免展示不存在的样式 */
+const EDGE_LEGENDS = [
+  { type: 'record', cls: '', label: '病历-实体' },
+  { type: 'rule', cls: 'rule', label: '证候-治法/方剂' },
+  { type: 'conflict', cls: 'conflict', label: '冲突' }
+]
+
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const params = () => {
   const d = filters.dateRange
@@ -121,6 +128,11 @@ const params = () => {
 
 const graph = reactive({ nodes: [], edges: [], truncated: false, hint: '' })
 const graphLoading = ref(false)
+
+const edgeLegend = computed(() => {
+  const present = new Set(graph.edges.map((e) => e.type || 'record'))
+  return EDGE_LEGENDS.filter((l) => present.has(l.type))
+})
 const graphRef = ref(null)
 let chart = null
 
@@ -183,7 +195,6 @@ const renderGraph = () => {
           return `${p.data.name}${p.data.value ? '（频次 ' + p.data.value + '）' : ''}`
         }
       },
-      legend: [{ data: categories.map((c) => c.name), textStyle: { fontSize: 11 }, top: 0 }],
       series: [
         {
           type: 'graph',
@@ -192,7 +203,7 @@ const renderGraph = () => {
           draggable: true,
           focusNodeAdjacency: true,
           emphasis: { focus: 'adjacency', label: { show: true } },
-          categories: categories.map((c) => ({ name: c.name })),
+          categories: categories.map((c) => ({ name: c.label })),
           label: { show: true, fontSize: 10, position: 'right', color: '#55534c' },
           force: { repulsion: 140, edgeLength: 46, gravity: 0.08 },
           lineStyle: { color: '#cfd6cf' },

@@ -19,8 +19,8 @@
     <!-- 数据清洗与术语归一（流程图） -->
     <PanelCard title="数据清洗与术语自动归一">
       <div class="flow-tip">
-        <b>清洗绝不填充医生未书写的内容</b> —— 缺失字段由质控扣分标记，由人工复核环节补充；
-        术语归一在解析环节已首次执行，此处按最新词典对全库实体兜底补归一。
+        <b>清洗不会填充医生未书写的内容</b>：缺失字段只做标记，由人工复核补充；
+        术语按最新词典统一为标准写法。
       </div>
 
       <div class="flow-wrapper">
@@ -38,7 +38,7 @@
         <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
           {{ clean.loading ? '清洗执行中…' : '执行数据清洗' }}
         </el-button>
-        <span class="tip">点击后按上述5步流水线处理，约1~3秒完成</span>
+        <span class="tip">按上述 5 步处理当前范围，可重复执行</span>
       </div>
 
       <!-- 清洗结果统计（中部） -->
@@ -114,7 +114,7 @@
         <el-button type="primary" :loading="exporting" @click="handleExport">导出下载</el-button>
       </div>
       <div class="tip" style="margin-top: 8px">
-        仅导出质控合格病历（21字段），自动脱敏手机号/身份证号；筛选条件复用多条件病历查询。
+        只导出质控合格的病历，手机号与身份证号会自动脱敏。
       </div>
 
       <div v-if="preview.result" class="preview-box">
@@ -158,7 +158,7 @@
     </PanelCard>
 
     <!-- 单条完整详情弹窗 -->
-    <el-dialog v-model="detailVisible" title="病历完整详情" width="760px">
+    <el-dialog v-model="detailVisible" title="病历完整详情" width="min(760px, 92vw)">
       <template v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
@@ -190,11 +190,11 @@ import { useAiStore } from '@/stores/ai'
 const aiStore = useAiStore()
 
 const STEPS = [
-  { title: '去重', desc: '原始文本哈希重复标记无效，不删除' },
-  { title: '字段清理', desc: '仅去空格 / 统一空值表示，绝不填值' },
-  { title: '格式规整', desc: '剂量单位 / 日期展示统一写法' },
-  { title: '脏数据隔离', desc: '仅"无法修复"的病历标记无效' },
-  { title: '术语自动归一', desc: '精确-包含-模糊三级，content 替换为标准词' }
+  { title: '去重', desc: '重复病历只标记，不删除' },
+  { title: '字段清理', desc: '只去多余空格，不改内容' },
+  { title: '格式规整', desc: '统一剂量与日期的写法' },
+  { title: '脏数据隔离', desc: '无法修复的病历标记为无效' },
+  { title: '术语归一', desc: '把「咽喉痛」这类写法统一成标准术语' }
 ]
 
 const FIELDS = [
@@ -281,7 +281,7 @@ const clean = reactive({ loading: false, result: null })
 const handleClean = async () => {
   try {
     await ElMessageBox.confirm(
-      `确定执行数据清洗吗？将处理全部病历（不做子集筛选）：去重仅标记无效、不删除记录，且绝不填充医生未书写的内容。当前已治理 ${stats.governedCount ?? 0} 条，本次会按最新词典重新兜底归一。`,
+      `将对「${scopeText.value}」范围内的病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`,
       '数据清洗',
       { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }
     )
