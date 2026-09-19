@@ -1,6 +1,7 @@
 package com.tcm.ehr.common.utils;
 
 import tools.jackson.databind.ObjectMapper;
+import com.tcm.ehr.domain.vo.NlpExtractVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -13,8 +14,11 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * Python NLP服务HTTP客户端封装（成员B的FastAPI服务，端口8001）
- * 服务未部署时返回null并记录告警，不阻塞主流程（降级开关 nlp.enabled=false 可完全关闭调用）
+ * Python NLP服务HTTP客户端封装（成员B的FastAPI服务，端口8001，批G·8.1）。
+ *
+ * <p>调用 {@code POST /api/nlp/extract} 并映射为 {@link NlpExtractVO}；
+ * 服务未启动 / 调用异常 / {@code nlp.enabled=false} 时返回 {@code null}，
+ * 由调用方降级为空 9 类（{@code modelAvailable=false}），不阻塞主流程。</p>
  */
 @Slf4j
 @Component
@@ -35,17 +39,23 @@ public class PythonNlpClient {
     public PythonNlpClient(ObjectMapper mapper) {
         this.mapper = mapper;
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
+                .version(HttpClient.Version.HTTP_1_1)   // uvicorn 仅 HTTP/1.1，禁用默认的 h2c upgrade
+                .connectTimeout(Duration.ofSeconds(3))
                 .build();
+    }
+
+    /** 抽取总开关（供导入链路判断是否触发抽取） */
+    public boolean isEnabled() {
+        return enabled;
     }
 
     /**
      * 调用 NLP实体抽取 POST /api/nlp/extract
      *
      * @param text 原始病历文本
-     * @return 抽取结果JSON（结构化实体），服务不可用返回null
+     * @return 抽取结果；未启用 / 服务不可用 / 异常时返回 null（调用方降级）
      */
-    public Map<String, Object> extract(String text) {
+    public NlpExtractVO extract(String text) {
         if (!enabled) {
             log.debug("[NLP] 已禁用（nlp.enabled=false），跳过调用");
             return null;
@@ -63,11 +73,9 @@ public class PythonNlpClient {
                 log.warn("[NLP] 调用失败: HTTP {}", response.statusCode());
                 return null;
             }
-            return mapper.readValue(response.body(),
-                    new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
-                    });
+            return mapper.readValue(response.body(), NlpExtractVO.class);
         } catch (Exception e) {
-            log.warn("[NLP] 调用异常: {}", e.getMessage());
+            log.warn("[NLP] 调用异常（将降级）: {}", e.getMessage());
             return null;
         }
     }

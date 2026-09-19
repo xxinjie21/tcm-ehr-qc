@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
@@ -17,6 +18,7 @@ import com.tcm.ehr.domain.vo.DeleteRecordsVO;
 import com.tcm.ehr.domain.vo.ImportStatusVO;
 import com.tcm.ehr.domain.vo.ImportSummaryVO;
 import com.tcm.ehr.domain.vo.ImportTaskVO;
+import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.RawRecordVO;
 import com.tcm.ehr.domain.vo.SearchVO;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -30,6 +32,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -62,6 +65,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> implements IRecordService {
 
     private final ObjectMapper objectMapper;
+    private final PythonNlpClient nlpClient;
+
+    /** 批G·8.3：导入入库后是否自动抽取（仅 nlp.enabled=true 时生效） */
+    @Value("${nlp.extract-on-import:true}")
+    private boolean extractOnImport;
 
     /** 原始 21 字段（禁止通过修改接口变更，命中即 400 code=1007） */
     private static final Set<String> ORIGINAL_FIELDS = Set.of(
@@ -214,6 +222,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
         if (!toInsert.isEmpty()) {
             saveBatch(toInsert);
+            extractAndStore(toInsert);
         }
         summary.setSuccess(toInsert.size());
 
@@ -382,6 +391,50 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
         s = s.trim();
         return s.length() > 40 ? s.substring(0, 40) + "…" : s;
+    }
+
+    /**
+     * 批G·8.3：导入入库后触发 NLP 抽取，结果写 {@code records.structured_data}。
+     * 仅当 {@code nlp.extract-on-import=true} 且 {@code nlp.enabled=true} 时执行；
+     * 单条失败仅告警、不阻塞导入。
+     */
+    private void extractAndStore(List<Record> records) {
+        if (!extractOnImport || !nlpClient.isEnabled() || records.isEmpty()) {
+            return;
+        }
+        int ok = 0;
+        for (Record r : records) {
+            try {
+                String text = composeText(r);
+                if (text.isBlank()) {
+                    continue;
+                }
+                NlpExtractVO vo = nlpClient.extract(text);
+                if (vo == null) {
+                    continue;
+                }
+                baseMapper.updateStructuredData(r.getId(), objectMapper.writeValueAsString(vo));
+                ok++;
+            } catch (Exception e) {
+                log.warn("[导入抽取] 病历 {} 抽取失败: {}", r.getId(), e.getMessage());
+            }
+        }
+        log.info("[导入抽取] 完成：成功 {} / {}", ok, records.size());
+    }
+
+    /** 由 21 字段拼装抽取用文本（供 NLP 服务输入） */
+    private String composeText(Record r) {
+        StringBuilder sb = new StringBuilder();
+        String[] parts = {r.getChiefComplaint(), r.getSelfReport(), r.getPresentIllness(),
+                r.getInspection(), r.getTongue(), r.getPulse(), r.getPhysicalExam(),
+                r.getTcmDiagnosis(), r.getPattern(), r.getPrescription(),
+                r.getFollowUp(), r.getTreatmentEffect()};
+        for (String s : parts) {
+            if (s != null && !s.isBlank()) {
+                sb.append(s.trim()).append('。');
+            }
+        }
+        return sb.toString();
     }
 
     // ============ 解析辅助 ============

@@ -1,0 +1,5 @@
+# NLP 抽取服务依赖（本机已安装版本：fastapi 0.125 / uvicorn 0.38 / torch 2.13 / transformers 5.15）
+fastapi
+uvicorn
+transformers
+torch

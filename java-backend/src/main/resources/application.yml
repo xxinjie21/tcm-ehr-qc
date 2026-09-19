@@ -70,12 +70,12 @@ jwt:
   secret: tcm-ehr-qc-jwt-secret-key-2026-course-design
   expire-hours: 24
 
-# NLP 抽取引擎（Java 进程内：DJL 读 tokenizer.json 分词 + ONNX Runtime 推理，无独立服务/端口）
+# NLP 抽取（批G·8.1）：Python FastAPI 服务（成员B），Java 经 PythonNlpClient 转发
 nlp:
-  enabled: false            # 模型抽取总开关；false 或模型缺失时回退规则兜底（舌象/脉象/病因/治法）
-  model-dir: D:/ZISHIKU/AI/tcm-ehr-qc/java-backend/nlp-model
-  max-length: 512           # 单条最大 token 数（模型 max_position_embeddings = 514）
-  batch-size: 16            # 批量送推理的批大小
+  enabled: false            # 抽取总开关；false 时不调用 Python 服务，接口返回空 9 类（modelAvailable=false）
+  service-url: http://localhost:8001
+  timeout: 30000            # 毫秒
+  extract-on-import: true   # 批G·8.3：病历导入入库后自动抽取写 structured_data（仅 enabled=true 时生效）
   convert-enabled: false    # 词典 PDF 智能转换子开关（② LLM 即 ETL）；依赖 llm.enabled=true，关闭时 PDF 上传提示走离线脚本/JSON 直传
 
 # LLM 增强（Spring AI 2.0；provider 二选一：ollama 本机 / openai 及兼容三方）

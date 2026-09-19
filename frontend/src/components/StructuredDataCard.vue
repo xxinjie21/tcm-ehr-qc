@@ -13,6 +13,8 @@
                 <b>{{ it.content }}</b>
                 <span v-if="it.sourceText && it.sourceText !== it.content" class="src">原文：{{ it.sourceText }}</span>
               </template>
+              <em v-if="it.source" class="tag" :class="it.source">{{ it.source === 'rule' ? '规则' : '模型' }}</em>
+              <span v-if="it.confidence != null" class="conf">{{ it.confidence }}</span>
             </span>
           </div>
         </div>
@@ -84,4 +86,15 @@ const tip = (it) => (it.sourceText && it.sourceText !== it.content ? `原文：$
 }
 .sd-item .src { font-size: 11.5px; color: var(--text-sub); margin-left: 6px; }
 .sd-item .dosage { color: var(--ochre); margin-left: 4px; }
+.sd-item .tag {
+  font-style: normal;
+  font-size: 10.5px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  color: #fff;
+  background: var(--ink-mid);
+}
+.sd-item .tag.rule { background: var(--ochre); }
+.sd-item .conf { font-size: 10.5px; color: var(--text-sub); margin-left: 4px; }
 </style>

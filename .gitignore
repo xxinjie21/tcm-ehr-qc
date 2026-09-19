@@ -38,6 +38,7 @@ logs/
 *.bin
 *.pt
 *.onnx
+python-nlp/model/
 
 # Node
 node_modules/

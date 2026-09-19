@@ -11,6 +11,10 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理：统一异常出口，全部返回 Result 错误体
@@ -69,6 +73,34 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.badRequest()
                 .body(Result.error(400, "参数类型不正确：" + e.getName()));
+    }
+
+    /** 上传文件超过大小上限（单文件/请求 50MB） -> HTTP 400 + code=400 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Result<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        return ResponseEntity.badRequest().body(Result.error(400, "文件超过大小上限（单文件/请求 50MB）"));
+    }
+
+    /** 非 multipart 请求或文件缺失 -> HTTP 400 + code=400（客户端错误，非 500） */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Result<Void>> handleMultipart(MultipartException e) {
+        return ResponseEntity.badRequest().body(Result.error(400, "请以 multipart/form-data 上传文件"));
+    }
+
+    /**
+     * multipart 请求里缺少文件部件（未带 file 字段） -> HTTP 400 + code=400
+     * （MissingServletRequestPartException 不是 MultipartException 的子类，抓不到上面那个分支）
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Result<Void>> handleMissingPart(MissingServletRequestPartException e) {
+        return ResponseEntity.badRequest()
+                .body(Result.error(400, "缺少文件参数：" + e.getRequestPartName()));
+    }
+
+    /** 未匹配到任何路由 -> HTTP 404（否则被兜底吞成 500「系统异常」，掩盖了真实原因） */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(404, "接口不存在"));
     }
 
     /** 兜底异常 -> HTTP 500 + code=500 */
