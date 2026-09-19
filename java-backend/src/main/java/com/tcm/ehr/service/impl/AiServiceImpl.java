@@ -5,11 +5,13 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.LlmClient;
+import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.AiReplyVO;
+import com.tcm.ehr.domain.vo.ScoreResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IAiService;
 import com.tcm.ehr.service.IStatsService;
@@ -351,6 +353,64 @@ public class AiServiceImpl implements IAiService {
             sb.append(KNOWLEDGE_FUNCTION).append(' ').append(KNOWLEDGE_FLOW);
         }
         return sb.toString().trim();
+    }
+
+    // ------------------------------------------------------------------ 批D·5.1 复核预检
+
+    @Override
+    public AiReplyVO review(AiQueryDTO dto) {
+        Record r = load(dto == null ? null : dto.getRecordId());
+        if (r == null) {
+            return null;
+        }
+        Map<String, Object> data = structured(r);
+
+        // 判定地基：规则重算预检单（与 records.qc_results 同源，确定性一致）
+        ScoreResultVO sr = QcScorer.score(data, r, false);
+        String precheck = precheckText(sr, r);
+
+        AiReplyVO vo = new AiReplyVO();
+        for (ScoreResultVO.Deduction d : sr.getDeductions()) {
+            vo.getKeyHints().add(d.getType() + "：" + d.getReason());
+        }
+
+        String raw = llmClient.chat(LlmClient.AI_REVIEW_SYSTEM_PROMPT, reviewPrompt(precheck, r, data));
+        boolean llmOk = raw != null && !raw.isBlank();
+        vo.setLlmAvailable(llmOk);
+        vo.setSource(llmOk ? "llm" : "rule");
+        vo.setAnswer(llmOk ? raw.trim() : precheck);
+        return vo;
+    }
+
+    private String precheckText(ScoreResultVO sr, Record r) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("规则预检单：评分 ").append(sr.getScore()).append("，分级 ").append(sr.getGrade()).append("。");
+        if (sr.getDeductions().isEmpty()) {
+            sb.append("无扣分项。");
+        } else {
+            sb.append("扣分项：");
+            sb.append(String.join("；", sr.getDeductions().stream()
+                    .map(d -> d.getType() + "-" + d.getItem() + "（-" + d.getPoints() + "，" + d.getReason() + "）")
+                    .toList()));
+            sb.append("。");
+        }
+        if (!sr.getLogicConflicts().isEmpty()) {
+            sb.append("逻辑冲突：").append(String.join("；", sr.getLogicConflicts())).append("。");
+        }
+        sb.append("当前辨证：").append(blank(r.getPattern()) ? "（空）" : r.getPattern());
+        return sb.toString();
+    }
+
+    private String reviewPrompt(String precheck, Record r, Map<String, Object> data) {
+        StringBuilder sb = new StringBuilder("【规则预检单】\n").append(precheck).append('\n');
+        sb.append("【结构化数据】\n")
+                .append("证候：").append(join(contents(data, "patternList"))).append('\n')
+                .append("治法：").append(join(contents(data, "treatmentList"))).append('\n')
+                .append("方剂：").append(join(contents(data, "formulaList"))).append('\n')
+                .append("舌象：").append(join(contents(data, "tongueList"))).append('\n')
+                .append("脉象：").append(join(contents(data, "pulseList"))).append('\n');
+        sb.append("\n请给出复核建议。");
+        return sb.toString();
     }
 
     // ------------------------------------------------------------------ 工具

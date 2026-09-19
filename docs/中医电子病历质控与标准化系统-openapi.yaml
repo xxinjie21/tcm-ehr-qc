@@ -759,6 +759,71 @@ components:
                 type: string
               points:
                 type: integer
+    GraphVO:
+      type: object
+      description: 质控检验图谱（出参，ECharts 2D 力导向数据）
+      properties:
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+                description: 病历摘要或实体标准词
+              type:
+                type: string
+                description: record / disease / pattern / symptom / tongue / pulse / formula / herb / cause / treatment
+              size:
+                type: integer
+                description: 病历=1；实体=频次
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              target:
+                type: string
+              type:
+                type: string
+                description: rel（病历-实体关联）/ rule（证候-治法/方剂规则）/ conflict（冲突，红色虚线）
+              label:
+                type: string
+                description: 冲突原因（type=conflict 时）
+        truncated:
+          type: boolean
+          description: 是否因节点/边上限被截断
+        hint:
+          type: string
+          description: 截断提示文案
+        counts:
+          type: object
+          description: 各类节点计数（图例/统计）
+          properties:
+            record:
+              type: integer
+            disease:
+              type: integer
+            symptom:
+              type: integer
+            tongue:
+              type: integer
+            pulse:
+              type: integer
+            pattern:
+              type: integer
+            cause:
+              type: integer
+            treatment:
+              type: integer
+            formula:
+              type: integer
+            herb:
+              type: integer
     # ========== 复核 DTO / VO ==========
     ReviewTaskVO:
       type: object
@@ -785,6 +850,9 @@ components:
           type: string
           format: date-time
           description: 复核截止时间（7个工作日时限）
+        overdue:
+          type: boolean
+          description: 是否已超截止时间（计算属性，仅视觉提醒，不自动流转）
         structuredData:
           $ref: '#/components/schemas/StructuredData'
           description: 已存储的NLP结构化抽取结果，供复核页左侧对照展示（免单独请求）
@@ -2052,6 +2120,59 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/qc/graph:
+    get:
+      tags:
+        - 质控
+      summary: 质控检验图谱
+      description: 【权限：仅管理员】按范围（复用 filters：department/start/end/pattern/grade）聚合"病历—实体"关联图 + LogicChecker 规则/冲突边；节点上限 200、边上限 800，超限截断并提示
+      parameters:
+        - name: department
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: pattern
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: grade
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 图谱数据（nodes / edges）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/GraphVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/dictionary/import:
     post:
       tags:
@@ -2543,5 +2664,53 @@ paths:
                 $ref: '#/components/schemas/ErrorVO'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/ai/review:
+    post:
+      tags:
+        - AI助手
+      summary: AI复核预检意见
+      description: |
+        【权限：管理员 / 审核员】基于规则预检单（qc_results / 重算）与 structuredData 生成复核建议
+        （疑缺脉象 / 证候-方剂冲突 / 建议复核重点）；判定仍为规则，LLM 仅叙述；
+        LLM 关/挂 → 回退预检单原文。读取受数据域约束（审核员仅待复核域）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiQueryDTO'
+            example:
+              recordId: 3f2a1b0c-...
+      responses:
+        '200':
+          description: 复核建议
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/AiReplyVO'
+        '400':
+          description: recordId 为空（code=400）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 病历不存在或不在数据域内（code=1006）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'

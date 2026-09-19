@@ -15,11 +15,11 @@ const routes = [
     children: [
       // 双角色（meta.title 与登录返回的 menus 名称一致，MainLayout 按 menus 渲染）
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '首页看板', roles: ['管理员', '审核员'] } },
-      { path: 'review', name: 'Review', component: () => import('@/views/Placeholder.vue'), meta: { title: '人工复核', roles: ['管理员', '审核员'] } },
+      { path: 'review', name: 'Review', component: () => import('@/views/Review.vue'), meta: { title: '人工复核', roles: ['管理员', '审核员'] } },
       // 仅管理员
       { path: 'records', name: 'Records', component: () => import('@/views/Records.vue'), meta: { title: '病历数据', roles: ['管理员'] } },
       { path: 'nlp-extract', name: 'NlpExtract', component: () => import('@/views/NlpExtract.vue'), meta: { title: '结构化解析', roles: ['管理员'] } },
-      { path: 'qc-check', name: 'QcCheck', component: () => import('@/views/Placeholder.vue'), meta: { title: '质控校验', roles: ['管理员'] } },
+      { path: 'qc-check', name: 'QcCheck', component: () => import('@/views/Qc.vue'), meta: { title: '质控校验', roles: ['管理员'] } },
       { path: 'governance', name: 'Governance', component: () => import('@/views/Governance.vue'), meta: { title: '清洗与导出', roles: ['管理员'] } },
       { path: 'dictionary', name: 'Dictionary', component: () => import('@/views/Dictionary.vue'), meta: { title: '术语词典', roles: ['管理员'] } },
       { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '日志审计', roles: ['管理员'] } }

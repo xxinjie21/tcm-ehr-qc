@@ -21,7 +21,8 @@ public final class LogicChecker {
     private LogicChecker() {
     }
 
-    private record Rule(String pattern, Set<String> treatments, Set<String> formulas) {
+    /** 规则条目（供图谱"证候→治法/方剂"规则子图复用；单源规则表） */
+    public record Rule(String pattern, Set<String> treatments, Set<String> formulas) {
     }
 
     private static final List<Rule> RULES = List.of(
@@ -29,6 +30,11 @@ public final class LogicChecker {
             new Rule("风热感冒", Set.of("辛凉解表"), Set.of("银翘散", "桑菊饮")),
             new Rule("暑湿感冒", Set.of("清暑祛湿"), Set.of("新加香薷饮"))
     );
+
+    /** 规则表只读视图（图谱复用，避免规则漂移） */
+    public static List<Rule> rules() {
+        return RULES;
+    }
 
     public static final String TYPE_TREATMENT = "证候-治法";
     public static final String TYPE_FORMULA = "证候-方剂";

@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
 import com.tcm.ehr.domain.vo.AiReplyVO;
@@ -44,5 +45,19 @@ public class AiController {
             return ResponseEntity.badRequest().body(Result.error(400, "question不能为空"));
         }
         return ResponseEntity.ok(Result.ok(aiService.chat(dto)));
+    }
+
+    /** AI 复核预检意见（批D·5.1）；【权限：管理员 / 审核员】 */
+    @RequireRole(roles = {"管理员", "审核员"})
+    @PostMapping("/review")
+    public ResponseEntity<Result<AiReplyVO>> review(@RequestBody AiQueryDTO dto) {
+        if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
+            return ResponseEntity.badRequest().body(Result.error(400, "recordId不能为空"));
+        }
+        AiReplyVO vo = aiService.review(dto);
+        if (vo == null) {
+            return ResponseEntity.status(404).body(Result.error(1006, "病历不存在"));
+        }
+        return ResponseEntity.ok(Result.ok(vo));
     }
 }

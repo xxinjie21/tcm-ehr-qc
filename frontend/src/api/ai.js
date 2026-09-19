@@ -9,3 +9,8 @@ export function aiInterpret(data) {
 export function aiChat(data) {
   return request.post('/ai/chat', data)
 }
+
+// AI 复核预检意见（批D·5.1）：基于规则预检单生成复核建议
+export function aiReview(data) {
+  return request.post('/ai/review', data)
+}

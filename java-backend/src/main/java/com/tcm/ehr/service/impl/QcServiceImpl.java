@@ -15,8 +15,10 @@ import com.tcm.ehr.domain.dto.LogicCheckDTO;
 import com.tcm.ehr.domain.dto.QcBatchDTO;
 import com.tcm.ehr.domain.dto.QcCheckDTO;
 import com.tcm.ehr.domain.dto.QcScoreDTO;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.po.ReviewTask;
+import com.tcm.ehr.domain.vo.GraphVO;
 import com.tcm.ehr.domain.vo.LogicCheckVO;
 import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcCheckVO;
@@ -32,7 +34,10 @@ import org.springframework.stereotype.Service;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +60,16 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private static final String BATCH_LOCK_KEY = "tcm:task:batch";
     private static final int BATCH_PAGE_SIZE = 1000;
     private static final Pattern NUMERIC = Pattern.compile("^\\d+(\\.\\d+)?(岁|个月|月|天)?$");
+
+    // 图谱上限（批D·3.3）：节点 200 = 病历 50 + 实体 150；边 800
+    private static final int GRAPH_RECORD_CAP = 50;
+    private static final int GRAPH_ENTITY_CAP = 150;
+    private static final int GRAPH_EDGE_CAP = 800;
+    private static final String[] ENTITY_TYPES = {
+            "disease", "symptom", "tongue", "pulse", "pattern", "cause", "treatment", "formula", "herb"};
+    private static final String[] ENTITY_KEYS = {
+            "diseases", "symptoms", "tongueList", "pulseList", "patternList", "causeList",
+            "treatmentList", "formulaList", "herbs"};
 
     private final ReviewTaskMapper reviewTaskMapper;
     private final ObjectMapper objectMapper;
@@ -242,6 +257,237 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     }
 
     // ============ 辅助 ============
+
+    @Override
+    public GraphVO graph(FiltersDTO filters) {
+        GraphVO vo = new GraphVO();
+        List<Record> records = baseMapper.selectList(RecordFilter.build(RequestUtils.currentRole(), filters));
+        if (records.isEmpty()) {
+            vo.setHint("范围内暂无可展示的质控数据");
+            return vo;
+        }
+
+        // 1) 抽取每条病历 9 类实体，累计全局频次
+        Map<String, Integer> freq = new HashMap<>();
+        Map<String, String> nameById = new HashMap<>();
+        Map<String, String> typeById = new HashMap<>();
+        List<Map<String, List<String>>> perRecord = new ArrayList<>();
+        int distinctEntities = 0;
+        for (Record r : records) {
+            Map<String, List<String>> byType = extractEntities(asMap(null, r.getStructuredData()));
+            perRecord.add(byType);
+            for (int i = 0; i < ENTITY_TYPES.length; i++) {
+                for (String c : byType.getOrDefault(ENTITY_TYPES[i], List.of())) {
+                    if (c.isBlank()) continue;
+                    String id = ENTITY_TYPES[i] + ":" + c;
+                    if (!freq.containsKey(id)) {
+                        distinctEntities++;
+                        nameById.put(id, c);
+                        typeById.put(id, ENTITY_TYPES[i]);
+                    }
+                    freq.merge(id, 1, Integer::sum);
+                }
+            }
+        }
+        if (freq.isEmpty()) {
+            vo.setHint("范围内暂无可展示的结构化实体");
+            return vo;
+        }
+
+        // 2) 实体节点：按频次取前 GRAPH_ENTITY_CAP
+        List<String> entityIds = freq.entrySet().stream()
+                .sorted((a, b) -> b.getValue() - a.getValue())
+                .map(Map.Entry::getKey)
+                .limit(GRAPH_ENTITY_CAP)
+                .toList();
+        Set<String> selected = new HashSet<>(entityIds);
+        for (String id : entityIds) {
+            GraphVO.Node n = new GraphVO.Node();
+            n.setId(id);
+            n.setName(nameById.get(id));
+            n.setType(typeById.get(id));
+            n.setSize(freq.get(id));
+            vo.getNodes().add(n);
+        }
+
+        // 3) 病历节点：与已选实体有交集的病历，取前 GRAPH_RECORD_CAP
+        Set<String> recordNodeIds = new HashSet<>();
+        for (int ri = 0; ri < records.size() && recordNodeIds.size() < GRAPH_RECORD_CAP; ri++) {
+            if (!hasSelectedEntity(perRecord.get(ri), selected)) continue;
+            Record r = records.get(ri);
+            String rid = "record:" + r.getId();
+            if (recordNodeIds.add(rid)) {
+                GraphVO.Node n = new GraphVO.Node();
+                n.setId(rid);
+                n.setName(recordLabel(r));
+                n.setType("record");
+                n.setSize(1);
+                vo.getNodes().add(n);
+            }
+        }
+
+        // 4) 边①：病历 → 实体
+        Set<String> edgeKeys = new HashSet<>();
+
+        // 4.0) 先算规则/冲突边（优先保留，避免被高频 rel 边截断）
+        for (int ri = 0; ri < records.size(); ri++) {
+            String rid = "record:" + records.get(ri).getId();
+            if (!recordNodeIds.contains(rid)) continue;
+            Map<String, List<String>> byType = perRecord.get(ri);
+            List<String> patterns = byType.getOrDefault("pattern", List.of());
+            List<String> treatments = byType.getOrDefault("treatment", List.of());
+            List<String> formulas = byType.getOrDefault("formula", List.of());
+            List<String> tongues = byType.getOrDefault("tongue", List.of());
+            List<String> pulses = byType.getOrDefault("pulse", List.of());
+
+            // ② 规则边：证候 → 治法 / 方剂（一致命中）
+            for (LogicChecker.Rule rule : LogicChecker.rules()) {
+                String p = firstMatch(patterns, rule.pattern());
+                if (p == null) continue;
+                String pid = "pattern:" + p;
+                if (!selected.contains(pid)) continue;
+                for (String t : treatments) {
+                    if (matchAny(t, rule.treatments()) && selected.contains("treatment:" + t)) {
+                        addEdge(vo, edgeKeys, pid, "treatment:" + t, "rule", rule.pattern() + "：合法治法");
+                    }
+                }
+                for (String f : formulas) {
+                    if (matchAny(f, rule.formulas()) && selected.contains("formula:" + f)) {
+                        addEdge(vo, edgeKeys, pid, "formula:" + f, "rule", rule.pattern() + "：合法方剂");
+                    }
+                }
+            }
+
+            // ③ 冲突边（checkLogic 命中 → 红色虚线 + 原因）
+            for (String c : LogicChecker.check(patterns, treatments, formulas, tongues, pulses)) {
+                if (c.startsWith(LogicChecker.TYPE_TREATMENT) && !patterns.isEmpty()) {
+                    String pid = "pattern:" + patterns.get(0);
+                    if (selected.contains(pid)) {
+                        for (String t : treatments) {
+                            if (selected.contains("treatment:" + t)) addEdge(vo, edgeKeys, pid, "treatment:" + t, "conflict", c);
+                        }
+                    }
+                } else if (c.startsWith(LogicChecker.TYPE_FORMULA) && !patterns.isEmpty()) {
+                    String pid = "pattern:" + patterns.get(0);
+                    if (selected.contains(pid)) {
+                        for (String f : formulas) {
+                            if (selected.contains("formula:" + f)) addEdge(vo, edgeKeys, pid, "formula:" + f, "conflict", c);
+                        }
+                    }
+                } else if (c.startsWith(LogicChecker.TYPE_TONGUE_PULSE) && !tongues.isEmpty() && !pulses.isEmpty()) {
+                    String tid = "tongue:" + tongues.get(0);
+                    String pid = "pulse:" + pulses.get(0);
+                    if (selected.contains(tid) && selected.contains(pid)) addEdge(vo, edgeKeys, tid, pid, "conflict", c);
+                }
+            }
+        }
+
+        // 4.1) 病历 → 实体关联边：填满剩余边预算
+        boolean relCut = false;
+        for (int ri = 0; ri < records.size() && !relCut; ri++) {
+            String rid = "record:" + records.get(ri).getId();
+            if (!recordNodeIds.contains(rid)) continue;
+            Map<String, List<String>> byType = perRecord.get(ri);
+            for (int i = 0; i < ENTITY_TYPES.length && !relCut; i++) {
+                for (String c : byType.getOrDefault(ENTITY_TYPES[i], List.of())) {
+                    String eid = ENTITY_TYPES[i] + ":" + c;
+                    if (!selected.contains(eid)) continue;
+                    if (vo.getEdges().size() >= GRAPH_EDGE_CAP) {
+                        relCut = true;
+                        break;
+                    }
+                    addEdge(vo, edgeKeys, rid, eid, "rel", null);
+                }
+            }
+        }
+
+        boolean truncated = distinctEntities > GRAPH_ENTITY_CAP
+                || recordNodeIds.size() >= GRAPH_RECORD_CAP
+                || relCut;
+        vo.setTruncated(truncated);
+        if (truncated) {
+            vo.setHint("仅展示高频节点与关联，部分关系已截断（节点上限 200 / 边上限 800）");
+        }
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (GraphVO.Node n : vo.getNodes()) {
+            counts.merge(n.getType(), 1, Integer::sum);
+        }
+        vo.setCounts(counts);
+        return vo;
+    }
+
+    /** 按 9 类抽取实体文本（herbs 取 name，其余取 content） */
+    private Map<String, List<String>> extractEntities(Map<String, Object> data) {
+        Map<String, List<String>> out = new HashMap<>();
+        if (data == null) {
+            return out;
+        }
+        for (int i = 0; i < ENTITY_TYPES.length; i++) {
+            List<String> list = new ArrayList<>();
+            if (data.get(ENTITY_KEYS[i]) instanceof List<?> raw) {
+                for (Object item : raw) {
+                    String c = null;
+                    if (item instanceof Map<?, ?> m) {
+                        Object v = m.get("content") != null ? m.get("content") : m.get("name");
+                        c = v == null ? null : String.valueOf(v).trim();
+                    } else if (item != null) {
+                        c = String.valueOf(item).trim();
+                    }
+                    if (c != null && !c.isBlank()) {
+                        list.add(c);
+                    }
+                }
+            }
+            out.put(ENTITY_TYPES[i], list);
+        }
+        return out;
+    }
+
+    private boolean hasSelectedEntity(Map<String, List<String>> byType, Set<String> selected) {
+        for (int i = 0; i < ENTITY_TYPES.length; i++) {
+            for (String c : byType.getOrDefault(ENTITY_TYPES[i], List.of())) {
+                if (selected.contains(ENTITY_TYPES[i] + ":" + c)) return true;
+            }
+        }
+        return false;
+    }
+
+    private void addEdge(GraphVO vo, Set<String> seen, String source, String target, String type, String label) {
+        if (source == null || target == null || source.equals(target)) return;
+        if (vo.getEdges().size() >= GRAPH_EDGE_CAP) return;
+        String key = source + "->" + target + "#" + type;
+        if (!seen.add(key)) return;
+        GraphVO.Edge e = new GraphVO.Edge();
+        e.setSource(source);
+        e.setTarget(target);
+        e.setType(type);
+        e.setLabel(label);
+        vo.getEdges().add(e);
+    }
+
+    private String recordLabel(Record r) {
+        String no = r.getRegistrationNo();
+        if (no != null && !no.isBlank()) return no;
+        String id = r.getId();
+        return id == null ? "病历" : id.substring(0, Math.min(8, id.length()));
+    }
+
+    private String firstMatch(List<String> values, String term) {
+        for (String v : values) {
+            if (match(v, term)) return v;
+        }
+        return null;
+    }
+
+    private boolean match(String text, String term) {
+        return text != null && term != null && (text.contains(term) || term.contains(text));
+    }
+
+    private boolean matchAny(String text, Set<String> terms) {
+        return terms.stream().anyMatch(t -> match(text, t));
+    }
+
 
     private boolean acquireLock() {
         try {

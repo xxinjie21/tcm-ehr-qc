@@ -20,4 +20,12 @@ public interface IAiService {
 
     /** AI 助手问答：业务问题走 LLM+规则检索，技术实现问题兜底拒答，LLM 不可用降级规则问答 */
     AiReplyVO chat(AiQueryDTO dto);
+
+    /**
+     * AI 复核预检意见（批D·5.1）：基于规则预检单(qc_results/重算) + structuredData 生成建议；
+     * 判定仍为规则，LLM 关/挂回退预检单原文。
+     *
+     * @return 建议；病历不存在返回 {@code null}
+     */
+    AiReplyVO review(AiQueryDTO dto);
 }

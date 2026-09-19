@@ -5,14 +5,16 @@ import com.tcm.ehr.domain.dto.LogicCheckDTO;
 import com.tcm.ehr.domain.dto.QcBatchDTO;
 import com.tcm.ehr.domain.dto.QcCheckDTO;
 import com.tcm.ehr.domain.dto.QcScoreDTO;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
+import com.tcm.ehr.domain.vo.GraphVO;
 import com.tcm.ehr.domain.vo.LogicCheckVO;
 import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcCheckVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 
 /**
- * 质控服务（批B·2.3）：事前检查 / 逻辑一致性 / 单条评分 / 批量重算。
+ * 质控服务（批B·2.3）：事前检查 / 逻辑一致性 / 单条评分 / 批量重算；批D·3.3 增图谱聚合。
  */
 public interface IQcService extends IService<Record> {
 
@@ -27,4 +29,7 @@ public interface IQcService extends IService<Record> {
 
     /** 全库/范围内批量重算（写 records + review_tasks） */
     QcBatchResultVO scoreBatch(QcBatchDTO dto);
+
+    /** 质控检验图谱（批D·3.3）：范围内聚合"病历—实体" + LogicChecker 规则/冲突边 */
+    GraphVO graph(FiltersDTO filters);
 }

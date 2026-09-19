@@ -41,6 +41,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.error(403, e.getMessage()));
     }
 
+    /** 资源不存在（病历 ID 无效等） -> HTTP 404 + 业务错误码（默认 1006） */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Result<Void>> handleNotFound(ResourceNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(e.getCode(), e.getMessage()));
+    }
+
     /** 请求体校验失败（@Valid） -> HTTP 400 + code=400 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Result<Void>> handleValidation(MethodArgumentNotValidException e) {
