@@ -65,6 +65,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private static final int GRAPH_RECORD_CAP = 50;
     private static final int GRAPH_ENTITY_CAP = 150;
     private static final int GRAPH_EDGE_CAP = 800;
+    /** 图谱聚合前最多扫描的病历数：超出则截断并在 hint 中说明（UX-41） */
+    private static final int MAX_SCAN_RECORDS = 3000;
     private static final String[] ENTITY_TYPES = {
             "disease", "symptom", "tongue", "pulse", "pattern", "cause", "treatment", "formula", "herb"};
     private static final String[] ENTITY_KEYS = {
@@ -265,6 +267,17 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         if (records.isEmpty()) {
             vo.setHint("范围内暂无可展示的质控数据");
             return vo;
+        }
+        // 图谱需解析 structuredData JSON 后聚合，SQL 无法直接分组（实体藏在 JSON 里），
+        // 因此全量加载后在内存聚合 —— 这里加扫描上限，避免大范围筛选把服务拖住（UX-41）。
+        // 完整 SQL 化需要先把 RecordFilter 的过滤条件下推到 SQL，属独立重构。
+        boolean scanCapped = records.size() > MAX_SCAN_RECORDS;
+        if (scanCapped) {
+            records = new ArrayList<>(records.subList(0, MAX_SCAN_RECORDS));
+            vo.setTruncated(true);
+            vo.setHint("范围内病历超过 " + MAX_SCAN_RECORDS + " 条，图谱仅基于前 " + MAX_SCAN_RECORDS
+                    + " 条聚合；建议缩小筛选范围以获得完整视图");
+            log.warn("[图谱] 扫描记录数超过上限 {}，已截断聚合", MAX_SCAN_RECORDS);
         }
 
         // 1) 抽取每条病历 9 类实体，累计全局频次

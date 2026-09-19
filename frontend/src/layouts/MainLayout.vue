@@ -7,6 +7,18 @@
       <div class="brand">
         中医电子病历质控与标准化系统<em>TCM EHR Quality Control &amp; Standardization</em>
       </div>
+      <!-- 全局功能搜索：按菜单名快速跳转，不必回侧栏找（UX-50） -->
+      <el-select
+        v-model="jumpPath"
+        class="global-search"
+        filterable
+        clearable
+        placeholder="搜索功能，如「复核」"
+        size="small"
+        @change="handleJump"
+      >
+        <el-option v-for="m in searchableMenus" :key="m.path" :label="m.title" :value="m.path" />
+      </el-select>
       <div class="user">
         <span class="avatar" aria-hidden="true">{{ userStore.role?.charAt(0) || '用' }}</span>
         <span>{{ userStore.role || '用户' }}</span>
@@ -41,6 +53,8 @@
             <span v-if="i < breadcrumb.length - 1" class="crumb-sep">/</span>
           </template>
         </nav>
+        <!-- 每页一个 h1（视觉隐藏），与面板标题 h2 构成层级（UX-17） -->
+        <h1 class="visually-hidden">{{ route.meta?.title || '首页看板' }}</h1>
         <router-view />
       </main>
     </div>
@@ -51,7 +65,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AiAssistant from '@/components/AiAssistant.vue'
@@ -93,6 +107,14 @@ const breadcrumb = computed(() => {
   const group = ALL_MENUS.find((m) => m.title === title)?.group
   return group ? [group, title] : [title]
 })
+
+/** 全局搜索只列当前角色可访问的菜单（UX-50） */
+const searchableMenus = computed(() => menuGroups.value.flatMap((g) => g.items))
+const jumpPath = ref('')
+const handleJump = (path) => {
+  if (path) router.push(path)
+  jumpPath.value = ''
+}
 
 const handleLogout = () => {
   userStore.logout()
@@ -148,6 +170,19 @@ const handleLogout = () => {
   align-items: center;
   gap: 10px;
   font-size: 13px;
+  color: #d8dfd9;
+}
+/* 全局功能搜索（UX-50） */
+.global-search {
+  width: 200px;
+  margin-right: 16px;
+}
+.global-search :deep(.el-select__wrapper) {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+.global-search :deep(.el-select__placeholder),
+.global-search :deep(.el-select__selected-item) {
   color: #d8dfd9;
 }
 .topbar .avatar {
@@ -212,6 +247,8 @@ main {
   /* 超宽屏下卡片与图表不再被无限拉伸（UX-45） */
   max-width: 1600px;
   margin: 0 auto;
+  /* 给右下角 AI 助手悬浮球留出安全间距，避免遮挡表格底部内容（UX-46） */
+  padding-bottom: 84px;
 }
 
 /* ===== 面包屑（UX-32） ===== */

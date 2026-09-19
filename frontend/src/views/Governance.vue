@@ -17,7 +17,11 @@
       <RangeFilter v-model="filters" />
       <div class="scope-row">
         <span class="scope-tip">当前范围：<b>{{ scopeText }}</b></span>
-        <el-button type="warning" :loading="recomputing" @click="handleRecompute">质控评分重算</el-button>
+        <el-button type="warning" :loading="recomputing" @click="handleRecompute">
+          {{ recomputing ? '重算执行中…' : '质控评分重算' }}
+        </el-button>
+        <!-- 全库重算耗时随数据量增长，执行期间给出预期（UX-37） -->
+        <span v-if="recomputing" class="tip">正在按规则重算范围内全部病历，数据量大时需数分钟，请勿关闭页面</span>
       </div>
     </section>
 
@@ -43,7 +47,12 @@
         <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
           {{ clean.loading ? '清洗执行中…' : '执行数据清洗' }}
         </el-button>
-        <span class="tip">按上述 5 步处理当前范围，可重复执行</span>
+        <!-- 执行期间说明「在做什么、要等多久、结果在哪看」，而不是只转一个圈（UX-37） -->
+        <span class="tip">
+          {{ clean.loading
+            ? '正在按 5 步依次处理，请勿关闭页面；完成后下方会给出分步结果'
+            : '按上述 5 步处理当前范围，可重复执行' }}
+        </span>
       </div>
 
       <!-- 清洗结果统计（中部） -->
@@ -124,7 +133,26 @@
       </div>
 
       <div v-if="preview.result" class="preview-box">
-        <div class="preview-hd">预览：共 {{ preview.result.total }} 条合格病历（样本前10条，点击行查看完整详情）</div>
+        <div class="preview-hd">
+          <span>预览：共 {{ preview.result.total }} 条合格病历（样本前10条，点击行查看完整详情）</span>
+          <!-- 21 列全出会横向滚很长，改为默认只显示关键列，其余按需勾选（UX-38） -->
+          <el-popover placement="bottom-end" :width="260" trigger="click">
+            <template #reference>
+              <el-button size="small" plain>
+                列显示（{{ visibleCols.length }}/{{ PREVIEW_COLS.length }}）
+              </el-button>
+            </template>
+            <div class="col-picker">
+              <el-checkbox-group v-model="visibleCols">
+                <el-checkbox v-for="c in PREVIEW_COLS" :key="c.prop" :value="c.prop">{{ c.label }}</el-checkbox>
+              </el-checkbox-group>
+              <div class="col-picker-actions">
+                <el-button size="small" @click="resetCols">恢复默认</el-button>
+                <el-button size="small" @click="visibleCols = PREVIEW_COLS.map((c) => c.prop)">全选</el-button>
+              </div>
+            </div>
+          </el-popover>
+        </div>
         <el-table
           :data="preview.result.sample"
           border
@@ -133,29 +161,21 @@
           highlight-current-row
           @row-click="openDetail"
         >
-          <el-table-column prop="registrationNo" label="登记号" width="150" fixed />
-          <el-table-column prop="gender" label="性别" width="60" />
-          <el-table-column prop="age" label="年龄" width="60" />
-          <el-table-column prop="westernDiagnosis" label="西医诊断" width="150" show-overflow-tooltip />
-          <el-table-column prop="tcmDiagnosis" label="中医诊断" width="150" show-overflow-tooltip />
-          <el-table-column prop="chiefComplaint" label="主诉" width="180" show-overflow-tooltip />
-          <el-table-column prop="selfReport" label="自诉" width="180" show-overflow-tooltip />
-          <el-table-column prop="presentIllness" label="现病史" width="200" show-overflow-tooltip />
-          <el-table-column prop="inspection" label="望诊" width="120" show-overflow-tooltip />
-          <el-table-column prop="pulse" label="脉诊" width="120" show-overflow-tooltip />
-          <el-table-column prop="tongue" label="舌诊" width="140" show-overflow-tooltip />
-          <el-table-column prop="physicalExam" label="查体" width="120" show-overflow-tooltip />
-          <el-table-column prop="pattern" label="辨证结论" width="200" show-overflow-tooltip />
-          <el-table-column prop="prescription" label="草药" width="260" show-overflow-tooltip />
-          <el-table-column prop="followUp" label="随访" width="120" show-overflow-tooltip />
-          <el-table-column prop="treatmentEffect" label="治疗效果" width="100" />
-          <el-table-column prop="department" label="科室" width="90" />
-          <el-table-column prop="doctorId" label="医生工号" width="90" />
-          <el-table-column label="接诊时间" width="110">
-            <template #default="{ row }">{{ (row.visitTime || '').substring(0, 10) }}</template>
+          <el-table-column
+            v-for="c in visibleColsList"
+            :key="c.prop"
+            :prop="c.prop"
+            :label="c.label"
+            :width="c.width"
+            :formatter="c.formatter"
+            show-overflow-tooltip
+          />
+          <!-- 行内「查看」入口：键盘用户也能打开详情，且给鼠标用户明确的「可点」提示（UX-18） -->
+          <el-table-column label="操作" width="70" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click.stop="detail = row">查看</el-button>
+            </template>
           </el-table-column>
-          <el-table-column prop="score" label="评分" width="60" fixed="right" />
-          <el-table-column prop="grade" label="分级" width="70" fixed="right" />
           <template #empty>
             <el-empty description="筛选范围内没有质控合格的病历" :image-size="80" />
           </template>
@@ -328,6 +348,42 @@ const buildPayload = () => ({
     pattern: filters.pattern || ''
   }
 })
+
+/**
+ * 预览表列定义（UX-38）。21 列全出横向滚动很长，默认只显示关键列，
+ * 其余在「列显示」里按需勾选；formatter 处理接诊时间这类要截断展示的字段。
+ */
+const PREVIEW_COLS = [
+  { prop: 'registrationNo', label: '登记号', width: 150 },
+  { prop: 'gender', label: '性别', width: 60 },
+  { prop: 'age', label: '年龄', width: 60 },
+  { prop: 'westernDiagnosis', label: '西医诊断', width: 150 },
+  { prop: 'tcmDiagnosis', label: '中医诊断', width: 150 },
+  { prop: 'chiefComplaint', label: '主诉', width: 180 },
+  { prop: 'selfReport', label: '自诉', width: 180 },
+  { prop: 'presentIllness', label: '现病史', width: 200 },
+  { prop: 'inspection', label: '望诊', width: 120 },
+  { prop: 'pulse', label: '脉诊', width: 120 },
+  { prop: 'tongue', label: '舌诊', width: 140 },
+  { prop: 'physicalExam', label: '查体', width: 120 },
+  { prop: 'pattern', label: '辨证结论', width: 200 },
+  { prop: 'prescription', label: '草药', width: 260 },
+  { prop: 'followUp', label: '随访', width: 120 },
+  { prop: 'treatmentEffect', label: '治疗效果', width: 100 },
+  { prop: 'department', label: '科室', width: 90 },
+  { prop: 'doctorId', label: '医生工号', width: 90 },
+  { prop: 'visitTime', label: '接诊时间', width: 110, formatter: (row) => (row.visitTime || '').substring(0, 10) },
+  { prop: 'score', label: '评分', width: 60 },
+  { prop: 'grade', label: '分级', width: 70 }
+]
+
+const DEFAULT_COLS = ['registrationNo', 'gender', 'age', 'westernDiagnosis', 'tcmDiagnosis',
+  'chiefComplaint', 'pattern', 'prescription', 'score', 'grade']
+const visibleCols = ref([...DEFAULT_COLS])
+const visibleColsList = computed(() => PREVIEW_COLS.filter((c) => visibleCols.value.includes(c.prop)))
+const resetCols = () => {
+  visibleCols.value = [...DEFAULT_COLS]
+}
 
 const preview = reactive({ loading: false, result: null })
 const detail = ref(null)
@@ -597,6 +653,32 @@ label {
   font-weight: bold;
   color: var(--ink);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* 列显示选择器（UX-38） */
+.col-picker :deep(.el-checkbox-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.col-picker :deep(.el-checkbox) {
+  margin-right: 0;
+}
+.col-picker-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+/* 预览行可点击下钻，给出指针提示（UX-18） */
+.preview-box :deep(.el-table__body tr) {
+  cursor: pointer;
 }
 .sd-title {
   font-size: 13px;

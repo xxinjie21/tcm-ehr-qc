@@ -17,5 +17,18 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    // 第三方依赖拆分为独立 chunk（UX-13）：可并行加载，且升级业务代码时浏览器能复用缓存
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vue: ['vue', 'vue-router', 'pinia'],
+          'element-plus': ['element-plus'],
+          echarts: ['echarts']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 700
   }
 })

@@ -1,13 +1,13 @@
 <template>
   <div class="ai-assistant">
-    <!-- 展开面板 -->
+    <!-- 展开面板。非模态浮窗（用户仍可操作页面），故不做焦点陷阱，只做焦点转移 -->
     <transition name="aii-fade">
-      <section v-if="open" class="aii-panel">
+      <section v-if="open" class="aii-panel" role="dialog" aria-label="AI 助手">
         <header class="aii-hd">
           <span class="aii-dot" />
           <span class="aii-title">AI 助手</span>
           <span class="aii-sub">业务问答 · 规则兜底</span>
-          <button class="aii-close" title="收起" @click="open = false">×</button>
+          <button class="aii-close" title="收起" aria-label="收起 AI 助手" @click="close">×</button>
         </header>
 
         <div class="aii-commands">
@@ -37,6 +37,7 @@
 
         <div class="aii-input">
           <el-input
+            ref="inputRef"
             v-model="draft"
             size="small"
             placeholder="输入你的问题…"
@@ -49,7 +50,15 @@
     </transition>
 
     <!-- 悬浮球 -->
-    <button class="aii-ball" :class="{ open }" title="AI 助手" @click="open = !open">
+    <button
+      ref="ballRef"
+      class="aii-ball"
+      :class="{ open }"
+      :title="open ? '收起 AI 助手' : '打开 AI 助手'"
+      :aria-label="open ? '收起 AI 助手' : '打开 AI 助手'"
+      :aria-expanded="open"
+      @click="toggle"
+    >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9 3h6l1.2 2.2L18.5 6l1 2.1-1.3 1.7.3 2.2-1.6 1.6-2.1 1.4h-3.6L7.1 13.6 5.5 12l.3-2.2L4.5 8.1 5.5 6l2.3-.8z" />
         <path d="M12 3v13.5" />
@@ -59,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { aiChat } from '@/api/ai'
 import { useAiStore } from '@/stores/ai'
@@ -67,6 +76,29 @@ import { useAiStore } from '@/stores/ai'
 const aiStore = useAiStore()
 
 const open = ref(false)
+const ballRef = ref(null)
+const inputRef = ref(null)
+
+/** 打开时把焦点移入输入框，收起时还回悬浮球，键盘用户不会「丢失焦点」（UX-36） */
+const toggle = () => {
+  open.value = !open.value
+}
+const close = () => {
+  open.value = false
+}
+
+watch(open, async (v) => {
+  await nextTick()
+  if (v) inputRef.value?.focus()
+  else ballRef.value?.focus()
+})
+
+/** Esc 收起（UX-36） */
+const onKeydown = (e) => {
+  if (e.key === 'Escape' && open.value) close()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 const draft = ref('')
 const loading = ref(false)
 const lastQuestion = ref('')

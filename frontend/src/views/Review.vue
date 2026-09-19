@@ -85,8 +85,27 @@
           <li v-if="!(precheck?.deductions || []).length && precheck" class="ok">无扣分项</li>
         </ul>
 
-        <div class="blk-title">人工修正（structuredData JSON，可留空）</div>
-        <el-input v-model="corrected" type="textarea" :rows="7" placeholder="按附录A结构编辑；留空表示不修改数据" />
+        <!-- 人工修正：字段级表单为主路径（UX-11 / UX-56）。
+             原实现是裸 JSON 文本域，要求审核员手写 9 类实体数组，实际不可操作 -->
+        <div class="blk-title">人工修正（按术语填写，多个用「、」分隔；留空表示该类无内容）</div>
+        <div class="edit-grid">
+          <div v-for="f in EDIT_FIELDS" :key="f.key" class="edit-item">
+            <label :for="'rv-' + f.key">{{ f.label }}</label>
+            <el-input
+              :id="'rv-' + f.key"
+              v-model="editValues[f.key]"
+              size="small"
+              :placeholder="originalText(f.key) || '无'"
+              clearable
+            />
+          </div>
+        </div>
+
+        <el-collapse class="json-mode">
+          <el-collapse-item title="高级模式：直接编辑结构化 JSON">
+            <el-input v-model="corrected" type="textarea" :rows="6" />
+          </el-collapse-item>
+        </el-collapse>
 
         <div class="rv-actions">
           <el-button type="primary" :loading="submitting" @click="submit(true)">提交修正并复核</el-button>
@@ -107,7 +126,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
@@ -188,6 +207,70 @@ const currentId = ref('')
 
 const aiLines = computed(() => (aiAnswer.value || '').split('\n').filter((l) => l.trim() !== ''))
 
+/**
+ * 可编辑的 9 类实体（UX-11 / UX-56）。
+ * herbs 取 `name`，其余取 `content`，与后端 structuredData 契约（功能设计附录A）一致。
+ */
+const EDIT_FIELDS = [
+  { key: 'diseases', label: '疾病' },
+  { key: 'symptoms', label: '症状' },
+  { key: 'patternList', label: '证候' },
+  { key: 'tongueList', label: '舌象' },
+  { key: 'pulseList', label: '脉象' },
+  { key: 'causeList', label: '病因' },
+  { key: 'treatmentList', label: '治法' },
+  { key: 'formulaList', label: '方剂' },
+  { key: 'herbs', label: '中药' }
+]
+
+const editValues = reactive({})
+const originalMap = ref({})
+
+const textOf = (entry) => entry?.content || entry?.name || ''
+const originalText = (key) => (originalMap.value[key] || []).map(textOf).filter(Boolean).join('、')
+
+const safeParse = (sd) => {
+  if (!sd) return {}
+  if (typeof sd === 'object') return sd
+  try {
+    return JSON.parse(sd)
+  } catch {
+    return {}
+  }
+}
+
+/** 用病历的原始结构化数据回填字段级表单（同时保留 JSON 高级模式的内容） */
+const fillEditors = (sd) => {
+  const data = safeParse(sd)
+  const map = {}
+  editValues && Object.keys(editValues).forEach((k) => delete editValues[k])
+  EDIT_FIELDS.forEach((f) => {
+    const list = Array.isArray(data[f.key]) ? data[f.key] : []
+    map[f.key] = list
+    editValues[f.key] = list.map(textOf).filter(Boolean).join('、')
+  })
+  originalMap.value = map
+}
+
+/** 字段级表单 → structuredData；原存在的条目沿用原文溯源 sourceText */
+const buildCorrected = () => {
+  const out = {}
+  EDIT_FIELDS.forEach((f) => {
+    const words = String(editValues[f.key] || '')
+      .split(/[、,，;；|]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    out[f.key] = words.map((w) => {
+      const hit = (originalMap.value[f.key] || []).find((e) => textOf(e) === w)
+      if (hit) return hit
+      return f.key === 'herbs'
+        ? { name: w, sourceText: '', standardTerm: '' }
+        : { content: w, sourceText: '', standardTerm: '' }
+    })
+  })
+  return out
+}
+
 const openReview = async (row) => {
   currentId.value = row.recordId
   visible.value = true
@@ -203,6 +286,7 @@ const openReview = async (row) => {
     precheck.value = sr.data
     const sd = raw.data?.structuredData
     corrected.value = sd ? (typeof sd === 'string' ? sd : JSON.stringify(sd, null, 1)) : ''
+    fillEditors(sd)
     // AI 预检意见（LLM 关时为规则预检原文）
     try {
       const ai = await aiReview({ recordId: row.recordId })
@@ -222,14 +306,10 @@ const submit = async (withCorrection) => {
   submitting.value = true
   result.value = null
   try {
+    // 以字段级表单为准组装 structuredData；JSON 高级模式仍可用（UX-11）
     let correctedData = null
-    if (withCorrection && corrected.value.trim()) {
-      try {
-        correctedData = JSON.parse(corrected.value)
-      } catch {
-        ElMessage.error('修正数据不是合法 JSON')
-        return
-      }
+    if (withCorrection) {
+      correctedData = buildCorrected()
     }
     const body = correctedData ? { correctedData } : {}
     const res = await submitReview(currentId.value, body)
@@ -298,6 +378,31 @@ onMounted(() => load(1))
   font-weight: bold;
   color: var(--ink);
   margin: 14px 0 8px;
+}
+/* 字段级人工修正（UX-11 / UX-56） */
+.edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.edit-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.edit-item label {
+  width: 42px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--text-sub);
+}
+.json-mode {
+  margin-bottom: 12px;
+}
+.json-mode :deep(.el-collapse-item__header) {
+  font-size: 12.5px;
+  color: var(--text-sub);
 }
 .ai-box {
   background: var(--paper);

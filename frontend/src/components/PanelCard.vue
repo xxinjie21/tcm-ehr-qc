@@ -1,8 +1,9 @@
 <template>
   <section class="panel">
-    <div class="panel-hd">
+    <!-- 面板标题用 h2，与页面级 h1 构成标题层级（UX-17） -->
+    <h2 class="panel-hd">
       <slot name="header">{{ title }}</slot>
-    </div>
+    </h2>
     <div class="panel-bd">
       <slot />
     </div>
@@ -28,6 +29,7 @@ defineProps({
   box-shadow: 0 2px 8px rgba(47, 70, 57, 0.08);
 }
 .panel-hd {
+  margin: 0;
   padding: 10px 16px;
   border-bottom: 1px solid #eee9dd;
   font-size: 14px;

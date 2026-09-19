@@ -2,38 +2,42 @@
   <div>
     <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilter" />
 
-    <!-- 待办快捷条（点击跳转）；无权限的卡片置灰并标注，避免点了才被 403 弹回（UX-02） -->
+    <!-- 待办快捷条；无权限的卡片置灰并标注，避免点了才被 403 弹回（UX-02）
+         用 button 而非 div：天然可聚焦、支持 Enter/Space（UX-18） -->
     <section class="todo-bar">
-      <div
+      <button
+        type="button"
         class="todo"
         :class="{ warn: overview.pendingReviewCount > 0 }"
         @click="go('/review', '人工复核')"
       >
-        <div class="todo-num">{{ overview.pendingReviewCount }}</div>
-        <div class="todo-lbl">待复核 ›</div>
-      </div>
-      <div
+        <span class="todo-num">{{ overview.pendingReviewCount }}</span>
+        <span class="todo-lbl">待复核 ›</span>
+      </button>
+      <button
+        type="button"
         class="todo"
         :class="{ warn: govern.pendingGovern > 0, readonly: !canVisit('清洗与导出') }"
         @click="go('/governance', '清洗与导出')"
       >
-        <div class="todo-num">{{ govern.pendingGovern }}</div>
-        <div class="todo-lbl">
+        <span class="todo-num">{{ govern.pendingGovern }}</span>
+        <span class="todo-lbl">
           待治理 <span v-if="canVisit('清洗与导出')">›</span>
           <span v-else class="todo-lock">仅管理员</span>
-        </div>
-      </div>
-      <div
+        </span>
+      </button>
+      <button
+        type="button"
         class="todo"
         :class="{ readonly: !canVisit('质控校验') }"
         @click="go('/qc-check', '质控校验')"
       >
-        <div class="todo-num">{{ overview.totalRecords }}</div>
-        <div class="todo-lbl">
+        <span class="todo-num">{{ overview.totalRecords }}</span>
+        <span class="todo-lbl">
           病历总数 <span v-if="canVisit('质控校验')">›</span>
           <span v-else class="todo-lock">仅管理员</span>
-        </div>
-      </div>
+        </span>
+      </button>
     </section>
 
     <!-- 只遮数据区：筛选条保持可交互，避免整页白屏 -->
@@ -47,13 +51,25 @@
 
       <!-- 质控趋势（跨整行） -->
       <PanelCard title="质控趋势（按月）" class="mb">
-        <div v-if="extra.trend.length" ref="trendRef" class="chart-tall" />
+        <div
+          v-if="extra.trend.length"
+          ref="trendRef"
+          class="chart-tall"
+          role="img"
+          :aria-label="trendLabel"
+        />
         <EmptyState v-else :failed="failed" :loading="loading" text="暂无趋势数据" @retry="loadAll" />
       </PanelCard>
 
       <div class="grid-2 mb">
         <PanelCard title="评分分布">
-          <div v-if="hasScores" ref="distRef" class="chart" />
+          <div
+            v-if="hasScores"
+            ref="distRef"
+            class="chart"
+            role="img"
+            :aria-label="distLabel"
+          />
           <EmptyState v-else :failed="failed" :loading="loading" text="暂无评分数据" @retry="loadAll" />
         </PanelCard>
         <PanelCard title="科室合格率">
@@ -88,7 +104,13 @@
 
       <div class="grid-2 mb">
         <PanelCard title="证候分布">
-          <div v-if="patternDist.length" ref="pieRef" class="chart" />
+          <div
+            v-if="patternDist.length"
+            ref="pieRef"
+            class="chart"
+            role="img"
+            :aria-label="pieLabel"
+          />
           <EmptyState v-else :failed="failed" :loading="loading" text="暂无证候分布数据" @retry="loadAll" />
         </PanelCard>
         <PanelCard title="方剂 / 中药频次 TOP5">
@@ -122,7 +144,7 @@
 import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
+import echarts from '@/utils/echarts'
 import StatsFilter from '@/components/StatsFilter.vue'
 import StatCard from '@/components/StatCard.vue'
 import BarList from '@/components/BarList.vue'
@@ -193,6 +215,26 @@ let distChart = null
 let pieChart = null
 
 const hasScores = computed(() => (extra.value.scoreDistribution || []).some((b) => b.count > 0))
+
+// 图表的文本替代：给屏幕阅读器与无法看图的环境提供关键结论（UX-35）
+const trendLabel = computed(() => {
+  const t = extra.value.trend || []
+  if (!t.length) return '质控趋势图，暂无数据'
+  const last = t[t.length - 1]
+  return `质控趋势折线图，共 ${t.length} 个月；最新 ${last.month} 合格率 ${last.qualifiedRate}%，待复核 ${last.pendingReview} 条`
+})
+
+const distLabel = computed(() => {
+  const d = (extra.value.scoreDistribution || []).filter((b) => b.count > 0)
+  if (!d.length) return '评分分布图，暂无数据'
+  return `评分分布柱状图：${d.map((b) => `${b.bucket} 分 ${b.count} 条`).join('，')}`
+})
+
+const pieLabel = computed(() => {
+  const p = patternDist.value || []
+  if (!p.length) return '证候分布图，暂无数据'
+  return `证候分布环形图：${p.map((s) => `${s.pattern} ${s.count} 条`).join('，')}`
+})
 
 const renderTrend = () => {
   if (!trendRef.value) return
@@ -348,6 +390,12 @@ onBeforeUnmount(() => {
   padding: 12px 18px;
   cursor: pointer;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
+  /* button 元素重置：保持原卡片观感（UX-18） */
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
 }
 .todo:hover {
   transform: translateY(-1px);
@@ -372,6 +420,7 @@ onBeforeUnmount(() => {
   margin-left: 4px;
 }
 .todo-num {
+  display: block;
   font-size: 22px;
   font-weight: bold;
   color: var(--ink);
@@ -379,6 +428,7 @@ onBeforeUnmount(() => {
 }
 .todo.warn .todo-num { color: var(--ochre); }
 .todo-lbl {
+  display: block;
   font-size: 12.5px;
   color: var(--text-sub);
   margin-top: 2px;

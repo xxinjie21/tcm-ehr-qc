@@ -5,14 +5,21 @@
         <RangeFilter v-model="filters" />
         <div class="qc-actions">
           <el-button type="primary" size="small" :loading="graphLoading" @click="loadGraph">刷新图谱</el-button>
-          <span class="tip">全库 / 范围内聚合；冲突边为红色虚线</span>
+          <!-- 说明「这张图回答什么问题」，而不只是「怎么算的」（UX-53） -->
+          <span class="tip">用来定位规则冲突：红色虚线为证候与治法/方剂不一致；按实体类型分扇区，同色为同类</span>
         </div>
       </div>
 
       <div v-if="graph.truncated" class="trunc-hint">{{ graph.hint }}</div>
 
       <div v-loading="graphLoading" class="graph-wrap">
-        <div v-if="graph.nodes.length" ref="graphRef" class="graph" />
+        <div
+          v-if="graph.nodes.length"
+          ref="graphRef"
+          class="graph"
+          role="img"
+          :aria-label="graphLabel"
+        />
         <el-empty v-else-if="!graphLoading" description="范围内暂无可展示的质控图谱" :image-size="90" />
       </div>
 
@@ -88,24 +95,25 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '@/utils/echarts'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { getGraph, qcScore } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 
-// 9 类实体 + 病历；与后端 GraphVO.type 对齐
+// 9 类实体 + 病历；与后端 GraphVO.type 对齐。
+// 配色按色相拉开：原方案里 4 类墨绿 + 2 类浅褐，实际只有约 6 种可辨色（UX-53）
 const categories = [
   { name: 'record', label: '病历', color: '#2f4639' },
-  { name: 'disease', label: '疾病', color: '#3d5a4c' },
+  { name: 'disease', label: '疾病', color: '#6aa84f' },
   { name: 'pattern', label: '证候', color: '#96714f' },
-  { name: 'symptom', label: '症状', color: '#b39a77' },
-  { name: 'tongue', label: '舌象', color: '#7a9184' },
-  { name: 'pulse', label: '脉象', color: '#8fa0a8' },
-  { name: 'formula', label: '方剂', color: '#6b8a79' },
-  { name: 'herb', label: '中药', color: '#cdc6b6' },
-  { name: 'cause', label: '病因', color: '#a04335' },
-  { name: 'treatment', label: '治法', color: '#4d6b58' }
+  { name: 'symptom', label: '症状', color: '#e0b44a' },
+  { name: 'tongue', label: '舌象', color: '#a04335' },
+  { name: 'pulse', label: '脉象', color: '#4a7c9e' },
+  { name: 'formula', label: '方剂', color: '#8e6ea8' },
+  { name: 'herb', label: '中药', color: '#4f9d8f' },
+  { name: 'cause', label: '病因', color: '#b5651d' },
+  { name: 'treatment', label: '治法', color: '#7a7a7a' }
 ]
 const CAT_INDEX = categories.reduce((m, c, i) => ({ ...m, [c.name]: i }), {})
 
@@ -135,6 +143,13 @@ const edgeLegend = computed(() => {
   const present = new Set(graph.edges.map((e) => e.type || 'record'))
   return EDGE_LEGENDS.filter((l) => present.has(l.type))
 })
+
+// 图谱的文本替代：把关键结论（节点数 / 冲突数）讲成一句话（UX-35）
+const graphLabel = computed(() => {
+  if (!graph.nodes.length) return '质控图谱，暂无数据'
+  const conflicts = graph.edges.filter((e) => e.type === 'conflict').length
+  return `质控关系图谱：${graph.nodes.length} 个节点、${graph.edges.length} 条关系，其中冲突 ${conflicts} 条`
+})
 const graphRef = ref(null)
 let chart = null
 
@@ -156,6 +171,43 @@ const loadGraph = async () => {
   }
 }
 
+/**
+ * 按实体类型固定分区的环形布局（UX-53）。
+ *
+ * <p>每类实体占一个扇区、同类型节点在扇区内均匀铺开，替换原来的 `layout:'force'` ——
+ * 力导向每次刷新图形都不同，既无法对比也无法截图留档，且 50+ 节点时会散成一团。</p>
+ */
+const layoutNodes = () => {
+  const byType = new Map()
+  graph.nodes.forEach((n) => {
+    const t = n.type || 'record'
+    if (!byType.has(t)) byType.set(t, [])
+    byType.get(t).push(n)
+  })
+  const sector = (2 * Math.PI) / categories.length
+  const R_OUTER = 250
+  const R_INNER = 90
+  const RINGS = 3
+  return graph.nodes.map((n) => {
+    const ci = CAT_INDEX[n.type] ?? 0
+    const list = byType.get(n.type) || [n]
+    const idx = list.indexOf(n)
+    const ratio = list.length <= 1 ? 0.5 : idx / (list.length - 1)
+    const angle = ci * sector + 0.1 * sector + ratio * 0.8 * sector
+    // 同扇区内按序号错开半径，避免同类型节点重叠
+    const r = R_INNER + ((idx % RINGS) / (RINGS - 1)) * (R_OUTER - R_INNER)
+    return {
+      id: n.id,
+      name: n.name,
+      category: ci,
+      symbolSize: n.type === 'record' ? 10 : Math.min(28, 7 + (n.size || 1) * 1.6),
+      value: n.size,
+      x: Math.cos(angle) * r,
+      y: Math.sin(angle) * r
+    }
+  })
+}
+
 const renderGraph = () => {
   if (!graphRef.value) {
     if (chart) {
@@ -168,13 +220,7 @@ const renderGraph = () => {
     if (chart) chart.dispose()
     chart = echarts.init(graphRef.value)
   }
-  const data = graph.nodes.map((n) => ({
-    id: n.id,
-    name: n.name,
-    category: CAT_INDEX[n.type] ?? 0,
-    symbolSize: n.type === 'record' ? 10 : Math.min(28, 7 + (n.size || 1) * 1.6),
-    value: n.size
-  }))
+  const data = layoutNodes()
   const links = graph.edges.map((e) => ({
     source: e.source,
     target: e.target,
@@ -200,14 +246,15 @@ const renderGraph = () => {
       series: [
         {
           type: 'graph',
-          layout: 'force',
+          // 坐标由 layoutNodes() 按实体类型预先算好，图形稳定可对比（UX-53）
+          layout: 'none',
           roam: true,
           draggable: true,
           focusNodeAdjacency: true,
           emphasis: { focus: 'adjacency', label: { show: true } },
           categories: categories.map((c) => ({ name: c.label })),
-          label: { show: true, fontSize: 10, position: 'right', color: '#55534c' },
-          force: { repulsion: 140, edgeLength: 46, gravity: 0.08 },
+          // 标签默认隐藏，hover 或相邻高亮时才出现，避免密集区文字重叠（UX-53）
+          label: { show: false, fontSize: 10, position: 'right', color: '#55534c' },
           lineStyle: { color: '#cfd6cf' },
           edgeSymbol: ['none', 'arrow'],
           edgeSymbolSize: 5,

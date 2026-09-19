@@ -61,7 +61,23 @@
         <el-button type="primary" :loading="importing" :disabled="!fileList.length" @click="handleImport">
           {{ importing ? '导入中…' : '开始导入' }}
         </el-button>
-        <el-button :disabled="!fileList.length || importing" @click="fileList = []">清空</el-button>
+        <el-button v-if="importing" :disabled="cancelled" @click="cancelImport">取消</el-button>
+        <el-button v-else :disabled="!fileList.length" @click="fileList = []">清空</el-button>
+      </div>
+
+      <!-- 逐文件进度（UX-15）：给出「第 n/N 个」与已入库统计，并说明不可关页面 -->
+      <div v-if="importing" class="import-progress">
+        <div class="ip-hd">
+          正在导入第 {{ Math.min(progress.done + 1, progress.total) }}/{{ progress.total }} 个文件：
+          <b>{{ progress.current || '准备中…' }}</b>
+        </div>
+        <el-progress
+          :percentage="progress.total ? Math.round((progress.done / progress.total) * 100) : 0"
+          :stroke-width="10"
+        />
+        <div class="ip-sub">
+          已入库 {{ progress.success }} 条，失败/跳过 {{ progress.failed }} 条；导入期间请勿关闭或刷新页面
+        </div>
       </div>
 
       <!-- 失败态独立于上一次结果，避免误读为「本次结果」（UX-22） -->
@@ -85,31 +101,40 @@
 
     <PanelCard title="单条新增病历">
       <el-form ref="createFormRef" :model="form" :rules="FORM_RULES" label-width="88px">
-        <div class="form-grid">
-          <el-form-item v-for="f in FIELDS" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
-            <!-- 性别改枚举下拉：自由文本会写进脏数据（UX-10） -->
-            <el-select
-              v-if="f.key === 'gender'"
-              v-model="form.gender"
-              placeholder="请选择"
-              clearable
-              style="width: 100%"
-            >
-              <el-option label="男" value="男" />
-              <el-option label="女" value="女" />
-            </el-select>
-            <el-date-picker
-              v-else-if="f.key === 'visitTime'"
-              v-model="form.visitTime"
-              type="datetime"
-              value-format="YYYY-MM-DDTHH:mm:ss"
-              placeholder="接诊时间"
-              style="width: 100%"
-            />
-            <el-input v-else v-model="form[f.key]" :type="f.wide ? 'textarea' : 'text'" :rows="f.wide ? 2 : 1" clearable />
-          </el-form-item>
-        </div>
-        <div class="actions">
+        <!-- 按语义分区，后四组默认折叠，避免 21 字段铺出一条 1000px 的长表单（UX-51） -->
+        <details
+          v-for="(g, gi) in FIELD_GROUPS"
+          :key="g.title"
+          class="form-group"
+          :open="gi === 0"
+        >
+          <summary class="group-hd">{{ g.title }}</summary>
+          <div class="form-grid">
+            <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
+              <!-- 性别改枚举下拉：自由文本会写进脏数据（UX-10） -->
+              <el-select
+                v-if="f.key === 'gender'"
+                v-model="form.gender"
+                placeholder="请选择"
+                clearable
+                style="width: 100%"
+              >
+                <el-option label="男" value="男" />
+                <el-option label="女" value="女" />
+              </el-select>
+              <el-date-picker
+                v-else-if="f.key === 'visitTime'"
+                v-model="form.visitTime"
+                type="datetime"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+                placeholder="接诊时间"
+                style="width: 100%"
+              />
+              <el-input v-else v-model="form[f.key]" :type="f.wide ? 'textarea' : 'text'" :rows="f.wide ? 2 : 1" clearable />
+            </el-form-item>
+          </div>
+        </details>
+        <div class="actions create-actions">
           <el-button type="primary" :loading="creating" @click="handleCreate">新增病历</el-button>
           <el-button :disabled="creating" @click="resetForm">重置</el-button>
         </div>
@@ -175,6 +200,20 @@ const fieldOf = (row, key) => {
   if (key === 'visitTime') return row.visitTime ? String(row.visitTime).replace('T', ' ').substring(0, 19) : ''
   return row[key]
 }
+
+/**
+ * 单条新增的分区（UX-51）：21 个字段平铺会产生 1000px+ 的长表单，
+ * 按语义分 5 组，只有第一组默认展开。
+ */
+const FIELD_MAP = FIELDS.reduce((m, f) => ({ ...m, [f.key]: f }), {})
+const FIELD_GROUPS = [
+  { title: '基本信息', keys: ['registrationNo', 'outpatientNo', 'gender', 'age', 'visitCount', 'department', 'doctorId', 'visitTime'] },
+  { title: '主诉与病史', keys: ['chiefComplaint', 'selfReport', 'presentIllness'] },
+  { title: '四诊', keys: ['inspection', 'tongue', 'pulse', 'physicalExam'] },
+  { title: '诊断', keys: ['westernDiagnosis', 'tcmDiagnosis', 'pattern'] },
+  { title: '处方与随访', keys: ['prescription', 'followUp', 'treatmentEffect'] }
+]
+const fieldsOf = (group) => group.keys.map((k) => FIELD_MAP[k]).filter(Boolean)
 
 // ===== F·7.4 查询 =====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
@@ -251,6 +290,10 @@ const fileList = ref([])
 const importing = ref(false)
 const summary = ref(null)
 const importFailed = ref(false)
+// 逐文件分批上传的进度（UX-15）：后端导入是同步接口，拿不到中间 taskId，
+// 因此按「文件」粒度推进度 —— 既真实可取消，也避免单次超大请求
+const progress = reactive({ done: 0, total: 0, current: '', success: 0, failed: 0 })
+const cancelled = ref(false)
 
 const onExceed = () => ElMessage.warning('单次最多上传 20 个文件')
 
@@ -274,25 +317,54 @@ const onFileChange = (file, list) => {
 }
 
 const handleImport = async () => {
-  const formData = new FormData()
-  fileList.value.forEach((f) => {
-    if (f.raw) formData.append('files', f.raw)
-  })
+  const files = fileList.value.map((f) => f.raw).filter(Boolean)
+  if (!files.length) return
   // 发起即清空上一次结果并复位失败态，避免把旧结果误读成本次结果（UX-22）
   summary.value = null
   importFailed.value = false
+  cancelled.value = false
+  progress.done = 0
+  progress.total = files.length
+  progress.current = ''
+  progress.success = 0
+  progress.failed = 0
   importing.value = true
   try {
-    const res = await importRecords(formData)
-    summary.value = res.data.summary
-    ElMessage.success(`导入完成：成功 ${res.data.summary.success} 条，失败 ${res.data.summary.failed} 条`)
+    const failures = []
+    for (let i = 0; i < files.length; i++) {
+      if (cancelled.value) break
+      progress.current = files[i].name
+      const fd = new FormData()
+      fd.append('files', files[i])
+      const res = await importRecords(fd)
+      const s = res.data.summary || {}
+      progress.success += s.success || 0
+      progress.failed += s.failed || 0
+      if (s.failures && s.failures.length) failures.push(...s.failures)
+      progress.done = i + 1
+    }
+    summary.value = {
+      total: progress.success + progress.failed,
+      success: progress.success,
+      failed: progress.failed,
+      failures
+    }
+    const tail = cancelled.value ? '（已取消，未处理剩余文件）' : ''
+    ElMessage.success(`导入完成：成功 ${progress.success} 条，失败 ${progress.failed} 条${tail}`)
     fileList.value = []
     handleSearch()
   } catch {
     importFailed.value = true
   } finally {
     importing.value = false
+    progress.current = ''
   }
+}
+
+/** 取消：当前文件完成后不再提交后续文件，已入库的不回滚 */
+const cancelImport = () => {
+  cancelled.value = true
+  ElMessage.info('已取消，正在处理中的文件完成后停止')
 }
 
 // ===== F·7.1 单条新增 =====
@@ -393,6 +465,27 @@ onMounted(handleSearch)
   font-size: 12.5px;
   color: var(--danger);
 }
+/* 逐文件导入进度（UX-15） */
+.import-progress {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.ip-hd {
+  font-size: 12.5px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.ip-hd b {
+  color: var(--ink);
+}
+.ip-sub {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-sub);
+}
 .result-hd { font-size: 14px; font-weight: bold; color: var(--ink); margin-bottom: 12px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
 .stat-item { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; text-align: center; }
@@ -402,6 +495,43 @@ onMounted(handleSearch)
 .stat-item.red .num { color: var(--danger); }
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }
 .form-grid .wide { grid-column: 1 / -1; }
+/* 分区折叠（UX-51） */
+.form-group {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 12px;
+  margin-bottom: 10px;
+}
+.form-group > summary.group-hd {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 0;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--ink);
+}
+.form-group > summary.group-hd::-webkit-details-marker {
+  display: none;
+}
+.form-group > summary.group-hd::before {
+  content: '▸ ';
+  color: var(--ink-mid);
+}
+.form-group[open] > summary.group-hd::before {
+  content: '▾ ';
+}
+.form-group[open] {
+  padding-bottom: 10px;
+}
+/* 提交按钮吸底，长表单滚动时始终可见（UX-51） */
+.create-actions {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  z-index: 1;
+}
 .sd-title { font-size: 13px; font-weight: bold; color: var(--ink); margin: 14px 0 8px; }
 @media (max-width: 1200px) {
   .form-grid { grid-template-columns: 1fr; }
