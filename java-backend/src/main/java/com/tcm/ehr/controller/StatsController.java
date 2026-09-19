@@ -1,19 +1,26 @@
 package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.domain.Result;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.StatsDTO;
 import com.tcm.ehr.service.IStatsService;
 import com.tcm.ehr.domain.vo.OverviewVO;
+import com.tcm.ehr.domain.vo.StatsAllVO;
 import com.tcm.ehr.domain.vo.StatsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 统计：首页指标卡 + 按type统计（症状频次/证型分布/方剂中药频次）
+ * + 看板扩展（批C·4.2：stats/all 一次拉取 / stats/extra 趋势·科室·评分分布）。
  */
 @RestController
 @RequestMapping("/api/stats")
@@ -30,13 +37,48 @@ public class StatsController {
 
     /** 科室动态选项（批B·4.1 U11）；【权限：登录即可】 */
     @GetMapping("/departments")
-    public Result<java.util.List<String>> departments() {
+    public Result<List<String>> departments() {
         return Result.ok(statsService.departments());
+    }
+
+    /** 看板一次拉取：指标卡 + 4 类统计（批C·4.2 U6）；【权限：登录即可】 */
+    @GetMapping("/all")
+    public Result<StatsAllVO> all(@RequestParam(required = false) String department,
+                                  @RequestParam(required = false) String start,
+                                  @RequestParam(required = false) String end,
+                                  @RequestParam(required = false) String pattern,
+                                  @RequestParam(required = false) String grade) {
+        return Result.ok(statsService.all(filters(department, start, end, pattern, grade)));
+    }
+
+    /** 看板扩展统计：趋势 / 科室合格率 / 评分分布 / 词典规模（批C·4.2）；【权限：登录即可】 */
+    @GetMapping("/extra")
+    public Result<StatsVO> extra(@RequestParam(required = false) String department,
+                                 @RequestParam(required = false) String start,
+                                 @RequestParam(required = false) String end,
+                                 @RequestParam(required = false) String pattern,
+                                 @RequestParam(required = false) String grade) {
+        return Result.ok(statsService.extra(filters(department, start, end, pattern, grade)));
     }
 
     /** 按type统计（recordIds圈定范围，空=全量）；type非法由 GlobalExceptionHandler 统一返回 400 */
     @PostMapping
     public Result<StatsVO> stats(@RequestBody StatsDTO dto) {
         return Result.ok(statsService.stats(dto));
+    }
+
+    /** GET query 参数 → FiltersDTO */
+    private FiltersDTO filters(String department, String start, String end, String pattern, String grade) {
+        FiltersDTO f = new FiltersDTO();
+        f.setDepartment(department);
+        f.setPattern(pattern);
+        f.setGrade(grade);
+        if (start != null && !start.isBlank() && end != null && !end.isBlank()) {
+            List<String> range = new ArrayList<>(2);
+            range.add(start);
+            range.add(end);
+            f.setDateRange(range);
+        }
+        return f;
     }
 }

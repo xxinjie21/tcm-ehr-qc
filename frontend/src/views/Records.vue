@@ -108,6 +108,7 @@
         </el-descriptions>
         <div class="sd-title">结构化数据（sourceText 为原文溯源）</div>
         <StructuredDataCard :data="raw.structuredData" />
+        <AiInterpretCard :record-id="raw.id" />
       </template>
     </el-dialog>
   </div>
@@ -119,9 +120,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
+import AiInterpretCard from '@/components/AiInterpretCard.vue'
 import {
   importRecords, createRecord, searchRecords, getRawRecord, deleteRecords
 } from '@/api/records'
+import { useAiStore } from '@/stores/ai'
+
+const aiStore = useAiStore()
 
 const FIELDS = [
   { key: 'registrationNo', label: '登记号' },
@@ -191,6 +196,8 @@ const openDetail = async (id) => {
     const res = await getRawRecord(id)
     raw.value = res.data
     detailVisible.value = true
+    // 写入共享状态，供 AI 助手"这份病历…"与解读卡使用
+    aiStore.setActiveRecord(res.data)
   } catch {
     // 拦截器已提示
   }

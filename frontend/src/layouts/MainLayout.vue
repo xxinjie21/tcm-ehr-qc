@@ -31,6 +31,9 @@
         <router-view />
       </main>
     </div>
+
+    <!-- 全局 AI 助手悬浮窗（批C·3.2，所有登录页可用） -->
+    <AiAssistant />
   </div>
 </template>
 
@@ -38,6 +41,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import AiAssistant from '@/components/AiAssistant.vue'
 
 const router = useRouter()
 const userStore = useUserStore()

@@ -125,7 +125,7 @@
           size="small"
           max-height="520"
           highlight-current-row
-          @row-click="(row) => (detail = row)"
+          @row-click="openDetail"
         >
           <el-table-column prop="registrationNo" label="登记号" width="150" fixed />
           <el-table-column prop="gender" label="性别" width="60" />
@@ -169,6 +169,7 @@
         </el-descriptions>
         <div class="sd-title">结构化数据（术语已归一，sourceText为原文溯源）</div>
         <StructuredDataCard :data="detail.structuredData" />
+        <AiInterpretCard :record-id="detail.id" />
       </template>
     </el-dialog>
   </div>
@@ -181,8 +182,12 @@ import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
+import AiInterpretCard from '@/components/AiInterpretCard.vue'
 import { clean as cleanApi, exportDataset, previewDataset, governanceStats, recomputeQc } from '@/api/governance'
 import { saveBlob } from '@/utils/download'
+import { useAiStore } from '@/stores/ai'
+
+const aiStore = useAiStore()
 
 const STEPS = [
   { title: '去重', desc: '原始文本哈希重复标记无效，不删除' },
@@ -263,6 +268,7 @@ const loadStats = async () => {
   try {
     const res = await governanceStats()
     Object.assign(stats, res.data)
+    aiStore.setStats(res.data)
   } catch {
     // 拦截器已提示，这里只保证状态收敛
   } finally {
@@ -286,6 +292,7 @@ const handleClean = async () => {
   try {
     const res = await cleanApi({ filters: { ...filters } })
     clean.result = res.data
+    aiStore.setNormByLevel(res.data.normByLevel || { exact: 0, contain: 0, fuzzy: 0 })
     ElMessage.success(`清洗完成：归一命中 ${res.data.normalized} 处`)
     loadStats()
   } catch {
@@ -314,6 +321,12 @@ const detailVisible = computed({
   get: () => !!detail.value,
   set: (v) => { if (!v) detail.value = null }
 })
+
+// 点详情：写入共享状态，供 AI 助手"这份病历…"类问题使用（批C·3.2）
+const openDetail = (row) => {
+  detail.value = row
+  aiStore.setActiveRecord(row)
+}
 
 const handlePreview = async () => {
   preview.loading = true

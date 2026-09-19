@@ -48,6 +48,8 @@ tags:
     description: 症状频次/证候分布/方剂中药频次
   - name: 日志
     description: 操作日志导出
+  - name: AI助手
+    description: AI 质控解读与业务问答（规则出结论 + LLM 叙述，LLM 不可用降级）
 security:
   - bearerAuth: []
 components:
@@ -995,6 +997,63 @@ components:
                 type: string
               count:
                 type: integer
+        trend:
+          type: array
+          description: 质控趋势（批C·4.2，/api/stats/extra）：按就诊月份，最近 12 个月升序
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+                example: '2026-01'
+              total:
+                type: integer
+              qualified:
+                type: integer
+              qualifiedRate:
+                type: number
+                format: float
+              pendingReview:
+                type: integer
+        departmentRates:
+          type: array
+          description: 科室合格率（批C·4.2，/api/stats/extra）
+          items:
+            type: object
+            properties:
+              department:
+                type: string
+              total:
+                type: integer
+              qualified:
+                type: integer
+              qualifiedRate:
+                type: number
+                format: float
+        scoreDistribution:
+          type: array
+          description: 评分分布直方图（批C·4.2，/api/stats/extra；90+ / 80-89 / 70-79 / 60-69 / 60以下，固定顺序）
+          items:
+            type: object
+            properties:
+              bucket:
+                type: string
+              count:
+                type: integer
+        dictionary:
+          type: object
+          description: 词典规模（批C·4.2，/api/stats/extra；5 类术语数量）
+          properties:
+            disease:
+              type: integer
+            symptom:
+              type: integer
+            pattern:
+              type: integer
+            herb:
+              type: integer
+            formula:
+              type: integer
     StatsOverviewVO:
       type: object
       description: 首页看板指标卡（出参），一次请求返回四个总览指标
@@ -1015,6 +1074,104 @@ components:
         invalidCount:
           type: integer
           description: 无效数（隔离归档）
+    StatsAllVO:
+      type: object
+      description: 首页看板一次拉取（出参）：指标卡 + 4 类统计，消除 5 个并发请求
+      properties:
+        overview:
+          $ref: '#/components/schemas/StatsOverviewVO'
+        disease:
+          $ref: '#/components/schemas/StatsVO'
+        symptom:
+          $ref: '#/components/schemas/StatsVO'
+        pattern:
+          $ref: '#/components/schemas/StatsVO'
+        prescription:
+          $ref: '#/components/schemas/StatsVO'
+    # ========== AI 助手 DTO / VO（interpret / chat / review 共享） ==========
+    AiQueryDTO:
+      type: object
+      description: AI 解读/问答/复核请求（入参，共享）：interpret 用 recordId；chat 用 question（+ 可选 recordId）；review 用 recordId + correctedData（批D）
+      properties:
+        recordId:
+          type: string
+          description: 病历ID（interpret 必填；chat 可选，"这份病历…"类问题需要）
+        question:
+          type: string
+          description: 使用者业务问题（chat 必填）
+    AiReplyVO:
+      type: object
+      description: AI 结果（出参，共享）；规则出结论 + LLM 叙述，LLM 不可用降级且规则结论保留
+      properties:
+        answer:
+          type: string
+          description: 自然语言回答/叙述（interpret 的报告叙述 或 chat 的问答回复，恒非空）
+        source:
+          type: string
+          description: 来源：llm（模型）/ rule（降级规则）
+          enum:
+            - llm
+            - rule
+        llmAvailable:
+          type: boolean
+          description: LLM 是否可用；false 时 answer 为模板/规则降级、summary 为 null
+        summary:
+          type: object
+          nullable: true
+          description: 病历要点摘要（interpret，LLM 生成）；LLM 不可用或 chat 时为 null
+          properties:
+            chiefComplaint:
+              type: string
+              description: 主诉
+            diagnosis:
+              type: string
+              description: 诊断（中医诊断）
+            syndrome:
+              type: string
+              description: 辨证
+            prescription:
+              type: string
+              description: 方药
+        completeness:
+          type: object
+          nullable: true
+          description: 完整性分析（interpret，21 字段口径）；chat 时为 null
+          properties:
+            total:
+              type: integer
+              example: 21
+            present:
+              type: integer
+            missing:
+              type: array
+              items:
+                type: string
+        coreMissing:
+          type: array
+          description: 核心字段缺失清单（interpret；脉象/舌象/证候/治法/方剂/中药）
+          items:
+            type: string
+        normHits:
+          type: object
+          nullable: true
+          description: 归一命中分布（interpret；精确/包含/模糊）；chat 时为 null
+          properties:
+            exact:
+              type: integer
+            contain:
+              type: integer
+            fuzzy:
+              type: integer
+            total:
+              type: integer
+        keyHints:
+          type: array
+          description: 关键提示（interpret；如"辨证结论为空""处方缺失"）
+          items:
+            type: string
+        disclaimer:
+          type: string
+          example: AI辅助分析，最终以人工复核为准
 paths:
   /api/auth/register:
     post:
@@ -2167,6 +2324,219 @@ paths:
                     $ref: '#/components/schemas/SearchVO'
         '400':
           description: 参数非法（分页参数错误等）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/stats/all:
+    get:
+      tags:
+        - 统计查询
+      summary: 看板一次拉取
+      description: 【权限：登录即可】首页看板一次返回指标卡 + 4 类统计（疾病/症状/证候/方剂中药），消除多个并发请求；可选筛选参数与范围条联动
+      parameters:
+        - name: department
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          description: 就诊开始日期
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          required: false
+          description: 就诊截止日期
+          schema:
+            type: string
+            format: date
+        - name: pattern
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: grade
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 看板聚合数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/StatsAllVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/stats/extra:
+    get:
+      tags:
+        - 统计查询
+      summary: 看板扩展统计
+      description: 【权限：登录即可】质控趋势（按月）/ 科室合格率 / 评分分布 / 词典规模（并入 StatsVO 的扩展字段）；可选筛选参数与范围条联动
+      parameters:
+        - name: department
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: pattern
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: grade
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 扩展统计结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/StatsVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/stats/departments:
+    get:
+      tags:
+        - 统计查询
+      summary: 科室动态选项
+      description: 【权限：登录即可】records.department 去重后的非空科室选项，供范围条下拉动态获取
+      responses:
+        '200':
+          description: 科室列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/ai/interpret:
+    post:
+      tags:
+        - AI助手
+      summary: AI质控解读
+      description: 【权限：登录即可】对单条病历生成可解释质控解读：规则出结论（完整性/缺项重点/归一命中/关键提示），再由 LlmClient 生成叙述与要点摘要；LLM 不可用降级模板叙述。读取受数据域约束（审核员仅待复核域）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiQueryDTO'
+            example:
+              recordId: 3f2a1b0c-...
+      responses:
+        '200':
+          description: 解读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/AiReplyVO'
+        '400':
+          description: recordId 为空（code=400）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 病历不存在或不在数据域内（code=1006）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/ai/chat:
+    post:
+      tags:
+        - AI助手
+      summary: AI助手问答
+      description: |
+        【权限：登录即可】面向使用者的项目业务问答（数据/功能/流程/判定原因），不回答技术实现问题。
+        路由：数据类问题→stats；归一/分布→归一命中；"这份病历…"→recordId 活跃详情；功能/流程/标准依据→知识注入；
+        技术实现问题→兜底拒答。LLM 不可用→降级规则问答（source=rule）。单轮问答，无会话历史。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiQueryDTO'
+            example:
+              question: 当前合格率与待复核构成
+              recordId: 3f2a1b0c-...
+      responses:
+        '200':
+          description: 回答
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/AiReplyVO'
+        '400':
+          description: question 为空（code=400）
           content:
             application/json:
               schema:
