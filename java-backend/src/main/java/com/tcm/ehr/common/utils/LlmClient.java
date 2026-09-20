@@ -1,10 +1,15 @@
 package com.tcm.ehr.common.utils;
 
 import com.openai.client.OpenAIClient;
+import com.openai.client.OpenAIClientAsync;
+import com.openai.client.OpenAIClientAsyncImpl;
 import com.openai.client.OpenAIClientImpl;
 import com.openai.core.ClientOptions;
-import com.tcm.ehr.common.config.LlmProperties;
+import com.tcm.ehr.common.config.LlmConfig;
+import com.tcm.ehr.common.config.LlmConfigStore;
 import io.micrometer.observation.ObservationRegistry;
+import org.springframework.core.retry.RetryPolicy;
+import org.springframework.core.retry.RetryTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -15,6 +20,8 @@ import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.http.okhttp.SpringAiOpenAiHttpClient;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -27,13 +34,16 @@ import java.time.Duration;
  * DeepSeek / 通义 / 智谱等改 {@code llm.base-url} 即可接入）。
  * <b>判定地基仍是规则引擎</b>——评分 / 分级 / 归一不依赖本类，本类只负责把规则结论叙述成人话。</p>
  *
- * <p><b>两条硬约束</b>（与《后续开发方案》§8.1 一致）：</p>
+ * <p><b>三条硬约束</b>（与《后续开发方案》§8.1 一致）：</p>
  * <ol>
  *   <li><b>不阻塞启动</b>：{@code ChatClient} 懒构造，首次调用才装配；配置缺失或非法只降级，
  *       绝不抛到启动期。Spring AI 的 {@code OpenAi*AutoConfiguration} 在缺 api-key 时会急切校验凭据、
  *       让整个上下文启动失败，故 {@code spring.ai.model.*} 已统一置 {@code none}，模型改由本类自行构造。</li>
  *   <li><b>不泄漏底层异常</b>：调用异常统一捕获 → 记 WARN → 返回 {@code null}，
- *       由调用方回退规则/模板兜底。</li>
+ *       由调用方回退规则/模板兜底。<b>唯一例外是 {@link #probe}</b>——连通性探测的目的就是报出失败原因，
+ *       由调用方负责脱敏后再返回给用户。</li>
+ *   <li><b>配置可变</b>（UX-68）：生效参数来自 {@link LlmConfigStore} 而非直接读 {@code application.yml}，
+ *       存储的版本号变化时会丢弃旧 {@code ChatClient} 并按新参数重建，实现「保存即生效、无需重启」。</li>
  * </ol>
  */
 @Slf4j
@@ -41,28 +51,45 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class LlmClient {
 
-    private static final String PROVIDER_OLLAMA = "ollama";
-    private static final String PROVIDER_OPENAI = "openai";
     private static final String DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 
-    private final LlmProperties props;
+    /** 连通性探测用提示词：只求最小往返，不要模型长篇输出 */
+    private static final String PROBE_PROMPT = "ping";
+
+    /** 未配置超时时的兜底值（与 {@code llm.timeout} 默认值一致） */
+    private static final int DEFAULT_TIMEOUT_MS = 60000;
+
+    /**
+     * 不重试的模板。Spring AI 默认重试模板连「连接被拒」也重试 3 次并指数退避
+     * （实测 10s / 10s / 50s），一次探测要等 80 秒以上，远超前端 30 秒超时 ——
+     * 用户只会看到一句无用的网络错误，而不是「连不上」这个真正的原因。
+     * 本项目 LLM 属可选增强，失败即回退规则，故统一不重试：宁可快速失败，不要长时间占用请求线程。
+     */
+    private static final RetryTemplate NO_RETRY = new RetryTemplate(RetryPolicy.withMaxRetries(0));
+
+    private final LlmConfigStore configStore;
 
     /** 懒构造；volatile + 双重检查，保证并发首次调用只装配一次 */
     private volatile ChatClient chatClient;
 
-    /** 装配失败（配置类错误）后本次运行内不再重试，避免每次调用都重复报错刷屏 */
-    private volatile boolean initFailed;
+    /** 已按哪个配置版本装配过（成功或失败都算）；与 {@link LlmConfigStore#version()} 不等则需重建 */
+    private volatile long builtVersion = -1;
 
     // ------------------------------------------------------------------ 对外
 
-    /** 当前是否可用：{@code llm.enabled=true} 且装配成功 */
+    /** 当前配置是否开启 LLM（{@code llm.enabled} 或运行时覆盖后的等效值） */
+    public boolean isEnabled() {
+        return configStore.get().enabled();
+    }
+
+    /** 当前是否可用：配置已开启且装配成功 */
     public boolean isAvailable() {
         return resolve() != null;
     }
 
     /** 当前通道名，供日志与诊断展示 */
     public String provider() {
-        return props.getProvider();
+        return configStore.get().provider();
     }
 
     /**
@@ -75,7 +102,8 @@ public class LlmClient {
     public String chat(String systemPrompt, String userPrompt) {
         ChatClient client = resolve();
         if (client == null) {
-            log.debug("[LLM] 不可用（llm.enabled={}，provider={}），降级", props.isEnabled(), props.getProvider());
+            LlmConfig cfg = configStore.get();
+            log.debug("[LLM] 不可用（enabled={}，provider={}），降级", cfg.enabled(), cfg.provider());
             return null;
         }
         try {
@@ -93,6 +121,26 @@ public class LlmClient {
     /** 无系统提示词的单轮对话 */
     public String chat(String userPrompt) {
         return chat(null, userPrompt);
+    }
+
+    /**
+     * 连通性探测（UX-68 {@code POST /api/llm/test}）：用<b>给定参数</b>（而非当前生效配置）
+     * 装配模型并发一轮最小请求，让用户可以先试再存。
+     *
+     * <p>与 {@link #chat} 相反，本方法<b>不吞异常</b>——探测的意义就是把失败原因交给调用方。
+     * 调用方必须对异常信息做脱敏（抹掉 api-key）后再回传。</p>
+     *
+     * @return 模型的回复内容
+     * @throws IllegalStateException 参数非法或连接/鉴权失败
+     */
+    public String probe(LlmConfig cfg) {
+        ChatModel model = buildModel(cfg);
+        String reply = ChatClient.builder(model).build()
+                .prompt()
+                .user(PROBE_PROMPT)
+                .call()
+                .content();
+        return reply == null ? "" : reply;
     }
 
     // ------------------------------------------------------------------ Prompt 归档
@@ -163,88 +211,113 @@ public class LlmClient {
 
     // ------------------------------------------------------------------ 装配
 
+    /**
+     * 取当前生效的 {@code ChatClient}；配置版本变化时按新参数重建（UX-68）。
+     *
+     * @return 可用客户端；未启用或装配失败返回 {@code null}
+     */
     private ChatClient resolve() {
-        if (!props.isEnabled() || initFailed) {
+        LlmConfig cfg = configStore.get();
+        if (!cfg.enabled()) {
             return null;
         }
-        ChatClient local = chatClient;
-        if (local != null) {
-            return local;
+        long v = configStore.version();
+        if (v == builtVersion) {
+            return chatClient;   // 本版本已尝试过装配（chatClient 为 null 即表示失败）
         }
         synchronized (this) {
-            if (chatClient != null) {
-                return chatClient;
-            }
-            try {
-                chatClient = build();
-                log.info("[LLM] 已启用：provider={}，model={}", props.getProvider(),
-                        isBlank(props.getModel()) ? "(通道默认)" : props.getModel());
-            } catch (Exception e) {
-                initFailed = true;
-                log.warn("[LLM] 装配失败，本次运行内降级（不影响主流程）：{}", e.getMessage());
+            if (v != builtVersion) {
+                chatClient = null;
+                try {
+                    chatClient = ChatClient.builder(buildModel(cfg)).build();
+                    log.info("[LLM] 已启用：provider={}，model={}", cfg.provider(),
+                            isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
+                } catch (Exception e) {
+                    log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
+                }
+                builtVersion = v;
             }
             return chatClient;
         }
     }
 
-    private ChatClient build() {
-        String provider = props.getProvider() == null ? "" : props.getProvider().trim().toLowerCase();
-        ChatModel model = switch (provider) {
-            case PROVIDER_OLLAMA -> buildOllama();
-            case PROVIDER_OPENAI -> buildOpenAi();
-            default -> throw new IllegalStateException(
-                    "llm.provider 非法：" + props.getProvider() + "（仅支持 ollama / openai）");
+    /** 按给定参数装配底层模型；参数非法直接抛出（由调用方决定降级还是上报） */
+    private ChatModel buildModel(LlmConfig cfg) {
+        String provider = LlmConfig.normalizeProvider(cfg.provider());
+        if (provider == null) {
+            throw new IllegalStateException("llm.provider 非法：" + cfg.provider() + "（仅支持 ollama / openai）");
+        }
+        return switch (provider) {
+            case LlmConfig.PROVIDER_OLLAMA -> buildOllama(cfg);
+            case LlmConfig.PROVIDER_OPENAI -> buildOpenAi(cfg);
+            default -> throw new IllegalStateException("llm.provider 非法：" + cfg.provider());
         };
-        return ChatClient.builder(model).build();
     }
 
     /** 本机通道：无需 api-key；Ollama 未启动时在调用期失败并降级 */
-    private ChatModel buildOllama() {
-        String baseUrl = isBlank(props.getBaseUrl()) ? DEFAULT_OLLAMA_BASE_URL : props.getBaseUrl().trim();
-        OllamaApi api = OllamaApi.builder().baseUrl(baseUrl).build();
+    private ChatModel buildOllama(LlmConfig cfg) {
+        String baseUrl = isBlank(cfg.baseUrl()) ? DEFAULT_OLLAMA_BASE_URL : cfg.baseUrl().trim();
+
+        // OllamaApi 默认不设超时，连不上时会一直挂着；必须显式给连接与读取超时
+        int timeout = cfg.timeout() > 0 ? cfg.timeout() : DEFAULT_TIMEOUT_MS;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofMillis(timeout));
+        factory.setReadTimeout(Duration.ofMillis(timeout));
+
+        OllamaApi api = OllamaApi.builder()
+                .baseUrl(baseUrl)
+                .restClientBuilder(RestClient.builder().requestFactory(factory))
+                .build();
 
         OllamaChatOptions.Builder options = OllamaChatOptions.builder();
-        if (!isBlank(props.getModel())) {
-            options.model(props.getModel().trim());
+        if (!isBlank(cfg.model())) {
+            options.model(cfg.model().trim());
         }
-        if (props.getTemperature() != null) {
-            options.temperature(props.getTemperature());
+        if (cfg.temperature() != null) {
+            options.temperature(cfg.temperature());
         }
         return OllamaChatModel.builder()
                 .ollamaApi(api)
                 .options(options.build())
                 .observationRegistry(ObservationRegistry.NOOP)
+                .retryTemplate(NO_RETRY)
                 .build();
     }
 
     /** OpenAI 兼容通道：只认 OpenAI 协议，base-url 指向三方网关即可复用 */
-    private ChatModel buildOpenAi() {
-        if (isBlank(props.getApiKey())) {
-            throw new IllegalStateException("llm.provider=openai 但 llm.api-key 为空");
+    private ChatModel buildOpenAi(LlmConfig cfg) {
+        if (isBlank(cfg.apiKey())) {
+            throw new IllegalStateException("provider=openai 但 api-key 为空");
         }
         SpringAiOpenAiHttpClient.Builder http = SpringAiOpenAiHttpClient.builder();
-        if (props.getTimeout() > 0) {
-            http.timeout(Duration.ofMillis(props.getTimeout()));
+        if (cfg.timeout() > 0) {
+            http.timeout(Duration.ofMillis(cfg.timeout()));
         }
 
         ClientOptions.Builder clientOptions = ClientOptions.builder()
-                .apiKey(props.getApiKey().trim())
+                .apiKey(cfg.apiKey().trim())
+                .maxRetries(0)          // 与 Ollama 通道同口径：快速失败，不做退避重试
                 .httpClient(http.build());
-        if (!isBlank(props.getBaseUrl())) {
-            clientOptions.baseUrl(props.getBaseUrl().trim());
+        if (!isBlank(cfg.baseUrl())) {
+            clientOptions.baseUrl(cfg.baseUrl().trim());
         }
-        OpenAIClient openAi = new OpenAIClientImpl(clientOptions.build());
+        ClientOptions options = clientOptions.build();
 
-        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder();
-        if (!isBlank(props.getModel())) {
-            options.model(props.getModel().trim());
+        OpenAiChatOptions.Builder chatOptions = OpenAiChatOptions.builder();
+        if (!isBlank(cfg.model())) {
+            chatOptions.model(cfg.model().trim());
         }
-        if (props.getTemperature() != null) {
-            options.temperature(props.getTemperature());
+        if (cfg.temperature() != null) {
+            chatOptions.temperature(cfg.temperature());
         }
+        // 同步与异步两个客户端都要给。OpenAiChatModel.build() 在缺异步客户端时会回退到
+        // OpenAiSetup 按 spring.ai.openai.* 自行装配，而本项目该前缀已统一置 none，
+        // 于是「api-key 明明填了」也会抛 At least one credential source must be specified
+        // —— 即 openai 通道永远连不上，且错误信息把矛头指向凭据、极难定位。
         return OpenAiChatModel.builder()
-                .openAiClient(openAi)
-                .options(options.build())
+                .openAiClient(new OpenAIClientImpl(options))
+                .openAiClientAsync(new OpenAIClientAsyncImpl(options))
+                .options(chatOptions.build())
                 .observationRegistry(ObservationRegistry.NOOP)
                 .build();
     }

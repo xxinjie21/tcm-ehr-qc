@@ -40,7 +40,7 @@ public class GovernanceController {
     @PostMapping("/api/governance/normalize")
     public ResponseEntity<Result<Map<String, Object>>> normalize(@RequestBody NormalizeDTO dto) {
         if (dto.getTerm() == null || dto.getTerm().isBlank()) {
-            return ResponseEntity.badRequest().body(Result.error("term不能为空"));
+            return ResponseEntity.badRequest().body(Result.error("请输入术语"));
         }
         if (dto.getType() == null || !List.of("disease", "pattern", "symptom", "herb", "formula").contains(dto.getType())) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));

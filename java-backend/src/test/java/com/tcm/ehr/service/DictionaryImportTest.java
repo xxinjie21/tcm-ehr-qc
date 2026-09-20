@@ -1,5 +1,6 @@
 package com.tcm.ehr.service;
 
+import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.common.config.LlmProperties;
 import com.tcm.ehr.common.utils.DictionaryStore;
 import com.tcm.ehr.common.utils.LlmClient;
@@ -64,9 +65,9 @@ class DictionaryImportTest {
     private DictionaryServiceImpl newService(boolean llmEnabled, boolean convertEnabled) {
         LlmProperties props = new LlmProperties();
         props.setEnabled(llmEnabled);
-        LlmClient client = new LlmClient(props);
+        LlmClient client = new LlmClient(new LlmConfigStore(props));
         DictionaryServiceImpl s = new DictionaryServiceImpl(fileService, store, esIndex,
-                new ObjectMapper(), client, props);
+                new ObjectMapper(), client);
         ReflectionTestUtils.setField(s, "convertEnabled", convertEnabled);
         return s;
     }
@@ -145,7 +146,8 @@ class DictionaryImportTest {
         assertEquals(2, vo.getTotal());
         assertEquals(1, vo.getImported());
         assertEquals(1, vo.getFailed());
-        assertEquals("standardTerm为空", vo.getFailures().get(0).get("reason"));
+        // UX-55：失败原因面向使用者，不得出现 standardTerm 这类字段名
+        assertEquals("标准术语列为空", vo.getFailures().get(0).get("reason"));
     }
 
     /** 非法 JSON：抛 IllegalArgumentException，由全局异常处理回 400 */

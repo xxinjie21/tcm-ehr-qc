@@ -27,9 +27,9 @@
 
     <!-- 数据清洗与术语归一（流程图） -->
     <PanelCard title="数据清洗与术语自动归一">
+      <!-- 全页只保留这一处总述（UX-57）：其余位置的说明文字删除或收进折叠区 -->
       <div class="flow-tip">
-        <b>清洗不会填充医生未书写的内容</b>：缺失字段只做标记，由人工复核补充；
-        术语按最新词典统一为标准写法。
+        清洗<b>不会填充医生未书写的内容</b>，也<b>不会删除任何病历</b>；术语按最新词典统一为标准写法。
       </div>
 
       <div class="flow-wrapper">
@@ -37,21 +37,27 @@
           <div class="step-card">
             <div class="step-num">{{ i + 1 }}</div>
             <div class="step-title">{{ s.title }}</div>
-            <div class="step-desc">{{ s.desc }}</div>
           </div>
-          <div v-if="i < STEPS.length - 1" class="step-arrow">→</div>
+          <!-- 末步留占位箭头，保证 5 张卡片等宽（UX-64） -->
+          <div class="step-arrow" :class="{ ghost: i === STEPS.length - 1 }" aria-hidden="true">→</div>
         </div>
       </div>
+
+      <!-- 每步细节按需展开，不占版面（UX-57） -->
+      <details class="step-more">
+        <summary>查看 5 步说明</summary>
+        <ul>
+          <li v-for="(s, i) in STEPS" :key="s.title"><b>{{ i + 1 }}. {{ s.title }}</b>：{{ s.desc }}</li>
+        </ul>
+      </details>
 
       <div class="clean-actions">
         <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
           {{ clean.loading ? '清洗执行中…' : '执行数据清洗' }}
         </el-button>
         <!-- 执行期间说明「在做什么、要等多久、结果在哪看」，而不是只转一个圈（UX-37） -->
-        <span class="tip">
-          {{ clean.loading
-            ? '正在按 5 步依次处理，请勿关闭页面；完成后下方会给出分步结果'
-            : '按上述 5 步处理当前范围，可重复执行' }}
+        <span v-if="clean.loading" class="tip">
+          正在按 5 步依次处理，请勿关闭页面；完成后下方会给出分步结果
         </span>
       </div>
 
@@ -173,7 +179,7 @@
           <!-- 行内「查看」入口：键盘用户也能打开详情，且给鼠标用户明确的「可点」提示（UX-18） -->
           <el-table-column label="操作" width="70" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click.stop="detail = row">查看</el-button>
+              <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
             </template>
           </el-table-column>
           <template #empty>
@@ -183,26 +189,35 @@
       </div>
     </PanelCard>
 
-    <!-- 单条完整详情弹窗 -->
-    <el-dialog v-model="detailVisible" title="病历完整详情" width="min(760px, 92vw)">
-      <template v-if="detail">
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
-            {{ fieldOf(detail, f.key) || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
-          <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
-        </el-descriptions>
-        <div class="sd-title">结构化数据（术语已归一，sourceText为原文溯源）</div>
-        <StructuredDataCard :data="detail.structuredData" />
-        <AiInterpretCard :record-id="detail.id" />
+    <!-- 单条完整详情：同页展开（UX-66）+ 左右两栏对照（UX-65） -->
+    <PanelCard v-if="detail" ref="detailRef" title="病历完整详情" class="detail-panel">
+      <template #header>
+        <span>病历完整详情</span>
+        <el-button link class="hd-close" @click="closeDetail">关闭详情</el-button>
       </template>
-    </el-dialog>
+      <div class="detail-2col">
+        <div class="detail-col">
+          <div class="col-hd">原始字段</div>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
+              {{ fieldOf(detail, f.key) || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
+            <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+        <div class="detail-col">
+          <div class="col-hd">结构化数据（术语已归一，sourceText 为原文溯源）</div>
+          <StructuredDataCard :data="detail.structuredData" />
+          <AiInterpretCard :record-id="detail.id" />
+        </div>
+      </div>
+    </PanelCard>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
@@ -386,16 +401,22 @@ const resetCols = () => {
 }
 
 const preview = reactive({ loading: false, result: null })
+
+// ===== 详情（同页展开，UX-66）=====
 const detail = ref(null)
-const detailVisible = computed({
-  get: () => !!detail.value,
-  set: (v) => { if (!v) detail.value = null }
-})
+const detailRef = ref(null)
 
 // 点详情：写入共享状态，供 AI 助手"这份病历…"类问题使用（批C·3.2）
-const openDetail = (row) => {
+const openDetail = async (row) => {
   detail.value = row
   aiStore.setActiveRecord(row)
+  // 同页展开后把详情区滚进视野，否则用户以为「点了没反应」
+  await nextTick()
+  detailRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const closeDetail = () => {
+  detail.value = null
 }
 
 const handlePreview = async () => {
@@ -494,16 +515,21 @@ onMounted(() => {
 .scope-tip { font-size: 13px; color: var(--text-sub); }
 .scope-tip b { color: var(--ink); }
 
-/* ===== 流程说明条 ===== */
+/* ===== 流程说明条 =====
+   边框与圆角统一为 --line / 6px，与 .step-card、.level-dist .ld 同一套规格（UX-64） */
 .flow-tip {
   background: var(--ink-light);
-  border: 1px solid #cddcd2;
-  border-radius: 4px;
-  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
   font-size: 12.5px;
   color: var(--ink-mid);
   line-height: 1.7;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+}
+.flow-tip b {
+  color: var(--ink);
+  font-weight: normal;
 }
 
 /* ===== 清洗流程图 ===== */
@@ -511,12 +537,12 @@ onMounted(() => {
   display: flex;
   align-items: stretch;
   gap: 6px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 .flow-step {
   display: flex;
   align-items: center;
-  flex: 1;
+  flex: 1 1 0;
   gap: 6px;
   min-width: 0;
 }
@@ -548,19 +574,56 @@ onMounted(() => {
   font-size: 13px;
   font-weight: bold;
   color: var(--ink);
-  margin-bottom: 6px;
 }
-.step-desc {
-  font-size: 11.5px;
-  color: var(--text-sub);
-  line-height: 1.5;
-  padding: 0 4px;
-}
+/* 箭头定宽，末步用同宽占位，保证 5 张卡片等宽（UX-64） */
 .step-arrow {
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
   font-size: 20px;
   color: var(--ochre);
-  flex-shrink: 0;
   font-weight: bold;
+}
+.step-arrow.ghost {
+  visibility: hidden;
+}
+
+/* 每步细节按需展开（UX-57） */
+.step-more {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 12px;
+  margin-bottom: 18px;
+  font-size: 12.5px;
+  color: var(--text-sub);
+}
+.step-more > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 0;
+  color: var(--ink-mid);
+}
+.step-more > summary::-webkit-details-marker {
+  display: none;
+}
+.step-more > summary::before {
+  content: '▸ ';
+  color: var(--ink-mid);
+}
+.step-more[open] > summary::before {
+  content: '▾ ';
+}
+.step-more[open] {
+  padding-bottom: 10px;
+}
+.step-more ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.9;
+}
+.step-more b {
+  color: var(--ink);
+  font-weight: normal;
 }
 
 /* ===== 执行按钮区 ===== */
@@ -614,7 +677,7 @@ onMounted(() => {
 .stat-item.ochre .num { color: var(--ochre); }
 .stat-item.red .num { color: var(--danger); }
 
-/* 三级命中分布（批B·2.2） */
+/* 三级命中分布（批B·2.2）；圆角与流程区统一为 6px（UX-64） */
 .level-dist {
   display: flex;
   align-items: center;
@@ -623,8 +686,8 @@ onMounted(() => {
   font-size: 13px;
   color: var(--ink);
 }
-.level-dist .ld-lbl { font-weight: bold; color: var(--text-sub); font-weight: normal; font-size: 12.5px; }
-.level-dist .ld { padding: 2px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.level-dist .ld-lbl { color: var(--text-sub); font-size: 12.5px; }
+.level-dist .ld { padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .level-dist .ld.exact { color: var(--ink-mid); }
 .level-dist .ld.contain { color: var(--ochre); }
 .level-dist .ld.fuzzy { color: var(--danger); }
@@ -680,26 +743,44 @@ label {
 .preview-box :deep(.el-table__body tr) {
   cursor: pointer;
 }
-.sd-title {
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--ink);
-  margin: 12px 0 6px;
+
+/* ===== 详情同页展开（UX-66）与左右两栏对照（UX-65） ===== */
+.detail-panel :deep(.panel-hd) {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
 }
-.sd-json {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 10px;
-  font-size: 12px;
-  max-height: 260px;
-  overflow: auto;
-  white-space: pre-wrap;
+.hd-close {
+  margin-left: auto;
+  font-size: 13px;
+}
+.detail-2col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.detail-col {
+  min-width: 0;
+}
+.col-hd {
+  font-size: 12.5px;
+  color: var(--text-sub);
+  margin-bottom: 8px;
 }
 
 @media (max-width: 1200px) {
-  .flow-wrapper { flex-wrap: wrap; }
-  .flow-step { min-width: 180px; flex: 1 1 30%; }
+  /* 窄屏改 3 列网格并隐藏箭头，保证每行卡片等宽（UX-64） */
+  .flow-wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .step-arrow {
+    display: none;
+  }
   .clean-stats { grid-template-columns: repeat(3, 1fr); }
+  .detail-2col { grid-template-columns: 1fr; }
 }
 </style>

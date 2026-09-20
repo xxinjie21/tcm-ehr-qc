@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.domain.dto.ExportDTO;
@@ -213,14 +214,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return stat;
     }
 
+    /** 附录A 字段名 → 词典类型；映射唯一权威在 {@link EntityNormalizer#dictionaryType}（解析链路共用） */
     private String mapEntityType(String key) {
-        return switch (key) {
-            case "diseases" -> "disease";
-            case "symptoms" -> "symptom";
-            case "patternList" -> "pattern";
-            case "formulaList" -> "formula";
-            default -> null; // tongueList/pulseList/causeList/treatmentList无独立词典，跳过
-        };
+        return EntityNormalizer.dictionaryType(key);
     }
 
     /**

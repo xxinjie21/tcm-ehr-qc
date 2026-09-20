@@ -50,6 +50,8 @@ tags:
     description: 操作日志导出
   - name: AI助手
     description: AI 质控解读与业务问答（规则出结论 + LLM 叙述，LLM 不可用降级）
+  - name: LLM配置
+    description: 运行时 LLM 通道配置（ollama / openai 兼容），保存即生效
 security:
   - bearerAuth: []
 components:
@@ -126,6 +128,15 @@ components:
           enum:
             - model
             - rule
+        normLevel:
+          type: integer
+          description: 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中词典时不返回
+        normSource:
+          type: string
+          description: 归一命中的术语来源（词典名）；未命中不返回
+        normCode:
+          type: string
+          description: 国标代码；词典未收录时不返回
     Herb:
       type: object
       description: 中药实体（含剂量），共享模型
@@ -139,6 +150,15 @@ components:
         sourceText:
           type: string
           description: 原文片段
+        normLevel:
+          type: integer
+          description: 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中词典时不返回
+        normSource:
+          type: string
+          description: 归一命中的术语来源（词典名）；未命中不返回
+        normCode:
+          type: string
+          description: 国标代码；词典未收录时不返回
     RecordMetadata:
       type: object
       description: 病历元数据（共享模型）
@@ -595,6 +615,84 @@ components:
         modelAvailable:
           type: boolean
           description: NLP 服务/模型是否可用；false 表示为降级结果（可能仅规则兜底或为空）
+    # ========== LLM 运行时配置 DTO / VO（UX-68） ==========
+    LlmConfigDTO:
+      type: object
+      description: LLM 配置入参（PUT /api/llm/config 与 POST /api/llm/test 共用）；字段为空表示沿用当前值，apiKey 传空串或掩码表示不修改
+      properties:
+        enabled:
+          type: boolean
+          description: 是否启用 LLM；不传沿用当前
+        provider:
+          type: string
+          enum:
+            - ollama
+            - openai
+          description: 通道；ollama 本机免 api-key，openai 指 OpenAI 及兼容三方网关
+        baseUrl:
+          type: string
+          description: 接口地址；留空用通道默认（ollama=http://localhost:11434，openai=https://api.openai.com/v1）
+        apiKey:
+          type: string
+          description: api-key；空串或回传的掩码均表示不修改（明文密钥只在服务端内存中）
+        model:
+          type: string
+          description: 模型名；留空用通道默认模型
+        temperature:
+          type: number
+          format: double
+          description: 采样温度，取值 0~2
+        timeout:
+          type: integer
+          description: 单次请求超时（毫秒），取值 1000~300000
+    LlmConfigVO:
+      type: object
+      description: LLM 当前生效配置（出参）；api-key 只回传掩码，明文永不出服务端
+      properties:
+        enabled:
+          type: boolean
+          description: 当前是否启用
+        provider:
+          type: string
+          enum:
+            - ollama
+            - openai
+        baseUrl:
+          type: string
+        apiKeyMask:
+          type: string
+          description: api-key 掩码（如 sk-****abcd）；未配置为空串
+          example: sk-****abcd
+        apiKeySet:
+          type: boolean
+          description: 是否已配置 api-key
+        model:
+          type: string
+        temperature:
+          type: number
+          format: double
+        timeout:
+          type: integer
+        available:
+          type: boolean
+          description: 当前是否已按生效配置装配成功（enabled 且参数合法）
+    LlmTestVO:
+      type: object
+      description: LLM 连通性探测结果（出参）
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+          description: 实际使用的模型名；配置留空时为通道默认模型
+        latencyMs:
+          type: integer
+          format: int64
+          description: 往返耗时（毫秒）
+        reply:
+          type: string
+          description: 模型回复内容（探测提示词为 ping，回复通常很短）
+
     # ========== 清洗与导出 DTO / VO ==========
     NormalizeDTO:
       type: object
@@ -1743,7 +1841,7 @@ paths:
       tags:
         - NLP抽取
       summary: NLP实体抽取
-      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）。Java 端转发至 Python FastAPI 服务（:8001），服务/模型不可用时降级（modelAvailable=false）
+      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）。Java 端转发至 Python FastAPI 服务（:8001），服务/模型不可用时降级（modelAvailable=false）。返回前对实体做术语归一（disease/symptom/pattern/formula/herb 五类走词典，舌/脉/病因/治法四类无独立词典仅保留原文）：content 为标准术语、sourceText 为归一前原文，并附 normLevel/normSource/normCode；未命中词典时 content 保持原文且不返回归一字段
       requestBody:
         required: true
         content:
@@ -2817,6 +2915,121 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: 病历不存在或不在数据域内（code=1006）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/llm/config:
+    get:
+      tags:
+        - LLM配置
+      summary: 读取 LLM 配置
+      description: 【权限：仅管理员】读取当前生效的 LLM 配置。api-key 只回传掩码（如 sk-****abcd），明文密钥不出服务端
+      responses:
+        '200':
+          description: 当前生效配置
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/LlmConfigVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags:
+        - LLM配置
+      summary: 覆盖 LLM 配置
+      description: |
+        【权限：仅管理员】覆盖运行时生效的 LLM 配置，保存即生效、无需重启。
+        只作用于内存，不写回 application.yml，重启后回到配置文件基线；
+        需要长期生效请写入配置文件的 llm 段。apiKey 传空串或掩码表示不修改。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmConfigDTO'
+            example:
+              enabled: true
+              provider: ollama
+              baseUrl: http://localhost:11434
+              apiKey: ''
+              model: qwen2.5:7b
+              temperature: 0.2
+              timeout: 60000
+      responses:
+        '200':
+          description: 生效后的配置
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/LlmConfigVO'
+        '400':
+          description: 参数非法（通道非 ollama/openai、温度越界、超时越界，或选 openai 但未填 api-key）（code=400）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/llm/test:
+    post:
+      tags:
+        - LLM配置
+      summary: LLM 连通性探测
+      description: 【权限：仅管理员】用请求体参数（省略则用当前生效配置）发一轮最小请求探测连通性，先试后存；不改变当前生效配置。探测超时上限 20 秒
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmConfigDTO'
+      responses:
+        '200':
+          description: 连接正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/LlmTestVO'
+        '400':
+          description: 参数非法（通道非 ollama/openai，或选 openai 但未填 api-key）（code=400）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          description: 上游模型服务不可达或鉴权失败（code=1009，消息已脱敏可直接展示）
           content:
             application/json:
               schema:

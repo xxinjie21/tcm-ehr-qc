@@ -1,6 +1,5 @@
 package com.tcm.ehr.service.impl;
 
-import com.tcm.ehr.common.config.LlmProperties;
 import com.tcm.ehr.common.utils.DictionaryStore;
 import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -52,7 +51,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
     private final IEsTermIndexService esTermIndexService;
     private final ObjectMapper objectMapper;
     private final LlmClient llmClient;
-    private final LlmProperties llmProperties;
 
     /** 词典 PDF 智能转换子开关；依赖 llm.enabled=true */
     @Value("${nlp.convert-enabled:false}")
@@ -132,7 +130,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         for (int i = 0; i < parsed.size(); i++) {
             TermEntry e = parsed.get(i);
             if (e == null || e.getStandardTerm() == null || e.getStandardTerm().isBlank()) {
-                failures.add(Map.of("row", i + 1, "reason", "standardTerm为空"));
+                failures.add(Map.of("row", i + 1, "reason", "标准术语列为空"));
                 continue;
             }
             ok.add(normalize(e));
@@ -158,7 +156,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             String[] row = rows.get(i);
             String standard = row[0] == null ? "" : row[0].trim();
             if (standard.isEmpty()) {
-                failures.add(Map.of("row", i + 1, "reason", "standardTerm为空"));
+                failures.add(Map.of("row", i + 1, "reason", "标准术语列为空"));
                 continue;
             }
             List<String> aliases = new ArrayList<>();
@@ -229,7 +227,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
         // 双开关：llm.enabled 总控 + nlp.convert-enabled 子控。关闭属「预期内不可用」，
         // 用 IllegalArgumentException 让 GlobalExceptionHandler 回 400 + 明确文案（而非 500 系统异常）
-        if (!llmProperties.isEnabled() || !convertEnabled) {
+        if (!llmClient.isEnabled() || !convertEnabled) {
             throw new IllegalArgumentException(
                     "PDF 智能转换未启用（需同时开启 llm.enabled 与 nlp.convert-enabled）。"
                             + "可改用 JSON 直传，或用离线脚本 tools/convert-standard-pdf.py 转换后导入。");
@@ -289,7 +287,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             idx++;
             if (c == null || c.getStandardTerm() == null || c.getStandardTerm().isBlank()) {
                 vo.getFailed().add(new ConvertPreviewVO.Failed("第 " + idx + " 个元素",
-                        "standardTerm为空"));
+                        "标准术语列为空"));
                 continue;
             }
             c.setStandardTerm(c.getStandardTerm().trim());

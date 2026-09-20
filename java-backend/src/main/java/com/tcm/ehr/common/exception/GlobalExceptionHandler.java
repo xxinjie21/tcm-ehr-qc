@@ -45,6 +45,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.error(403, e.getMessage()));
     }
 
+    /**
+     * LLM 连通性探测失败 -> HTTP 502 + code=1009。
+     *
+     * <p>上游模型服务不可达 / 鉴权失败属「网关侧故障」，与客户端参数错误（400）区分开；
+     * 消息在抛出前已脱敏（抹掉 api-key），可直接展示给用户。</p>
+     */
+    @ExceptionHandler(LlmProbeException.class)
+    public ResponseEntity<Result<Void>> handleLlmProbe(LlmProbeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Result.error(1009, e.getMessage()));
+    }
+
     /** 资源不存在（病历 ID 无效等） -> HTTP 404 + 业务错误码（默认 1006） */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Result<Void>> handleNotFound(ResourceNotFoundException e) {

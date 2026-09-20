@@ -1,165 +1,195 @@
 <template>
   <div>
-    <PanelCard title="病历代查">
-      <RangeFilter v-model="query" />
-      <div class="actions">
-        <el-button type="primary" :loading="searching" @click="handleSearch">查 询</el-button>
-        <el-button :disabled="searching" @click="handleReset">重置</el-button>
-        <span class="tip">共 {{ total }} 条</span>
-      </div>
-
-      <el-table v-loading="searching" :data="rows" border size="small" style="margin-top: 12px" max-height="420">
-        <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
-        <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="openDetail(row.id)">查看</el-button>
-            <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="无符合条件的病历" :image-size="80" />
-        </template>
-      </el-table>
-
-      <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50]"
-        :total="total"
-        layout="total, sizes, prev, pager, next"
-        style="margin-top: 12px; justify-content: flex-end"
-        @current-change="handleSearch"
-        @size-change="handleSizeChange"
-      />
-    </PanelCard>
-
-    <PanelCard title="病历批量导入">
-      <div class="tip">
-        支持 .xlsx / .xls，单文件 ≤50MB、单次 ≤20 个文件；按「登记号」等 21 字段解析入库，
-        与治理清洗同一去重口径（21 字段完全一致视为重复，跳过并记录）。
-      </div>
-
-      <el-upload
-        v-model:file-list="fileList"
-        class="uploader"
-        drag
-        multiple
-        :auto-upload="false"
-        :limit="20"
-        accept=".xlsx,.xls"
-        :on-change="onFileChange"
-        :on-exceed="onExceed"
-      >
-        <div class="up-inner">
-          <div class="up-title">将 Excel 拖到此处，或<em>点击选择</em></div>
-          <div class="up-sub">可多选，仅 .xlsx / .xls</div>
-        </div>
-      </el-upload>
-
-      <div class="actions">
-        <el-button type="primary" :loading="importing" :disabled="!fileList.length" @click="handleImport">
-          {{ importing ? '导入中…' : '开始导入' }}
-        </el-button>
-        <el-button v-if="importing" :disabled="cancelled" @click="cancelImport">取消</el-button>
-        <el-button v-else :disabled="!fileList.length" @click="fileList = []">清空</el-button>
-      </div>
-
-      <!-- 逐文件进度（UX-15）：给出「第 n/N 个」与已入库统计，并说明不可关页面 -->
-      <div v-if="importing" class="import-progress">
-        <div class="ip-hd">
-          正在导入第 {{ Math.min(progress.done + 1, progress.total) }}/{{ progress.total }} 个文件：
-          <b>{{ progress.current || '准备中…' }}</b>
-        </div>
-        <el-progress
-          :percentage="progress.total ? Math.round((progress.done / progress.total) * 100) : 0"
-          :stroke-width="10"
-        />
-        <div class="ip-sub">
-          已入库 {{ progress.success }} 条，失败/跳过 {{ progress.failed }} 条；导入期间请勿关闭或刷新页面
-        </div>
-      </div>
-
-      <!-- 失败态独立于上一次结果，避免误读为「本次结果」（UX-22） -->
-      <div v-if="importFailed" class="import-failed">
-        本次导入失败，请根据上方提示排查后重试（上一次结果已清除）。
-      </div>
-
-      <div v-if="summary" class="result">
-        <div class="result-hd">导入结果</div>
-        <div class="stats">
-          <div class="stat-item"><div class="num">{{ summary.total }}</div><div class="lbl">有效数据行</div></div>
-          <div class="stat-item green"><div class="num">{{ summary.success }}</div><div class="lbl">成功入库</div></div>
-          <div class="stat-item red"><div class="num">{{ summary.failed }}</div><div class="lbl">失败 / 跳过</div></div>
-        </div>
-        <el-table v-if="summary.failures && summary.failures.length" :data="summary.failures" border size="small" max-height="260">
-          <el-table-column prop="filename" label="文件" width="240" show-overflow-tooltip />
-          <el-table-column prop="reason" label="原因" show-overflow-tooltip />
-        </el-table>
-      </div>
-    </PanelCard>
-
-    <PanelCard title="单条新增病历">
-      <el-form ref="createFormRef" :model="form" :rules="FORM_RULES" label-width="88px">
-        <!-- 按语义分区，后四组默认折叠，避免 21 字段铺出一条 1000px 的长表单（UX-51） -->
-        <details
-          v-for="(g, gi) in FIELD_GROUPS"
-          :key="g.title"
-          class="form-group"
-          :open="gi === 0"
-        >
-          <summary class="group-hd">{{ g.title }}</summary>
-          <div class="form-grid">
-            <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
-              <!-- 性别改枚举下拉：自由文本会写进脏数据（UX-10） -->
-              <el-select
-                v-if="f.key === 'gender'"
-                v-model="form.gender"
-                placeholder="请选择"
-                clearable
-                style="width: 100%"
-              >
-                <el-option label="男" value="男" />
-                <el-option label="女" value="女" />
-              </el-select>
-              <el-date-picker
-                v-else-if="f.key === 'visitTime'"
-                v-model="form.visitTime"
-                type="datetime"
-                value-format="YYYY-MM-DDTHH:mm:ss"
-                placeholder="接诊时间"
-                style="width: 100%"
-              />
-              <el-input v-else v-model="form[f.key]" :type="f.wide ? 'textarea' : 'text'" :rows="f.wide ? 2 : 1" clearable />
-            </el-form-item>
+    <!-- 三块能力改为标签页切换（UX-51）：原先「查表 / 批量导入 / 单条新增」纵向堆叠，
+         用户到达表单本身就要滚动整屏；切换后每屏只面对一件事 -->
+    <el-tabs v-model="activeTab" class="records-tabs">
+      <!-- ============ 病历代查 ============ -->
+      <el-tab-pane label="病历代查" name="query">
+        <PanelCard title="病历代查">
+          <RangeFilter v-model="query" />
+          <div class="actions">
+            <el-button type="primary" :loading="searching" @click="handleSearch">查 询</el-button>
+            <el-button :disabled="searching" @click="handleReset">重置</el-button>
+            <span class="tip-inline">共 {{ total }} 条</span>
           </div>
-        </details>
-        <div class="actions create-actions">
-          <el-button type="primary" :loading="creating" @click="handleCreate">新增病历</el-button>
-          <el-button :disabled="creating" @click="resetForm">重置</el-button>
-        </div>
-      </el-form>
-    </PanelCard>
 
-    <el-dialog v-model="detailVisible" title="病历详情（原始字段只读）" width="min(780px, 92vw)">
-      <template v-if="raw">
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
-            {{ fieldOf(raw, f.key) || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="评分">{{ raw.score ?? '—' }}</el-descriptions-item>
-          <el-descriptions-item label="分级">{{ raw.grade || '—' }}</el-descriptions-item>
-        </el-descriptions>
-        <div class="sd-title">结构化数据（sourceText 为原文溯源）</div>
-        <StructuredDataCard :data="raw.structuredData" />
-        <AiInterpretCard :record-id="raw.id" />
-      </template>
-    </el-dialog>
+          <el-table
+            v-loading="searching"
+            :data="rows"
+            border
+            size="small"
+            style="margin-top: 12px"
+            max-height="420"
+            :row-class-name="rowClass"
+          >
+            <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
+            <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
+            <el-table-column label="操作" width="150" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="openDetail(row.id)">查看</el-button>
+                <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <el-empty description="无符合条件的病历" :image-size="80" />
+            </template>
+          </el-table>
+
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="total"
+            layout="total, sizes, prev, pager, next"
+            style="margin-top: 12px; justify-content: flex-end"
+            @current-change="handleSearch"
+            @size-change="handleSizeChange"
+          />
+        </PanelCard>
+
+        <!-- 详情改为同页展开（UX-66），左右两栏对照（UX-65）：
+             左＝原始 21 字段，右＝结构化数据 + AI 解读，两端同屏可比对 -->
+        <PanelCard v-if="raw" ref="detailRef" title="病历详情（原始字段只读）" class="detail-panel">
+          <template #header>
+            <span>病历详情（原始字段只读）</span>
+            <el-button link class="hd-close" @click="closeDetail">关闭详情</el-button>
+          </template>
+          <div class="detail-2col">
+            <div class="detail-col">
+              <div class="col-hd">原始字段</div>
+              <el-descriptions :column="2" border size="small">
+                <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
+                  {{ fieldOf(raw, f.key) || '—' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="评分">{{ raw.score ?? '—' }}</el-descriptions-item>
+                <el-descriptions-item label="分级">{{ raw.grade || '—' }}</el-descriptions-item>
+              </el-descriptions>
+            </div>
+            <div class="detail-col">
+              <div class="col-hd">结构化数据（sourceText 为原文溯源）</div>
+              <StructuredDataCard :data="raw.structuredData" />
+              <AiInterpretCard :record-id="raw.id" />
+            </div>
+          </div>
+        </PanelCard>
+      </el-tab-pane>
+
+      <!-- ============ 病历批量导入 ============ -->
+      <el-tab-pane label="病历批量导入" name="import" lazy>
+        <PanelCard title="病历批量导入">
+          <div class="tip">
+            支持 .xlsx / .xls，单文件 ≤50MB、单次 ≤20 个文件；按「登记号」等 21 字段解析入库，
+            与治理清洗同一去重口径（21 字段完全一致视为重复，跳过并记录）。
+          </div>
+
+          <el-upload
+            v-model:file-list="fileList"
+            class="uploader"
+            drag
+            multiple
+            :auto-upload="false"
+            :limit="20"
+            accept=".xlsx,.xls"
+            :on-change="onFileChange"
+            :on-exceed="onExceed"
+          >
+            <div class="up-inner">
+              <div class="up-title">将 Excel 拖到此处，或<em>点击选择</em></div>
+              <div class="up-sub">可多选，仅 .xlsx / .xls</div>
+            </div>
+          </el-upload>
+
+          <div class="actions">
+            <el-button type="primary" :loading="importing" :disabled="!fileList.length" @click="handleImport">
+              {{ importing ? '导入中…' : '开始导入' }}
+            </el-button>
+            <el-button v-if="importing" :disabled="cancelled" @click="cancelImport">取消</el-button>
+            <el-button v-else :disabled="!fileList.length" @click="fileList = []">清空</el-button>
+          </div>
+
+          <!-- 逐文件进度（UX-15）：给出「第 n/N 个」与已入库统计，并说明不可关页面 -->
+          <div v-if="importing" class="import-progress">
+            <div class="ip-hd">
+              正在导入第 {{ Math.min(progress.done + 1, progress.total) }}/{{ progress.total }} 个文件：
+              <b>{{ progress.current || '准备中…' }}</b>
+            </div>
+            <el-progress
+              :percentage="progress.total ? Math.round((progress.done / progress.total) * 100) : 0"
+              :stroke-width="10"
+            />
+            <div class="ip-sub">
+              已入库 {{ progress.success }} 条，失败/跳过 {{ progress.failed }} 条；导入期间请勿关闭或刷新页面
+            </div>
+          </div>
+
+          <!-- 失败态独立于上一次结果，避免误读为「本次结果」（UX-22） -->
+          <div v-if="importFailed" class="import-failed">
+            本次导入失败，请根据上方提示排查后重试（上一次结果已清除）。
+          </div>
+
+          <div v-if="summary" class="result">
+            <div class="result-hd">导入结果</div>
+            <div class="stats">
+              <div class="stat-item"><div class="num">{{ summary.total }}</div><div class="lbl">有效数据行</div></div>
+              <div class="stat-item green"><div class="num">{{ summary.success }}</div><div class="lbl">成功入库</div></div>
+              <div class="stat-item red"><div class="num">{{ summary.failed }}</div><div class="lbl">失败 / 跳过</div></div>
+            </div>
+            <el-table v-if="summary.failures && summary.failures.length" :data="summary.failures" border size="small" max-height="260">
+              <el-table-column prop="filename" label="文件" width="240" show-overflow-tooltip />
+              <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+            </el-table>
+          </div>
+        </PanelCard>
+      </el-tab-pane>
+
+      <!-- ============ 单条新增病历 ============ -->
+      <el-tab-pane label="单条新增病历" name="create" lazy>
+        <PanelCard title="单条新增病历">
+          <el-form ref="createFormRef" :model="form" :rules="FORM_RULES" label-width="88px">
+            <!-- 语义分区 + 多列栅格（UX-51 修订）：原先 21 字段平铺是 1000px+ 长表单，
+                 改成折叠分组后用户仍要逐组展开、整页依旧要滚动。
+                 现改为分区常显 + 3 列栅格：21 字段压到约 12 行，常规屏幕一屏内可填完，
+                 校验失败的红字也直接可见（不再藏在折叠区里） -->
+            <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
+              <div class="group-hd">{{ g.title }}</div>
+              <div class="form-grid">
+                <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
+                  <!-- 性别改枚举下拉：自由文本会写进脏数据（UX-10） -->
+                  <el-select
+                    v-if="f.key === 'gender'"
+                    v-model="form.gender"
+                    placeholder="请选择"
+                    clearable
+                    style="width: 100%"
+                  >
+                    <el-option label="男" value="男" />
+                    <el-option label="女" value="女" />
+                  </el-select>
+                  <el-date-picker
+                    v-else-if="f.key === 'visitTime'"
+                    v-model="form.visitTime"
+                    type="datetime"
+                    value-format="YYYY-MM-DDTHH:mm:ss"
+                    placeholder="接诊时间"
+                    style="width: 100%"
+                  />
+                  <el-input v-else v-model="form[f.key]" :type="f.wide ? 'textarea' : 'text'" :rows="f.wide ? 2 : 1" clearable />
+                </el-form-item>
+              </div>
+            </div>
+            <div class="actions create-actions">
+              <el-button type="primary" :loading="creating" @click="handleCreate">新增病历</el-button>
+              <el-button :disabled="creating" @click="resetForm">重置</el-button>
+            </div>
+          </el-form>
+        </PanelCard>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -171,6 +201,9 @@ import {
 import { useAiStore } from '@/stores/ai'
 
 const aiStore = useAiStore()
+
+// 当前标签页（UX-51）；导入与新增懒加载，首屏只渲染查询表
+const activeTab = ref('query')
 
 const FIELDS = [
   { key: 'registrationNo', label: '登记号' },
@@ -203,7 +236,7 @@ const fieldOf = (row, key) => {
 
 /**
  * 单条新增的分区（UX-51）：21 个字段平铺会产生 1000px+ 的长表单，
- * 按语义分 5 组，只有第一组默认展开。
+ * 按语义分 5 组，只有含必填项的第一组默认展开。
  */
 const FIELD_MAP = FIELDS.reduce((m, f) => ({ ...m, [f.key]: f }), {})
 const FIELD_GROUPS = [
@@ -251,20 +284,32 @@ const handleReset = () => {
   handleSearch()
 }
 
-// ===== 详情 / 删除 =====
+// ===== 详情（同页展开，UX-66）=====
 const raw = ref(null)
-const detailVisible = ref(false)
+const detailRef = ref(null)
+const activeId = ref('')
+
+/** 当前查看行高亮，便于在长表里对上号 */
+const rowClass = ({ row }) => (row.id === activeId.value ? 'row-active' : '')
 
 const openDetail = async (id) => {
   try {
     const res = await getRawRecord(id)
     raw.value = res.data
-    detailVisible.value = true
+    activeId.value = id
     // 写入共享状态，供 AI 助手"这份病历…"与解读卡使用
     aiStore.setActiveRecord(res.data)
+    // 同页展开后把详情区滚进视野，否则用户以为「点了没反应」
+    await nextTick()
+    detailRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } catch {
     // 拦截器已提示
   }
+}
+
+const closeDetail = () => {
+  raw.value = null
+  activeId.value = ''
 }
 
 const handleDelete = async (id) => {
@@ -278,6 +323,7 @@ const handleDelete = async (id) => {
   try {
     await deleteRecords([id])
     ElMessage.success('删除成功')
+    if (activeId.value === id) closeDetail()
     handleSearch()
   } catch {
     // 拦截器已提示
@@ -425,9 +471,10 @@ const handleCreate = async () => {
     await createRecord(payload)
     ElMessage.success(`新增成功：登记号 ${payload.registrationNo}`)
     resetForm()
-    // 回到第 1 页并刷新，让用户立刻确认已入库（UX-09）
+    // 切回查表页并回到第 1 页刷新，让用户立刻确认已入库（UX-09）
     page.value = 1
     await handleSearch()
+    activeTab.value = 'query'
   } catch {
     // 拦截器已提示
   } finally {
@@ -439,11 +486,22 @@ onMounted(handleSearch)
 </script>
 
 <style scoped>
+/* 标签页（UX-51）：去掉底部分隔线，避免与面板边框叠成双线 */
+.records-tabs :deep(.el-tabs__header) {
+  margin-bottom: 12px;
+}
+.records-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
 .tip {
   font-size: 12.5px;
   color: var(--text-sub);
   line-height: 1.7;
   margin-bottom: 14px;
+}
+.tip-inline {
+  font-size: 12.5px;
+  color: var(--text-sub);
 }
 .uploader :deep(.el-upload-dragger) {
   padding: 26px 10px;
@@ -493,35 +551,45 @@ onMounted(handleSearch)
 .stat-item .lbl { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.red .num { color: var(--danger); }
-.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }
-.form-grid .wide { grid-column: 1 / -1; }
-/* 分区折叠（UX-51） */
-.form-group {
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0 12px;
+/* 多列栅格（UX-51 修订）：3 列时 21 字段压到约 12 行，常规屏幕一屏可填完。
+   wide（长文本）占 2 列而非整行 —— 否则每行拉满宽度、纵向白白多出 6 行 */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 16px;
+}
+.form-grid .wide {
+  grid-column: span 2;
+}
+.form-grid :deep(.el-form-item) {
   margin-bottom: 10px;
 }
-.form-group > summary.group-hd {
-  cursor: pointer;
-  list-style: none;
-  padding: 9px 0;
-  font-size: 13px;
+.form-grid :deep(.el-form-item__label) {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding-bottom: 0;
+}
+/* 分区常显（UX-51 修订）：不再折叠，标题只作视觉分隔 */
+.form-group {
+  margin-bottom: 8px;
+}
+.group-hd {
+  position: relative;
+  padding: 5px 0 6px 10px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
   font-weight: bold;
   color: var(--ink);
+  border-bottom: 1px solid var(--line);
 }
-.form-group > summary.group-hd::-webkit-details-marker {
-  display: none;
-}
-.form-group > summary.group-hd::before {
-  content: '▸ ';
-  color: var(--ink-mid);
-}
-.form-group[open] > summary.group-hd::before {
-  content: '▾ ';
-}
-.form-group[open] {
-  padding-bottom: 10px;
+.group-hd::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 3px;
+  height: 13px;
+  background: var(--ink-mid);
 }
 /* 提交按钮吸底，长表单滚动时始终可见（UX-51） */
 .create-actions {
@@ -532,8 +600,42 @@ onMounted(handleSearch)
   border-top: 1px solid var(--line);
   z-index: 1;
 }
-.sd-title { font-size: 13px; font-weight: bold; color: var(--ink); margin: 14px 0 8px; }
-@media (max-width: 1200px) {
+
+/* ===== 详情同页展开（UX-66）与左右两栏对照（UX-65） ===== */
+.detail-panel :deep(.panel-hd) {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+.hd-close {
+  margin-left: auto;
+  font-size: 13px;
+}
+.detail-2col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.detail-col {
+  min-width: 0;
+}
+.col-hd {
+  font-size: 12.5px;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+}
+:deep(.row-active) td {
+  background: var(--ink-light) !important;
+}
+/* 栅格降列：1500px 以下 2 列、1000px 以下单列，保证窄屏不出现横向挤压 */
+@media (max-width: 1500px) {
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1000px) {
   .form-grid { grid-template-columns: 1fr; }
+  .form-grid .wide { grid-column: auto; }
+  .detail-2col { grid-template-columns: 1fr; }
 }
 </style>

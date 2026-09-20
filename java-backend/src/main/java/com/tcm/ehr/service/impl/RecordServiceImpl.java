@@ -341,7 +341,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
         Object sd = body == null ? null : body.get("structuredData");
         if (sd == null) {
-            throw new IllegalArgumentException("structuredData 不能为空");
+            throw new IllegalArgumentException("未提供结构化数据");
         }
         String json;
         try {
@@ -355,7 +355,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     @Override
     public DeleteRecordsVO deleteRecords(DeleteRecordsDTO dto) {
         if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
-            throw new IllegalArgumentException("ids 不能为空");
+            throw new IllegalArgumentException("未选择要操作的病历");
         }
         int n = baseMapper.deleteBatchIds(dto.getIds());
         DeleteRecordsVO vo = new DeleteRecordsVO();

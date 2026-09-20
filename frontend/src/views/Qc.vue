@@ -5,40 +5,55 @@
         <RangeFilter v-model="filters" />
         <div class="qc-actions">
           <el-button type="primary" size="small" :loading="graphLoading" @click="loadGraph">刷新图谱</el-button>
+          <!-- 默认只画冲突定位子图：全量关系图节点数百、散乱难读（UX-53） -->
+          <el-radio-group v-model="graphMode" size="small">
+            <el-radio-button value="conflict">冲突定位</el-radio-button>
+            <el-radio-button value="full">全量关系</el-radio-button>
+          </el-radio-group>
           <!-- 说明「这张图回答什么问题」，而不只是「怎么算的」（UX-53） -->
-          <span class="tip">用来定位规则冲突：红色虚线为证候与治法/方剂不一致；按实体类型分扇区，同色为同类</span>
+          <span class="tip">用来定位规则冲突：红色虚线为证候与治法/方剂不一致</span>
         </div>
       </div>
 
       <div v-if="graph.truncated" class="trunc-hint">{{ graph.hint }}</div>
 
+      <!-- 冲突定位模式下无冲突：直接给结论，不画一张空图 -->
+      <div v-if="graphMode === 'conflict' && !graphLoading && !conflictEdges.length" class="no-conflict">
+        范围内未发现规则冲突（证候与治法 / 方剂一致）。
+        <el-button link type="primary" @click="graphMode = 'full'">查看全量关系图</el-button>
+      </div>
+
       <!-- 结论条：直接回答「这张图发现了什么」，而不是只描述怎么算的（UX-53） -->
-      <div v-if="graph.nodes.length" class="graph-summary">
-        <span class="gsum"><b>{{ graphSummary.records }}</b> 份病历</span>
+      <div v-if="visibleGraph.nodes.length" class="graph-summary">
+        <span class="gsum"><b>{{ graphSummary.records }}</b> 份病历涉及冲突</span>
         <span class="gsum"><b>{{ graphSummary.nodes }}</b> 个实体节点</span>
         <span class="gsum" :class="{ bad: graphSummary.conflicts > 0 }">
           <b>{{ graphSummary.conflicts }}</b> 处规则冲突
         </span>
         <span class="gsum-hint">
-          {{ graphSummary.conflicts
-            ? '红色虚线条就是冲突所在，放大后可看清涉及的证候与治法/方剂'
-            : '未发现规则冲突；节点大小代表出现频次，放大可查看实体与病历的关联' }}
+          {{ graphMode === 'full'
+            ? '全量关系图用于总览，节点较多；定位冲突请切回「冲突定位」'
+            : '红色虚线条就是冲突所在，放大后可看清涉及的证候与治法/方剂' }}
         </span>
       </div>
 
       <div v-loading="graphLoading" class="graph-wrap">
         <div
-          v-if="graph.nodes.length"
+          v-if="visibleGraph.nodes.length"
           ref="graphRef"
           class="graph"
           role="img"
           :aria-label="graphLabel"
         />
-        <el-empty v-else-if="!graphLoading" description="范围内暂无可展示的质控图谱" :image-size="90" />
+        <el-empty
+          v-else-if="!graphLoading && (graphMode === 'full' || conflictEdges.length)"
+          description="范围内暂无可展示的质控图谱"
+          :image-size="90"
+        />
       </div>
 
-      <div v-if="graph.nodes.length" class="graph-legend">
-        <span v-for="c in categories" :key="c.name" class="lg">
+      <div v-if="visibleGraph.nodes.length" class="graph-legend">
+        <span v-for="c in visibleCategories" :key="c.name" class="lg">
           <i :style="{ background: c.color }" />{{ c.label }}
         </span>
         <span v-for="l in edgeLegend" :key="l.type" class="lg">
@@ -82,33 +97,36 @@
       />
     </PanelCard>
 
-    <el-dialog v-model="detailVisible" title="规则预检单（扣分明细）" width="min(620px, 92vw)">
-      <template v-if="detail">
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
-          <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
-        </el-descriptions>
-        <div class="sd-title">扣分明细</div>
-        <el-table :data="detail.deductions" border size="small" max-height="300">
-          <el-table-column prop="type" label="类型" width="110" />
-          <el-table-column prop="item" label="项" width="90" />
-          <el-table-column prop="points" label="扣分" width="70" />
-          <el-table-column prop="reason" label="原因" show-overflow-tooltip />
-          <template #empty><div class="ok">无扣分项</div></template>
-        </el-table>
-        <template v-if="detail.logicConflicts && detail.logicConflicts.length">
-          <div class="sd-title">逻辑冲突</div>
-          <ul class="conflicts">
-            <li v-for="c in detail.logicConflicts" :key="c">{{ c }}</li>
-          </ul>
-        </template>
+    <!-- 扣分明细：同页展开（UX-66），不再用弹窗遮住上下文 -->
+    <PanelCard v-if="detail" ref="detailRef" title="规则预检单（扣分明细）" class="detail-panel">
+      <template #header>
+        <span>规则预检单（扣分明细）</span>
+        <el-button link class="hd-close" @click="closeDetail">关闭详情</el-button>
       </template>
-    </el-dialog>
+      <el-descriptions :column="2" border size="small">
+        <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
+        <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
+      </el-descriptions>
+      <div class="sd-title">扣分明细</div>
+      <el-table :data="detail.deductions" border size="small" max-height="300">
+        <el-table-column prop="type" label="类型" width="110" />
+        <el-table-column prop="item" label="项" width="90" />
+        <el-table-column prop="points" label="扣分" width="70" />
+        <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+        <template #empty><div class="ok">无扣分项</div></template>
+      </el-table>
+      <template v-if="detail.logicConflicts && detail.logicConflicts.length">
+        <div class="sd-title">逻辑冲突</div>
+        <ul class="conflicts">
+          <li v-for="c in detail.logicConflicts" :key="c">{{ c }}</li>
+        </ul>
+      </template>
+    </PanelCard>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { reactive, ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import echarts from '@/utils/echarts'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -153,23 +171,81 @@ const params = () => {
 const graph = reactive({ nodes: [], edges: [], truncated: false, hint: '' })
 const graphLoading = ref(false)
 
+/** 视图模式：冲突定位（默认）/ 全量关系（UX-53） */
+const graphMode = ref('conflict')
+
+const conflictEdges = computed(() => graph.edges.filter((e) => e.type === 'conflict'))
+
+/** 冲突边两端的实体节点 id */
+const conflictNodeIds = computed(() => {
+  const s = new Set()
+  conflictEdges.value.forEach((e) => {
+    s.add(e.source)
+    s.add(e.target)
+  })
+  return s
+})
+
+/**
+ * 实际绘制的图（UX-53）。冲突定位模式只保留「冲突边 + 两端实体」——
+ * 节点数从数百降到十余个，图形立刻可读；全量关系图收进「全量关系」二级入口。
+ */
+const visibleGraph = computed(() => {
+  if (graphMode.value === 'full') {
+    return { nodes: graph.nodes, edges: graph.edges }
+  }
+  const ids = conflictNodeIds.value
+  if (!ids.size) return { nodes: [], edges: [] }
+  return {
+    nodes: graph.nodes.filter((n) => ids.has(n.id)),
+    edges: graph.edges.filter((e) => ids.has(e.source) && ids.has(e.target))
+  }
+})
+
+const nodeType = computed(() => {
+  const m = new Map()
+  graph.nodes.forEach((n) => m.set(n.id, n.type || 'record'))
+  return m
+})
+
+/** 受冲突影响的病历数：只报数、不画进子图（画进去节点会翻十倍） */
+const affectedRecords = computed(() => {
+  const ids = conflictNodeIds.value
+  if (!ids.size) return 0
+  const types = nodeType.value
+  const recs = new Set()
+  graph.edges.forEach((e) => {
+    const ts = types.get(e.source)
+    const tt = types.get(e.target)
+    if (ts === 'record' && ids.has(e.target)) recs.add(e.source)
+    else if (tt === 'record' && ids.has(e.source)) recs.add(e.target)
+  })
+  return recs.size
+})
+
+const visibleCategories = computed(() => {
+  const present = new Set(visibleGraph.value.nodes.map((n) => n.type || 'record'))
+  return categories.filter((c) => present.has(c.name))
+})
+
 const edgeLegend = computed(() => {
-  const present = new Set(graph.edges.map((e) => e.type || 'record'))
+  const present = new Set(visibleGraph.value.edges.map((e) => e.type || 'record'))
   return EDGE_LEGENDS.filter((l) => present.has(l.type))
 })
 
 // 图谱的文本替代：把关键结论（节点数 / 冲突数）讲成一句话（UX-35）
 const graphLabel = computed(() => {
-  if (!graph.nodes.length) return '质控图谱，暂无数据'
-  const conflicts = graph.edges.filter((e) => e.type === 'conflict').length
-  return `质控关系图谱：${graph.nodes.length} 个节点、${graph.edges.length} 条关系，其中冲突 ${conflicts} 条`
+  const v = visibleGraph.value
+  if (!v.nodes.length) return '质控图谱，暂无数据'
+  const conflicts = v.edges.filter((e) => e.type === 'conflict').length
+  return `质控关系图谱：${v.nodes.length} 个节点、${v.edges.length} 条关系，其中冲突 ${conflicts} 条`
 })
 
 /** 结论条数据：把图里的规模与冲突数直接摆出来（UX-53） */
 const graphSummary = computed(() => ({
-  records: graph.nodes.filter((n) => n.type === 'record').length,
-  nodes: graph.nodes.length,
-  conflicts: graph.edges.filter((e) => e.type === 'conflict').length
+  records: affectedRecords.value,
+  nodes: visibleGraph.value.nodes.length,
+  conflicts: visibleGraph.value.edges.filter((e) => e.type === 'conflict').length
 }))
 const graphRef = ref(null)
 let chart = null
@@ -202,8 +278,9 @@ const loadGraph = async () => {
  * 固定 3 环会把同扇区节点挤在一起重叠，黄金比能在连续半径上均匀铺开且无需分环。</p>
  */
 const layoutNodes = () => {
+  const nodes = visibleGraph.value.nodes
   const byType = new Map()
-  graph.nodes.forEach((n) => {
+  nodes.forEach((n) => {
     const t = n.type || 'record'
     if (!byType.has(t)) byType.set(t, [])
     byType.get(t).push(n)
@@ -211,7 +288,7 @@ const layoutNodes = () => {
   const sector = (2 * Math.PI) / categories.length
   const R_INNER = 80
   const R_OUTER = 320
-  return graph.nodes.map((n) => {
+  return nodes.map((n) => {
     const ci = CAT_INDEX[n.type] ?? 0
     const list = byType.get(n.type) || [n]
     const idx = list.indexOf(n)
@@ -244,7 +321,7 @@ const renderGraph = () => {
     chart = echarts.init(graphRef.value)
   }
   const data = layoutNodes()
-  const links = graph.edges.map((e) => ({
+  const links = visibleGraph.value.edges.map((e) => ({
     source: e.source,
     target: e.target,
     value: e.label || '',
@@ -290,6 +367,9 @@ const renderGraph = () => {
   )
 }
 
+// 切换视图模式只重画，不必重新请求（同一份数据两种呈现）
+watch(graphMode, () => nextTick(renderGraph))
+
 // ===== 预检列表 / 扣分明细 =====
 const grade = ref('待复核')
 const precheckRows = ref([])
@@ -317,16 +397,23 @@ const handleSizeChange = () => {
   loadPrecheck()
 }
 
-const detailVisible = ref(false)
+// 扣分明细改为同页展开（UX-66）
 const detail = ref(null)
+const detailRef = ref(null)
+
 const openDetail = async (recordId) => {
   try {
     const res = await qcScore({ recordId })
     detail.value = res.data
-    detailVisible.value = true
+    await nextTick()
+    detailRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } catch {
     // 拦截器已提示
   }
+}
+
+const closeDetail = () => {
+  detail.value = null
 }
 
 const handleResize = () => chart && chart.resize()
@@ -364,10 +451,20 @@ onBeforeUnmount(() => {
   background: #fdf6e8;
   border: 1px solid #ecd9b0;
   color: #96714f;
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 6px 12px;
   font-size: 12.5px;
   margin-bottom: 8px;
+}
+/* 冲突定位模式下无冲突：直接给结论（UX-53） */
+.no-conflict {
+  background: var(--ink-light);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 10px;
 }
 /* 图谱结论条（UX-53） */
 .graph-summary {
@@ -377,7 +474,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 10px 16px;
   margin-bottom: 10px;
 }
@@ -463,5 +560,16 @@ onBeforeUnmount(() => {
   padding: 8px;
   color: var(--ink-mid);
   font-size: 12.5px;
+}
+/* 详情同页展开（UX-66）：标题吸顶，长内容滚动时关闭入口始终可见 */
+.detail-panel :deep(.panel-hd) {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+.hd-close {
+  margin-left: auto;
+  font-size: 13px;
 }
 </style>

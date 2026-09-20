@@ -28,12 +28,22 @@ public class NlpExtractVO {
         return new NlpExtractVO();
     }
 
+    /**
+     * 实体（结构同附录A Entity）。归一后 {@code content}=标准术语、{@code sourceText}=归一前原文，
+     * 两者构成「归一前后对照」；未命中词典时 {@code content} 保持原文、{@code normLevel} 为空。
+     */
     @Data
     public static class Entity {
         private String content;
         private String sourceText;
         private Double confidence;
         private String source;
+        /** 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中为 null */
+        private Integer normLevel;
+        /** 归一命中的术语来源（词典名），未命中为 null */
+        private String normSource;
+        /** 国标代码，词典未收录则为 null */
+        private String normCode;
     }
 
     @Data
@@ -43,5 +53,11 @@ public class NlpExtractVO {
         private String sourceText;
         private Double confidence;
         private String source;
+        /** 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中为 null */
+        private Integer normLevel;
+        /** 归一命中的术语来源（词典名），未命中为 null */
+        private String normSource;
+        /** 国标代码，词典未收录则为 null */
+        private String normCode;
     }
 }

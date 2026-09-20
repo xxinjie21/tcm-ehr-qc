@@ -29,7 +29,7 @@ public class AiController {
     @PostMapping("/interpret")
     public ResponseEntity<Result<AiReplyVO>> interpret(@RequestBody AiQueryDTO dto) {
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
-            return ResponseEntity.badRequest().body(Result.error(400, "recordId不能为空"));
+            return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }
         AiReplyVO vo = aiService.interpret(dto);
         if (vo == null) {
@@ -42,7 +42,7 @@ public class AiController {
     @PostMapping("/chat")
     public ResponseEntity<Result<AiReplyVO>> chat(@RequestBody AiQueryDTO dto) {
         if (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank()) {
-            return ResponseEntity.badRequest().body(Result.error(400, "question不能为空"));
+            return ResponseEntity.badRequest().body(Result.error(400, "请输入问题"));
         }
         return ResponseEntity.ok(Result.ok(aiService.chat(dto)));
     }
@@ -52,7 +52,7 @@ public class AiController {
     @PostMapping("/review")
     public ResponseEntity<Result<AiReplyVO>> review(@RequestBody AiQueryDTO dto) {
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
-            return ResponseEntity.badRequest().body(Result.error(400, "recordId不能为空"));
+            return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }
         AiReplyVO vo = aiService.review(dto);
         if (vo == null) {

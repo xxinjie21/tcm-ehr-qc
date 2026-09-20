@@ -98,7 +98,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         if (raw != null) {
             String age = trim(raw.getAge());
             if (age != null && !NUMERIC.matcher(age).matches()) {
-                vo.getFormatErrors().add(new QcCheckVO.FormatError("年龄", "age 非数字：" + age));
+                vo.getFormatErrors().add(new QcCheckVO.FormatError("年龄", "年龄格式不正确：" + age));
             }
             String gender = trim(raw.getGender());
             if (gender != null && !"男".equals(gender) && !"女".equals(gender)) {

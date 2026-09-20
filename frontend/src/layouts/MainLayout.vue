@@ -7,19 +7,11 @@
       <div class="brand">
         中医电子病历质控与标准化系统<em>TCM EHR Quality Control &amp; Standardization</em>
       </div>
-      <!-- 全局功能搜索：按菜单名快速跳转，不必回侧栏找（UX-50） -->
-      <el-select
-        v-model="jumpPath"
-        class="global-search"
-        filterable
-        clearable
-        placeholder="搜索功能，如「复核」"
-        size="small"
-        @change="handleJump"
-      >
-        <el-option v-for="m in searchableMenus" :key="m.path" :label="m.title" :value="m.path" />
-      </el-select>
       <div class="user">
+        <!-- 导入 LLM：仅管理员可见（UX-68）；配置含三方通道密钥，属系统级设置 -->
+        <el-button v-if="isAdmin" link class="llm-entry" @click="llmVisible = true">
+          导入 LLM
+        </el-button>
         <span class="avatar" aria-hidden="true">{{ userStore.role?.charAt(0) || '用' }}</span>
         <span>{{ userStore.role || '用户' }}</span>
         <el-button link class="logout" @click="handleLogout">退出</el-button>
@@ -61,6 +53,9 @@
 
     <!-- 全局 AI 助手悬浮窗（批C·3.2，所有登录页可用） -->
     <AiAssistant />
+
+    <!-- LLM 运行时配置（UX-68）；属「短平快的一次性配置」，按 UX-66 口径用弹窗 -->
+    <LlmConfigDialog v-model="llmVisible" />
   </div>
 </template>
 
@@ -69,6 +64,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AiAssistant from '@/components/AiAssistant.vue'
+import LlmConfigDialog from '@/components/LlmConfigDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,13 +104,9 @@ const breadcrumb = computed(() => {
   return group ? [group, title] : [title]
 })
 
-/** 全局搜索只列当前角色可访问的菜单（UX-50） */
-const searchableMenus = computed(() => menuGroups.value.flatMap((g) => g.items))
-const jumpPath = ref('')
-const handleJump = (path) => {
-  if (path) router.push(path)
-  jumpPath.value = ''
-}
+/** LLM 配置入口仅管理员可见（后端接口同为【权限：仅管理员】，前端只是不展示无效入口） */
+const isAdmin = computed(() => userStore.role === '管理员')
+const llmVisible = ref(false)
 
 const handleLogout = () => {
   userStore.logout()
@@ -156,7 +148,6 @@ const handleLogout = () => {
 .brand {
   font-size: 16px;
   letter-spacing: 1px;
-  margin-right: 36px;
 }
 .brand em {
   font-style: normal;
@@ -172,18 +163,13 @@ const handleLogout = () => {
   font-size: 13px;
   color: #d8dfd9;
 }
-/* 全局功能搜索（UX-50） */
-.global-search {
-  width: 200px;
-  margin-right: 16px;
-}
-.global-search :deep(.el-select__wrapper) {
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: none;
-}
-.global-search :deep(.el-select__placeholder),
-.global-search :deep(.el-select__selected-item) {
+/* 导入 LLM 入口（UX-68）：与「退出」同为顶栏次级操作，样式保持一致 */
+.llm-entry {
   color: #d8dfd9;
+  font-size: 13px;
+}
+.llm-entry:hover {
+  color: #fff;
 }
 .topbar .avatar {
   width: 28px;

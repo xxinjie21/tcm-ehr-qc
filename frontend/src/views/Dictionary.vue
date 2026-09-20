@@ -18,7 +18,7 @@
           @keyup.enter="loadTerms"
         />
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms">查 询</el-button>
-        <span class="tip">共 {{ terms.length }} 条（内存词典实时查询）</span>
+        <span class="tip">共 {{ terms.length }} 条</span>
       </div>
       <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
         <el-table-column prop="standardTerm" label="标准术语" width="220" />
@@ -91,6 +91,71 @@
       </div>
     </PanelCard>
 
+    <!-- PDF 智能转换预览：预览阶段不落库，确认后才写入。
+         由弹窗改为同页展开（UX-66 修订）——弹窗内嵌宽表格必然出现滚动条，
+         且用户看不到它属于「术语库导入」这一步的上下文。左＝候选，右＝失败明细与确认操作 -->
+    <PanelCard
+      v-if="convertVisible"
+      ref="convertRef"
+      title="PDF 转换预览"
+      class="convert-panel"
+    >
+      <template #header>
+        <span>PDF 转换预览（确认后才写入词典）</span>
+        <el-button link class="hd-close" @click="convertVisible = false">关闭预览</el-button>
+      </template>
+
+      <div class="convert-body">
+        <div class="convert-main">
+          <div class="convert-hd">
+            转换出候选 <b>{{ convert.candidates.length }}</b> 条，失败 <b>{{ convert.failed.length }}</b> 条；
+            确认后写入【{{ typeLabel }}】词典。
+          </div>
+          <el-table :data="convert.candidates" border size="small" max-height="400" style="margin-top: 10px">
+            <el-table-column type="index" label="#" width="50" />
+            <el-table-column prop="standardTerm" label="标准术语" width="170" />
+            <el-table-column label="别名" min-width="220">
+              <template #default="{ row }">
+                <el-tag
+                  v-for="a in row.aliases"
+                  :key="a"
+                  size="small"
+                  effect="plain"
+                  style="margin-right: 6px"
+                >{{ a }}</el-tag>
+                <span v-if="!row.aliases?.length" class="tip">无</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="source" label="来源" width="150" show-overflow-tooltip />
+            <el-table-column prop="code" label="国标代码" width="110" />
+            <template #empty>
+              <el-empty description="没有可入库的候选" :image-size="70" />
+            </template>
+          </el-table>
+        </div>
+
+        <div class="convert-side">
+          <div class="col-hd">失败明细（{{ convert.failed.length }} 条）</div>
+          <div v-if="convert.failed.length" class="fail-list">
+            <div v-for="(f, i) in convert.failed" :key="i" class="ded-item">
+              <span>{{ f.reason }}{{ f.text ? '：' + f.text : '' }}</span>
+            </div>
+          </div>
+          <div v-else class="tip">本次没有失败项。</div>
+
+          <div class="convert-actions">
+            <el-button :disabled="!convert.failed.length" @click="downloadFailed">下载失败明细</el-button>
+            <el-button
+              type="primary"
+              :loading="importing"
+              :disabled="!convert.candidates.length"
+              @click="confirmConvert"
+            >确认入库（{{ convert.candidates.length }} 条）</el-button>
+          </div>
+        </div>
+      </div>
+    </PanelCard>
+
     <PanelCard title="版本回滚">
       <div class="rollback-row">
         <span class="tip">回滚会用该备份覆盖当前词典，立即生效。</span>
@@ -111,60 +176,11 @@
         </el-table-column>
       </el-table>
     </PanelCard>
-
-    <!-- PDF 智能转换预览：预览阶段不落库，确认后才写入 -->
-    <el-dialog v-model="convertVisible" title="PDF 转换预览" width="min(860px, 92vw)">
-      <div class="convert-hd">
-        转换出候选 <b>{{ convert.candidates.length }}</b> 条，失败 <b>{{ convert.failed.length }}</b> 条。
-        确认后将写入【{{ typeLabel }}】词典（入库前自动备份，可在「版本回滚」恢复）。
-      </div>
-
-      <el-table :data="convert.candidates" border size="small" max-height="320" style="margin-top: 10px">
-        <el-table-column type="index" label="#" width="50" />
-        <el-table-column prop="standardTerm" label="标准术语" width="170" />
-        <el-table-column label="别名" min-width="220">
-          <template #default="{ row }">
-            <el-tag
-              v-for="a in row.aliases"
-              :key="a"
-              size="small"
-              effect="plain"
-              style="margin-right: 6px"
-            >{{ a }}</el-tag>
-            <span v-if="!row.aliases?.length" class="tip">无</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="source" label="来源" width="170" show-overflow-tooltip />
-        <el-table-column prop="code" label="国标代码" width="110" />
-        <template #empty>
-          <el-empty description="没有可入库的候选" :image-size="70" />
-        </template>
-      </el-table>
-
-      <div v-if="convert.failed.length" class="failures" style="margin-top: 12px">
-        <div class="ded-hd">失败明细（{{ convert.failed.length }} 条）：</div>
-        <div v-for="(f, i) in convert.failed.slice(0, 8)" :key="i" class="ded-item">
-          <span>{{ f.reason }}{{ f.text ? '：' + f.text : '' }}</span>
-        </div>
-        <div v-if="convert.failed.length > 8" class="tip">…另有 {{ convert.failed.length - 8 }} 条，请下载核对</div>
-      </div>
-
-      <template #footer>
-        <el-button :disabled="!convert.failed.length" @click="downloadFailed">下载失败明细</el-button>
-        <el-button @click="convertVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="importing"
-          :disabled="!convert.candidates.length"
-          @click="confirmConvert"
-        >确认入库（{{ convert.candidates.length }} 条）</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
@@ -261,7 +277,7 @@ const handleImport = async () => {
     return
   }
   const ok = await ElMessageBox.confirm(
-    `确定用「${importFile.value.name}」覆盖【${typeLabel.value}】词典吗？将处理全部【${typeLabel.value}】词典，导入前会自动备份，可在下方「版本回滚」恢复。`,
+    `确定用「${importFile.value.name}」覆盖【${typeLabel.value}】词典吗？`,
     '术语库导入',
     { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' }
   ).catch(() => false)
@@ -272,8 +288,17 @@ const handleImport = async () => {
 }
 
 const convertVisible = ref(false)
+const convertRef = ref(null)
 const convert = reactive({ candidates: [], failed: [] })
 const converting = ref(false)
+
+/** 预览展开后滚到面板处：面板在导入卡片下方，不滚的话用户可能以为「点了没反应」 */
+watch(convertVisible, (v) => {
+  if (!v) return
+  nextTick(() => {
+    convertRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+})
 
 /** PDF → LLM 转换 → 候选预览（此步不落库） */
 const handleConvert = async () => {
@@ -454,6 +479,50 @@ onMounted(() => {
   margin-bottom: 6px;
   font-size: 12.5px;
 }
+
+/* ===== PDF 转换预览：同页展开，左右两栏（UX-66 修订） ===== */
+.convert-panel {
+  margin-top: 14px;
+}
+.hd-close {
+  font-size: 12.5px;
+}
+.convert-body {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+.convert-main {
+  flex: 2;
+  min-width: 0;
+}
+.convert-side {
+  flex: 1;
+  min-width: 250px;
+  border-left: 1px solid var(--line);
+  padding-left: 22px;
+}
+.col-hd {
+  font-size: 12.5px;
+  font-weight: bold;
+  color: var(--ink);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+/* 失败项可能上百条，给一个与候选表等高的滚动区；
+   页面本身不再出现滚动条 */
+.fail-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.convert-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .convert-hd {
   font-size: 13px;
   color: var(--text-sub);
@@ -461,5 +530,16 @@ onMounted(() => {
 }
 .convert-hd b {
   color: var(--ink);
+}
+@media (max-width: 900px) {
+  .convert-body {
+    flex-direction: column;
+  }
+  .convert-side {
+    border-left: 0;
+    padding-left: 0;
+    min-width: 0;
+    width: 100%;
+  }
 }
 </style>

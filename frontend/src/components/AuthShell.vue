@@ -180,26 +180,21 @@
   letter-spacing: 0.5px;
 }
 
-/* ===== 窄屏：左品牌区转为顶部横条 ===== */
+/* ===== 窄屏（UX-59）：不再把左品牌区压成顶部横条 =====
+   品牌区是纯装饰内容，窄屏下直接隐去，让表单占满宽度；
+   外壳同步去掉边框与底色，避免出现「空壳套表单」的观感。 */
 @media (max-width: 900px) {
-  .auth-shell {
-    flex-direction: column;
-    min-height: 0;
-  }
   .auth-brand {
-    width: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-    padding: 30px 24px 26px;
+    display: none;
   }
-  .auth-brand h2 {
-    font-size: 18px;
-  }
-  .auth-brand .ver {
-    margin-top: 16px;
+  .auth-shell {
+    max-width: 480px;
+    min-height: 0;
+    border: none;
+    background: transparent;
   }
   .auth-form {
-    padding: 30px 24px;
+    padding: 24px 4px;
   }
   .auth-demo {
     margin-top: 22px;

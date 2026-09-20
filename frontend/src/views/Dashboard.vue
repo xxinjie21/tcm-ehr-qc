@@ -92,50 +92,6 @@
           />
         </PanelCard>
       </div>
-
-      <div class="grid-2 mb">
-        <PanelCard title="疾病频次 TOP10">
-          <BarList :items="diseaseStats.map((s) => ({ name: s.disease, value: s.count }))" />
-        </PanelCard>
-        <PanelCard title="症状频次 TOP10">
-          <BarList :items="symptomStats.map((s) => ({ name: s.symptom, value: s.count }))" />
-        </PanelCard>
-      </div>
-
-      <div class="grid-2 mb">
-        <PanelCard title="证候分布">
-          <div
-            v-if="patternDist.length"
-            ref="pieRef"
-            class="chart"
-            role="img"
-            :aria-label="pieLabel"
-          />
-          <EmptyState v-else :failed="failed" :loading="loading" text="暂无证候分布数据" @retry="loadAll" />
-        </PanelCard>
-        <PanelCard title="方剂 / 中药频次 TOP5">
-          <div class="dual">
-            <div class="dual-col">
-              <div class="dual-hd">方剂</div>
-              <BarList :items="formulaStats.map((s) => ({ name: s.formula, value: s.count }))" color="var(--ochre)" />
-            </div>
-            <div class="dual-col">
-              <div class="dual-hd">中药</div>
-              <BarList :items="herbStats.map((s) => ({ name: s.herb, value: s.count }))" />
-            </div>
-          </div>
-        </PanelCard>
-      </div>
-
-      <!-- 词典规模卡 -->
-      <PanelCard title="术语词典规模">
-        <div class="dict-grid">
-          <div v-for="d in DICT_ITEMS" :key="d.key" class="dict-item">
-            <div class="dict-num">{{ extra.dictionary[d.key] ?? 0 }}</div>
-            <div class="dict-lbl">{{ d.label }}</div>
-          </div>
-        </div>
-      </PanelCard>
     </div>
   </div>
 </template>
@@ -147,10 +103,9 @@ import { ElMessage } from 'element-plus'
 import echarts from '@/utils/echarts'
 import StatsFilter from '@/components/StatsFilter.vue'
 import StatCard from '@/components/StatCard.vue'
-import BarList from '@/components/BarList.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
-import { getAllStats, getExtraStats, getDepartments } from '@/api/stats'
+import { getOverview, getExtraStats, getDepartments } from '@/api/stats'
 import { governanceStats } from '@/api/governance'
 import { useUserStore } from '@/stores/user'
 
@@ -190,29 +145,12 @@ const overview = ref({
   invalidCount: 0
 })
 const govern = reactive({ pendingGovern: 0 })
-const diseaseStats = ref([])
-const symptomStats = ref([])
-const patternDist = ref([])
-const formulaStats = ref([])
-const herbStats = ref([])
-const extra = ref({ trend: [], departmentRates: [], scoreDistribution: [], dictionary: {} })
-
-const DICT_ITEMS = [
-  { key: 'disease', label: '疾病' },
-  { key: 'symptom', label: '症状' },
-  { key: 'pattern', label: '证候' },
-  { key: 'herb', label: '中药' },
-  { key: 'formula', label: '方剂' }
-]
-
-const PIE_COLORS = ['#3d5a4c', '#96714f', '#b39a77', '#7a9184', '#8fa0a8', '#cdc6b6']
+const extra = ref({ trend: [], departmentRates: [], scoreDistribution: [] })
 
 const trendRef = ref(null)
 const distRef = ref(null)
-const pieRef = ref(null)
 let trendChart = null
 let distChart = null
-let pieChart = null
 
 const hasScores = computed(() => (extra.value.scoreDistribution || []).some((b) => b.count > 0))
 
@@ -228,12 +166,6 @@ const distLabel = computed(() => {
   const d = (extra.value.scoreDistribution || []).filter((b) => b.count > 0)
   if (!d.length) return '评分分布图，暂无数据'
   return `评分分布柱状图：${d.map((b) => `${b.bucket} 分 ${b.count} 条`).join('，')}`
-})
-
-const pieLabel = computed(() => {
-  const p = patternDist.value || []
-  if (!p.length) return '证候分布图，暂无数据'
-  return `证候分布环形图：${p.map((s) => `${s.pattern} ${s.count} 条`).join('，')}`
 })
 
 const renderTrend = () => {
@@ -287,28 +219,6 @@ const renderDist = () => {
   })
 }
 
-const renderPie = () => {
-  if (!pieRef.value) return
-  if (!pieChart || pieChart.getDom() !== pieRef.value) {
-    if (pieChart) pieChart.dispose()
-    pieChart = echarts.init(pieRef.value)
-  }
-  pieChart.setOption({
-    color: PIE_COLORS,
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { orient: 'vertical', right: 10, top: 'center', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 13 } },
-    series: [
-      {
-        type: 'pie',
-        radius: ['52%', '78%'],
-        center: ['40%', '50%'],
-        label: { show: false },
-        data: patternDist.value.map((s) => ({ name: s.pattern, value: s.count }))
-      }
-    ]
-  })
-}
-
 const params = () => ({
   department: filter.department || '',
   start: filter.start || '',
@@ -316,17 +226,13 @@ const params = () => ({
   pattern: ''
 })
 
+// 看板只拉主线口径：指标卡走 /stats/overview（轻量），趋势/分布走 /stats/extra（UX-60）
 const loadAll = async () => {
   loading.value = true
   failed.value = false
   try {
-    const [all, ex] = await Promise.all([getAllStats(params()), getExtraStats(params())])
-    overview.value = all.data.overview
-    diseaseStats.value = (all.data.disease.statistics || []).slice(0, 10)
-    symptomStats.value = (all.data.symptom.statistics || []).slice(0, 10)
-    patternDist.value = (all.data.pattern.distribution || []).slice(0, 6)
-    formulaStats.value = (all.data.prescription.formulaStats || []).slice(0, 5)
-    herbStats.value = (all.data.prescription.herbStats || []).slice(0, 5)
+    const [ov, ex] = await Promise.all([getOverview(), getExtraStats(params())])
+    overview.value = ov.data
     extra.value = ex.data
 
     // 待治理（仅管理员可读治理统计）
@@ -345,7 +251,6 @@ const loadAll = async () => {
     await nextTick()
     renderTrend()
     renderDist()
-    renderPie()
     loading.value = false
   }
 }
@@ -366,13 +271,12 @@ onMounted(() => {
 const handleResize = () => {
   if (trendChart) trendChart.resize()
   if (distChart) distChart.resize()
-  if (pieChart) pieChart.resize()
 }
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
-  ;[trendChart, distChart, pieChart].forEach((c) => c && c.dispose())
-  trendChart = distChart = pieChart = null
+  ;[trendChart, distChart].forEach((c) => c && c.dispose())
+  trendChart = distChart = null
 })
 </script>
 
@@ -457,16 +361,6 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 280px;
 }
-.dual {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-.dual-hd {
-  font-size: 12.5px;
-  color: var(--text-sub);
-  margin-bottom: 8px;
-}
 .rate-list {
   display: flex;
   flex-direction: column;
@@ -509,37 +403,12 @@ onBeforeUnmount(() => {
   width: 40px;
   color: var(--text-sub);
 }
-.dict-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-}
-.dict-item {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 12px;
-  text-align: center;
-}
-.dict-num {
-  font-size: 22px;
-  font-weight: bold;
-  color: var(--ink);
-}
-.dict-lbl {
-  font-size: 12px;
-  color: var(--text-sub);
-  margin-top: 4px;
-}
 @media (max-width: 1200px) {
   .grid-2 {
     grid-template-columns: 1fr;
   }
   .todo-bar {
     grid-template-columns: 1fr;
-  }
-  .dict-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

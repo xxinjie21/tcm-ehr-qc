@@ -54,7 +54,7 @@ public final class QcScorer {
         if (raw != null) {
             String age = trim(raw.getAge());
             if (age != null && !NUMERIC.matcher(age).matches()) {
-                ded.add(new ScoreResultVO.Deduction("格式错误", "年龄", 5, "age 非数字：" + age));
+                ded.add(new ScoreResultVO.Deduction("格式错误", "年龄", 5, "年龄格式不正确：" + age));
             }
             String gender = trim(raw.getGender());
             if (gender != null && !"男".equals(gender) && !"女".equals(gender)) {
@@ -62,10 +62,10 @@ public final class QcScorer {
             }
         }
         if (strList(data, "symptoms").isEmpty()) {
-            ded.add(new ScoreResultVO.Deduction("症状为空", "症状", 5, "symptoms 为空"));
+            ded.add(new ScoreResultVO.Deduction("症状为空", "症状", 5, "未记录任何症状"));
         }
         if (duplicate) {
-            ded.add(new ScoreResultVO.Deduction("重复数据", "文本MD5", 5, "与已评分病历 21 字段完全一致"));
+            ded.add(new ScoreResultVO.Deduction("重复数据", "重复标记", 5, "与已有病历内容完全一致"));
         }
 
         int totalDeduct = ded.stream().mapToInt(ScoreResultVO.Deduction::getPoints).sum();
