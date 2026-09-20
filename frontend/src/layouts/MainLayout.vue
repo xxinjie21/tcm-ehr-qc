@@ -188,15 +188,19 @@ const handleLogout = () => {
 }
 
 /* ===== 布局（原型 layout） ===== */
+/* 固定视口：顶栏 + 布局占满整屏高，长页只在 main 内部滚动 —— 文档层不再出现上下滚动条，
+   页面不会被挤窄/左移（第七轮确认：日志审计页内部滚动即正确形态，全站统一为内滚） */
 .layout {
   display: flex;
-  min-height: calc(100vh - 52px);
+  height: calc(100vh - 52px);
+  overflow: hidden;
 }
 aside {
   width: 176px;
   background: #fbfaf6;
   border-right: 1px solid var(--line);
   flex-shrink: 0;
+  overflow-y: auto;
 }
 .menu {
   list-style: none;
@@ -230,6 +234,8 @@ main {
   flex: 1;
   padding: 16px 20px;
   min-width: 0;
+  /* 长页内部滚动（顶栏/侧栏固定），文档层不出现滚动条 → 通栏且切页不偏移 */
+  overflow-y: auto;
   /* 超宽屏下卡片与图表不再被无限拉伸（UX-45） */
   max-width: 1600px;
   margin: 0 auto;
