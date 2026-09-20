@@ -78,11 +78,17 @@ const fieldOf = (row, key) => {
 </script>
 
 <style scoped>
+/* 左右两栏（UX-65）：左＝原始 21 字段只读，右＝结构化数据 + AI 解读，同屏可比对；
+   改为弹窗后（UX-69 / UX-77）不再占用页面纵向空间。
+   内容超长时只让两栏内部滚动（第七轮）：页脚「关闭」始终留在视口内，
+   不会出现「要看关闭按钮还得先滚到最底」 */
 .detail-2col {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+  max-height: calc(86vh - 140px);
+  overflow: auto;
 }
 .detail-col {
   min-width: 0;

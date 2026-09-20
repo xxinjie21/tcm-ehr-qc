@@ -123,7 +123,17 @@
       <!-- ============ 单条新增病历 ============ -->
       <el-tab-pane label="单条新增病历" name="create" lazy>
         <PanelCard title="单条新增病历">
-          <el-form ref="createFormRef" :model="form" :rules="FORM_RULES" label-width="88px">
+          <!-- 紧凑口径（UX-51 第七轮修订）：标签左置 + 控件 small + 文本域单行起步。
+               第六轮只做了「分区常显 + 3 列栅格」，控件仍是 32px、标签各占一行，
+               用户实测仍要下拉；本轮直接压控件高度（.compact-form 见 theme.css） -->
+          <el-form
+            ref="createFormRef"
+            class="compact-form"
+            :model="form"
+            :rules="FORM_RULES"
+            label-width="72px"
+            size="small"
+          >
             <!-- 语义分区 + 多列栅格（UX-51 修订）：原先 21 字段平铺是 1000px+ 长表单，
                  改成折叠分组后用户仍要逐组展开、整页依旧要滚动。
                  现改为分区常显 + 3 列栅格：21 字段压到约 12 行，常规屏幕一屏内可填完，
@@ -151,7 +161,14 @@
                     placeholder="接诊时间"
                     style="width: 100%"
                   />
-                  <el-input v-else v-model="form[f.key]" :type="f.wide ? 'textarea' : 'text'" :rows="f.wide ? 2 : 1" clearable />
+                  <el-input
+                    v-else
+                    v-model="form[f.key]"
+                    :type="f.multi ? 'textarea' : 'text'"
+                    :rows="1"
+                    :autosize="f.multi ? { minRows: 1, maxRows: 2 } : false"
+                    clearable
+                  />
                 </el-form-item>
               </div>
             </div>
@@ -182,25 +199,33 @@ const aiStore = useAiStore()
 // 当前标签页（UX-51）；导入与新增懒加载，首屏只渲染查询表
 const activeTab = ref('query')
 
+/**
+ * 21 个原始字段（UX-51）。
+ *
+ * <p>`wide` 只留给真正需要整行宽度的长叙述（主诉 / 自诉 / 现病史 / 草药）；
+ * `multi` 表示用文本域（单行起步、随输入自增），其余短字段走单行输入。
+ * 第七轮之前 wide 有 11 个，span 2 在 3 列栅格里排不紧，纵向白白多出 4 行，
+ * 这也是用户反复说「填写框还是太大」的直接原因。</p>
+ */
 const FIELDS = [
   { key: 'registrationNo', label: '登记号' },
   { key: 'outpatientNo', label: '门诊号' },
   { key: 'gender', label: '性别' },
   { key: 'age', label: '年龄' },
   { key: 'visitCount', label: '就诊次数' },
-  { key: 'westernDiagnosis', label: '西医诊断', wide: true },
-  { key: 'tcmDiagnosis', label: '中医诊断', wide: true },
-  { key: 'chiefComplaint', label: '主诉', wide: true },
-  { key: 'selfReport', label: '自诉', wide: true },
-  { key: 'presentIllness', label: '现病史', wide: true },
-  { key: 'inspection', label: '望诊', wide: true },
-  { key: 'pulse', label: '脉诊' },
-  { key: 'tongue', label: '舌诊', wide: true },
-  { key: 'physicalExam', label: '查体', wide: true },
-  { key: 'pattern', label: '辨证结论', wide: true },
-  { key: 'prescription', label: '草药', wide: true },
-  { key: 'followUp', label: '随访', wide: true },
-  { key: 'treatmentEffect', label: '治疗效果' },
+  { key: 'westernDiagnosis', label: '西医诊断', multi: true },
+  { key: 'tcmDiagnosis', label: '中医诊断', multi: true },
+  { key: 'chiefComplaint', label: '主诉', multi: true, wide: true },
+  { key: 'selfReport', label: '自诉', multi: true, wide: true },
+  { key: 'presentIllness', label: '现病史', multi: true, wide: true },
+  { key: 'inspection', label: '望诊', multi: true },
+  { key: 'pulse', label: '脉诊', multi: true },
+  { key: 'tongue', label: '舌诊', multi: true },
+  { key: 'physicalExam', label: '查体', multi: true },
+  { key: 'pattern', label: '辨证结论', multi: true },
+  { key: 'prescription', label: '草药', multi: true, wide: true },
+  { key: 'followUp', label: '随访', multi: true },
+  { key: 'treatmentEffect', label: '治疗效果', multi: true },
   { key: 'department', label: '开单科室' },
   { key: 'doctorId', label: '医生工号' },
   { key: 'visitTime', label: '接诊时间' }
@@ -525,33 +550,35 @@ onMounted(handleSearch)
 .stat-item .lbl { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.red .num { color: var(--danger); }
-/* 多列栅格（UX-51 修订）：3 列时 21 字段压到约 12 行，常规屏幕一屏可填完。
-   wide（长文本）占 2 列而非整行 —— 否则每行拉满宽度、纵向白白多出 6 行 */
+/* 多列栅格（UX-51 修订）：3 列时 21 字段压到约 11 行，常规屏幕一屏可填完。
+   wide（长文本）占 2 列而非整行 —— 否则每行拉满宽度、纵向白白多出数行；
+   第七轮进一步只把主诉 / 自诉 / 现病史 / 草药 4 项定为 wide（原先 11 项），
+   并把控件高度统一压到 small（24px，见 theme.css 的 .compact-form） */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 16px;
+  gap: 0 12px;
 }
 .form-grid .wide {
   grid-column: span 2;
 }
 .form-grid :deep(.el-form-item) {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 .form-grid :deep(.el-form-item__label) {
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.5;
   padding-bottom: 0;
 }
 /* 分区常显（UX-51 修订）：不再折叠，标题只作视觉分隔 */
 .form-group {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .group-hd {
   position: relative;
-  padding: 5px 0 6px 10px;
-  margin-bottom: 10px;
-  font-size: 12.5px;
+  padding: 3px 0 4px 9px;
+  margin-bottom: 6px;
+  font-size: 12px;
   font-weight: bold;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
@@ -560,9 +587,9 @@ onMounted(handleSearch)
   content: '';
   position: absolute;
   left: 0;
-  top: 6px;
+  top: 4px;
   width: 3px;
-  height: 13px;
+  height: 12px;
   background: var(--ink-mid);
 }
 /* 提交按钮吸底，长表单滚动时始终可见（UX-51） */
@@ -570,7 +597,7 @@ onMounted(handleSearch)
   position: sticky;
   bottom: 0;
   background: #fff;
-  padding: 10px 0;
+  padding: 8px 0;
   border-top: 1px solid var(--line);
   z-index: 1;
 }
@@ -578,12 +605,16 @@ onMounted(handleSearch)
 :deep(.row-active) td {
   background: var(--ink-light) !important;
 }
-/* 栅格降列：1500px 以下 2 列、1000px 以下单列，保证窄屏不出现横向挤压 */
-@media (max-width: 1500px) {
+/* 栅格降级（UX-51 第七轮，按真机量测定断点）：
+   1500px 以下如果取消 span 2，21 字段从 11 行降到 8 行，比降到 2 列更省高度；
+   1200px 以下 3 列每列已不足 320px，标签左置后控件过窄，才收 2 列 */
+@media (max-width: 1559px) {
+  .form-grid .wide { grid-column: span 1; }
+}
+@media (max-width: 1199px) {
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 1000px) {
+@media (max-width: 900px) {
   .form-grid { grid-template-columns: 1fr; }
-  .form-grid .wide { grid-column: auto; }
 }
 </style>

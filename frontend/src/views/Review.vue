@@ -59,7 +59,9 @@
     </PanelCard>
 
     <div v-loading="detailLoading">
-      <!-- ② 当前任务卡 -->
+      <!-- ② 当前任务卡：详情区头部，右上角固定「关闭详情」出口（UX-73 第七轮）。
+           第六轮只把关闭入口放进底部吸底条，用户实测仍反馈「只有保存修改 / 复核通过」——
+           进入复核后视线落在头部，出口必须在这里就出现，位置与弹窗右上角关闭同侧 -->
       <section v-if="current" class="task-card">
         <span class="task-id">{{ current.recordId }}</span>
         <span class="tag tag-score">当前评分：{{ current.score ?? '—' }} 分</span>
@@ -67,6 +69,7 @@
         <span class="deadline">
           复核截止：<b>{{ fmt(current.deadlineTime) }}</b>（{{ remainText }}）
         </span>
+        <el-button class="close-top" :disabled="submitting" @click="closeReview">关闭详情</el-button>
       </section>
 
       <!-- ③ 病历原文对照（可折叠） -->
@@ -179,7 +182,8 @@
           点击「复核通过」后系统会自动重新执行质控评分与诊疗逻辑校验；不填修正内容表示仅裁定不修改数据。
         </span>
         <div class="btns">
-          <!-- 补关闭入口（UX-73）：此前只有保存 / 通过两个出口，想只读退出无处可点 -->
+          <!-- 补关闭入口（UX-73）：此前只有保存 / 通过两个出口，想只读退出无处可点。
+               第七轮在任务卡右上角再加一处，底部这处保留 —— 读到最底也有出口 -->
           <el-button :disabled="submitting" @click="closeReview">关闭详情</el-button>
           <el-button :loading="submitting" @click="submit(false)">保存修改</el-button>
           <el-button type="primary" :loading="submitting" @click="submit(true)">复核通过</el-button>
@@ -540,6 +544,11 @@ onMounted(() => load(1))
 }
 .deadline b {
   color: var(--danger);
+}
+/* 详情区右上角出口（UX-73 第七轮）：与病历详情弹窗右上角关闭同侧，
+   进入复核即可见，不必先滚到页面底部 */
+.task-card .close-top {
+  flex-shrink: 0;
 }
 
 /* ===== ③ 原文折叠 ===== */

@@ -1,7 +1,10 @@
 <template>
   <div>
-    <!-- ① 选择病历：看板式列表，不再靠输入登记号（UX-61） -->
-    <PanelCard title="选择病历">
+    <!-- ① 选择病历：看板式列表，不再靠输入登记号（UX-61）
+         载入后整卡收起（UX-70 第七轮）：真机实测这个列表约 470px，一直展开会把
+         下方填写区推到折叠线以下（1600×900 整页 1474px）。收起后由「载入条」上的
+         「换病历」重新展开 —— 卡片本身也一并收起，不留空面板占高 -->
+    <PanelCard v-if="!recordId || pickerOpen" title="选择病历">
       <RangeFilter v-model="query" />
       <div class="actions">
         <el-button type="primary" :loading="listLoading" @click="search(1)">查 询</el-button>
@@ -54,8 +57,34 @@
               已载入病历：<b>{{ loadedLabel }}</b>
               <span v-if="loadedMeta" class="tip">{{ loadedMeta }}</span>
               <span class="tip">换病历时上一次抽取结果会自动清空</span>
+              <!-- 选择病历卡已收起，换病历入口挪到这里（UX-70 第七轮） -->
+              <el-button
+                v-if="!pickerOpen"
+                link
+                type="primary"
+                class="picker-toggle"
+                @click="pickerOpen = true"
+              >
+                换病历
+              </el-button>
             </template>
             <span v-else class="tip">请在上方「选择病历」列表中点选一份病历</span>
+          </div>
+
+          <!-- 无产出时把原因讲清楚（UX-63 第七轮）：术语归一依赖上游实体，
+               没有实体就没有可归的内容，不能让用户以为「归一没执行」 -->
+          <div v-if="emptyReason" class="nlp-off">
+            <template v-if="emptyReason === 'off'">
+              <b>NLP 抽取服务未启用</b>：后端 nlp.enabled=false（或 python-nlp 未在 :8001 启动），
+              本次抽取返回空 9 类、modelAvailable=false。<b>术语归一一直在跑</b>（抽取接口内部即调用
+              EntityNormalizer.normalize，命中时把 content 换为标准术语、原文留在 sourceText），
+              这里为空是上游没有实体可归。启用方式：application.yml 置 nlp.enabled: true 并启动
+              python-nlp 后重试；也可以先用右下方「术语归一试算」直接查词典。
+            </template>
+            <template v-else>
+              抽取已完成，但 9 类实体全空 —— 术语归一同样没有可归的内容。
+              可检查原文是否覆盖主诉 / 四诊 / 辨证结论 / 草药等可抽取字段。
+            </template>
           </div>
 
           <div class="split">
@@ -63,20 +92,29 @@
             <div class="pane">
               <div class="pane-hd">原文（按字段模块化，可单独修改）</div>
               <!-- 分区常显 + 多列栅格（UX-70）：原先 4 组折叠、默认只开 2 组，
-                   用户仍要逐组展开、整页依旧要滚动；与病历数据页 UX-51 同一口径 -->
-              <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
-                <div class="group-hd">{{ g.title }}</div>
-                <div class="form-grid">
-                  <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :class="{ wide: f.wide }">
-                    <el-input
-                      v-model="fields[f.key]"
-                      :type="f.wide ? 'textarea' : 'text'"
-                      :rows="f.wide ? 2 : 1"
-                      clearable
-                    />
-                  </el-form-item>
+                   用户仍要逐组展开、整页依旧要滚动；与病历数据页 UX-51 同一口径。
+                   第七轮再压控件高度（标签左置 + small + 文本域单行起步，见 theme.css） -->
+              <el-form
+                class="compact-form field-form"
+                label-width="68px"
+                size="small"
+                @submit.prevent
+              >
+                <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
+                  <div class="group-hd">{{ g.title }}</div>
+                  <div class="form-grid">
+                    <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :class="{ wide: f.wide }">
+                      <el-input
+                        v-model="fields[f.key]"
+                        :type="f.multi ? 'textarea' : 'text'"
+                        :rows="1"
+                        :autosize="f.multi ? { minRows: 1, maxRows: 2 } : false"
+                        clearable
+                      />
+                    </el-form-item>
+                  </div>
                 </div>
-              </div>
+              </el-form>
 
               <!-- 整段文本只读对照：抽取请求就是这段拼接结果（UX-62） -->
               <details class="composed-panel">
@@ -100,14 +138,57 @@
               <div class="pane-hd">
                 抽取结果
                 <span v-if="result" class="src-note" :class="{ warn: !result.modelAvailable }">
-                  {{ result.modelAvailable ? '模型抽取 + 规则兜底' : 'NLP 服务未就绪（降级：可能仅规则兜底或为空）' }}
+                  {{ result.modelAvailable ? '模型抽取 + 规则兜底' : 'NLP 服务未启用（本次未产生实体）' }}
                 </span>
               </div>
-              <div v-if="result" class="norm-note">
-                已按词典归一：实体显示为<b>标准术语</b>，灰色小字为归一前原文，鼠标悬停可看命中层级。
+              <!-- 归一状态行（UX-63 第七轮）：明说「归一跑没跑、跑出了什么」 -->
+              <div v-if="result" class="norm-note" :class="{ warn: !!emptyReason }">
+                <template v-if="emptyReason">
+                  本次没有实体，<b>术语归一没有可归的内容</b>（原因见上方提示）。
+                </template>
+                <template v-else>
+                  已按词典归一：实体显示为<b>标准术语</b>，灰色小字为归一前原文，鼠标悬停可看命中层级。
+                </template>
               </div>
               <StructuredDataCard v-if="result" :data="result" />
               <el-empty v-else description="尚未抽取" :image-size="80" />
+
+              <!-- 术语归一试算（UX-63 第七轮）：词典直查，不依赖 Python NLP 服务，
+                   让用户在本页就能亲自跑一次归一、看到「原文 → 标准词」 -->
+              <div class="norm-tool">
+                <div class="nt-hd">术语归一试算（直查词典，不依赖 NLP 服务）</div>
+                <div class="nt-row">
+                  <el-select v-model="normType" size="small" style="width: 116px">
+                    <el-option v-for="t in NORM_TYPES" :key="t.value" :label="t.label" :value="t.value" />
+                  </el-select>
+                  <el-input
+                    v-model="normTerm"
+                    size="small"
+                    placeholder="如：脾肾阳虚"
+                    clearable
+                    @keyup.enter="runNormalize"
+                  />
+                  <el-button
+                    size="small"
+                    :loading="normLoading"
+                    :disabled="!normTerm.trim()"
+                    @click="runNormalize"
+                  >
+                    归 一
+                  </el-button>
+                </div>
+                <div v-if="normResult" class="nt-result">
+                  <span class="nt-in">{{ normResult.term }}</span>
+                  <span class="nt-arrow">→</span>
+                  <span class="nt-out" :class="{ miss: !normResult.source }">{{ normResult.standardTerm }}</span>
+                  <span class="nt-src">
+                    {{ normResult.source ? `命中词典 · ${normResult.source}` : '未命中词典，返回原词' }}
+                  </span>
+                </div>
+                <div v-else class="nt-hint">
+                  命中示例：证候「脾肾阳虚」、中药「炙甘草」；词典未收录的口语词（如「嗓子疼」）会原样返回并标为未命中。
+                </div>
+              </div>
             </div>
           </div>
         </PanelCard>
@@ -170,6 +251,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { extractNlp } from '@/api/nlp'
+import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 
 const activeTab = ref('single')
@@ -210,6 +292,8 @@ const resetQuery = () => {
 }
 
 const recordId = ref('')
+/** 选择病历列表是否展开（UX-70 第七轮）：载入一份后自动收起，把填写区提到首屏 */
+const pickerOpen = ref(true)
 /** 已载入病历的展示标识（优先登记号），保存确认与成功提示都要回显它（UX-01） */
 const loadedLabel = ref('')
 /** 病历基本信息（只读）：给出上下文，但不参与抽取 */
@@ -229,19 +313,26 @@ const FIELD_GROUPS = [
   { title: '处方与随访', keys: ['prescription', 'followUp', 'treatmentEffect'] }
 ]
 
+/**
+ * 字段标签与形态（UX-70 第七轮）。
+ *
+ * <p>`wide` 只留给长叙述（主诉 / 自诉 / 现病史 / 草药），占 2 列；
+ * `multi` 用文本域、单行起步随输入自增，其余短字段单行输入。
+ * 之前 12 个字段里 10 个是 wide，span 2 在 3 列栅格排不紧，纵向多出好几行。</p>
+ */
 const FIELD_LABELS = {
-  chiefComplaint: { label: '主诉', wide: true },
-  selfReport: { label: '自诉', wide: true },
-  presentIllness: { label: '现病史', wide: true },
-  inspection: { label: '望诊', wide: true },
-  tongue: { label: '舌诊', wide: true },
-  pulse: { label: '脉诊' },
-  physicalExam: { label: '查体', wide: true },
-  tcmDiagnosis: { label: '中医诊断', wide: true },
-  pattern: { label: '辨证结论', wide: true },
-  prescription: { label: '草药', wide: true },
-  followUp: { label: '随访', wide: true },
-  treatmentEffect: { label: '治疗效果' }
+  chiefComplaint: { label: '主诉', multi: true, wide: true },
+  selfReport: { label: '自诉', multi: true, wide: true },
+  presentIllness: { label: '现病史', multi: true, wide: true },
+  inspection: { label: '望诊', multi: true },
+  tongue: { label: '舌诊', multi: true },
+  pulse: { label: '脉诊', multi: true },
+  physicalExam: { label: '查体', multi: true },
+  tcmDiagnosis: { label: '中医诊断', multi: true },
+  pattern: { label: '辨证结论', multi: true },
+  prescription: { label: '草药', multi: true, wide: true },
+  followUp: { label: '随访', multi: true },
+  treatmentEffect: { label: '治疗效果', multi: true }
 }
 
 const ALL_KEYS = FIELD_GROUPS.flatMap((g) => g.keys)
@@ -282,6 +373,8 @@ const loadRecord = async (row) => {
     result.value = null
     text.value = composedText.value
     activeTab.value = 'single'
+    // 载入即收起病历列表（UX-70 第七轮）：填写区随即回到首屏，不必先滚过 470px 的列表
+    pickerOpen.value = false
   } catch {
     // 拦截器已提示
   } finally {
@@ -294,11 +387,71 @@ const runExtract = async () => {
   try {
     const res = await extractNlp({ text: composedText.value })
     result.value = res.data
-    if (!res.data.modelAvailable) ElMessage.warning('NLP 服务未就绪，结果为降级输出')
+    if (!res.data.modelAvailable) {
+      ElMessage.warning('NLP 服务未启用：本次未产生实体，术语归一无可归内容')
+    }
   } catch {
     // 拦截器已提示
   } finally {
     extracting.value = false
+  }
+}
+
+/**
+ * 抽取无产出（UX-63 第七轮）。
+ *
+ * <p>用户在第七轮再次提出「结构化解析也应该执行术语归一」。实测
+ * {@code NlpController.extract()} 第 43 行确实调用了 {@code EntityNormalizer.normalize}，
+ * 归一一直有跑；之所以看起来「没执行」，是因为 {@code nlp.enabled=false} 时上游
+ * 只回空 9 类，归一没有可归的内容。所以这里把「有没有产出、为什么没有」直接讲出来，
+ * 而不是让一片空白自己表达。</p>
+ */
+const ENTITY_KEYS = [
+  'diseases', 'symptoms', 'tongueList', 'pulseList', 'patternList',
+  'causeList', 'treatmentList', 'formulaList', 'herbs'
+]
+const resultEmpty = computed(() => {
+  const r = result.value
+  if (!r) return false
+  return ENTITY_KEYS.every((k) => !(Array.isArray(r[k]) && r[k].length))
+})
+/** ''＝有产出；'off'＝NLP 未启用；'none'＝已启用但未识别出实体 */
+const emptyReason = computed(() => {
+  if (!result.value || !resultEmpty.value) return ''
+  return result.value.modelAvailable ? 'none' : 'off'
+})
+
+// ===== 术语归一试算（UX-63 第七轮）=====
+/** 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射 */
+const NORM_TYPES = [
+  { value: 'disease', label: '疾病' },
+  { value: 'pattern', label: '证候' },
+  { value: 'symptom', label: '症状' },
+  { value: 'herb', label: '中药' },
+  { value: 'formula', label: '方剂' }
+]
+const normType = ref('pattern')
+const normTerm = ref('')
+const normLoading = ref(false)
+const normResult = ref(null)
+
+/** 直接查词典归一（POST /api/governance/normalize），不经过 Python NLP 服务 */
+const runNormalize = async () => {
+  const term = normTerm.value.trim()
+  if (!term) return
+  normLoading.value = true
+  try {
+    const res = await normalize({ type: normType.value, term })
+    const d = res.data || {}
+    normResult.value = {
+      term,
+      standardTerm: d.standardTerm || term,
+      source: d.source || ''
+    }
+  } catch {
+    // 拦截器已提示
+  } finally {
+    normLoading.value = false
   }
 }
 
@@ -395,6 +548,8 @@ onMounted(() => search(1))
 .actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .nlp-tabs :deep(.el-tabs__header) { margin-bottom: 12px; }
 .nlp-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+/* 「换病历」入口（UX-70 第七轮）：选择病历卡收起后挂在载入条右侧 */
+.picker-toggle { font-weight: normal; margin-left: auto; }
 .loaded-bar {
   display: flex;
   align-items: center;
@@ -409,8 +564,20 @@ onMounted(() => search(1))
   margin-bottom: 14px;
 }
 .loaded-bar b { color: var(--ink); }
-/* 左栏（原文）给 1.5 份宽：3 列栅格才有可用宽度（UX-70） */
-.split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+/* 左栏（原文）给 1.5 份宽：3 列栅格才有可用宽度（UX-70）。
+   定高一屏（UX-70 第七轮，真机量测定值）：12 个字段都是带正文的长文本，
+   加上右侧对照区，整页在 1600×900 下量到 1033px、1366×768 下 997px，仍要下拉整页。
+   把对照区框在一屏内、滚动收到框内部之后：① 页面本身不再出现下拉条；
+   ② 左栏吸底的主操作条改成吸在这个框的底部，恒在视口内，不必滚到底再点「执行抽取」 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  max-height: calc(100vh - 385px);
+  min-height: 280px;
+  overflow: auto;
+}
 .pane { min-width: 0; }
 .pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 8px; }
 .src-note { font-size: 11.5px; color: var(--ink-mid); font-weight: normal; margin-left: 8px; }
@@ -426,17 +593,63 @@ onMounted(() => search(1))
   line-height: 1.7;
 }
 .norm-note b { color: var(--ink); font-weight: normal; }
+.norm-note.warn {
+  background: #fdf6f4;
+  border-color: #e3c3bb;
+  color: #8a3d33;
+}
+/* 无产出提示（UX-63 第七轮）：把「为什么没有结果」摆到填写区上方，不藏在空态里 */
+.nlp-off {
+  background: #fdf6f4;
+  border: 1px solid #e3c3bb;
+  border-left: 3px solid var(--danger);
+  border-radius: 6px;
+  padding: 9px 13px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: #8a3d33;
+}
+.nlp-off b { color: var(--danger); }
+
+/* 术语归一试算（UX-63 第七轮）：词典直查，不依赖 NLP 服务 */
+.norm-tool {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.nt-hd { font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
+.nt-row { display: flex; gap: 8px; align-items: center; }
+.nt-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px dashed #ece8dc;
+  font-size: 12.5px;
+}
+.nt-in { color: var(--text-sub); }
+.nt-arrow { color: #c9c3b4; }
+.nt-out { color: var(--ink); font-weight: bold; }
+.nt-out.miss { color: var(--danger); font-weight: normal; }
+.nt-src { font-size: 11.5px; color: var(--text-sub); margin-left: auto; }
+.nt-hint { margin-top: 8px; font-size: 11.5px; color: var(--text-sub); line-height: 1.7; }
 
 /* 原文模块化字段（UX-62）；分区常显 + 3 列栅格（UX-70，与病历数据页同一口径）：
-   wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行 */
-.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 14px; }
+   wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。
+   第七轮再收紧行距与列间距，控件高度由 .compact-form 统一压到 small（24px） */
+.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
 .form-grid .wide { grid-column: span 2; }
-.form-group { margin-bottom: 8px; }
+.form-group { margin-bottom: 4px; }
 .group-hd {
   position: relative;
-  padding: 5px 0 6px 10px;
-  margin-bottom: 10px;
-  font-size: 12.5px;
+  padding: 3px 0 4px 9px;
+  margin-bottom: 6px;
+  font-size: 12px;
   font-weight: bold;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
@@ -445,13 +658,14 @@ onMounted(() => search(1))
   content: '';
   position: absolute;
   left: 0;
-  top: 6px;
+  top: 4px;
   width: 3px;
-  height: 13px;
+  height: 12px;
   background: var(--ink-mid);
 }
-.form-grid :deep(.el-form-item) { margin-bottom: 10px; }
-.form-grid :deep(.el-form-item__label) { font-size: 12.5px; color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
+.form-grid :deep(.el-form-item) { margin-bottom: 6px; }
+.form-grid :deep(.el-form-item__label) { font-size: 12px; color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
+.field-form { margin-bottom: 6px; }
 /* 整段文本只读对照：默认收起，不占填写区版面 */
 .composed-panel {
   border: 1px solid var(--line);
@@ -475,7 +689,7 @@ onMounted(() => search(1))
   position: sticky;
   bottom: 0;
   background: #fff;
-  padding: 10px 0;
+  padding: 8px 0;
   border-top: 1px solid var(--line);
   z-index: 1;
 }

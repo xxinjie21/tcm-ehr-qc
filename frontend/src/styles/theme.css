@@ -81,6 +81,33 @@ body {
   border-radius: 2px;
 }
 
+/* ===== 紧凑表单（UX-51 / UX-70） ===== */
+/* 用户在第七轮再次指出：填写区仍要下拉才能填完，要求「每一个填写框小一点」。
+   统一做三件事：① 控件走 small 尺寸（24px，由 el-form 的 size 下发）；
+   ② 标签左置，一个字段只占一行，不再「标签一行 + 控件一行」；
+   ③ 文本域单行起步、随输入自增。同样的字段数纵向约省四成高度。
+   校验红字改回占位（默认是浮层，行距收紧后会压住下一行）。 */
+.compact-form .el-form-item {
+  margin-bottom: 6px;
+}
+.compact-form .el-form-item__label {
+  font-size: 12px;
+  line-height: 1.5;
+  padding-bottom: 0;
+}
+.compact-form .el-input__wrapper,
+.compact-form .el-select__wrapper {
+  padding: 1px 8px;
+}
+.compact-form .el-textarea__inner {
+  padding: 3px 8px;
+  line-height: 1.5;
+}
+.compact-form .el-form-item__error {
+  position: static;
+  padding-top: 1px;
+}
+
 /* ===== 视觉隐藏（给屏幕阅读器的文本，不占视觉空间） ===== */
 .visually-hidden {
   position: absolute;
@@ -108,6 +135,10 @@ aside :focus-visible,
 }
 
 /* ===== 滚动条 ===== */
+/* 全局常驻滚动条槽位：长短页切换时视口宽度不再跳动（UX·未命名·全局3 / UX 审查补充 G1） */
+html {
+  scrollbar-gutter: stable;
+}
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
