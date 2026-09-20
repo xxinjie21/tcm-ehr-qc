@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="review-page">
     <!-- ① 待复核任务列表 -->
     <PanelCard title="待复核任务列表">
       <div class="rv-bar">
@@ -797,6 +797,13 @@ onMounted(() => load(1))
 }
 
 /* ===== ⑥ 底部操作 ===== */
+/* 页面根为 flex 列 + min-height:100%：内容不足一屏时 margin-top:auto 把底栏顶到底部，
+   不再浮在页面中部（data-v 作用域元素浮中部问题）；内容超长时 sticky 仍吸底可见 */
+.review-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
 .footer-bar {
   display: flex;
   align-items: center;
@@ -810,6 +817,7 @@ onMounted(() => load(1))
   /* 吸底（UX-73）：对照区很长，关闭 / 提交入口始终可见，不必滚到底 */
   position: sticky;
   bottom: 0;
+  margin-top: auto;
   z-index: 3;
   box-shadow: 0 -2px 8px rgba(47, 70, 57, 0.06);
 }

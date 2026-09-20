@@ -1,10 +1,7 @@
 <template>
   <div>
-    <!-- ① 选择病历：看板式列表，不再靠输入登记号（UX-61）
-         载入后整卡收起（UX-70 第七轮）：真机实测这个列表约 470px，一直展开会把
-         下方填写区推到折叠线以下（1600×900 整页 1474px）。收起后由「载入条」上的
-         「换病历」重新展开 —— 卡片本身也一并收起，不留空面板占高 -->
-    <PanelCard v-if="!recordId || pickerOpen" title="选择病历">
+    <!-- ① 选择病历：看板式列表，常驻可见（第七轮确认：载入后仍需看到列表，方便随时切换病历） -->
+    <PanelCard title="选择病历">
       <RangeFilter v-model="query" />
       <div class="actions">
         <el-button type="primary" :loading="listLoading" @click="search(1)">查 询</el-button>
@@ -56,16 +53,16 @@
             <template v-if="recordId">
               已载入病历：<b>{{ loadedLabel }}</b>
               <span v-if="loadedMeta" class="tip">{{ loadedMeta }}</span>
-              <span class="tip">换病历时上一次抽取结果会自动清空</span>
-              <!-- 选择病历卡已收起，换病历入口挪到这里（UX-70 第七轮） -->
+              <span class="tip">关闭详情将清空当前病历与抽取结果</span>
+              <!-- 与人工复核一致的「关闭详情」出口（第七轮）：清空当前病历，列表仍常驻可见 -->
               <el-button
-                v-if="!pickerOpen"
                 link
                 type="primary"
                 class="picker-toggle"
-                @click="pickerOpen = true"
+                :disabled="extracting"
+                @click="closeDetail"
               >
-                换病历
+                关闭详情
               </el-button>
             </template>
             <span v-else class="tip">请在上方「选择病历」列表中点选一份病历</span>
@@ -97,7 +94,6 @@
               <el-form
                 class="compact-form field-form"
                 label-width="68px"
-                size="small"
                 @submit.prevent
               >
                 <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
@@ -292,8 +288,6 @@ const resetQuery = () => {
 }
 
 const recordId = ref('')
-/** 选择病历列表是否展开（UX-70 第七轮）：载入一份后自动收起，把填写区提到首屏 */
-const pickerOpen = ref(true)
 /** 已载入病历的展示标识（优先登记号），保存确认与成功提示都要回显它（UX-01） */
 const loadedLabel = ref('')
 /** 病历基本信息（只读）：给出上下文，但不参与抽取 */
@@ -373,13 +367,21 @@ const loadRecord = async (row) => {
     result.value = null
     text.value = composedText.value
     activeTab.value = 'single'
-    // 载入即收起病历列表（UX-70 第七轮）：填写区随即回到首屏，不必先滚过 470px 的列表
-    pickerOpen.value = false
   } catch {
     // 拦截器已提示
   } finally {
     listLoading.value = false
   }
+}
+
+/** 关闭详情（与人工复核一致的出口，第七轮）：清空当前病历与抽取结果，列表常驻可见 */
+const closeDetail = () => {
+  recordId.value = ''
+  loadedLabel.value = ''
+  loadedMeta.value = ''
+  Object.assign(fields, emptyFields())
+  result.value = null
+  text.value = ''
 }
 
 const runExtract = async () => {
