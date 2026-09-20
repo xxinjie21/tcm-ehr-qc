@@ -1,5 +1,5 @@
 <template>
-  <div ref="pageRef" :style="fitStyle">
+  <div>
     <el-tabs v-model="activeTab" class="dict-tabs">
       <el-tab-pane label="疾病" name="disease" />
       <el-tab-pane label="证候" name="pattern" />
@@ -20,7 +20,7 @@
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms">查 询</el-button>
         <span class="tip">共 {{ terms.length }} 条</span>
       </div>
-      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
+      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="240">
         <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
           <template #default="{ row }">
@@ -162,7 +162,7 @@
         <span class="tip">回滚会用该备份覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新备份列表</el-button>
       </div>
-      <el-table :data="backups" border style="margin-top: 12px" max-height="280">
+      <el-table :data="backups" border style="margin-top: 12px" max-height="200">
         <el-table-column prop="filename" label="备份文件" min-width="280" />
         <el-table-column prop="time" label="备份时间" width="180" />
         <el-table-column label="操作" width="120">
@@ -181,7 +181,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
@@ -189,27 +189,6 @@ import { getTerms, importDict, convertDict, rollback, getBackups } from '@/api/d
 import { saveBlob } from '@/utils/download'
 
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
-
-// ===== 一页适配（UX：术语词典整体一屏放下）=====
-// 只改页面整体大小（zoom 整体缩放），不改任何卡片排版与组件高度；
-// 按「原始内容高 / 可视高」计算缩放，内容再高也只缩到刚好一屏，不出现纵向滚动条。
-const pageRef = ref(null)
-const fitScale = ref(1)
-const fitStyle = computed(() => ({ zoom: fitScale.value }))
-// topbar 52 + main 上下 padding 32 + 底部缓冲 16
-const FIT_PAD = 52 + 16 + 16 + 16
-let fitTimer = null
-const scheduleFit = () => {
-  if (fitTimer) cancelAnimationFrame(fitTimer)
-  fitTimer = requestAnimationFrame(() => {
-    const el = pageRef.value
-    if (!el) return
-    el.style.zoom = '1'
-    const avail = Math.max(320, window.innerHeight - FIT_PAD)
-    fitScale.value = Math.min(1, avail / Math.max(el.scrollHeight, 1))
-  })
-}
-const handleResize = () => scheduleFit()
 
 const activeTab = ref('symptom')
 const typeLabel = computed(() => TYPE_LABELS[activeTab.value])
@@ -225,7 +204,6 @@ const loadTerms = async () => {
     terms.value = res.data.terms || []
   } finally {
     loadingTerms.value = false
-    nextTick(scheduleFit)
   }
 }
 
@@ -374,7 +352,6 @@ const doImport = async (file) => {
     importResult.value = res.data
     ElMessage.success(`导入完成：成功 ${res.data.imported} / 共 ${res.data.total}`)
     loadTerms()
-    nextTick(scheduleFit)
     return true
   } catch {
     // 拦截器已提示
@@ -397,7 +374,6 @@ const backups = ref([])
 const loadBackups = async () => {
   const res = await getBackups({ type: activeTab.value })
   backups.value = res.data.backups || []
-  nextTick(scheduleFit)
 }
 
 const handleRollback = async (row) => {
@@ -415,13 +391,6 @@ const handleRollback = async (row) => {
 onMounted(() => {
   loadTerms()
   loadBackups()
-  scheduleFit()
-  window.addEventListener('resize', handleResize)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (fitTimer) cancelAnimationFrame(fitTimer)
 })
 </script>
 
