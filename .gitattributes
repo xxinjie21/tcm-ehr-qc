@@ -1,0 +1,23 @@
+# 行尾口径写进仓库：仓库内与检出均为 LF，不再受各人 core.autocrlf 影响
+# 背景：本机 PortableGit 的 system gitconfig 设了 core.autocrlf=true，
+# 检出时会把 LF 转成 CRLF，导致编辑器比对工作区与 HEAD 时误报「LF → CRLF」。
+* text=auto eol=lf
+
+# Windows 批处理必须 CRLF，否则无法执行
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制，不做行尾转换
+*.xlsx binary
+*.xls binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.jar binary
+*.bin binary
+*.onnx binary
+*.pyc binary
