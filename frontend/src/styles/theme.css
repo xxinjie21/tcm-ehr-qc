@@ -135,9 +135,13 @@ aside :focus-visible,
 }
 
 /* ===== 滚动条 ===== */
-/* 全局常驻滚动条槽位：长短页切换时视口宽度不再跳动（UX·未命名·全局3 / UX 审查补充 G1） */
+/* 全局常驻滚动条槽位：长短页切换时视口宽度不再跳动（UX·未命名·全局3 / UX 审查补充 G1）。
+   顶栏通栏：html 顶部 52px 一并刷成 topbar 的墨绿 —— 滚动条槽位（右端窄条）也覆盖到，
+   否则 header 只到滚动条左侧、右端露出纸色缺口（第七轮 header-topbar 未占满整行） */
 html {
   scrollbar-gutter: stable;
+  background-color: var(--paper);
+  background-image: linear-gradient(to bottom, var(--ink) 0, var(--ink) 52px, transparent 52px);
 }
 ::-webkit-scrollbar {
   width: 8px;
