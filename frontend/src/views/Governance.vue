@@ -27,7 +27,7 @@
 
     <!-- 数据清洗与术语归一（流程图） -->
     <PanelCard title="数据清洗与术语自动归一">
-      <!-- 全页只保留这一处总述（UX-57）：其余位置的说明文字删除或收进折叠区 -->
+      <!-- 总述只保留这一处（UX-57）；每步的一句话解释回到步骤卡内（UX-76） -->
       <div class="flow-tip">
         清洗<b>不会填充医生未书写的内容</b>，也<b>不会删除任何病历</b>；术语按最新词典统一为标准写法。
       </div>
@@ -37,19 +37,14 @@
           <div class="step-card">
             <div class="step-num">{{ i + 1 }}</div>
             <div class="step-title">{{ s.title }}</div>
+            <!-- 还原每步解释（UX-76）：UX-57 收敛过度，5 步说明全收进折叠区后
+                 步骤卡只剩序号与标题，用户看不出每步到底做什么 -->
+            <div class="step-desc">{{ s.desc }}</div>
           </div>
           <!-- 末步留占位箭头，保证 5 张卡片等宽（UX-64） -->
           <div class="step-arrow" :class="{ ghost: i === STEPS.length - 1 }" aria-hidden="true">→</div>
         </div>
       </div>
-
-      <!-- 每步细节按需展开，不占版面（UX-57） -->
-      <details class="step-more">
-        <summary>查看 5 步说明</summary>
-        <ul>
-          <li v-for="(s, i) in STEPS" :key="s.title"><b>{{ i + 1 }}. {{ s.title }}</b>：{{ s.desc }}</li>
-        </ul>
-      </details>
 
       <div class="clean-actions">
         <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
@@ -189,41 +184,18 @@
       </div>
     </PanelCard>
 
-    <!-- 单条完整详情：同页展开（UX-66）+ 左右两栏对照（UX-65） -->
-    <PanelCard v-if="detail" ref="detailRef" title="病历完整详情" class="detail-panel">
-      <template #header>
-        <span>病历完整详情</span>
-        <el-button link class="hd-close" @click="closeDetail">关闭详情</el-button>
-      </template>
-      <div class="detail-2col">
-        <div class="detail-col">
-          <div class="col-hd">原始字段</div>
-          <el-descriptions :column="2" border size="small">
-            <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
-              {{ fieldOf(detail, f.key) || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
-            <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
-          </el-descriptions>
-        </div>
-        <div class="detail-col">
-          <div class="col-hd">结构化数据（术语已归一，sourceText 为原文溯源）</div>
-          <StructuredDataCard :data="detail.structuredData" />
-          <AiInterpretCard :record-id="detail.id" />
-        </div>
-      </div>
-    </PanelCard>
+    <!-- 单条完整详情改弹窗（UX-77）：排版与病历数据页的「病历详情」共用同一组件 -->
+    <RecordDetailDialog v-model="detailVisible" :record="detail" title="病历完整详情" />
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, computed, nextTick, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
-import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import AiInterpretCard from '@/components/AiInterpretCard.vue'
+import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import { clean as cleanApi, exportDataset, previewDataset, governanceStats, recomputeQc } from '@/api/governance'
 import { getDepartments } from '@/api/stats'
 import { saveBlob } from '@/utils/download'
@@ -238,35 +210,6 @@ const STEPS = [
   { title: '脏数据隔离', desc: '无法修复的病历标记为无效' },
   { title: '术语归一', desc: '把「咽喉痛」这类写法统一成标准术语' }
 ]
-
-const FIELDS = [
-  { key: 'registrationNo', label: '登记号' },
-  { key: 'outpatientNo', label: '门诊号' },
-  { key: 'gender', label: '性别' },
-  { key: 'age', label: '年龄' },
-  { key: 'visitCount', label: '就诊次数' },
-  { key: 'westernDiagnosis', label: '西医诊断', wide: true },
-  { key: 'tcmDiagnosis', label: '中医诊断', wide: true },
-  { key: 'chiefComplaint', label: '主诉', wide: true },
-  { key: 'selfReport', label: '自诉', wide: true },
-  { key: 'presentIllness', label: '现病史', wide: true },
-  { key: 'inspection', label: '望诊', wide: true },
-  { key: 'pulse', label: '脉诊' },
-  { key: 'tongue', label: '舌诊', wide: true },
-  { key: 'physicalExam', label: '查体', wide: true },
-  { key: 'pattern', label: '辨证结论', wide: true },
-  { key: 'prescription', label: '草药', wide: true },
-  { key: 'followUp', label: '随访', wide: true },
-  { key: 'treatmentEffect', label: '治疗效果' },
-  { key: 'department', label: '开单科室' },
-  { key: 'doctorId', label: '医生工号' },
-  { key: 'visitTime', label: '接诊时间' }
-]
-
-const fieldOf = (row, key) => {
-  if (key === 'visitTime') return (row.visitTime || '').replace('T', ' ').substring(0, 19)
-  return row[key]
-}
 
 const stats = reactive({ qualified: 0, pendingGovern: 0, governedCount: 0 })
 const statsLoading = ref(false)
@@ -402,21 +345,20 @@ const resetCols = () => {
 
 const preview = reactive({ loading: false, result: null })
 
-// ===== 详情（同页展开，UX-66）=====
+// ===== 详情（弹窗，UX-77）=====
 const detail = ref(null)
-const detailRef = ref(null)
+const detailVisible = ref(false)
 
 // 点详情：写入共享状态，供 AI 助手"这份病历…"类问题使用（批C·3.2）
-const openDetail = async (row) => {
+const openDetail = (row) => {
   detail.value = row
   aiStore.setActiveRecord(row)
-  // 同页展开后把详情区滚进视野，否则用户以为「点了没反应」
-  await nextTick()
-  detailRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  detailVisible.value = true
 }
 
+/** 只收起弹窗、保留 detail：否则关闭动画期间内容会闪空 */
 const closeDetail = () => {
-  detail.value = null
+  detailVisible.value = false
 }
 
 const handlePreview = async () => {
@@ -551,7 +493,7 @@ onMounted(() => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 16px 8px;
+  padding: 14px 12px;
   text-align: center;
   transition: transform 0.15s, box-shadow 0.15s;
 }
@@ -575,6 +517,13 @@ onMounted(() => {
   font-weight: bold;
   color: var(--ink);
 }
+/* 每步的一句话解释（UX-76）：卡内常显，不再收进折叠区 */
+.step-desc {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-sub);
+}
 /* 箭头定宽，末步用同宽占位，保证 5 张卡片等宽（UX-64） */
 .step-arrow {
   width: 20px;
@@ -586,44 +535,6 @@ onMounted(() => {
 }
 .step-arrow.ghost {
   visibility: hidden;
-}
-
-/* 每步细节按需展开（UX-57） */
-.step-more {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0 12px;
-  margin-bottom: 18px;
-  font-size: 12.5px;
-  color: var(--text-sub);
-}
-.step-more > summary {
-  cursor: pointer;
-  list-style: none;
-  padding: 9px 0;
-  color: var(--ink-mid);
-}
-.step-more > summary::-webkit-details-marker {
-  display: none;
-}
-.step-more > summary::before {
-  content: '▸ ';
-  color: var(--ink-mid);
-}
-.step-more[open] > summary::before {
-  content: '▾ ';
-}
-.step-more[open] {
-  padding-bottom: 10px;
-}
-.step-more ul {
-  margin: 0;
-  padding-left: 18px;
-  line-height: 1.9;
-}
-.step-more b {
-  color: var(--ink);
-  font-weight: normal;
 }
 
 /* ===== 执行按钮区 ===== */
@@ -744,32 +655,6 @@ label {
   cursor: pointer;
 }
 
-/* ===== 详情同页展开（UX-66）与左右两栏对照（UX-65） ===== */
-.detail-panel :deep(.panel-hd) {
-  position: sticky;
-  top: 0;
-  background: #fff;
-  z-index: 2;
-}
-.hd-close {
-  margin-left: auto;
-  font-size: 13px;
-}
-.detail-2col {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-.detail-col {
-  min-width: 0;
-}
-.col-hd {
-  font-size: 12.5px;
-  color: var(--text-sub);
-  margin-bottom: 8px;
-}
-
 @media (max-width: 1200px) {
   /* 窄屏改 3 列网格并隐藏箭头，保证每行卡片等宽（UX-64） */
   .flow-wrapper {
@@ -781,6 +666,5 @@ label {
     display: none;
   }
   .clean-stats { grid-template-columns: repeat(3, 1fr); }
-  .detail-2col { grid-template-columns: 1fr; }
 }
 </style>

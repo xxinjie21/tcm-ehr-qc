@@ -5,20 +5,24 @@
         <RangeFilter v-model="filters" />
         <div class="qc-actions">
           <el-button type="primary" size="small" :loading="graphLoading" @click="loadGraph">刷新图谱</el-button>
-          <!-- 默认只画冲突定位子图：全量关系图节点数百、散乱难读（UX-53） -->
+          <!-- 默认画全量关系图（UX-72）：演示数据的证候都不在 LogicChecker.RULES 覆盖范围内，
+               规则边与冲突边恒为 0，默认「冲突定位」会让画布与空态都不渲染 -->
           <el-radio-group v-model="graphMode" size="small">
-            <el-radio-button value="conflict">冲突定位</el-radio-button>
             <el-radio-button value="full">全量关系</el-radio-button>
+            <el-radio-button value="conflict">冲突定位</el-radio-button>
           </el-radio-group>
           <!-- 说明「这张图回答什么问题」，而不只是「怎么算的」（UX-53） -->
-          <span class="tip">用来定位规则冲突：红色虚线为证候与治法/方剂不一致</span>
+          <span class="tip">全量关系图看整体；切到「冲突定位」只留红色虚线（证候与治法/方剂不一致）</span>
         </div>
       </div>
 
       <div v-if="graph.truncated" class="trunc-hint">{{ graph.hint }}</div>
 
       <!-- 冲突定位模式下无冲突：直接给结论，不画一张空图 -->
-      <div v-if="graphMode === 'conflict' && !graphLoading && !conflictEdges.length" class="no-conflict">
+      <div
+        v-if="graphMode === 'conflict' && !graphLoading && graph.nodes.length && !conflictEdges.length"
+        class="no-conflict"
+      >
         范围内未发现规则冲突（证候与治法 / 方剂一致）。
         <el-button link type="primary" @click="graphMode = 'full'">查看全量关系图</el-button>
       </div>
@@ -46,7 +50,7 @@
           :aria-label="graphLabel"
         />
         <el-empty
-          v-else-if="!graphLoading && (graphMode === 'full' || conflictEdges.length)"
+          v-else-if="!graphLoading"
           description="范围内暂无可展示的质控图谱"
           :image-size="90"
         />
@@ -97,31 +101,37 @@
       />
     </PanelCard>
 
-    <!-- 扣分明细：同页展开（UX-66），不再用弹窗遮住上下文 -->
-    <PanelCard v-if="detail" ref="detailRef" title="规则预检单（扣分明细）" class="detail-panel">
-      <template #header>
-        <span>规则预检单（扣分明细）</span>
-        <el-button link class="hd-close" @click="closeDetail">关闭详情</el-button>
+    <!-- 扣分明细改回弹窗（UX-71）：用户第六轮明确指定用弹窗，属 UX-66 的例外 -->
+    <el-dialog
+      v-model="detailVisible"
+      title="规则预检单（扣分明细）"
+      width="min(780px, 94vw)"
+      top="8vh"
+    >
+      <template v-if="detail">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
+          <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
+        </el-descriptions>
+        <div class="sd-title">扣分明细</div>
+        <el-table :data="detail.deductions" border size="small" max-height="300">
+          <el-table-column prop="type" label="类型" width="110" />
+          <el-table-column prop="item" label="项" width="90" />
+          <el-table-column prop="points" label="扣分" width="70" />
+          <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+          <template #empty><div class="ok">无扣分项</div></template>
+        </el-table>
+        <template v-if="detail.logicConflicts && detail.logicConflicts.length">
+          <div class="sd-title">逻辑冲突</div>
+          <ul class="conflicts">
+            <li v-for="c in detail.logicConflicts" :key="c">{{ c }}</li>
+          </ul>
+        </template>
       </template>
-      <el-descriptions :column="2" border size="small">
-        <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
-        <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
-      </el-descriptions>
-      <div class="sd-title">扣分明细</div>
-      <el-table :data="detail.deductions" border size="small" max-height="300">
-        <el-table-column prop="type" label="类型" width="110" />
-        <el-table-column prop="item" label="项" width="90" />
-        <el-table-column prop="points" label="扣分" width="70" />
-        <el-table-column prop="reason" label="原因" show-overflow-tooltip />
-        <template #empty><div class="ok">无扣分项</div></template>
-      </el-table>
-      <template v-if="detail.logicConflicts && detail.logicConflicts.length">
-        <div class="sd-title">逻辑冲突</div>
-        <ul class="conflicts">
-          <li v-for="c in detail.logicConflicts" :key="c">{{ c }}</li>
-        </ul>
+      <template #footer>
+        <el-button @click="closeDetail">关闭</el-button>
       </template>
-    </PanelCard>
+    </el-dialog>
   </div>
 </template>
 
@@ -171,8 +181,8 @@ const params = () => {
 const graph = reactive({ nodes: [], edges: [], truncated: false, hint: '' })
 const graphLoading = ref(false)
 
-/** 视图模式：冲突定位（默认）/ 全量关系（UX-53） */
-const graphMode = ref('conflict')
+/** 视图模式：全量关系（默认，UX-72）/ 冲突定位（UX-53） */
+const graphMode = ref('full')
 
 const conflictEdges = computed(() => graph.edges.filter((e) => e.type === 'conflict'))
 
@@ -397,23 +407,22 @@ const handleSizeChange = () => {
   loadPrecheck()
 }
 
-// 扣分明细改为同页展开（UX-66）
+// 扣分明细改回弹窗（UX-71）；关闭时只收起、不清数据，避免关闭动画期间内容闪空
 const detail = ref(null)
-const detailRef = ref(null)
+const detailVisible = ref(false)
 
 const openDetail = async (recordId) => {
   try {
     const res = await qcScore({ recordId })
     detail.value = res.data
-    await nextTick()
-    detailRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    detailVisible.value = true
   } catch {
     // 拦截器已提示
   }
 }
 
 const closeDetail = () => {
-  detail.value = null
+  detailVisible.value = false
 }
 
 const handleResize = () => chart && chart.resize()
@@ -560,16 +569,5 @@ onBeforeUnmount(() => {
   padding: 8px;
   color: var(--ink-mid);
   font-size: 12.5px;
-}
-/* 详情同页展开（UX-66）：标题吸顶，长内容滚动时关闭入口始终可见 */
-.detail-panel :deep(.panel-hd) {
-  position: sticky;
-  top: 0;
-  background: #fff;
-  z-index: 2;
-}
-.hd-close {
-  margin-left: auto;
-  font-size: 13px;
 }
 </style>

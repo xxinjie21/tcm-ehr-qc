@@ -58,17 +58,7 @@
         >
           <div class="upload-tip">
             拖拽文件到此处，或 <em>点击选择</em>
-            <div class="sub">
-              支持 Excel(.xlsx/.xls) / CSV / JSON；PDF 可智能转换为术语
-              <details class="fmt-detail">
-                <summary>查看格式说明</summary>
-                <div class="fmt-body">
-                  · Excel / CSV：第 1 列「标准术语」、第 2 列「别名」（多个用 、或 ; 分隔），可选第 3 列「国标代码」<br />
-                  · JSON：条目数组，每项含「标准术语」「别名」，可选「来源」「国标代码」<br />
-                  · PDF：上传后先转换为候选术语，确认无误再入库
-                </div>
-              </details>
-            </div>
+            <div class="sub">支持 Excel(.xlsx/.xls) / CSV / JSON；PDF 可智能转换为术语</div>
           </div>
         </el-upload>
         <div class="import-actions">
@@ -76,6 +66,17 @@
             {{ isPdfFile ? '智能转换（预览）' : '开始导入' }}
           </el-button>
           <div class="tip" style="margin-top: 8px">导入前会自动备份，可在下方「版本回滚」恢复。</div>
+
+          <!-- 格式说明移出 el-upload 拖拽区（UX-78）：原先嵌在拖拽热区里，
+               点 <summary> 会冒泡触发原生文件选择框 -->
+          <details class="fmt-detail">
+            <summary>查看格式说明</summary>
+            <div class="fmt-body">
+              · Excel / CSV：第 1 列「标准术语」、第 2 列「别名」（多个用 、或 ; 分隔），可选第 3 列「国标代码」<br />
+              · JSON：条目数组，每项含「标准术语」「别名」，可选「来源」「国标代码」<br />
+              · PDF：上传后先转换为候选术语，确认无误再入库
+            </div>
+          </details>
         </div>
       </div>
       <div v-if="importResult" class="import-result">
@@ -427,9 +428,12 @@ onMounted(() => {
   color: var(--text-sub);
   margin-top: 4px;
 }
-/* 详细格式收进折叠说明，避免一上来把数据结构摊给用户（UX-58） */
+/* 详细格式收进折叠说明，避免一上来把数据结构摊给用户（UX-58）；
+   位置在 import-actions 内，不再落在上传热区（UX-78） */
 .fmt-detail {
-  margin-top: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-sub);
 }
 .fmt-detail summary {
   display: inline-block;

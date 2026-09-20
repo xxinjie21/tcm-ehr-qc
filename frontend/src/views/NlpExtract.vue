@@ -62,13 +62,10 @@
             <!-- 原文：按字段模块化，可单独修改（UX-62） -->
             <div class="pane">
               <div class="pane-hd">原文（按字段模块化，可单独修改）</div>
-              <details
-                v-for="(g, gi) in FIELD_GROUPS"
-                :key="g.title"
-                class="form-group"
-                :open="gi < 2"
-              >
-                <summary class="group-hd">{{ g.title }}</summary>
+              <!-- 分区常显 + 多列栅格（UX-70）：原先 4 组折叠、默认只开 2 组，
+                   用户仍要逐组展开、整页依旧要滚动；与病历数据页 UX-51 同一口径 -->
+              <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
+                <div class="group-hd">{{ g.title }}</div>
                 <div class="form-grid">
                   <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :class="{ wide: f.wide }">
                     <el-input
@@ -79,15 +76,15 @@
                     />
                   </el-form-item>
                 </div>
-              </details>
+              </div>
 
               <!-- 整段文本只读对照：抽取请求就是这段拼接结果（UX-62） -->
-              <details class="form-group">
-                <summary class="group-hd">整段文本（只读对照）</summary>
+              <details class="composed-panel">
+                <summary class="composed-hd">整段文本（只读对照）</summary>
                 <div class="composed">{{ composedText || '（当前无内容）' }}</div>
               </details>
 
-              <div class="actions">
+              <div class="actions pane-actions">
                 <el-button type="primary" :loading="extracting" :disabled="!composedText" @click="runExtract">
                   执行抽取
                 </el-button>
@@ -412,7 +409,8 @@ onMounted(() => search(1))
   margin-bottom: 14px;
 }
 .loaded-bar b { color: var(--ink); }
-.split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+/* 左栏（原文）给 1.5 份宽：3 列栅格才有可用宽度（UX-70） */
+.split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
 .pane { min-width: 0; }
 .pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 8px; }
 .src-note { font-size: 11.5px; color: var(--ink-mid); font-weight: normal; margin-left: 8px; }
@@ -429,29 +427,58 @@ onMounted(() => search(1))
 }
 .norm-note b { color: var(--ink); font-weight: normal; }
 
-/* 原文模块化字段（UX-62） */
-.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 14px; }
-.form-grid .wide { grid-column: 1 / -1; }
-.form-group {
+/* 原文模块化字段（UX-62）；分区常显 + 3 列栅格（UX-70，与病历数据页同一口径）：
+   wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行 */
+.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 14px; }
+.form-grid .wide { grid-column: span 2; }
+.form-group { margin-bottom: 8px; }
+.group-hd {
+  position: relative;
+  padding: 5px 0 6px 10px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  font-weight: bold;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+.group-hd::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 3px;
+  height: 13px;
+  background: var(--ink-mid);
+}
+.form-grid :deep(.el-form-item) { margin-bottom: 10px; }
+.form-grid :deep(.el-form-item__label) { font-size: 12.5px; color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
+/* 整段文本只读对照：默认收起，不占填写区版面 */
+.composed-panel {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 0 12px;
   margin-bottom: 10px;
 }
-.form-group > summary.group-hd {
+.composed-hd {
   cursor: pointer;
   list-style: none;
   padding: 9px 0;
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--ink);
+  font-size: 12.5px;
+  color: var(--ink-mid);
 }
-.form-group > summary.group-hd::-webkit-details-marker { display: none; }
-.form-group > summary.group-hd::before { content: '▸ '; color: var(--ink-mid); }
-.form-group[open] > summary.group-hd::before { content: '▾ '; }
-.form-group[open] { padding-bottom: 10px; }
-.form-group :deep(.el-form-item) { margin-bottom: 12px; }
-.form-group :deep(.el-form-item__label) { font-size: 12px; color: var(--text-sub); padding-bottom: 2px; line-height: 1.6; }
+.composed-hd::-webkit-details-marker { display: none; }
+.composed-hd::before { content: '▸ '; color: var(--ink-mid); }
+.composed-panel[open] .composed-hd::before { content: '▾ '; }
+.composed-panel[open] { padding-bottom: 10px; }
+/* 执行抽取 / 保存吸底（UX-70）：字段区较长，主操作始终可见 */
+.pane-actions {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  z-index: 1;
+}
 .composed {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -490,8 +517,14 @@ onMounted(() => search(1))
 .batch-failures { margin-top: 14px; border-top: 1px dashed #ece8dc; padding-top: 12px; }
 .bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: 8px; }
 
+@media (max-width: 1400px) {
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 1200px) {
   .split { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
   .form-grid { grid-template-columns: 1fr; }
+  .form-grid .wide { grid-column: auto; }
 }
 </style>

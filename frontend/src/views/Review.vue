@@ -179,6 +179,8 @@
           点击「复核通过」后系统会自动重新执行质控评分与诊疗逻辑校验；不填修正内容表示仅裁定不修改数据。
         </span>
         <div class="btns">
+          <!-- 补关闭入口（UX-73）：此前只有保存 / 通过两个出口，想只读退出无处可点 -->
+          <el-button :disabled="submitting" @click="closeReview">关闭详情</el-button>
           <el-button :loading="submitting" @click="submit(false)">保存修改</el-button>
           <el-button type="primary" :loading="submitting" @click="submit(true)">复核通过</el-button>
         </div>
@@ -427,6 +429,24 @@ const openReview = async (row) => {
   }
 }
 
+/** 退出详情：收起任务卡 / 原文 / 对照区，保留提交反馈条 */
+const exitDetail = () => {
+  current.value = null
+  record.value = null
+  precheck.value = null
+  aiAnswer.value = ''
+  aiSource.value = ''
+  remark.value = ''
+  Object.keys(editValues).forEach((k) => delete editValues[k])
+  originalMap.value = {}
+}
+
+/** 关闭详情：连提交反馈一起收起，回到纯任务列表（UX-73） */
+const closeReview = () => {
+  exitDetail()
+  result.value = null
+}
+
 const submit = async (withCorrection) => {
   submitting.value = true
   result.value = null
@@ -438,6 +458,8 @@ const submit = async (withCorrection) => {
     result.value = res.data
     submittedAt.value = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
     ElMessage.success(`复核完成：${res.data.status}`)
+    // 复核通过即退出详情（UX-74）：任务已办结，无需用户再手动关一次
+    if (withCorrection) exitDetail()
     await load()
   } catch {
     // 拦截器已提示
@@ -586,6 +608,12 @@ onMounted(() => load(1))
 }
 .compare .panel {
   margin-bottom: 0;
+  /* 补齐面板外框（UX-75）：本页自写 .panel / .panel-hd / .panel-bd，
+     原先漏了 .panel 的外框，左右对比区看起来没有边界，与病历数据页不一致 */
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
 }
 .panel-hd {
   margin: 0;
@@ -770,6 +798,11 @@ onMounted(() => load(1))
   border-radius: 6px;
   padding: 13px 20px;
   flex-wrap: wrap;
+  /* 吸底（UX-73）：对照区很长，关闭 / 提交入口始终可见，不必滚到底 */
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  box-shadow: 0 -2px 8px rgba(47, 70, 57, 0.06);
 }
 .footer-bar .tip {
   flex: 1;

@@ -47,31 +47,9 @@
           />
         </PanelCard>
 
-        <!-- 详情改为同页展开（UX-66），左右两栏对照（UX-65）：
-             左＝原始 21 字段，右＝结构化数据 + AI 解读，两端同屏可比对 -->
-        <PanelCard v-if="raw" ref="detailRef" title="病历详情（原始字段只读）" class="detail-panel">
-          <template #header>
-            <span>病历详情（原始字段只读）</span>
-            <el-button link class="hd-close" @click="closeDetail">关闭详情</el-button>
-          </template>
-          <div class="detail-2col">
-            <div class="detail-col">
-              <div class="col-hd">原始字段</div>
-              <el-descriptions :column="2" border size="small">
-                <el-descriptions-item v-for="f in FIELDS" :key="f.key" :label="f.label" :span="f.wide ? 2 : 1">
-                  {{ fieldOf(raw, f.key) || '—' }}
-                </el-descriptions-item>
-                <el-descriptions-item label="评分">{{ raw.score ?? '—' }}</el-descriptions-item>
-                <el-descriptions-item label="分级">{{ raw.grade || '—' }}</el-descriptions-item>
-              </el-descriptions>
-            </div>
-            <div class="detail-col">
-              <div class="col-hd">结构化数据（sourceText 为原文溯源）</div>
-              <StructuredDataCard :data="raw.structuredData" />
-              <AiInterpretCard :record-id="raw.id" />
-            </div>
-          </div>
-        </PanelCard>
+        <!-- 详情改回弹窗（UX-69）：用户第六轮明确指定用弹窗，属 UX-66 的例外。
+             弹窗内仍是左右两栏对照（UX-65），排版与「病历完整详情」共用同一组件 -->
+        <RecordDetailDialog v-model="detailVisible" :record="raw" />
       </el-tab-pane>
 
       <!-- ============ 病历批量导入 ============ -->
@@ -189,12 +167,11 @@
 </template>
 
 <script setup>
-import { reactive, ref, nextTick, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import StructuredDataCard from '@/components/StructuredDataCard.vue'
-import AiInterpretCard from '@/components/AiInterpretCard.vue'
+import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import {
   importRecords, createRecord, searchRecords, getRawRecord, deleteRecords
 } from '@/api/records'
@@ -228,11 +205,6 @@ const FIELDS = [
   { key: 'doctorId', label: '医生工号' },
   { key: 'visitTime', label: '接诊时间' }
 ]
-
-const fieldOf = (row, key) => {
-  if (key === 'visitTime') return row.visitTime ? String(row.visitTime).replace('T', ' ').substring(0, 19) : ''
-  return row[key]
-}
 
 /**
  * 单条新增的分区（UX-51）：21 个字段平铺会产生 1000px+ 的长表单，
@@ -284,9 +256,9 @@ const handleReset = () => {
   handleSearch()
 }
 
-// ===== 详情（同页展开，UX-66）=====
+// ===== 详情（弹窗，UX-69）=====
 const raw = ref(null)
-const detailRef = ref(null)
+const detailVisible = ref(false)
 const activeId = ref('')
 
 /** 当前查看行高亮，便于在长表里对上号 */
@@ -299,17 +271,15 @@ const openDetail = async (id) => {
     activeId.value = id
     // 写入共享状态，供 AI 助手"这份病历…"与解读卡使用
     aiStore.setActiveRecord(res.data)
-    // 同页展开后把详情区滚进视野，否则用户以为「点了没反应」
-    await nextTick()
-    detailRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    detailVisible.value = true
   } catch {
     // 拦截器已提示
   }
 }
 
+/** 只收起弹窗、保留 raw：否则关闭动画期间内容会闪空（UX-69） */
 const closeDetail = () => {
-  raw.value = null
-  activeId.value = ''
+  detailVisible.value = false
 }
 
 const handleDelete = async (id) => {
@@ -323,7 +293,11 @@ const handleDelete = async (id) => {
   try {
     await deleteRecords([id])
     ElMessage.success('删除成功')
-    if (activeId.value === id) closeDetail()
+    if (activeId.value === id) {
+      closeDetail()
+      raw.value = null
+      activeId.value = ''
+    }
     handleSearch()
   } catch {
     // 拦截器已提示
@@ -601,31 +575,6 @@ onMounted(handleSearch)
   z-index: 1;
 }
 
-/* ===== 详情同页展开（UX-66）与左右两栏对照（UX-65） ===== */
-.detail-panel :deep(.panel-hd) {
-  position: sticky;
-  top: 0;
-  background: #fff;
-  z-index: 2;
-}
-.hd-close {
-  margin-left: auto;
-  font-size: 13px;
-}
-.detail-2col {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-.detail-col {
-  min-width: 0;
-}
-.col-hd {
-  font-size: 12.5px;
-  color: var(--text-sub);
-  margin-bottom: 8px;
-}
 :deep(.row-active) td {
   background: var(--ink-light) !important;
 }
@@ -636,6 +585,5 @@ onMounted(handleSearch)
 @media (max-width: 1000px) {
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; }
-  .detail-2col { grid-template-columns: 1fr; }
 }
 </style>
