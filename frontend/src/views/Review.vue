@@ -797,12 +797,13 @@ onMounted(() => load(1))
 }
 
 /* ===== ⑥ 底部操作 ===== */
-/* 页面根为 flex 列 + min-height:100%：内容不足一屏时 margin-top:auto 把底栏顶到底部，
-   不再浮在页面中部（data-v 作用域元素浮中部问题）；内容超长时 sticky 仍吸底可见 */
+/* 页面根作为 main（flex 列）的直接子项用 flex:1 撑满内容区高度 —— 不依赖百分比，
+   短内容时 margin-top:auto 把底栏顶到底部不再浮中部；长内容滚动时 sticky 仍吸底可见 */
 .review-page {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  min-height: 0;
 }
 .footer-bar {
   display: flex;
