@@ -20,7 +20,7 @@
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms">查 询</el-button>
         <span class="tip">共 {{ terms.length }} 条</span>
       </div>
-      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
+      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="220">
         <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
           <template #default="{ row }">
@@ -162,7 +162,7 @@
         <span class="tip">回滚会用该备份覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新备份列表</el-button>
       </div>
-      <el-table :data="backups" border style="margin-top: 12px" max-height="280">
+      <el-table :data="backups" border style="margin-top: 12px" max-height="170">
         <el-table-column prop="filename" label="备份文件" min-width="280" />
         <el-table-column prop="time" label="备份时间" width="180" />
         <el-table-column label="操作" width="120">
@@ -418,6 +418,10 @@ onMounted(() => {
   display: flex;
   gap: 20px;
   align-items: flex-start;
+}
+/* 压缩上传区撑高，配合表格/回滚高度让整页一屏放下（不改排版） */
+.import-row :deep(.el-upload-dragger) {
+  padding: 18px 12px;
 }
 .upload-tip {
   font-size: 13px;
