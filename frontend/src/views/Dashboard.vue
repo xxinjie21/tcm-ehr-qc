@@ -285,13 +285,13 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .todo {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 12px 18px;
+  padding: 9px 18px;
   cursor: pointer;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
   /* button 元素重置：保持原卡片观感（UX-18） */
@@ -340,26 +340,26 @@ onBeforeUnmount(() => {
 .stats {
   display: flex;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
 }
 .grid-2 :deep(.panel) {
   margin-bottom: 0;
 }
 .mb {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .chart {
   width: 100%;
-  height: 260px;
+  height: 210px;
 }
 .chart-tall {
   width: 100%;
-  height: 280px;
+  height: 230px;
 }
 .rate-list {
   display: flex;
