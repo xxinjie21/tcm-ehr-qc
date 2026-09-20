@@ -37,7 +37,7 @@
         </nav>
       </aside>
 
-      <main id="main-content">
+      <main id="main-content" :class="{ 'pad-b-sm': route.path === '/dictionary' }">
         <!-- 面包屑：承载分组与当前位置（UX-32） -->
         <nav v-if="breadcrumb.length" class="crumb" aria-label="面包屑">
           <template v-for="(c, i) in breadcrumb" :key="c">
@@ -236,14 +236,17 @@ main {
   /* 长页内部滚动：main 铺满整宽，滚动条贴窗最右（不再因内容居中而偏左）；
      文档层不出现滚动条 → 通栏且切页不偏移 */
   overflow-y: auto;
-  /* 底部预留缩小（84→56）：给右下角 AI 助手悬浮球留安全间距的同时，
-     让词典等页面在常规屏高下一屏放下，不再触发纵向滚动条 */
-  padding: 16px 20px 56px;
+  padding: 16px 20px 84px;
+  /* 给右下角 AI 助手悬浮球留出安全间距，避免遮挡表格底部内容（UX-46） */
 }
 /* 内层内容仍限宽居中（UX-45），但滚动容器保持通宽 */
 main > * {
   max-width: 1600px;
   margin: 0 auto;
+}
+/* 术语词典一页缩放页：底部安全间距收紧到 40px（该项交给 zoom 适配自己留白） */
+main.pad-b-sm {
+  padding-bottom: 40px;
 }
 
 /* ===== 面包屑（UX-32） ===== */

@@ -196,8 +196,8 @@ const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', h
 const pageRef = ref(null)
 const fitScale = ref(1)
 const fitStyle = computed(() => ({ zoom: fitScale.value }))
-// topbar 52 + main 上 padding 16 + 下 padding 56 + 缓冲 8（与 MainLayout 底部预留对齐）
-const FIT_PAD = 52 + 16 + 56 + 8
+// topbar 52 + main 上 padding 16 + main 下 padding 40（词典页已收紧）+ 底部缓冲 12
+const FIT_PAD = 52 + 16 + 40 + 12
 let fitTimer = null
 const scheduleFit = () => {
   if (fitTimer) cancelAnimationFrame(fitTimer)
