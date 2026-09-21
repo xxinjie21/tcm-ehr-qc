@@ -9,12 +9,16 @@
         <span class="tip">共 {{ total }} 条，点击行即载入该病历原文</span>
       </div>
 
+      <!-- max-height 必须 ≥「表头 + 每页 10 行」= 32 + 32×10 = 352px，否则默认每页 10 条会多出
+           一条内部滚动条。实测：写 320 时可视区只有 288px，差 32px 就冒滚动条；写 360 与人工复核、
+           质控校验同口径，10 行正好铺满且不滚（>10 条时仍保留滚动，属预期）。
+           改小这个值等于把滚动条加回来 -->
       <el-table
         v-loading="listLoading"
         :data="rows"
         border
         size="small"
-        max-height="320"
+        max-height="360"
         highlight-current-row
         :row-class-name="rowClass"
         style="margin-top: 12px"
