@@ -270,6 +270,7 @@ import { extractNlp } from '@/api/nlp'
 import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
+import { apiErrorMessage } from '@/utils/request'
 
 const activeTab = ref('single')
 
@@ -551,8 +552,8 @@ const runBatch = async () => {
           batchProgress.success += 1
         }
       } catch (e) {
-        // 单条失败不影响后续
-        batchFailures.value.push({ label, reason: e?.message || '抽取或保存失败' })
+        // 单条失败不影响后续；原因优先取后端 msg —— axios 的英文兜底对用户没有信息量
+        batchFailures.value.push({ label, reason: apiErrorMessage(e, '抽取或保存失败') })
         batchProgress.failed += 1
       }
       batchProgress.done = i + 1

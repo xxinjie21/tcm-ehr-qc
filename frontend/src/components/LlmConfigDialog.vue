@@ -99,6 +99,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getLlmConfig, updateLlmConfig, testLlmConfig } from '@/api/llm'
+import { apiErrorMessage } from '@/utils/request'
 
 const visible = defineModel({ type: Boolean, default: false })
 const emit = defineEmits(['saved'])
@@ -165,8 +166,10 @@ async function handleTest() {
     const { data } = await testLlmConfig(payload())
     testResult.value = { ok: true, ...data }
   } catch (e) {
-    // request.js 已弹过 toast；这里保留就地结果，避免用户滚动后找不到原因
-    testResult.value = { ok: false, message: e?.message || '连接失败' }
+    // request.js 已弹过 toast；这里保留就地结果，避免用户滚动后找不到原因。
+    // 必须取后端 msg：探测失败时后端回 502 + code=1009，该消息已脱敏、契约上就是给用户看的；
+    // 直接用 e.message 会退化成 axios 的 "Request failed with status code 502"，等于把原因丢掉。
+    testResult.value = { ok: false, message: apiErrorMessage(e, '连接失败') }
   } finally {
     testing.value = false
   }

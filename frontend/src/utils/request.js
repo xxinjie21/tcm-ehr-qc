@@ -58,4 +58,16 @@ request.interceptors.response.use(
   }
 )
 
+/**
+ * 从 axios 错误里取出「能给用户看」的那句文案。
+ *
+ * 后端统一回 Result{code,msg,data}，其中 msg 是面向用户的 —— 例如
+ * LlmProbeException 的消息契约上就写明「已脱敏、可直接展示给用户」。
+ * 而 axios 自己的 error.message 只有 "Request failed with status code 502"
+ * 这种英文兜底。两个混用时用户看到的是后者，服务端已经准备好的原因被白白丢掉。
+ */
+export function apiErrorMessage(e, fallback = '请求失败') {
+  return e?.response?.data?.msg || e?.message || fallback
+}
+
 export default request
