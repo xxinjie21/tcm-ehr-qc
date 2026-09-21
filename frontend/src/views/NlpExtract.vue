@@ -88,18 +88,19 @@
           </div>
 
           <!-- 无产出时把原因讲清楚（UX-63 第七轮）：术语归一依赖上游实体，
-               没有实体就没有可归的内容，不能让用户以为「归一没执行」 -->
+               没有实体就没有可归的内容，不能让用户以为「归一没执行」。
+               第八轮：这段是给用户看的，一律说人话 —— 配置项、端口、字段名等技术细节
+               已挪到后端 slf4j 日志（PythonNlpClient 启动时 warn 一次），此处不再出现。 -->
           <div v-if="emptyReason" class="nlp-off">
             <template v-if="emptyReason === 'off'">
-              <b>NLP 抽取服务未启用</b>：后端 nlp.enabled=false（或 python-nlp 未在 :8001 启动），
-              本次抽取返回空 9 类、modelAvailable=false。<b>术语归一一直在跑</b>（抽取接口内部即调用
-              EntityNormalizer.normalize，命中时把 content 换为标准术语、原文留在 sourceText），
-              这里为空是上游没有实体可归。启用方式：application.yml 置 nlp.enabled: true 并启动
-              python-nlp 后重试；也可以先用右下方「术语归一试算」直接查词典。
+              <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）。自动抽取功能当前未开启，
+              或抽取服务暂时不可用，所以没有产出内容。
+              这不是「术语归一」没执行 —— <b>归一一直在跑</b>，只是没有可归的要素。
+              需要开启请联系系统管理员；也可以先用下方「术语归一试算」直接查词典。
             </template>
             <template v-else>
-              抽取已完成，但 9 类实体全空 —— 术语归一同样没有可归的内容。
-              可检查原文是否覆盖主诉 / 四诊 / 辨证结论 / 草药等可抽取字段。
+              抽取已完成，但没有识别出可归一的要素（疾病、证候、症状、中药等）。
+              请确认原文是否写了主诉、四诊、辨证结论、用药等内容。
             </template>
           </div>
 
@@ -153,13 +154,13 @@
               <div class="pane-hd">
                 抽取结果
                 <span v-if="result" class="src-note" :class="{ warn: !result.modelAvailable }">
-                  {{ result.modelAvailable ? '模型抽取 + 规则兜底' : 'NLP 服务未启用（本次未产生实体）' }}
+                  {{ result.modelAvailable ? '模型抽取 + 规则补充' : '自动抽取未开启（本次无要素）' }}
                 </span>
               </div>
               <!-- 归一状态行（UX-63 第七轮）：明说「归一跑没跑、跑出了什么」 -->
               <div v-if="result" class="norm-note" :class="{ warn: !!emptyReason }">
                 <template v-if="emptyReason">
-                  本次没有实体，<b>术语归一没有可归的内容</b>（原因见上方提示）。
+                  本次没有抽取到要素，<b>术语归一没有可归的内容</b>（原因见上方提示）。
                 </template>
                 <template v-else>
                   已按词典归一：实体显示为<b>标准术语</b>，灰色小字为归一前原文，鼠标悬停可看命中层级。
@@ -410,7 +411,7 @@ const runExtract = async () => {
     const res = await extractNlp({ text: composedText.value })
     result.value = res.data
     if (!res.data.modelAvailable) {
-      ElMessage.warning('NLP 服务未启用：本次未产生实体，术语归一无可归内容')
+      ElMessage.warning('本次没有抽取到病历要素，术语归一没有可归的内容')
     }
   } catch {
     // 拦截器已提示
@@ -427,6 +428,10 @@ const runExtract = async () => {
  * 归一一直有跑；之所以看起来「没执行」，是因为 {@code nlp.enabled=false} 时上游
  * 只回空 9 类，归一没有可归的内容。所以这里把「有没有产出、为什么没有」直接讲出来，
  * 而不是让一片空白自己表达。</p>
+ *
+ * <p>第八轮补充：{@code modelAvailable} 只是一个布尔值，「配置没开」与「服务挂了」在前端
+ * 无法区分，所以 'off' 分支的文案只能说「未开启，或服务暂时不可用」，不能断言其一。
+ * 要让它说准需要后端多下发一个原因字段（本次未做）。</p>
  */
 const ENTITY_KEYS = [
   'diseases', 'symptoms', 'tongueList', 'pulseList', 'patternList',

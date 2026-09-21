@@ -2,6 +2,7 @@ package com.tcm.ehr.common.utils;
 
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -50,6 +51,28 @@ public class PythonNlpClient {
     }
 
     /**
+     * 启动时把「抽取服务未启用」这件事说清楚（第八轮）。
+     *
+     * <p>{@code nlp.enabled} 是 {@code @Value} 静态配置，启动时即已知，所以只在这里
+     * 打一次，不必每个请求重复刷屏。级别用 warn 而非 debug：这是配置事实，生产把
+     * {@code com.tcm.ehr} 调回 info 后仍应可见 —— 诊断信息不该随日志级别一起消失。</p>
+     *
+     * <p>这段技术细节原先写在解析页的降级横幅上，用户看不懂；第八轮改为
+     * 横幅只说人话、细节落在这里。</p>
+     */
+    @PostConstruct
+    public void reportDisabledOnStartup() {
+        if (enabled) {
+            log.info("[NLP] 抽取服务已启用，目标地址 {}", serviceUrl);
+            return;
+        }
+        log.warn("[NLP] 抽取服务未启用（nlp.enabled=false）：本次抽取将返回空 9 类、"
+                + "modelAvailable=false。术语归一仍在执行（NlpController.extract 内调 "
+                + "EntityNormalizer.normalize），但上游无实体可归。启用方式：application.yml "
+                + "置 nlp.enabled: true 并启动 python-nlp（{}）后重试。", serviceUrl);
+    }
+
+    /**
      * 调用 NLP实体抽取 POST /api/nlp/extract
      *
      * @param text 原始病历文本
@@ -57,7 +80,7 @@ public class PythonNlpClient {
      */
     public NlpExtractVO extract(String text) {
         if (!enabled) {
-            log.debug("[NLP] 已禁用（nlp.enabled=false），跳过调用");
+            log.debug("[NLP] 已禁用（nlp.enabled=false），跳过调用；本次降级为空 9 类，术语归一无可归内容");
             return null;
         }
         try {
@@ -70,12 +93,14 @@ public class PythonNlpClient {
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                log.warn("[NLP] 调用失败: HTTP {}", response.statusCode());
+                log.warn("[NLP] 调用失败: HTTP {}（{}），已降级为空 9 类、modelAvailable=false，术语归一无可归内容",
+                        response.statusCode(), serviceUrl);
                 return null;
             }
             return mapper.readValue(response.body(), NlpExtractVO.class);
         } catch (Exception e) {
-            log.warn("[NLP] 调用异常（将降级）: {}", e.getMessage());
+            log.warn("[NLP] 调用异常（{}），已降级为空 9 类、modelAvailable=false，术语归一无可归内容: {}",
+                    serviceUrl, e.getMessage());
             return null;
         }
     }

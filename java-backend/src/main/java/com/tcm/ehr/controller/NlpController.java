@@ -38,6 +38,10 @@ public class NlpController {
         }
         NlpExtractVO vo = nlpClient.extract(text);
         if (vo == null) {
+            // 上游未启用 / 不可用：降级为空 9 类（modelAvailable=false）。
+            // 具体原因见 PythonNlpClient 的启动 warn 与调用期 warn/debug；
+            // 这里只记请求规模，便于把「哪次请求降级了」与上面那条日志对上。
+            log.debug("[NLP] 抽取降级为空 9 类（textLength={}），术语归一无可归内容", text.length());
             return ResponseEntity.ok(Result.ok(NlpExtractVO.empty()));
         }
         EntityNormalizer.NormStat stat = entityNormalizer.normalize(vo);
