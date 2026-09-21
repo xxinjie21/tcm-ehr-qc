@@ -562,6 +562,19 @@ components:
                 type: string
               summary:
                 type: string
+              grade:
+                type: string
+                description: 分级（合格/待复核/无效），随查询一并返回，列表页直接展示
+              visitTime:
+                type: string
+                format: date-time
+                description: 接诊时间（秒级）。列表展示到日、悬浮展示到秒，故下发完整精度由前端按场景格式化；同时它是列表排序键，避免排序键与所见图列不一致
+              gender:
+                type: string
+                description: 性别，与 age 合成一列展示
+              age:
+                type: string
+                description: 年龄，与 gender 合成一列展示
     # ========== NLP 抽取 DTO / VO ==========
     NlpExtractDTO:
       type: object

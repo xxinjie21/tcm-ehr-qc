@@ -61,7 +61,11 @@ public final class RecordFilter {
                 wrapper.le("visit_time", dto.getDateRange().get(1).trim() + " 23:59:59");
             }
         }
-        wrapper.orderByDesc("create_time");
+        // 排序键必须是列表实际展示的那一列（visit_time 接诊时间）。
+        // 原先按 create_time 排，但批量导入/灌库场景下 create_time 会大量同值 ——
+        // 实测 500 条演示数据 create_time 只有 1 个不同值，排序完全失效、返回 UUID 序，
+        // 对用户等于随机。visit_time 有真实分布（2019~2025），且可走 idx_department_visit_time。
+        wrapper.orderByDesc("visit_time");
         return wrapper;
     }
 

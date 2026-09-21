@@ -20,9 +20,28 @@
         style="margin-top: 12px"
         @row-click="loadRecord"
       >
-        <el-table-column prop="registrationNo" label="登记号" width="140" show-overflow-tooltip />
+        <!-- 列口径与「病历数据」的病历列表一致（病历ID 为 UUID，36 字符，需给足宽度）。
+             原「登记号」列已删：/records/search 返回的 SearchVO.Item 里没有该字段，恒为空 -->
+        <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
         <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
         <el-table-column prop="grade" label="分级" width="90" />
+        <!-- 接诊时间（第八轮）：常态只到日，悬停给秒级原值。
+             只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
+             会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
+        <el-table-column label="接诊时间" width="110">
+          <template #default="{ row }">
+            <el-tooltip :content="fmtDateTime(row.visitTime, 'second')" placement="top">
+              <span>{{ fmtDateTime(row.visitTime, 'date') }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <!-- 年龄/性别（第八轮）：单块自包含，需回滚时整块删掉即可 ——
+             后端两字段是追加、向后兼容，回滚不需要动后端 -->
+        <el-table-column label="年龄/性别" width="110">
+          <template #default="{ row }">
+            <span>{{ [row.age ? row.age + '岁' : '', row.gender].filter(Boolean).join(' / ') || '—' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="90" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click.stop="loadRecord(row)">载入</el-button>
@@ -249,6 +268,7 @@ import RangeFilter from '@/components/RangeFilter.vue'
 import { extractNlp } from '@/api/nlp'
 import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
+import { fmtDateTime } from '@/utils/format'
 
 const activeTab = ref('single')
 

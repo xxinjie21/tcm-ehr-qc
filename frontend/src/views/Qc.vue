@@ -1,10 +1,19 @@
 <template>
   <div>
+    <!-- 范围查询提升为整页生效（第八轮）：此前 RangeFilter 只喂图谱，
+         而「AI 预检列表」另挂一个独立的分级下拉，同一页存在两个互不相干的范围口径 -->
+    <PanelCard title="范围查询">
+      <div class="filter-bar">
+        <RangeFilter v-model="filters" />
+        <el-button type="primary" size="small" :loading="queryLoading" @click="applyFilters">查 询</el-button>
+        <el-button size="small" :disabled="queryLoading" @click="resetFilters">重置</el-button>
+        <span class="tip">范围对本页两块同时生效：质控检验图谱 + AI 预检列表</span>
+      </div>
+    </PanelCard>
+
     <PanelCard title="质控检验图谱">
       <div class="qc-filter">
-        <RangeFilter v-model="filters" />
         <div class="qc-actions">
-          <el-button type="primary" size="small" :loading="graphLoading" @click="loadGraph">刷新图谱</el-button>
           <!-- 默认画全量关系图（UX-72）：演示数据的证候都不在 LogicChecker.RULES 覆盖范围内，
                规则边与冲突边恒为 0，默认「冲突定位」会让画布与空态都不渲染 -->
           <el-radio-group v-model="graphMode" size="small">
@@ -68,18 +77,30 @@
 
     <PanelCard title="AI 预检列表 / 扣分明细">
       <div class="precheck-bar">
-        <span>分级</span>
-        <el-select v-model="grade" size="small" style="width: 130px" @change="loadPrecheck(1)">
-          <el-option label="待复核" value="待复核" />
-          <el-option label="无效" value="无效" />
-          <el-option label="合格" value="合格" />
-        </el-select>
-        <span class="tip">点击行查看规则扣分明细</span>
+        <span class="tip">点击行查看规则扣分明细；范围沿用上方「范围查询」，不再单独设分级</span>
       </div>
 
       <el-table v-loading="precheckLoading" :data="precheckRows" border size="small" max-height="360">
         <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
         <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
+        <el-table-column prop="grade" label="分级" width="90" />
+        <!-- 接诊时间（第八轮）：常态只到日，悬停给秒级原值。
+             只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
+             会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
+        <el-table-column label="接诊时间" width="110">
+          <template #default="{ row }">
+            <el-tooltip :content="fmtDateTime(row.visitTime, 'second')" placement="top">
+              <span>{{ fmtDateTime(row.visitTime, 'date') }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <!-- 年龄/性别（第八轮）：单块自包含，需回滚时整块删掉即可 ——
+             后端两字段是追加、向后兼容，回滚不需要动后端 -->
+        <el-table-column label="年龄/性别" width="110">
+          <template #default="{ row }">
+            <span>{{ [row.age ? row.age + '岁' : '', row.gender].filter(Boolean).join(' / ') || '—' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
@@ -147,6 +168,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { getGraph, qcScore } from '@/api/qc'
 import { searchRecords } from '@/api/records'
+import { fmtDateTime } from '@/utils/format'
 
 // 9 类实体 + 病历；与后端 GraphVO.type 对齐。
 // 配色按色相拉开：原方案里 4 类墨绿 + 2 类浅褐，实际只有约 6 种可辨色（UX-53）
@@ -386,7 +408,8 @@ const renderGraph = () => {
 watch(graphMode, () => nextTick(renderGraph))
 
 // ===== 预检列表 / 扣分明细 =====
-const grade = ref('待复核')
+// 分级不再单独持有：统一由上方「范围查询」的 filters.grade 驱动，
+// 否则同一页会出现两个互不相干的分级口径（第八轮）
 const precheckRows = ref([])
 const precheckTotal = ref(0)
 const precheckPage = ref(1)
@@ -397,7 +420,7 @@ const loadPrecheck = async (p) => {
   if (typeof p === 'number') precheckPage.value = p
   precheckLoading.value = true
   try {
-    const res = await searchRecords({ grade: grade.value, page: precheckPage.value, pageSize: precheckSize.value })
+    const res = await searchRecords({ ...filters, page: precheckPage.value, pageSize: precheckSize.value })
     precheckRows.value = res.data?.records || []
     precheckTotal.value = res.data?.total || 0
   } catch {
@@ -410,6 +433,20 @@ const loadPrecheck = async (p) => {
 const handleSizeChange = () => {
   precheckPage.value = 1
   loadPrecheck()
+}
+
+/** 范围查询是整页口径：刷新时图谱与预检列表必须一起走，不能只刷其中一块 */
+const queryLoading = computed(() => graphLoading.value || precheckLoading.value)
+const applyFilters = () => {
+  loadGraph()
+  loadPrecheck(1)
+}
+const resetFilters = () => {
+  filters.department = ''
+  filters.dateRange = null
+  filters.pattern = ''
+  filters.grade = ''
+  applyFilters()
 }
 
 // 扣分明细改回弹窗（UX-71）；关闭时只收起、不清数据，避免关闭动画期间内容闪空
@@ -453,6 +490,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 页面级范围查询条（第八轮）：与 RangeFilter 同一行，控件底对齐 */
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .qc-filter {
   margin-bottom: 10px;
 }
@@ -460,7 +504,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
 }
 .tip {
   font-size: 12.5px;
