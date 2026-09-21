@@ -797,13 +797,16 @@ onMounted(() => load(1))
 }
 
 /* ===== ⑥ 底部操作 ===== */
-/* 页面根作为 main（flex 列）的直接子项用 flex:1 撑满内容区高度 —— 不依赖百分比，
-   短内容时 margin-top:auto 把底栏顶到底部不再浮中部；长内容滚动时 sticky 仍吸底可见 */
+/* 页面根为 flex 列 + min-height：内容不足一屏时 margin-top:auto 把底栏顶到底部，
+   不再浮在页面中部（data-v 作用域元素浮中部问题）；内容超长时 sticky 仍吸底可见。
+   注意 min-height 必须减掉同层前面的面包屑与隐藏 h1（21 + 12 + 1 = 34px）——
+   main 的 content box 高度里已经含了它们，不减就会恒多撑 34px，表现是
+   「还没进入复核」就冒出一条页面滚动条，且底栏被推进 main 的 84px 底部留白里。
+   实测 1440×900 与 1366×768 都是溢出 33px（未进入复核时） */
 .review-page {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: calc(100% - 34px);
 }
 .footer-bar {
   display: flex;
