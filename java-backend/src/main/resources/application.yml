@@ -72,7 +72,12 @@ jwt:
 
 # NLP 抽取（批G·8.1）：Python FastAPI 服务（成员B），Java 经 PythonNlpClient 转发
 nlp:
-  enabled: false            # 抽取总开关；false 时不调用 Python 服务，接口返回空 9 类（modelAvailable=false）
+  enabled: true             # 抽取总开关（2026-09-22 由 false 改为 true，按用户要求默认开启）。
+                            # true 时经 PythonNlpClient 调用 :8001 的 python-nlp 服务；
+                            # 注意：开启前需先启动该服务（python-nlp/.venv/Scripts/python.exe
+                            # -m uvicorn main:app --host 127.0.0.1 --port 8001），否则每次抽取
+                            # 要等 3s 连接超时才降级，且导入病历会被逐条串行阻塞。
+                            # false 时不发请求，接口直接返回空 9 类（modelAvailable=false）。
   service-url: http://localhost:8001
   timeout: 30000            # 毫秒
   extract-on-import: true   # 批G·8.3：病历导入入库后自动抽取写 structured_data（仅 enabled=true 时生效）
