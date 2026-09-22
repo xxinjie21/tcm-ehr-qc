@@ -9,10 +9,15 @@
     <div class="rf-item">
       <!-- 范围选择器内部是「两个 input」，所以 id 必须是两个 id 的数组：
            传字符串会触发 element-plus 的 prop 类型告警（PickerRangeTrigger 的 id 只收 Array）。
-           label 只能关联其中一个控件，取起始那个 -->
+           label 只能关联其中一个控件（取起始那个），结束那个因此没有标签，
+           Chrome 的 Issues 面板会报「No label associated with a form field」。
+           aria-label 是 Picker 的显式 prop（ariaLabel）：范围分支把它透传给
+           PickerRangeTrigger，而后者用 useAttrs() 把同一份 attrs 合并进「两个」input
+           —— 所以这一行同时给起止两个框补上无障碍名称，且不会污染外层 div。 -->
       <label for="rf-date-start">就诊时间</label>
       <el-date-picker
         :id="['rf-date-start', 'rf-date-end']"
+        aria-label="就诊时间"
         v-model="inner.dateRange"
         type="daterange"
         value-format="YYYY-MM-DD"

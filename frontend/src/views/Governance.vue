@@ -98,8 +98,14 @@
     <PanelCard title="标准数据集导出">
       <div class="export-row">
         <div>
-          <label for="ex-format">导出格式</label>
-          <el-radio-group id="ex-format" v-model="format">
+          <!-- 单选按钮组是「一组」控件，而 <label for> 只能关联「单个」控件：
+               指向 el-radio-group 的根 div（role=radiogroup）会命中非可标注元素，
+               Chrome 的 Issues 面板报「Incorrect use of <label for=FORM_ELEMENT>」。
+               正解是视觉文案用 span（同 AiInterpretCard 的 UX-34 做法），
+               组本身用 aria-label 命名 —— 组内每个 radio 由 element-plus 自己的
+               <label> 包裹，已经各自有名字，不需要我们再管。 -->
+          <span class="field-lbl">导出格式</span>
+          <el-radio-group v-model="format" aria-label="导出格式">
             <el-radio-button value="csv">CSV</el-radio-button>
             <el-radio-button value="json">JSON</el-radio-button>
           </el-radio-group>
@@ -111,10 +117,12 @@
           </el-select>
         </div>
         <div>
-          <!-- 同 RangeFilter：范围选择器的 id 必须传数组（内部两个 input） -->
+          <!-- 同 RangeFilter：范围选择器的 id 必须传数组（内部两个 input）；
+               aria-label 由 Picker 透传给 PickerRangeTrigger，会同时落到起止两个框上 -->
           <label for="ex-date-start">就诊时间</label>
           <el-date-picker
             :id="['ex-date-start', 'ex-date-end']"
+            aria-label="就诊时间"
             v-model="filters.dateRange"
             type="daterange"
             value-format="YYYY-MM-DD"
@@ -612,7 +620,9 @@ onMounted(() => {
   flex-wrap: wrap;
   padding-bottom: 6px;
 }
-label {
+/* 字段视觉标签：单选按钮组不能用 <label for>，改用 span，故与 label 共用同一套样式 */
+label,
+.field-lbl {
   display: block;
   font-size: 12px;
   color: var(--text-sub);
