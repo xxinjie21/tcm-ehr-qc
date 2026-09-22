@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -62,6 +63,7 @@ class EsTermNormalizerTest {
 
         assertEquals(STD, r.standardTerm(), "别名应归一为标准词");
         assertEquals("中医临床诊疗术语 症状", r.source());
+        assertEquals(EsTermNormalizer.VIA_ES, r.via(), "ES 召回后判定命中，途径应为 ES");
     }
 
     // ---------------------------------------------------------------- 兜底与降级
@@ -71,8 +73,10 @@ class EsTermNormalizerTest {
     void esEmptyRecall_shouldFallBackToMemory() throws IOException {
         when(es.search(anyString(), anyString(), anyInt())).thenReturn(List.of());
 
-        assertEquals(STD, normalizer.normalize(TYPE, ALIAS).standardTerm(),
-                "ES 未召回时必须回退内存，否则归一结果会漏");
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, ALIAS);
+
+        assertEquals(STD, r.standardTerm(), "ES 未召回时必须回退内存，否则归一结果会漏");
+        assertEquals(EsTermNormalizer.VIA_MEMORY, r.via(), "回退内存命中，途径应为 MEMORY");
     }
 
     /** ES 抛异常（服务不可用）：降级到内存，不得外抛 */
@@ -81,8 +85,10 @@ class EsTermNormalizerTest {
         when(es.search(anyString(), anyString(), anyInt()))
                 .thenThrow(new IOException("connection refused"));
 
-        assertEquals(STD, normalizer.normalize(TYPE, ALIAS).standardTerm(),
-                "ES 不可用时必须静默降级到内存");
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, ALIAS);
+
+        assertEquals(STD, r.standardTerm(), "ES 不可用时必须静默降级到内存");
+        assertEquals(EsTermNormalizer.VIA_MEMORY, r.via(), "ES 不可用时途径应为 MEMORY");
     }
 
     /** ES 召回了候选但判定都不中：仍要回退内存全量，避免「候选不全」导致漏判 */
@@ -91,8 +97,11 @@ class EsTermNormalizerTest {
         when(es.search(anyString(), anyString(), anyInt()))
                 .thenReturn(List.of(entry("头痛", List.of(), "症状")));
 
-        assertEquals(STD, normalizer.normalize(TYPE, ALIAS).standardTerm(),
-                "候选集判定未中时必须再查内存全量");
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, ALIAS);
+
+        assertEquals(STD, r.standardTerm(), "候选集判定未中时必须再查内存全量");
+        assertEquals(EsTermNormalizer.VIA_MEMORY, r.via(),
+                "ES 候选判定未中、由内存命中，途径应为 MEMORY 而不是 ES");
     }
 
     // ---------------------------------------------------------------- 三级判定阈值
@@ -131,7 +140,7 @@ class EsTermNormalizerTest {
 
     // ---------------------------------------------------------------- 边界
 
-    /** 未命中：返回原词、source 置空 */
+    /** 未命中：返回原词、source 置空、途径为空 */
     @Test
     void noHit_shouldReturnInputWithEmptySource() throws IOException {
         when(es.search(anyString(), anyString(), anyInt())).thenReturn(List.of());
@@ -140,6 +149,7 @@ class EsTermNormalizerTest {
 
         assertEquals("完全无关的词", r.standardTerm());
         assertEquals("", r.source());
+        assertNull(r.via(), "未命中不得带归一途径，否则前端会误报「已按 ES 归一」");
     }
 
     /** 空输入：原样返回，且不应触发检索 */
@@ -149,6 +159,7 @@ class EsTermNormalizerTest {
 
         assertEquals("   ", r.standardTerm());
         assertEquals("", r.source());
+        assertNull(r.via());
         Mockito.verify(es, Mockito.never()).search(anyString(), anyString(), anyInt());
     }
 }

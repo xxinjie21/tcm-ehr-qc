@@ -51,6 +51,9 @@ public class GovernanceController {
         data.put("source", r.source());
         data.put("level", r.level());
         data.put("code", r.code());
+        // 归一途径：ES（ES 索引召回后判定命中）/ MEMORY（回退内存词典命中）/ null（未命中）。
+        // 试算面板要把这条显示出来，否则用户无法判断 ES 索引到底有没有生效。
+        data.put("via", r.via());
         return ResponseEntity.ok(Result.ok(data));
     }
 

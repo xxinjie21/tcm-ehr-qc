@@ -137,6 +137,12 @@ components:
         normCode:
           type: string
           description: 国标代码；词典未收录时不返回
+        normVia:
+          type: string
+          description: 归一途径：ES=ES 索引召回后判定命中 / MEMORY=ES 未召回或未命中、回退内存词典命中；未命中不返回
+          enum:
+            - ES
+            - MEMORY
     Herb:
       type: object
       description: 中药实体（含剂量），共享模型
@@ -150,6 +156,16 @@ components:
         sourceText:
           type: string
           description: 原文片段
+        confidence:
+          type: number
+          format: double
+          description: 置信度（0~1）；模型实体提供，规则兜底可省
+        source:
+          type: string
+          description: 来源：model（NER 模型）/ rule（规则兜底）
+          enum:
+            - model
+            - rule
         normLevel:
           type: integer
           description: 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中词典时不返回
@@ -159,6 +175,12 @@ components:
         normCode:
           type: string
           description: 国标代码；词典未收录时不返回
+        normVia:
+          type: string
+          description: 归一途径：ES=ES 索引召回后判定命中 / MEMORY=ES 未召回或未命中、回退内存词典命中；未命中不返回
+          enum:
+            - ES
+            - MEMORY
     RecordMetadata:
       type: object
       description: 病历元数据（共享模型）
@@ -737,12 +759,26 @@ components:
           description: 口语化/非标准术语
     NormalizeVO:
       type: object
-      description: 术语标准化响应（出参；未命中时 standardTerm 返回原词、source 返回空字符串）
+      description: 术语标准化响应（出参；未命中时 standardTerm 返回原词、source 返回空字符串、level=0、via 为 null）
       properties:
         standardTerm:
           type: string
+          description: 命中的标准术语；未命中时为原词
         source:
           type: string
+          description: 归一命中的术语来源（词典名）；未命中为空字符串
+        level:
+          type: integer
+          description: 归一命中层级：1=精确 / 2=包含 / 3=模糊；0=未命中
+        code:
+          type: string
+          description: 国标代码；词典未收录时为 null
+        via:
+          type: string
+          description: 归一途径：ES=ES 索引召回后判定命中 / MEMORY=ES 未召回或未命中、回退内存词典命中；未命中为 null
+          enum:
+            - ES
+            - MEMORY
     CleanDTO:
       type: object
       description: 数据清洗请求（入参）
@@ -1871,7 +1907,7 @@ paths:
       tags:
         - NLP抽取
       summary: NLP实体抽取
-      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）。Java 端转发至 Python FastAPI 服务（:8001），服务/模型不可用时降级（modelAvailable=false）。返回前对实体做术语归一（disease/symptom/pattern/formula/herb 五类走词典，舌/脉/病因/治法四类无独立词典仅保留原文）：content 为标准术语、sourceText 为归一前原文，并附 normLevel/normSource/normCode；未命中词典时 content 保持原文且不返回归一字段
+      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）。Java 端转发至 Python FastAPI 服务（:8001），服务/模型不可用时降级（modelAvailable=false）。返回前对实体做术语归一（disease/symptom/pattern/formula/herb 五类走词典，舌/脉/病因/治法四类无独立词典仅保留原文）：content 为标准术语、sourceText 为归一前原文，并附 normLevel/normSource/normCode/normVia；未命中词典时 content 保持原文且不返回归一字段
       requestBody:
         required: true
         content:

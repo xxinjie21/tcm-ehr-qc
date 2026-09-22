@@ -22,11 +22,21 @@ import java.util.Set;
  * <p><b>为什么还要内存兜底</b>：ES 召回本身是近似检索，理论上存在「内存全量能命中、ES 未召回」
  * 的边界情况。为了做到<b>行为与改造前完全一致</b>，ES 未召回或未命中时会再用内存全量判一次；
  * ES 不可用时也直接走内存。代价是「未命中」路径要付一次内存遍历，命中路径只需在候选集内判定。</p>
+ *
+ * <p><b>为什么要把「走了哪条路」下发</b>：上面这条兜底路径原先只写进 {@code log.debug}，
+ * 用户看到的只是「命中词典」，无法判断这次命中是不是 ES 索引给的，也就无法判断 ES 到底有没有生效。
+ * {@link NormalizeResult#via()} 把召回分支显式带出来，页面即可直接标注「ES 索引 / 内存词典」。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class EsTermNormalizer {
+
+    /** 归一途径：ES 索引召回后在候选集内判定命中 */
+    public static final String VIA_ES = "ES";
+
+    /** 归一途径：ES 未召回或未命中，回退内存全量词典后命中 */
+    public static final String VIA_MEMORY = "MEMORY";
 
     /** ES 召回候选上限：召回宁可宽，判定才从严 */
     private static final int RECALL_SIZE = 50;
@@ -44,20 +54,21 @@ public class EsTermNormalizer {
      * @param source       术语来源（未命中为 ""）
      * @param level        命中层级：1=精确 / 2=包含 / 3=模糊 / 0=未命中
      * @param code         国标代码（词典收录则有，否则 null）
+     * @param via          归一途径：{@link #VIA_ES} / {@link #VIA_MEMORY}；未命中为 null
      */
-    public record NormalizeResult(String standardTerm, String source, int level, String code) {
+    public record NormalizeResult(String standardTerm, String source, int level, String code, String via) {
     }
 
     public NormalizeResult normalize(String type, String term) {
         String input = term == null ? "" : term.trim();
         if (input.isEmpty()) {
-            return new NormalizeResult(term, "", 0, null);
+            return new NormalizeResult(term, "", 0, null, null);
         }
 
         // ① ES 召回 -> 判定（命中路径只需在候选集内比较）
         List<TermEntry> recalled = recall(type, input);
         if (!recalled.isEmpty()) {
-            NormalizeResult hit = judge(recalled, input);
+            NormalizeResult hit = judge(recalled, input, VIA_ES);
             if (hit != null) {
                 log.debug("[归一] {} ES命中({}候选): {} -> {}", type, recalled.size(), input, hit.standardTerm());
                 return hit;
@@ -67,14 +78,14 @@ public class EsTermNormalizer {
         // ② 兜底：内存全量判定，保证「ES 漏召回」不会导致归一结果与改造前不一致
         List<TermEntry> all = store.get(type);
         if (!all.isEmpty()) {
-            NormalizeResult hit = judge(all, input);
+            NormalizeResult hit = judge(all, input, VIA_MEMORY);
             if (hit != null) {
                 log.debug("[归一] {} 内存命中({}条): {} -> {}", type, all.size(), input, hit.standardTerm());
                 return hit;
             }
         }
 
-        return new NormalizeResult(input, "", 0, null);
+        return new NormalizeResult(input, "", 0, null, null);
     }
 
     /** ES 检索候选；ES 不可用/索引缺失时返回空列表，交由上层回退内存 */
@@ -90,16 +101,17 @@ public class EsTermNormalizer {
     /**
      * 既有三级判定（改造前后逐字保持，勿改顺序与比较符）。
      *
+     * @param via 本次判定所依据的召回来源，原样带进结果（{@link #VIA_ES} / {@link #VIA_MEMORY}）
      * @return 命中结果；三级都不中返回 {@code null}
      */
-    private NormalizeResult judge(List<TermEntry> entries, String input) {
+    private NormalizeResult judge(List<TermEntry> entries, String input, String via) {
         // 一级·精确：标准词/别名完全相等
         for (TermEntry e : entries) {
             if (e.getStandardTerm().equals(input)) {
-                return new NormalizeResult(e.getStandardTerm(), e.getSource(), 1, e.getCode());
+                return new NormalizeResult(e.getStandardTerm(), e.getSource(), 1, e.getCode(), via);
             }
             if (e.getAliases() != null && e.getAliases().contains(input)) {
-                return new NormalizeResult(e.getStandardTerm(), e.getSource(), 1, e.getCode());
+                return new NormalizeResult(e.getStandardTerm(), e.getSource(), 1, e.getCode(), via);
             }
         }
 
@@ -115,7 +127,8 @@ public class EsTermNormalizer {
             }
         }
         if (bestContains != null) {
-            return new NormalizeResult(bestContains.getStandardTerm(), bestContains.getSource(), 2, bestContains.getCode());
+            return new NormalizeResult(bestContains.getStandardTerm(), bestContains.getSource(), 2,
+                    bestContains.getCode(), via);
         }
 
         // 三级·模糊：字符Dice相似度 ≥ 阈值，取最高分
@@ -134,7 +147,8 @@ public class EsTermNormalizer {
             }
         }
         if (bestFuzzy != null && bestScore >= scoreThreshold) {
-            return new NormalizeResult(bestFuzzy.getStandardTerm(), bestFuzzy.getSource(), 3, bestFuzzy.getCode());
+            return new NormalizeResult(bestFuzzy.getStandardTerm(), bestFuzzy.getSource(), 3,
+                    bestFuzzy.getCode(), via);
         }
 
         return null;

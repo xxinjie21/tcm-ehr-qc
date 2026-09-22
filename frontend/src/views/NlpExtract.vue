@@ -191,9 +191,35 @@
                   本次没有抽取到要素，<b>术语归一没有可归的内容</b>（原因见上方提示）。
                 </template>
                 <template v-else>
-                  已按词典归一：实体显示为<b>标准术语</b>，灰色小字为归一前原文，鼠标悬停可看命中层级。
+                  已按词典归一：实体显示为<b>标准术语</b>，灰色小字是归一前的原文。
                 </template>
               </div>
+
+              <!-- 归一汇总（第九轮）：把「这次归一到底做了什么」摊成数字，并说清走的是 ES 索引
+                   还是内存词典兜底。此前只有一句「已按词典归一」，用户无法判断 ES 到底有没有生效，
+                   也无从知道命中了多少、未命中多少。 -->
+              <div v-if="normStat && normStat.total" class="norm-stat">
+                <div class="ns-line">
+                  有词典的实体共 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>，
+                  未命中 <b :class="{ bad: normStat.miss > 0 }">{{ normStat.miss }}</b>
+                  <span v-if="normStat.hit">
+                    （精确 {{ normStat.exact }} / 包含 {{ normStat.contain }} / 模糊 {{ normStat.fuzzy }}）
+                  </span>
+                </div>
+                <div class="ns-line">
+                  命中走的路径：ES 索引 <b>{{ normStat.es }}</b>，内存词典兜底
+                  <b :class="{ bad: normStat.memory > 0 }">{{ normStat.memory }}</b>
+                  <span v-if="normStat.noDict">
+                    ；另有 {{ normStat.noDict }} 个实体所在字段没有独立词典，不参与归一
+                  </span>
+                </div>
+                <div class="ns-legend">
+                  <span class="lg"><i class="dot solid"></i><span class="lg-t">实心标签＝这条实体怎么来的（模型抽取 / 规则兜底）</span></span>
+                  <span class="lg"><i class="dot hollow"></i><span class="lg-t">描边标签＝归一的命中方式与路径（如「精确命中·ES 索引」）</span></span>
+                  <span class="lg"><i class="dot none"></i><span class="lg-t">「置信 xx%」＝模型对这个片段的识别把握，<b>与归一无关</b>；规则兜底是确定性匹配，没有这个数</span></span>
+                </div>
+              </div>
+
               <StructuredDataCard v-if="result" :data="result" />
               <el-empty v-else description="尚未抽取" :image-size="80" />
 
@@ -229,8 +255,14 @@
                   <span class="nt-in">{{ normResult.term }}</span>
                   <span class="nt-arrow">→</span>
                   <span class="nt-out" :class="{ miss: !normResult.source }">{{ normResult.standardTerm }}</span>
+                  <!-- 试算也要说清「怎么比上的、走哪条路」：否则用户没法判断 ES 索引有没有生效 -->
                   <span class="nt-src">
-                    {{ normResult.source ? `命中词典 · ${normResult.source}` : '未命中词典，返回原词' }}
+                    <template v-if="normResult.source">
+                      命中词典 · {{ normResult.source }}
+                      <template v-if="normResult.level">· {{ LEVEL_FULL[normResult.level] || normResult.level }}</template>
+                      <template v-if="normResult.via">· 走 {{ VIA_TEXT[normResult.via] || normResult.via }}</template>
+                    </template>
+                    <template v-else>未命中词典，返回原词</template>
                   </span>
                 </div>
                 <div v-else class="nt-hint">
@@ -303,6 +335,7 @@ import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
+import { LEVEL_FULL, VIA_TEXT, summarizeNorm } from '@/utils/structured'
 
 const activeTab = ref('single')
 
@@ -500,6 +533,14 @@ const sourceNote = computed(() => {
   return '自动抽取未生效'
 })
 
+/**
+ * 归一汇总（第九轮）：命中多少、未命中多少、精确/包含/模糊各几条、走 ES 还是内存。
+ *
+ * <p>口径实现放在 {@code utils/structured.js}，与实体卡片共用同一份分区定义 ——
+ * 两处各写一份必然漂移。</p>
+ */
+const normStat = computed(() => summarizeNorm(result.value))
+
 // ===== 术语归一试算（UX-63 第七轮）=====
 /** 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射 */
 const NORM_TYPES = [
@@ -525,7 +566,10 @@ const runNormalize = async () => {
     normResult.value = {
       term,
       standardTerm: d.standardTerm || term,
-      source: d.source || ''
+      source: d.source || '',
+      level: d.level || 0,
+      // 归一途径由后端下发（ES 索引 / 内存词典），前端不猜
+      via: d.via || ''
     }
   } catch {
     // 拦截器已提示
@@ -644,18 +688,15 @@ onMounted(() => search(1))
 }
 .loaded-bar b { color: var(--ink); }
 /* 左栏（原文）给 1.5 份宽：3 列栅格才有可用宽度（UX-70）。
-   定高一屏（UX-70 第七轮，真机量测定值）：12 个字段都是带正文的长文本，
-   加上右侧对照区，整页在 1600×900 下量到 1033px、1366×768 下 997px，仍要下拉整页。
-   把对照区框在一屏内、滚动收到框内部之后：① 页面本身不再出现下拉条；
-   ② 左栏吸底的主操作条改成吸在这个框的底部，恒在视口内，不必滚到底再点「执行抽取」 */
+   第九轮改回「同页展开」：第七轮曾把滚动收到这个框内部（max-height + overflow:auto），
+   为的是整页不出下拉条；但用户明确不要这一层的上下滚动条 —— 框内滚动等于把内容切成
+   两个滚动上下文，找实体要滚两次。现在框不限高，内容自然撑开、由页面统一滚动，
+   与项目「长内容同页展开」的既有口径一致。左栏主操作条仍是 sticky bottom，滚动时恒在视口内。 */
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
-  max-height: calc(100vh - 385px);
-  min-height: 280px;
-  overflow: auto;
 }
 .pane { min-width: 0; }
 .pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 8px; }
@@ -677,6 +718,41 @@ onMounted(() => search(1))
   border-color: #e3c3bb;
   color: #8a3d33;
 }
+/* 归一汇总（第九轮）：把命中数、未命中数、走 ES 还是内存摊开 */
+.norm-stat {
+  font-size: 12px;
+  color: var(--text-sub);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 11px;
+  margin-bottom: 10px;
+  line-height: 1.8;
+}
+.norm-stat b { color: var(--ink); font-weight: bold; }
+/* 未命中 / 走了内存兜底都算「该看一眼」的数：前者说明词典没收，后者说明 ES 没兜住 */
+.norm-stat b.bad { color: var(--danger); }
+.ns-line + .ns-line { margin-top: 2px; }
+.ns-legend {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed #ece8dc;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11.5px;
+}
+.ns-legend .lg { display: flex; align-items: flex-start; gap: 5px; }
+/* 文案必须包在一个 span 里：.lg 是 flex 容器，裸文本节点与 <b> 会各自变成匿名 flex 项，
+   于是「…把握，| 与归一无关 | ；规则兜底…」被 gap 拆成三段、换行后断成三行 */
+.ns-legend .lg-t { flex: 1 1 auto; }
+.ns-legend b { color: var(--ink); }
+/* 图例上的小圆点：实心＝实体来源标签，空心＝归一标签，与卡片上的两种描边风格对应；
+   none 只占位对齐，第三行没有对应标签 */
+.dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 2px; margin-top: 5px; }
+.dot.solid { background: var(--ink-mid); }
+.dot.hollow { background: transparent; border: 1px solid var(--ochre); }
+.dot.none { background: transparent; }
 /* 无产出提示（UX-63 第七轮）：把「为什么没有结果」摆到填写区上方，不藏在空态里 */
 .nlp-off {
   background: #fdf6f4;
