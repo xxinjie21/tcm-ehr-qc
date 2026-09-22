@@ -7,10 +7,19 @@ import java.util.List;
 
 /**
  * NLP 抽取结果（批G·8.1，对应 openapi NlpExtractVO，结构同 StructuredData）。
- * 9 类实体 + modelAvailable（服务/模型是否可用，false 表示降级结果）。
+ * 9 类实体 + modelAvailable（服务/模型是否可用，false 表示降级结果）+ unavailableReason（降级原因）。
  */
 @Data
 public class NlpExtractVO {
+
+    /** 降级原因：抽取总开关未开启（服务端配置，页面上无法自助打开） */
+    public static final String REASON_DISABLED = "DISABLED";
+
+    /** 降级原因：开关已开但抽取服务连不上（未启动 / 中途停止 / 返回非 200 / 调用异常） */
+    public static final String REASON_UNREACHABLE = "SERVICE_UNREACHABLE";
+
+    /** 降级原因：服务在跑但模型未加载，本次仅规则兜底（舌象 / 脉象 / 病因 / 治法） */
+    public static final String REASON_MODEL_MISSING = "MODEL_MISSING";
 
     private List<Entity> diseases = new ArrayList<>();
     private List<Entity> symptoms = new ArrayList<>();
@@ -22,6 +31,16 @@ public class NlpExtractVO {
     private List<Entity> formulaList = new ArrayList<>();
     private List<Herb> herbs = new ArrayList<>();
     private boolean modelAvailable;
+
+    /**
+     * 降级原因（{@link #REASON_DISABLED} / {@link #REASON_UNREACHABLE} / {@link #REASON_MODEL_MISSING}）；
+     * 正常有产出时为 {@code null}。
+     *
+     * <p>第八轮之前只下发一个 {@code modelAvailable} 布尔值，「功能没开」与「服务挂了」在前端
+     * 无法区分，页面横幅只能写成「未开启，或抽取服务暂时不可用」，用户看不出该找谁、也不知道
+     * 能不能自助解决。这里把判定结果显式下发，前端即可按原因给不同的结论与下一步。</p>
+     */
+    private String unavailableReason;
 
     /** 降级空结果（服务未启动 / nlp.enabled=false） */
     public static NlpExtractVO empty() {

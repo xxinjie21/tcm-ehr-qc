@@ -628,6 +628,15 @@ components:
         modelAvailable:
           type: boolean
           description: NLP 服务/模型是否可用；false 表示为降级结果（可能仅规则兜底或为空）
+        unavailableReason:
+          type: string
+          nullable: true
+          enum: [DISABLED, SERVICE_UNREACHABLE, MODEL_MISSING]
+          description: >-
+            降级原因，正常有产出时为 null。DISABLED=抽取总开关未开启（需管理员在服务端开启，页面上无法自助打开）；
+            SERVICE_UNREACHABLE=开关已开但抽取服务连不上（未启动 / 中途停止 / 返回非 200 / 调用异常）；
+            MODEL_MISSING=服务在跑但模型未加载，本次仅规则兜底（舌象 / 脉象 / 病因 / 治法）。
+            前端据此把「为什么没有产出」说准，不再合写成「未开启，或抽取服务暂时不可用」。
     # ========== LLM 运行时配置 DTO / VO（UX-68） ==========
     LlmConfigDTO:
       type: object

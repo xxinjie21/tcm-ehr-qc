@@ -91,19 +91,41 @@
             <span v-else class="tip">请在上方「选择病历」列表中点选一份病历</span>
           </div>
 
-          <!-- 无产出时把原因讲清楚（UX-63 第七轮）：术语归一依赖上游实体，
-               没有实体就没有可归的内容，不能让用户以为「归一没执行」。
-               第八轮：这段是给用户看的，一律说人话 —— 配置项、端口、字段名等技术细节
+          <!-- 无产出时把原因讲清楚（UX-63 第七轮；第八轮按原因细分）：
+               术语归一依赖上游实体，没有实体就没有可归的内容，不能让用户以为「归一没执行」。
+               第七轮只能把「功能没开」与「服务挂了」合写成一句「未开启，或…」，用户看不出该找谁；
+               第八轮后端下发 unavailableReason，这里按原因分别给结论与下一步，四态各说一件事。
+               这段是给用户看的，一律说人话 —— 配置项、端口、字段名等技术细节
                已挪到后端 slf4j 日志（PythonNlpClient 启动时 warn 一次），此处不再出现。 -->
           <div v-if="emptyReason" class="nlp-off">
-            <template v-if="emptyReason === 'off'">
-              <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）。自动抽取功能当前未开启，
-              或抽取服务暂时不可用，所以没有产出内容。
-              这不是「术语归一」没执行 —— <b>归一一直在跑</b>，只是没有可归的要素。
-              需要开启请联系系统管理员；也可以先用下方「术语归一试算」直接查词典。
+            <template v-if="emptyReason === 'DISABLED'">
+              <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）——
+              自动抽取功能<b>当前还没有开启</b>，所以没有产出内容。
+              这不是「术语归一」没执行：<b>归一一直在跑</b>，只是没有可归的要素。
+              开启由系统管理员在服务端完成，页面上无法自助打开；在此之前可以先用下方
+              「术语归一试算」直接查词典。
+            </template>
+            <template v-else-if="emptyReason === 'SERVICE_UNREACHABLE'">
+              <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）——
+              自动抽取功能<b>已经开启，但抽取服务当前连不上</b>（服务可能未启动或中途停止了），
+              所以这次没有产出内容。这不是「术语归一」没执行：<b>归一一直在跑</b>，只是没有可归的要素。
+              请联系系统管理员恢复抽取服务后重试；也可以先用下方「术语归一试算」直接查词典。
+            </template>
+            <template v-else-if="emptyReason === 'MODEL_MISSING'">
+              <b>本次只识别出很少的要素</b> —— 抽取服务已经启动，但<b>模型没有加载成功</b>，
+              这次只跑了规则兜底（舌象、脉象、病因、治法）。这不是「术语归一」没执行：
+              <b>归一一直在跑</b>。请联系系统管理员检查抽取服务的模型文件。
+            </template>
+            <template v-else-if="emptyReason === 'UNKNOWN'">
+              <!-- 仅在后端未下发 unavailableReason（版本未同步）时出现：
+                   退回原先的合并说法，不冒充「原文没写要素」误导用户。 -->
+              <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）。
+              自动抽取功能当前未开启，或抽取服务暂时不可用，所以没有产出内容。
+              这不是「术语归一」没执行：<b>归一一直在跑</b>，只是没有可归的要素。
+              请联系系统管理员；也可以先用下方「术语归一试算」直接查词典。
             </template>
             <template v-else>
-              抽取已完成，但没有识别出可归一的要素（疾病、证候、症状、中药等）。
+              抽取已正常执行，但这段原文里没有识别出可归一的要素（疾病、证候、症状、中药等）。
               请确认原文是否写了主诉、四诊、辨证结论、用药等内容。
             </template>
           </div>
@@ -157,8 +179,10 @@
             <div class="pane">
               <div class="pane-hd">
                 抽取结果
+                <!-- 来源标注同样按原因细分（第八轮）：原先只有「模型抽取 + 规则补充」与
+                     「自动抽取未开启」两种，后者会把「服务连不上」也说成「未开启」。 -->
                 <span v-if="result" class="src-note" :class="{ warn: !result.modelAvailable }">
-                  {{ result.modelAvailable ? '模型抽取 + 规则补充' : '自动抽取未开启（本次无要素）' }}
+                  {{ sourceNote }}
                 </span>
               </div>
               <!-- 归一状态行（UX-63 第七轮）：明说「归一跑没跑、跑出了什么」 -->
@@ -430,17 +454,17 @@ const runExtract = async () => {
 }
 
 /**
- * 抽取无产出（UX-63 第七轮）。
+ * 抽取无产出（UX-63 第七轮；第八轮按原因细分）。
  *
  * <p>用户在第七轮再次提出「结构化解析也应该执行术语归一」。实测
- * {@code NlpController.extract()} 第 43 行确实调用了 {@code EntityNormalizer.normalize}，
- * 归一一直有跑；之所以看起来「没执行」，是因为 {@code nlp.enabled=false} 时上游
- * 只回空 9 类，归一没有可归的内容。所以这里把「有没有产出、为什么没有」直接讲出来，
- * 而不是让一片空白自己表达。</p>
+ * {@code NlpController.extract()} 确实调用了 {@code EntityNormalizer.normalize}，
+ * 归一一直有跑；之所以看起来「没执行」，是因为上游降级只回空 9 类，归一没有可归的内容。
+ * 所以这里把「有没有产出、为什么没有」直接讲出来，而不是让一片空白自己表达。</p>
  *
- * <p>第八轮补充：{@code modelAvailable} 只是一个布尔值，「配置没开」与「服务挂了」在前端
- * 无法区分，所以 'off' 分支的文案只能说「未开启，或服务暂时不可用」，不能断言其一。
- * 要让它说准需要后端多下发一个原因字段（本次未做）。</p>
+ * <p>第八轮：{@code modelAvailable} 只是一个布尔值，「功能没开」与「服务挂了」在前端无法区分，
+ * 文案只能写成「未开启，或抽取服务暂时不可用」，用户看不出该找谁、也不知道能不能自助解决。
+ * 后端现在下发 {@code unavailableReason}，这里按原因分开：开关没开要找管理员开、服务连不上要找
+ * 管理员恢复服务、模型没加载只出规则兜底、四者都不是则是原文确实没写要素。</p>
  */
 const ENTITY_KEYS = [
   'diseases', 'symptoms', 'tongueList', 'pulseList', 'patternList',
@@ -451,10 +475,29 @@ const resultEmpty = computed(() => {
   if (!r) return false
   return ENTITY_KEYS.every((k) => !(Array.isArray(r[k]) && r[k].length))
 })
-/** ''＝有产出；'off'＝NLP 未启用；'none'＝已启用但未识别出实体 */
+/**
+ * ''＝有产出；否则＝降级原因。
+ * 取值：DISABLED（开关没开）/ SERVICE_UNREACHABLE（服务连不上）/ MODEL_MISSING（模型未加载）
+ *      —— 这三个来自后端 unavailableReason；
+ *      NO_ENTITY（抽取正常，但原文确实没写要素）在前端判定；
+ *      UNKNOWN 只在后端未下发原因（版本未同步）时兜底，退回原先的合并说法。
+ */
 const emptyReason = computed(() => {
-  if (!result.value || !resultEmpty.value) return ''
-  return result.value.modelAvailable ? 'none' : 'off'
+  const r = result.value
+  if (!r || !resultEmpty.value) return ''
+  if (r.unavailableReason) return r.unavailableReason
+  return r.modelAvailable ? 'NO_ENTITY' : 'UNKNOWN'
+})
+
+/** 结果来源标注：按原因各说一句，避免把「服务连不上」也说成「未开启」 */
+const sourceNote = computed(() => {
+  const r = result.value
+  if (!r) return ''
+  if (r.modelAvailable) return '模型抽取 + 规则补充'
+  if (r.unavailableReason === 'MODEL_MISSING') return '仅规则兜底（模型未加载）'
+  if (r.unavailableReason === 'SERVICE_UNREACHABLE') return '自动抽取未生效（服务连不上）'
+  if (r.unavailableReason === 'DISABLED') return '自动抽取未开启'
+  return '自动抽取未生效'
 })
 
 // ===== 术语归一试算（UX-63 第七轮）=====

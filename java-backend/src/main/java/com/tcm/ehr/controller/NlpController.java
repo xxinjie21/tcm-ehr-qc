@@ -7,6 +7,7 @@ import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>返回前调用 {@link EntityNormalizer} 做术语归一（UX-63）：{@code content}=标准术语、
  * {@code sourceText}=归一前原文，命中层级随实体返回；无词典的 4 类（舌/脉/病因/治法）只保留原文。
  * 清洗链路的兜底补归一仍然保留，两者幂等、不会重复计数。</p>
+ *
+ * <p>降级时同时下发 {@code unavailableReason}（第八轮）：原先只有一个 {@code modelAvailable}
+ * 布尔值，页面横幅只能把「功能没开」与「服务挂了」合写成「未开启，或抽取服务暂时不可用」，
+ * 用户看不出该找谁。原因在这里判定 —— {@code nlp.enabled} 是静态配置，本类自己就能读，
+ * 不必改 {@link PythonNlpClient#extract} 的签名（该方法被导入链路共用）。</p>
  */
 @Slf4j
 @RestController
@@ -29,6 +35,10 @@ public class NlpController {
 
     private final PythonNlpClient nlpClient;
     private final EntityNormalizer entityNormalizer;
+
+    /** 与 {@link PythonNlpClient} 读同一个配置项，仅用于区分「没开」与「连不上」 */
+    @Value("${nlp.enabled:false}")
+    private boolean nlpEnabled;
 
     @PostMapping("/api/nlp/extract")
     public ResponseEntity<Result<NlpExtractVO>> extract(@RequestBody NlpExtractDTO dto) {
@@ -40,9 +50,20 @@ public class NlpController {
         if (vo == null) {
             // 上游未启用 / 不可用：降级为空 9 类（modelAvailable=false）。
             // 具体原因见 PythonNlpClient 的启动 warn 与调用期 warn/debug；
-            // 这里只记请求规模，便于把「哪次请求降级了」与上面那条日志对上。
-            log.debug("[NLP] 抽取降级为空 9 类（textLength={}），术语归一无可归内容", text.length());
-            return ResponseEntity.ok(Result.ok(NlpExtractVO.empty()));
+            // 这里只记请求规模与判定出的原因，便于把「哪次请求降级了」与上面那条日志对上。
+            String reason = nlpEnabled
+                    ? NlpExtractVO.REASON_UNREACHABLE
+                    : NlpExtractVO.REASON_DISABLED;
+            log.debug("[NLP] 抽取降级为空 9 类（textLength={}，reason={}），术语归一无可归内容",
+                    text.length(), reason);
+            NlpExtractVO empty = NlpExtractVO.empty();
+            empty.setUnavailableReason(reason);
+            return ResponseEntity.ok(Result.ok(empty));
+        }
+        if (!vo.isModelAvailable()) {
+            // 服务在跑但模型没加载：仍会返回规则兜底的少数类别，不算「没产出」，
+            // 但要让用户知道这次少了模型那一半。
+            vo.setUnavailableReason(NlpExtractVO.REASON_MODEL_MISSING);
         }
         EntityNormalizer.NormStat stat = entityNormalizer.normalize(vo);
         log.debug("[NLP] 抽取完成并归一：命中 {} 条（精确 {} / 包含 {} / 模糊 {}）",
