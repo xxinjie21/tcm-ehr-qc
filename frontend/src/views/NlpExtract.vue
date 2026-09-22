@@ -200,23 +200,25 @@
                    也无从知道命中了多少、未命中多少。 -->
               <div v-if="normStat && normStat.total" class="norm-stat">
                 <div class="ns-line">
-                  有词典的实体共 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>，
+                  有词典的实体 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>
+                  <span v-if="normStat.hit">（精确 {{ normStat.exact }} / 包含 {{ normStat.contain }} / 模糊 {{ normStat.fuzzy }}）</span>，
                   未命中 <b :class="{ bad: normStat.miss > 0 }">{{ normStat.miss }}</b>
-                  <span v-if="normStat.hit">
-                    （精确 {{ normStat.exact }} / 包含 {{ normStat.contain }} / 模糊 {{ normStat.fuzzy }}）
-                  </span>
                 </div>
                 <div class="ns-line">
-                  命中走的路径：ES 索引 <b>{{ normStat.es }}</b>，内存词典兜底
-                  <b :class="{ bad: normStat.memory > 0 }">{{ normStat.memory }}</b>
-                  <span v-if="normStat.noDict">
-                    ；另有 {{ normStat.noDict }} 个实体所在字段没有独立词典，不参与归一
-                  </span>
+                  <template v-if="viaMissing">
+                    命中路径：<b class="bad">后端尚未下发这项数据</b>（重启后端后即可看到走 ES 索引还是内存词典）
+                  </template>
+                  <template v-else>
+                    命中路径：ES 索引 <b>{{ normStat.es }}</b>，内存兜底
+                    <b :class="{ bad: normStat.memory > 0 }">{{ normStat.memory }}</b>
+                    <span v-if="normStat.noDict">；另有 {{ normStat.noDict }} 个实体所在字段无独立词典、不参与归一</span>
+                  </template>
                 </div>
+                <!-- 图例压到两行：分级这件事必须在页面上有一处权威解释，但不能占太多版面。
+                     原先三行、且没把「三档」这层关系写出来，用户看到「精确命中」不知道它是个分档 -->
                 <div class="ns-legend">
-                  <span class="lg"><i class="dot solid"></i><span class="lg-t">实心标签＝这条实体怎么来的（模型抽取 / 规则兜底）</span></span>
-                  <span class="lg"><i class="dot hollow"></i><span class="lg-t">描边标签＝归一的命中方式与路径（如「精确命中·ES 索引」）</span></span>
-                  <span class="lg"><i class="dot none"></i><span class="lg-t">「置信 xx%」＝模型对这个片段的识别把握，<b>与归一无关</b>；规则兜底是确定性匹配，没有这个数</span></span>
+                  <span class="lg"><i class="dot solid"></i><span class="lg-t">实心标签＝来源（模型抽取 / 规则兜底）；「置信 xx%」是模型对该片段的识别把握，<b>与归一无关</b></span></span>
+                  <span class="lg"><i class="dot hollow"></i><span class="lg-t">描边标签＝归一结果，命中分三档、可靠度 <b>精确 ＞ 包含 ＞ 模糊</b>；后缀是命中走的路径（ES / 内存）；「未收录」＝词典里没这个词</span></span>
                 </div>
               </div>
 
@@ -541,6 +543,17 @@ const sourceNote = computed(() => {
  */
 const normStat = computed(() => summarizeNorm(result.value))
 
+/**
+ * 有命中、却一条途径数据都没有 —— 说明后端还没下发 {@code normVia}（跑的是改前后的版本）。
+ *
+ * <p>不能直接渲染成「ES 索引 0，内存兜底 0」：那样看起来像「15 次命中哪条路都没走」，
+ * 用户会以为归一坏了。必须说清是「这项数据后端还没给」，并给出可执行的下一步。</p>
+ */
+const viaMissing = computed(() => {
+  const s = normStat.value
+  return !!s && s.hit > 0 && s.es + s.memory === 0
+})
+
 // ===== 术语归一试算（UX-63 第七轮）=====
 /** 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射 */
 const NORM_TYPES = [
@@ -687,14 +700,24 @@ onMounted(() => search(1))
   margin-bottom: 14px;
 }
 .loaded-bar b { color: var(--ink); }
-/* 左栏（原文）给 1.5 份宽：3 列栅格才有可用宽度（UX-70）。
+/* 左栏（原文）给 1.25 份宽（第九轮实测校准，原为 1.5）。
    第九轮改回「同页展开」：第七轮曾把滚动收到这个框内部（max-height + overflow:auto），
    为的是整页不出下拉条；但用户明确不要这一层的上下滚动条 —— 框内滚动等于把内容切成
    两个滚动上下文，找实体要滚两次。现在框不限高，内容自然撑开、由页面统一滚动，
-   与项目「长内容同页展开」的既有口径一致。左栏主操作条仍是 sticky bottom，滚动时恒在视口内。 */
+   与项目「长内容同页展开」的既有口径一致。左栏主操作条仍是 sticky bottom，滚动时恒在视口内。
+
+   比例为何从 1.5 收到 1.25（Edge 实测两档视口）：
+   - 左栏高度对宽度不敏感 —— 799→666px 区间内左表单恒为 545px（1366 下 517px），收窄它没有代价；
+   - 右栏的实体卡高度对宽度极敏感 —— 1366 下右栏 439px 宽时 sd-card 高达 1056px，488px 宽即降到
+     701px 并触底（标签不再反复折行）；1600 下 533px 宽本来已触底，加宽无收益。
+   - 1.25 是拐点：再往下（1.1 / 1.0）右栏只再降 20~40px，却把左栏压得过窄。
+   实测效果（已注入 normVia，即后端重启后的真实状态）：
+     1366 下两栏高度差 808 → 429px；1600 下 404 → 381px；两档 sd-card 均落在 701px 地板值。
+   注意：右栏比左栏高是内容量差异（21 个实体 + 归一汇总 + 归一试算，对 12 个字段的表单），
+   不可能靠比例抹平；这里只把「因宽度不足而白折的行」消掉。 */
 .split {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }

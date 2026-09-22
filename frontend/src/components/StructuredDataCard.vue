@@ -62,7 +62,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, VIA_TEXT, entityName, pct } from '@/utils/structured'
+import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, VIA_TEXT, VIA_SHORT, entityName, pct } from '@/utils/structured'
 
 const props = defineProps({
   data: { type: [String, Object], default: null }
@@ -101,10 +101,10 @@ const emptyHint = computed(() => (neverParsed.value
   ? '这份病历还没有跑过结构化抽取。可在「结构化解析」页载入该病历后点「执行抽取」，结果会写入这里。'
   : '抽取已经执行过，只是这段原文里没有可归一的要素（疾病 / 症状 / 证候 / 方剂 / 中药等）。'))
 
-/** 实体上的归一标签文案：命中方式 + 走哪条路；未命中说「未收录」 */
+/** 实体上的归一标签文案：命中方式 + 走哪条路（途径用短写法，见 VIA_SHORT 的注释）；未命中说「未收录」 */
 const lvText = (it) => {
   if (!it.normLevel) return '未收录'
-  const via = it.normVia ? `·${VIA_TEXT[it.normVia] || it.normVia}` : ''
+  const via = it.normVia ? `·${VIA_SHORT[it.normVia] || it.normVia}` : ''
   return `${LEVEL_SHORT[it.normLevel] || it.normLevel}${via}`
 }
 /** 描边颜色：命中按精确度分三级，未收录走中性灰 —— 灰的是「没查到」，
@@ -122,6 +122,11 @@ const tpTitle = (sec, it) => {
 /**
  * 悬停明细。**保证任何实体都至少有两行**——之前这里在「原文与标准词相同且未命中」时
  * 直接返回空串，导致舌象 / 脉象 / 病因 / 治法 四类实体完全没有悬停信息。
+ *
+ * <p>行数刻意压到 4 行以内（原先是 8 行：归一 / 怎么比的 / 走哪条路 / 词典来源 / 国标代码 /
+ * 原文片段 / 来源 / 置信度）。合并方式：「走哪条路」并进「归一」一行；「词典来源 + 国标代码」
+ * 合成「依据」；「来源 + 置信度」合成一行；「原文片段」本来就已经写在标题的「原文 → 标准词」里，
+ * 不再重复。三档分级与置信度的含义移到结果区图例统一说明，这里不逐条复述。</p>
  */
 const tpRows = (sec, it) => {
   const rows = []
@@ -131,25 +136,25 @@ const tpRows = (sec, it) => {
   if (!sec.dict) {
     rows.push({ k: '归一', v: '该字段没有独立词典，不做归一，保留原文' })
   } else if (it.normLevel) {
-    rows.push({ k: '归一', v: `已命中词典，${LEVEL_FULL[it.normLevel] || it.normLevel}` })
+    const via = it.normVia ? ` · 走 ${VIA_TEXT[it.normVia] || it.normVia}` : ''
+    rows.push({ k: '归一', v: `${LEVEL_FULL[it.normLevel] || it.normLevel}${via}` })
     rows.push({ k: '怎么比的', v: levelDesc(it.normLevel, raw, name) })
-    rows.push({ k: '走哪条路', v: it.normVia ? VIA_TEXT[it.normVia] || it.normVia : '—' })
-    if (it.normSource) rows.push({ k: '词典来源', v: it.normSource })
-    if (it.normCode) rows.push({ k: '国标代码', v: it.normCode })
+    if (it.normSource) {
+      rows.push({ k: '依据', v: it.normCode ? `${it.normSource}（${it.normCode}）` : it.normSource })
+    }
   } else {
     rows.push({ k: '归一', v: '未命中词典，按原文返回' })
   }
 
-  if (raw && raw !== name) rows.push({ k: '原文片段', v: raw })
-
-  rows.push({
-    k: '来源',
-    v: it.source === 'rule' ? '规则兜底（确定性匹配，无置信度）' : '模型抽取'
-  })
-  if (it.confidence != null) {
-    rows.push({ k: '置信度', v: `${pct(it.confidence)}（模型对这个片段的识别把握，与归一无关）` })
-  }
+  rows.push({ k: '来源', v: sourceLine(it) })
   return rows
+}
+
+/** 来源行：模型抽取带置信度；规则兜底是确定性匹配，没有置信度可言 */
+const sourceLine = (it) => {
+  if (it.source === 'rule') return '规则兜底（确定性匹配，没有置信度）'
+  const c = pct(it.confidence)
+  return c ? `模型抽取 · 置信 ${c}` : '模型抽取'
 }
 
 /** 把「精确/包含/模糊」翻成「跟谁比、怎么比上的」 */
