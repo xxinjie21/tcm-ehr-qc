@@ -7,9 +7,12 @@
       </el-select>
     </div>
     <div class="rf-item">
-      <label for="rf-date">就诊时间</label>
+      <!-- 范围选择器内部是「两个 input」，所以 id 必须是两个 id 的数组：
+           传字符串会触发 element-plus 的 prop 类型告警（PickerRangeTrigger 的 id 只收 Array）。
+           label 只能关联其中一个控件，取起始那个 -->
+      <label for="rf-date-start">就诊时间</label>
       <el-date-picker
-        id="rf-date"
+        :id="['rf-date-start', 'rf-date-end']"
         v-model="inner.dateRange"
         type="daterange"
         value-format="YYYY-MM-DD"

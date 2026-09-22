@@ -111,9 +111,10 @@
           </el-select>
         </div>
         <div>
-          <label for="ex-date">就诊时间</label>
+          <!-- 同 RangeFilter：范围选择器的 id 必须传数组（内部两个 input） -->
+          <label for="ex-date-start">就诊时间</label>
           <el-date-picker
-            id="ex-date"
+            :id="['ex-date-start', 'ex-date-end']"
             v-model="filters.dateRange"
             type="daterange"
             value-format="YYYY-MM-DD"
