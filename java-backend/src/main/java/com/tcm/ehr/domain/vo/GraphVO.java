@@ -22,6 +22,17 @@ public class GraphVO {
     private String hint;
     /** 各类节点计数（图例/统计） */
     private Map<String, Integer> counts = new LinkedHashMap<>();
+    /**
+     * 本次聚合范围内<b>被规则表覆盖到</b>的证候名（可能为空）。
+     *
+     * <p>用来把「判过、确实没冲突」与「根本没规则可判」区分开：{@code LogicChecker.RULES}
+     * 只覆盖少数证候，未覆盖的证候按设计<b>不判冲突</b>（不误杀）。若这个列表为空，
+     * 则 {@code edges} 里必然没有 rule / conflict 边，此时对用户说「证候与治法一致」是
+     * 把「没判」说成了「没问题」——前端据此换文案。</p>
+     *
+     * <p>只下发「命中到的证候名」，不下发整张规则表，避免规则口径在两处各写一份。</p>
+     */
+    private List<String> coveredPatterns = new ArrayList<>();
 
     @Data
     public static class Node {

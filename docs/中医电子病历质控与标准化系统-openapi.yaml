@@ -944,6 +944,14 @@ components:
               type: integer
             herb:
               type: integer
+        coveredPatterns:
+          type: array
+          items:
+            type: string
+          description: >-
+            本次聚合范围内被规则表覆盖到的证候名（可能为空）。规则表只覆盖少数常见证候，
+            未覆盖的证候按设计不判冲突（不误杀）；若该数组为空，则 edges 中必然没有
+            rule / conflict 边，前端应据此把文案从「证候与治法一致」改为「无可判规则」。
     # ========== 复核 DTO / VO ==========
     ReviewTaskVO:
       type: object

@@ -15,7 +15,8 @@
       <div class="qc-filter">
         <div class="qc-actions">
           <!-- 默认画全量关系图（UX-72）：演示数据的证候都不在 LogicChecker.RULES 覆盖范围内，
-               规则边与冲突边恒为 0，默认「冲突定位」会让画布与空态都不渲染 -->
+               规则边与冲突边恒为 0，默认「冲突定位」会让画布与空态都不渲染。
+               后端已回 coveredPatterns 标明「本范围有没有可判的证候」，见下方 no-conflict 文案 -->
           <el-radio-group v-model="graphMode" size="small">
             <el-radio-button value="full">全量关系</el-radio-button>
             <el-radio-button value="conflict">冲突定位</el-radio-button>
@@ -27,12 +28,22 @@
 
       <div v-if="graph.truncated" class="trunc-hint">{{ graph.hint }}</div>
 
-      <!-- 冲突定位模式下无冲突：直接给结论，不画一张空图 -->
+      <!-- 冲突定位模式下无冲突：直接给结论，不画一张空图。
+           但「没有冲突边」有两种成因，必须分开说：
+           ① 有证候被规则表覆盖 → 判过、确实一致；
+           ② 一个都没被覆盖 → 根本没判，此时说「证候与治法一致」是把「没做」说成「没问题」，
+              与前面修的「抽取未开启」降级文案是同一类问题。 -->
       <div
         v-if="graphMode === 'conflict' && !graphLoading && graph.nodes.length && !conflictEdges.length"
         class="no-conflict"
       >
-        范围内未发现规则冲突（证候与治法 / 方剂一致）。
+        <template v-if="graph.coveredPatterns.length">
+          范围内未发现规则冲突（证候与治法 / 方剂一致）。
+        </template>
+        <template v-else>
+          范围内没有可判的规则，无法判断证候与治法 / 方剂是否一致 ——
+          这不代表检查通过。规则表只覆盖少数常见证候，其余证候按设计不判冲突（避免误报）。
+        </template>
         <el-button link type="primary" @click="graphMode = 'full'">查看全量关系图</el-button>
       </div>
 
@@ -40,8 +51,11 @@
       <div v-if="visibleGraph.nodes.length" class="graph-summary">
         <span class="gsum"><b>{{ graphSummary.records }}</b> 份病历涉及冲突</span>
         <span class="gsum"><b>{{ graphSummary.nodes }}</b> 个实体节点</span>
+        <!-- 冲突计数：本范围无证候被规则表覆盖时，摆一个「0 处规则冲突」等于把「没判」
+             说成「没问题」，这里改成直说「无规则可判」 -->
         <span class="gsum" :class="{ bad: graphSummary.conflicts > 0 }">
-          <b>{{ graphSummary.conflicts }}</b> 处规则冲突
+          <template v-if="graph.coveredPatterns.length"><b>{{ graphSummary.conflicts }}</b> 处规则冲突</template>
+          <template v-else>本范围无规则可判</template>
         </span>
         <span class="gsum-hint">
           {{ graphMode === 'full'
@@ -151,7 +165,14 @@
           <ul v-if="detail.logicConflicts && detail.logicConflicts.length" class="conflicts">
             <li v-for="c in detail.logicConflicts" :key="c">{{ c }}</li>
           </ul>
-          <div v-else class="ok">未发现逻辑冲突</div>
+          <!-- 空结果不能说成「没问题」：规则表只覆盖少数常见证候，未覆盖的证候按设计不判冲突，
+               所以这里空白的成因有两种（判过、确实一致 / 根本没判）。本弹窗只有评分接口的
+               logicConflicts，拿不到「本病历是否被规则覆盖」，故文案只说「未报冲突」+ 说明边界，
+               不做「一致」的断言（图谱侧有 coveredPatterns，可以判得更细）。 -->
+          <div v-else class="ok">
+            规则引擎未报冲突
+            <span class="tip">规则表只覆盖少数常见证候，未覆盖的证候不判冲突；此处空白不等于已核对</span>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -205,7 +226,10 @@ const params = () => {
   }
 }
 
-const graph = reactive({ nodes: [], edges: [], truncated: false, hint: '' })
+// coveredPatterns：本次范围内「被规则表覆盖到」的证候名。
+// 规则表只覆盖少数常见证候，未覆盖的证候按设计不判冲突 —— 所以「0 冲突」有两种含义：
+// ① 判过、确实一致；② 根本没有规则可判。靠这个数组区分，避免把后者说成「一致」。
+const graph = reactive({ nodes: [], edges: [], truncated: false, hint: '', coveredPatterns: [] })
 const graphLoading = ref(false)
 
 /** 视图模式：全量关系（默认，UX-72）/ 冲突定位（UX-53） */
@@ -275,7 +299,11 @@ const graphLabel = computed(() => {
   const v = visibleGraph.value
   if (!v.nodes.length) return '质控图谱，暂无数据'
   const conflicts = v.edges.filter((e) => e.type === 'conflict').length
-  return `质控关系图谱：${v.nodes.length} 个节点、${v.edges.length} 条关系，其中冲突 ${conflicts} 条`
+  // 读屏用户同样听不到「没判」与「没问题」的区别，这里补一句
+  const tail = conflicts === 0 && !graph.coveredPatterns.length
+    ? '，本范围无规则可判'
+    : `，其中冲突 ${conflicts} 条`
+  return `质控关系图谱：${v.nodes.length} 个节点、${v.edges.length} 条关系${tail}`
 })
 
 /** 结论条数据：把图里的规模与冲突数直接摆出来（UX-53） */
@@ -296,6 +324,7 @@ const loadGraph = async () => {
     graph.edges = d.edges || []
     graph.truncated = !!d.truncated
     graph.hint = d.hint || ''
+    graph.coveredPatterns = d.coveredPatterns || []
   } catch {
     // 拦截器已提示
   } finally {

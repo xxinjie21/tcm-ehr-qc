@@ -357,6 +357,12 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             for (LogicChecker.Rule rule : LogicChecker.rules()) {
                 String p = firstMatch(patterns, rule.pattern());
                 if (p == null) continue;
+                // 记下「这个证候被规则表覆盖到了」（不依赖它是否进入 200 节点上限）：
+                // 规则表只覆盖少数证候，未覆盖的不判冲突（不误杀）。前端据此区分
+                // 「判过、确实没冲突」与「根本没规则可判」，避免把后者说成「证候与治法一致」。
+                if (!vo.getCoveredPatterns().contains(p)) {
+                    vo.getCoveredPatterns().add(p);
+                }
                 String pid = "pattern:" + p;
                 if (!selected.contains(pid)) continue;
                 for (String t : treatments) {

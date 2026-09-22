@@ -53,3 +53,6 @@ nodejs-global/
 
 # AI 工具目录（非项目代码）
 .workbuddy-ai/
+# 旧版工具目录：只剩一份 2026-09-19 的工作日志，内容已被 .workbuddy-ai/memory/ 取代。
+# 一直没被忽略，git status 里长期挂着一个未跟踪目录；这里补上（文件本身仍在本地）。
+.workbuddy/
