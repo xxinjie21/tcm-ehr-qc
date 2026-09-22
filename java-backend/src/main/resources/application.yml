@@ -81,7 +81,11 @@ nlp:
   service-url: http://localhost:8001
   timeout: 30000            # 毫秒
   extract-on-import: true   # 批G·8.3：病历导入入库后自动抽取写 structured_data（仅 enabled=true 时生效）
-  convert-enabled: false    # 词典 PDF 智能转换子开关（② LLM 即 ETL）；依赖 llm.enabled=true，关闭时 PDF 上传提示走离线脚本/JSON 直传
+  convert-enabled: true     # 词典 PDF 智能转换子开关（② LLM 即 ETL；2026-09-22 由 false 改为 true）。
+                            # 改 true 是为了让「导入 LLM = AI 功能都开」成立：原先它默认关闭且页面上
+                            # 无法自助打开，管理员导入 LLM 后上传 PDF 仍报错，报错文案还暴露配置项名。
+                            # 它仍是独立开关（单独关掉的能力保留），只是默认开；真正的总控是 llm.enabled，
+                            # llm 未开启时 PDF 上传仍回 400，但文案改为说人话、不再提配置项名。
 
 # LLM 增强（Spring AI 2.0；provider 二选一：ollama 本机 / openai 及兼容三方）
 # 默认关闭，口径与 nlp.enabled 一致：关闭或调用失败时回退规则兜底，不阻塞主流程。

@@ -225,17 +225,21 @@ public class DictionaryServiceImpl implements IDictionaryService {
         ConvertPreviewVO vo = new ConvertPreviewVO();
         vo.setType(type);
 
-        // 双开关：llm.enabled 总控 + nlp.convert-enabled 子控。关闭属「预期内不可用」，
-        // 用 IllegalArgumentException 让 GlobalExceptionHandler 回 400 + 明确文案（而非 500 系统异常）
+        // 双开关：llm.enabled 总控 + nlp.convert-enabled 子控（子控默认已开）。
+        // 关闭属「预期内不可用」，用 IllegalArgumentException 让 GlobalExceptionHandler 回 400 +
+        // 明确文案（而非 500 系统异常）。
+        // 文案一律说人话、不出现配置项名：用户看到 llm.enabled / nlp.convert-enabled 只会
+        // 以为是配置文件的问题，而这两个开关在页面上本来就打不开，说了也解决不了。
         if (!llmClient.isEnabled() || !convertEnabled) {
             throw new IllegalArgumentException(
-                    "PDF 智能转换未启用（需同时开启 llm.enabled 与 nlp.convert-enabled）。"
-                            + "可改用 JSON 直传，或用离线脚本 tools/convert-standard-pdf.py 转换后导入。");
+                    "PDF 智能转换未启用 —— 需要先开启 AI 能力：请让系统管理员在「导入 LLM」里"
+                            + "填写通道与密钥并保存，之后即可直接上传 PDF。"
+                            + "也可以改用 JSON 直传，或用离线脚本 tools/convert-standard-pdf.py 转换后导入。");
         }
         if (!llmClient.isAvailable()) {
             throw new IllegalArgumentException(
-                    "LLM 通道不可用（provider=" + llmClient.provider() + "），无法智能转换。"
-                            + "请检查 llm 配置，或改用 JSON 直传 / 离线脚本。");
+                    "AI 服务当前连不上，无法智能转换。请让系统管理员确认 AI 服务已启动、"
+                            + "配置填写正确后重试；也可以改用 JSON 直传 / 离线脚本。");
         }
 
         String text = extractPdfText(file);

@@ -52,8 +52,8 @@ public class DictionaryController {
     /**
      * PDF 智能转换（国标 PDF 免手工转 JSON）：上传 PDF → 抽文本 → LLM 提取候选 → 返回预览。
      * <b>预览不落库</b>，管理员确认后再走 {@code /import} 入库。
-     * 开关关闭（llm.enabled / nlp.convert-enabled 任一为 false）时回 HTTP 400 + 友好提示，
-     * 引导走离线脚本或 JSON 直传；【权限：仅管理员】
+     * AI 能力未开启（总控 llm.enabled 关闭）或通道连不上时回 HTTP 400 + 友好提示，
+     * 引导走离线脚本或 JSON 直传；提示文案不出现配置项名；【权限：仅管理员】
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/convert")
