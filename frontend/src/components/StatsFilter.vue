@@ -1,19 +1,22 @@
 <template>
   <section class="filter">
     <span class="cap">统计范围</span>
+    <!-- 视觉标签必须带 for 才能关联到控件：只写 <label> 文本的话，
+         Chrome 的 Issues 面板会对下面每个控件报「No label associated with a form field」。
+         单个控件用 id + for（成组控件不能用 for，见 Governance 的单选按钮组） -->
     <div>
-      <label>开单科室</label>
-      <el-select v-model="model.department" placeholder="全部科室" clearable style="width: 150px">
+      <label for="sf-department">开单科室</label>
+      <el-select id="sf-department" v-model="model.department" placeholder="全部科室" clearable style="width: 150px">
         <el-option v-for="d in departments" :key="d" :label="d" :value="d" />
       </el-select>
     </div>
     <div>
-      <label>就诊起始</label>
-      <el-date-picker v-model="model.start" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
+      <label for="sf-start">就诊起始</label>
+      <el-date-picker id="sf-start" v-model="model.start" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
     </div>
     <div>
-      <label>就诊截止</label>
-      <el-date-picker v-model="model.end" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
+      <label for="sf-end">就诊截止</label>
+      <el-date-picker id="sf-end" v-model="model.end" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
     </div>
     <el-button type="primary" size="small" @click="$emit('search')">查 询</el-button>
     <el-button size="small" @click="$emit('reset')">重置为全部</el-button>

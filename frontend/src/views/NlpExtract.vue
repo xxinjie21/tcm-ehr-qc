@@ -178,12 +178,16 @@
               <div class="norm-tool">
                 <div class="nt-hd">术语归一试算（直查词典，不依赖 NLP 服务）</div>
                 <div class="nt-row">
-                  <el-select v-model="normType" size="small" style="width: 116px">
+                  <!-- 这一行只有 placeholder、没有视觉标签，补 aria-label 让屏幕阅读器
+                       与 Chrome 的「No label associated with a form field」检查能认出它们
+                       （placeholder 不算无障碍名称） -->
+                  <el-select v-model="normType" size="small" aria-label="词典类型" style="width: 116px">
                     <el-option v-for="t in NORM_TYPES" :key="t.value" :label="t.label" :value="t.value" />
                   </el-select>
                   <el-input
                     v-model="normTerm"
                     size="small"
+                    aria-label="待归一的术语"
                     placeholder="如：脾肾阳虚"
                     clearable
                     @keyup.enter="runNormalize"

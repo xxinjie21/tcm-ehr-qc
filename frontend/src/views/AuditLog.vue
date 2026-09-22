@@ -2,11 +2,14 @@
   <div>
     <PanelCard title="操作日志">
       <div class="filter-row">
-        <el-select v-model="query.action" placeholder="操作类型" clearable style="width: 150px">
+        <!-- 这两个控件只有 placeholder、没有视觉标签，补 aria-label
+             （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
+        <el-select v-model="query.action" aria-label="操作类型" placeholder="操作类型" clearable style="width: 150px">
           <el-option v-for="a in actionOptions" :key="a" :label="a" :value="a" />
         </el-select>
         <el-input
           v-model="query.keyword"
+          aria-label="操作人 / 对象关键字"
           placeholder="操作人 / 对象关键字"
           clearable
           style="width: 240px"

@@ -3,8 +3,10 @@
     <!-- ① 待复核任务列表 -->
     <PanelCard title="待复核任务列表">
       <div class="rv-bar">
+        <!-- 这里的视觉标签是普通 span（不是 <label for>），控件本身没有无障碍名称，
+             Chrome 会报「No label associated with a form field」；补 aria-label 即可 -->
         <span>状态</span>
-        <el-select v-model="status" size="small" style="width: 130px" @change="load(1)">
+        <el-select v-model="status" size="small" aria-label="状态" style="width: 130px" @change="load(1)">
           <el-option label="待复核" value="待复核" />
           <el-option label="已完成" value="已完成" />
         </el-select>

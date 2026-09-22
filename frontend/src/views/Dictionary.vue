@@ -10,8 +10,11 @@
 
     <PanelCard :title="`术语查询（${typeLabel}）`">
       <div class="search-row">
+        <!-- 只给 placeholder 的搜索框没有无障碍名称，补 aria-label
+             （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
         <el-input
           v-model="keyword"
+          aria-label="术语查询"
           placeholder="输入术语或别名关键字，模糊匹配"
           clearable
           style="width: 320px"
