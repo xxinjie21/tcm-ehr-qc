@@ -68,7 +68,7 @@ public class DictionaryController {
         return ResponseEntity.ok(Result.ok(vo));
     }
 
-    /** 只读查询/自动补全（内存词典，标准词+别名关键字模糊匹配） */
+    /** 只读查询/自动补全（读词典 JSON 文件，标准词+别名关键字模糊匹配） */
     @GetMapping("/terms")
     public ResponseEntity<Result<Map<String, Object>>> terms(@RequestParam("type") String type,
                                                              @RequestParam(value = "keyword", required = false) String keyword)

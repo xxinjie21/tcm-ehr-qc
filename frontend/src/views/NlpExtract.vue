@@ -200,9 +200,8 @@
                 </template>
               </div>
 
-              <!-- 归一汇总（第九轮）：把「这次归一到底做了什么」摊成数字，并说清走的是 ES 索引
-                   还是内存词典兜底。此前只有一句「已按词典归一」，用户无法判断 ES 到底有没有生效，
-                   也无从知道命中了多少、未命中多少。 -->
+              <!-- 归一汇总：把「这次归一到底做了什么」摊成数字。此前只有一句「已按词典归一」，
+                   用户既不知道命中了多少、未命中多少，也无从判断归一到底跑没跑。 -->
               <div v-if="normStat && normStat.total" class="norm-stat">
                 <div class="ns-line">
                   有词典的实体 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>
@@ -749,7 +748,7 @@ onMounted(() => search(1))
   line-height: 1.8;
 }
 .norm-stat b { color: var(--ink); font-weight: bold; }
-/* 未命中 / 走了内存兜底都算「该看一眼」的数：前者说明词典没收，后者说明 ES 没兜住 */
+/* 未命中数算「该看一眼」的数：命中率偏低说明词典没收这个词，用户可能要补词典 */
 .norm-stat b.bad { color: var(--danger); }
 .ns-line + .ns-line { margin-top: 2px; }
 .ns-legend {

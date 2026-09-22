@@ -13,7 +13,7 @@ import java.util.Map;
  */
 public interface IDictionaryService {
 
-    /** 术语查询：内存词典标准词/别名关键字模糊匹配 */
+    /** 术语查询：读词典 JSON 文件，标准词/别名关键字模糊匹配 */
     List<Map<String, Object>> searchTerms(String type, String keyword) throws IOException;
 
     /** 词典导入：解析 -> 去重合并 -> 备份 -> 写文件 -> 刷内存/ES */
