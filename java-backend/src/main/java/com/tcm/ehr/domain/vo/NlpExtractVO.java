@@ -63,8 +63,6 @@ public class NlpExtractVO {
         private String normSource;
         /** 国标代码，词典未收录则为 null */
         private String normCode;
-        /** 归一途径：ES（ES 索引召回后判定命中）/ MEMORY（ES 未召回或未命中，回退内存词典命中）；未命中为 null */
-        private String normVia;
     }
 
     @Data
@@ -80,7 +78,5 @@ public class NlpExtractVO {
         private String normSource;
         /** 国标代码，词典未收录则为 null */
         private String normCode;
-        /** 归一途径：ES（ES 索引召回后判定命中）/ MEMORY（ES 未召回或未命中，回退内存词典命中）；未命中为 null */
-        private String normVia;
     }
 }

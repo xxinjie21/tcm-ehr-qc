@@ -2,7 +2,7 @@ package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
-import com.tcm.ehr.common.utils.DictionaryStore;
+import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.service.IDictionaryService;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.vo.ConvertPreviewVO;
@@ -39,7 +39,7 @@ public class DictionaryController {
     @PostMapping("/import")
     public ResponseEntity<Result<ImportResultVO>> importDict(@RequestParam("file") MultipartFile file,
                                                              @RequestParam("type") String type) throws IOException {
-        if (!DictionaryStore.TYPES.contains(type)) {
+        if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         // 文件格式不支持等 IllegalArgumentException 由 GlobalExceptionHandler 统一返回 400
@@ -59,7 +59,7 @@ public class DictionaryController {
     @PostMapping("/convert")
     public ResponseEntity<Result<ConvertPreviewVO>> convert(@RequestParam("file") MultipartFile file,
                                                            @RequestParam("type") String type) throws IOException {
-        if (!DictionaryStore.TYPES.contains(type)) {
+        if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         ConvertPreviewVO vo = dictionaryService.convertFromPdf(type, file);
@@ -73,7 +73,7 @@ public class DictionaryController {
     public ResponseEntity<Result<Map<String, Object>>> terms(@RequestParam("type") String type,
                                                              @RequestParam(value = "keyword", required = false) String keyword)
             throws IOException {
-        if (!DictionaryStore.TYPES.contains(type)) {
+        if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         return ResponseEntity.ok(Result.ok(Map.of("terms", dictionaryService.searchTerms(type, keyword))));
@@ -85,7 +85,7 @@ public class DictionaryController {
     public ResponseEntity<Result<Void>> rollback(@RequestBody Map<String, String> body) throws IOException {
         String type = body.get("type");
         String backupFilename = body.get("backupFilename");
-        if (!DictionaryStore.TYPES.contains(type)) {
+        if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         if (backupFilename == null || !dictionaryService.backupExists(type, backupFilename)) {
@@ -99,7 +99,7 @@ public class DictionaryController {
     /** 备份版本列表 */
     @GetMapping("/backups")
     public ResponseEntity<Result<Map<String, Object>>> backups(@RequestParam("type") String type) throws IOException {
-        if (!DictionaryStore.TYPES.contains(type)) {
+        if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         return ResponseEntity.ok(Result.ok(Map.of("backups", dictionaryService.listBackups(type))));

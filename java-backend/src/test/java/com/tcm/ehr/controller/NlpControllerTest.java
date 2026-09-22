@@ -66,11 +66,9 @@ class NlpControllerTest {
 
         EsTermNormalizer termNormalizer = mock(EsTermNormalizer.class);
         when(termNormalizer.normalize("symptom", "咽痛"))
-                .thenReturn(new EsTermNormalizer.NormalizeResult("咽喉痛", "中医症状词典", 3, null,
-                        EsTermNormalizer.VIA_ES));
+                .thenReturn(new EsTermNormalizer.NormalizeResult("咽喉痛", "中医症状词典", 3, null));
         when(termNormalizer.normalize("herb", "双花"))
-                .thenReturn(new EsTermNormalizer.NormalizeResult("金银花", "中药词典", 1, "GS-001",
-                        EsTermNormalizer.VIA_MEMORY));
+                .thenReturn(new EsTermNormalizer.NormalizeResult("金银花", "中药词典", 1, "GS-001"));
 
         ResponseEntity<Result<NlpExtractVO>> resp =
                 controller(client, termNormalizer).extract(dto("咽痛"));
@@ -81,21 +79,17 @@ class NlpControllerTest {
         assertEquals("咽痛", symptom.getSourceText());
         assertEquals(Integer.valueOf(3), symptom.getNormLevel());
         assertEquals("中医症状词典", symptom.getNormSource());
-        // 归一途径要原样透出：ES 索引命中与内存兜底命中必须可区分
-        assertEquals(EsTermNormalizer.VIA_ES, symptom.getNormVia());
 
         NlpExtractVO.Herb herb = out.getHerbs().get(0);
         assertEquals("金银花", herb.getName());
         assertEquals("双花", herb.getSourceText());
         assertEquals(Integer.valueOf(1), herb.getNormLevel());
         assertEquals("GS-001", herb.getNormCode());
-        assertEquals(EsTermNormalizer.VIA_MEMORY, herb.getNormVia());
 
-        // 无词典字段：content 不动、不标命中级别、不带归一途径
+        // 无词典字段：content 不动、不标命中级别
         assertEquals("舌红", out.getTongueList().get(0).getContent());
         assertEquals("舌红", out.getTongueList().get(0).getSourceText());
         assertNull(out.getTongueList().get(0).getNormLevel());
-        assertNull(out.getTongueList().get(0).getNormVia());
     }
 
     private NlpExtractVO.Entity entity(String text) {

@@ -185,6 +185,11 @@
                   {{ sourceNote }}
                 </span>
               </div>
+              <!-- 抽取整体失败（当前主要是术语索引不可用 → 503）：就地留痕，不只是一个会消失的 toast -->
+              <div v-if="extractError" class="nlp-off">
+                <b>本次抽取没有完成</b> —— {{ extractError }}
+                抽取与术语归一依赖 ES 术语索引，索引不可用时不会退化成「全部未收录」，请处理后再重试。
+              </div>
               <!-- 归一状态行（UX-63 第七轮）：明说「归一跑没跑、跑出了什么」 -->
               <div v-if="result" class="norm-note" :class="{ warn: !!emptyReason }">
                 <template v-if="emptyReason">
@@ -203,22 +208,14 @@
                   有词典的实体 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>
                   <span v-if="normStat.hit">（精确 {{ normStat.exact }} / 包含 {{ normStat.contain }} / 模糊 {{ normStat.fuzzy }}）</span>，
                   未命中 <b :class="{ bad: normStat.miss > 0 }">{{ normStat.miss }}</b>
+                  <span v-if="normStat.noDict">；另有 {{ normStat.noDict }} 个实体所在字段无独立词典、不参与归一</span>
                 </div>
                 <div class="ns-line">
-                  <template v-if="viaMissing">
-                    命中路径：<b class="bad">后端尚未下发这项数据</b>（重启后端后即可看到走 ES 索引还是内存词典）
-                  </template>
-                  <template v-else>
-                    命中路径：ES 索引 <b>{{ normStat.es }}</b>，内存兜底
-                    <b :class="{ bad: normStat.memory > 0 }">{{ normStat.memory }}</b>
-                    <span v-if="normStat.noDict">；另有 {{ normStat.noDict }} 个实体所在字段无独立词典、不参与归一</span>
-                  </template>
+                  归一由 <b>ES 术语索引</b> 提供（ES 是唯一权威，没有内存兜底）；<b>索引不可用时抽取会直接失败并说明原因</b>，不会静默把词判成「未收录」。
                 </div>
-                <!-- 图例压到两行：分级这件事必须在页面上有一处权威解释，但不能占太多版面。
-                     原先三行、且没把「三档」这层关系写出来，用户看到「精确命中」不知道它是个分档 -->
                 <div class="ns-legend">
                   <span class="lg"><i class="dot solid"></i><span class="lg-t">实心标签＝来源（模型抽取 / 规则兜底）；「置信 xx%」是模型对该片段的识别把握，<b>与归一无关</b></span></span>
-                  <span class="lg"><i class="dot hollow"></i><span class="lg-t">描边标签＝归一结果，命中分三档、可靠度 <b>精确 ＞ 包含 ＞ 模糊</b>；后缀是命中走的路径（ES / 内存）；「未收录」＝词典里没这个词</span></span>
+                  <span class="lg"><i class="dot hollow"></i><span class="lg-t">描边标签＝归一结果，命中分三档、可靠度 <b>精确 ＞ 包含 ＞ 模糊</b>；「未收录」＝词典里没这个词</span></span>
                 </div>
               </div>
 
@@ -257,12 +254,11 @@
                   <span class="nt-in">{{ normResult.term }}</span>
                   <span class="nt-arrow">→</span>
                   <span class="nt-out" :class="{ miss: !normResult.source }">{{ normResult.standardTerm }}</span>
-                  <!-- 试算也要说清「怎么比上的、走哪条路」：否则用户没法判断 ES 索引有没有生效 -->
+                  <!-- 试算也要说清「怎么比上的」：否则用户没法判断是精确命中还是猜的 -->
                   <span class="nt-src">
                     <template v-if="normResult.source">
                       命中词典 · {{ normResult.source }}
                       <template v-if="normResult.level">· {{ LEVEL_FULL[normResult.level] || normResult.level }}</template>
-                      <template v-if="normResult.via">· 走 {{ VIA_TEXT[normResult.via] || normResult.via }}</template>
                     </template>
                     <template v-else>未命中词典，返回原词</template>
                   </span>
@@ -337,7 +333,7 @@ import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
-import { LEVEL_FULL, VIA_TEXT, summarizeNorm } from '@/utils/structured'
+import { LEVEL_FULL, summarizeNorm } from '@/utils/structured'
 
 const activeTab = ref('single')
 
@@ -434,6 +430,14 @@ const composedText = computed(() => ALL_KEYS
 const text = ref('')
 const result = ref(null)
 const extracting = ref(false)
+/**
+ * 抽取整体失败的原因（当前最主要的一种：术语索引不可用 → 后端 503）。
+ *
+ * <p>归一自 2026-09-23 起只认 ES 索引、不再有内存兜底，索引挂掉会让抽取<b>整体失败</b>而不是
+ * 返回一份全是「未收录」的结果。只弹一个几秒就消失的 toast 用户很容易错过，所以就地留一条，
+ * 直到下次抽取成功才清掉。</p>
+ */
+const extractError = ref('')
 
 const canSave = computed(() => !!recordId.value && !!result.value)
 
@@ -454,6 +458,7 @@ const loadRecord = async (row) => {
       d.visitTime ? String(d.visitTime).replace('T', ' ').substring(0, 16) : '']
       .filter(Boolean).join(' · ')
     result.value = null
+    extractError.value = ''
     text.value = composedText.value
     activeTab.value = 'single'
   } catch {
@@ -470,19 +475,23 @@ const closeDetail = () => {
   loadedMeta.value = ''
   Object.assign(fields, emptyFields())
   result.value = null
+  extractError.value = ''
   text.value = ''
 }
 
 const runExtract = async () => {
   extracting.value = true
+  extractError.value = ''
   try {
     const res = await extractNlp({ text: composedText.value })
     result.value = res.data
     if (!res.data.modelAvailable) {
       ElMessage.warning('本次没有抽取到病历要素，术语归一没有可归的内容')
     }
-  } catch {
-    // 拦截器已提示
+  } catch (e) {
+    // 拦截器已弹过 toast；这里再就地留一条 —— 503（术语索引不可用）是关键故障，不该只靠 toast
+    extractError.value = apiErrorMessage(e, '抽取失败')
+    result.value = null
   } finally {
     extracting.value = false
   }
@@ -543,17 +552,6 @@ const sourceNote = computed(() => {
  */
 const normStat = computed(() => summarizeNorm(result.value))
 
-/**
- * 有命中、却一条途径数据都没有 —— 说明后端还没下发 {@code normVia}（跑的是改前后的版本）。
- *
- * <p>不能直接渲染成「ES 索引 0，内存兜底 0」：那样看起来像「15 次命中哪条路都没走」，
- * 用户会以为归一坏了。必须说清是「这项数据后端还没给」，并给出可执行的下一步。</p>
- */
-const viaMissing = computed(() => {
-  const s = normStat.value
-  return !!s && s.hit > 0 && s.es + s.memory === 0
-})
-
 // ===== 术语归一试算（UX-63 第七轮）=====
 /** 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射 */
 const NORM_TYPES = [
@@ -580,9 +578,7 @@ const runNormalize = async () => {
       term,
       standardTerm: d.standardTerm || term,
       source: d.source || '',
-      level: d.level || 0,
-      // 归一途径由后端下发（ES 索引 / 内存词典），前端不猜
-      via: d.via || ''
+      level: d.level || 0
     }
   } catch {
     // 拦截器已提示

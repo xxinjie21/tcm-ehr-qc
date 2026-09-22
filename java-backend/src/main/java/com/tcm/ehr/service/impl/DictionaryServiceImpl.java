@@ -1,7 +1,7 @@
 package com.tcm.ehr.service.impl;
 
-import com.tcm.ehr.common.utils.DictionaryStore;
 import com.tcm.ehr.common.utils.LlmClient;
+import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ConvertPreviewVO;
 import com.tcm.ehr.domain.vo.ImportResultVO;
@@ -47,7 +47,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
     private static final int MAX_TEXT_CHARS = 20000;
 
     private final IDictionaryFileService fileService;
-    private final DictionaryStore store;
     private final IEsTermIndexService esTermIndexService;
     private final ObjectMapper objectMapper;
     private final LlmClient llmClient;
@@ -63,11 +62,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     @Override
     public List<Map<String, Object>> searchTerms(String type, String keyword) throws IOException {
-        List<TermEntry> entries = store.get(type);
-        if (entries.isEmpty()) {
-            entries = fileService.read(type);
-            store.put(type, entries);
-        }
+        // 词典列表直接读 JSON 文件（原先借 DictionaryStore 当文件缓存）。
+        // DictionaryStore 已随「归一不再内存兜底」删除；这里每次读一次文件 ——
+        // 全词典仅 131 条、文件十几 KB，且本方法只服务术语词典页的列表/搜索，代价可忽略。
+        List<TermEntry> entries = fileService.read(type);
         List<Map<String, Object>> result = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
         for (TermEntry e : entries) {
@@ -106,7 +104,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
         List<TermEntry> entries = new ArrayList<>(merged.values());
         String backupName = fileService.backup(type);
         fileService.write(type, entries);
-        store.put(type, entries);
         esTermIndexService.rebuild(type, entries);
 
         ImportResultVO vo = new ImportResultVO();
@@ -327,7 +324,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
     public void rollback(String type, String backupFilename) throws IOException {
         fileService.restore(type, backupFilename);
         List<TermEntry> entries = fileService.read(type);
-        store.put(type, entries);
         esTermIndexService.rebuild(type, entries);
         log.info("[词典] {} 回滚到 {}，现有{}条", type, backupFilename, entries.size());
     }

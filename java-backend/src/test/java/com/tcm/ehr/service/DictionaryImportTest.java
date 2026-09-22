@@ -2,7 +2,6 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.common.config.LlmProperties;
-import com.tcm.ehr.common.utils.DictionaryStore;
 import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
@@ -46,14 +45,12 @@ class DictionaryImportTest {
     private static final String TYPE = "symptom";
 
     private IDictionaryFileService fileService;
-    private DictionaryStore store;
     private IEsTermIndexService esIndex;
     private DictionaryServiceImpl service;
 
     @BeforeEach
     void setUp() throws IOException {
         fileService = Mockito.mock(IDictionaryFileService.class);
-        store = new DictionaryStore();
         esIndex = Mockito.mock(IEsTermIndexService.class);
         when(fileService.read(anyString())).thenReturn(List.of());
         when(fileService.backup(anyString())).thenReturn("symptoms.json.bak_test");
@@ -66,7 +63,7 @@ class DictionaryImportTest {
         LlmProperties props = new LlmProperties();
         props.setEnabled(llmEnabled);
         LlmClient client = new LlmClient(new LlmConfigStore(props));
-        DictionaryServiceImpl s = new DictionaryServiceImpl(fileService, store, esIndex,
+        DictionaryServiceImpl s = new DictionaryServiceImpl(fileService, esIndex,
                 new ObjectMapper(), client);
         ReflectionTestUtils.setField(s, "convertEnabled", convertEnabled);
         return s;
@@ -233,15 +230,20 @@ class DictionaryImportTest {
         assertTrue(e.getMessage().contains("文件格式不支持"), e.getMessage());
     }
 
-    /** 导入确实走完「备份 -> 写文件 -> 刷内存 -> 重建ES」四步 */
+    /** 导入确实走完「备份 -> 写文件 -> 重建ES」三步 */
     @Test
-    void import_shouldBackupWriteRefreshAndRebuild() throws IOException {
+    void import_shouldBackupWriteAndRebuild() throws IOException {
         service.importDictionary(TYPE, json("d.json", "[{\"standardTerm\":\"喉痹\"}]"));
 
         Mockito.verify(fileService).backup(TYPE);
         Mockito.verify(fileService).write(Mockito.eq(TYPE), any());
-        Mockito.verify(esIndex).rebuild(Mockito.eq(TYPE), any());
-        assertEquals(1, store.size(TYPE));
+
+        // 归一已改为只认 ES 索引，所以「导入的新词能不能归上」全看这一步：
+        // 断言灌进索引的就是刚导入的那条，而不是只断言 rebuild 被调用过
+        ArgumentCaptor<List<TermEntry>> captor = ArgumentCaptor.forClass(List.class);
+        Mockito.verify(esIndex).rebuild(Mockito.eq(TYPE), captor.capture());
+        assertEquals(1, captor.getValue().size());
+        assertEquals("喉痹", captor.getValue().get(0).getStandardTerm());
     }
 
     // ---------------------------------------------------------------- PDF 转换兜底

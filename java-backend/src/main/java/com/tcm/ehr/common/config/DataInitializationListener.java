@@ -1,7 +1,7 @@
 package com.tcm.ehr.common.config;
 
 import com.tcm.ehr.service.IDictionaryFileService;
-import com.tcm.ehr.common.utils.DictionaryStore;
+import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.service.IEsTermIndexService;
 import com.tcm.ehr.domain.po.TermEntry;
 import lombok.RequiredArgsConstructor;
@@ -13,13 +13,15 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
  * 启动监听器：
  * 1. 验证Redis/ES连接
- * 2. 加载data/dictionaries/*.json -> 内存缓存 + ES索引重建（术语库"提前内置"）
+ * 2. 加载data/dictionaries/*.json -> ES索引重建（术语库"提前内置"）
+ *
+ * <p>2026-09-23 起不再往内存里塞一份词典缓存 —— 归一改为只认 ES 索引，
+ * 加载只做「文件 -> ES」这一步。</p>
  */
 @Slf4j
 @Component
@@ -28,7 +30,6 @@ public class DataInitializationListener implements ApplicationRunner {
 
     private final StringRedisTemplate redisTemplate;
     private final IDictionaryFileService fileService;
-    private final DictionaryStore store;
     private final IEsTermIndexService esTermIndexService;
     private final RestHighLevelClient esClient;
 
@@ -45,38 +46,44 @@ public class DataInitializationListener implements ApplicationRunner {
         }
 
         // 2. 验证ES连接
+        //    必须 catch Exception，不能只 catch IOException：ES 连不上时 ping 抛的是
+        //    ElasticsearchException（unchecked，内部包着 ExecutionException / ConnectException），
+        //    只抓 IOException 会让它一路冒到 SpringApplication，把整个启动炸掉（实测过）。
+        //    ES 不可用应当是「归一不可用」（接口返回 503 说明原因），而不是「系统起不来」。
         try {
             boolean ping = esClient.ping(RequestOptions.DEFAULT);
             log.info("[ES] 连接成功: ping={}", ping);
-        } catch (IOException e) {
-            log.warn("[ES] 连接失败: {}", e.getMessage());
+        } catch (Exception e) {
+            log.warn("[ES] 连接失败: {} —— 术语索引不可用，归一相关接口将返回 503", e.getMessage());
         }
 
         // 3. MySQL数据源
         log.info("[MySQL] 数据源已配置（tcm_ehr@localhost:3306）");
 
-        // 4. 术语库加载（提前内置）：JSON文件 -> 内存缓存 -> ES索引重建
+        // 4. 术语库加载（提前内置）：JSON文件 -> ES索引重建
         loadDictionaries();
 
         log.info("========== 系统启动初始化完成 ==========");
     }
 
     /**
-     * 加载四类词典：读文件、刷内存缓存、重建ES索引
+     * 加载五类词典：读文件、重建 ES 索引。
+     *
+     * <p>ES 重建失败只记日志、不让启动失败 —— 但要注意此时归一整体不可用（会返回 503），
+     * 日志里必须能看出是哪一类、什么原因。</p>
      */
     private void loadDictionaries() {
-        for (String type : DictionaryStore.TYPES) {
+        for (String type : TermTypes.ALL) {
             try {
                 List<TermEntry> entries = fileService.read(type);
                 if (entries.isEmpty()) {
                     log.warn("[词典] {} 词典文件为空或不存在，跳过（可到术语词典页导入）", type);
                     continue;
                 }
-                store.put(type, entries);
                 esTermIndexService.rebuild(type, entries);
                 log.info("[词典] {} 加载 {} 条术语", type, entries.size());
             } catch (Exception e) {
-                log.error("[词典] {} 加载失败: {}", type, e.getMessage());
+                log.error("[词典] {} 加载失败（该类术语的归一将不可用）: {}", type, e.getMessage());
             }
         }
     }

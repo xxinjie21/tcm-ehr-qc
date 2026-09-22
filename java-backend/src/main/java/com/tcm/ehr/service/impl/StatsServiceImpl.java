@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import com.tcm.ehr.common.utils.DictionaryStore;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
@@ -15,11 +14,13 @@ import com.tcm.ehr.domain.vo.OverviewVO;
 import com.tcm.ehr.domain.vo.StatsAllVO;
 import com.tcm.ehr.domain.vo.StatsVO;
 import com.tcm.ehr.mapper.RecordMapper;
+import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.IStatsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,7 +44,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     private static final List<String> SCORE_BUCKETS = List.of("90+", "80-89", "70-79", "60-69", "60以下");
 
     private final ObjectMapper objectMapper;
-    private final DictionaryStore dictionaryStore;
+    private final IDictionaryFileService fileService;
 
     @Override
     public List<String> departments() {
@@ -152,13 +153,31 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             vo.getScoreDistribution().add(b);
         });
 
-        // ④ 词典规模（5 类术语数量）
-        vo.getDictionary().put("disease", dictionaryStore.size("disease"));
-        vo.getDictionary().put("symptom", dictionaryStore.size("symptom"));
-        vo.getDictionary().put("pattern", dictionaryStore.size("pattern"));
-        vo.getDictionary().put("herb", dictionaryStore.size("herb"));
-        vo.getDictionary().put("formula", dictionaryStore.size("formula"));
+        // ④ 词典规模（5 类术语数量）：读词典文件，见 termCount
+        vo.getDictionary().put("disease", termCount("disease"));
+        vo.getDictionary().put("symptom", termCount("symptom"));
+        vo.getDictionary().put("pattern", termCount("pattern"));
+        vo.getDictionary().put("herb", termCount("herb"));
+        vo.getDictionary().put("formula", termCount("formula"));
         return vo;
+    }
+
+    /**
+     * 某类术语条数：直接读词典 JSON 文件（原先读 {@code DictionaryStore} 的内存缓存）。
+     *
+     * <p>DictionaryStore 已随「归一不再内存兜底」删除，这里改读同一个数据源 ——
+     * <b>JSON 文件才是词典的真源</b>，ES 只是它的检索副本。刻意<b>不</b>改成查 ES 的 _count：
+     * 那样看板会因 ES 不可用而连「词典规模」这种静态信息都拿不到，而改造前看板并不依赖 ES。</p>
+     *
+     * <p>读文件失败时返回 <b>-1</b> 而不是 0 —— 0 会被读成「词典是空的」，属于另一种误导。</p>
+     */
+    private int termCount(String type) {
+        try {
+            return fileService.read(type).size();
+        } catch (IOException e) {
+            log.warn("[统计] {} 词典读取失败，词条数按 -1 上报: {}", type, e.getMessage());
+            return -1;
+        }
     }
 
     /** 按数据域 + 用户筛选取病历（看板扩展口径） */

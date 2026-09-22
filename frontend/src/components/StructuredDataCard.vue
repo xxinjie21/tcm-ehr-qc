@@ -62,7 +62,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, VIA_TEXT, VIA_SHORT, entityName, pct } from '@/utils/structured'
+import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, entityName, pct } from '@/utils/structured'
 
 const props = defineProps({
   data: { type: [String, Object], default: null }
@@ -101,12 +101,8 @@ const emptyHint = computed(() => (neverParsed.value
   ? '这份病历还没有跑过结构化抽取。可在「结构化解析」页载入该病历后点「执行抽取」，结果会写入这里。'
   : '抽取已经执行过，只是这段原文里没有可归一的要素（疾病 / 症状 / 证候 / 方剂 / 中药等）。'))
 
-/** 实体上的归一标签文案：命中方式 + 走哪条路（途径用短写法，见 VIA_SHORT 的注释）；未命中说「未收录」 */
-const lvText = (it) => {
-  if (!it.normLevel) return '未收录'
-  const via = it.normVia ? `·${VIA_SHORT[it.normVia] || it.normVia}` : ''
-  return `${LEVEL_SHORT[it.normLevel] || it.normLevel}${via}`
-}
+/** 实体上的归一标签文案：命中方式；未命中说「未收录」 */
+const lvText = (it) => (it.normLevel ? LEVEL_SHORT[it.normLevel] || it.normLevel : '未收录')
 /** 描边颜色：命中按精确度分三级，未收录走中性灰 —— 灰的是「没查到」，
     红黄是「查到了但可能不准」，两者不该同色 */
 const lvClass = (it) => (it.normLevel ? `lv${it.normLevel}` : 'lv0')
@@ -136,8 +132,7 @@ const tpRows = (sec, it) => {
   if (!sec.dict) {
     rows.push({ k: '归一', v: '该字段没有独立词典，不做归一，保留原文' })
   } else if (it.normLevel) {
-    const via = it.normVia ? ` · 走 ${VIA_TEXT[it.normVia] || it.normVia}` : ''
-    rows.push({ k: '归一', v: `${LEVEL_FULL[it.normLevel] || it.normLevel}${via}` })
+    rows.push({ k: '归一', v: LEVEL_FULL[it.normLevel] || it.normLevel })
     rows.push({ k: '怎么比的', v: levelDesc(it.normLevel, raw, name) })
     if (it.normSource) {
       rows.push({ k: '依据', v: it.normCode ? `${it.normSource}（${it.normCode}）` : it.normSource })

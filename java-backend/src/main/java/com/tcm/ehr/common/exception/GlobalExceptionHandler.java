@@ -56,6 +56,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Result.error(1009, e.getMessage()));
     }
 
+    /**
+     * 术语索引不可用 -> HTTP 503 + code=1010。
+     *
+     * <p>归一自 2026-09-23 起只认 ES 索引、没有内存兜底，所以这条路径必须显式报出来：
+     * 若按「未命中」处理，页面上会显示成「词典里没收录这个词」，把服务故障说成词典缺词。</p>
+     */
+    @ExceptionHandler(TermIndexUnavailableException.class)
+    public ResponseEntity<Result<Void>> handleTermIndexUnavailable(TermIndexUnavailableException e) {
+        log.error("[全局异常] 术语索引不可用: {}", e.getMessage(), e);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Result.error(1010, e.getMessage()));
+    }
+
     /** 资源不存在（病历 ID 无效等） -> HTTP 404 + 业务错误码（默认 1006） */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Result<Void>> handleNotFound(ResourceNotFoundException e) {

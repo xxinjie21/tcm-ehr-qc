@@ -26,8 +26,13 @@ public interface IEsTermIndexService {
      * 候选召回（宽松，宁可多召回）：精确(标准词/别名) + 分词命中(标准词/别名) 的 OR 组合。
      *
      * <p>只负责「把可能相关的词条捞出来」，<b>判定不在这里做</b>——命中与否由
-     * {@link com.tcm.ehr.common.utils.EsTermNormalizer} 按三级规则 + Dice 阈值决定。
-     * 召回是近似的，因此调用方必须保留内存兜底。</p>
+     * {@link com.tcm.ehr.common.utils.EsTermNormalizer} 按三级规则 + Dice 阈值决定。</p>
+     *
+     * <p><b>召回是近似的，而本索引现在是归一的唯一权威</b>（2026-09-23 起不再有内存兜底）：
+     * 未召回即视为未命中。ES 不可用时本方法抛 {@link java.io.IOException}，
+     * 由 {@link com.tcm.ehr.common.utils.EsTermNormalizer} 包装成
+     * {@link com.tcm.ehr.common.exception.TermIndexUnavailableException} 返回 503，
+     * <b>不要在这里吞掉异常或返回空列表</b> —— 那会把「索引挂了」伪装成「词典没这个词」。</p>
      *
      * @param type          术语类型
      * @param input         输入词

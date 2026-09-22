@@ -173,7 +173,6 @@ public class EntityNormalizer {
             herb.setNormLevel(r.level());
             herb.setNormSource(r.source());
             herb.setNormCode(r.code());
-            herb.setNormVia(r.via());
             stat[0]++;
             stat[r.level()]++;
         }
@@ -206,7 +205,6 @@ public class EntityNormalizer {
             e.setNormLevel(r.level());
             e.setNormSource(r.source());
             e.setNormCode(r.code());
-            e.setNormVia(r.via());
             stat[0]++;
             stat[r.level()]++;
         }
