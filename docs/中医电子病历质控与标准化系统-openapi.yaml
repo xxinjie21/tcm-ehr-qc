@@ -2407,7 +2407,7 @@ paths:
       tags:
         - 词典管理
       summary: 术语库 PDF 智能转换（预览）
-      description: 【权限：仅管理员】上传国标 PDF，抽取文本后由 LLM 提取术语候选；不写入术语库，确认后再调 /api/dictionary/import 入库。AI 能力未开启（llm.enabled 关闭）或通道连不上时返回 400；提示文案不出现配置项名（nlp.convert-enabled 自 2026-09-22 起默认开启）
+      description: 【权限：仅管理员】上传国标 PDF，抽取文本后由 LLM 提取术语候选；不写入术语库，确认后再调 /api/dictionary/import 入库。AI 能力未开启（llm.enabled 关闭）或通道连不上时返回 400；提示文案不出现配置项名（llm.convert-enabled 自 2026-09-22 起默认开启）
       requestBody:
         required: true
         content:

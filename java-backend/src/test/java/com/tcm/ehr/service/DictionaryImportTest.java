@@ -246,7 +246,7 @@ class DictionaryImportTest {
 
     // ---------------------------------------------------------------- PDF 转换兜底
 
-    /** 开关关闭（llm.enabled 与 nlp.convert-enabled 均 false）：回友好文案而非 500 */
+    /** 开关关闭（llm.enabled 与 llm.convert-enabled 均 false）：回友好文案而非 500 */
     @Test
     void convertWhenDisabled_shouldGiveFriendlyMessage() {
         MultipartFile pdf = new MockMultipartFile("file", "gb.pdf", "application/pdf",

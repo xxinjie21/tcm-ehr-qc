@@ -20,7 +20,13 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "llm")
 public class LlmProperties {
 
-    /** LLM 总开关（文档「AI 开关三清单」中的 llm.enabled；子开关 nlp.convert-enabled 依赖它） */
+    /**
+     * LLM 总开关（文档「AI 开关三清单」中的 llm.enabled；子开关 llm.convert-enabled 依赖它）。
+     *
+     * <p>注意：这里只是<b>启动基线</b>，运行时会被 {@code LlmConfigStore}（页面上「导入 LLM」）覆盖。
+     * {@code llm.convert-enabled} 刻意不并进本类 —— 它是静态 {@code @Value}、改完要重启，
+     * 与本类「可被运行时覆盖的连接参数」不是一套机制。</p>
+     */
     private boolean enabled = false;
 
     /** 通道：{@code ollama}（本机，无需 api-key）或 {@code openai}（OpenAI 及兼容三方网关） */
