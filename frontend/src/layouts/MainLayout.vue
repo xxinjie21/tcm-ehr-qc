@@ -235,8 +235,6 @@ main {
   min-width: 0;
   /* 长页内部滚动：main 铺满整宽，滚动条贴窗最右（不再因内容居中而偏左）；
      文档层不出现滚动条 → 通栏且切页不偏移 */
-  display: flex;
-  flex-direction: column;
   overflow-y: auto;
   padding: 16px 20px 84px;
   /* 给右下角 AI 助手悬浮球留出安全间距，避免遮挡表格底部内容（UX-46） */
