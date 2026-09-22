@@ -5,7 +5,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 /**
  * 实体术语归一（UX-63）：把抽取出的 9 类实体就地归一到国标标准术语。
@@ -21,6 +25,11 @@ import java.util.List;
  *
  * <p><b>为什么不下推判定到 ES</b>：与 {@link EsTermNormalizer} 一致——ES 只负责召回候选，
  * 精确 / 包含 / 字符 Dice≥0.8 三级判定仍在 Java 侧完成。</p>
+ *
+ * <p><b>同标准词去重（第八轮）</b>：归一本身会把不同原文折叠到同一标准词上——原文里同时有
+ * 「嗳气」与「嗳气频作」时，后者按「包含命中」也归成「嗳气」，于是列表里出现两个一模一样的
+ * 「嗳气」，用户会以为系统出错。{@link #dedupByTerm} 是<b>唯一去重口径</b>，解析链路与清洗链路
+ * 共用（与 {@link #dictionaryType} 同一思路：口径只写一处，避免两处漂移）。</p>
  */
 @Slf4j
 @Component
@@ -62,6 +71,75 @@ public class EntityNormalizer {
         };
     }
 
+    /**
+     * 同一标准词只留一条代表（唯一去重口径，解析链路与清洗链路共用）。
+     *
+     * <p><b>去重范围＝调用方给的那一个列表</b>，即<b>字段内</b>，不跨字段——「风寒」同时出现在
+     * 疾病与病因是两个不同的语义槽位，各自保留。</p>
+     *
+     * <p><b>保留哪一条</b>（依次比较，先满足者胜）：
+     * ① {@code sourceText} 更长优先——原文更完整（「嗳气频作」优于「嗳气」），
+     * 且「原文 → 标准词」的对照才看得见，否则归一结果看起来什么都没发生；
+     * ② 等长时 {@code normLevel} 更小优先（1 精确 &lt; 2 包含 &lt; 3 模糊 &lt; 未命中）；
+     * ③ 再相等时保留<b>先出现</b>的那条（{@link LinkedHashMap} 保序，重复键 put 不改位置）。</p>
+     *
+     * <p>代表条目<b>整条</b>保留自己的 confidence，不跨条取最大值——置信度描述的是它那条 span，
+     * 拼装会让数字与展示的原文对不上。</p>
+     *
+     * <p>术语键为空的条目<b>不参与合并</b>（各自用唯一键占位）——否则所有缺 content 的条目
+     * 会被并成一条。</p>
+     *
+     * @param items      待去重列表，可为 null
+     * @param termOf     取「归一后标准词」；为空则该条不参与合并
+     * @param sourceOf   取「归一前原文」，用于比较完整性
+     * @param levelOf    取「命中层级」，可为 null（未命中）
+     * @return 去重后的新列表；{@code items} 为 null 或不足 2 条时原样返回
+     */
+    public static <T> List<T> dedupByTerm(List<T> items,
+                                          Function<T, String> termOf,
+                                          Function<T, String> sourceOf,
+                                          Function<T, Integer> levelOf) {
+        if (items == null || items.size() < 2) {
+            return items;
+        }
+        Map<String, T> kept = new LinkedHashMap<>();
+        int blankSeq = 0;
+        for (T item : items) {
+            if (item == null) {
+                continue;
+            }
+            String term = termOf.apply(item);
+            // 术语为空：用唯一键占位，保证「不参与合并」而不是「全部并成一条」
+            String key = (term == null || term.isBlank()) ? "\u0000" + (blankSeq++) : term;
+            T prev = kept.get(key);
+            if (prev == null || isMoreRepresentative(item, prev, sourceOf, levelOf)) {
+                kept.put(key, item);
+            }
+        }
+        return new ArrayList<>(kept.values());
+    }
+
+    /** 见 {@link #dedupByTerm} 的「保留哪一条」：① 原文更长 ② 层级更精确 ③ 先出现者胜 */
+    private static <T> boolean isMoreRepresentative(T candidate, T current,
+                                                    Function<T, String> sourceOf,
+                                                    Function<T, Integer> levelOf) {
+        int lc = lengthOf(sourceOf.apply(candidate));
+        int lp = lengthOf(sourceOf.apply(current));
+        if (lc != lp) {
+            return lc > lp;
+        }
+        return rankOf(levelOf.apply(candidate)) < rankOf(levelOf.apply(current));
+    }
+
+    /** 命中层级排序权重：1 精确 &lt; 2 包含 &lt; 3 模糊 &lt; 未命中（null） */
+    private static int rankOf(Integer level) {
+        return level == null ? 4 : level;
+    }
+
+    private static int lengthOf(String s) {
+        return s == null ? 0 : s.length();
+    }
+
     /** 就地归一抽取结果中的 7 类 Entity 与 herbs，返回命中统计 */
     public NormStat normalize(NlpExtractVO vo) {
         if (vo == null) {
@@ -70,14 +148,14 @@ public class EntityNormalizer {
         int[] stat = {0, 0, 0, 0};
 
         // 7 类 Entity 走同一字段→类型映射；无词典的 4 类只回填 sourceText（供前端展示原文）
-        normEntities(vo.getDiseases(), "diseases", stat);
-        normEntities(vo.getSymptoms(), "symptoms", stat);
-        normEntities(vo.getTongueList(), "tongueList", stat);
-        normEntities(vo.getPulseList(), "pulseList", stat);
-        normEntities(vo.getPatternList(), "patternList", stat);
-        normEntities(vo.getCauseList(), "causeList", stat);
-        normEntities(vo.getTreatmentList(), "treatmentList", stat);
-        normEntities(vo.getFormulaList(), "formulaList", stat);
+        vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat));
+        vo.setSymptoms(normEntities(vo.getSymptoms(), "symptoms", stat));
+        vo.setTongueList(normEntities(vo.getTongueList(), "tongueList", stat));
+        vo.setPulseList(normEntities(vo.getPulseList(), "pulseList", stat));
+        vo.setPatternList(normEntities(vo.getPatternList(), "patternList", stat));
+        vo.setCauseList(normEntities(vo.getCauseList(), "causeList", stat));
+        vo.setTreatmentList(normEntities(vo.getTreatmentList(), "treatmentList", stat));
+        vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat));
 
         for (NlpExtractVO.Herb herb : vo.getHerbs()) {
             if (herb == null) continue;
@@ -98,13 +176,15 @@ public class EntityNormalizer {
             stat[0]++;
             stat[r.level()]++;
         }
+        vo.setHerbs(dedupByTerm(vo.getHerbs(), NlpExtractVO.Herb::getName,
+                NlpExtractVO.Herb::getSourceText, NlpExtractVO.Herb::getNormLevel));
 
         return NormStat.of(stat);
     }
 
-    private void normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat) {
+    private List<NlpExtractVO.Entity> normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat) {
         if (entities == null) {
-            return;
+            return null;
         }
         String type = dictionaryType(fieldKey);
         for (NlpExtractVO.Entity e : entities) {
@@ -128,6 +208,10 @@ public class EntityNormalizer {
             stat[0]++;
             stat[r.level()]++;
         }
+        // 归一之后再合并同标准词。统计仍按「归一动作」计（去重前），
+        // 即 NormStat 描述的是做了多少次归一，去重只影响下发给前端的列表。
+        return dedupByTerm(entities, NlpExtractVO.Entity::getContent,
+                NlpExtractVO.Entity::getSourceText, NlpExtractVO.Entity::getNormLevel);
     }
 
     /** 归一目标值：优先 content，缺失时退回 sourceText（两者在模型侧同源） */

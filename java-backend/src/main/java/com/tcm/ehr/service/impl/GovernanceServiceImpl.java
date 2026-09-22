@@ -160,26 +160,30 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     "causeList", "treatmentList", "formulaList")) {
                 if (!(data.get(key) instanceof List<?> list)) continue;
                 String type = mapEntityType(key);
-                if (type == null) continue;
-                for (Object item : list) {
-                    if (!(item instanceof Map)) continue;
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> entity = (Map<String, Object>) item;
-                    Object content = entity.get("content");
-                    if (content == null || String.valueOf(content).isBlank()) continue;
-                    var result = termNormalizer.normalize(type, String.valueOf(content));
-                    if (result.source() != null && !result.source().isBlank()
-                            && !result.standardTerm().equals(String.valueOf(content))) {
-                        entity.put("content", result.standardTerm());
-                        entity.put("normLevel", result.level());
-                        entity.put("normSource", result.source());
-                        if (result.code() != null) {
-                            entity.put("normCode", result.code());
+                // 无词典的 4 类（舌/脉/病因/治法）不做归一，但仍要走下面的同标准词去重
+                if (type != null) {
+                    for (Object item : list) {
+                        if (!(item instanceof Map)) continue;
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> entity = (Map<String, Object>) item;
+                        Object content = entity.get("content");
+                        if (content == null || String.valueOf(content).isBlank()) continue;
+                        var result = termNormalizer.normalize(type, String.valueOf(content));
+                        if (result.source() != null && !result.source().isBlank()
+                                && !result.standardTerm().equals(String.valueOf(content))) {
+                            entity.put("content", result.standardTerm());
+                            entity.put("normLevel", result.level());
+                            entity.put("normSource", result.source());
+                            if (result.code() != null) {
+                                entity.put("normCode", result.code());
+                            }
+                            stat[0]++;
+                            if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
                         }
-                        stat[0]++;
-                        if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
                     }
                 }
+                // 同标准词去重（第八轮）：口径与解析链路共用 EntityNormalizer.dedupByTerm
+                data.put(key, dedupStructuredList(list, "content"));
             }
             // herbs：name归一 + dosage格式规整（统一小写单位表示，不改数值）
             if (data.get("herbs") instanceof List<?> list) {
@@ -206,12 +210,48 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         if (!d.equals(String.valueOf(herb.get("dosage")))) herb.put("dosage", d);
                     }
                 }
+                data.put("herbs", dedupStructuredList(list, "name"));
             }
             baseMapper.updateStructuredData(r.getId(), objectMapper.writeValueAsString(data));
         } catch (JacksonException e) {
             log.warn("[治理] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
         }
         return stat;
+    }
+
+    /**
+     * structuredData 里某一类实体的「同标准词去重」（第八轮）。
+     *
+     * <p><b>不另写一套规则</b>：直接复用解析链路用的 {@link EntityNormalizer#dedupByTerm}，
+     * 与 {@code mapEntityType} 同一思路——口径只写一处，避免解析链路与清洗链路漂移。</p>
+     *
+     * <p>键取 {@code termField}（实体为 {@code content}、中药为 {@code name}）；键为空的元素
+     * 由 dedupByTerm 用唯一键占位，不参与合并。归一后 content 相同者只留一条，
+     * 代表条目的选取规则见 dedupByTerm 的注释。</p>
+     */
+    @SuppressWarnings("unchecked")
+    private List<Object> dedupStructuredList(List<?> list, String termField) {
+        if (list == null || list.size() < 2) {
+            return (List<Object>) list;
+        }
+        return EntityNormalizer.dedupByTerm((List<Object>) list,
+                item -> mapStr(item, termField),
+                item -> mapStr(item, "sourceText"),
+                GovernanceServiceImpl::mapLevel);
+    }
+
+    /** 取 structuredData 实体里的字符串字段；非 Map 或字段缺失返回 null */
+    private static String mapStr(Object item, String field) {
+        if (!(item instanceof Map<?, ?> m)) return null;
+        Object v = m.get(field);
+        return v == null ? null : String.valueOf(v);
+    }
+
+    /** 取 normLevel；非数字返回 null（未归一 / 未命中词典） */
+    private static Integer mapLevel(Object item) {
+        if (!(item instanceof Map<?, ?> m)) return null;
+        Object v = m.get("normLevel");
+        return (v instanceof Number n) ? n.intValue() : null;
     }
 
     /** 附录A 字段名 → 词典类型；映射唯一权威在 {@link EntityNormalizer#dictionaryType}（解析链路共用） */
