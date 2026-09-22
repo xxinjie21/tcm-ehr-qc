@@ -121,7 +121,9 @@
           </template>
         </el-table-column>
         <template #empty>
-          <el-empty description="无数据" :image-size="80" />
+          <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一套 searchRecords 查询，
+               原先只写「无数据」，用户不知道是没查到、还是页面坏了 -->
+          <el-empty description="筛选范围内没有病历" :image-size="80" />
         </template>
       </el-table>
       <el-pagination

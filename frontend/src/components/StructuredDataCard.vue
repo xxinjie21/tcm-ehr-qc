@@ -48,7 +48,15 @@
         </div>
       </div>
     </template>
-    <el-empty v-else description="无标准化数据" :image-size="70" />
+    <!-- 空态必须分清两件事（「把没做说成没问题」同类问题已修 3 处，这是第 4 处）：
+         ① 压根没抽过 —— structuredData 为 null / 空串 / 解析不出来，库里就是没有；
+         ② 抽过了、只是没识别出要素 —— 后端 extractAndStore 只要 NLP 返回非 null 就写库，
+            **哪怕 9 类全空**，所以「有对象但 9 类都空」明确代表抽取跑过了。
+         原先两种都写「无标准化数据」，用户会以为「抽取没问题、只是没东西」，
+         而实际可能是一次都没抽过 —— 两者的下一步动作完全不同。 -->
+    <el-empty v-else :description="emptyTitle" :image-size="70">
+      <div class="empty-hint">{{ emptyHint }}</div>
+    </el-empty>
   </div>
 </template>
 
@@ -80,6 +88,18 @@ const list = (key) => {
 }
 
 const hasAny = computed(() => sections.some((s) => list(s.key).length > 0))
+
+/**
+ * 空态的两种含义（见模板注释）。
+ *
+ * <p>{@code parsed === null} 表示压根没有数据：{@code data} 为 null/空串，或 JSON 解析失败。
+ * 反之为「有数据但 9 类都空」，即抽取执行过、只是没识别出要素。</p>
+ */
+const neverParsed = computed(() => parsed.value === null)
+const emptyTitle = computed(() => (neverParsed.value ? '尚未抽取标准化数据' : '已抽取，但没有识别出要素'))
+const emptyHint = computed(() => (neverParsed.value
+  ? '这份病历还没有跑过结构化抽取。可在「结构化解析」页载入该病历后点「执行抽取」，结果会写入这里。'
+  : '抽取已经执行过，只是这段原文里没有可归一的要素（疾病 / 症状 / 证候 / 方剂 / 中药等）。'))
 
 /** 实体上的归一标签文案：命中方式 + 走哪条路；未命中说「未收录」 */
 const lvText = (it) => {
@@ -184,6 +204,14 @@ const levelDesc = (level, raw, name) => {
 .sd-item .tag.lv2 { color: var(--ochre); }
 .sd-item .tag.lv3 { color: var(--danger); }
 .sd-item .conf { font-size: 10.5px; color: var(--text-sub); margin-left: 4px; }
+/* 空态副文案：标题只说「哪一种空」，下一步动作放这里 */
+.empty-hint {
+  max-width: 420px;
+  margin: 2px auto 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-sub);
+}
 </style>
 
 <!-- 非 scoped：el-tooltip 的内容被 teleport 到 body，scoped 选择器命中不到，必须用全局块 -->
