@@ -32,11 +32,20 @@ public interface IDictionaryFileService {
     /** 回滚：备份文件覆盖当前词典文件 */
     void restore(String type, String backupFilename) throws IOException;
 
-    /** 备份版本列表（按时间倒序） */
+    /**
+     * 备份版本列表（按时间倒序）。每项含：filename / time（可读时间）/
+     * count（该备份词条数）/ delta（相对当前词典的增减，形如 +3 / -2 / 0）。
+     */
     List<Map<String, String>> listBackups(String type) throws IOException;
 
     /** 备份文件是否存在 */
     boolean backupExists(String type, String backupFilename);
+
+    /**
+     * 当前词典版本（5 类词典内容合成，内容不变则稳定、变更即变）。
+     * 用于结构化数据落库时记录「本次归一依据哪一版词典」。
+     */
+    String currentVersion();
 
     /** 读取文本文件内容 */
     String readText(Path path) throws IOException;

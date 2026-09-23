@@ -9,6 +9,7 @@ import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.CreateRecordDTO;
 import com.tcm.ehr.domain.dto.DeleteRecordsDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
@@ -22,6 +23,7 @@ import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.RawRecordVO;
 import com.tcm.ehr.domain.vo.SearchVO;
 import com.tcm.ehr.mapper.RecordMapper;
+import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.IRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +68,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     private final ObjectMapper objectMapper;
     private final PythonNlpClient nlpClient;
+    private final IDictionaryFileService dictionaryFileService;
 
     /** 批G·8.3：导入入库后是否自动抽取（仅 nlp.enabled=true 时生效） */
     @Value("${nlp.extract-on-import:true}")
@@ -349,6 +352,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         } catch (Exception e) {
             throw new IllegalArgumentException("structuredData 格式错误");
         }
+        json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());
         baseMapper.updateStructuredData(recordId, json);
     }
 
@@ -414,7 +418,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 if (vo == null) {
                     continue;
                 }
-                baseMapper.updateStructuredData(r.getId(), objectMapper.writeValueAsString(vo));
+                String json = objectMapper.writeValueAsString(vo);
+                json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());
+                baseMapper.updateStructuredData(r.getId(), json);
                 ok++;
             } catch (Exception e) {
                 log.warn("[导入抽取] 病历 {} 抽取失败: {}", r.getId(), e.getMessage());

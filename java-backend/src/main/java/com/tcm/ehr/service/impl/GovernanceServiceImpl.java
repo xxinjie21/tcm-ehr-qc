@@ -6,10 +6,12 @@ import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordUtil;
+import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.ExportDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CleanResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
+import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.IGovernanceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +38,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     private final EsTermNormalizer termNormalizer;
     private final ObjectMapper objectMapper;
+    private final IDictionaryFileService dictionaryFileService;
 
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
@@ -212,7 +215,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 }
                 data.put("herbs", dedupStructuredList(list, "name"));
             }
-            baseMapper.updateStructuredData(r.getId(), objectMapper.writeValueAsString(data));
+            String json = StructuredDataMeta.stamp(objectMapper, objectMapper.writeValueAsString(data),
+                    dictionaryFileService.currentVersion());
+            baseMapper.updateStructuredData(r.getId(), json);
         } catch (JacksonException e) {
             log.warn("[治理] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
         }

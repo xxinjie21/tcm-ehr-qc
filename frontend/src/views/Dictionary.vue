@@ -166,8 +166,13 @@
         <el-button size="small" @click="loadBackups">刷新备份列表</el-button>
       </div>
       <el-table :data="backups" border style="margin-top: 12px" max-height="280">
-        <el-table-column prop="filename" label="备份文件" min-width="280" />
-        <el-table-column prop="time" label="备份时间" width="180" />
+        <el-table-column prop="time" label="备份时间" min-width="180" />
+        <el-table-column prop="count" label="词条数" width="110" />
+        <el-table-column label="较当前" width="120">
+          <template #default="{ row }">
+            <span :class="deltaClass(row.delta)">{{ deltaText(row.delta) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120">
           <template #default="{ row }">
             <el-button
@@ -397,6 +402,19 @@ const downloadFailed = () => {
 
 const backups = ref([])
 
+/** 较当前增减：正=备份比现在多，负=少，0=一致 */
+const deltaText = (d) => {
+  const n = Number(d)
+  if (Number.isNaN(n)) return '—'
+  if (n === 0) return '无变化'
+  return n > 0 ? `多 ${n} 条` : `少 ${-n} 条`
+}
+const deltaClass = (d) => {
+  const n = Number(d)
+  if (Number.isNaN(n) || n === 0) return 'dl-flat'
+  return n > 0 ? 'dl-up' : 'dl-down'
+}
+
 const loadBackups = async () => {
   const res = await getBackups({ type: activeTab.value })
   backups.value = res.data.backups || []
@@ -405,7 +423,7 @@ const loadBackups = async () => {
 
 const handleRollback = async (row) => {
   await ElMessageBox.confirm(
-    `确定将「${TYPE_LABELS[activeTab.value]}」词典回滚到 ${row.filename} 吗？`,
+    `确定将「${TYPE_LABELS[activeTab.value]}」词典回滚到 ${row.time} 的备份吗？覆盖当前词典并立即生效。`,
     '版本回滚',
     { type: 'warning' }
   )
@@ -444,6 +462,9 @@ onBeforeUnmount(() => {
   gap: 12px;
   align-items: center;
 }
+.dl-up { color: var(--ochre); }
+.dl-down { color: var(--danger); }
+.dl-flat { color: var(--text-sub); }
 .tip {
   font-size: 12.5px;
   color: var(--text-sub);

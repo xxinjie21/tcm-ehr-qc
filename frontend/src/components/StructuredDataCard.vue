@@ -1,5 +1,10 @@
 <template>
   <div class="sd-card">
+    <!-- 可追溯：这份结构化数据是依据哪一版术语词典产生的（抽取/归一落库时打点） -->
+    <div v-if="dictVersion" class="sd-meta">
+      依据词典版本 <b>{{ dictVersion }}</b>
+      <span v-if="dictCapturedAt" class="sd-meta-t">· 采集于 {{ dictCapturedAt }}</span>
+    </div>
     <template v-if="hasAny">
       <div v-for="sec in sections" :key="sec.key" class="sd-section">
         <div v-if="list(sec.key).length" class="sd-sec">
@@ -89,6 +94,10 @@ const list = (key) => {
 
 const hasAny = computed(() => sections.some((s) => list(s.key).length > 0))
 
+/** 词典版本元信息（落库时打点，见 StructuredDataMeta）；旧数据没有则为空、不展示 */
+const dictVersion = computed(() => parsed.value?._meta?.dictVersion || '')
+const dictCapturedAt = computed(() => parsed.value?._meta?.dictCapturedAt || '')
+
 /**
  * 空态的两种含义（见模板注释）。
  *
@@ -164,6 +173,15 @@ const levelDesc = (level, raw, name) => {
 
 <style scoped>
 .sd-card { font-size: 13px; }
+.sd-meta {
+  font-size: 11.5px;
+  color: var(--text-sub);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--line);
+}
+.sd-meta b { color: var(--ink-mid); font-weight: normal; }
+.sd-meta-t { margin-left: 4px; }
 .sd-sec { margin-bottom: 12px; }
 .sd-sec-title {
   font-size: 13px;
