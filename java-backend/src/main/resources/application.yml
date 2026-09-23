@@ -73,7 +73,8 @@ nlp:
                             # 超时才降级，且导入病历会被逐条串行阻塞。false 时不发请求。
   service-url: http://localhost:8001
   timeout: 30000            # 毫秒
-  extract-on-import: true   # 病历导入入库后自动抽取写 structured_data（仅 enabled=true 时生效）
+  batch:
+    concurrency: 2          # 批量解析后台工作线程数（保护 Python NLP，超出任务排队）
 
 # LLM 增强（Spring AI 2.0；provider 二选一：ollama 本机 / openai 及兼容三方）
 # 默认关闭；关闭或调用失败时回退规则兜底，不阻塞主流程（模型装配见上方 spring.ai.model）

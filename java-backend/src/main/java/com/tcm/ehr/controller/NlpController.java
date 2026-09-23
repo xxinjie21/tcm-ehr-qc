@@ -1,17 +1,27 @@
 package com.tcm.ehr.controller;
 
+import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.EntityNormalizer;
+import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.PythonNlpClient;
+import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.domain.dto.NlpBatchDTO;
 import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
+import com.tcm.ehr.domain.vo.NlpTaskVO;
+import com.tcm.ehr.service.INlpBatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * NLP 实体抽取（批G·8.1）：转发至 Python FastAPI 服务（成员B，:8001）。
@@ -35,6 +45,8 @@ public class NlpController {
 
     private final PythonNlpClient nlpClient;
     private final EntityNormalizer entityNormalizer;
+    private final INlpBatchService nlpBatchService;
+    private final OperationLogger operationLogger;
 
     /** 与 {@link PythonNlpClient} 读同一个配置项，仅用于区分「没开」与「连不上」 */
     @Value("${nlp.enabled:false}")
@@ -69,5 +81,41 @@ public class NlpController {
         log.debug("[NLP] 抽取完成并归一：命中 {} 条（精确 {} / 包含 {} / 模糊 {}）",
                 stat.hit(), stat.exact(), stat.contain(), stat.fuzzy());
         return ResponseEntity.ok(Result.ok(vo));
+    }
+
+    // ------------------------------------------------------------------ 批量解析（批K·K-a，异步任务）
+
+    /** 提交批量解析任务（后台队列执行）；【权限：仅管理员】 */
+    @RequireRole(roles = {"管理员"})
+    @PostMapping("/api/nlp/extract/batch")
+    public Result<NlpTaskVO> submitBatch(@RequestBody(required = false) NlpBatchDTO dto) {
+        NlpTaskVO vo = nlpBatchService.submit(dto, RequestUtils.currentUsername());
+        operationLogger.log("批量解析", null, "提交任务，计划 " + vo.getTotal() + " 条");
+        return Result.ok("已提交，后台解析中", vo);
+    }
+
+    /** 批量任务进度查询；【权限：仅管理员】 */
+    @RequireRole(roles = {"管理员"})
+    @GetMapping("/api/nlp/extract/batch/{id}")
+    public ResponseEntity<Result<NlpTaskVO>> batchStatus(@PathVariable String id) {
+        NlpTaskVO vo = nlpBatchService.get(id);
+        if (vo == null) {
+            return ResponseEntity.status(404).body(Result.error(404, "任务不存在"));
+        }
+        return ResponseEntity.ok(Result.ok(vo));
+    }
+
+    /** 取消批量任务（排队中直接取消，运行中置取消位）；【权限：仅管理员】 */
+    @RequireRole(roles = {"管理员"})
+    @PostMapping("/api/nlp/extract/batch/{id}/cancel")
+    public Result<NlpTaskVO> cancelBatch(@PathVariable String id) {
+        return Result.ok("已取消", nlpBatchService.cancel(id));
+    }
+
+    /** 批量任务列表（最近 50 条）；【权限：仅管理员】 */
+    @RequireRole(roles = {"管理员"})
+    @GetMapping("/api/nlp/extract/batch")
+    public Result<List<NlpTaskVO>> batchList() {
+        return Result.ok(nlpBatchService.list());
     }
 }

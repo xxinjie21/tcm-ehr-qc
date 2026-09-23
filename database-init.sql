@@ -87,6 +87,26 @@ CREATE TABLE IF NOT EXISTS operation_log (
   INDEX idx_action (action)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
 
+-- 5. NLP 批量解析任务表（批K·K-a：后端异步任务，进度/失败清单落库，重启后可查）
+CREATE TABLE IF NOT EXISTS nlp_task (
+  id VARCHAR(36) PRIMARY KEY COMMENT '任务ID(UUID)',
+  status VARCHAR(20) NOT NULL COMMENT '状态：QUEUED/RUNNING/COMPLETED/CANCELLED/INTERRUPTED/FAILED',
+  total INT NOT NULL DEFAULT 0 COMMENT '计划处理条数',
+  done INT NOT NULL DEFAULT 0 COMMENT '已处理条数',
+  success INT NOT NULL DEFAULT 0 COMMENT '成功条数',
+  failed INT NOT NULL DEFAULT 0 COMMENT '失败条数',
+  current_label VARCHAR(255) COMMENT '当前处理的病历标识',
+  filters_json TEXT COMMENT '筛选范围(JSON)',
+  created_by VARCHAR(50) COMMENT '提交人用户名',
+  failure_list JSON COMMENT '失败清单(仅存前500条)',
+  failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  started_at DATETIME COMMENT '开始时间',
+  finished_at DATETIME COMMENT '结束时间',
+  INDEX idx_status (status),
+  INDEX idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='NLP批量解析任务表';
+
 -- 初始化账号（密码均为123456的BCrypt加密）
 -- admin/123456 = 管理员；auditor/123456 = 审核员
 INSERT INTO users (id, username, password, role) VALUES

@@ -595,6 +595,72 @@ components:
         text:
           type: string
           description: 待抽取的病历文本
+    NlpBatchDTO:
+      type: object
+      description: 批量解析提交请求（入参）
+      properties:
+        filters:
+          type: object
+          description: 筛选范围（与病历查询同口径：科室 / 时间区间 / 证候 / 分级）
+          properties:
+            department:
+              type: string
+            dateRange:
+              type: array
+              items:
+                type: string
+                format: date
+            pattern:
+              type: string
+            grade:
+              type: string
+        limit:
+          type: integer
+          description: 处理条数上限；空或 <=0 表示按筛选范围内全部
+    NlpTaskVO:
+      type: object
+      description: 批量解析任务（出参）
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          description: QUEUED / RUNNING / COMPLETED / CANCELLED / INTERRUPTED / FAILED
+        total:
+          type: integer
+          description: 计划处理条数
+        done:
+          type: integer
+        success:
+          type: integer
+        failed:
+          type: integer
+        current:
+          type: string
+          description: 当前处理的病历标识
+        createdBy:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        failureTruncated:
+          type: boolean
+          description: 失败清单是否被截断（仅保留前 500 条）
+        failures:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              reason:
+                type: string
     NlpExtractVO:
       type: object
       description: NLP 抽取响应（出参，结构同 StructuredData）
@@ -1599,6 +1665,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorVO'
+  /api/logs/purge:
+    post:
+      tags:
+        - 日志
+      summary: 归档并清理操作日志
+      description: 【权限：仅管理员】清理 beforeDate（yyyy-MM-dd，不含当天）之前的 operation_log。服务端先导出归档 CSV 到 logs/，成功后才删除；本次清理动作本身也记入审计
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                beforeDate:
+                  type: string
+                  description: 清理截止日期（yyyy-MM-dd）
+                  example: '2026-01-01'
+      responses:
+        '200':
+          description: 清理结果 {deleted, archivedFile}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: integer
+                        description: 删除条数
+                      archivedFile:
+                        type: string
+                        description: 归档文件名（无删除时为空串）
+        '400':
+          description: 未提供 beforeDate 或日期格式错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/records/import:
     post:
       tags:
@@ -1927,6 +2042,135 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorVO'
+  /api/nlp/extract/batch:
+    post:
+      tags:
+        - NLP抽取
+      summary: 提交批量结构化解析任务
+      description: 【权限：仅管理员】按筛选范围提交后台批量解析任务，立即返回 taskId。任务由服务端固定并发（默认 2）的队列执行，进度与失败清单持久化在 nlp_task 表，可关闭页面后回来查看。每条处理：拼文本→抽取→ES 术语归一→打词典版本→写 structured_data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NlpBatchDTO'
+      responses:
+        '200':
+          description: 已提交，返回任务（含计划条数 total）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/NlpTaskVO'
+        '400':
+          description: 抽取服务未开启（nlp.enabled=false）等参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 非管理员
+        '500':
+          $ref: '#/components/responses/ServerError'
+    get:
+      tags:
+        - NLP抽取
+      summary: 批量解析任务列表
+      description: 【权限：仅管理员】最近 50 条任务（按提交时间倒序）
+      responses:
+        '200':
+          description: 任务列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NlpTaskVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/nlp/extract/batch/{id}:
+    get:
+      tags:
+        - NLP抽取
+      summary: 批量解析任务进度
+      description: 【权限：仅管理员】查询任务状态、进度与失败清单（失败清单仅保留前 500 条）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 任务详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/NlpTaskVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 任务不存在
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/nlp/extract/batch/{id}/cancel:
+    post:
+      tags:
+        - NLP抽取
+      summary: 取消批量解析任务
+      description: 【权限：仅管理员】排队中（QUEUED）直接置为已取消；运行中（RUNNING）置取消位，工作线程在条/页边界退出，已处理的不回滚
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 取消后的任务
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/NlpTaskVO'
+        '400':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/governance/normalize:
     post:
       tags:

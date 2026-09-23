@@ -271,12 +271,12 @@
         </PanelCard>
       </el-tab-pane>
 
-      <!-- ============ 批量解析（页面内嵌，不用弹窗） ============ -->
-      <el-tab-pane label="批量解析" name="batch" lazy>
+      <!-- ============ 批量解析（批K：后端异步任务，仅管理员） ============ -->
+      <el-tab-pane v-if="isAdmin" label="批量解析" name="batch" lazy>
         <PanelCard title="批量结构化解析">
           <div class="tip">
-            先按条件选定病历范围，再逐条执行抽取并保存到病历。条数较多时耗时较长，
-            <b>请勿关闭页面</b>；需要中断可点「取消」，已处理的不回滚。
+            选定范围后提交，由<b>后台任务</b>逐条抽取并写入病历。提交后可关闭本页，任务在服务端继续；
+            进度与失败清单保存在服务端，随时回来查看。
           </div>
 
           <div class="batch-filter">
@@ -286,33 +286,60 @@
 
           <div class="batch-row">
             <span>处理条数上限</span>
-            <el-input-number v-model="batchLimit" :min="1" :max="500" size="small" :disabled="batchRunning" />
-            <span class="tip">（最多处理符合条件的前 N 条）</span>
+            <el-input-number v-model="batchLimit" :min="1" :max="100000" :step="50" size="small" :disabled="submitting" />
+            <span class="tip">（按范围内前 N 条；条数多时后台跑得久）</span>
           </div>
 
           <div class="actions">
-            <el-button v-if="!batchRunning" type="primary" @click="runBatch">开始批量解析</el-button>
-            <el-button v-else @click="batchCancelled = true">取消</el-button>
+            <el-button type="primary" :loading="submitting" @click="submitBatch">开始批量解析</el-button>
+            <el-button :disabled="submitting" @click="loadBatchList">刷新任务列表</el-button>
           </div>
 
-          <div v-if="batchRunning || batchProgress.done" class="batch-progress">
-            <div class="bp-hd">
-              正在处理第 {{ Math.min(batchProgress.done + 1, batchProgress.total) }}/{{ batchProgress.total }} 条：
-              <b>{{ batchProgress.current || '准备中…' }}</b>
-            </div>
+          <!-- 当前 / 选中任务 -->
+          <div v-if="activeTask" class="batch-progress">
+            <div class="bp-hd"><b>{{ statusText(activeTask) }}</b></div>
             <el-progress
-              :percentage="batchProgress.total ? Math.round((batchProgress.done / batchProgress.total) * 100) : 0"
+              :percentage="activeTask.total ? Math.round((activeTask.done / activeTask.total) * 100) : 0"
               :stroke-width="10"
             />
-            <div class="bp-sub">成功 {{ batchProgress.success }} 条，失败 {{ batchProgress.failed }} 条</div>
+            <div class="bp-sub">
+              共 {{ activeTask.total }} 条 · 已处理 {{ activeTask.done }} · 成功 {{ activeTask.success }} · 失败 {{ activeTask.failed }}
+              <span v-if="activeTask.current"> · 当前 {{ activeTask.current }}</span>
+            </div>
+            <div v-if="isActive(activeTask)" class="actions">
+              <el-button size="small" @click="cancelBatch(activeTask.id)">取消任务</el-button>
+            </div>
+
+            <div v-if="activeTask.failures && activeTask.failures.length" class="batch-failures">
+              <div class="bf-hd">
+                失败清单（{{ activeTask.failures.length }} 条{{ activeTask.failureTruncated ? '，仅显示前 500 条' : '' }}）
+              </div>
+              <el-table :data="activeTask.failures" border size="small" max-height="240">
+                <el-table-column prop="label" label="病历" width="200" show-overflow-tooltip />
+                <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+              </el-table>
+            </div>
           </div>
 
-          <!-- 失败清单（UX-61）：不只是一句「失败 N 条」，要能查到是哪几条 -->
-          <div v-if="batchFailures.length" class="batch-failures">
-            <div class="bf-hd">失败清单（{{ batchFailures.length }} 条）</div>
-            <el-table :data="batchFailures" border size="small" max-height="240">
-              <el-table-column prop="label" label="病历" width="200" show-overflow-tooltip />
-              <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+          <!-- 最近任务 -->
+          <div v-if="batchTasks.length" class="batch-list">
+            <div class="bf-hd">最近任务</div>
+            <el-table :data="batchTasks" border size="small" max-height="260">
+              <el-table-column label="提交时间" width="170">
+                <template #default="{ row }">{{ (row.createTime || '').replace('T', ' ').substring(0, 19) }}</template>
+              </el-table-column>
+              <el-table-column label="状态" min-width="240">
+                <template #default="{ row }">{{ statusText(row) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="150">
+                <template #default="{ row }">
+                  <el-button v-if="isActive(row)" link type="danger" @click="cancelBatch(row.id)">取消</el-button>
+                  <template v-else>
+                    <el-button link type="primary" @click="viewTask(row.id)">查看</el-button>
+                    <el-button link type="primary" @click="rerun">重跑</el-button>
+                  </template>
+                </template>
+              </el-table-column>
             </el-table>
           </div>
         </PanelCard>
@@ -322,14 +349,15 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { extractNlp } from '@/api/nlp'
+import { extractNlp, submitNlpBatch, getNlpBatch, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
 import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
+import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
 import { LEVEL_FULL, summarizeNorm } from '@/utils/structured'
@@ -605,73 +633,117 @@ const save = async () => {
   }
 }
 
-// ===== 批量解析（UX-52 / UX-61：页面内嵌，不用弹窗）=====
+// ===== 批量解析（批K：后端异步任务；仅管理员）=====
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.role === '管理员')
+
 const batchLimit = ref(50)
-const batchRunning = ref(false)
-const batchCancelled = ref(false)
-const batchProgress = reactive({ done: 0, total: 0, current: '', success: 0, failed: 0 })
-const batchFailures = ref([])
+const submitting = ref(false)
 /** 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选 */
 const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+const activeTask = ref(null)
+const batchTasks = ref([])
+let pollTimer = null
 
-/**
- * 按筛选条件取病历，逐条抽取并保存。
- *
- * <p>后端暂无批量接口，这里在前端串行推进 —— 相比人工逐条点开仍是质变，
- * 且能给出真实进度与取消入口。若后续补批量任务接口，替换此循环即可。</p>
- */
-const runBatch = async () => {
-  batchRunning.value = true
-  batchCancelled.value = false
-  batchFailures.value = []
-  Object.assign(batchProgress, { done: 0, total: 0, current: '', success: 0, failed: 0 })
-  try {
-    const res = await searchRecords({ ...batchFilters, page: 1, pageSize: batchLimit.value })
-    const list = res.data?.records || []
-    if (!list.length) {
-      ElMessage.warning('当前筛选范围内没有可解析的病历')
-      return
-    }
-    batchProgress.total = list.length
-    for (let i = 0; i < list.length; i++) {
-      if (batchCancelled.value) break
-      const item = list[i]
-      const label = item.registrationNo || item.id
-      batchProgress.current = label
-      try {
-        const raw = await getRawRecord(item.id)
-        const d = raw.data || {}
-        const text = ALL_KEYS
-          .map((k) => d[k])
-          .filter((s) => s && String(s).trim())
-          .map((s) => String(s).trim())
-          .join('。')
-        if (!text) {
-          batchFailures.value.push({ label, reason: '该病历无可抽取的文本字段' })
-          batchProgress.failed += 1
-        } else {
-          const ex = await extractNlp({ text })
-          await updateRecord(item.id, { structuredData: ex.data })
-          batchProgress.success += 1
-        }
-      } catch (e) {
-        // 单条失败不影响后续；原因优先取后端 msg —— axios 的英文兜底对用户没有信息量
-        batchFailures.value.push({ label, reason: apiErrorMessage(e, '抽取或保存失败') })
-        batchProgress.failed += 1
-      }
-      batchProgress.done = i + 1
-    }
-    const tail = batchCancelled.value ? '（已取消，未处理剩余病历）' : ''
-    ElMessage.success(`批量解析完成：成功 ${batchProgress.success} 条，失败 ${batchProgress.failed} 条${tail}`)
-    search(1)
-  } catch {
-    // 拦截器已提示
-  } finally {
-    batchRunning.value = false
+const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
+const isActive = (t) => !!t && ACTIVE_STATUS.includes(t.status)
+
+/** 状态文案：一句一个事实，精确到数字/原因 */
+const statusText = (t) => {
+  if (!t) return ''
+  switch (t.status) {
+    case 'QUEUED': return '排队中（等待工作线程）'
+    case 'RUNNING': return `进行中 ${t.done}/${t.total} · 成功 ${t.success} 失败 ${t.failed}`
+    case 'COMPLETED': return `已完成：成功 ${t.success}，失败 ${t.failed}`
+    case 'CANCELLED': return `已取消（已处理 ${t.done}，剩余未处理）`
+    case 'INTERRUPTED': return '已中断（服务重启），可重跑'
+    case 'FAILED': return '失败'
+    default: return t.status
   }
 }
 
-onMounted(() => search(1))
+const loadBatchList = async () => {
+  try {
+    const res = await listNlpBatch()
+    batchTasks.value = res.data || []
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+const stopPoll = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+const poll = async () => {
+  const id = activeTask.value?.id
+  if (!id) return
+  try {
+    const res = await getNlpBatch(id)
+    activeTask.value = res.data
+    if (!isActive(activeTask.value)) stopPoll()
+  } catch {
+    stopPoll()
+  }
+}
+
+const startPoll = () => {
+  stopPoll()
+  pollTimer = setInterval(() => {
+    poll()
+    loadBatchList()
+  }, 2000)
+}
+
+const submitBatch = async () => {
+  submitting.value = true
+  try {
+    const res = await submitNlpBatch({ filters: { ...batchFilters }, limit: batchLimit.value })
+    ElMessage.success(`已提交，计划 ${res.data.total} 条`)
+    activeTask.value = res.data
+    loadBatchList()
+    startPoll()
+  } catch {
+    // 拦截器已提示（未开启抽取 / 无权限 / 服务异常）
+  } finally {
+    submitting.value = false
+  }
+}
+
+const cancelBatch = async (id) => {
+  await ElMessageBox.confirm('确定取消该批量解析任务吗？已处理的不回滚。', '取消任务', { type: 'warning' })
+  try {
+    const res = await cancelNlpBatch(id)
+    if (activeTask.value?.id === id) {
+      activeTask.value = res.data
+      stopPoll()
+    }
+    loadBatchList()
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+const viewTask = async (id) => {
+  try {
+    const res = await getNlpBatch(id)
+    activeTask.value = res.data
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+const rerun = () => submitBatch()
+
+onMounted(() => {
+  search(1)
+  loadBatchList()
+})
+
+onBeforeUnmount(stopPoll)
 </script>
 
 <style scoped>
@@ -902,6 +974,7 @@ onMounted(() => search(1))
 .bp-hd b { color: var(--ink); }
 .bp-sub { margin-top: 8px; font-size: 12px; color: var(--text-sub); }
 .batch-failures { margin-top: 14px; border-top: 1px dashed #ece8dc; padding-top: 12px; }
+.batch-list { margin-top: 16px; border-top: 1px dashed #ece8dc; padding-top: 12px; }
 .bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: 8px; }
 
 @media (max-width: 1400px) {
