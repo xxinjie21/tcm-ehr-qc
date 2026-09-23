@@ -13,3 +13,8 @@ export function getLogActions() {
 export function exportLogs(params) {
   return request.get('/logs/export', { params, responseType: 'blob', timeout: 200000 })
 }
+
+// 归档并清理指定日期之前的日志（先归档落盘、成功再删）
+export function purgeLogs(beforeDate) {
+  return request.post('/logs/purge', { beforeDate }, { timeout: 200000 })
+}

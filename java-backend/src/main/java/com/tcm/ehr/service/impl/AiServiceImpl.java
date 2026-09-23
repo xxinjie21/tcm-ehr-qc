@@ -9,11 +9,13 @@ import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
+import com.tcm.ehr.domain.po.OperationLog;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.AiReplyVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IAiService;
+import com.tcm.ehr.service.ILogService;
 import com.tcm.ehr.service.IStatsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.format.DateTimeFormatter;
 
 /**
  * AI 消费端服务实现（批C · 3.1 解读卡 / 3.2 助手浮窗）。
@@ -47,6 +50,9 @@ public class AiServiceImpl implements IAiService {
 
     private static final String TECH_REFUSAL = "这属于系统实现细节，建议查看设计文档或咨询开发同学。";
 
+    /** 操作日志时间格式（注入个人操作上下文用，批I·I3） */
+    private static final DateTimeFormatter LOG_TS = DateTimeFormatter.ofPattern("MM-dd HH:mm");
+
     private static final String KNOWLEDGE_FLOW =
             "业务主线：原始病历 → 接入 → 结构化解析 → 术语归一 → 质控判定 → 人工复核 → 治理导出 → 统计评估。";
     private static final String KNOWLEDGE_FUNCTION =
@@ -61,6 +67,7 @@ public class AiServiceImpl implements IAiService {
     private final IStatsService statsService;
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
+    private final ILogService logService;
 
     // ------------------------------------------------------------------ 3.1 解读
 
@@ -332,6 +339,28 @@ public class AiServiceImpl implements IAiService {
             hit = true;
         }
 
+        // 个人操作上下文（批I·I3）：只注入"当前用户"最近 10 条，脱敏（动作/对象/时间，不含 IP）
+        if (containsAny(question, "操作", "日志", "我做了", "做了什么", "审计", "提交了", "操作记录")) {
+            sb.append("【我的最近操作】");
+            List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 10);
+            if (recent.isEmpty()) {
+                sb.append("没有查到操作记录。\n");
+            } else {
+                for (OperationLog l : recent) {
+                    sb.append(nz(l.getAction()));
+                    if (l.getTarget() != null && !l.getTarget().isBlank()) {
+                        sb.append('：').append(l.getTarget().trim());
+                    }
+                    if (l.getLogTime() != null) {
+                        sb.append("（").append(l.getLogTime().format(LOG_TS)).append("）");
+                    }
+                    sb.append('；');
+                }
+                sb.append('\n');
+            }
+            hit = true;
+        }
+
         if (!hit) {
             sb.append("【知识】").append(KNOWLEDGE_FUNCTION).append('\n').append(KNOWLEDGE_FLOW).append('\n');
         }
@@ -345,6 +374,10 @@ public class AiServiceImpl implements IAiService {
             int i = context.indexOf("【当前病历】");
             int end = context.indexOf('\n', i);
             sb.append(context, i + "【当前病历】".length(), end < 0 ? context.length() : end);
+        } else if (context.contains("【我的最近操作】")) {
+            int i = context.indexOf("【我的最近操作】");
+            int end = context.indexOf('\n', i);
+            sb.append(context, i + "【我的最近操作】".length(), end < 0 ? context.length() : end);
         } else if (context.contains("【看板统计】")) {
             int i = context.indexOf("【看板统计】");
             int end = context.indexOf('\n', i);

@@ -87,6 +87,7 @@ llm:
   model: ""                   # 留空用通道默认模型；ollama 例 qwen2.5:7b，openai 例 gpt-4o-mini
   temperature: 0.2
   timeout: 60000              # 毫秒
+  config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化（重启回显）；api-key 不落盘
 
 # 操作日志（绝对路径，避免随启动目录漂移）
 log:

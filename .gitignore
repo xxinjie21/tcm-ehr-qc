@@ -31,6 +31,9 @@ Thumbs.db
 # 术语库备份（不上传）
 data/dictionaries/backup/
 
+# LLM 运行时配置（含本机通道/模型，不上传；api-key 不落盘）
+data/llm-config.json
+
 # 日志（不上传）
 logs/
 

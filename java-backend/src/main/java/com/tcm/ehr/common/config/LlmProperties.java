@@ -46,4 +46,12 @@ public class LlmProperties {
 
     /** 单次请求超时（毫秒） */
     private int timeout = 60000;
+
+    /**
+     * 运行时"非密钥"配置的持久化文件（UX-68 增强）。
+     *
+     * <p>「导入 LLM」保存后，enabled/provider/baseUrl/model/temperature/timeout 会写入此文件，
+     * 重启后回显；<b>api-key 不写入</b>（只存内存，需每次填写）。</p>
+     */
+    private String configFile = "data/llm-config.json";
 }
