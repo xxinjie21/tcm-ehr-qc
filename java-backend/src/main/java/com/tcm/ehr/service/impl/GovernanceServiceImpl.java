@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 数据治理服务实现：术语归一、数据清洗、标准数据集导出
+ * 数据清洗服务实现：术语归一、数据清洗、标准数据集导出
  */
 @Slf4j
 @Service
@@ -118,7 +118,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
             baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, status, grade);
 
-            // ⑤ 术语归一（兜底）：仅对合格病历执行，归一后标记已治理
+            // ⑤ 术语归一（兜底）：仅对合格病历执行，归一后标记已清洗
             if ("合格".equals(grade) && r.getStructuredData() != null && !r.getStructuredData().isBlank()) {
                 int[] norm = normalizeStructuredData(r);
                 vo.setNormalized(vo.getNormalized() + norm[0]);
@@ -128,7 +128,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 baseMapper.markGoverned(r.getId());
             }
         }
-        log.info("[治理] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
+        log.info("[清洗] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
                 vo.getTotal(), vo.getDeduped(), vo.getRepaired(), vo.getIsolated(), vo.getNormalized());
         return vo;
     }
@@ -219,7 +219,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     dictionaryFileService.currentVersion());
             baseMapper.updateStructuredData(r.getId(), json);
         } catch (JacksonException e) {
-            log.warn("[治理] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
+            log.warn("[清洗] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
         }
         return stat;
     }

@@ -68,12 +68,12 @@ class AuthServiceTest {
 
         assertNotNull(vo.getToken());
         assertEquals("管理员", vo.getRole());
-        // 管理员菜单：文档第五章/登录响应示例共 8 项，名称已由旧名“数据治理”改为“清洗与导出”
+        // 管理员菜单：文档第五章/登录响应示例共 8 项，名称已由旧名“数据清洗”改为“清洗与导出”
         List<String> menus = vo.getMenus();
         assertEquals(8, menus.size());
         assertTrue(menus.contains("人工复核"));
         assertTrue(menus.contains("清洗与导出"));
-        assertFalse(menus.contains("数据治理"));
+        assertFalse(menus.contains("数据清洗"));
 
         Claims claims = jwtUtil.parseToken(vo.getToken());
         assertEquals("admin-0001", claims.getSubject());

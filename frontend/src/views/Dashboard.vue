@@ -22,7 +22,7 @@
       >
         <span class="todo-num">{{ govern.pendingGovern }}</span>
         <span class="todo-lbl">
-          待治理 <span v-if="canVisit('清洗与导出')">›</span>
+          待清洗 <span v-if="canVisit('清洗与导出')">›</span>
           <span v-else class="todo-lock">仅管理员</span>
         </span>
       </button>
@@ -235,7 +235,7 @@ const loadAll = async () => {
     overview.value = ov.data
     extra.value = ex.data
 
-    // 待治理（仅管理员可读治理统计）
+    // 待清洗（仅管理员可读清洗统计）
     if (userStore.role === '管理员') {
       try {
         const g = await governanceStats()

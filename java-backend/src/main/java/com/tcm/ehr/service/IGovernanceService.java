@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 数据治理服务：术语归一、数据清洗、标准数据集导出
+ * 数据清洗服务：术语归一、数据清洗、标准数据集导出
  */
 public interface IGovernanceService extends IService<Record> {
 
@@ -27,7 +27,7 @@ public interface IGovernanceService extends IService<Record> {
     /** 数据集预览：过滤结果总数 + 前10条样本 */
     Map<String, Object> previewDataset(ExportDTO dto);
 
-    /** 治理状态统计：质控合格/已治理/待治理 */
+    /** 清洗状态统计：质控合格/已清洗/待清洗 */
     Map<String, Object> governanceStats();
 
     /** 导出文件载体 */

@@ -36,7 +36,7 @@ import StructuredDataCard from './StructuredDataCard.vue'
 import AiInterpretCard from './AiInterpretCard.vue'
 
 defineProps({
-  /** 弹窗标题：病历数据页用「病历详情（原始字段只读）」，治理页用「病历完整详情」 */
+  /** 弹窗标题：病历数据页用「病历详情（原始字段只读）」，清洗页用「病历完整详情」 */
   title: { type: String, default: '病历详情（原始字段只读）' },
   /** 病历行对象，需含 21 个原始字段 + structuredData + score/grade */
   record: { type: Object, default: null }

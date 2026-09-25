@@ -400,7 +400,7 @@ const estimate = computed(() => {
     if (key && String(editValues[key] || '').trim()) gain += d.points || 0
   })
   const score = Math.max(0, Math.min(100, base + gain))
-  const grade = score >= 90 ? '合格 → 进入数据治理' : score >= 60 ? '待复核' : '无效'
+  const grade = score >= 90 ? '合格 → 进入数据清洗' : score >= 60 ? '待复核' : '无效'
   return { score, grade }
 })
 

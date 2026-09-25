@@ -54,7 +54,7 @@ public class AiServiceImpl implements IAiService {
     private static final DateTimeFormatter LOG_TS = DateTimeFormatter.ofPattern("MM-dd HH:mm");
 
     private static final String KNOWLEDGE_FLOW =
-            "业务主线：原始病历 → 接入 → 结构化解析 → 术语归一 → 质控判定 → 人工复核 → 治理导出 → 统计评估。";
+            "业务主线：原始病历 → 接入 → 结构化解析 → 术语归一 → 质控判定 → 人工复核 → 清洗导出 → 统计评估。";
     private static final String KNOWLEDGE_FUNCTION =
             "系统功能：病历导入/查询、NLP 结构化解析、质控评分（完整性/逻辑/格式三层扣分，分级为合格/待复核/无效）、"
             + "人工复核（7 个工作日时限）、数据清洗与术语归一（精确/包含/模糊三级）、标准数据集导出、术语词典管理、日志审计。";

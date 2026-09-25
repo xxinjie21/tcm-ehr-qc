@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS records (
   score INT COMMENT '质控评分（满分100）',
   grade VARCHAR(20) COMMENT '分级：合格/待复核/无效',
   status VARCHAR(20) COMMENT '状态：pending/reviewing/completed/invalid',
-  governed TINYINT NOT NULL DEFAULT 0 COMMENT '已治理标记（清洗+术语归一完成后置1）',
+  governed TINYINT NOT NULL DEFAULT 0 COMMENT '已清洗标记（清洗+术语归一完成后置1）',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_registration_no (registration_no),

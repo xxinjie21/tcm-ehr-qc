@@ -54,7 +54,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <ul>
  *   <li>解析：POI {@link WorkbookFactory}（兼容 .xlsx / .xls）；表头中文名 → 21 字段；</li>
- *   <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与治理清洗同口径；</li>
+ *   <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；</li>
  *   <li>进度：内存 Map（taskId → 状态），服务重启后丢失，查询返回 404（与 openapi 一致）；</li>
  *   <li>导入同步执行：接口返回即本轮完成，status 直接为「已完成」。</li>
  * </ul>

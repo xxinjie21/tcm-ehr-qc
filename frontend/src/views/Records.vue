@@ -90,7 +90,7 @@
         <PanelCard title="病历批量导入">
           <div class="tip">
             支持 .xlsx / .xls，单文件 ≤50MB、单次 ≤20 个文件；按「登记号」等 21 字段解析入库，
-            与治理清洗同一去重口径（21 字段完全一致视为重复，跳过并记录）。
+            与数据清洗同一去重口径（21 字段完全一致视为重复，跳过并记录）。
           </div>
           <div class="import-auto">
             <el-switch v-model="autoExtract" />

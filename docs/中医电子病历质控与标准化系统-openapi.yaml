@@ -2283,11 +2283,11 @@ paths:
     get:
       tags:
         - 清洗与导出
-      summary: 治理状态统计
-      description: 【权限：仅管理员】返回质控合格病历数量、待治理、已治理统计（清洗与导出页顶部状态行）
+      summary: 清洗状态统计
+      description: 【权限：仅管理员】返回质控合格病历数量、待清洗、已清洗统计（清洗与导出页顶部状态行）
       responses:
         '200':
-          description: 治理状态统计
+          description: 清洗状态统计
           content:
             application/json:
               schema:

@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 数据治理：术语标准化 / 数据清洗 / 标准数据集导出
+ * 数据清洗：术语标准化 / 数据清洗 / 标准数据集导出
  */
 @RestController
 @RequiredArgsConstructor
@@ -94,7 +94,7 @@ public class GovernanceController {
         return Result.ok(governanceService.previewDataset(dto));
     }
 
-    /** 治理状态统计：质控合格/已治理/待治理；【权限：仅管理员】 */
+    /** 清洗状态统计：质控合格/已清洗/待清洗；【权限：仅管理员】 */
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/governance/stats")
     public Result<Map<String, Object>> governanceStats() {

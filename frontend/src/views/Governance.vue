@@ -1,10 +1,10 @@
 <template>
   <div>
-    <!-- 治理状态行（顶部） -->
+    <!-- 清洗状态行（顶部） -->
     <section v-loading="statsLoading" class="gov-stats">
       <span class="gs"><b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
-      <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待治理</span>
-      <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已治理</span>
+      <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
+      <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已清洗</span>
       <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果（UX-21） -->
       <span v-if="statsFailed" class="gs-fail">
         统计加载失败{{ statsLoadedAt ? `（上次成功 ${statsLoadedAt}）` : '' }}
@@ -394,7 +394,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ===== 治理状态行（顶部） ===== */
+/* ===== 清洗状态行（顶部） ===== */
 .gov-stats {
   background: #fff;
   border: 1px solid var(--line);

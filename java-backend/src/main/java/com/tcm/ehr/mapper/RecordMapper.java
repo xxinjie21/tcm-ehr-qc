@@ -28,7 +28,7 @@ public interface RecordMapper extends BaseMapper<Record> {
             """)
     Map<String, Object> selectOverview();
 
-    /** 治理状态统计：合格总数/已治理/待治理 */
+    /** 清洗状态统计：合格总数/已清洗/待清洗 */
     @Select("""
             SELECT
                 COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualified,
@@ -53,7 +53,7 @@ public interface RecordMapper extends BaseMapper<Record> {
                           @Param("status") String status,
                           @Param("grade") String grade);
 
-    /** 治理完成标记 */
+    /** 清洗完成标记 */
     @Update("UPDATE records SET governed = 1 WHERE id = #{id}")
     int markGoverned(@Param("id") String id);
 
