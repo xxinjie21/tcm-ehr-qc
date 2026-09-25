@@ -2816,8 +2816,8 @@ paths:
     get:
       tags:
         - 词典管理
-      summary: 词典备份版本列表
-      description: 【权限：登录即可】列出指定术语类型的备份文件名（回滚可选版本）
+      summary: 词典历史版本列表
+      description: 【权限：登录即可】列出指定术语类型的历史版本（每次导入/转换自动留存），含可读时间、词条数、相对当前增减
       parameters:
         - name: type
           in: query
@@ -2832,7 +2832,7 @@ paths:
               - formula
       responses:
         '200':
-          description: 备份列表
+          description: 历史版本列表
           content:
             application/json:
               schema:
@@ -2848,6 +2848,19 @@ paths:
                         type: array
                         items:
                           type: object
+                          properties:
+                            filename:
+                              type: string
+                              description: 版本文件标识（回滚时回传）
+                            time:
+                              type: string
+                              description: 导入时间（yyyy-MM-dd HH:mm:ss）
+                            count:
+                              type: string
+                              description: 该版本词条数
+                            delta:
+                              type: string
+                              description: 相对当前词典的增减，如 +3 / -2 / 0
         '400':
           description: 术语类型非法（code=4001）
           content:

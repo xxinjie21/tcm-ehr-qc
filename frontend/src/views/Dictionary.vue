@@ -162,11 +162,11 @@
 
     <PanelCard title="版本回滚">
       <div class="rollback-row">
-        <span class="tip">回滚会用该备份覆盖当前词典，立即生效。</span>
-        <el-button size="small" @click="loadBackups">刷新备份列表</el-button>
+        <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
+        <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
       </div>
       <el-table :data="backups" border style="margin-top: 12px" max-height="280">
-        <el-table-column prop="time" label="备份时间" min-width="180" />
+        <el-table-column prop="time" label="导入时间" min-width="180" />
         <el-table-column prop="count" label="词条数" width="110" />
         <el-table-column label="较当前" width="120">
           <template #default="{ row }">
@@ -423,7 +423,7 @@ const loadBackups = async () => {
 
 const handleRollback = async (row) => {
   await ElMessageBox.confirm(
-    `确定将「${TYPE_LABELS[activeTab.value]}」词典回滚到 ${row.time} 的备份吗？覆盖当前词典并立即生效。`,
+    `确定将「${TYPE_LABELS[activeTab.value]}」词典回滚到 ${row.time} 的版本吗？覆盖当前词典并立即生效。`,
     '版本回滚',
     { type: 'warning' }
   )
