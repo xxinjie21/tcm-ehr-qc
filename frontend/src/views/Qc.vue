@@ -173,7 +173,7 @@
                不做「一致」的断言（图谱侧有 coveredPatterns，可以判得更细）。 -->
           <div v-else class="ok">
             规则引擎未报冲突
-            <span class="tip">规则表只覆盖少数常见证候，未覆盖的证候不判冲突；此处空白不等于已核对</span>
+            <span class="tip">规则表只覆盖少数证候，未覆盖的不判冲突；空白 ≠ 已核对</span>
           </div>
         </div>
       </div>

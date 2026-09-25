@@ -177,12 +177,12 @@ const renderTrend = () => {
   const t = extra.value.trend
   trendChart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['合格率', '待复核数'], right: 10, top: 0, textStyle: { fontSize: 12 } },
+    legend: { data: ['合格率', '待复核'], right: 10, top: 0, textStyle: { fontSize: 12 } },
     grid: { left: 44, right: 48, top: 34, bottom: 28 },
     xAxis: { type: 'category', data: t.map((p) => p.month), axisLine: { lineStyle: { color: '#d8d2c4' } } },
     yAxis: [
       { type: 'value', name: '合格率%', max: 100, axisLabel: { formatter: '{value}' }, splitLine: { lineStyle: { color: '#efebe1' } } },
-      { type: 'value', name: '待复核', splitLine: { show: false } }
+      { type: 'value', splitLine: { show: false } }
     ],
     series: [
       {
@@ -191,7 +191,7 @@ const renderTrend = () => {
         itemStyle: { color: '#3d5a4c' }, areaStyle: { color: 'rgba(61,90,76,0.10)' }
       },
       {
-        name: '待复核数', type: 'line', smooth: true, yAxisIndex: 1,
+        name: '待复核', type: 'line', smooth: true, yAxisIndex: 1,
         data: t.map((p) => p.pendingReview),
         itemStyle: { color: '#96714f' }, lineStyle: { type: 'dashed' }
       }

@@ -168,7 +168,11 @@
                 <el-button type="primary" :loading="extracting" :disabled="!composedText" @click="runExtract">
                   执行抽取
                 </el-button>
-                <el-button :disabled="!canSave" @click="save">保存到病历</el-button>
+                <el-button
+                  :disabled="!canSave"
+                  title="把本次抽取结果写入该病历的结构化数据（覆盖原有的），不是新增病历"
+                  @click="save"
+                >写回结构化数据</el-button>
                 <!-- 禁用时说明原因，而不是让用户猜（UX-01） -->
                 <span v-if="!recordId" class="tip">先在上方列表点选一份病历才能保存</span>
                 <span v-else-if="!result" class="tip">先执行抽取才能保存</span>
@@ -285,9 +289,21 @@
           </div>
 
           <div class="batch-row">
-            <span>处理条数上限</span>
-            <el-input-number v-model="batchLimit" :min="1" :max="100000" :step="50" size="small" :disabled="submitting" />
-            <span class="tip">（按范围内前 N 条；条数多时后台跑得久）</span>
+            <span>处理范围</span>
+            <el-radio-group v-model="batchMode" :disabled="submitting" size="small">
+              <el-radio value="all">全部</el-radio>
+              <el-radio value="limit">指定前 N 条</el-radio>
+            </el-radio-group>
+            <el-input-number
+              v-if="batchMode === 'limit'"
+              v-model="batchLimit"
+              :min="1"
+              :max="100000"
+              :step="100"
+              size="small"
+              :disabled="submitting"
+            />
+            <span class="tip">条数多时后台跑得久，可关闭页面稍后回来</span>
           </div>
 
           <div class="actions">
@@ -619,7 +635,7 @@ const save = async () => {
   try {
     await ElMessageBox.confirm(
       `将本次抽取结果写入病历「${label}」的结构化数据，覆盖原有内容。确认？`,
-      '保存到病历',
+      '写回结构化数据',
       { type: 'warning', confirmButtonText: '确认保存', cancelButtonText: '取消' }
     )
   } catch {
@@ -627,7 +643,7 @@ const save = async () => {
   }
   try {
     await updateRecord(recordId.value, { structuredData: result.value })
-    ElMessage.success(`已保存到病历「${label}」`)
+    ElMessage.success(`已写回病历「${label}」的结构化数据`)
   } catch {
     // 拦截器已提示
   }
@@ -637,7 +653,8 @@ const save = async () => {
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.role === '管理员')
 
-const batchLimit = ref(50)
+const batchLimit = ref(1000)
+const batchMode = ref('all')
 const submitting = ref(false)
 /** 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选 */
 const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
@@ -701,7 +718,10 @@ const startPoll = () => {
 const submitBatch = async () => {
   submitting.value = true
   try {
-    const res = await submitNlpBatch({ filters: { ...batchFilters }, limit: batchLimit.value })
+    const res = await submitNlpBatch({
+      filters: { ...batchFilters },
+      limit: batchMode.value === 'limit' ? batchLimit.value : 0
+    })
     ElMessage.success(`已提交，计划 ${res.data.total} 条`)
     activeTask.value = res.data
     loadBatchList()

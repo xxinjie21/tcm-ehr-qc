@@ -57,11 +57,18 @@
         <div class="col-hd">模型参数</div>
         <el-form label-position="top" class="llm-form">
           <el-form-item label="模型名">
-            <el-input
+            <el-select
               v-model="form.model"
-              :placeholder="form.provider === 'ollama' ? '如 qwen2.5:7b' : '如 gpt-4o-mini'"
-            />
-            <span class="llm-hint">留空用通道默认模型</span>
+              filterable
+              allow-create
+              default-first-option
+              :reserve-keyword="false"
+              :placeholder="form.provider === 'ollama' ? '选择或输入，如 qwen2.5:7b' : '选择或输入，如 deepseek-chat'"
+              style="width: 100%"
+            >
+              <el-option v-for="m in modelOptions" :key="m" :label="m" :value="m" />
+            </el-select>
+            <span class="llm-hint">从下拉选择，或直接输入自定义模型名</span>
           </el-form-item>
 
           <div class="llm-row">
@@ -97,10 +104,16 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getLlmConfig, updateLlmConfig, testLlmConfig } from '@/api/llm'
 import { apiErrorMessage } from '@/utils/request'
+
+/** 常用模型（可选择或手输；避免用户不知道填什么） */
+const MODEL_OPTIONS = {
+  ollama: ['qwen2.5:7b', 'qwen2.5:14b', 'llama3.1', 'deepseek-r1:7b'],
+  openai: ['deepseek-chat', 'deepseek-reasoner', 'gpt-4o-mini', 'qwen-plus', 'glm-4', 'moonshot-v1-8k']
+}
 
 const visible = defineModel({ type: Boolean, default: false })
 const emit = defineEmits(['saved'])
@@ -127,6 +140,9 @@ const form = reactive({
   temperature: 0.2,
   timeout: 60000
 })
+
+/** 下拉候选：按当前通道给常用模型 */
+const modelOptions = computed(() => MODEL_OPTIONS[form.provider] || MODEL_OPTIONS.openai)
 
 async function loadConfig() {
   loading.value = true
