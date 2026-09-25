@@ -23,7 +23,7 @@
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms">查 询</el-button>
         <span class="tip">共 {{ terms.length }} 条</span>
       </div>
-      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
+      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" height="360">
         <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
           <template #default="{ row }">
@@ -165,7 +165,7 @@
         <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
       </div>
-      <el-table :data="backups" border style="margin-top: 12px" max-height="280">
+      <el-table :data="backups" border style="margin-top: 12px" height="220">
         <el-table-column prop="time" label="导入时间" min-width="180" />
         <el-table-column prop="count" label="词条数" width="110" />
         <el-table-column label="较当前" width="120">
@@ -204,7 +204,7 @@ const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', h
 const pageRef = ref(null)
 const fitScale = ref(1)
 const fitStyle = computed(() => ({ zoom: fitScale.value }))
-// topbar 52 + main 上 padding 16 + main 下 padding 40（词典页已收紧）+ 底部缓冲 12
+// 兜底常量（取不到 main 时用）：topbar 52 + main 上 padding 16 + 下 padding 40 + 缓冲 12
 const FIT_PAD = 52 + 16 + 40 + 12
 let fitTimer = null
 const scheduleFit = () => {
@@ -212,14 +212,30 @@ const scheduleFit = () => {
   fitTimer = requestAnimationFrame(() => {
     const el = pageRef.value
     if (!el) return
-    el.style.zoom = '1'
-    const avail = Math.max(320, window.innerHeight - FIT_PAD)
-    fitScale.value = Math.min(1, avail / Math.max(el.scrollHeight, 1))
+    // 实测可用高：main 内容区 − 上下 padding − 面包屑；退化用常量
+    let avail = window.innerHeight - FIT_PAD
+    const main = el.closest('main')
+    if (main) {
+      const cs = getComputedStyle(main)
+      const crumb = main.querySelector('.crumb')
+      const crumbH = crumb
+        ? crumb.getBoundingClientRect().height + (parseFloat(getComputedStyle(crumb).marginBottom) || 0)
+        : 0
+      avail = main.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0) - crumbH
+    }
+    avail = Math.max(320, avail)
+    // 不做 zoom 重置：当前 zoom 下的 scrollHeight ÷ 当前缩放 = 自然高，避免二次重排与闪烁
+    const cur = fitScale.value || 1
+    const natural = el.scrollHeight / cur
+    const next = Math.min(1, avail / Math.max(natural, 1))
+    if (Math.abs(next - cur) >= 0.005) {
+      fitScale.value = Number(next.toFixed(4))
+    }
   })
 }
 const handleResize = () => scheduleFit()
 
-const activeTab = ref('symptom')
+const activeTab = ref('disease')
 const typeLabel = computed(() => TYPE_LABELS[activeTab.value])
 
 const keyword = ref('')
@@ -233,7 +249,6 @@ const loadTerms = async () => {
     terms.value = res.data.terms || []
   } finally {
     loadingTerms.value = false
-    nextTick(scheduleFit)
   }
 }
 
@@ -323,11 +338,11 @@ const convertRef = ref(null)
 const convert = reactive({ candidates: [], failed: [] })
 const converting = ref(false)
 
-/** 预览展开后滚到面板处：面板在导入卡片下方，不滚的话用户可能以为「点了没反应」 */
+/** 预览展开/收起都改变页面高度：展开时滚到面板处，并重算缩放 */
 watch(convertVisible, (v) => {
-  if (!v) return
   nextTick(() => {
-    convertRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (v) convertRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    scheduleFit()
   })
 })
 
@@ -418,7 +433,6 @@ const deltaClass = (d) => {
 const loadBackups = async () => {
   const res = await getBackups({ type: activeTab.value })
   backups.value = res.data.backups || []
-  nextTick(scheduleFit)
 }
 
 const handleRollback = async (row) => {
