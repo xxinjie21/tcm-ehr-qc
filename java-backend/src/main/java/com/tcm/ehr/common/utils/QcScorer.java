@@ -39,8 +39,33 @@ public final class QcScorer {
     private static final int MISS_FULL = 12;
     /** 漏抽：原始列有、结构化为空 */
     private static final int MISS_PARTIAL = 6;
+    /** 逻辑冲突每条扣分 */
+    public static final int W_LOGIC = 10;
+    /** 格式错误扣分 */
+    public static final int W_FORMAT = 5;
+    /** 重复数据扣分 */
+    public static final int W_DUPLICATE = 5;
+    /** 合格线 */
+    public static final int QUALIFIED = 90;
+    /** 无效线（低于即无效） */
+    public static final int INVALID = 60;
+    /** 真缺失达到该数判严重（直接无效） */
+    public static final int SERIOUS_FULL = 3;
 
     private QcScorer() {
+    }
+
+    /** 核心要素清单（供只读接口下发，单一数据源） */
+    public static List<String> coreFields() {
+        return CORE;
+    }
+
+    public static int missFull() {
+        return MISS_FULL;
+    }
+
+    public static int missPartial() {
+        return MISS_PARTIAL;
     }
 
     public static ScoreResultVO score(Map<String, Object> data, Record raw, boolean duplicate) {
@@ -70,7 +95,7 @@ public final class QcScorer {
                 strList(data, "treatmentList"), strList(data, "formulaList"),
                 strList(data, "tongueList"), strList(data, "pulseList"));
         for (String c : conflicts) {
-            ded.add(new ScoreResultVO.Deduction("逻辑冲突", c.split("：")[0], 10, c));
+            ded.add(new ScoreResultVO.Deduction("逻辑冲突", c.split("：")[0], W_LOGIC, c));
         }
         vo.setLogicConflicts(conflicts);
 
@@ -78,27 +103,27 @@ public final class QcScorer {
         if (raw != null) {
             String age = trim(raw.getAge());
             if (age != null && !NUMERIC.matcher(age).matches()) {
-                ded.add(new ScoreResultVO.Deduction("格式错误", "年龄", 5, "年龄格式不正确：" + age));
+                ded.add(new ScoreResultVO.Deduction("格式错误", "年龄", W_FORMAT, "年龄格式不正确：" + age));
             }
             String gender = trim(raw.getGender());
             if (gender != null && !"男".equals(gender) && !"女".equals(gender)) {
-                ded.add(new ScoreResultVO.Deduction("格式错误", "性别", 5, "性别非 男/女：" + gender));
+                ded.add(new ScoreResultVO.Deduction("格式错误", "性别", W_FORMAT, "性别非 男/女：" + gender));
             }
         }
         if (duplicate) {
-            ded.add(new ScoreResultVO.Deduction("重复数据", "重复标记", 5, "与已有病历内容完全一致"));
+            ded.add(new ScoreResultVO.Deduction("重复数据", "重复标记", W_DUPLICATE, "与已有病历内容完全一致"));
         }
 
         int totalDeduct = ded.stream().mapToInt(ScoreResultVO.Deduction::getPoints).sum();
         int score = Math.max(0, 100 - totalDeduct);
 
-        boolean serious = fullMissing >= 3;
+        boolean serious = fullMissing >= SERIOUS_FULL;
         String grade;
-        if (serious || score < 60) {
+        if (serious || score < INVALID) {
             grade = "无效";
         } else if (!conflicts.isEmpty()) {
             grade = "待复核";
-        } else if (score >= 90) {
+        } else if (score >= QUALIFIED) {
             grade = "合格";
         } else {
             grade = "待复核";

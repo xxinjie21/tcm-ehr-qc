@@ -25,15 +25,30 @@ public final class LogicChecker {
     public record Rule(String pattern, Set<String> treatments, Set<String> formulas) {
     }
 
+    /** 舌脉冲突条目 */
+    public record TonguePulse(String tongue, String pulse) {
+    }
+
     private static final List<Rule> RULES = List.of(
             new Rule("风寒感冒", Set.of("辛温解表"), Set.of("麻黄汤", "桂枝汤")),
             new Rule("风热感冒", Set.of("辛凉解表"), Set.of("银翘散", "桑菊饮")),
             new Rule("暑湿感冒", Set.of("清暑祛湿"), Set.of("新加香薷饮"))
     );
 
+    /** 舌脉冲突（供只读接口下发，单一数据源） */
+    private static final List<TonguePulse> TONGUE_PULSE = List.of(
+            new TonguePulse("舌红", "脉沉迟"),
+            new TonguePulse("舌淡", "脉数")
+    );
+
     /** 规则表只读视图（图谱复用，避免规则漂移） */
     public static List<Rule> rules() {
         return RULES;
+    }
+
+    /** 舌脉冲突只读视图 */
+    public static List<TonguePulse> tonguePulseConflicts() {
+        return TONGUE_PULSE;
     }
 
     public static final String TYPE_TREATMENT = "证候-治法";
@@ -61,11 +76,10 @@ public final class LogicChecker {
             }
         }
         // 舌象 × 脉象
-        if (containsAny(tongues, "舌红") && containsAny(pulses, "脉沉迟")) {
-            conflicts.add(TYPE_TONGUE_PULSE + "冲突：舌红 × 脉沉迟");
-        }
-        if (containsAny(tongues, "舌淡") && containsAny(pulses, "脉数")) {
-            conflicts.add(TYPE_TONGUE_PULSE + "冲突：舌淡 × 脉数");
+        for (TonguePulse tp : TONGUE_PULSE) {
+            if (containsAny(tongues, tp.tongue()) && containsAny(pulses, tp.pulse())) {
+                conflicts.add(TYPE_TONGUE_PULSE + "冲突：" + tp.tongue() + " × " + tp.pulse());
+            }
         }
         return conflicts;
     }

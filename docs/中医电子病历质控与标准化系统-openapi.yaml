@@ -2702,6 +2702,116 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/qc/rules:
+    get:
+      tags:
+        - 质控
+      summary: 质控评分标准
+      description: 【权限：登录即可】只读下发当前评分口径与逻辑规则（核心要素、扣分权重、分级阈值、证候规则、舌脉冲突），供前端"标准可视化"，避免前端再写一份导致漂移
+      responses:
+        '200':
+          description: 评分标准
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      coreFields:
+                        type: array
+                        items:
+                          type: string
+                      weights:
+                        type: object
+                      thresholds:
+                        type: object
+                      logicRules:
+                        type: array
+                        items:
+                          type: object
+                      tonguePulseConflicts:
+                        type: array
+                        items:
+                          type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/qc/deduction-stats:
+    get:
+      tags:
+        - 质控
+      summary: 范围扣分维度聚合
+      description: 【权限：仅管理员】按范围（filters：department/start/end/pattern/grade）聚合各病历扣分明细：按维度（byType）与明细项（byItem）汇总次数/扣分，另附分级分布；优先读 records.qc_results，缺失则现算，扫描上限超出时 truncated=true
+      parameters:
+        - name: department
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: pattern
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: grade
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 扣分聚合
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      scanned:
+                        type: integer
+                      truncated:
+                        type: boolean
+                      totalPoints:
+                        type: integer
+                      byType:
+                        type: array
+                        items:
+                          type: object
+                      byItem:
+                        type: array
+                        items:
+                          type: object
+                      gradeDist:
+                        type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/dictionary/import:
     post:
       tags:

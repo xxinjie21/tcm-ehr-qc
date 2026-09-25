@@ -463,6 +463,112 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return out;
     }
 
+    @Override
+    public com.tcm.ehr.domain.vo.QcRuleSetVO rules() {
+        com.tcm.ehr.domain.vo.QcRuleSetVO vo = new com.tcm.ehr.domain.vo.QcRuleSetVO();
+        vo.setCoreFields(new ArrayList<>(QcScorer.coreFields()));
+        Map<String, Integer> w = new LinkedHashMap<>();
+        w.put("fullMissing", QcScorer.missFull());
+        w.put("partialMissing", QcScorer.missPartial());
+        w.put("logicConflict", QcScorer.W_LOGIC);
+        w.put("format", QcScorer.W_FORMAT);
+        w.put("duplicate", QcScorer.W_DUPLICATE);
+        vo.setWeights(w);
+        Map<String, Integer> t = new LinkedHashMap<>();
+        t.put("qualified", QcScorer.QUALIFIED);
+        t.put("invalid", QcScorer.INVALID);
+        t.put("seriousFullMissing", QcScorer.SERIOUS_FULL);
+        vo.setThresholds(t);
+        for (LogicChecker.Rule r : LogicChecker.rules()) {
+            com.tcm.ehr.domain.vo.QcRuleSetVO.LogicRule lr = new com.tcm.ehr.domain.vo.QcRuleSetVO.LogicRule();
+            lr.setPattern(r.pattern());
+            lr.setTreatments(new ArrayList<>(r.treatments()));
+            lr.setFormulas(new ArrayList<>(r.formulas()));
+            vo.getLogicRules().add(lr);
+        }
+        for (LogicChecker.TonguePulse tp : LogicChecker.tonguePulseConflicts()) {
+            com.tcm.ehr.domain.vo.QcRuleSetVO.TonguePulse x = new com.tcm.ehr.domain.vo.QcRuleSetVO.TonguePulse();
+            x.setTongue(tp.tongue());
+            x.setPulse(tp.pulse());
+            vo.getTonguePulseConflicts().add(x);
+        }
+        return vo;
+    }
+
+    @Override
+    public com.tcm.ehr.domain.vo.DeductionStatsVO deductionStats(FiltersDTO filters) {
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), filters);
+        com.tcm.ehr.domain.vo.DeductionStatsVO vo = new com.tcm.ehr.domain.vo.DeductionStatsVO();
+        Map<String, int[]> byType = new LinkedHashMap<>();
+        Map<String, int[]> byItem = new LinkedHashMap<>();
+        Map<String, Integer> gradeDist = new LinkedHashMap<>();
+        int scanned = 0;
+        int totalPoints = 0;
+        int pageNo = 1;
+        while (true) {
+            Page<Record> page = baseMapper.selectPage(new Page<>(pageNo, BATCH_PAGE_SIZE), wrapper);
+            List<Record> records = page.getRecords();
+            if (records.isEmpty()) {
+                break;
+            }
+            for (Record r : records) {
+                if (scanned >= MAX_SCAN_RECORDS) {
+                    vo.setTruncated(true);
+                    break;
+                }
+                scanned++;
+                gradeDist.merge(r.getGrade() == null ? "未评分" : r.getGrade(), 1, Integer::sum);
+                ScoreResultVO sr = scoreOf(r);
+                if (sr == null || sr.getDeductions() == null) {
+                    continue;
+                }
+                for (ScoreResultVO.Deduction d : sr.getDeductions()) {
+                    totalPoints += d.getPoints();
+                    int[] a = byType.computeIfAbsent(d.getType(), k -> new int[2]);
+                    a[0]++;
+                    a[1] += d.getPoints();
+                    int[] b = byItem.computeIfAbsent(d.getType() + "|" + d.getItem(), k -> new int[2]);
+                    b[0]++;
+                    b[1] += d.getPoints();
+                }
+            }
+            if (vo.isTruncated() || records.size() < BATCH_PAGE_SIZE) {
+                break;
+            }
+            pageNo++;
+        }
+        for (Map.Entry<String, int[]> e : byType.entrySet()) {
+            vo.getByType().add(new com.tcm.ehr.domain.vo.DeductionStatsVO.ByType(e.getKey(), e.getValue()[0], e.getValue()[1]));
+        }
+        List<com.tcm.ehr.domain.vo.DeductionStatsVO.ByItem> items = new ArrayList<>();
+        for (Map.Entry<String, int[]> e : byItem.entrySet()) {
+            String[] k = e.getKey().split("\\|", 2);
+            items.add(new com.tcm.ehr.domain.vo.DeductionStatsVO.ByItem(k[0], k.length > 1 ? k[1] : "", e.getValue()[0], e.getValue()[1]));
+        }
+        items.sort((a, b) -> Integer.compare(b.getPoints(), a.getPoints()));
+        vo.setByItem(new ArrayList<>(items.subList(0, Math.min(20, items.size()))));
+        vo.setScanned(scanned);
+        vo.setTotalPoints(totalPoints);
+        vo.setGradeDist(gradeDist);
+        return vo;
+    }
+
+    /** 取该病历的评分结果：优先读 qc_results，缺失则按当前规则现算 */
+    private ScoreResultVO scoreOf(Record r) {
+        if (r.getQcResults() != null && !r.getQcResults().isBlank()) {
+            try {
+                return objectMapper.readValue(r.getQcResults(), ScoreResultVO.class);
+            } catch (Exception ignored) {
+                // 落库格式异常则退回现算
+            }
+        }
+        try {
+            return QcScorer.score(asMap(null, r.getStructuredData()), r, false);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private boolean hasSelectedEntity(Map<String, List<String>> byType, Set<String> selected) {
         for (int i = 0; i < ENTITY_TYPES.length; i++) {
             for (String c : byType.getOrDefault(ENTITY_TYPES[i], List.of())) {

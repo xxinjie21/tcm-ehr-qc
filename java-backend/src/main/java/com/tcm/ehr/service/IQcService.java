@@ -32,4 +32,10 @@ public interface IQcService extends IService<Record> {
 
     /** 质控检验图谱（批D·3.3）：范围内聚合"病历—实体" + LogicChecker 规则/冲突边 */
     GraphVO graph(FiltersDTO filters);
+
+    /** 评分标准（批P）：只读下发当前评分口径与逻辑规则，供前端"标准可视化" */
+    com.tcm.ehr.domain.vo.QcRuleSetVO rules();
+
+    /** 范围扣分维度聚合（批P）：范围内各病历扣分明细按维度/明细汇总 */
+    com.tcm.ehr.domain.vo.DeductionStatsVO deductionStats(FiltersDTO filters);
 }

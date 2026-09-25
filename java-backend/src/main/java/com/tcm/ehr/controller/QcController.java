@@ -86,4 +86,22 @@ public class QcController {
         }
         return f;
     }
+
+    /** 质控评分标准（批P）：只读下发当前口径与逻辑规则；【权限：登录即可】 */
+    @GetMapping("/api/qc/rules")
+    public Result<com.tcm.ehr.domain.vo.QcRuleSetVO> rules() {
+        return Result.ok(qcService.rules());
+    }
+
+    /** 范围扣分维度聚合（批P）；【权限：仅管理员】 */
+    @RequireRole(roles = {"管理员"})
+    @GetMapping("/api/qc/deduction-stats")
+    public Result<com.tcm.ehr.domain.vo.DeductionStatsVO> deductionStats(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end,
+            @RequestParam(required = false) String pattern,
+            @RequestParam(required = false) String grade) {
+        return Result.ok(qcService.deductionStats(filters(department, start, end, pattern, grade)));
+    }
 }

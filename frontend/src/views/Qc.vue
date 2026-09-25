@@ -7,7 +7,96 @@
         <RangeFilter v-model="filters" />
         <el-button type="primary" size="small" :loading="queryLoading" @click="applyFilters">查 询</el-button>
         <el-button size="small" :disabled="queryLoading" @click="resetFilters">重置</el-button>
-        <span class="tip">范围对本页两块同时生效：质控检验图谱 + AI 预检列表</span>
+        <span class="tip">范围对本页各块同时生效：评分标准 / 扣分构成 / 规则证据 / AI 预检列表</span>
+      </div>
+    </PanelCard>
+
+    <!-- 质控评分标准（批P）：把写死的口径可视化，先让用户懂"标准" -->
+    <PanelCard title="质控评分标准">
+      <el-collapse v-model="standardOpen">
+        <el-collapse-item name="std">
+          <template #title>
+            <span class="std-title">评分口径 · 分级线 · 逻辑规则</span>
+          </template>
+          <div v-if="qcRules" class="std-body">
+            <div class="std-cols">
+              <div class="std-col">
+                <div class="sub-hd">评分构成（满分 100，逐项扣分）</div>
+                <div class="std-dim">
+                  <span class="sd-name">核心要素缺失</span>
+                  <span class="sd-desc">症状 / 证候 / 舌象 / 脉象 / 中药</span>
+                  <span class="sd-w">真缺失 -{{ qcRules.weights.fullMissing }} ／ 漏抽 -{{ qcRules.weights.partialMissing }}</span>
+                </div>
+                <div class="std-dim">
+                  <span class="sd-name">逻辑冲突</span>
+                  <span class="sd-desc">证候-治法 / 证候-方剂 / 舌脉 不一致</span>
+                  <span class="sd-w">每条 -{{ qcRules.weights.logicConflict }}</span>
+                </div>
+                <div class="std-dim">
+                  <span class="sd-name">格式错误</span>
+                  <span class="sd-desc">年龄非数字 / 性别非男女</span>
+                  <span class="sd-w">每项 -{{ qcRules.weights.format }}</span>
+                </div>
+                <div class="std-dim">
+                  <span class="sd-name">重复数据</span>
+                  <span class="sd-desc">与已有病历内容完全一致</span>
+                  <span class="sd-w">-{{ qcRules.weights.duplicate }}</span>
+                </div>
+              </div>
+              <div class="std-col">
+                <div class="sub-hd">分级线</div>
+                <div class="std-grade ok">合格：无逻辑冲突且 ≥ {{ qcRules.thresholds.qualified }} 分</div>
+                <div class="std-grade mid">待复核：有逻辑冲突，或 {{ qcRules.thresholds.qualified }} 分以下且 ≥ {{ qcRules.thresholds.invalid }} 分</div>
+                <div class="std-grade bad">无效：&lt; {{ qcRules.thresholds.invalid }} 分，或核心要素真缺失 ≥ {{ qcRules.thresholds.seriousFullMissing }} 项</div>
+                <div class="sub-hd">逻辑规则（可判范围）</div>
+                <div v-for="r in qcRules.logicRules" :key="r.pattern" class="rule-card">
+                  <b>{{ r.pattern }}</b>
+                  <span>治法：{{ r.treatments.join(' / ') }}</span>
+                  <span>方剂：{{ r.formulas.join(' / ') }}</span>
+                </div>
+                <div class="rule-card tongue">
+                  <b>舌脉冲突</b>
+                  <span v-for="tp in qcRules.tonguePulseConflicts" :key="tp.tongue + tp.pulse">{{ tp.tongue }} × {{ tp.pulse }}</span>
+                </div>
+                <div class="tip">规则表只覆盖少数证候，未覆盖的不判冲突（空白 ≠ 已核对）。</div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="标准加载中…" :image-size="60" />
+        </el-collapse-item>
+      </el-collapse>
+    </PanelCard>
+
+    <!-- 本范围扣分构成（批P）：范围内各病历扣分明细聚合 -->
+    <PanelCard title="本范围扣分构成">
+      <div v-loading="dedLoading">
+        <template v-if="dedStats">
+          <div v-if="dedStats.byType.length" class="dist">
+            <div v-for="t in dedStats.byType" :key="t.type" class="dist-row">
+              <span class="dr-l">{{ t.type }}</span>
+              <div class="dr-bar"><i :style="{ width: barWidth(t.points) }"></i></div>
+              <span class="dr-v">{{ t.count }} 次 · -{{ t.points }}</span>
+            </div>
+          </div>
+          <div v-else class="ok">本范围内没有扣分项（全部病历未触发任何扣分规则）</div>
+
+          <template v-if="dedStats.byItem.length">
+            <div class="sub-hd">Top 扣分项</div>
+            <el-table :data="dedStats.byItem" border size="small" max-height="240">
+              <el-table-column prop="type" label="类型" width="130" />
+              <el-table-column prop="item" label="项" width="110" />
+              <el-table-column prop="count" label="次数" width="80" />
+              <el-table-column prop="points" label="合计扣分" width="100" />
+            </el-table>
+          </template>
+
+          <div class="sub-hd">分级分布（扫描 {{ dedStats.scanned }} 份）</div>
+          <div class="grade-chips">
+            <span v-for="(v, k) in dedStats.gradeDist" :key="k" class="gc">{{ k }} {{ v }}</span>
+          </div>
+          <div v-if="dedStats.truncated" class="trunc-hint">超出扫描上限，仅统计前 {{ dedStats.scanned }} 份</div>
+        </template>
+        <el-empty v-else-if="!dedLoading" description="点击上方「查询」查看本范围扣分构成" :image-size="70" />
       </div>
     </PanelCard>
 
@@ -30,8 +119,11 @@
         </span>
       </div>
 
-      <div v-loading="graphLoading">
-        <template v-if="graph.nodes.length">
+      <el-collapse v-model="evidenceOpen" class="ev-collapse">
+        <el-collapse-item name="ev">
+          <template #title><span class="std-title">规则证据明细（冲突清单 / 规则命中 / 覆盖情况）</span></template>
+          <div v-loading="graphLoading">
+            <template v-if="graph.nodes.length">
           <div class="sub-hd">冲突清单</div>
           <el-table v-if="conflictRows.length" :data="conflictRows" border size="small">
             <el-table-column prop="reason" label="冲突" min-width="220" show-overflow-tooltip />
@@ -61,12 +153,14 @@
             未覆盖证候（不判冲突）：{{ uncoveredPatterns.join('、') }}
           </p>
         </template>
-        <el-empty
-          v-else-if="!graphLoading"
-          description="范围内暂无可展示的质控证据"
-          :image-size="90"
-        />
-      </div>
+            <el-empty
+              v-else-if="!graphLoading"
+              description="范围内暂无可展示的质控证据"
+              :image-size="90"
+            />
+          </div>
+        </el-collapse-item>
+      </el-collapse>
     </PanelCard>
 
     <PanelCard title="AI 预检列表 / 扣分明细">
@@ -133,6 +227,26 @@
             <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
             <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
           </el-descriptions>
+
+          <!-- 评分构成瀑布（批P）：100 分起逐项扣到最终分，一眼看分扣在哪 -->
+          <div class="sd-title">评分构成（100 分起，逐项扣）</div>
+          <div class="wf">
+            <div class="wf-item"><span class="wf-l">总分</span><b class="wf-num">100</b></div>
+            <div v-for="(d, i) in detail.deductions" :key="i" class="wf-item">
+              <span class="wf-l">{{ d.type }} · {{ d.item }}</span>
+              <b class="wf-num neg">-{{ d.points }}</b>
+            </div>
+            <div class="wf-item end">
+              <span class="wf-l">最终得分</span>
+              <b class="wf-num">{{ detail.score }}</b>
+              <span class="wf-grade" :class="gradeClass(detail.grade)">{{ detail.grade }}</span>
+            </div>
+          </div>
+          <div class="wf-note">
+            合格线 {{ qualified }} 分
+            <template v-if="detail.score < qualified">，距合格线还差 {{ qualified - detail.score }} 分</template>
+          </div>
+
           <div class="sd-title">扣分明细（合计 -{{ detailTotal }} 分）</div>
           <el-table :data="detail.deductions" border size="small" max-height="340">
             <el-table-column prop="type" label="类型" width="110" />
@@ -168,11 +282,49 @@
 import { reactive, ref, computed, onMounted } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { getGraph, qcScore } from '@/api/qc'
+import { getGraph, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
 
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+
+// ===== 评分标准 / 扣分构成（批P） =====
+const qcRules = ref(null)
+const standardOpen = ref(['std']) // 默认展开：先让用户看到"标准"
+const evidenceOpen = ref([]) // 规则证据明细默认收起
+const dedStats = ref(null)
+const dedLoading = ref(false)
+
+const loadRules = async () => {
+  try {
+    const res = await getQcRules()
+    qcRules.value = res.data
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 标准里的合格线（未加载时退回 90） */
+const qualified = computed(() => qcRules.value?.thresholds?.qualified ?? 90)
+const gradeClass = (g) => (g === '合格' ? 'is-ok' : g === '无效' ? 'is-bad' : 'is-mid')
+
+const loadDedStats = async () => {
+  dedLoading.value = true
+  try {
+    const res = await getDeductionStats(params())
+    dedStats.value = res.data
+  } catch {
+    // 拦截器已提示
+  } finally {
+    dedLoading.value = false
+  }
+}
+
+/** 条形宽度：按最大扣分点数归一 */
+const barWidth = (points) => {
+  const max = Math.max(1, ...(dedStats.value?.byType || []).map((t) => t.points))
+  return Math.round((points / max) * 100) + '%'
+}
 const params = () => {
   const d = filters.dateRange
   return {
@@ -273,11 +425,12 @@ const handleSizeChange = () => {
   loadPrecheck()
 }
 
-/** 范围查询是整页口径：刷新时图谱与预检列表必须一起走，不能只刷其中一块 */
-const queryLoading = computed(() => graphLoading.value || precheckLoading.value)
+/** 范围查询是整页口径：刷新时各块必须一起走 */
+const queryLoading = computed(() => graphLoading.value || precheckLoading.value || dedLoading.value)
 const applyFilters = () => {
   loadGraph()
   loadPrecheck(1)
+  loadDedStats()
 }
 const resetFilters = () => {
   filters.department = ''
@@ -311,8 +464,10 @@ const closeDetail = () => {
 }
 
 onMounted(() => {
+  loadRules()
   loadGraph()
   loadPrecheck(1)
+  loadDedStats()
 })
 </script>
 
@@ -490,5 +645,182 @@ onMounted(() => {
   font-size: 12.5px;
   line-height: 1.8;
   color: var(--text-sub);
+}
+
+/* ===== 评分标准面板（批P） ===== */
+.std-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--ink);
+}
+.std-body {
+  padding-top: 4px;
+}
+.std-cols {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+.std-col {
+  flex: 1;
+  min-width: 0;
+}
+.std-dim {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 12.5px;
+}
+.std-dim .sd-name {
+  font-weight: bold;
+  color: var(--ink);
+  flex: 0 0 96px;
+}
+.std-dim .sd-desc {
+  flex: 1 1 auto;
+  color: var(--text-sub);
+}
+.std-dim .sd-w {
+  flex: 0 0 auto;
+  color: var(--ochre);
+  font-weight: bold;
+}
+.std-grade {
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.std-grade.ok {
+  background: var(--ink-light);
+  color: var(--ink);
+}
+.std-grade.mid {
+  background: var(--ochre-light);
+  color: #8a6a44;
+}
+.std-grade.bad {
+  background: #fdf3f1;
+  color: #8a3d33;
+}
+.rule-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-mid);
+  border-radius: 4px;
+  background: var(--paper);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.rule-card.tongue {
+  border-left-color: var(--danger);
+}
+.ev-collapse {
+  border-top: none;
+}
+
+/* ===== 本范围扣分构成 ===== */
+.dist {
+  margin-bottom: 8px;
+}
+.dist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+.dist-row .dr-l {
+  flex: 0 0 130px;
+  color: var(--ink);
+}
+.dist-row .dr-bar {
+  flex: 1 1 auto;
+  height: 12px;
+  background: var(--paper);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.dist-row .dr-bar i {
+  display: block;
+  height: 100%;
+  background: var(--ochre);
+}
+.dist-row .dr-v {
+  flex: 0 0 130px;
+  text-align: right;
+  color: var(--text-sub);
+}
+.grade-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.grade-chips .gc {
+  font-size: 12.5px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+}
+
+/* ===== 评分构成瀑布（弹窗内） ===== */
+.wf {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: var(--paper);
+}
+.wf-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 12.5px;
+}
+.wf-item .wf-l {
+  flex: 1 1 auto;
+  color: var(--ink);
+}
+.wf-item .wf-num {
+  flex: 0 0 auto;
+  color: var(--ink);
+}
+.wf-item .wf-num.neg {
+  color: var(--danger);
+}
+.wf-item.end {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 6px;
+}
+.wf-grade {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.wf-grade.is-ok {
+  background: var(--ink-light);
+  color: var(--ink);
+}
+.wf-grade.is-mid {
+  background: var(--ochre-light);
+  color: #8a6a44;
+}
+.wf-grade.is-bad {
+  background: #fdf3f1;
+  color: #8a3d33;
+}
+.wf-note {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-bottom: 10px;
 }
 </style>
