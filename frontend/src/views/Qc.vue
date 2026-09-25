@@ -17,11 +17,59 @@
         <span>质控评分标准</span>
         <el-button v-if="isAdmin" link type="primary" class="hd-action" @click="openRules">规则配置</el-button>
       </template>
-      <div class="std-body">
-        <div v-for="(line, i) in descriptions" :key="i" class="std-desc">· {{ line }}</div>
-        <div v-if="ruleWarnings.length" class="trunc-hint">规则告警：{{ ruleWarnings.join('；') }}</div>
+      <div v-if="rules" class="std-cards">
+        <div class="std-card">
+          <div class="sc-hd">完整性 · 病历应包含</div>
+          <div class="sc-chips">
+            <span v-for="e in rules.completeness.elements" :key="e.name" class="sc-chip">{{ e.name }}</span>
+          </div>
+          <div class="sc-note">
+            完全缺失 -{{ rules.completeness.elements[0]?.weightFull ?? 12 }} ／
+            仅有原始记录、未结构化 -{{ rules.completeness.elements[0]?.weightPartial ?? 6 }}
+          </div>
+        </div>
+
+        <div class="std-card">
+          <div class="sc-hd">格式检查</div>
+          <div v-for="f in rules.format" :key="f.field" class="sc-line">
+            <b>{{ f.label || f.field }}</b>
+            <span>{{ f.type === 'enum' ? ('须为 ' + (f.values || []).join('/')) : ('须匹配 ' + f.expr) }}</span>
+            <em>-{{ f.weight }}</em>
+          </div>
+          <div v-if="!rules.format.length" class="sc-note">未配置</div>
+        </div>
+
+        <div class="std-card">
+          <div class="sc-hd">一致性规则</div>
+          <div v-for="c in rules.consistency" :key="c.name" class="sc-line col">
+            <b>{{ c.name }}</b>
+            <span>
+              证候含 {{ (c.patternAny || []).join('/') }} → 中药 {{ (c.expectHerbs || []).join('/') || '—' }}<template v-if="c.expectTongue && c.expectTongue.length">｜舌 {{ c.expectTongue.join('/') }}</template><template v-if="c.expectPulse && c.expectPulse.length">｜脉 {{ c.expectPulse.join('/') }}</template>
+            </span>
+            <em>-{{ c.weight }}</em>
+          </div>
+          <div v-if="!rules.consistency.length" class="sc-note">未配置（不判冲突）</div>
+        </div>
+
+        <div class="std-card">
+          <div class="sc-hd">术语标准化</div>
+          <div v-if="rules.standardization.enabled" class="sc-note">
+            {{ (rules.standardization.elementTypes || []).join('/') }} 未命中词典：每个 -{{ rules.standardization.weightEach }}，上限 -{{ rules.standardization.cap }}
+          </div>
+          <div v-else class="sc-note off">已关闭（不参与评分）</div>
+          <div class="sc-hd inner">重复病历</div>
+          <div class="sc-note">内容完全重复 -{{ rules.duplicateWeight }}</div>
+        </div>
+
+        <div class="std-card wide">
+          <div class="sc-hd">分级线</div>
+          <div class="std-grade ok">合格：无逻辑冲突且 ≥ {{ rules.thresholds.qualified }} 分</div>
+          <div class="std-grade mid">待复核：有逻辑冲突，或 {{ rules.thresholds.invalid }}~{{ rules.thresholds.qualified - 1 }} 分</div>
+          <div class="std-grade bad">无效：&lt; {{ rules.thresholds.invalid }} 分，或核心真缺失 ≥ {{ rules.thresholds.seriousFullMissing }} 项</div>
+        </div>
       </div>
-      <el-empty v-if="!descriptions.length" description="标准加载中…" :image-size="60" />
+      <div v-if="ruleWarnings.length" class="trunc-hint">规则告警：{{ ruleWarnings.join('；') }}</div>
+      <el-empty v-if="!rules" description="标准加载中…" :image-size="60" />
     </PanelCard>
 
     <!-- 规则配置（仅管理员）：句子清单 + 就地编辑，保存即生效 -->
@@ -805,6 +853,81 @@ onMounted(() => {
   line-height: 1.9;
   color: var(--ink);
   padding: 2px 0;
+}
+.std-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.std-card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: #fff;
+}
+.std-card.wide {
+  grid-column: 1 / -1;
+}
+.sc-hd {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--ink);
+  border-left: 3px solid var(--ink-mid);
+  padding-left: 8px;
+  margin-bottom: 8px;
+}
+.sc-hd.inner {
+  margin-top: 12px;
+}
+.sc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.sc-chip {
+  font-size: 12px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ink-light);
+  color: var(--ink);
+}
+.sc-note {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.8;
+}
+.sc-note.off {
+  color: var(--ochre);
+}
+.sc-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink);
+  padding: 3px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.sc-line.col {
+  flex-wrap: wrap;
+}
+.sc-line:last-child {
+  border-bottom: none;
+}
+.sc-line b {
+  flex: 0 0 auto;
+  color: var(--ink);
+}
+.sc-line span {
+  flex: 1 1 auto;
+  color: var(--text-sub);
+}
+.sc-line em {
+  flex: 0 0 auto;
+  font-style: normal;
+  color: var(--danger);
 }
 .rc {
   max-height: 72vh;
