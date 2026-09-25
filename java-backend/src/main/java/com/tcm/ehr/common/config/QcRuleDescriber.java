@@ -44,22 +44,14 @@ public final class QcRuleDescriber {
             out.add("格式检查：" + String.join("；", fmts) + "。");
         }
 
-        // 一致性
+        // 一致性（类型 → 类型，批S）
         for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
-            StringBuilder sb = new StringBuilder("若证候含【" + String.join("/", c.getPatternAny()) + "】，则 ");
-            List<String> conds = new ArrayList<>();
-            if (!c.getExpectHerbs().isEmpty()) {
-                conds.add("中药应包含 " + String.join("/", c.getExpectHerbs()) + " 之一");
+            if (c.getTriggerType() == null || c.getExpectType() == null) {
+                continue;
             }
-            if (!c.getExpectTongue().isEmpty()) {
-                conds.add("舌象应为 " + String.join("/", c.getExpectTongue()));
-            }
-            if (!c.getExpectPulse().isEmpty()) {
-                conds.add("脉象应为 " + String.join("/", c.getExpectPulse()));
-            }
-            sb.append(String.join("、", conds));
-            sb.append("；不符且该项有记录时记逻辑冲突（- ").append(c.getWeight()).append(" 分）。");
-            out.add(sb.toString());
+            out.add("若【" + labelOf(c.getTriggerType()) + "】含 " + String.join("/", c.getTriggerValues())
+                    + "，则【" + labelOf(c.getExpectType()) + "】应为 " + String.join("/", c.getExpectValues())
+                    + " 之一；不符且该项有记录时记逻辑冲突（- " + c.getWeight() + " 分）。");
         }
 
         // 标准化
@@ -81,11 +73,13 @@ public final class QcRuleDescriber {
         return out;
     }
 
-    /** 可选要素目录：取自实体类型目录（9 类，中文名 ↔ structuredKey / 回退列），用户只选中文 */
+    /** 可选要素目录：取自实体类型目录（9 类，中文名 ↔ 类型 key / structuredKey / 回退列），用户只选中文 */
     public static List<QcRuleSet.Element> catalogElements() {
         List<QcRuleSet.Element> list = new ArrayList<>();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
-            list.add(el(t.label(), t.structuredKey(), t.fallback()));
+            QcRuleSet.Element e = el(t.label(), t.structuredKey(), t.fallback());
+            e.setTypeKey(t.key());
+            list.add(e);
         }
         return list;
     }
@@ -96,6 +90,11 @@ public final class QcRuleDescriber {
         list.add(fmt("age", "regex", "^\\d+(\\.\\d+)?(岁|个月|月|天)?$", List.of(), "年龄", "年龄格式不正确"));
         list.add(fmt("gender", "enum", null, List.of("男", "女"), "性别", "性别非 男/女"));
         return list;
+    }
+
+    private static String labelOf(String type) {
+        EntityTypes.EntityType t = EntityTypes.byKey(type);
+        return t == null ? type : t.label();
     }
 
     private static QcRuleSet.Element el(String name, String source, List<String> fallback) {

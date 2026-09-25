@@ -1,15 +1,17 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.common.config.QcRuleSet;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * 诊疗逻辑一致性评估（批B·2.3，批Q 改为按配置的规则执行）。
+ * 诊疗逻辑一致性评估（批B·2.3，批S 泛化为"类型 → 类型"）。
  *
- * <p>规则来自 {@link QcRuleSet#getConsistency()}：证候命中关键词时，若病历记录了相应要素
- * （中药/舌象/脉象），则须与期望集合相符，否则记为冲突；<b>对应要素缺失则跳过（不适用）</b>。</p>
+ * <p>规则来自 {@link QcRuleSet#getConsistency()}：当【触发类型】实体命中【触发值】时，
+ * 若病历记录了【期望类型】实体，则其须命中【期望值】之一，否则记冲突；期望类型实体缺失 → 不适用。</p>
  */
 public final class LogicChecker {
 
@@ -17,37 +19,67 @@ public final class LogicChecker {
     }
 
     /**
-     * @return 冲突描述列表（形如"规则名：xxx与证候不符"）
+     * @param data  结构化数据（structured_data 反序列化后的 map）
+     * @param rules 一致性规则
+     * @return 冲突描述列表（形如"规则名：中药与证候不符"）
      */
-    public static List<String> check(List<String> patterns, List<String> tongues, List<String> pulses,
-                                     List<String> herbs, List<QcRuleSet.ConsistencyRule> rules) {
+    public static List<String> check(Map<String, Object> data, List<QcRuleSet.ConsistencyRule> rules) {
         List<String> conflicts = new ArrayList<>();
-        if (rules == null || patterns == null || patterns.isEmpty()) {
+        if (rules == null || data == null) {
             return conflicts;
         }
         for (QcRuleSet.ConsistencyRule rule : rules) {
-            if (rule.getPatternAny() == null || rule.getPatternAny().isEmpty()) {
+            if (rule.getTriggerType() == null || rule.getExpectType() == null
+                    || rule.getTriggerValues() == null || rule.getTriggerValues().isEmpty()
+                    || rule.getExpectValues() == null || rule.getExpectValues().isEmpty()) {
                 continue;
             }
-            boolean hit = patterns.stream().anyMatch(p -> anyContains(p, rule.getPatternAny()));
+            List<String> triggers = listOf(data, rule.getTriggerType());
+            List<String> expects = listOf(data, rule.getExpectType());
+            // 触发类型无该实体 → 不适用
+            if (triggers.isEmpty()) {
+                continue;
+            }
+            boolean hit = triggers.stream().anyMatch(t -> anyContains(t, rule.getTriggerValues()));
             if (!hit) {
                 continue;
             }
-            String name = rule.getName() == null ? "一致性" : rule.getName();
-            if (!rule.getExpectHerbs().isEmpty() && herbs != null && !herbs.isEmpty()
-                    && herbs.stream().noneMatch(h -> anyContains(h, rule.getExpectHerbs()))) {
-                conflicts.add(name + "：中药与证候不符");
+            // 期望类型没有记录 → 不适用（不误判）
+            if (expects.isEmpty()) {
+                continue;
             }
-            if (!rule.getExpectTongue().isEmpty() && tongues != null && !tongues.isEmpty()
-                    && tongues.stream().noneMatch(t -> anyContains(t, rule.getExpectTongue()))) {
-                conflicts.add(name + "：舌象与证候不符");
-            }
-            if (!rule.getExpectPulse().isEmpty() && pulses != null && !pulses.isEmpty()
-                    && pulses.stream().noneMatch(p -> anyContains(p, rule.getExpectPulse()))) {
-                conflicts.add(name + "：脉象与证候不符");
+            boolean ok = expects.stream().anyMatch(e -> anyContains(e, rule.getExpectValues()));
+            if (!ok) {
+                String name = rule.getName() == null ? "一致性" : rule.getName();
+                conflicts.add(name + "：" + labelOf(rule.getExpectType()) + "与" + labelOf(rule.getTriggerType()) + "不符");
             }
         }
         return conflicts;
+    }
+
+    /** 取某实体类型在结构化数据中的实体文本列表（herbs 取 name，其余取 content） */
+    private static List<String> listOf(Map<String, Object> data, String type) {
+        List<String> out = new ArrayList<>();
+        EntityTypes.EntityType t = EntityTypes.byKey(type);
+        if (t == null || !(data.get(t.structuredKey()) instanceof List<?> list)) {
+            return out;
+        }
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> m) {
+                Object v = m.get("content") != null ? m.get("content") : m.get("name");
+                if (v != null && !String.valueOf(v).isBlank()) {
+                    out.add(String.valueOf(v).trim());
+                }
+            } else if (item != null && !String.valueOf(item).isBlank()) {
+                out.add(String.valueOf(item).trim());
+            }
+        }
+        return out;
+    }
+
+    private static String labelOf(String type) {
+        EntityTypes.EntityType t = EntityTypes.byKey(type);
+        return t == null ? type : t.label();
     }
 
     private static boolean anyContains(String text, List<String> keys) {

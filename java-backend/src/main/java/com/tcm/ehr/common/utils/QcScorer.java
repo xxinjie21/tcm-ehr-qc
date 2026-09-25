@@ -44,10 +44,8 @@ public final class QcScorer {
             ded.add(new ScoreResultVO.Deduction("核心字段缺失", el.getName(), points, reasonFor(el, rawHas)));
         }
 
-        // ② 逻辑一致性
-        List<String> conflicts = LogicChecker.check(
-                strList(data, "patternList"), strList(data, "tongueList"), strList(data, "pulseList"),
-                strList(data, "herbs"), rs.getConsistency());
+        // ② 逻辑一致性（类型 → 类型，批S）
+        List<String> conflicts = LogicChecker.check(data, rs.getConsistency());
         for (String c : conflicts) {
             String name = c.contains("：") ? c.substring(0, c.indexOf("：")) : c;
             int w = weightOf(rs, name);

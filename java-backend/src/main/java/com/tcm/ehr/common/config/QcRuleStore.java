@@ -131,6 +131,20 @@ public class QcRuleStore {
         }
         if (r.getConsistency() == null) {
             r.setConsistency(new ArrayList<>());
+        } else {
+            // 过滤旧格式/非法条目（批S 一致性结构升级：需 triggerType/expectType/values）
+            List<QcRuleSet.ConsistencyRule> valid = new ArrayList<>();
+            for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
+                boolean ok = c.getTriggerType() != null && c.getExpectType() != null
+                        && c.getTriggerValues() != null && !c.getTriggerValues().isEmpty()
+                        && c.getExpectValues() != null && !c.getExpectValues().isEmpty();
+                if (ok) {
+                    valid.add(c);
+                } else {
+                    warnings.add("存在旧版/无效的一致性规则，已忽略：" + (c.getName() == null ? "(未命名)" : c.getName()));
+                }
+            }
+            r.setConsistency(valid);
         }
         if (r.getFormat() == null) {
             r.setFormat(new ArrayList<>());

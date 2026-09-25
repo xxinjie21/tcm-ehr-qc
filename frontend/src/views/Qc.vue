@@ -101,23 +101,27 @@
           <el-button link type="danger" @click="removeCustomFormat(i)">删</el-button>
         </div>
 
-        <div class="rc-hd">③ 一致性规则（证候 → 期望中药 / 舌象 / 脉象）</div>
+        <div class="rc-hd">③ 一致性规则（触发类型 → 期望类型，期望值取自词典）</div>
         <div v-for="(c, i) in form.consistency" :key="i" class="rc-block">
           <div class="rc-line">
-            若证候含
-            <el-select v-model="c.patternAny" multiple filterable allow-create collapse-tags size="small" style="min-width: 260px">
-              <el-option v-for="p in patternOptions" :key="p" :label="p" :value="p" />
+            若
+            <el-select v-model="c.triggerType" size="small" style="width: 120px">
+              <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
+            </el-select>
+            含
+            <el-select v-model="c.triggerValues" multiple filterable allow-create collapse-tags size="small" style="min-width: 220px">
+              <el-option v-for="v in termsOf(c.triggerType)" :key="v" :label="v" :value="v" />
             </el-select>
           </div>
           <div class="rc-line">
-            则中药应含
-            <el-select v-model="c.expectHerbs" multiple filterable allow-create collapse-tags size="small" style="min-width: 260px">
-              <el-option v-for="h in herbOptions" :key="h" :label="h" :value="h" />
+            则
+            <el-select v-model="c.expectType" size="small" style="width: 120px">
+              <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
             </el-select>
-            ；舌象
-            <el-input v-model="c.tongueText" size="small" style="width: 120px" placeholder="如 舌质淡红" />
-            ；脉象
-            <el-input v-model="c.pulseText" size="small" style="width: 120px" placeholder="如 脉弦细" />
+            应为
+            <el-select v-model="c.expectValues" multiple filterable collapse-tags size="small" style="min-width: 220px">
+              <el-option v-for="v in termsOf(c.expectType)" :key="v" :label="v" :value="v" />
+            </el-select>
             冲突扣
             <el-input-number v-model="c.weight" size="small" :min="0" :controls="false" />
             分
@@ -381,8 +385,8 @@ const params = () => {
 // ===== 规则配置（管理员）：句子清单 + 就地编辑 =====
 const rulesVisible = ref(false)
 const savingRules = ref(false)
-const patternOptions = ref([])
-const herbOptions = ref([])
+/** 各词典类型的标准词（供一致性"期望值"下拉，仅从词典选） */
+const dictTerms = ref({})
 const form = reactive({
   rules: null,
   elementNames: [],
@@ -392,15 +396,19 @@ const form = reactive({
   consistency: []
 })
 const clone = (o) => JSON.parse(JSON.stringify(o))
+const termsOf = (type) => dictTerms.value[type] || []
 
-const loadDictOptions = async () => {
-  try {
-    const [p, h] = await Promise.all([getTerms({ type: 'pattern' }), getTerms({ type: 'herb' })])
-    patternOptions.value = (p.data?.terms || []).map((t) => t.standardTerm).filter(Boolean)
-    herbOptions.value = (h.data?.terms || []).map((t) => t.standardTerm).filter(Boolean)
-  } catch {
-    // 词典不可用则留空，仍可手输
-  }
+const loadDictTerms = async () => {
+  const types = ['disease', 'pattern', 'symptom', 'herb', 'formula']
+  await Promise.all(types.map(async (type) => {
+    if (dictTerms.value[type]) return
+    try {
+      const res = await getTerms({ type })
+      dictTerms.value[type] = (res.data?.terms || []).map((t) => t.standardTerm).filter(Boolean)
+    } catch {
+      dictTerms.value[type] = []
+    }
+  }))
 }
 
 const openRules = async () => {
@@ -417,8 +425,11 @@ const openRules = async () => {
     label: f.label, weight: f.weight ?? 5, reason: f.reason
   }))
   form.consistency = (r.consistency || []).map((c) => ({
-    name: c.name, patternAny: c.patternAny || [], expectHerbs: c.expectHerbs || [],
-    tongueText: (c.expectTongue || []).join(','), pulseText: (c.expectPulse || []).join(','),
+    name: c.name,
+    triggerType: c.triggerType || 'pattern',
+    triggerValues: c.triggerValues || [],
+    expectType: c.expectType || 'herb',
+    expectValues: c.expectValues || [],
     weight: c.weight ?? 10
   }))
   form.rules = {
@@ -427,9 +438,7 @@ const openRules = async () => {
     thresholds: r.thresholds || { qualified: 90, invalid: 60, seriousFullMissing: 3 }
   }
   rulesVisible.value = true
-  if (!patternOptions.value.length || !herbOptions.value.length) {
-    loadDictOptions()
-  }
+  loadDictTerms()
 }
 
 /** 格式：模板勾选即用（无需写正则）；非模板项作为历史自定义规则展示 */
@@ -458,7 +467,10 @@ const removeCustomFormat = (i) => {
   if (idx >= 0) form.format.splice(idx, 1)
 }
 const addConsistency = () => {
-  form.consistency.push({ name: '自定义规则', patternAny: [], expectHerbs: [], tongueText: '', pulseText: '', weight: 10 })
+  form.consistency.push({
+    name: '自定义规则', triggerType: 'pattern', triggerValues: [],
+    expectType: 'herb', expectValues: [], weight: 10
+  })
 }
 
 const saveRules = async () => {
@@ -475,13 +487,13 @@ const saveRules = async () => {
       }
     })
     const consistency = form.consistency
-      .filter((c) => (c.patternAny || []).length)
+      .filter((c) => (c.triggerValues || []).length && (c.expectValues || []).length)
       .map((c) => ({
         name: c.name || '自定义规则',
-        patternAny: c.patternAny,
-        expectHerbs: c.expectHerbs || [],
-        expectTongue: String(c.tongueText || '').split(/[，,;；\s]+/).map((x) => x.trim()).filter(Boolean),
-        expectPulse: String(c.pulseText || '').split(/[，,;；\s]+/).map((x) => x.trim()).filter(Boolean),
+        triggerType: c.triggerType,
+        triggerValues: c.triggerValues,
+        expectType: c.expectType,
+        expectValues: c.expectValues,
         weight: c.weight
       }))
     const payload = {

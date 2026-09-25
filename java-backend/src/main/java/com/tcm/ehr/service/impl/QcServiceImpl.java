@@ -104,9 +104,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     @Override
     public LogicCheckVO checkLogic(LogicCheckDTO dto) {
-        List<String> patterns = pick(dto == null ? null : dto.getPatternList());
-        List<String> conflicts = LogicChecker.check(patterns, List.of(), List.of(), List.of(),
-                ruleStore.get().getConsistency());
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        if (dto != null) {
+            data.put("patternList", dto.getPatternList());
+            data.put("treatmentList", dto.getTreatmentList());
+            data.put("formulaList", dto.getFormulaList());
+        }
+        List<String> conflicts = LogicChecker.check(data, ruleStore.get().getConsistency());
         LogicCheckVO vo = new LogicCheckVO();
         vo.setConflicts(conflicts);
         vo.setConsistent(conflicts.isEmpty());
