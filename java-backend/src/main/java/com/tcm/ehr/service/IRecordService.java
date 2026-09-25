@@ -21,8 +21,8 @@ import java.util.Map;
  */
 public interface IRecordService extends IService<Record> {
 
-    /** 批量导入病历（.xlsx/.xls 多文件），返回 taskId + 本轮摘要 */
-    ImportTaskVO importRecords(MultipartFile[] files);
+    /** 批量导入病历（.xlsx/.xls 多文件），返回 taskId + 本轮摘要；autoExtract=导入后投后台批量解析任务 */
+    ImportTaskVO importRecords(MultipartFile[] files, boolean autoExtract);
 
     /** 导入进度查询；任务不存在（含服务重启）返回 null，由 Controller 转 404 */
     ImportStatusVO importStatus(String taskId);

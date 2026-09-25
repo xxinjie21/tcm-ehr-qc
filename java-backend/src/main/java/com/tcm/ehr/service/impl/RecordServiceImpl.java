@@ -65,6 +65,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     private final ObjectMapper objectMapper;
     private final IDictionaryFileService dictionaryFileService;
+    private final com.tcm.ehr.service.INlpBatchService nlpBatchService;
 
     /** 原始 21 字段（禁止通过修改接口变更，命中即 400 code=1007） */
     private static final Set<String> ORIGINAL_FIELDS = Set.of(
@@ -110,7 +111,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     private final Map<String, ImportStatusVO> taskStore = new ConcurrentHashMap<>();
 
     @Override
-    public ImportTaskVO importRecords(MultipartFile[] files) {
+    public ImportTaskVO importRecords(MultipartFile[] files, boolean autoExtract) {
         if (files == null || files.length == 0) {
             throw new IllegalArgumentException("请上传至少一个文件");
         }
@@ -220,6 +221,18 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
         summary.setSuccess(toInsert.size());
 
+        // 导入后自动结构化解析（用户开关，默认关）：投后台批任务，导入本身不阻塞
+        String autoTaskId = null;
+        if (autoExtract && !toInsert.isEmpty()) {
+            try {
+                var task = nlpBatchService.submitIds(
+                        toInsert.stream().map(Record::getId).toList(), RequestUtils.currentUsername());
+                autoTaskId = task == null ? null : task.getId();
+            } catch (Exception e) {
+                log.warn("[病历导入] 自动解析未提交：{}", e.getMessage());
+            }
+        }
+
         status.setStatus("已完成");
         status.setTotal(summary.getTotal());
         status.setProcessed(summary.getTotal());
@@ -230,6 +243,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         ImportTaskVO vo = new ImportTaskVO();
         vo.setTaskId(taskId);
         vo.setSummary(summary);
+        vo.setAutoExtractTaskId(autoTaskId);
         log.info("[病历导入] task={} 文件={} 行={} 成功={} 失败={}",
                 taskId, files.length, summary.getTotal(), summary.getSuccess(), summary.getFailed());
         return vo;

@@ -13,6 +13,9 @@ public interface INlpBatchService {
     /** 提交批量解析任务（仅管理员提交；返回含计划条数的任务视图） */
     NlpTaskVO submit(NlpBatchDTO dto, String createdBy);
 
+    /** 按记录ID集合提交（导入后自动解析用）；ids 为空返回 null；未开启抽取抛异常 */
+    NlpTaskVO submitIds(List<String> ids, String createdBy);
+
     /** 查询任务进度（不存在返回 null） */
     NlpTaskVO get(String id);
 

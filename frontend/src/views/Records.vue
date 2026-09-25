@@ -77,6 +77,11 @@
             支持 .xlsx / .xls，单文件 ≤50MB、单次 ≤20 个文件；按「登记号」等 21 字段解析入库，
             与治理清洗同一去重口径（21 字段完全一致视为重复，跳过并记录）。
           </div>
+          <div class="import-auto">
+            <el-switch v-model="autoExtract" />
+            <span>导入后自动结构化解析（后台任务，需抽取服务已开启）</span>
+            <span class="tip">开启后导入秒回，解析交由后台队列，可在「结构化解析」页看进度</span>
+          </div>
 
           <el-upload
             v-model:file-list="fileList"
@@ -351,6 +356,8 @@ const handleDelete = async (id) => {
 // ===== F·7.1 导入 =====
 const MAX_FILE_MB = 50
 const fileList = ref([])
+/** 导入后自动结构化解析（默认关；需抽取服务已开启） */
+const autoExtract = ref(false)
 const importing = ref(false)
 const summary = ref(null)
 const importFailed = ref(false)
@@ -393,6 +400,7 @@ const handleImport = async () => {
   progress.success = 0
   progress.failed = 0
   importing.value = true
+  let autoTaskSubmitted = false
   try {
     const failures = []
     for (let i = 0; i < files.length; i++) {
@@ -400,8 +408,10 @@ const handleImport = async () => {
       progress.current = files[i].name
       const fd = new FormData()
       fd.append('files', files[i])
+      fd.append('autoExtract', autoExtract.value ? 'true' : 'false')
       const res = await importRecords(fd)
       const s = res.data.summary || {}
+      if (res.data.autoExtractTaskId) autoTaskSubmitted = true
       progress.success += s.success || 0
       progress.failed += s.failed || 0
       if (s.failures && s.failures.length) failures.push(...s.failures)
@@ -414,7 +424,8 @@ const handleImport = async () => {
       failures
     }
     const tail = cancelled.value ? '（已取消，未处理剩余文件）' : ''
-    ElMessage.success(`导入完成：成功 ${progress.success} 条，失败 ${progress.failed} 条${tail}`)
+    const autoTail = autoTaskSubmitted ? '；已提交后台结构化解析' : ''
+    ElMessage.success(`导入完成：成功 ${progress.success} 条，失败 ${progress.failed} 条${autoTail}${tail}`)
     fileList.value = []
     handleSearch()
   } catch {
@@ -520,6 +531,18 @@ onMounted(handleSearch)
 .tip-inline {
   font-size: 12.5px;
   color: var(--text-sub);
+}
+.import-auto {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.import-auto .tip {
+  margin: 0;
 }
 .uploader :deep(.el-upload-dragger) {
   padding: 26px 10px;

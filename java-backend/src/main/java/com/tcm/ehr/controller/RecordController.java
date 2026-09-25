@@ -39,13 +39,15 @@ public class RecordController {
     private final IRecordService recordService;
     private final OperationLogger operationLogger;
 
-    /** 病历批量导入（多文件 .xlsx/.xls）；【权限：仅管理员】 */
+    /** 病历批量导入（多文件 .xlsx/.xls）；autoExtract=导入后自动结构化解析（后台任务）；【权限：仅管理员】 */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records/import")
-    public Result<ImportTaskVO> importRecords(@RequestParam("files") MultipartFile[] files) {
-        ImportTaskVO vo = recordService.importRecords(files);
+    public Result<ImportTaskVO> importRecords(@RequestParam("files") MultipartFile[] files,
+                                              @RequestParam(value = "autoExtract", defaultValue = "false") boolean autoExtract) {
+        ImportTaskVO vo = recordService.importRecords(files, autoExtract);
         operationLogger.log("病历导入", "文件" + files.length + "个",
-                "成功" + vo.getSummary().getSuccess() + "条，失败" + vo.getSummary().getFailed() + "条");
+                "成功" + vo.getSummary().getSuccess() + "条，失败" + vo.getSummary().getFailed() + "条"
+                        + (vo.getAutoExtractTaskId() == null ? "" : "，已提交后台解析"));
         return Result.ok(vo);
     }
 

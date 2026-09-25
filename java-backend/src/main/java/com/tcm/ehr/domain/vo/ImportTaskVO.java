@@ -10,4 +10,6 @@ public class ImportTaskVO {
 
     private String taskId;
     private ImportSummaryVO summary;
+    /** 勾选"导入后自动解析"且抽取已开启时，返回后台批任务ID；否则为 null */
+    private String autoExtractTaskId;
 }

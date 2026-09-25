@@ -31,6 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -77,6 +78,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
     /** 运行中任务的取消位 */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
+    /**
+     * 按记录ID集合执行的任务（导入后自动解析）：仅内存持有。
+     * 重启后这些任务被 K-c 标记为 INTERRUPTED、不会续跑，故无需落库占存储。
+     */
+    private final Map<String, List<String>> idBatches = new ConcurrentHashMap<>();
 
     private volatile boolean running;
     private ExecutorService workers;
@@ -169,6 +175,32 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     @Override
+    public NlpTaskVO submitIds(List<String> ids, String createdBy) {
+        if (ids == null || ids.isEmpty()) {
+            return null;
+        }
+        if (!nlpClient.isEnabled()) {
+            throw new IllegalArgumentException("抽取服务未开启（nlp.enabled=false），已跳过自动解析");
+        }
+        NlpTask t = new NlpTask();
+        t.setId(UUID.randomUUID().toString());
+        t.setStatus(NlpTask.QUEUED);
+        t.setTotal(ids.size());
+        t.setDone(0);
+        t.setSuccess(0);
+        t.setFailed(0);
+        t.setCreatedBy(createdBy);
+        t.setFailureList("[]");
+        t.setFailureTruncated(false);
+        t.setCreateTime(LocalDateTime.now().withNano(0));
+        taskMapper.insert(t);
+        idBatches.put(t.getId(), new ArrayList<>(ids));
+        queue.offer(t.getId());
+        log.info("[批解析] 已提交按ID任务 {}：计划 {} 条", t.getId(), ids.size());
+        return toVO(t, false);
+    }
+
+    @Override
     public NlpTaskVO get(String id) {
         NlpTask t = taskMapper.selectById(id);
         return t == null ? null : toVO(t, true);
@@ -206,70 +238,104 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private void runTask(String id) {
         NlpTask t = taskMapper.selectById(id);
         if (t == null || NlpTask.CANCELLED.equals(t.getStatus())) {
+            idBatches.remove(id);
             return;
         }
-        int limit = t.getTotal() == null ? 0 : t.getTotal();
-        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, readFilters(t.getFiltersJson()));
+        List<String> idSource = idBatches.get(id);
 
         t.setStatus(NlpTask.RUNNING);
         t.setStartedAt(LocalDateTime.now().withNano(0));
         taskMapper.updateById(t);
 
         List<NlpTaskVO.Failure> failures = new ArrayList<>();
-        boolean truncated = false;
-        int pageNo = 1;
-        int processed = 0;
+        boolean[] truncated = {false};
+        int[] processed = {0};
         boolean cancelled = false;
         try {
-            outer:
-            while (true) {
-                if (cancelFlags.contains(id)) {
-                    cancelled = true;
-                    break;
-                }
-                Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE), wrapper);
-                List<Record> list = page.getRecords();
-                if (list.isEmpty()) {
-                    break;
-                }
-                for (Record r : list) {
-                    if (cancelFlags.contains(id)) {
-                        cancelled = true;
-                        break outer;
-                    }
-                    if (processed >= limit) {
-                        break outer;
-                    }
-                    processed++;
-                    try {
-                        processOne(r);
-                        t.setSuccess(t.getSuccess() + 1);
-                    } catch (Exception e) {
-                        t.setFailed(t.getFailed() + 1);
-                        if (failures.size() < MAX_FAILURES) {
-                            failures.add(new NlpTaskVO.Failure(labelOf(r), reasonOf(e)));
-                        } else {
-                            truncated = true;
-                        }
-                    }
-                    t.setDone(processed);
-                    t.setCurrentLabel(labelOf(r));
-                    if (processed % PROGRESS_EVERY == 0) {
-                        persistProgress(t, failures, truncated);
-                    }
-                }
-                if (list.size() < PAGE_SIZE) {
-                    break;
-                }
-                pageNo++;
-            }
+            cancelled = idSource != null
+                    ? runByIds(id, idSource, t, failures, truncated, processed)
+                    : runByFilter(id, t, failures, truncated, processed);
         } finally {
             t.setStatus(cancelled ? NlpTask.CANCELLED : NlpTask.COMPLETED);
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
-            persistProgress(t, failures, truncated);
+            persistProgress(t, failures, truncated[0]);
             cancelFlags.remove(id);
+            idBatches.remove(id);
             log.info("[批解析] 任务 {} 结束：{}，成功 {}，失败 {}", id, t.getStatus(), t.getSuccess(), t.getFailed());
+        }
+    }
+
+    /** 按筛选范围分页处理；返回是否被取消 */
+    private boolean runByFilter(String id, NlpTask t, List<NlpTaskVO.Failure> failures,
+                                boolean[] truncated, int[] processed) {
+        int limit = t.getTotal() == null ? 0 : t.getTotal();
+        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, readFilters(t.getFiltersJson()));
+        int pageNo = 1;
+        while (true) {
+            if (cancelFlags.contains(id)) {
+                return true;
+            }
+            Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE), wrapper);
+            List<Record> list = page.getRecords();
+            if (list.isEmpty()) {
+                break;
+            }
+            for (Record r : list) {
+                if (cancelFlags.contains(id)) {
+                    return true;
+                }
+                if (processed[0] >= limit) {
+                    return false;
+                }
+                step(id, r, t, failures, truncated, processed);
+            }
+            if (list.size() < PAGE_SIZE) {
+                break;
+            }
+            pageNo++;
+        }
+        return false;
+    }
+
+    /** 按记录ID集合分块处理（导入后自动解析用）；返回是否被取消 */
+    private boolean runByIds(String id, List<String> ids, NlpTask t, List<NlpTaskVO.Failure> failures,
+                             boolean[] truncated, int[] processed) {
+        for (int off = 0; off < ids.size(); off += PAGE_SIZE) {
+            if (cancelFlags.contains(id)) {
+                return true;
+            }
+            List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
+            List<Record> list = recordMapper.selectBatchIds(chunk);
+            for (Record r : list) {
+                if (cancelFlags.contains(id)) {
+                    return true;
+                }
+                step(id, r, t, failures, truncated, processed);
+            }
+        }
+        return false;
+    }
+
+    /** 处理单条并更新进度（两条取数路径共用） */
+    private void step(String id, Record r, NlpTask t, List<NlpTaskVO.Failure> failures,
+                      boolean[] truncated, int[] processed) {
+        processed[0]++;
+        try {
+            processOne(r);
+            t.setSuccess(t.getSuccess() + 1);
+        } catch (Exception e) {
+            t.setFailed(t.getFailed() + 1);
+            if (failures.size() < MAX_FAILURES) {
+                failures.add(new NlpTaskVO.Failure(labelOf(r), reasonOf(e)));
+            } else {
+                truncated[0] = true;
+            }
+        }
+        t.setDone(processed[0]);
+        t.setCurrentLabel(labelOf(r));
+        if (processed[0] % PROGRESS_EVERY == 0) {
+            persistProgress(t, failures, truncated[0]);
         }
     }
 

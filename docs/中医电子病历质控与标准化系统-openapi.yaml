@@ -1723,6 +1723,7 @@ paths:
         【权限：仅管理员】
         批量上传病历Excel文件（.xlsx），校验格式并创建导入任务。
         约束：单文件最大50MB，单次最多20个文件。
+        autoExtract=true 且后端已开启抽取时，导入完成后自动投递后台结构化解析任务（返回 autoExtractTaskId）。
       requestBody:
         required: true
         content:
@@ -1735,6 +1736,10 @@ paths:
                   items:
                     type: string
                     format: binary
+                autoExtract:
+                  type: boolean
+                  default: false
+                  description: 导入后是否自动结构化解析（后台任务）
       responses:
         '200':
           description: 导入任务已创建
