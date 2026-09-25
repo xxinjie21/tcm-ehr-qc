@@ -17,11 +17,6 @@
       <RangeFilter v-model="filters" />
       <div class="scope-row">
         <span class="scope-tip">当前范围：<b>{{ scopeText }}</b></span>
-        <el-button type="warning" :loading="recomputing" @click="handleRecompute">
-          {{ recomputing ? '重算执行中…' : '质控评分重算' }}
-        </el-button>
-        <!-- 全库重算耗时随数据量增长，执行期间给出预期（UX-37） -->
-        <span v-if="recomputing" class="tip">正在按规则重算范围内全部病历，数据量大时需数分钟，请勿关闭页面</span>
       </div>
     </section>
 
@@ -205,7 +200,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
-import { clean as cleanApi, exportDataset, previewDataset, governanceStats, recomputeQc } from '@/api/governance'
+import { clean as cleanApi, exportDataset, previewDataset, governanceStats } from '@/api/governance'
 import { getDepartments } from '@/api/stats'
 import { saveBlob } from '@/utils/download'
 import { useAiStore } from '@/stores/ai'
@@ -227,7 +222,7 @@ const statsLoading = ref(false)
 const statsFailed = ref(false)
 const statsLoadedAt = ref('')
 
-// 当前范围（批B·4.1）：清洗 / 质控重算 只作用于该范围（filters 见下方声明）
+// 当前范围（批B·4.1）：清洗 / 导出 只作用于该范围（filters 见下方声明）
 const scopeText = computed(() => {
   const parts = []
   if (filters.department) parts.push(filters.department)
@@ -236,30 +231,6 @@ const scopeText = computed(() => {
   if (filters.grade) parts.push(filters.grade)
   return parts.length ? parts.join(' · ') : '全部'
 })
-
-const recomputing = ref(false)
-const handleRecompute = async () => {
-  try {
-    await ElMessageBox.confirm(
-      `将对「${scopeText.value}」范围内的病历按质控规则重算评分与分级（覆盖现有分数），确认？`,
-      '质控评分重算',
-      { type: 'warning', confirmButtonText: '确认重算', cancelButtonText: '取消' }
-    )
-  } catch {
-    return
-  }
-  recomputing.value = true
-  try {
-    const res = await recomputeQc({ filters: { ...filters } })
-    const d = res.data
-    ElMessage.success(`重算完成：合格 ${d.qualified}，待复核 ${d.pendingReview}，无效 ${d.invalid}，失败 ${d.failed}`)
-    loadStats()
-  } catch {
-    // 拦截器已提示
-  } finally {
-    recomputing.value = false
-  }
-}
 
 const loadStats = async () => {
   statsLoading.value = true

@@ -7,7 +7,10 @@
         <RangeFilter v-model="filters" />
         <el-button type="primary" size="small" :loading="queryLoading" @click="applyFilters">查 询</el-button>
         <el-button size="small" :disabled="queryLoading" @click="resetFilters">重置</el-button>
-        <span class="tip">范围对本页各块同时生效：评分标准 / 扣分构成 / 规则证据 / AI 预检列表</span>
+        <el-button type="warning" size="small" :loading="recomputing" @click="handleRecompute">
+          {{ recomputing ? '重算执行中…' : '质控评分计算' }}
+        </el-button>
+        <span class="tip">范围对本页各块同时生效；「质控评分计算」按当前范围重算评分与分级</span>
       </div>
     </PanelCard>
 
@@ -314,7 +317,7 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
+import { qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules, recomputeQc } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 import { getTerms } from '@/api/dictionary'
 import { useUserStore } from '@/stores/user'
@@ -575,6 +578,32 @@ const resetFilters = () => {
   filters.pattern = ''
   filters.grade = ''
   applyFilters()
+}
+
+// 质控评分计算（批T：从清洗页移来）：按当前范围重算评分与分级
+const recomputing = ref(false)
+const handleRecompute = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将按质控规则重算当前筛选范围内病历的评分与分级（覆盖现有分数），确认？',
+      '质控评分计算',
+      { type: 'warning', confirmButtonText: '确认重算', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  recomputing.value = true
+  try {
+    const res = await recomputeQc({ filters: { ...filters } })
+    const d = res.data || {}
+    ElMessage.success(`重算完成：合格 ${d.qualified}，待复核 ${d.pendingReview}，无效 ${d.invalid}，失败 ${d.failed}`)
+    loadPrecheck(1)
+    loadDedStats()
+  } catch {
+    // 拦截器已提示
+  } finally {
+    recomputing.value = false
+  }
 }
 
 // 扣分明细改回弹窗（UX-71）；关闭时只收起、不清数据，避免关闭动画期间内容闪空

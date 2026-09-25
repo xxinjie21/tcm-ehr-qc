@@ -20,3 +20,8 @@ export function resetQcRules() {
 export function getDeductionStats(params) {
   return request.get('/qc/deduction-stats', { params })
 }
+
+// 质控评分重算（全库/范围内，长耗时同步接口）
+export function recomputeQc(data) {
+  return request.post('/qc/score/batch', data, { timeout: 200000 })
+}
