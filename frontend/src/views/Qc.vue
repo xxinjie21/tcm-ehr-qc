@@ -100,69 +100,6 @@
       </div>
     </PanelCard>
 
-    <PanelCard title="质控检验（规则证据）">
-      <div class="tip">
-        把「规则引擎」的判定证据列出来：证候 → 治法/方剂 是否一致、冲突在哪。
-        规则表只覆盖少数证候，<b>未覆盖的不判冲突</b>（空白 ≠ 已核对）。
-      </div>
-
-      <div v-if="graph.truncated" class="trunc-hint">{{ graph.hint }}</div>
-
-      <!-- 结论条：先给规模与冲突数，再给明细 -->
-      <div v-if="graph.nodes.length" class="graph-summary">
-        <span class="gsum"><b>{{ graphSummary.records }}</b> 份病历</span>
-        <span class="gsum"><b>{{ graphSummary.covered }}</b> 个证候被规则覆盖</span>
-        <span class="gsum"><b>{{ graphSummary.rules }}</b> 条规则命中</span>
-        <span class="gsum" :class="{ bad: graphSummary.conflicts > 0 }">
-          <template v-if="graph.coveredPatterns.length"><b>{{ graphSummary.conflicts }}</b> 处冲突</template>
-          <template v-else>本范围无规则可判</template>
-        </span>
-      </div>
-
-      <el-collapse v-model="evidenceOpen" class="ev-collapse">
-        <el-collapse-item name="ev">
-          <template #title><span class="std-title">规则证据明细（冲突清单 / 规则命中 / 覆盖情况）</span></template>
-          <div v-loading="graphLoading">
-            <template v-if="graph.nodes.length">
-          <div class="sub-hd">冲突清单</div>
-          <el-table v-if="conflictRows.length" :data="conflictRows" border size="small">
-            <el-table-column prop="reason" label="冲突" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="source" label="涉及（证候 / 舌脉）" width="190" show-overflow-tooltip />
-            <el-table-column prop="target" label="涉及（治法 / 方剂）" width="190" show-overflow-tooltip />
-          </el-table>
-          <el-empty
-            v-else
-            :description="graph.coveredPatterns.length ? '未发现冲突' : '本范围无规则可判，未做冲突判定'"
-            :image-size="60"
-          />
-
-          <div class="sub-hd">规则命中对照（证候 → 合法治法 / 方剂）</div>
-          <el-table v-if="ruleRows.length" :data="ruleRows" border size="small" max-height="320">
-            <el-table-column prop="pattern" label="证候" width="160" show-overflow-tooltip />
-            <el-table-column prop="kind" label="类型" width="80" />
-            <el-table-column prop="target" label="合法项" min-width="160" show-overflow-tooltip />
-            <el-table-column prop="reason" label="依据" min-width="160" show-overflow-tooltip />
-          </el-table>
-          <el-empty v-else description="本范围未命中可判规则" :image-size="60" />
-
-          <div class="sub-hd">规则覆盖情况</div>
-          <p class="cover-line">
-            已覆盖证候：{{ graph.coveredPatterns.length ? graph.coveredPatterns.join('、') : '无' }}
-          </p>
-          <p v-if="uncoveredPatterns.length" class="cover-line">
-            未覆盖证候（不判冲突）：{{ uncoveredPatterns.join('、') }}
-          </p>
-        </template>
-            <el-empty
-              v-else-if="!graphLoading"
-              description="范围内暂无可展示的质控证据"
-              :image-size="90"
-            />
-          </div>
-        </el-collapse-item>
-      </el-collapse>
-    </PanelCard>
-
     <PanelCard title="AI 预检列表 / 扣分明细">
       <div class="precheck-bar">
         <span class="tip">点击行查看规则扣分明细；范围沿用上方「范围查询」，不再单独设分级</span>
@@ -282,7 +219,7 @@
 import { reactive, ref, computed, onMounted } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { getGraph, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
+import { qcScore, getQcRules, getDeductionStats } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
 
@@ -291,7 +228,6 @@ const filters = reactive({ department: '', dateRange: null, pattern: '', grade: 
 // ===== 评分标准 / 扣分构成（批P） =====
 const qcRules = ref(null)
 const standardOpen = ref(['std']) // 默认展开：先让用户看到"标准"
-const evidenceOpen = ref([]) // 规则证据明细默认收起
 const dedStats = ref(null)
 const dedLoading = ref(false)
 
@@ -336,67 +272,6 @@ const params = () => {
   }
 }
 
-// coveredPatterns：本次范围内「被规则表覆盖到」的证候名（见后端 GraphVO 注释）。
-const graph = reactive({ nodes: [], edges: [], truncated: false, hint: '', coveredPatterns: [] })
-const graphLoading = ref(false)
-
-/** 节点 id → 名称 */
-const nameById = computed(() => {
-  const m = new Map()
-  graph.nodes.forEach((n) => m.set(n.id, n.name))
-  return m
-})
-
-const conflictEdges = computed(() => graph.edges.filter((e) => e.type === 'conflict'))
-const ruleEdges = computed(() => graph.edges.filter((e) => e.type === 'rule'))
-
-/** 冲突清单：冲突原因 + 两端名称 */
-const conflictRows = computed(() => conflictEdges.value.map((e) => ({
-  reason: e.label || '冲突',
-  source: nameById.value.get(e.source) || e.source,
-  target: nameById.value.get(e.target) || e.target
-})))
-
-/** 规则命中对照：证候 → 合法治法/方剂 */
-const ruleRows = computed(() => ruleEdges.value.map((e) => ({
-  pattern: nameById.value.get(e.source) || e.source,
-  kind: (e.label || '').includes('方剂') ? '方剂' : '治法',
-  target: nameById.value.get(e.target) || e.target,
-  reason: e.label || ''
-})))
-
-/** 范围内出现但规则表未覆盖的证候（不判冲突） */
-const uncoveredPatterns = computed(() => {
-  const covered = new Set(graph.coveredPatterns)
-  return graph.nodes
-    .filter((n) => n.type === 'pattern' && !covered.has(n.name))
-    .map((n) => n.name)
-})
-
-const graphSummary = computed(() => ({
-  records: graph.nodes.filter((n) => n.type === 'record').length,
-  covered: graph.coveredPatterns.length,
-  rules: ruleEdges.value.length,
-  conflicts: conflictEdges.value.length
-}))
-
-const loadGraph = async () => {
-  graphLoading.value = true
-  try {
-    const res = await getGraph(params())
-    const d = res.data || {}
-    graph.nodes = d.nodes || []
-    graph.edges = d.edges || []
-    graph.truncated = !!d.truncated
-    graph.hint = d.hint || ''
-    graph.coveredPatterns = d.coveredPatterns || []
-  } catch {
-    // 拦截器已提示
-  } finally {
-    graphLoading.value = false
-  }
-}
-
 // ===== 预检列表 / 扣分明细 =====
 // 分级不再单独持有：统一由上方「范围查询」的 filters.grade 驱动，
 // 否则同一页会出现两个互不相干的分级口径（第八轮）
@@ -426,9 +301,8 @@ const handleSizeChange = () => {
 }
 
 /** 范围查询是整页口径：刷新时各块必须一起走 */
-const queryLoading = computed(() => graphLoading.value || precheckLoading.value || dedLoading.value)
+const queryLoading = computed(() => precheckLoading.value || dedLoading.value)
 const applyFilters = () => {
-  loadGraph()
   loadPrecheck(1)
   loadDedStats()
 }
@@ -465,7 +339,6 @@ const closeDetail = () => {
 
 onMounted(() => {
   loadRules()
-  loadGraph()
   loadPrecheck(1)
   loadDedStats()
 })
@@ -479,14 +352,6 @@ onMounted(() => {
   gap: 12px;
   flex-wrap: wrap;
 }
-.qc-filter {
-  margin-bottom: 10px;
-}
-.qc-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 .tip {
   font-size: 12.5px;
   color: var(--text-sub);
@@ -499,83 +364,6 @@ onMounted(() => {
   padding: 6px 12px;
   font-size: 12.5px;
   margin-bottom: 8px;
-}
-/* 冲突定位模式下无冲突：直接给结论（UX-53） */
-.no-conflict {
-  background: var(--ink-light);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 14px 18px;
-  font-size: 13px;
-  color: var(--ink);
-  margin-bottom: 10px;
-}
-/* 图谱结论条（UX-53） */
-.graph-summary {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 10px 16px;
-  margin-bottom: 10px;
-}
-.gsum {
-  font-size: 12.5px;
-  color: var(--text-sub);
-}
-.gsum b {
-  font-size: 17px;
-  color: var(--ink);
-  margin-right: 4px;
-}
-.gsum.bad b {
-  color: var(--danger);
-}
-.gsum-hint {
-  font-size: 12px;
-  color: var(--text-sub);
-  margin-left: auto;
-}
-.graph-wrap {
-  min-height: 420px;
-}
-.graph {
-  width: 100%;
-  height: 520px;
-}
-.graph-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-sub);
-}
-.lg {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.lg i {
-  display: inline-block;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-}
-.lg i.line {
-  width: 18px;
-  height: 0;
-  border-top: 2px solid #cfd6cf;
-  border-radius: 0;
-}
-.lg i.line.rule {
-  border-top: 2px dotted #96714f;
-}
-.lg i.line.conflict {
-  border-top: 2px dashed #c0392b;
 }
 .precheck-bar {
   display: flex;
@@ -639,12 +427,6 @@ onMounted(() => {
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
   padding-left: 8px;
-}
-.cover-line {
-  margin: 4px 0;
-  font-size: 12.5px;
-  line-height: 1.8;
-  color: var(--text-sub);
 }
 
 /* ===== 评分标准面板（批P） ===== */
@@ -720,9 +502,6 @@ onMounted(() => {
 }
 .rule-card.tongue {
   border-left-color: var(--danger);
-}
-.ev-collapse {
-  border-top: none;
 }
 
 /* ===== 本范围扣分构成 ===== */
