@@ -11,61 +11,151 @@
       </div>
     </PanelCard>
 
-    <!-- 质控评分标准（批P）：把写死的口径可视化，先让用户懂"标准" -->
+    <!-- 质控评分标准（批P/Q）：按可配置规则渲染，先让用户懂"标准" -->
     <PanelCard title="质控评分标准">
+      <template #header>
+        <span>质控评分标准</span>
+        <el-button v-if="isAdmin" link type="primary" class="hd-action" @click="openRules">规则配置</el-button>
+      </template>
+
       <el-collapse v-model="standardOpen">
-        <el-collapse-item name="std">
+        <el-collapse-item v-if="rules" name="std">
           <template #title>
-            <span class="std-title">评分口径 · 分级线 · 逻辑规则</span>
+            <span class="std-title">评分口径 · 分级线 · 规则</span>
           </template>
-          <div v-if="qcRules" class="std-body">
+          <div class="std-body">
             <div class="std-cols">
               <div class="std-col">
-                <div class="sub-hd">评分构成（满分 100，逐项扣分）</div>
-                <div class="std-dim">
-                  <span class="sd-name">核心要素缺失</span>
-                  <span class="sd-desc">症状 / 证候 / 舌象 / 脉象 / 中药</span>
-                  <span class="sd-w">真缺失 -{{ qcRules.weights.fullMissing }} ／ 漏抽 -{{ qcRules.weights.partialMissing }}</span>
+                <div class="sub-hd">完整性（真缺失 / 漏抽）</div>
+                <div v-for="e in rules.completeness.elements" :key="e.name" class="std-dim">
+                  <span class="sd-name">{{ e.name }}</span>
+                  <span class="sd-desc">
+                    结构化：{{ e.source }}
+                    <template v-if="e.fallback && e.fallback.length"> ｜ 回退：{{ e.fallback.join('/') }}</template>
+                  </span>
+                  <span class="sd-w">-{{ e.weightFull }} / -{{ e.weightPartial }}</span>
+                </div>
+                <div class="sub-hd">格式</div>
+                <div v-for="f in rules.format" :key="f.field" class="std-dim">
+                  <span class="sd-name">{{ f.label || f.field }}</span>
+                  <span class="sd-desc">{{ f.type === 'enum' ? ('须为 ' + (f.values || []).join('/')) : ('匹配 ' + f.expr) }}</span>
+                  <span class="sd-w">-{{ f.weight }}</span>
                 </div>
                 <div class="std-dim">
-                  <span class="sd-name">逻辑冲突</span>
-                  <span class="sd-desc">证候-治法 / 证候-方剂 / 舌脉 不一致</span>
-                  <span class="sd-w">每条 -{{ qcRules.weights.logicConflict }}</span>
-                </div>
-                <div class="std-dim">
-                  <span class="sd-name">格式错误</span>
-                  <span class="sd-desc">年龄非数字 / 性别非男女</span>
-                  <span class="sd-w">每项 -{{ qcRules.weights.format }}</span>
-                </div>
-                <div class="std-dim">
-                  <span class="sd-name">重复数据</span>
+                  <span class="sd-name">重复</span>
                   <span class="sd-desc">与已有病历内容完全一致</span>
-                  <span class="sd-w">-{{ qcRules.weights.duplicate }}</span>
+                  <span class="sd-w">-{{ rules.duplicateWeight }}</span>
+                </div>
+                <div class="std-dim">
+                  <span class="sd-name">术语标准化</span>
+                  <span class="sd-desc">
+                    {{ rules.standardization.enabled
+                      ? ('未命中词典的 ' + (rules.standardization.elementTypes || []).join('/') + ' 实体')
+                      : '已关闭（不参与评分）' }}
+                  </span>
+                  <span class="sd-w">
+                    {{ rules.standardization.enabled
+                      ? ('每个 -' + rules.standardization.weightEach + '，上限 -' + rules.standardization.cap)
+                      : '—' }}
+                  </span>
                 </div>
               </div>
               <div class="std-col">
                 <div class="sub-hd">分级线</div>
-                <div class="std-grade ok">合格：无逻辑冲突且 ≥ {{ qcRules.thresholds.qualified }} 分</div>
-                <div class="std-grade mid">待复核：有逻辑冲突，或 {{ qcRules.thresholds.qualified }} 分以下且 ≥ {{ qcRules.thresholds.invalid }} 分</div>
-                <div class="std-grade bad">无效：&lt; {{ qcRules.thresholds.invalid }} 分，或核心要素真缺失 ≥ {{ qcRules.thresholds.seriousFullMissing }} 项</div>
-                <div class="sub-hd">逻辑规则（可判范围）</div>
-                <div v-for="r in qcRules.logicRules" :key="r.pattern" class="rule-card">
-                  <b>{{ r.pattern }}</b>
-                  <span>治法：{{ r.treatments.join(' / ') }}</span>
-                  <span>方剂：{{ r.formulas.join(' / ') }}</span>
-                </div>
-                <div class="rule-card tongue">
-                  <b>舌脉冲突</b>
-                  <span v-for="tp in qcRules.tonguePulseConflicts" :key="tp.tongue + tp.pulse">{{ tp.tongue }} × {{ tp.pulse }}</span>
-                </div>
-                <div class="tip">规则表只覆盖少数证候，未覆盖的不判冲突（空白 ≠ 已核对）。</div>
+                <div class="std-grade ok">合格：无逻辑冲突且 ≥ {{ rules.thresholds.qualified }} 分</div>
+                <div class="std-grade mid">待复核：有逻辑冲突，或 {{ rules.thresholds.invalid }}~{{ rules.thresholds.qualified - 1 }} 分</div>
+                <div class="std-grade bad">无效：&lt; {{ rules.thresholds.invalid }} 分，或真缺失 ≥ {{ rules.thresholds.seriousFullMissing }} 项</div>
+
+                <div class="sub-hd">一致性规则（{{ (rules.consistency || []).length }} 条）</div>
+                <template v-if="(rules.consistency || []).length">
+                  <div v-for="r in rules.consistency" :key="r.name" class="rule-card">
+                    <b>{{ r.name }}（-{{ r.weight }}）</b>
+                    <span>证候含：{{ (r.patternAny || []).join('/') }}</span>
+                    <span v-if="r.expectHerbs && r.expectHerbs.length">期望中药：{{ r.expectHerbs.join('/') }}</span>
+                    <span v-if="r.expectTongue && r.expectTongue.length">期望舌象：{{ r.expectTongue.join('/') }}</span>
+                    <span v-if="r.expectPulse && r.expectPulse.length">期望脉象：{{ r.expectPulse.join('/') }}</span>
+                  </div>
+                </template>
+                <div v-else class="tip">未配置一致性规则（不判冲突）</div>
+                <div class="tip">规则依赖的要素在数据中缺失时自动「不适用」，不会误判。</div>
               </div>
             </div>
           </div>
-          <el-empty v-else description="标准加载中…" :image-size="60" />
         </el-collapse-item>
       </el-collapse>
+      <el-empty v-if="!rules" description="标准加载中…" :image-size="60" />
+      <div v-if="ruleWarnings.length" class="trunc-hint">规则告警：{{ ruleWarnings.join('；') }}</div>
     </PanelCard>
+
+    <!-- 规则配置（仅管理员）：全量编辑，保存即生效 -->
+    <el-dialog v-model="rulesVisible" title="质控规则配置（保存即生效）" width="min(1040px, 96vw)" top="4vh">
+      <div v-if="form.rules" class="rc">
+        <div class="rc-hd">完整性要素</div>
+        <el-table :data="form.rules.completeness.elements" border size="small">
+          <el-table-column label="名称" width="90"><template #default="{ row }"><el-input v-model="row.name" size="small" /></template></el-table-column>
+          <el-table-column label="结构化key" width="130"><template #default="{ row }"><el-input v-model="row.source" size="small" /></template></el-table-column>
+          <el-table-column label="回退字段（逗号分隔）"><template #default="{ row }"><el-input v-model="row.fallbackText" size="small" /></template></el-table-column>
+          <el-table-column label="真缺失" width="90"><template #default="{ row }"><el-input-number v-model="row.weightFull" size="small" :min="0" :controls="false" /></template></el-table-column>
+          <el-table-column label="漏抽" width="90"><template #default="{ row }"><el-input-number v-model="row.weightPartial" size="small" :min="0" :controls="false" /></template></el-table-column>
+          <el-table-column width="54"><template #default="{ $index }"><el-button link type="danger" @click="form.rules.completeness.elements.splice($index, 1)">删</el-button></template></el-table-column>
+        </el-table>
+        <el-button size="small" @click="addElement">+ 要素</el-button>
+
+        <div class="rc-hd">格式规则</div>
+        <el-table :data="form.rules.format" border size="small">
+          <el-table-column label="字段" width="110"><template #default="{ row }"><el-input v-model="row.field" size="small" /></template></el-table-column>
+          <el-table-column label="类型" width="100"><template #default="{ row }"><el-select v-model="row.type" size="small"><el-option label="regex" value="regex" /><el-option label="enum" value="enum" /></el-select></template></el-table-column>
+          <el-table-column label="表达式/枚举（枚举用逗号）"><template #default="{ row }"><el-input v-model="row.ruleText" size="small" /></template></el-table-column>
+          <el-table-column label="展示名" width="100"><template #default="{ row }"><el-input v-model="row.label" size="small" /></template></el-table-column>
+          <el-table-column label="扣分" width="80"><template #default="{ row }"><el-input-number v-model="row.weight" size="small" :min="0" :controls="false" /></template></el-table-column>
+          <el-table-column width="54"><template #default="{ $index }"><el-button link type="danger" @click="form.rules.format.splice($index, 1)">删</el-button></template></el-table-column>
+        </el-table>
+        <el-button size="small" @click="addFormat">+ 格式规则</el-button>
+
+        <div class="rc-hd">一致性规则（证候命中 → 期望中药/舌象/脉象）</div>
+        <el-table :data="form.rules.consistency" border size="small">
+          <el-table-column label="规则名" width="150"><template #default="{ row }"><el-input v-model="row.name" size="small" /></template></el-table-column>
+          <el-table-column label="证候关键词（逗号）"><template #default="{ row }"><el-input v-model="row.patternText" size="small" /></template></el-table-column>
+          <el-table-column label="期望中药（逗号）"><template #default="{ row }"><el-input v-model="row.herbsText" size="small" /></template></el-table-column>
+          <el-table-column label="期望舌象（逗号）"><template #default="{ row }"><el-input v-model="row.tongueText" size="small" /></template></el-table-column>
+          <el-table-column label="期望脉象（逗号）"><template #default="{ row }"><el-input v-model="row.pulseText" size="small" /></template></el-table-column>
+          <el-table-column label="扣分" width="80"><template #default="{ row }"><el-input-number v-model="row.weight" size="small" :min="0" :controls="false" /></template></el-table-column>
+          <el-table-column width="54"><template #default="{ $index }"><el-button link type="danger" @click="form.rules.consistency.splice($index, 1)">删</el-button></template></el-table-column>
+        </el-table>
+        <el-button size="small" @click="addConsistency">+ 一致性规则</el-button>
+
+        <div class="rc-hd">术语标准化 / 其他</div>
+        <div class="rc-row">
+          <span>启用标准化</span>
+          <el-switch v-model="form.rules.standardization.enabled" />
+          <span>每条扣分</span>
+          <el-input-number v-model="form.rules.standardization.weightEach" size="small" :min="0" :controls="false" />
+          <span>上限</span>
+          <el-input-number v-model="form.rules.standardization.cap" size="small" :min="0" :controls="false" />
+        </div>
+        <div class="rc-row">
+          <span>标准化类型</span>
+          <el-select v-model="form.rules.standardization.elementTypes" multiple size="small" style="min-width: 260px">
+            <el-option v-for="t in TERM_TYPES" :key="t" :label="t" :value="t" />
+          </el-select>
+        </div>
+        <div class="rc-row">
+          <span>重复扣分</span>
+          <el-input-number v-model="form.rules.duplicateWeight" size="small" :min="0" :controls="false" />
+          <span>合格线</span>
+          <el-input-number v-model="form.rules.thresholds.qualified" size="small" :min="0" :max="100" :controls="false" />
+          <span>无效线</span>
+          <el-input-number v-model="form.rules.thresholds.invalid" size="small" :min="0" :max="100" :controls="false" />
+          <span>真缺失判严重</span>
+          <el-input-number v-model="form.rules.thresholds.seriousFullMissing" size="small" :min="1" :controls="false" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="resetRules">恢复默认</el-button>
+        <el-button @click="rulesVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingRules" @click="saveRules">保存并生效</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 本范围扣分构成（批P）：范围内各病历扣分明细聚合 -->
     <PanelCard title="本范围扣分构成">
@@ -217,31 +307,39 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { qcScore, getQcRules, getDeductionStats } from '@/api/qc'
+import { qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
 import { searchRecords } from '@/api/records'
+import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
+
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.role === '管理员')
 
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 
-// ===== 评分标准 / 扣分构成（批P） =====
-const qcRules = ref(null)
+// ===== 评分标准 / 扣分构成（批P/Q） =====
+const rules = ref(null)
+const ruleWarnings = ref([])
 const standardOpen = ref(['std']) // 默认展开：先让用户看到"标准"
 const dedStats = ref(null)
 const dedLoading = ref(false)
+const TERM_TYPES = ['disease', 'pattern', 'symptom', 'herb', 'formula']
 
 const loadRules = async () => {
   try {
     const res = await getQcRules()
-    qcRules.value = res.data
+    rules.value = res.data?.rules || null
+    ruleWarnings.value = res.data?.warnings || []
   } catch {
     // 拦截器已提示
   }
 }
 
 /** 标准里的合格线（未加载时退回 90） */
-const qualified = computed(() => qcRules.value?.thresholds?.qualified ?? 90)
+const qualified = computed(() => rules.value?.thresholds?.qualified ?? 90)
 const gradeClass = (g) => (g === '合格' ? 'is-ok' : g === '无效' ? 'is-bad' : 'is-mid')
 
 const loadDedStats = async () => {
@@ -261,6 +359,7 @@ const barWidth = (points) => {
   const max = Math.max(1, ...(dedStats.value?.byType || []).map((t) => t.points))
   return Math.round((points / max) * 100) + '%'
 }
+
 const params = () => {
   const d = filters.dateRange
   return {
@@ -269,6 +368,85 @@ const params = () => {
     end: d && d.length === 2 ? d[1] : '',
     pattern: filters.pattern || '',
     grade: filters.grade || ''
+  }
+}
+
+// ===== 规则配置（管理员，全量编辑，保存即生效） =====
+const rulesVisible = ref(false)
+const savingRules = ref(false)
+const form = reactive({ rules: null })
+const clone = (o) => JSON.parse(JSON.stringify(o))
+const split = (s) => String(s || '').split(/[，,;；\s]+/).map((x) => x.trim()).filter(Boolean)
+
+const openRules = async () => {
+  if (!rules.value) {
+    await loadRules()
+  }
+  const r = clone(rules.value || { completeness: { elements: [] }, format: [], consistency: [], standardization: {}, thresholds: {} })
+  r.completeness = r.completeness || { elements: [] }
+  r.completeness.elements = r.completeness.elements || []
+  r.format = r.format || []
+  r.consistency = r.consistency || []
+  r.standardization = r.standardization || { enabled: true, elementTypes: [], weightEach: 1, cap: 5 }
+  r.thresholds = r.thresholds || { qualified: 90, invalid: 60, seriousFullMissing: 3 }
+
+  r.completeness.elements.forEach((e) => { e.fallbackText = (e.fallback || []).join(',') })
+  r.format.forEach((f) => { f.ruleText = f.type === 'enum' ? (f.values || []).join(',') : (f.expr || '') })
+  r.consistency.forEach((c) => {
+    c.patternText = (c.patternAny || []).join(',')
+    c.herbsText = (c.expectHerbs || []).join(',')
+    c.tongueText = (c.expectTongue || []).join(',')
+    c.pulseText = (c.expectPulse || []).join(',')
+  })
+  form.rules = r
+  rulesVisible.value = true
+}
+const addElement = () => form.rules.completeness.elements.push({ name: '', source: '', fallbackText: '', weightFull: 12, weightPartial: 6 })
+const addFormat = () => form.rules.format.push({ field: '', type: 'regex', ruleText: '', label: '', weight: 5, reason: '' })
+const addConsistency = () => form.rules.consistency.push({ name: '', patternText: '', herbsText: '', tongueText: '', pulseText: '', weight: 10 })
+
+const saveRules = async () => {
+  savingRules.value = true
+  try {
+    const r = clone(form.rules)
+    ;(r.completeness.elements || []).forEach((e) => { e.fallback = split(e.fallbackText); delete e.fallbackText })
+    ;(r.format || []).forEach((f) => {
+      if (f.type === 'enum') { f.values = split(f.ruleText); f.expr = null } else { f.expr = f.ruleText; f.values = [] }
+      delete f.ruleText
+    })
+    ;(r.consistency || []).forEach((c) => {
+      c.patternAny = split(c.patternText)
+      c.expectHerbs = split(c.herbsText)
+      c.expectTongue = split(c.tongueText)
+      c.expectPulse = split(c.pulseText)
+      delete c.patternText; delete c.herbsText; delete c.tongueText; delete c.pulseText
+    })
+    const res = await updateQcRules(r)
+    rules.value = res.data?.rules || rules.value
+    ruleWarnings.value = res.data?.warnings || []
+    ElMessage.success('规则已保存并生效')
+    rulesVisible.value = false
+  } catch {
+    // 拦截器已提示
+  } finally {
+    savingRules.value = false
+  }
+}
+
+const resetRules = async () => {
+  try {
+    await ElMessageBox.confirm('确定恢复默认质控规则吗？当前自定义规则将被覆盖。', '恢复默认', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    const res = await resetQcRules()
+    rules.value = res.data?.rules || null
+    ruleWarnings.value = res.data?.warnings || []
+    ElMessage.success('已恢复默认规则')
+    rulesVisible.value = false
+  } catch {
+    // 拦截器已提示
   }
 }
 
@@ -601,5 +779,31 @@ onMounted(() => {
   font-size: 12px;
   color: var(--text-sub);
   margin-bottom: 10px;
+}
+
+/* ===== 规则配置弹窗 ===== */
+.hd-action {
+  margin-left: 12px;
+}
+.rc {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.rc-hd {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--ink);
+  border-left: 3px solid var(--ink-mid);
+  padding-left: 8px;
+}
+.rc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--ink);
 }
 </style>

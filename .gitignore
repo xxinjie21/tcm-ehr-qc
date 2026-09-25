@@ -34,6 +34,9 @@ data/dictionaries/backup/
 # LLM 运行时配置（含本机通道/模型，不上传；api-key 不落盘）
 data/llm-config.json
 
+# 质控规则运行时配置（可由管理员在界面修改，不上传）
+data/qc-rules.json
+
 # 日志（不上传）
 logs/
 

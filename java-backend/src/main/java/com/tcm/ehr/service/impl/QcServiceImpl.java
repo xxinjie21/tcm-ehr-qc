@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import com.tcm.ehr.common.config.QcRuleSet;
+import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.utils.LogicChecker;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.QcScorer;
@@ -18,10 +20,11 @@ import com.tcm.ehr.domain.dto.QcScoreDTO;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.po.ReviewTask;
-import com.tcm.ehr.domain.vo.GraphVO;
+import com.tcm.ehr.domain.vo.DeductionStatsVO;
 import com.tcm.ehr.domain.vo.LogicCheckVO;
 import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcCheckVO;
+import com.tcm.ehr.domain.vo.QcRulesVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
@@ -35,7 +38,6 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,12 +46,12 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * 质控服务实现（批B·2.3）：事前检查 / 逻辑一致性 / 单条评分 / 批量重算。
+ * 质控服务实现（批B·2.3；批Q 规则可配置）。
  *
  * <ul>
- *   <li>判定地基=规则引擎（QcScorer + LogicChecker），LLM 不参与；</li>
- *   <li>批量：分页分批（1000/页）+ Redis SETNX 防重（tcm:task:batch）+ 单条失败跳过汇总；</li>
- *   <li>review_tasks 幂等 upsert（无批量前置清理），查询过滤 is_obsolete=0。</li>
+ *   <li>判定地基 = 规则引擎（QcScorer + LogicChecker），规则来自 {@link QcRuleStore}；</li>
+ *   <li>批量：分页分批（1000/页） + Redis SETNX 防重（tcm:task:batch）；</li>
+ *   <li>review_tasks 幂等 upsert（查询过滤 is_obsolete=0）。</li>
  * </ul>
  */
 @Slf4j
@@ -59,50 +61,41 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     private static final String BATCH_LOCK_KEY = "tcm:task:batch";
     private static final int BATCH_PAGE_SIZE = 1000;
-    private static final Pattern NUMERIC = Pattern.compile("^\\d+(\\.\\d+)?(岁|个月|月|天)?$");
-
-    // 图谱上限（批D·3.3）：节点 200 = 病历 50 + 实体 150；边 800
-    private static final int GRAPH_RECORD_CAP = 50;
-    private static final int GRAPH_ENTITY_CAP = 150;
-    private static final int GRAPH_EDGE_CAP = 800;
-    /** 图谱聚合前最多扫描的病历数：超出则截断并在 hint 中说明（UX-41） */
+    /** 扣分聚合/扫描上限 */
     private static final int MAX_SCAN_RECORDS = 3000;
-    private static final String[] ENTITY_TYPES = {
-            "disease", "symptom", "tongue", "pulse", "pattern", "cause", "treatment", "formula", "herb"};
-    private static final String[] ENTITY_KEYS = {
-            "diseases", "symptoms", "tongueList", "pulseList", "patternList", "causeList",
-            "treatmentList", "formulaList", "herbs"};
 
     private final ReviewTaskMapper reviewTaskMapper;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redis;
     private final OperationLogger operationLogger;
+    private final QcRuleStore ruleStore;
 
     @Value("${qc.batch.max-records:30000}")
     private int maxRecords;
+
+    // ------------------------------------------------------------------ 检查
 
     @Override
     public QcCheckVO check(QcCheckDTO dto) {
         Record raw = loadRaw(dto == null ? null : dto.getRecordId());
         Map<String, Object> data = asMap(dto == null ? null : dto.getStructuredData(),
                 raw == null ? null : raw.getStructuredData());
+        QcRuleSet rules = ruleStore.get();
 
         QcCheckVO vo = new QcCheckVO();
-        // 缺失（核心 5 要素，真缺失口径：结构化与原始列均无）
-        for (String field : List.of("症状", "证候", "舌象", "脉象", "中药")) {
-            if (coreMissing(field, data, raw)) {
-                vo.getMissingFields().add(field);
+        for (QcRuleSet.Element el : rules.getCompleteness().getElements()) {
+            if (!structuredPresent(el.getSource(), data) && !rawPresent(el.getFallback(), raw)) {
+                vo.getMissingFields().add(el.getName());
             }
         }
-        // 格式
         if (raw != null) {
-            String age = trim(raw.getAge());
-            if (age != null && !NUMERIC.matcher(age).matches()) {
-                vo.getFormatErrors().add(new QcCheckVO.FormatError("年龄", "年龄格式不正确：" + age));
-            }
-            String gender = trim(raw.getGender());
-            if (gender != null && !"男".equals(gender) && !"女".equals(gender)) {
-                vo.getFormatErrors().add(new QcCheckVO.FormatError("性别", "性别非 男/女：" + gender));
+            for (QcRuleSet.FormatRule fr : rules.getFormat()) {
+                String v = rawValue(raw, fr.getField());
+                if (v != null && !formatOk(fr, v)) {
+                    String label = fr.getLabel() == null ? fr.getField() : fr.getLabel();
+                    vo.getFormatErrors().add(new QcCheckVO.FormatError(label,
+                            (fr.getReason() == null ? label + "格式不正确" : fr.getReason()) + "：" + v));
+                }
             }
         }
         vo.setDuplicate(false);
@@ -112,14 +105,15 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     @Override
     public LogicCheckVO checkLogic(LogicCheckDTO dto) {
         List<String> patterns = pick(dto == null ? null : dto.getPatternList());
-        List<String> treatments = pick(dto == null ? null : dto.getTreatmentList());
-        List<String> formulas = pick(dto == null ? null : dto.getFormulaList());
-        List<String> conflicts = LogicChecker.check(patterns, treatments, formulas, List.of(), List.of());
+        List<String> conflicts = LogicChecker.check(patterns, List.of(), List.of(), List.of(),
+                ruleStore.get().getConsistency());
         LogicCheckVO vo = new LogicCheckVO();
         vo.setConflicts(conflicts);
         vo.setConsistent(conflicts.isEmpty());
         return vo;
     }
+
+    // ------------------------------------------------------------------ 评分
 
     @Override
     public ScoreResultVO score(QcScoreDTO dto) {
@@ -129,7 +123,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             throw new IllegalArgumentException("structuredData 与 recordId 至少提供一个");
         }
         Map<String, Object> data = asMap(sd, raw == null ? null : raw.getStructuredData());
-        return QcScorer.score(data, raw, false);
+        return QcScorer.score(data, raw, false, ruleStore.get());
     }
 
     @Override
@@ -148,6 +142,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         QcBatchResultVO result = new QcBatchResultVO();
         Set<String> seenHash = new HashSet<>();
         try {
+            QcRuleSet rules = ruleStore.get();
             int pageNo = 1;
             while (true) {
                 Page<Record> page = baseMapper.selectPage(new Page<>(pageNo, BATCH_PAGE_SIZE), wrapper);
@@ -158,12 +153,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 for (Record r : records) {
                     result.setTotal(result.getTotal() + 1);
                     try {
-                        processOne(r, result, seenHash);
+                        processOne(r, result, seenHash, rules);
                     } catch (Exception e) {
                         result.setFailed(result.getFailed() + 1);
                         if (result.getFailureSamples().size() < 50) {
-                            result.getFailureSamples().add(
-                                    new QcBatchResultVO.Failure(r.getId(), e.getMessage()));
+                            result.getFailureSamples().add(new QcBatchResultVO.Failure(r.getId(), e.getMessage()));
                         }
                         log.warn("[质控重算] 病历 {} 失败: {}", r.getId(), e.getMessage());
                     }
@@ -182,12 +176,12 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return result;
     }
 
-    private void processOne(Record r, QcBatchResultVO result, Set<String> seenHash) throws Exception {
+    private void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception {
         String hash = RecordUtil.textHash(r);
         boolean duplicate = !seenHash.add(hash);
 
         Map<String, Object> data = asMap(null, r.getStructuredData());
-        ScoreResultVO vo = QcScorer.score(data, r, duplicate);
+        ScoreResultVO vo = QcScorer.score(data, r, duplicate, rules);
 
         String status = switch (vo.getGrade()) {
             case "合格" -> "completed";
@@ -205,7 +199,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
     }
 
-    /** review_tasks 幂等 upsert（无批量前置清理） */
+    /** review_tasks 幂等 upsert */
     private void upsertReviewTask(Record r, ScoreResultVO vo) {
         List<ReviewTask> existing = reviewTaskMapper.selectList(new QueryWrapper<ReviewTask>()
                 .eq("record_id", r.getId()).eq("is_obsolete", 0));
@@ -258,247 +252,31 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return d.withNano(0);
     }
 
-    // ============ 辅助 ============
+    // ------------------------------------------------------------------ 规则
 
     @Override
-    public GraphVO graph(FiltersDTO filters) {
-        GraphVO vo = new GraphVO();
-        List<Record> records = baseMapper.selectList(RecordFilter.build(RequestUtils.currentRole(), filters));
-        if (records.isEmpty()) {
-            vo.setHint("范围内暂无可展示的质控数据");
-            return vo;
-        }
-        // 图谱需解析 structuredData JSON 后聚合，SQL 无法直接分组（实体藏在 JSON 里），
-        // 因此全量加载后在内存聚合 —— 这里加扫描上限，避免大范围筛选把服务拖住（UX-41）。
-        // 完整 SQL 化需要先把 RecordFilter 的过滤条件下推到 SQL，属独立重构。
-        boolean scanCapped = records.size() > MAX_SCAN_RECORDS;
-        if (scanCapped) {
-            records = new ArrayList<>(records.subList(0, MAX_SCAN_RECORDS));
-            vo.setTruncated(true);
-            vo.setHint("范围内病历超过 " + MAX_SCAN_RECORDS + " 条，图谱仅基于前 " + MAX_SCAN_RECORDS
-                    + " 条聚合；建议缩小筛选范围以获得完整视图");
-            log.warn("[图谱] 扫描记录数超过上限 {}，已截断聚合", MAX_SCAN_RECORDS);
-        }
-
-        // 1) 抽取每条病历 9 类实体，累计全局频次
-        Map<String, Integer> freq = new HashMap<>();
-        Map<String, String> nameById = new HashMap<>();
-        Map<String, String> typeById = new HashMap<>();
-        List<Map<String, List<String>>> perRecord = new ArrayList<>();
-        int distinctEntities = 0;
-        for (Record r : records) {
-            Map<String, List<String>> byType = extractEntities(asMap(null, r.getStructuredData()));
-            perRecord.add(byType);
-            for (int i = 0; i < ENTITY_TYPES.length; i++) {
-                for (String c : byType.getOrDefault(ENTITY_TYPES[i], List.of())) {
-                    if (c.isBlank()) continue;
-                    String id = ENTITY_TYPES[i] + ":" + c;
-                    if (!freq.containsKey(id)) {
-                        distinctEntities++;
-                        nameById.put(id, c);
-                        typeById.put(id, ENTITY_TYPES[i]);
-                    }
-                    freq.merge(id, 1, Integer::sum);
-                }
-            }
-        }
-        if (freq.isEmpty()) {
-            vo.setHint("范围内暂无可展示的结构化实体");
-            return vo;
-        }
-
-        // 2) 实体节点：按频次取前 GRAPH_ENTITY_CAP
-        List<String> entityIds = freq.entrySet().stream()
-                .sorted((a, b) -> b.getValue() - a.getValue())
-                .map(Map.Entry::getKey)
-                .limit(GRAPH_ENTITY_CAP)
-                .toList();
-        Set<String> selected = new HashSet<>(entityIds);
-        for (String id : entityIds) {
-            GraphVO.Node n = new GraphVO.Node();
-            n.setId(id);
-            n.setName(nameById.get(id));
-            n.setType(typeById.get(id));
-            n.setSize(freq.get(id));
-            vo.getNodes().add(n);
-        }
-
-        // 3) 病历节点：与已选实体有交集的病历，取前 GRAPH_RECORD_CAP
-        Set<String> recordNodeIds = new HashSet<>();
-        for (int ri = 0; ri < records.size() && recordNodeIds.size() < GRAPH_RECORD_CAP; ri++) {
-            if (!hasSelectedEntity(perRecord.get(ri), selected)) continue;
-            Record r = records.get(ri);
-            String rid = "record:" + r.getId();
-            if (recordNodeIds.add(rid)) {
-                GraphVO.Node n = new GraphVO.Node();
-                n.setId(rid);
-                n.setName(recordLabel(r));
-                n.setType("record");
-                n.setSize(1);
-                vo.getNodes().add(n);
-            }
-        }
-
-        // 4) 边①：病历 → 实体
-        Set<String> edgeKeys = new HashSet<>();
-
-        // 4.0) 先算规则/冲突边（优先保留，避免被高频 rel 边截断）
-        for (int ri = 0; ri < records.size(); ri++) {
-            String rid = "record:" + records.get(ri).getId();
-            if (!recordNodeIds.contains(rid)) continue;
-            Map<String, List<String>> byType = perRecord.get(ri);
-            List<String> patterns = byType.getOrDefault("pattern", List.of());
-            List<String> treatments = byType.getOrDefault("treatment", List.of());
-            List<String> formulas = byType.getOrDefault("formula", List.of());
-            List<String> tongues = byType.getOrDefault("tongue", List.of());
-            List<String> pulses = byType.getOrDefault("pulse", List.of());
-
-            // ② 规则边：证候 → 治法 / 方剂（一致命中）
-            for (LogicChecker.Rule rule : LogicChecker.rules()) {
-                String p = firstMatch(patterns, rule.pattern());
-                if (p == null) continue;
-                // 记下「这个证候被规则表覆盖到了」（不依赖它是否进入 200 节点上限）：
-                // 规则表只覆盖少数证候，未覆盖的不判冲突（不误杀）。前端据此区分
-                // 「判过、确实没冲突」与「根本没规则可判」，避免把后者说成「证候与治法一致」。
-                if (!vo.getCoveredPatterns().contains(p)) {
-                    vo.getCoveredPatterns().add(p);
-                }
-                String pid = "pattern:" + p;
-                if (!selected.contains(pid)) continue;
-                for (String t : treatments) {
-                    if (matchAny(t, rule.treatments()) && selected.contains("treatment:" + t)) {
-                        addEdge(vo, edgeKeys, pid, "treatment:" + t, "rule", rule.pattern() + "：合法治法");
-                    }
-                }
-                for (String f : formulas) {
-                    if (matchAny(f, rule.formulas()) && selected.contains("formula:" + f)) {
-                        addEdge(vo, edgeKeys, pid, "formula:" + f, "rule", rule.pattern() + "：合法方剂");
-                    }
-                }
-            }
-
-            // ③ 冲突边（checkLogic 命中 → 红色虚线 + 原因）
-            for (String c : LogicChecker.check(patterns, treatments, formulas, tongues, pulses)) {
-                if (c.startsWith(LogicChecker.TYPE_TREATMENT) && !patterns.isEmpty()) {
-                    String pid = "pattern:" + patterns.get(0);
-                    if (selected.contains(pid)) {
-                        for (String t : treatments) {
-                            if (selected.contains("treatment:" + t)) addEdge(vo, edgeKeys, pid, "treatment:" + t, "conflict", c);
-                        }
-                    }
-                } else if (c.startsWith(LogicChecker.TYPE_FORMULA) && !patterns.isEmpty()) {
-                    String pid = "pattern:" + patterns.get(0);
-                    if (selected.contains(pid)) {
-                        for (String f : formulas) {
-                            if (selected.contains("formula:" + f)) addEdge(vo, edgeKeys, pid, "formula:" + f, "conflict", c);
-                        }
-                    }
-                } else if (c.startsWith(LogicChecker.TYPE_TONGUE_PULSE) && !tongues.isEmpty() && !pulses.isEmpty()) {
-                    String tid = "tongue:" + tongues.get(0);
-                    String pid = "pulse:" + pulses.get(0);
-                    if (selected.contains(tid) && selected.contains(pid)) addEdge(vo, edgeKeys, tid, pid, "conflict", c);
-                }
-            }
-        }
-
-        // 4.1) 病历 → 实体关联边：填满剩余边预算
-        boolean relCut = false;
-        for (int ri = 0; ri < records.size() && !relCut; ri++) {
-            String rid = "record:" + records.get(ri).getId();
-            if (!recordNodeIds.contains(rid)) continue;
-            Map<String, List<String>> byType = perRecord.get(ri);
-            for (int i = 0; i < ENTITY_TYPES.length && !relCut; i++) {
-                for (String c : byType.getOrDefault(ENTITY_TYPES[i], List.of())) {
-                    String eid = ENTITY_TYPES[i] + ":" + c;
-                    if (!selected.contains(eid)) continue;
-                    if (vo.getEdges().size() >= GRAPH_EDGE_CAP) {
-                        relCut = true;
-                        break;
-                    }
-                    addEdge(vo, edgeKeys, rid, eid, "rel", null);
-                }
-            }
-        }
-
-        boolean truncated = distinctEntities > GRAPH_ENTITY_CAP
-                || recordNodeIds.size() >= GRAPH_RECORD_CAP
-                || relCut;
-        vo.setTruncated(truncated);
-        if (truncated) {
-            vo.setHint("仅展示高频节点与关联，部分关系已截断（节点上限 200 / 边上限 800）");
-        }
-
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (GraphVO.Node n : vo.getNodes()) {
-            counts.merge(n.getType(), 1, Integer::sum);
-        }
-        vo.setCounts(counts);
-        return vo;
-    }
-
-    /** 按 9 类抽取实体文本（herbs 取 name，其余取 content） */
-    private Map<String, List<String>> extractEntities(Map<String, Object> data) {
-        Map<String, List<String>> out = new HashMap<>();
-        if (data == null) {
-            return out;
-        }
-        for (int i = 0; i < ENTITY_TYPES.length; i++) {
-            List<String> list = new ArrayList<>();
-            if (data.get(ENTITY_KEYS[i]) instanceof List<?> raw) {
-                for (Object item : raw) {
-                    String c = null;
-                    if (item instanceof Map<?, ?> m) {
-                        Object v = m.get("content") != null ? m.get("content") : m.get("name");
-                        c = v == null ? null : String.valueOf(v).trim();
-                    } else if (item != null) {
-                        c = String.valueOf(item).trim();
-                    }
-                    if (c != null && !c.isBlank()) {
-                        list.add(c);
-                    }
-                }
-            }
-            out.put(ENTITY_TYPES[i], list);
-        }
-        return out;
+    public QcRulesVO rules() {
+        return new QcRulesVO(ruleStore.get(), ruleStore.warnings());
     }
 
     @Override
-    public com.tcm.ehr.domain.vo.QcRuleSetVO rules() {
-        com.tcm.ehr.domain.vo.QcRuleSetVO vo = new com.tcm.ehr.domain.vo.QcRuleSetVO();
-        vo.setCoreFields(new ArrayList<>(QcScorer.coreFields()));
-        Map<String, Integer> w = new LinkedHashMap<>();
-        w.put("fullMissing", QcScorer.missFull());
-        w.put("partialMissing", QcScorer.missPartial());
-        w.put("logicConflict", QcScorer.W_LOGIC);
-        w.put("format", QcScorer.W_FORMAT);
-        w.put("duplicate", QcScorer.W_DUPLICATE);
-        vo.setWeights(w);
-        Map<String, Integer> t = new LinkedHashMap<>();
-        t.put("qualified", QcScorer.QUALIFIED);
-        t.put("invalid", QcScorer.INVALID);
-        t.put("seriousFullMissing", QcScorer.SERIOUS_FULL);
-        vo.setThresholds(t);
-        for (LogicChecker.Rule r : LogicChecker.rules()) {
-            com.tcm.ehr.domain.vo.QcRuleSetVO.LogicRule lr = new com.tcm.ehr.domain.vo.QcRuleSetVO.LogicRule();
-            lr.setPattern(r.pattern());
-            lr.setTreatments(new ArrayList<>(r.treatments()));
-            lr.setFormulas(new ArrayList<>(r.formulas()));
-            vo.getLogicRules().add(lr);
-        }
-        for (LogicChecker.TonguePulse tp : LogicChecker.tonguePulseConflicts()) {
-            com.tcm.ehr.domain.vo.QcRuleSetVO.TonguePulse x = new com.tcm.ehr.domain.vo.QcRuleSetVO.TonguePulse();
-            x.setTongue(tp.tongue());
-            x.setPulse(tp.pulse());
-            vo.getTonguePulseConflicts().add(x);
-        }
-        return vo;
+    public QcRulesVO updateRules(QcRuleSet rules) {
+        ruleStore.update(rules);
+        return new QcRulesVO(ruleStore.get(), ruleStore.warnings());
     }
 
     @Override
-    public com.tcm.ehr.domain.vo.DeductionStatsVO deductionStats(FiltersDTO filters) {
+    public QcRulesVO resetRules() {
+        ruleStore.reset();
+        return new QcRulesVO(ruleStore.get(), ruleStore.warnings());
+    }
+
+    // ------------------------------------------------------------------ 扣分聚合
+
+    @Override
+    public DeductionStatsVO deductionStats(FiltersDTO filters) {
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), filters);
-        com.tcm.ehr.domain.vo.DeductionStatsVO vo = new com.tcm.ehr.domain.vo.DeductionStatsVO();
+        DeductionStatsVO vo = new DeductionStatsVO();
         Map<String, int[]> byType = new LinkedHashMap<>();
         Map<String, int[]> byItem = new LinkedHashMap<>();
         Map<String, Integer> gradeDist = new LinkedHashMap<>();
@@ -538,12 +316,12 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             pageNo++;
         }
         for (Map.Entry<String, int[]> e : byType.entrySet()) {
-            vo.getByType().add(new com.tcm.ehr.domain.vo.DeductionStatsVO.ByType(e.getKey(), e.getValue()[0], e.getValue()[1]));
+            vo.getByType().add(new DeductionStatsVO.ByType(e.getKey(), e.getValue()[0], e.getValue()[1]));
         }
-        List<com.tcm.ehr.domain.vo.DeductionStatsVO.ByItem> items = new ArrayList<>();
+        List<DeductionStatsVO.ByItem> items = new ArrayList<>();
         for (Map.Entry<String, int[]> e : byItem.entrySet()) {
             String[] k = e.getKey().split("\\|", 2);
-            items.add(new com.tcm.ehr.domain.vo.DeductionStatsVO.ByItem(k[0], k.length > 1 ? k[1] : "", e.getValue()[0], e.getValue()[1]));
+            items.add(new DeductionStatsVO.ByItem(k[0], k.length > 1 ? k[1] : "", e.getValue()[0], e.getValue()[1]));
         }
         items.sort((a, b) -> Integer.compare(b.getPoints(), a.getPoints()));
         vo.setByItem(new ArrayList<>(items.subList(0, Math.min(20, items.size()))));
@@ -563,56 +341,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             }
         }
         try {
-            return QcScorer.score(asMap(null, r.getStructuredData()), r, false);
+            return QcScorer.score(asMap(null, r.getStructuredData()), r, false, ruleStore.get());
         } catch (Exception e) {
             return null;
         }
     }
 
-    private boolean hasSelectedEntity(Map<String, List<String>> byType, Set<String> selected) {
-        for (int i = 0; i < ENTITY_TYPES.length; i++) {
-            for (String c : byType.getOrDefault(ENTITY_TYPES[i], List.of())) {
-                if (selected.contains(ENTITY_TYPES[i] + ":" + c)) return true;
-            }
-        }
-        return false;
-    }
-
-    private void addEdge(GraphVO vo, Set<String> seen, String source, String target, String type, String label) {
-        if (source == null || target == null || source.equals(target)) return;
-        if (vo.getEdges().size() >= GRAPH_EDGE_CAP) return;
-        String key = source + "->" + target + "#" + type;
-        if (!seen.add(key)) return;
-        GraphVO.Edge e = new GraphVO.Edge();
-        e.setSource(source);
-        e.setTarget(target);
-        e.setType(type);
-        e.setLabel(label);
-        vo.getEdges().add(e);
-    }
-
-    private String recordLabel(Record r) {
-        String no = r.getRegistrationNo();
-        if (no != null && !no.isBlank()) return no;
-        String id = r.getId();
-        return id == null ? "病历" : id.substring(0, Math.min(8, id.length()));
-    }
-
-    private String firstMatch(List<String> values, String term) {
-        for (String v : values) {
-            if (match(v, term)) return v;
-        }
-        return null;
-    }
-
-    private boolean match(String text, String term) {
-        return text != null && term != null && (text.contains(term) || term.contains(text));
-    }
-
-    private boolean matchAny(String text, Set<String> terms) {
-        return terms.stream().anyMatch(t -> match(text, t));
-    }
-
+    // ------------------------------------------------------------------ 辅助
 
     private boolean acquireLock() {
         try {
@@ -636,7 +371,6 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return recordId == null || recordId.isBlank() ? null : baseMapper.selectById(recordId);
     }
 
-    /** 优先用入参对象，其次解析病历 structured_data 字符串 */
     private Map<String, Object> asMap(Object inline, String json) {
         Object src = inline != null ? inline : json;
         if (src == null) {
@@ -665,27 +399,60 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 .toList();
     }
 
-    /** 核心要素是否"真缺失"（结构化与原始列均无）；症状无对应原始列 */
-    private boolean coreMissing(String field, Map<String, Object> data, Record raw) {
-        return switch (field) {
-            case "症状" -> listEmpty(data, "symptoms");
-            case "证候" -> listEmpty(data, "patternList") && (raw == null || blank(raw.getPattern()));
-            case "舌象" -> listEmpty(data, "tongueList") && (raw == null || blank(raw.getTongue()));
-            case "脉象" -> listEmpty(data, "pulseList") && (raw == null || blank(raw.getPulse()));
-            case "中药" -> listEmpty(data, "herbs") && (raw == null || blank(raw.getPrescription()));
-            default -> false;
+    private boolean structuredPresent(String key, Map<String, Object> data) {
+        return key != null && data != null && data.get(key) instanceof List<?> list && !list.isEmpty();
+    }
+
+    private boolean rawPresent(List<String> fields, Record raw) {
+        if (raw == null || fields == null) {
+            return false;
+        }
+        for (String f : fields) {
+            if (rawValue(raw, f) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean formatOk(QcRuleSet.FormatRule fr, String v) {
+        if ("enum".equalsIgnoreCase(fr.getType())) {
+            return fr.getValues() != null && fr.getValues().contains(v);
+        }
+        if (fr.getExpr() == null || fr.getExpr().isBlank()) {
+            return true;
+        }
+        try {
+            return Pattern.compile(fr.getExpr()).matcher(v).matches();
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    private String rawValue(Record r, String field) {
+        if (r == null || field == null) {
+            return null;
+        }
+        String v = switch (field) {
+            case "registrationNo" -> r.getRegistrationNo();
+            case "outpatientNo" -> r.getOutpatientNo();
+            case "gender" -> r.getGender();
+            case "age" -> r.getAge();
+            case "westernDiagnosis" -> r.getWesternDiagnosis();
+            case "tcmDiagnosis" -> r.getTcmDiagnosis();
+            case "presentIllness" -> r.getPresentIllness();
+            case "chiefComplaint" -> r.getChiefComplaint();
+            case "selfReport" -> r.getSelfReport();
+            case "inspection" -> r.getInspection();
+            case "pulse" -> r.getPulse();
+            case "tongue" -> r.getTongue();
+            case "physicalExam" -> r.getPhysicalExam();
+            case "pattern" -> r.getPattern();
+            case "prescription" -> r.getPrescription();
+            case "followUp" -> r.getFollowUp();
+            case "treatmentEffect" -> r.getTreatmentEffect();
+            default -> null;
         };
-    }
-
-    private boolean listEmpty(Map<String, Object> data, String key) {
-        return data == null || !(data.get(key) instanceof List<?> list) || list.isEmpty();
-    }
-
-    private String trim(String s) {
-        return s == null || s.isBlank() ? null : s.trim();
-    }
-
-    private boolean blank(String s) {
-        return s == null || s.isBlank();
+        return v == null || v.isBlank() ? null : v.trim();
     }
 }

@@ -46,6 +46,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
 
     private final RecordMapper recordMapper;
     private final ObjectMapper objectMapper;
+    private final com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
 
     @Override
     public ReviewTasksVO listTasks(Integer page, Integer pageSize, String status) {
@@ -118,7 +119,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         }
 
         // ② 自动重算（判定地基仍是规则）
-        ScoreResultVO sr = QcScorer.score(asMap(r.getStructuredData()), r, false);
+        ScoreResultVO sr = QcScorer.score(asMap(r.getStructuredData()), r, false, qcRuleStore.get());
         String status = switch (sr.getGrade()) {
             case "合格" -> "completed";
             case "待复核" -> "reviewing";

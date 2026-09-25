@@ -1,98 +1,64 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.config.QcRuleSet;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 /**
- * 诊疗逻辑一致性规则（批B·2.3，单源规则表；/api/qc/check/logic 与 QcScorer 共用）。
+ * 诊疗逻辑一致性评估（批B·2.3，批Q 改为按配置的规则执行）。
  *
- * <p>固定写死（v1 边界，不做规则表迁移/可视化配置）：</p>
- * <ul>
- *   <li>风寒感冒 → 辛温解表 → 麻黄汤 / 桂枝汤</li>
- *   <li>风热感冒 → 辛凉解表 → 银翘散 / 桑菊饮</li>
- *   <li>暑湿感冒 → 清暑祛湿 → 新加香薷饮</li>
- *   <li>舌脉：舌红 × 脉沉迟；舌淡 × 脉数</li>
- * </ul>
- * <p><b>未覆盖证候不判冲突</b>（不误杀）。</p>
+ * <p>规则来自 {@link QcRuleSet#getConsistency()}：证候命中关键词时，若病历记录了相应要素
+ * （中药/舌象/脉象），则须与期望集合相符，否则记为冲突；<b>对应要素缺失则跳过（不适用）</b>。</p>
  */
 public final class LogicChecker {
 
     private LogicChecker() {
     }
 
-    /** 规则条目（供图谱"证候→治法/方剂"规则子图复用；单源规则表） */
-    public record Rule(String pattern, Set<String> treatments, Set<String> formulas) {
-    }
-
-    /** 舌脉冲突条目 */
-    public record TonguePulse(String tongue, String pulse) {
-    }
-
-    private static final List<Rule> RULES = List.of(
-            new Rule("风寒感冒", Set.of("辛温解表"), Set.of("麻黄汤", "桂枝汤")),
-            new Rule("风热感冒", Set.of("辛凉解表"), Set.of("银翘散", "桑菊饮")),
-            new Rule("暑湿感冒", Set.of("清暑祛湿"), Set.of("新加香薷饮"))
-    );
-
-    /** 舌脉冲突（供只读接口下发，单一数据源） */
-    private static final List<TonguePulse> TONGUE_PULSE = List.of(
-            new TonguePulse("舌红", "脉沉迟"),
-            new TonguePulse("舌淡", "脉数")
-    );
-
-    /** 规则表只读视图（图谱复用，避免规则漂移） */
-    public static List<Rule> rules() {
-        return RULES;
-    }
-
-    /** 舌脉冲突只读视图 */
-    public static List<TonguePulse> tonguePulseConflicts() {
-        return TONGUE_PULSE;
-    }
-
-    public static final String TYPE_TREATMENT = "证候-治法";
-    public static final String TYPE_FORMULA = "证候-方剂";
-    public static final String TYPE_TONGUE_PULSE = "舌脉";
-
     /**
-     * 检查证候-治法/方剂 与 舌脉冲突。
-     *
-     * @return 冲突描述列表（空表示一致）
+     * @return 冲突描述列表（形如"规则名：xxx与证候不符"）
      */
-    public static List<String> check(List<String> patterns, List<String> treatments,
-                                     List<String> formulas, List<String> tongues, List<String> pulses) {
+    public static List<String> check(List<String> patterns, List<String> tongues, List<String> pulses,
+                                     List<String> herbs, List<QcRuleSet.ConsistencyRule> rules) {
         List<String> conflicts = new ArrayList<>();
-        for (Rule rule : RULES) {
-            boolean patternHit = patterns.stream().anyMatch(p -> matches(p, rule.pattern()));
-            if (!patternHit) {
+        if (rules == null || patterns == null || patterns.isEmpty()) {
+            return conflicts;
+        }
+        for (QcRuleSet.ConsistencyRule rule : rules) {
+            if (rule.getPatternAny() == null || rule.getPatternAny().isEmpty()) {
                 continue;
             }
-            if (!treatments.isEmpty() && treatments.stream().noneMatch(t -> matchesAny(t, rule.treatments()))) {
-                conflicts.add(TYPE_TREATMENT + "不匹配：" + rule.pattern() + " × " + String.join("/", treatments));
+            boolean hit = patterns.stream().anyMatch(p -> anyContains(p, rule.getPatternAny()));
+            if (!hit) {
+                continue;
             }
-            if (!formulas.isEmpty() && formulas.stream().noneMatch(f -> matchesAny(f, rule.formulas()))) {
-                conflicts.add(TYPE_FORMULA + "不匹配：" + rule.pattern() + " × " + String.join("/", formulas));
+            String name = rule.getName() == null ? "一致性" : rule.getName();
+            if (!rule.getExpectHerbs().isEmpty() && herbs != null && !herbs.isEmpty()
+                    && herbs.stream().noneMatch(h -> anyContains(h, rule.getExpectHerbs()))) {
+                conflicts.add(name + "：中药与证候不符");
             }
-        }
-        // 舌象 × 脉象
-        for (TonguePulse tp : TONGUE_PULSE) {
-            if (containsAny(tongues, tp.tongue()) && containsAny(pulses, tp.pulse())) {
-                conflicts.add(TYPE_TONGUE_PULSE + "冲突：" + tp.tongue() + " × " + tp.pulse());
+            if (!rule.getExpectTongue().isEmpty() && tongues != null && !tongues.isEmpty()
+                    && tongues.stream().noneMatch(t -> anyContains(t, rule.getExpectTongue()))) {
+                conflicts.add(name + "：舌象与证候不符");
+            }
+            if (!rule.getExpectPulse().isEmpty() && pulses != null && !pulses.isEmpty()
+                    && pulses.stream().noneMatch(p -> anyContains(p, rule.getExpectPulse()))) {
+                conflicts.add(name + "：脉象与证候不符");
             }
         }
         return conflicts;
     }
 
-    private static boolean matches(String text, String term) {
-        return text != null && term != null && (text.contains(term) || term.contains(text));
-    }
-
-    private static boolean matchesAny(String text, Set<String> terms) {
-        return terms.stream().anyMatch(t -> matches(text, t));
-    }
-
-    private static boolean containsAny(List<String> list, String keyword) {
-        return list.stream().anyMatch(s -> s != null && s.contains(keyword));
+    private static boolean anyContains(String text, List<String> keys) {
+        if (text == null) {
+            return false;
+        }
+        for (String k : keys) {
+            if (k != null && !k.isBlank() && text.contains(k)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

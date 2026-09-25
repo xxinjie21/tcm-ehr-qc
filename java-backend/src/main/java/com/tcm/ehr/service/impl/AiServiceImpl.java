@@ -68,6 +68,7 @@ public class AiServiceImpl implements IAiService {
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
     private final ILogService logService;
+    private final com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
 
     // ------------------------------------------------------------------ 3.1 解读
 
@@ -402,7 +403,7 @@ public class AiServiceImpl implements IAiService {
         Map<String, Object> data = structured(r);
 
         // 判定地基：规则重算预检单（与 records.qc_results 同源，确定性一致）
-        ScoreResultVO sr = QcScorer.score(data, r, false);
+        ScoreResultVO sr = QcScorer.score(data, r, false, qcRuleStore.get());
         String precheck = precheckText(sr, r);
 
         AiReplyVO vo = new AiReplyVO();
