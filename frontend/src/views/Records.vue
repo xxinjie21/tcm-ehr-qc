@@ -10,10 +10,17 @@
           <div class="actions">
             <el-button type="primary" :loading="searching" @click="handleSearch">查 询</el-button>
             <el-button :disabled="searching" @click="handleReset">重置</el-button>
+            <el-button
+              type="danger"
+              plain
+              :disabled="searching || !selectedIds.length"
+              @click="handleBatchDelete"
+            >批量删除{{ selectedIds.length ? `（${selectedIds.length}）` : '' }}</el-button>
             <span class="tip-inline">共 {{ total }} 条</span>
           </div>
 
           <el-table
+            ref="tableRef"
             v-loading="searching"
             :data="rows"
             border
@@ -21,7 +28,9 @@
             style="margin-top: 12px"
             max-height="420"
             :row-class-name="rowClass"
+            @selection-change="onSelectionChange"
           >
+            <el-table-column type="selection" width="46" />
             <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
             <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
             <el-table-column prop="grade" label="分级" width="90" />
@@ -347,6 +356,43 @@ const handleDelete = async (id) => {
       raw.value = null
       activeId.value = ''
     }
+    tableRef.value?.clearSelection()
+    selectedIds.value = []
+    handleSearch()
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 批量删除：表格多选 → 一次提交 ids */
+const tableRef = ref(null)
+const selectedIds = ref([])
+const onSelectionChange = (rows) => {
+  selectedIds.value = rows.map((r) => r.id)
+}
+const handleBatchDelete = async () => {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  try {
+    await ElMessageBox.confirm(
+      `确认删除选中的 ${ids.length} 份病历？删除后不可恢复（会留痕）。`,
+      '批量删除病历',
+      { type: 'warning', confirmButtonText: `删除 ${ids.length} 条`, cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    const res = await deleteRecords(ids)
+    const n = res.data?.deletedCount ?? ids.length
+    ElMessage.success(`已删除 ${n} 份病历`)
+    if (ids.includes(activeId.value)) {
+      closeDetail()
+      raw.value = null
+      activeId.value = ''
+    }
+    tableRef.value?.clearSelection()
+    selectedIds.value = []
     handleSearch()
   } catch {
     // 拦截器已提示
