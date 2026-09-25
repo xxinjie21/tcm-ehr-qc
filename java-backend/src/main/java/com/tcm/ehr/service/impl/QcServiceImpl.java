@@ -256,19 +256,28 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     @Override
     public QcRulesVO rules() {
-        return new QcRulesVO(ruleStore.get(), ruleStore.warnings());
+        return buildRulesVO();
     }
 
     @Override
     public QcRulesVO updateRules(QcRuleSet rules) {
         ruleStore.update(rules);
-        return new QcRulesVO(ruleStore.get(), ruleStore.warnings());
+        return buildRulesVO();
     }
 
     @Override
     public QcRulesVO resetRules() {
         ruleStore.reset();
-        return new QcRulesVO(ruleStore.get(), ruleStore.warnings());
+        return buildRulesVO();
+    }
+
+    /** 组装：规则 + 自然语言描述 + 目录 + 告警（单一来源） */
+    private QcRulesVO buildRulesVO() {
+        QcRulesVO vo = new QcRulesVO(ruleStore.get(), ruleStore.warnings());
+        vo.setDescriptions(com.tcm.ehr.common.config.QcRuleDescriber.describe(ruleStore.get()));
+        vo.setCatalogElements(com.tcm.ehr.common.config.QcRuleDescriber.catalogElements());
+        vo.setCatalogFormats(com.tcm.ehr.common.config.QcRuleDescriber.catalogFormats());
+        return vo;
     }
 
     // ------------------------------------------------------------------ 扣分聚合

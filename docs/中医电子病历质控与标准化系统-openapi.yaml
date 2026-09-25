@@ -2654,10 +2654,10 @@ paths:
       tags:
         - 质控
       summary: 读取质控规则
-      description: 【权限：登录即可】返回当前生效的质控规则集（可配置）与加载告警；规则依赖的要素缺失时判定为"不适用"
+      description: 【权限：登录即可】返回当前生效的质控规则集（可配置）、自然语言描述与目录，以及加载告警；规则依赖的要素缺失时判定为"不适用"
       responses:
         '200':
-          description: 规则集 {rules, warnings}
+          description: 规则集 {rules, descriptions, catalogElements, catalogFormats, warnings}
           content:
             application/json:
               schema:
@@ -2671,6 +2671,21 @@ paths:
                     properties:
                       rules:
                         type: object
+                      descriptions:
+                        type: array
+                        description: 自然语言描述（与规则同源）
+                        items:
+                          type: string
+                      catalogElements:
+                        type: array
+                        description: 可选要素目录（中文名 ↔ 结构化 key/回退列）
+                        items:
+                          type: object
+                      catalogFormats:
+                        type: array
+                        description: 格式模板目录
+                        items:
+                          type: object
                       warnings:
                         type: array
                         items:
