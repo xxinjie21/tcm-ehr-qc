@@ -1914,6 +1914,55 @@ paths:
                 $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/records/delete-by-filter:
+    post:
+      tags:
+        - 病历管理
+      summary: 按范围批量删除病历
+      description: 【权限：仅管理员】按筛选范围（科室/时间区间/证候/分级）删除全部匹配病历；四个条件全空时拒绝（防误删全库）。删除前先清 review_tasks 外键依赖
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                department:
+                  type: string
+                dateRange:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                pattern:
+                  type: string
+                grade:
+                  type: string
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/DeleteRecordsVO'
+        '400':
+          description: 未设置任何筛选条件
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/records/raw/{recordId}:
     get:
       tags:

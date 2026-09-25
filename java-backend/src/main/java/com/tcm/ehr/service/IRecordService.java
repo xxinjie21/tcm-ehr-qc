@@ -3,6 +3,7 @@ package com.tcm.ehr.service;
 import com.baomidou.mybatisplus.spring.service.IService;
 import com.tcm.ehr.domain.dto.CreateRecordDTO;
 import com.tcm.ehr.domain.dto.DeleteRecordsDTO;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CreateRecordVO;
@@ -38,6 +39,9 @@ public interface IRecordService extends IService<Record> {
 
     /** 批量删除病历 */
     DeleteRecordsVO deleteRecords(DeleteRecordsDTO dto);
+
+    /** 按筛选范围批量删除病历（管理员；条件全空拒绝，防误删全库） */
+    DeleteRecordsVO deleteByFilter(FiltersDTO filters);
 
     /** 多条件分页查询（数据域 → 用户筛选，取交集） */
     SearchVO searchRecords(SearchDTO dto);

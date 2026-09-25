@@ -50,8 +50,8 @@ tcm-ehr-qc/
 
 ## 接口数量
 
-- Java后端：46个接口（Spring Boot :8080；openapi 43 路径 / 46 操作）
-- 总计：46个接口
+- Java后端：47个接口（Spring Boot :8080；openapi 44 路径 / 47 操作）
+- 总计：47个接口
 - 契约基准：`docs/中医电子病历质控与标准化系统-openapi.yaml`（接口增删先改该文件 → 此处数量随之同步）
 
 ## 核心算法

@@ -5,6 +5,7 @@ import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.CreateRecordDTO;
 import com.tcm.ehr.domain.dto.DeleteRecordsDTO;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.vo.CreateRecordVO;
 import com.tcm.ehr.domain.vo.DeleteRecordsVO;
@@ -94,6 +95,15 @@ public class RecordController {
     public Result<DeleteRecordsVO> deleteRecords(@RequestBody DeleteRecordsDTO dto) {
         DeleteRecordsVO vo = recordService.deleteRecords(dto);
         operationLogger.log("病历删除", "共" + vo.getDeletedCount() + "条", null);
+        return Result.ok("删除成功", vo);
+    }
+
+    /** 按筛选范围批量删除病历（条件全空拒绝，防误删全库）；【权限：仅管理员】 */
+    @RequireRole(roles = {"管理员"})
+    @PostMapping("/api/records/delete-by-filter")
+    public Result<DeleteRecordsVO> deleteByFilter(@RequestBody FiltersDTO filters) {
+        DeleteRecordsVO vo = recordService.deleteByFilter(filters);
+        operationLogger.log("病历删除", "按范围", "共" + vo.getDeletedCount() + "条");
         return Result.ok("删除成功", vo);
     }
 

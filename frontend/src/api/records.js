@@ -30,6 +30,11 @@ export function deleteRecords(ids) {
   return request.delete('/records', { data: { ids } })
 }
 
+// 按筛选范围批量删除（条件全空后端拒绝，防误删全库）
+export function deleteRecordsByFilter(filters) {
+  return request.post('/records/delete-by-filter', filters, { timeout: 200000 })
+}
+
 // F·7.4 多条件分页查询
 export function searchRecords(data) {
   return request.post('/records/search', data)

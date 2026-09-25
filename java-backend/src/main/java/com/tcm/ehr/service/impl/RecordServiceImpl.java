@@ -11,6 +11,7 @@ import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.CreateRecordDTO;
 import com.tcm.ehr.domain.dto.DeleteRecordsDTO;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CreateRecordVO;
@@ -66,6 +67,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     private final ObjectMapper objectMapper;
     private final IDictionaryFileService dictionaryFileService;
     private final com.tcm.ehr.service.INlpBatchService nlpBatchService;
+    private final com.tcm.ehr.mapper.ReviewTaskMapper reviewTaskMapper;
 
     /** 原始 21 字段（禁止通过修改接口变更，命中即 400 code=1007） */
     private static final Set<String> ORIGINAL_FIELDS = Set.of(
@@ -76,6 +78,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
     private static final int MAX_FILES = 20;
+    /** 删除分块大小（先删 review_tasks 再删 records，避免一次 IN 过大） */
+    private static final int DELETE_CHUNK = 500;
 
     /** 表头中文名 → 字段标识（与 data/seed-database.py 的 Excel 表头一致） */
     private static final Map<String, String> HEADER_FIELD = new LinkedHashMap<>();
@@ -366,10 +370,47 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
             throw new IllegalArgumentException("未选择要操作的病历");
         }
-        int n = baseMapper.deleteBatchIds(dto.getIds());
+        return doDelete(dto.getIds());
+    }
+
+    @Override
+    public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
+        if (!hasAnyFilter(filters)) {
+            throw new IllegalArgumentException("请至少设置一个筛选条件，避免误删全库");
+        }
+        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, filters);
+        List<Record> rows = baseMapper.selectList(wrapper.select("id"));
+        List<String> ids = rows.stream().map(Record::getId).toList();
+        return doDelete(ids);
+    }
+
+    /**
+     * 实际删除：先清外键依赖（review_tasks.record_id → records.id），再分块删病历，避免外键约束报错。
+     */
+    private DeleteRecordsVO doDelete(List<String> ids) {
         DeleteRecordsVO vo = new DeleteRecordsVO();
-        vo.setDeletedCount(n);
+        if (ids == null || ids.isEmpty()) {
+            vo.setDeletedCount(0);
+            return vo;
+        }
+        int deleted = 0;
+        for (int i = 0; i < ids.size(); i += DELETE_CHUNK) {
+            List<String> chunk = ids.subList(i, Math.min(i + DELETE_CHUNK, ids.size()));
+            reviewTaskMapper.delete(new QueryWrapper<com.tcm.ehr.domain.po.ReviewTask>().in("record_id", chunk));
+            deleted += baseMapper.deleteBatchIds(chunk);
+        }
+        vo.setDeletedCount(deleted);
         return vo;
+    }
+
+    /** 范围条件是否至少有一个（部门/证候/分级任一非空，或时间区间两端齐全） */
+    private boolean hasAnyFilter(FiltersDTO f) {
+        if (f == null) {
+            return false;
+        }
+        boolean range = f.getDateRange() != null && f.getDateRange().size() == 2
+                && !isBlank(f.getDateRange().get(0)) && !isBlank(f.getDateRange().get(1));
+        return !isBlank(f.getDepartment()) || !isBlank(f.getPattern()) || !isBlank(f.getGrade()) || range;
     }
 
     @Override

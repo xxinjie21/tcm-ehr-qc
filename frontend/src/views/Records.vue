@@ -3,9 +3,9 @@
     <!-- 三块能力改为标签页切换（UX-51）：原先「查表 / 批量导入 / 单条新增」纵向堆叠，
          用户到达表单本身就要滚动整屏；切换后每屏只面对一件事 -->
     <el-tabs v-model="activeTab" class="records-tabs">
-      <!-- ============ 病历代查 ============ -->
-      <el-tab-pane label="病历代查" name="query">
-        <PanelCard title="病历代查">
+      <!-- ============ 病历查询 ============ -->
+      <el-tab-pane label="病历查询" name="query">
+        <PanelCard title="病历查询">
           <RangeFilter v-model="query" />
           <div class="actions">
             <el-button type="primary" :loading="searching" @click="handleSearch">查 询</el-button>
@@ -16,6 +16,12 @@
               :disabled="searching || !selectedIds.length"
               @click="handleBatchDelete"
             >批量删除{{ selectedIds.length ? `（${selectedIds.length}）` : '' }}</el-button>
+            <el-button
+              type="danger"
+              :disabled="searching || !hasFilter"
+              title="按上方筛选范围删除全部匹配病历"
+              @click="handleRangeDelete"
+            >删除范围内病历</el-button>
             <span class="tip-inline">共 {{ total }} 条</span>
           </div>
 
@@ -222,7 +228,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import {
-  importRecords, createRecord, searchRecords, getRawRecord, deleteRecords
+  importRecords, createRecord, searchRecords, getRawRecord, deleteRecords, deleteRecordsByFilter
 } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
 import { useAiStore } from '@/stores/ai'
@@ -280,6 +286,12 @@ const fieldsOf = (group) => group.keys.map((k) => FIELD_MAP[k]).filter(Boolean)
 
 // ===== F·7.4 查询 =====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+/** 范围删除要求至少一个筛选条件（与后端一致，防误删全库） */
+const hasFilter = computed(() => {
+  const r = query.dateRange
+  const range = Array.isArray(r) && r.length === 2 && r[0] && r[1]
+  return !!(query.department || query.pattern || query.grade || range)
+})
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -391,6 +403,47 @@ const handleBatchDelete = async () => {
       raw.value = null
       activeId.value = ''
     }
+    tableRef.value?.clearSelection()
+    selectedIds.value = []
+    handleSearch()
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+/** 按当前筛选范围删除全部匹配病历（前端先取条数确认，后端再按要求删） */
+const handleRangeDelete = async () => {
+  if (!hasFilter.value) {
+    ElMessage.warning('请先设置至少一个筛选条件')
+    return
+  }
+  let n = 0
+  try {
+    const res = await searchRecords({ ...query, page: 1, pageSize: 1 })
+    n = res.data?.total || 0
+  } catch {
+    return
+  }
+  if (!n) {
+    ElMessage.warning('当前筛选范围内没有病历')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将删除当前筛选范围内全部 ${n} 份病历，删除后不可恢复（会留痕）。确认？`,
+      '删除范围内病历',
+      { type: 'warning', confirmButtonText: `删除 ${n} 条`, cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    const res = await deleteRecordsByFilter({ ...query })
+    ElMessage.success(`已删除 ${res.data?.deletedCount ?? 0} 份病历`)
+    // 详情可能指向已删病历，直接收起
+    closeDetail()
+    raw.value = null
+    activeId.value = ''
     tableRef.value?.clearSelection()
     selectedIds.value = []
     handleSearch()
