@@ -42,7 +42,7 @@ public class GovernanceController {
         if (dto.getTerm() == null || dto.getTerm().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error("请输入术语"));
         }
-        if (dto.getType() == null || !List.of("disease", "pattern", "symptom", "herb", "formula").contains(dto.getType())) {
+        if (dto.getType() == null || !com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(dto.getType())) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         var r = governanceService.normalize(dto.getType(), dto.getTerm());

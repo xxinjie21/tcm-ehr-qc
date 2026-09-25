@@ -81,18 +81,12 @@ public final class QcRuleDescriber {
         return out;
     }
 
-    /** 可选要素目录（中文名 ↔ 结构化 key / 回退列），供配置下拉，用户只选中文 */
+    /** 可选要素目录：取自实体类型目录（9 类，中文名 ↔ structuredKey / 回退列），用户只选中文 */
     public static List<QcRuleSet.Element> catalogElements() {
         List<QcRuleSet.Element> list = new ArrayList<>();
-        list.add(el("症状", "symptoms", List.of("chiefComplaint", "selfReport", "presentIllness")));
-        list.add(el("证候", "patternList", List.of("pattern")));
-        list.add(el("舌象", "tongueList", List.of("tongue")));
-        list.add(el("脉象", "pulseList", List.of("pulse")));
-        list.add(el("中药", "herbs", List.of("prescription")));
-        list.add(el("疾病", "diseases", List.of("tcmDiagnosis", "westernDiagnosis")));
-        list.add(el("病因", "causeList", List.of()));
-        list.add(el("治法", "treatmentList", List.of()));
-        list.add(el("方剂", "formulaList", List.of()));
+        for (EntityTypes.EntityType t : EntityTypes.all()) {
+            list.add(el(t.label(), t.structuredKey(), t.fallback()));
+        }
         return list;
     }
 

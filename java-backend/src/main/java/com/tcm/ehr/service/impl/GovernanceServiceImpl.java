@@ -42,7 +42,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
-        if (!List.of("disease", "pattern", "symptom", "herb", "formula").contains(type)) {
+        if (!com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(type)) {
             throw new IllegalArgumentException("type必须为disease/pattern/symptom/herb/formula");
         }
         return termNormalizer.normalize(type, term);

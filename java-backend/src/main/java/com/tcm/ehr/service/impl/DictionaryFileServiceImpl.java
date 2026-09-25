@@ -54,14 +54,11 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
 
     @Override
     public String fileNameOf(String type) {
-        return switch (type) {
-            case "disease" -> "diseases.json";
-            case "pattern" -> "patterns.json";
-            case "symptom" -> "symptoms.json";
-            case "herb" -> "herbs.json";
-            case "formula" -> "formulas.json";
-            default -> throw new IllegalArgumentException("未知词典类型: " + type);
-        };
+        String name = com.tcm.ehr.common.config.EntityTypes.fileNameOf(type);
+        if (name == null) {
+            throw new IllegalArgumentException("未知词典类型: " + type);
+        }
+        return name;
     }
 
     @Override
@@ -156,7 +153,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         try {
             StringBuilder sb = new StringBuilder();
             long stamp = 0;
-            for (String type : List.of("disease", "pattern", "symptom", "herb", "formula")) {
+            for (String type : com.tcm.ehr.common.config.EntityTypes.dictKeys()) {
                 Path f = dir().resolve(fileNameOf(type));
                 if (Files.exists(f)) {
                     stamp = stamp * 31 + Files.getLastModifiedTime(f).toMillis() + Files.size(f);

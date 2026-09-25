@@ -55,20 +55,14 @@ public class EntityNormalizer {
     /**
      * 附录A 字段名 → 词典类型（唯一映射，解析链路与清洗链路共用，避免两处口径漂移）。
      *
+     * <p>批S 起取自 {@link com.tcm.ehr.common.config.EntityTypes}：只有"有词典"的类型参与归一，
+     * 舌象/脉象/病因/治法无独立词典，返回 {@code null}。</p>
+     *
      * @return 词典类型；该字段无独立词典时返回 {@code null}
      */
     public static String dictionaryType(String fieldKey) {
-        if (fieldKey == null) {
-            return null;
-        }
-        return switch (fieldKey) {
-            case "diseases" -> "disease";
-            case "symptoms" -> "symptom";
-            case "patternList" -> "pattern";
-            case "formulaList" -> "formula";
-            // tongueList/pulseList/causeList/treatmentList 无独立词典，跳过
-            default -> null;
-        };
+        var t = com.tcm.ehr.common.config.EntityTypes.dictTypeByStructuredKey(fieldKey);
+        return t == null ? null : t.key();
     }
 
     /**
