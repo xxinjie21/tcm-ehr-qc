@@ -11,81 +11,61 @@
       </div>
     </PanelCard>
 
-    <PanelCard title="质控检验图谱">
-      <div class="qc-filter">
-        <div class="qc-actions">
-          <!-- 默认画全量关系图（UX-72）：演示数据的证候都不在 LogicChecker.RULES 覆盖范围内，
-               规则边与冲突边恒为 0，默认「冲突定位」会让画布与空态都不渲染。
-               后端已回 coveredPatterns 标明「本范围有没有可判的证候」，见下方 no-conflict 文案 -->
-          <el-radio-group v-model="graphMode" size="small">
-            <el-radio-button value="full">全量关系</el-radio-button>
-            <el-radio-button value="conflict">冲突定位</el-radio-button>
-          </el-radio-group>
-          <!-- 说明「这张图回答什么问题」，而不只是「怎么算的」（UX-53） -->
-          <span class="tip">全量关系图看整体；切到「冲突定位」只留红色虚线（证候与治法/方剂不一致）</span>
-        </div>
+    <PanelCard title="质控检验（规则证据）">
+      <div class="tip">
+        把「规则引擎」的判定证据列出来：证候 → 治法/方剂 是否一致、冲突在哪。
+        规则表只覆盖少数证候，<b>未覆盖的不判冲突</b>（空白 ≠ 已核对）。
       </div>
 
       <div v-if="graph.truncated" class="trunc-hint">{{ graph.hint }}</div>
 
-      <!-- 冲突定位模式下无冲突：直接给结论，不画一张空图。
-           但「没有冲突边」有两种成因，必须分开说：
-           ① 有证候被规则表覆盖 → 判过、确实一致；
-           ② 一个都没被覆盖 → 根本没判，此时说「证候与治法一致」是把「没做」说成「没问题」，
-              与前面修的「抽取未开启」降级文案是同一类问题。 -->
-      <div
-        v-if="graphMode === 'conflict' && !graphLoading && graph.nodes.length && !conflictEdges.length"
-        class="no-conflict"
-      >
-        <template v-if="graph.coveredPatterns.length">
-          范围内未发现规则冲突（证候与治法 / 方剂一致）。
-        </template>
-        <template v-else>
-          范围内没有可判的规则，无法判断证候与治法 / 方剂是否一致 ——
-          这不代表检查通过。规则表只覆盖少数常见证候，其余证候按设计不判冲突（避免误报）。
-        </template>
-        <el-button link type="primary" @click="graphMode = 'full'">查看全量关系图</el-button>
-      </div>
-
-      <!-- 结论条：直接回答「这张图发现了什么」，而不是只描述怎么算的（UX-53） -->
-      <div v-if="visibleGraph.nodes.length" class="graph-summary">
-        <span class="gsum"><b>{{ graphSummary.records }}</b> 份病历涉及冲突</span>
-        <span class="gsum"><b>{{ graphSummary.nodes }}</b> 个实体节点</span>
-        <!-- 冲突计数：本范围无证候被规则表覆盖时，摆一个「0 处规则冲突」等于把「没判」
-             说成「没问题」，这里改成直说「无规则可判」 -->
+      <!-- 结论条：先给规模与冲突数，再给明细 -->
+      <div v-if="graph.nodes.length" class="graph-summary">
+        <span class="gsum"><b>{{ graphSummary.records }}</b> 份病历</span>
+        <span class="gsum"><b>{{ graphSummary.covered }}</b> 个证候被规则覆盖</span>
+        <span class="gsum"><b>{{ graphSummary.rules }}</b> 条规则命中</span>
         <span class="gsum" :class="{ bad: graphSummary.conflicts > 0 }">
-          <template v-if="graph.coveredPatterns.length"><b>{{ graphSummary.conflicts }}</b> 处规则冲突</template>
+          <template v-if="graph.coveredPatterns.length"><b>{{ graphSummary.conflicts }}</b> 处冲突</template>
           <template v-else>本范围无规则可判</template>
         </span>
-        <span class="gsum-hint">
-          {{ graphMode === 'full'
-            ? '全量关系图用于总览，节点较多；定位冲突请切回「冲突定位」'
-            : '红色虚线条就是冲突所在，放大后可看清涉及的证候与治法/方剂' }}
-        </span>
       </div>
 
-      <div v-loading="graphLoading" class="graph-wrap">
-        <div
-          v-if="visibleGraph.nodes.length"
-          ref="graphRef"
-          class="graph"
-          role="img"
-          :aria-label="graphLabel"
-        />
+      <div v-loading="graphLoading">
+        <template v-if="graph.nodes.length">
+          <div class="sub-hd">冲突清单</div>
+          <el-table v-if="conflictRows.length" :data="conflictRows" border size="small">
+            <el-table-column prop="reason" label="冲突" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="source" label="涉及（证候 / 舌脉）" width="190" show-overflow-tooltip />
+            <el-table-column prop="target" label="涉及（治法 / 方剂）" width="190" show-overflow-tooltip />
+          </el-table>
+          <el-empty
+            v-else
+            :description="graph.coveredPatterns.length ? '未发现冲突' : '本范围无规则可判，未做冲突判定'"
+            :image-size="60"
+          />
+
+          <div class="sub-hd">规则命中对照（证候 → 合法治法 / 方剂）</div>
+          <el-table v-if="ruleRows.length" :data="ruleRows" border size="small" max-height="320">
+            <el-table-column prop="pattern" label="证候" width="160" show-overflow-tooltip />
+            <el-table-column prop="kind" label="类型" width="80" />
+            <el-table-column prop="target" label="合法项" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="reason" label="依据" min-width="160" show-overflow-tooltip />
+          </el-table>
+          <el-empty v-else description="本范围未命中可判规则" :image-size="60" />
+
+          <div class="sub-hd">规则覆盖情况</div>
+          <p class="cover-line">
+            已覆盖证候：{{ graph.coveredPatterns.length ? graph.coveredPatterns.join('、') : '无' }}
+          </p>
+          <p v-if="uncoveredPatterns.length" class="cover-line">
+            未覆盖证候（不判冲突）：{{ uncoveredPatterns.join('、') }}
+          </p>
+        </template>
         <el-empty
           v-else-if="!graphLoading"
-          description="范围内暂无可展示的质控图谱"
+          description="范围内暂无可展示的质控证据"
           :image-size="90"
         />
-      </div>
-
-      <div v-if="visibleGraph.nodes.length" class="graph-legend">
-        <span v-for="c in visibleCategories" :key="c.name" class="lg">
-          <i :style="{ background: c.color }" />{{ c.label }}
-        </span>
-        <span v-for="l in edgeLegend" :key="l.type" class="lg">
-          <i class="line" :class="l.cls" />{{ l.label }}
-        </span>
       </div>
     </PanelCard>
 
@@ -185,36 +165,12 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import echarts from '@/utils/echarts'
+import { reactive, ref, computed, onMounted } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { getGraph, qcScore } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
-
-// 9 类实体 + 病历；与后端 GraphVO.type 对齐。
-// 配色按色相拉开：原方案里 4 类墨绿 + 2 类浅褐，实际只有约 6 种可辨色（UX-53）
-const categories = [
-  { name: 'record', label: '病历', color: '#2f4639' },
-  { name: 'disease', label: '疾病', color: '#6aa84f' },
-  { name: 'pattern', label: '证候', color: '#96714f' },
-  { name: 'symptom', label: '症状', color: '#e0b44a' },
-  { name: 'tongue', label: '舌象', color: '#a04335' },
-  { name: 'pulse', label: '脉象', color: '#4a7c9e' },
-  { name: 'formula', label: '方剂', color: '#8e6ea8' },
-  { name: 'herb', label: '中药', color: '#4f9d8f' },
-  { name: 'cause', label: '病因', color: '#b5651d' },
-  { name: 'treatment', label: '治法', color: '#7a7a7a' }
-]
-const CAT_INDEX = categories.reduce((m, c, i) => ({ ...m, [c.name]: i }), {})
-
-/** 边类型图例：只在当前数据里真的出现过的边类型才渲染，避免展示不存在的样式 */
-const EDGE_LEGENDS = [
-  { type: 'record', cls: '', label: '病历-实体' },
-  { type: 'rule', cls: 'rule', label: '证候-治法/方剂' },
-  { type: 'conflict', cls: 'conflict', label: '冲突' }
-]
 
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const params = () => {
@@ -228,94 +184,49 @@ const params = () => {
   }
 }
 
-// coveredPatterns：本次范围内「被规则表覆盖到」的证候名。
-// 规则表只覆盖少数常见证候，未覆盖的证候按设计不判冲突 —— 所以「0 冲突」有两种含义：
-// ① 判过、确实一致；② 根本没有规则可判。靠这个数组区分，避免把后者说成「一致」。
+// coveredPatterns：本次范围内「被规则表覆盖到」的证候名（见后端 GraphVO 注释）。
 const graph = reactive({ nodes: [], edges: [], truncated: false, hint: '', coveredPatterns: [] })
 const graphLoading = ref(false)
 
-/** 视图模式：全量关系（默认，UX-72）/ 冲突定位（UX-53） */
-const graphMode = ref('full')
-
-const conflictEdges = computed(() => graph.edges.filter((e) => e.type === 'conflict'))
-
-/** 冲突边两端的实体节点 id */
-const conflictNodeIds = computed(() => {
-  const s = new Set()
-  conflictEdges.value.forEach((e) => {
-    s.add(e.source)
-    s.add(e.target)
-  })
-  return s
-})
-
-/**
- * 实际绘制的图（UX-53）。冲突定位模式只保留「冲突边 + 两端实体」——
- * 节点数从数百降到十余个，图形立刻可读；全量关系图收进「全量关系」二级入口。
- */
-const visibleGraph = computed(() => {
-  if (graphMode.value === 'full') {
-    return { nodes: graph.nodes, edges: graph.edges }
-  }
-  const ids = conflictNodeIds.value
-  if (!ids.size) return { nodes: [], edges: [] }
-  return {
-    nodes: graph.nodes.filter((n) => ids.has(n.id)),
-    edges: graph.edges.filter((e) => ids.has(e.source) && ids.has(e.target))
-  }
-})
-
-const nodeType = computed(() => {
+/** 节点 id → 名称 */
+const nameById = computed(() => {
   const m = new Map()
-  graph.nodes.forEach((n) => m.set(n.id, n.type || 'record'))
+  graph.nodes.forEach((n) => m.set(n.id, n.name))
   return m
 })
 
-/** 受冲突影响的病历数：只报数、不画进子图（画进去节点会翻十倍） */
-const affectedRecords = computed(() => {
-  const ids = conflictNodeIds.value
-  if (!ids.size) return 0
-  const types = nodeType.value
-  const recs = new Set()
-  graph.edges.forEach((e) => {
-    const ts = types.get(e.source)
-    const tt = types.get(e.target)
-    if (ts === 'record' && ids.has(e.target)) recs.add(e.source)
-    else if (tt === 'record' && ids.has(e.source)) recs.add(e.target)
-  })
-  return recs.size
+const conflictEdges = computed(() => graph.edges.filter((e) => e.type === 'conflict'))
+const ruleEdges = computed(() => graph.edges.filter((e) => e.type === 'rule'))
+
+/** 冲突清单：冲突原因 + 两端名称 */
+const conflictRows = computed(() => conflictEdges.value.map((e) => ({
+  reason: e.label || '冲突',
+  source: nameById.value.get(e.source) || e.source,
+  target: nameById.value.get(e.target) || e.target
+})))
+
+/** 规则命中对照：证候 → 合法治法/方剂 */
+const ruleRows = computed(() => ruleEdges.value.map((e) => ({
+  pattern: nameById.value.get(e.source) || e.source,
+  kind: (e.label || '').includes('方剂') ? '方剂' : '治法',
+  target: nameById.value.get(e.target) || e.target,
+  reason: e.label || ''
+})))
+
+/** 范围内出现但规则表未覆盖的证候（不判冲突） */
+const uncoveredPatterns = computed(() => {
+  const covered = new Set(graph.coveredPatterns)
+  return graph.nodes
+    .filter((n) => n.type === 'pattern' && !covered.has(n.name))
+    .map((n) => n.name)
 })
 
-const visibleCategories = computed(() => {
-  const present = new Set(visibleGraph.value.nodes.map((n) => n.type || 'record'))
-  return categories.filter((c) => present.has(c.name))
-})
-
-const edgeLegend = computed(() => {
-  const present = new Set(visibleGraph.value.edges.map((e) => e.type || 'record'))
-  return EDGE_LEGENDS.filter((l) => present.has(l.type))
-})
-
-// 图谱的文本替代：把关键结论（节点数 / 冲突数）讲成一句话（UX-35）
-const graphLabel = computed(() => {
-  const v = visibleGraph.value
-  if (!v.nodes.length) return '质控图谱，暂无数据'
-  const conflicts = v.edges.filter((e) => e.type === 'conflict').length
-  // 读屏用户同样听不到「没判」与「没问题」的区别，这里补一句
-  const tail = conflicts === 0 && !graph.coveredPatterns.length
-    ? '，本范围无规则可判'
-    : `，其中冲突 ${conflicts} 条`
-  return `质控关系图谱：${v.nodes.length} 个节点、${v.edges.length} 条关系${tail}`
-})
-
-/** 结论条数据：把图里的规模与冲突数直接摆出来（UX-53） */
 const graphSummary = computed(() => ({
-  records: affectedRecords.value,
-  nodes: visibleGraph.value.nodes.length,
-  conflicts: visibleGraph.value.edges.filter((e) => e.type === 'conflict').length
+  records: graph.nodes.filter((n) => n.type === 'record').length,
+  covered: graph.coveredPatterns.length,
+  rules: ruleEdges.value.length,
+  conflicts: conflictEdges.value.length
 }))
-const graphRef = ref(null)
-let chart = null
 
 const loadGraph = async () => {
   graphLoading.value = true
@@ -330,113 +241,9 @@ const loadGraph = async () => {
   } catch {
     // 拦截器已提示
   } finally {
-    await nextTick()
-    renderGraph()
     graphLoading.value = false
   }
 }
-
-/**
- * 按实体类型固定分区的环形布局（UX-53）。
- *
- * <p>每类实体占一个扇区、同类型节点在扇区内铺开，替换原来的 `layout:'force'` ——
- * 力导向每次刷新图形都不同，既无法对比也无法截图留档，且 50+ 节点时会散成一团。</p>
- *
- * <p>半径用黄金比 `idx * 0.618 % 1` 错开：截断后单类可达 60+ 节点，
- * 固定 3 环会把同扇区节点挤在一起重叠，黄金比能在连续半径上均匀铺开且无需分环。</p>
- */
-const layoutNodes = () => {
-  const nodes = visibleGraph.value.nodes
-  const byType = new Map()
-  nodes.forEach((n) => {
-    const t = n.type || 'record'
-    if (!byType.has(t)) byType.set(t, [])
-    byType.get(t).push(n)
-  })
-  const sector = (2 * Math.PI) / categories.length
-  const R_INNER = 80
-  const R_OUTER = 320
-  return nodes.map((n) => {
-    const ci = CAT_INDEX[n.type] ?? 0
-    const list = byType.get(n.type) || [n]
-    const idx = list.indexOf(n)
-    const total = list.length
-    const ratio = total <= 1 ? 0.5 : idx / (total - 1)
-    const angle = ci * sector + 0.08 * sector + ratio * 0.84 * sector
-    const r = R_INNER + ((idx * 0.618) % 1) * (R_OUTER - R_INNER)
-    return {
-      id: n.id,
-      name: n.name,
-      category: ci,
-      symbolSize: n.type === 'record' ? 12 : Math.min(36, 10 + (n.size || 1) * 2.4),
-      value: n.size,
-      x: Math.cos(angle) * r,
-      y: Math.sin(angle) * r
-    }
-  })
-}
-
-const renderGraph = () => {
-  if (!graphRef.value) {
-    if (chart) {
-      chart.dispose()
-      chart = null
-    }
-    return
-  }
-  if (!chart || chart.getDom() !== graphRef.value) {
-    if (chart) chart.dispose()
-    chart = echarts.init(graphRef.value)
-  }
-  const data = layoutNodes()
-  const links = visibleGraph.value.edges.map((e) => ({
-    source: e.source,
-    target: e.target,
-    value: e.label || '',
-    lineStyle: e.type === 'conflict'
-      ? { color: '#c0392b', type: 'dashed', width: 2.6 }
-      : e.type === 'rule'
-        ? { color: '#96714f', type: 'dotted', width: 1.4 }
-        : { color: '#dfe4df', width: 0.8, curveness: 0.06 }
-  }))
-  chart.setOption(
-    {
-      color: categories.map((c) => c.color),
-      tooltip: {
-        trigger: 'item',
-        formatter: (p) => {
-          if (p.dataType === 'edge') {
-            return `${p.data.source} → ${p.data.target}${p.data.value ? '<br/>' + p.data.value : ''}`
-          }
-          return `${p.data.name}${p.data.value ? '（频次 ' + p.data.value + '）' : ''}`
-        }
-      },
-      series: [
-        {
-          type: 'graph',
-          // 坐标由 layoutNodes() 按实体类型预先算好，图形稳定可对比（UX-53）
-          layout: 'none',
-          roam: true,
-          draggable: true,
-          focusNodeAdjacency: true,
-          emphasis: { focus: 'adjacency', label: { show: true } },
-          categories: categories.map((c) => ({ name: c.label })),
-          // 标签默认隐藏，hover 或相邻高亮时才出现，避免密集区文字重叠（UX-53）
-          label: { show: false, fontSize: 10, position: 'right', color: '#55534c' },
-          lineStyle: { color: '#cfd6cf' },
-          edgeSymbol: ['none', 'arrow'],
-          edgeSymbolSize: 5,
-          data,
-          links
-        }
-      ]
-    },
-    true
-  )
-}
-
-// 切换视图模式只重画，不必重新请求（同一份数据两种呈现）
-watch(graphMode, () => nextTick(renderGraph))
 
 // ===== 预检列表 / 扣分明细 =====
 // 分级不再单独持有：统一由上方「范围查询」的 filters.grade 驱动，
@@ -503,20 +310,9 @@ const closeDetail = () => {
   detailVisible.value = false
 }
 
-const handleResize = () => chart && chart.resize()
-
 onMounted(() => {
   loadGraph()
   loadPrecheck(1)
-  window.addEventListener('resize', handleResize)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (chart) {
-    chart.dispose()
-    chart = null
-  }
 })
 </script>
 
@@ -680,5 +476,19 @@ onBeforeUnmount(() => {
   padding: 8px;
   color: var(--ink-mid);
   font-size: 12.5px;
+}
+.sub-hd {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--ink);
+  border-left: 3px solid var(--ink-mid);
+  padding-left: 8px;
+}
+.cover-line {
+  margin: 4px 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text-sub);
 }
 </style>
