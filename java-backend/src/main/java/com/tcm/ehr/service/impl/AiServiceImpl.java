@@ -276,8 +276,11 @@ public class AiServiceImpl implements IAiService {
 
         // 规则检索：把相关业务上下文拼进 prompt；同时准备降级答案
         String context = buildContext(question, dto == null ? null : dto.getRecordId());
+        String history = dto == null ? null : dto.getHistory();
+        String historyBlock = (history == null || history.isBlank())
+                ? "" : "\n\n【上文对话】\n" + history.trim();
         String raw = llmClient.chat(LlmClient.AI_CHAT_SYSTEM_PROMPT,
-                "【业务上下文】\n" + context + "\n\n【使用者问题】\n" + question);
+                "【业务上下文】\n" + context + historyBlock + "\n\n【使用者问题】\n" + question);
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);
         if (llmOk) {
@@ -342,7 +345,7 @@ public class AiServiceImpl implements IAiService {
         // 个人操作上下文（批I·I3）：只注入"当前用户"最近 10 条，脱敏（动作/对象/时间，不含 IP）
         if (containsAny(question, "操作", "日志", "我做了", "做了什么", "审计", "提交了", "操作记录")) {
             sb.append("【我的最近操作】");
-            List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 10);
+            List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 50);
             if (recent.isEmpty()) {
                 sb.append("没有查到操作记录。\n");
             } else {

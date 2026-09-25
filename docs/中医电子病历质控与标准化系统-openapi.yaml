@@ -1379,6 +1379,9 @@ components:
         question:
           type: string
           description: 使用者业务问题（chat 必填）
+        history:
+          type: string
+          description: 追问上下文（chat 可选）：本会话近期问答，前端拼好后传入，用于多轮追问
     AiReplyVO:
       type: object
       description: AI 结果（出参，共享）；规则出结论 + LLM 叙述，LLM 不可用降级且规则结论保留

@@ -19,4 +19,7 @@ public class AiQueryDTO {
 
     /** 使用者业务问题（chat 必填） */
     private String question;
+
+    /** 追问上下文：本会话近期问答（可选，前端拼好后传入；仅用于 chat） */
+    private String history;
 }
