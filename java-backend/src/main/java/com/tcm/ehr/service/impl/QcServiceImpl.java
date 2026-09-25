@@ -88,8 +88,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 raw == null ? null : raw.getStructuredData());
 
         QcCheckVO vo = new QcCheckVO();
-        // 缺失（核心 6 项）
-        for (String field : List.of("脉象", "舌象", "证候", "治法", "方剂", "中药")) {
+        // 缺失（核心 5 要素，真缺失口径：结构化与原始列均无）
+        for (String field : List.of("症状", "证候", "舌象", "脉象", "中药")) {
             if (coreMissing(field, data, raw)) {
                 vo.getMissingFields().add(field);
             }
@@ -559,13 +559,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 .toList();
     }
 
+    /** 核心要素是否"真缺失"（结构化与原始列均无）；症状无对应原始列 */
     private boolean coreMissing(String field, Map<String, Object> data, Record raw) {
         return switch (field) {
-            case "脉象" -> listEmpty(data, "pulseList") && (raw == null || blank(raw.getPulse()));
-            case "舌象" -> listEmpty(data, "tongueList") && (raw == null || blank(raw.getTongue()));
+            case "症状" -> listEmpty(data, "symptoms");
             case "证候" -> listEmpty(data, "patternList") && (raw == null || blank(raw.getPattern()));
-            case "治法" -> listEmpty(data, "treatmentList");
-            case "方剂" -> listEmpty(data, "formulaList");
+            case "舌象" -> listEmpty(data, "tongueList") && (raw == null || blank(raw.getTongue()));
+            case "脉象" -> listEmpty(data, "pulseList") && (raw == null || blank(raw.getPulse()));
             case "中药" -> listEmpty(data, "herbs") && (raw == null || blank(raw.getPrescription()));
             default -> false;
         };

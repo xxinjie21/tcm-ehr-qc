@@ -214,13 +214,13 @@ public class AiServiceImpl implements IAiService {
         return c;
     }
 
+    /** 核心要素缺失（5 项；真缺失口径，结构化为空且原始列也空；症状无原始列） */
     private List<String> coreMissing(Map<String, Object> data, Record r) {
         List<String> missing = new ArrayList<>();
-        if (listEmpty(data, "pulseList") && blank(r.getPulse())) missing.add("脉象");
-        if (listEmpty(data, "tongueList") && blank(r.getTongue())) missing.add("舌象");
+        if (listEmpty(data, "symptoms")) missing.add("症状");
         if (listEmpty(data, "patternList") && blank(r.getPattern())) missing.add("证候");
-        if (listEmpty(data, "treatmentList")) missing.add("治法");
-        if (listEmpty(data, "formulaList")) missing.add("方剂");
+        if (listEmpty(data, "tongueList") && blank(r.getTongue())) missing.add("舌象");
+        if (listEmpty(data, "pulseList") && blank(r.getPulse())) missing.add("脉象");
         if (listEmpty(data, "herbs") && blank(r.getPrescription())) missing.add("中药");
         return missing;
     }

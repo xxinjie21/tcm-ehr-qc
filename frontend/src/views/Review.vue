@@ -106,6 +106,9 @@
             </div>
 
             <p class="ded-hd">质控扣分明细（合计 -{{ totalDeduct }} 分）</p>
+            <div v-if="precheck && precheck.structuredMissing" class="ded-item structured-miss">
+              <span>尚未结构化解析（或解析失败），本次按"原始列有记录"从轻计分；建议先执行结构化解析</span>
+            </div>
             <div v-for="(d, i) in deductions" :key="i" class="ded-item">
               <span>{{ d.type }}：{{ d.reason }}</span>
               <span class="pts">-{{ d.points }}</span>
@@ -251,13 +254,12 @@ const COMPARE_FIELDS = [
   { key: 'causeList', label: '病因', termType: '' }
 ]
 
-/** 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算 */
+/** 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算（核心 5 要素） */
 const FIELD_BY_ITEM = {
-  脉象: 'pulseList',
-  舌象: 'tongueList',
+  症状: 'symptoms',
   证候: 'patternList',
-  治法: 'treatmentList',
-  方剂: 'formulaList',
+  舌象: 'tongueList',
+  脉象: 'pulseList',
   中药: 'herbs'
 }
 
@@ -720,6 +722,10 @@ onMounted(() => load(1))
   color: var(--danger);
   font-weight: bold;
   flex-shrink: 0;
+}
+.structured-miss {
+  background: var(--ink-light);
+  color: var(--text-sub);
 }
 .ok {
   padding: 6px 0;

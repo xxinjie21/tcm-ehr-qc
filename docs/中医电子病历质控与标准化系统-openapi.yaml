@@ -944,7 +944,7 @@ components:
           description: 事前质控结果
     QcScoreVO:
       type: object
-      description: 评分响应（出参；满分100，最低0）
+      description: 评分响应（出参；满分100，最低0）。核心要素 5 项（症状/证候/舌象/脉象/中药），判定以结构化结果为准；治法、方剂不参与评分
       properties:
         score:
           type: integer
@@ -954,6 +954,9 @@ components:
             - 合格
             - 待复核
             - 无效
+        structuredMissing:
+          type: boolean
+          description: structured_data 缺失/解析失败；为 true 时各核心按"漏抽"口径从轻扣分，结果落待复核
         deductions:
           type: array
           items:
@@ -961,8 +964,12 @@ components:
             properties:
               type:
                 type: string
+              item:
+                type: string
               points:
                 type: integer
+              reason:
+                type: string
     GraphVO:
       type: object
       description: 质控检验图谱（出参，节点=病历+实体、边=关联/规则/冲突；前端以「冲突清单 + 规则命中对照 + 覆盖说明」表格呈现，2026-09-23 起不再画力导向图）
@@ -1431,7 +1438,7 @@ components:
                 type: string
         coreMissing:
           type: array
-          description: 核心字段缺失清单（interpret；脉象/舌象/证候/治法/方剂/中药）
+          description: 核心要素缺失清单（interpret；症状/证候/舌象/脉象/中药，真缺失口径）
           items:
             type: string
         normHits:

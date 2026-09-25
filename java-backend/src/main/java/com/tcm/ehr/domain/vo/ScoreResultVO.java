@@ -18,6 +18,8 @@ public class ScoreResultVO {
     private List<Deduction> deductions = new ArrayList<>();
     private List<String> logicConflicts = new ArrayList<>();
     private boolean serious;
+    /** 结构化数据缺失/解析失败：本次未按结构化结果评分（各核心按"漏抽"口径扣分） */
+    private boolean structuredMissing;
     private LocalDateTime checkedAt;
 
     @Data
