@@ -246,16 +246,14 @@
       />
     </PanelCard>
 
-    <!-- 扣分明细改回弹窗（UX-71）：用户第六轮明确指定用弹窗，属 UX-66 的例外。
-         弹窗内改左右两栏（UX-65 第七轮）：原先评分 + 扣分表 + 逻辑冲突纵向叠，
-         扣分项一多就要下拉；现左＝评分/分级 + 扣分明细，右＝逻辑冲突，一屏看完 -->
+    <!-- 扣分明细弹窗（UX-71）：评分/分级 + 评分构成瀑布 + 扣分明细表 -->
     <el-dialog
       v-model="detailVisible"
       title="规则预检单（扣分明细）"
       width="min(1080px, 94vw)"
       top="7vh"
     >
-      <div v-if="detail" class="ded-2col">
+      <div v-if="detail">
         <div class="ded-col">
           <el-descriptions :column="2" border size="small">
             <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
@@ -289,20 +287,6 @@
             <el-table-column prop="reason" label="原因" show-overflow-tooltip />
             <template #empty><div class="ok">无扣分项</div></template>
           </el-table>
-        </div>
-        <div class="ded-col">
-          <div class="sd-title">逻辑冲突</div>
-          <ul v-if="detail.logicConflicts && detail.logicConflicts.length" class="conflicts">
-            <li v-for="c in detail.logicConflicts" :key="c">{{ c }}</li>
-          </ul>
-          <!-- 空结果不能说成「没问题」：规则表只覆盖少数常见证候，未覆盖的证候按设计不判冲突，
-               所以这里空白的成因有两种（判过、确实一致 / 根本没判）。本弹窗只有评分接口的
-               logicConflicts，拿不到「本病历是否被规则覆盖」，故文案只说「未报冲突」+ 说明边界，
-               不做「一致」的断言（图谱侧有 coveredPatterns，可以判得更细）。 -->
-          <div v-else class="ok">
-            规则引擎未报冲突
-            <span class="tip">规则表只覆盖少数证候，未覆盖的不判冲突；空白 ≠ 已核对</span>
-          </div>
         </div>
       </div>
       <template #footer>
@@ -673,39 +657,11 @@ onMounted(() => {
   color: var(--ink);
   margin: 14px 0 8px;
 }
-/* 扣分明细弹窗改左右两栏（UX-65 第七轮）：扣分项一多，纵向叠放就要下拉；
-   右栏顶部标题与左栏「扣分明细」对齐，两栏各自独立、互不撑高 */
-.ded-2col {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-}
 .ded-col {
   min-width: 0;
 }
 .ded-col .sd-title:first-child {
   margin-top: 0;
-}
-.ded-col + .ded-col {
-  border-left: 1px solid var(--line);
-  padding-left: 20px;
-}
-@media (max-width: 900px) {
-  .ded-2col {
-    grid-template-columns: 1fr;
-  }
-  .ded-col + .ded-col {
-    border-left: 0;
-    padding-left: 0;
-  }
-}
-.conflicts {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 12.5px;
-  color: var(--danger);
-  line-height: 1.8;
 }
 .ok {
   padding: 8px;
