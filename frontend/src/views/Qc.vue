@@ -17,57 +17,43 @@
         <span>质控评分标准</span>
         <el-button v-if="isAdmin" link type="primary" class="hd-action" @click="openRules">规则配置</el-button>
       </template>
-      <div v-if="rules" class="std-cards">
-        <div class="std-card">
-          <div class="sc-hd">完整性 · 病历应包含</div>
-          <div class="sc-chips">
-            <span v-for="e in rules.completeness.elements" :key="e.name" class="sc-chip">{{ e.name }}</span>
-          </div>
-          <div class="sc-note">
-            完全缺失 -{{ rules.completeness.elements[0]?.weightFull ?? 12 }} ／
-            仅有原始记录、未结构化 -{{ rules.completeness.elements[0]?.weightPartial ?? 6 }}
-          </div>
+      <div v-if="rules" class="std-grid">
+        <div class="st">
+          <span class="st-k">病历应包含</span>
+          <span class="st-v">
+            <span v-for="e in rules.completeness.elements" :key="e.name" class="chip">{{ e.name }}</span>
+          </span>
         </div>
-
-        <div class="std-card">
-          <div class="sc-hd">格式检查</div>
-          <div v-for="f in rules.format" :key="f.field" class="sc-line">
-            <b>{{ f.label || f.field }}</b>
-            <span>{{ f.type === 'enum' ? ('须为 ' + (f.values || []).join('/')) : ('须匹配 ' + f.expr) }}</span>
-            <em>-{{ f.weight }}</em>
-          </div>
-          <div v-if="!rules.format.length" class="sc-note">未配置</div>
+        <div class="st">
+          <span class="st-k">缺失扣分</span>
+          <span class="st-v">完全缺失 -{{ rules.completeness.elements[0]?.weightFull ?? 12 }} ／ 未结构化 -{{ rules.completeness.elements[0]?.weightPartial ?? 6 }}</span>
         </div>
-
-        <div class="std-card">
-          <div class="sc-hd">一致性规则</div>
-          <div v-for="c in rules.consistency" :key="c.name" class="sc-line col">
-            <b>{{ c.name }}</b>
-            <span>
-              证候含 {{ (c.patternAny || []).join('/') }} → 中药 {{ (c.expectHerbs || []).join('/') || '—' }}<template v-if="c.expectTongue && c.expectTongue.length">｜舌 {{ c.expectTongue.join('/') }}</template><template v-if="c.expectPulse && c.expectPulse.length">｜脉 {{ c.expectPulse.join('/') }}</template>
-            </span>
-            <em>-{{ c.weight }}</em>
-          </div>
-          <div v-if="!rules.consistency.length" class="sc-note">未配置（不判冲突）</div>
+        <div class="st">
+          <span class="st-k">格式</span>
+          <span class="st-v">{{ rules.format.map((f) => f.label || f.field).join('、') || '未配置' }}</span>
         </div>
-
-        <div class="std-card">
-          <div class="sc-hd">术语标准化</div>
-          <div v-if="rules.standardization.enabled" class="sc-note">
-            {{ (rules.standardization.elementTypes || []).join('/') }} 未命中词典：每个 -{{ rules.standardization.weightEach }}，上限 -{{ rules.standardization.cap }}
-          </div>
-          <div v-else class="sc-note off">已关闭（不参与评分）</div>
-          <div class="sc-hd inner">重复病历</div>
-          <div class="sc-note">内容完全重复 -{{ rules.duplicateWeight }}</div>
+        <div class="st">
+          <span class="st-k">一致性</span>
+          <span class="st-v">{{ (rules.consistency || []).length }} 条（证候 → 中药 / 舌象 / 脉象）</span>
         </div>
-
-        <div class="std-card wide">
-          <div class="sc-hd">分级线</div>
-          <div class="std-grade ok">合格：无逻辑冲突且 ≥ {{ rules.thresholds.qualified }} 分</div>
-          <div class="std-grade mid">待复核：有逻辑冲突，或 {{ rules.thresholds.invalid }}~{{ rules.thresholds.qualified - 1 }} 分</div>
-          <div class="std-grade bad">无效：&lt; {{ rules.thresholds.invalid }} 分，或核心真缺失 ≥ {{ rules.thresholds.seriousFullMissing }} 项</div>
+        <div class="st">
+          <span class="st-k">术语标准化</span>
+          <span class="st-v">{{ rules.standardization.enabled ? ('开 · 每个 -' + rules.standardization.weightEach + ' 上限 -' + rules.standardization.cap) : '已关闭' }}</span>
+        </div>
+        <div class="st">
+          <span class="st-k">重复</span>
+          <span class="st-v">-{{ rules.duplicateWeight }}</span>
+        </div>
+        <div class="st">
+          <span class="st-k">分级</span>
+          <span class="st-v">合格 ≥{{ rules.thresholds.qualified }} ／ 无效 &lt;{{ rules.thresholds.invalid }} 或真缺失 ≥{{ rules.thresholds.seriousFullMissing }}</span>
         </div>
       </div>
+      <el-collapse v-if="descriptions.length" class="std-detail">
+        <el-collapse-item title="查看完整规则说明" name="d">
+          <div v-for="(l, i) in descriptions" :key="i" class="std-desc">· {{ l }}</div>
+        </el-collapse-item>
+      </el-collapse>
       <div v-if="ruleWarnings.length" class="trunc-hint">规则告警：{{ ruleWarnings.join('；') }}</div>
       <el-empty v-if="!rules" description="标准加载中…" :image-size="60" />
     </PanelCard>
@@ -90,22 +76,30 @@
           分。
         </div>
 
-        <div class="rc-hd">② 格式检查</div>
-        <div v-for="(f, i) in form.format" :key="i" class="rc-line">
-          【{{ f.label || f.field }}】
-          <el-select v-if="f.type === 'enum'" v-model="f.values" multiple collapse-tags size="small" style="min-width: 150px">
-            <el-option label="男" value="男" />
-            <el-option label="女" value="女" />
-          </el-select>
-          <el-input v-else v-model="f.expr" size="small" style="width: 230px" />
-          不合规扣
+        <div class="rc-hd">② 格式检查（勾选即可，无需填写规则）</div>
+        <div class="rc-flow">
+          <div v-for="t in catalogFormats" :key="t.field" class="rc-fmt" :class="{ on: !!fmtOf(t.field) }">
+            <el-checkbox :model-value="!!fmtOf(t.field)" @change="(v) => toggleFormat(t, v)" />
+            <span class="rc-fmt-l">{{ t.label }}</span>
+            <template v-if="fmtOf(t.field)">
+              不合规扣
+              <el-input-number
+                :model-value="fmtOf(t.field).weight"
+                size="small"
+                :min="0"
+                :controls="false"
+                @update:model-value="(v) => setFmtWeight(t.field, v)"
+              />
+              分
+            </template>
+          </div>
+        </div>
+        <div v-for="(f, i) in customFormats" :key="i" class="rc-line">
+          【{{ f.label || f.field }}】不合规扣
           <el-input-number v-model="f.weight" size="small" :min="0" :controls="false" />
           分
-          <el-button link type="danger" @click="form.format.splice(i, 1)">删</el-button>
+          <el-button link type="danger" @click="removeCustomFormat(i)">删</el-button>
         </div>
-        <el-select placeholder="+ 添加格式项" size="small" style="width: 200px" @change="addFormatTpl">
-          <el-option v-for="t in catalogFormats" :key="t.field" :label="t.label" :value="t.field" />
-        </el-select>
 
         <div class="rc-hd">③ 一致性规则（证候 → 期望中药 / 舌象 / 脉象）</div>
         <div v-for="(c, i) in form.consistency" :key="i" class="rc-block">
@@ -438,14 +432,30 @@ const openRules = async () => {
   }
 }
 
-const addFormatTpl = (field) => {
-  const t = catalogFormats.value.find((x) => x.field === field)
-  if (t) {
-    form.format.push({
-      field: t.field, type: t.type || 'regex', expr: t.expr || '', values: clone(t.values || []),
-      label: t.label, weight: t.weight ?? 5, reason: t.reason
-    })
+/** 格式：模板勾选即用（无需写正则）；非模板项作为历史自定义规则展示 */
+const fmtOf = (field) => form.format.find((f) => f.field === field)
+const customFormats = computed(() => form.format.filter((f) => !catalogFormats.value.some((t) => t.field === f.field)))
+const toggleFormat = (t, on) => {
+  if (on) {
+    if (!fmtOf(t.field)) {
+      form.format.push({
+        field: t.field, type: t.type || 'regex', expr: t.expr || '', values: clone(t.values || []),
+        label: t.label, weight: t.weight ?? 5, reason: t.reason
+      })
+    }
+  } else {
+    const i = form.format.findIndex((f) => f.field === t.field)
+    if (i >= 0) form.format.splice(i, 1)
   }
+}
+const setFmtWeight = (field, v) => {
+  const f = fmtOf(field)
+  if (f) f.weight = v
+}
+const removeCustomFormat = (i) => {
+  const target = customFormats.value[i]
+  const idx = form.format.indexOf(target)
+  if (idx >= 0) form.format.splice(idx, 1)
 }
 const addConsistency = () => {
   form.consistency.push({ name: '自定义规则', patternAny: [], expectHerbs: [], tongueText: '', pulseText: '', weight: 10 })
@@ -854,80 +864,64 @@ onMounted(() => {
   color: var(--ink);
   padding: 2px 0;
 }
-.std-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
-}
-.std-card {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 10px 14px;
-  background: #fff;
-}
-.std-card.wide {
-  grid-column: 1 / -1;
-}
-.sc-hd {
-  font-size: 13px;
-  font-weight: bold;
-  color: var(--ink);
-  border-left: 3px solid var(--ink-mid);
-  padding-left: 8px;
-  margin-bottom: 8px;
-}
-.sc-hd.inner {
-  margin-top: 12px;
-}
-.sc-chips {
+/* 标准：紧凑一行一项（标签 + 值） */
+.std-grid {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
-  margin-bottom: 8px;
 }
-.sc-chip {
+.st {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.st-k {
+  flex: 0 0 110px;
+  color: var(--text-sub);
+}
+.st-v {
+  flex: 1 1 auto;
+  color: var(--ink);
+}
+.chip {
+  display: inline-block;
+  margin: 0 6px 2px 0;
+  padding: 0 8px;
   font-size: 12px;
-  padding: 2px 10px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--ink-light);
   color: var(--ink);
 }
-.sc-note {
-  font-size: 12px;
-  color: var(--text-sub);
-  line-height: 1.8;
+.std-detail {
+  margin-top: 8px;
+  border-top: 1px dashed var(--line);
 }
-.sc-note.off {
-  color: var(--ochre);
-}
-.sc-line {
+/* 格式模板勾选 */
+.rc-flow {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--ink);
-  padding: 3px 0;
-  border-bottom: 1px dashed var(--line);
-}
-.sc-line.col {
   flex-wrap: wrap;
+  gap: 10px;
 }
-.sc-line:last-child {
-  border-bottom: none;
-}
-.sc-line b {
-  flex: 0 0 auto;
-  color: var(--ink);
-}
-.sc-line span {
-  flex: 1 1 auto;
+.rc-fmt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  font-size: 12.5px;
   color: var(--text-sub);
 }
-.sc-line em {
-  flex: 0 0 auto;
-  font-style: normal;
-  color: var(--danger);
+.rc-fmt.on {
+  border-color: var(--ink-mid);
+  background: var(--ink-light);
+  color: var(--ink);
+}
+.rc-fmt-l {
+  font-weight: bold;
 }
 .rc {
   max-height: 72vh;
