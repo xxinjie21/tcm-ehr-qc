@@ -1,5 +1,5 @@
 <template>
-  <div ref="pageRef" :style="fitStyle">
+  <div>
     <el-tabs v-model="activeTab" class="dict-tabs">
       <el-tab-pane label="疾病" name="disease" />
       <el-tab-pane label="证候" name="pattern" />
@@ -23,7 +23,7 @@
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms">查 询</el-button>
         <span class="tip">共 {{ terms.length }} 条</span>
       </div>
-      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" height="360">
+      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
         <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
           <template #default="{ row }">
@@ -165,7 +165,7 @@
         <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
       </div>
-      <el-table :data="backups" border style="margin-top: 12px" height="220">
+      <el-table :data="backups" border style="margin-top: 12px" max-height="260">
         <el-table-column prop="time" label="导入时间" min-width="180" />
         <el-table-column prop="count" label="词条数" width="110" />
         <el-table-column label="较当前" width="120">
@@ -189,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
@@ -198,43 +198,7 @@ import { saveBlob } from '@/utils/download'
 
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
 
-// ===== 一页适配（UX：术语词典整体一屏放下）=====
-// 只改页面整体大小（zoom 整体缩放），不改任何卡片排版与组件高度；
-// 按「原始内容高 / 可视高」计算缩放，内容再高也只缩到刚好一屏，不出现纵向滚动条。
-const pageRef = ref(null)
-const fitScale = ref(1)
-const fitStyle = computed(() => ({ zoom: fitScale.value }))
-// 兜底常量（取不到 main 时用）：topbar 52 + main 上 padding 16 + 下 padding 40 + 缓冲 12
-const FIT_PAD = 52 + 16 + 40 + 12
-let fitTimer = null
-const scheduleFit = () => {
-  if (fitTimer) cancelAnimationFrame(fitTimer)
-  fitTimer = requestAnimationFrame(() => {
-    const el = pageRef.value
-    if (!el) return
-    // 实测可用高：main 内容区 − 上下 padding − 面包屑；退化用常量
-    let avail = window.innerHeight - FIT_PAD
-    const main = el.closest('main')
-    if (main) {
-      const cs = getComputedStyle(main)
-      const crumb = main.querySelector('.crumb')
-      const crumbH = crumb
-        ? crumb.getBoundingClientRect().height + (parseFloat(getComputedStyle(crumb).marginBottom) || 0)
-        : 0
-      avail = main.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0) - crumbH
-    }
-    avail = Math.max(320, avail)
-    // 不做 zoom 重置：当前 zoom 下的 scrollHeight ÷ 当前缩放 = 自然高，避免二次重排与闪烁
-    const cur = fitScale.value || 1
-    const natural = el.scrollHeight / cur
-    const next = Math.min(1, avail / Math.max(natural, 1))
-    if (Math.abs(next - cur) >= 0.005) {
-      fitScale.value = Number(next.toFixed(4))
-    }
-  })
-}
-const handleResize = () => scheduleFit()
-
+// ===== 布局：与其它页一致，不做整页缩放（表格内部滚动）=====
 const activeTab = ref('disease')
 const typeLabel = computed(() => TYPE_LABELS[activeTab.value])
 
@@ -338,11 +302,11 @@ const convertRef = ref(null)
 const convert = reactive({ candidates: [], failed: [] })
 const converting = ref(false)
 
-/** 预览展开/收起都改变页面高度：展开时滚到面板处，并重算缩放 */
+/** 预览展开时滚到面板处，避免用户以为「点了没反应」 */
 watch(convertVisible, (v) => {
+  if (!v) return
   nextTick(() => {
-    if (v) convertRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    scheduleFit()
+    convertRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
 })
 
@@ -397,7 +361,6 @@ const doImport = async (file) => {
     importResult.value = res.data
     ElMessage.success(`导入完成：成功 ${res.data.imported} / 共 ${res.data.total}`)
     loadTerms()
-    nextTick(scheduleFit)
     return true
   } catch {
     // 拦截器已提示
@@ -450,13 +413,6 @@ const handleRollback = async (row) => {
 onMounted(() => {
   loadTerms()
   loadBackups()
-  scheduleFit()
-  window.addEventListener('resize', handleResize)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (fitTimer) cancelAnimationFrame(fitTimer)
 })
 </script>
 

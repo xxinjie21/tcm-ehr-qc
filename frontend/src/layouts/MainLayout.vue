@@ -37,7 +37,7 @@
         </nav>
       </aside>
 
-      <main id="main-content" :class="{ 'pad-b-sm': route.path === '/dictionary' }">
+      <main id="main-content">
         <!-- 面包屑：承载分组与当前位置（UX-32） -->
         <nav v-if="breadcrumb.length" class="crumb" aria-label="面包屑">
           <template v-for="(c, i) in breadcrumb" :key="c">
@@ -243,10 +243,6 @@ main {
 main > * {
   max-width: 1600px;
   margin: 0 auto;
-}
-/* 术语词典一页缩放页：底部安全间距收紧到 40px（该项交给 zoom 适配自己留白） */
-main.pad-b-sm {
-  padding-bottom: 40px;
 }
 
 /* ===== 面包屑（UX-32） ===== */
