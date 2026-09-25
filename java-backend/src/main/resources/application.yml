@@ -69,12 +69,12 @@ jwt:
 
 # NLP 抽取：Java 经 PythonNlpClient 转发到独立的 Python 服务
 nlp:
-  enabled: true             # 抽取总开关。开启前必须先启动 python-nlp，否则每次抽取要等 3s 连接
-                            # 超时才降级，且导入病历会被逐条串行阻塞。false 时不发请求。
+  enabled: true             # 抽取总开关。开启前必须先启动 python-nlp，否则抽取要等连接超时才降级；
+                            # false 时单条抽取与批量任务都不可用。改它必须重启。
   service-url: http://localhost:8001
   timeout: 30000            # 毫秒
   batch:
-    concurrency: 2          # 批量解析后台工作线程数（保护 Python NLP，超出任务排队）
+    concurrency: 2          # 批量解析后台并发线程数；调大缩短总耗时，但会同时压 Python NLP（单条推理数百毫秒）
 
 # LLM 增强（Spring AI 2.0；provider 二选一：ollama 本机 / openai 及兼容三方）
 # 默认关闭；关闭或调用失败时回退规则兜底，不阻塞主流程（模型装配见上方 spring.ai.model）
