@@ -2649,47 +2649,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
-  /api/entity-types:
-    get:
-      tags:
-        - 系统
-      summary: 实体类型目录
-      description: 【权限：登录即可】返回固定 9 类实体类型（key / 中文名 / 结构化字段 / 是否有词典 / 原始回退列），供 结构化解析 / 术语词典 / 质控规则 统一使用（单一来源，不含用户自定义类型）
-      responses:
-        '200':
-          description: 类型列表
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 200
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        key:
-                          type: string
-                        label:
-                          type: string
-                        structuredKey:
-                          type: string
-                        dict:
-                          type: boolean
-                        fallback:
-                          type: array
-                          items:
-                            type: string
-                        order:
-                          type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
   /api/qc/rules:
     get:
       tags:
