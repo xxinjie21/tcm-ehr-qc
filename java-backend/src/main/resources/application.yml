@@ -63,7 +63,10 @@ qc:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 刻意不设 log-impl：不指定时 MyBatis 走 slf4j，SQL 与绑定参数只在 debug 级别输出。
+    # 设成 StdOutImpl 会把每次查询的 SQL 和绑定参数打到 stdout —— 病历正文 / 主诉 / 现病史
+    # 与登录查询的用户名会整段进日志，同时显著拖慢批量操作。
+    # 需要排查 SQL 时临时加：logging.level.com.tcm.ehr.mapper=debug（用完删掉）
 
 server:
   port: 8080
@@ -102,5 +105,6 @@ log:
 
 logging:
   level:
-    com.tcm.ehr: debug
+    # 排查问题时才改 debug；长期开会让日志迅速变大（且 debug 里可能带业务数据）
+    com.tcm.ehr: info
     org.springframework.web: info
