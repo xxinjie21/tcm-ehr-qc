@@ -2,6 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
@@ -289,8 +290,26 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         List<Record> records = filterQualified(dto);
         Map<String, Object> result = new HashMap<>();
         result.put("total", records.size());
-        result.put("sample", records.subList(0, Math.min(10, records.size())));
+        List<Record> sample = records.subList(0, Math.min(10, records.size()));
+        // 预览与导出必须走同一套脱敏。此前预览直接把实体塞进响应 ——
+        // 于是同一条现病史（可能写着手机号）在导出件里打码、在预览表格里明文。
+        result.put("sample", maskedSample(sample));
         return result;
+    }
+
+    /**
+     * 样本记录按导出同一口径脱敏：先序列化，再用 {@link #mask} 打码，最后解析回结构。
+     *
+     * <p>键名与类型不变，前端预览表格（按 prop 取值）无需改动；visitTime 仍是字符串，
+     * 所以列上的 {@code substring(0,10)} 照常可用。</p>
+     *
+     * <p>刻意<b>不</b>捕获异常：脱敏失败就应当让这一次预览失败（与导出路径一致），
+     * 而不是静默返回未脱敏的样本 —— 后者是把「承诺打码却出了明文」当成正常结果。</p>
+     */
+    private Object maskedSample(List<Record> sample) {
+        String json = objectMapper.writeValueAsString(sample);
+        return objectMapper.readValue(mask(json), new TypeReference<List<Map<String, Object>>>() {
+        });
     }
 
     @Override

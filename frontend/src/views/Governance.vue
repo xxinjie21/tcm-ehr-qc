@@ -134,7 +134,7 @@
         <el-button type="primary" :loading="exporting" @click="handleExport">导出下载</el-button>
       </div>
       <div class="tip" style="margin-top: 8px">
-        只导出质控合格的病历，手机号与身份证号会自动脱敏。
+        只导出质控合格的病历；导出的文件与上方预览里出现的手机号、身份证号都会自动打码。
       </div>
 
       <div v-if="preview.result" class="preview-box">
