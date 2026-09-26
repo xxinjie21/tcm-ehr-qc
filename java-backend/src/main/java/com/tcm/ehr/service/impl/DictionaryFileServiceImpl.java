@@ -145,6 +145,10 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
 
     @Override
     public boolean backupExists(String type, String backupFilename) {
+        // 与 restore() 同一套前缀校验：否则 backupFilename 传 ../.. 之类可以探测任意路径是否存在
+        if (backupFilename == null || !backupFilename.startsWith(fileNameOf(type) + ".bak_")) {
+            return false;
+        }
         return Files.exists(backupDir().resolve(backupFilename));
     }
 

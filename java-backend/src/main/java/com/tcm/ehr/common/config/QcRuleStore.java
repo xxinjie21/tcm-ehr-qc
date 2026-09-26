@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,7 @@ public class QcRuleStore {
     private String rulesFile;
 
     private volatile QcRuleSet current;
-    private final List<String> warnings = new ArrayList<>();
+    private final List<String> warnings = new CopyOnWriteArrayList<>();
 
     public QcRuleStore(ObjectMapper mapper) {
         this.mapper = mapper;

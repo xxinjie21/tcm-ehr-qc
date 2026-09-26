@@ -1,6 +1,7 @@
 package com.tcm.ehr.service;
 
 import com.tcm.ehr.common.config.QcRuleStore;
+import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.po.Record;
@@ -25,6 +26,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -143,12 +145,15 @@ class ReviewServiceTest {
         assertNotNull(t.getCompletedTime());
     }
 
+    /** 无待复核任务时抛统一错误码，而不是返回 null 让前端拿到 data:null（B8-4） */
     @Test
-    void returnNullWhenNoActiveTask() {
+    void noActiveTaskThrowsUnifiedErrorCode() {
         when(recordMapper.selectById("rec-3")).thenReturn(record("rec-3", true));
         when(reviewTaskMapper.selectList(ArgumentMatchers.any())).thenReturn(List.of());
 
-        assertNull(service.review("rec-3", null));
+        ResourceNotFoundException e = assertThrows(ResourceNotFoundException.class,
+                () -> service.review("rec-3", null));
+        assertEquals(1006, e.getCode(), "「资源不存在」只保留一条码：1006");
     }
 
     @Test

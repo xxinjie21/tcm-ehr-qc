@@ -33,6 +33,16 @@ public class NlpExtractVO {
     private boolean modelAvailable;
 
     /**
+     * 是否因文本过长被截断（Python 侧 NER 的 token 上限为 510）。
+     *
+     * <p>截断时模型只看得到前 510 个 token，尾部实体静默丢失而响应照样说
+     * {@code modelAvailable=true} —— 调用方无从判断「结果不完整」。
+     * 规则兜底（舌象 / 脉象 / 病因 / 治法）始终用全文，所以这个标记只说明
+     * <b>模型那条路没看全</b>。（审查报告 L11）</p>
+     */
+    private boolean truncated;
+
+    /**
      * 降级原因（{@link #REASON_DISABLED} / {@link #REASON_UNREACHABLE} / {@link #REASON_MODEL_MISSING}）；
      * 正常有产出时为 {@code null}。
      *

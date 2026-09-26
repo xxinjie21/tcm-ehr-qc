@@ -111,7 +111,10 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         List<ReviewTask> tasks = baseMapper.selectList(new QueryWrapper<ReviewTask>()
                 .eq("record_id", recordId).eq("is_obsolete", 0).eq("status", "pending"));
         if (tasks.isEmpty()) {
-            return null;
+            // 原来 return null，由 Controller 转成 Result.error(2003) —— 于是同一条「资源不存在」
+            // 有两个错误码（1006 / 2003），且这条给前端的是 data:null 而不是错误码。
+            // 统一走 ResourceNotFoundException（审查报告 M7 / 方案 B8-4）。
+            throw new ResourceNotFoundException(1006, "复核记录不存在或状态已完结");
         }
         ReviewTask task = tasks.get(0);
 

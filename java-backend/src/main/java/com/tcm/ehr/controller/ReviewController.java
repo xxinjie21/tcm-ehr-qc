@@ -39,13 +39,12 @@ public class ReviewController {
     /** 人工校正与复核；【权限：管理员 / 审核员】 */
     @RequireRole(roles = {"管理员", "审核员"})
     @PostMapping("/api/records/{recordId}/review")
-    public ResponseEntity<Result<ReviewResultVO>> review(@PathVariable String recordId,
-                                                         @RequestBody(required = false) ReviewDTO dto) {
+    public Result<ReviewResultVO> review(@PathVariable String recordId,
+                                         @RequestBody(required = false) ReviewDTO dto) {
+        // 「病历不存在」与「复核记录不存在或状态已完结」都走 ResourceNotFoundException(1006)
+        // → GlobalExceptionHandler 统一回 404 + code=1006，不再有第二套码（B8-4）
         ReviewResultVO vo = reviewService.review(recordId, dto);
-        if (vo == null) {
-            return ResponseEntity.badRequest().body(Result.error(2003, "复核记录不存在或状态已完结"));
-        }
         operationLogger.log("人工复核", recordId, "结果：" + vo.getStatus() + "，评分：" + vo.getScore());
-        return ResponseEntity.ok(Result.ok(vo));
+        return Result.ok(vo);
     }
 }

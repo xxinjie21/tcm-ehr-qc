@@ -1,5 +1,6 @@
-# NLP 抽取服务依赖（本机已安装版本：fastapi 0.125 / uvicorn 0.38 / torch 2.13 / transformers 5.15）
-fastapi
-uvicorn
-transformers
-torch
+# NLP 抽取服务依赖（版本取自本机 .venv 实测：python-nlp/.venv）
+# 锁版本：原来 4 行全裸，换机器/重装会拉到不兼容的大版本（如 transformers 5 → 6）
+fastapi==0.141.1
+uvicorn==0.53.0
+transformers==5.17.0
+torch==2.14.0

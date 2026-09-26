@@ -30,7 +30,7 @@ NLP实体抽取（hwtcmner 模型 + 正则补充舌象/脉象/病因/治法）
 | 前端 | Vue.js 3 + Element Plus | SPA单页应用 |
 | 后端 | Spring Boot（Java） | RESTful API、业务逻辑 |
 | NLP抽取 | Python FastAPI + transformers（hwtcmner） | 独立服务 :8001，Java `PythonNlpClient` 转发；模型缺失降级为规则兜底 |
-| 数据库 | MySQL | 4张核心表（users / records / review_tasks / operation_log） |
+| 数据库 | MySQL | 5张核心表（users / records / review_tasks / operation_log / nlp_task） |
 | 搜索引擎 | Elasticsearch | 术语归一查询 |
 | 文件存储 | JSON文件 | 术语库配置 |
 
@@ -41,8 +41,14 @@ tcm-ehr-qc/
 ├── docs/                          # 设计文档
 ├── java-backend/                  # Java后端（Spring Boot）
 ├── frontend/                      # Vue.js前端
+├── python-nlp/                    # NLP 抽取服务（FastAPI，:8001）
 ├── data/
-│   └── dictionaries/              # 术语库配置
+│   ├── dictionaries/              # 术语库配置
+│   └── qc-rules.json              # 质控规则运行时覆盖（可选，缺失用内置默认）
+├── tools/
+│   └── convert-standard-pdf.py    # 标准 PDF → 词典 JSON 的离线转换脚本
+├── logs/                          # 运行日志与审计归档（不入库）
+├── database-init.sql              # 建库建表 + 种子数据（DDL 唯一权威）
 ├── .gitignore
 ├── LICENSE
 └── README.md
