@@ -171,6 +171,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                     summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「登记号」"));
                     continue;
                 }
+                if (!colIndex.containsKey("visitTime")) {
+                    summary.setFailed(summary.getFailed() + 1);
+                    summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「接诊时间」"));
+                    continue;
+                }
                 for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
                     Row row = sheet.getRow(i);
                     if (row == null || isBlank(cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
@@ -484,7 +489,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         r.setTreatmentEffect(get(row, idx, "treatmentEffect"));
         r.setDepartment(get(row, idx, "department"));
         r.setDoctorId(get(row, idx, "doctorId"));
-        r.setVisitTime(parseDateTime(row.getCell(idx.getOrDefault("visitTime", -1))));
+        // 与同文件 get() 一致的写法：缺列时返回 null。
+        // 原写法 getCell(idx.getOrDefault("visitTime", -1)) 在缺列时 getCell(-1) 会抛
+        // IllegalArgumentException，被上层记成 POI 的「Cell index must be >= 0」，每行都失败。
+        Integer visitIdx = idx.get("visitTime");
+        r.setVisitTime(visitIdx == null ? null : parseDateTime(row.getCell(visitIdx)));
         return r;
     }
 
