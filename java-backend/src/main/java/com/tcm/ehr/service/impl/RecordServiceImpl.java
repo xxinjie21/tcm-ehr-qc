@@ -34,6 +34,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -370,6 +371,14 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         baseMapper.updateStructuredData(recordId, json);
     }
 
+    /**
+     * 按 id 删除。
+     *
+     * <p>事务加在这个 public 方法上，<b>不能</b>加在 private 的 {@code doDelete} 上 ——
+     * 后者只被同类自调用，注解不经过代理、等于没加
+     * （{@code fk_review_record} 存在，先删 review_tasks 再删 records，中途失败会留下孤儿状态）。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public DeleteRecordsVO deleteRecords(DeleteRecordsDTO dto) {
         if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
@@ -378,6 +387,15 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return doDelete(dto.getIds());
     }
 
+    /**
+     * 按筛选范围删除。
+     *
+     * <p>事务横跨「按范围取 id + 分块删」，保证 {@code review_tasks} 与 {@code records} 一起回滚。</p>
+     *
+     * <p>ponytail: 整批一个事务，3.5 万条时锁范围偏大、时长也长；当前演示库 500 条无感。
+     * 真到全库量级，应改成「先算 id、再分批各自提交」，并配合单次删除上限。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
         if (!hasAnyFilter(filters)) {

@@ -25,6 +25,7 @@ import com.tcm.ehr.service.IReviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -88,6 +89,14 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         return vo;
     }
 
+    /**
+     * 人工校正 + 重算 + 任务流转，三段写库必须同生共死。
+     *
+     * <p>中途失败会让结构化数据 / 评分与 {@code review_tasks} 状态对不上
+     * （分数已回写、任务仍 pending）。加在 public 方法上才经过代理 ——
+     * 本项目此前全仓库 {@code @Transactional} 为 0（审查报告 G2）。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public ReviewResultVO review(String recordId, ReviewDTO dto) {
         Record r = recordMapper.selectById(recordId);
