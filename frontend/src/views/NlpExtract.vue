@@ -366,6 +366,9 @@
 </template>
 
 <script setup>
+// 单条 / 批量 NLP 结构化解析页：上方病历列表点行载入原文，下方「单条解析」「批量解析」两个 Tab。
+// 单条：原文按字段模块化可逐项改，抽取后展示归一结果、可写回该病历结构化数据（覆盖原有）；
+// 批量：仅管理员可见，走后端异步任务，提交后可关页面、靠轮询刷新进度。归一只认 ES 词典，索引不可用即整体失败。
 import { computed, reactive, ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
@@ -393,27 +396,35 @@ const listLoading = ref(false)
 /** 列表加载失败：与「确实没有匹配」区分开（三态统一） */
 const listFailed = ref(false)
 
+// 查询病历列表（分页 / 筛选 / 重试共用）：传数字即跳到该页；失败置 listFailed 与「确实没有匹配」区分，toast 由拦截器出
 const search = async (p) => {
+  // 1. 传数字即跳到该页（翻页与重试共用同一入口）
   if (typeof p === 'number') page.value = p
+  // 2. 进入加载态，并清掉上一次的失败标记
   listLoading.value = true
   listFailed.value = false
   try {
+    // 3. 拉取列表数据，回填行与总数
     const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
     rows.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch {
+    // 4. 请求失败置失败标记，与「确实没有匹配」区分开
     listFailed.value = true
     // 拦截器已提示
   } finally {
+    // 5. 无论成败都收掉加载态
     listLoading.value = false
   }
 }
 
+// 每页条数变化：重置回第 1 页再查，避免停留在越界页码上拿到空列表
 const handleSizeChange = () => {
   page.value = 1
   search()
 }
 
+// 清空全部筛选条件并回到第 1 页重新查询
 const resetQuery = () => {
   query.department = ''
   query.dateRange = null
@@ -428,6 +439,7 @@ const loadedLabel = ref('')
 /** 病历基本信息（只读）：给出上下文，但不参与抽取 */
 const loadedMeta = ref('')
 
+// 高亮当前已载入病历所在行，方便在列表里定位（样式见 .row-active）
 const rowClass = ({ row }) => (row.id === recordId.value ? 'row-active' : '')
 
 // ===== 原文：模块化字段（UX-62）=====
@@ -464,9 +476,12 @@ const FIELD_LABELS = {
   treatmentEffect: { label: '治疗效果', multi: true }
 }
 
+// 参与抽取的全部字段键，顺序即拼接顺序；由分组推导，新增字段只改 FIELD_GROUPS 即可
 const ALL_KEYS = FIELD_GROUPS.flatMap((g) => g.keys)
+// 把分组的 key 展开成带标签与形态的表单项，供模板遍历渲染
 const fieldsOf = (group) => group.keys.map((k) => ({ key: k, ...FIELD_LABELS[k] }))
 
+// 生成一份全空字段对象；换病历 / 关闭详情时用它整体重置，避免残留上一位患者的原文
 const emptyFields = () => ALL_KEYS.reduce((o, k) => ({ ...o, [k]: '' }), {})
 const fields = reactive(emptyFields())
 
@@ -489,31 +504,40 @@ const extracting = ref(false)
  */
 const extractError = ref('')
 
+// 可写回的前提：既载入了病历、又有抽取结果；两者缺一即禁用保存并给出对应提示
 const canSave = computed(() => !!recordId.value && !!result.value)
 
 /** 载入一份病历：换病历时必须清空上一次抽取结果，否则会把 A 的结果存进 B（UX-01） */
 const loadRecord = async (row) => {
+  // 1. 无有效行号直接返回，避免拿空 id 发请求
   if (!row?.id) return
+  // 2. 进入加载态
   listLoading.value = true
   try {
+    // 3. 拉取该病历原文，缺字段统一兜底为空
     const res = await getRawRecord(row.id)
     const d = res.data || {}
+    // 4. 逐字段回填，先整体清空避免残留上一位患者的原文
     Object.assign(fields, emptyFields())
     ALL_KEYS.forEach((k) => {
       fields[k] = d[k] == null ? '' : String(d[k])
     })
+    // 5. 记下当前病历标识与只读基本信息，供保存确认回显
     recordId.value = row.id
     loadedLabel.value = d.registrationNo || row.registrationNo || row.id
     loadedMeta.value = [d.gender, d.age ? `${d.age} 岁` : '', d.department,
       d.visitTime ? String(d.visitTime).replace('T', ' ').substring(0, 16) : '']
       .filter(Boolean).join(' · ')
+    // 6. 换病历必须清掉上一次的抽取结果与失败留痕，否则会把 A 的结果存进 B
     result.value = null
     extractError.value = ''
+    // 7. 同步拼接文本并切到单条解析页
     text.value = composedText.value
     activeTab.value = 'single'
   } catch {
     // 拦截器已提示
   } finally {
+    // 8. 无论成败都收掉加载态
     listLoading.value = false
   }
 }
@@ -529,20 +553,27 @@ const closeDetail = () => {
   text.value = ''
 }
 
+// 执行抽取：请求体是字段拼接文本；整体失败（如术语索引不可用 503）时就地留痕并清空旧结果，
+// 避免用户对着上一份结果继续操作
 const runExtract = async () => {
+  // 1. 进入抽取态并清掉上一次的失败留痕
   extracting.value = true
   extractError.value = ''
   try {
+    // 2. 提交字段拼接文本，落抽取结果
     const res = await extractNlp({ text: composedText.value })
     result.value = res.data
+    // 3. 没抽到要素时提示一句，避免一片空白自己表达
     if (!res.data.modelAvailable) {
       ElMessage.warning('本次没有抽取到病历要素，术语归一没有可归的内容')
     }
   } catch (e) {
     // 拦截器已弹过 toast；这里再就地留一条 —— 503（术语索引不可用）是关键故障，不该只靠 toast
+    // 4. 失败就地留痕并清空旧结果，不让用户对着上一份结果继续操作
     extractError.value = apiErrorMessage(e, '抽取失败')
     result.value = null
   } finally {
+    // 5. 无论成败都收掉抽取态
     extracting.value = false
   }
 }
@@ -564,6 +595,7 @@ const ENTITY_KEYS = [
   'diseases', 'symptoms', 'tongueList', 'pulseList', 'patternList',
   'causeList', 'treatmentList', 'formulaList', 'herbs'
 ]
+// 抽取结果是否「无产出」：9 类实体全为空即视为空；结果本身为 null 时不判空，交给空态展示
 const resultEmpty = computed(() => {
   const r = result.value
   if (!r) return false
@@ -618,10 +650,13 @@ const normResult = ref(null)
 
 /** 直接查词典归一（POST /api/governance/normalize），不经过 Python NLP 服务 */
 const runNormalize = async () => {
+  // 1. 取词去空白，为空直接返回不发请求
   const term = normTerm.value.trim()
   if (!term) return
+  // 2. 进入试算态
   normLoading.value = true
   try {
+    // 3. 查词典归一，把命中词 / 来源 / 级别落成展示结果
     const res = await normalize({ type: normType.value, term })
     const d = res.data || {}
     normResult.value = {
@@ -633,22 +668,28 @@ const runNormalize = async () => {
   } catch {
     // 拦截器已提示
   } finally {
+    // 4. 无论成败都收掉试算态
     normLoading.value = false
   }
 }
 
+// 写回结构化数据：先二次确认（覆盖原有内容、不可撤销），确认后才提交，取消则直接返回不发请求
 const save = async () => {
+  // 1. 取用于回显的病历标识（优先登记号）
   const label = loadedLabel.value || recordId.value
   try {
+    // 2. 二次确认：写回会覆盖原有内容且不可撤销
     await ElMessageBox.confirm(
       `将本次抽取结果写入病历「${label}」的结构化数据，覆盖原有内容。确认？`,
       '写回结构化数据',
       { type: 'warning', confirmButtonText: '确认保存', cancelButtonText: '取消' }
     )
   } catch {
+    // 3. 取消确认则直接返回，不发请求
     return
   }
   try {
+    // 4. 确认后写回结构化数据并提示成功
     await updateRecord(recordId.value, { structuredData: result.value })
     ElMessage.success(`已写回病历「${label}」的结构化数据`)
   } catch {
@@ -658,6 +699,7 @@ const save = async () => {
 
 // ===== 批量解析（批K：后端异步任务；仅管理员）=====
 const userStore = useUserStore()
+// 批量解析入口仅管理员可见（与后端权限一致，前端只做入口收敛）
 const isAdmin = computed(() => userStore.role === '管理员')
 
 const batchLimit = ref(1000)
@@ -670,6 +712,7 @@ const batchTasks = ref([])
 let pollTimer = null
 
 const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
+// 任务是否仍在跑（排队 / 进行中）：决定是否显示取消按钮、是否继续轮询
 const isActive = (t) => !!t && ACTIVE_STATUS.includes(t.status)
 
 /** 状态文案：一句一个事实，精确到数字/原因 */
@@ -686,6 +729,7 @@ const statusText = (t) => {
   }
 }
 
+// 拉取最近任务列表；失败静默（拦截器已提示），不阻塞当前进度展示
 const loadBatchList = async () => {
   try {
     const res = await listNlpBatch()
@@ -695,6 +739,7 @@ const loadBatchList = async () => {
   }
 }
 
+// 停掉轮询定时器并清空句柄，防止重复启动或组件卸载后继续发请求
 const stopPoll = () => {
   if (pollTimer) {
     clearInterval(pollTimer)
@@ -702,18 +747,24 @@ const stopPoll = () => {
   }
 }
 
+// 单次轮询：按当前任务 id 取最新进度；任务已结束或请求失败即停止轮询
 const poll = async () => {
+  // 1. 取当前任务 id，没有则无需轮询
   const id = activeTask.value?.id
   if (!id) return
   try {
+    // 2. 取最新进度并回填当前任务
     const res = await getNlpBatch(id)
     activeTask.value = res.data
+    // 3. 任务已结束（非排队 / 进行中）则停止轮询
     if (!isActive(activeTask.value)) stopPoll()
   } catch {
+    // 4. 请求失败也停止轮询，避免空转
     stopPoll()
   }
 }
 
+// 启动轮询（先停旧定时器）：每 2 秒刷新任务详情与最近任务列表，供提交后与查看任务共用
 const startPoll = () => {
   stopPoll()
   pollTimer = setInterval(() => {
@@ -729,6 +780,7 @@ const startPoll = () => {
  * 原来都没有二次确认，而空范围等于全库（约 90 秒、覆盖已有结构化数据）。
  */
 const describeBatchScope = async () => {
+  // 1. 把已设的筛选条件拼成一句可读范围
   const parts = []
   if (batchFilters.department) parts.push(`科室＝${batchFilters.department}`)
   if (batchFilters.dateRange && batchFilters.dateRange.length === 2) {
@@ -736,6 +788,7 @@ const describeBatchScope = async () => {
   }
   if (batchFilters.pattern) parts.push(`证候＝${batchFilters.pattern}`)
   if (batchFilters.grade) parts.push(`分级＝${batchFilters.grade}`)
+  // 2. 查该范围条数，取不到就退化成「未知」，不阻塞确认
   let count = '未知'
   try {
     const res = await searchRecords({ ...batchFilters, page: 1, pageSize: 1 })
@@ -743,56 +796,74 @@ const describeBatchScope = async () => {
   } catch {
     // 取不到条数不阻塞确认，退化成「未知」
   }
+  // 3. 返回范围描述与条数，供提交前二次确认
   return { scope: parts.length ? parts.join(' · ') : '全部病历（未设筛选）', count }
 }
 
+// 提交批量任务：先算出范围描述与条数做二次确认（空范围等于全库，代价大），确认后提交并开始轮询
 const submitBatch = async () => {
+  // 1. 先算出当前范围的可读描述与条数
   const { scope, count } = await describeBatchScope()
   const limited = batchMode.value === 'limit' ? `（本次只处理前 ${batchLimit.value} 条）` : ''
+  // 2. 二次确认：空范围等于全库，代价大且会覆盖已有数据
   const ok = await confirmBox(
     `将对「${scope}」范围内约 ${count} 条病历执行批量解析${limited}，耗时较长，`
       + '且会覆盖这些病历已有的结构化数据。确定提交？',
     '批量解析'
   )
+  // 3. 用户取消则直接返回，不提交
   if (!ok) {
     return
   }
+  // 4. 进入提交态，防重复点击
   submitting.value = true
   try {
+    // 5. 提交异步任务并提示计划条数
     const res = await submitNlpBatch({
       filters: { ...batchFilters },
       limit: batchMode.value === 'limit' ? batchLimit.value : 0
     })
     ElMessage.success(`已提交，计划 ${res.data.total} 条`)
+    // 6. 把新任务设为当前任务并开始轮询进度
     activeTask.value = res.data
     loadBatchList()
     startPoll()
   } catch {
     // 拦截器已提示（未开启抽取 / 无权限 / 服务异常）
   } finally {
+    // 7. 无论成败都收掉提交态
     submitting.value = false
   }
 }
 
+// 取消指定任务：确认后调接口；若取消的正是当前任务则停止轮询并刷新其状态，已处理的条目不回滚
 const cancelBatch = async (id) => {
+  // 1. 二次确认：已处理的条目不回滚
   if (!(await confirmBox('确定取消该批量解析任务吗？已处理的不回滚。', '取消任务'))) {
+    // 2. 取消则直接返回，不发请求
     return
   }
   try {
+    // 3. 调接口取消任务
     const res = await cancelNlpBatch(id)
+    // 4. 取消的正是当前任务则停止轮询并刷新其状态
     if (activeTask.value?.id === id) {
       activeTask.value = res.data
       stopPoll()
     }
+    // 5. 刷新最近任务列表
     loadBatchList()
   } catch {
     // 拦截器已提示
   }
 }
 
+// 查看历史任务详情：载入后立即启动轮询，让进度自刷新（否则只赋值、页面不会更新）
 const viewTask = async (id) => {
   try {
+    // 1. 拉取该历史任务的详情
     const res = await getNlpBatch(id)
+    // 2. 设为当前任务，供任务卡与进度展示
     activeTask.value = res.data
     // 原来只赋值、不启动轮询，进度不会自刷新
     startPoll()

@@ -81,12 +81,17 @@ const safeRedirect = () => {
     : '/dashboard'
 }
 
+// 提交登录：先校验表单（validate 失败会 reject，需 catch 兜住避免未处理异常）；
+// 成功后写入登录态并按 redirect 还原目标页，失败由请求拦截器统一提示
 const handleLogin = async () => {
   // validate() 失败会 reject，未捕获会产生未处理的 Promise 异常（UX-26）
+  // 1. 先做表单校验；失败直接中止（validate 会 reject，需 catch 兜住）
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
+  // 2. 置加载态：按钮转圈，避免重复提交
   loading.value = true
   try {
+    // 3. 提交登录并写入登录态（token / 角色 / 菜单）
     const res = await login(form)
     userStore.setLogin(res.data)
     ElMessage.success('登录成功')
@@ -95,6 +100,7 @@ const handleLogin = async () => {
   } catch {
     // 拦截器已提示（凭证错误 / 网络异常）
   } finally {
+    // 无论成败都复位加载态，避免按钮卡在 loading
     loading.value = false
   }
 }

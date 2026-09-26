@@ -287,6 +287,8 @@ const FIELD_GROUPS = [
   { title: '诊断', keys: ['westernDiagnosis', 'tcmDiagnosis', 'pattern'] },
   { title: '处方与随访', keys: ['prescription', 'followUp', 'treatmentEffect'] }
 ]
+// 取某分区下的字段定义：按分区声明的 keys 顺序映射回 FIELDS，并过滤掉 FIELD_MAP 里
+// 不存在的 key —— 这样分组里写错 key 只会少渲染字段，不会冒出一个空表单项
 const fieldsOf = (group) => group.keys.map((k) => FIELD_MAP[k]).filter(Boolean)
 
 // ===== F·7.4 查询 =====
@@ -305,17 +307,23 @@ const searching = ref(false)
 /** 列表加载失败：与「确实没有匹配」区分开（三态统一） */
 const listFailed = ref(false)
 
+// 查询列表：按当前筛选条件 + 分页参数请求，成功后覆盖表格数据与总数；
+// 失败时置 listFailed，使空态能区分「加载失败」与「确实无数据」（错误提示由拦截器统一给出）
 const handleSearch = async () => {
+  // 1. 置加载态并清空上次失败态，重试时能重新给出 loading
   searching.value = true
   listFailed.value = false
   try {
+    // 2. 按当前筛选条件 + 分页参数请求列表，成功后覆盖表格数据与总数
     const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
     rows.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch {
+    // 3. 标记失败态，让空态能区分「加载失败」与「确实无数据」
     listFailed.value = true
     // 拦截器已提示
   } finally {
+    // 4. 无论成败都要关掉 loading
     searching.value = false
   }
 }
@@ -326,12 +334,16 @@ const handleSizeChange = () => {
   handleSearch()
 }
 
+// 重置筛选：清空全部查询条件并回到第 1 页，随后再查一次让列表与筛选框同步回到初始态
 const handleReset = () => {
+  // 1. 清空全部查询条件，四个筛选字段一起归零
   query.department = ''
   query.dateRange = null
   query.pattern = ''
   query.grade = ''
+  // 2. 回到第 1 页，避免停在不存在的页码
   page.value = 1
+  // 3. 重新查询，让列表与筛选框同步回初始态
   handleSearch()
 }
 
@@ -343,13 +355,19 @@ const activeId = ref('')
 /** 当前查看行高亮，便于在长表里对上号 */
 const rowClass = ({ row }) => (row.id === activeId.value ? 'row-active' : '')
 
+// 打开详情弹窗：按 id 回查原始病历（列表行只有摘要，完整字段不在列表数据里），
+// 同时写入 aiStore 供 AI 助手「这份病历…」类提问引用；失败不弹窗，由拦截器提示
 const openDetail = async (id) => {
   try {
+    // 1. 按 id 回查原始病历（列表行只有摘要，完整字段不在列表数据里）
     const res = await getRawRecord(id)
     raw.value = res.data
+    // 2. 记下当前 id，供列表行高亮对上号
     activeId.value = id
     // 写入共享状态，供 AI 助手"这份病历…"与解读卡使用
+    // 3. 写入共享状态，供 AI 助手「这份病历…」与解读卡使用
     aiStore.setActiveRecord(res.data)
+    // 4. 数据就绪后才打开弹窗；失败不弹窗
     detailVisible.value = true
   } catch {
     // 拦截器已提示
@@ -361,22 +379,29 @@ const closeDetail = () => {
   detailVisible.value = false
 }
 
+// 删除单条病历：先二次确认（不可恢复、会留痕），确认后提交删除并刷新列表；
+// 若删的正是当前详情记录，则一并收起弹窗、清空 raw，避免弹窗继续指向已删数据
 const handleDelete = async (id) => {
+  // 1. 先二次确认：删除不可恢复且会留痕
   try {
     await ElMessageBox.confirm('确认删除该病历？删除后不可恢复（会留痕）。', '删除病历', {
       type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'
     })
+  // 2. 用户取消就直接返回，不发删除请求
   } catch {
     return
   }
+  // 3. 确认后提交删除
   try {
     await deleteRecords([id])
     ElMessage.success('删除成功')
+    // 4. 若删的正是当前详情记录，收起弹窗并清空引用，避免弹窗指向已删数据
     if (activeId.value === id) {
       closeDetail()
       raw.value = null
       activeId.value = ''
     }
+    // 5. 清空表格选中并刷新列表
     tableRef.value?.clearSelection()
     selectedIds.value = []
     handleSearch()
@@ -388,30 +413,39 @@ const handleDelete = async (id) => {
 /** 批量删除：表格多选 → 一次提交 ids */
 const tableRef = ref(null)
 const selectedIds = ref([])
+// 表格多选变化：只收敛成 id 数组供批量删除提交；表格自身的选中态由 clearSelection 复位
 const onSelectionChange = (rows) => {
   selectedIds.value = rows.map((r) => r.id)
 }
+// 批量删除：对选中的 ids 二次确认（确认文案带上条数），通过后一次提交；
+// 删除后清空选择并刷新列表，若当前详情记录在被删集合内则同步收起弹窗
 const handleBatchDelete = async () => {
+  // 1. 先取选中 id 快照，没有选中就直接返回
   const ids = selectedIds.value
   if (!ids.length) return
+  // 2. 二次确认，确认文案带上将删条数
   try {
     await ElMessageBox.confirm(
       `确认删除选中的 ${ids.length} 份病历？删除后不可恢复（会留痕）。`,
       '批量删除病历',
       { type: 'warning', confirmButtonText: `删除 ${ids.length} 条`, cancelButtonText: '取消' }
     )
+  // 3. 用户取消就直接返回
   } catch {
     return
   }
+  // 4. 一次提交全部 id
   try {
     const res = await deleteRecords(ids)
     const n = res.data?.deletedCount ?? ids.length
     ElMessage.success(`已删除 ${n} 份病历`)
+    // 5. 当前详情记录在被删集合内时，收起弹窗并清空引用
     if (ids.includes(activeId.value)) {
       closeDetail()
       raw.value = null
       activeId.value = ''
     }
+    // 6. 清空选择并刷新列表
     tableRef.value?.clearSelection()
     selectedIds.value = []
     handleSearch()
@@ -422,30 +456,37 @@ const handleBatchDelete = async () => {
 
 /** 按当前筛选范围删除全部匹配病历（前端先取条数确认，后端再按要求删） */
 const handleRangeDelete = async () => {
+  // 1. 没有筛选条件不允许范围删除（防误删全库）
   if (!hasFilter.value) {
     ElMessage.warning('请先设置至少一个筛选条件')
     return
   }
+  // 2. 先只取总数（pageSize=1），拿到确切条数供确认文案用
   let n = 0
   try {
     const res = await searchRecords({ ...query, page: 1, pageSize: 1 })
     n = res.data?.total || 0
+  // 3. 取数失败就中止，不进入删除流程
   } catch {
     return
   }
+  // 4. 范围内没有病历，提示后直接返回
   if (!n) {
     ElMessage.warning('当前筛选范围内没有病历')
     return
   }
+  // 5. 二次确认，文案写明将删除多少条
   try {
     await ElMessageBox.confirm(
       `将删除当前筛选范围内全部 ${n} 份病历，删除后不可恢复（会留痕）。确认？`,
       '删除范围内病历',
       { type: 'warning', confirmButtonText: `删除 ${n} 条`, cancelButtonText: '取消' }
     )
+  // 6. 用户取消就直接返回
   } catch {
     return
   }
+  // 7. 提交范围删除
   try {
     const res = await deleteRecordsByFilter({ ...query })
     ElMessage.success(`已删除 ${res.data?.deletedCount ?? 0} 份病历`)
@@ -453,6 +494,7 @@ const handleRangeDelete = async () => {
     closeDetail()
     raw.value = null
     activeId.value = ''
+    // 8. 清空选择并刷新列表
     tableRef.value?.clearSelection()
     selectedIds.value = []
     handleSearch()
@@ -474,30 +516,41 @@ const importFailed = ref(false)
 const progress = reactive({ done: 0, total: 0, current: '', success: 0, failed: 0 })
 const cancelled = ref(false)
 
+// 超过单次上传数量上限（20 个）时的兜底提示：limit 拦截不会走到 on-change，
+// 不显式提示用户会以为文件没被选中是卡住了
 const onExceed = () => ElMessage.warning('单次最多上传 20 个文件')
 
 /** 前端预校验：类型与大小不合法直接剔除，不用等服务端返回（UX-27） */
 const onFileChange = (file, list) => {
+  // 1. 取原始 File 对象，没有就跳过（如已有文件的回显）
   const raw = file.raw
   if (!raw) return
   const name = (raw.name || '').toLowerCase()
+  // 2. 定义剔除函数：提示原因并把该文件移出上传列表
   const reject = (reason) => {
     ElMessage.error(`「${raw.name}」${reason}`)
     const i = list.indexOf(file)
     if (i >= 0) list.splice(i, 1)
   }
+  // 3. 类型校验：非 .xlsx / .xls 直接剔除
   if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
     reject('格式不支持，仅支持 .xlsx / .xls')
     return
   }
+  // 4. 大小校验：超过单文件上限也剔除
   if (raw.size > MAX_FILE_MB * 1024 * 1024) {
     reject(`超过 ${MAX_FILE_MB}MB 上限`)
   }
 }
 
+// 导入病历：逐文件串行上传 —— 后端导入是同步接口、拿不到中间 taskId，
+// 因此进度按「文件」粒度推进，也让「取消」有真实落点（当前文件传完即停）；
+// 发起即清空上次结果与失败态，完成后汇总本次统计、清空文件列表并刷新查询列表
 const handleImport = async () => {
+  // 1. 先取出待上传的原始文件，没有文件直接返回
   const files = fileList.value.map((f) => f.raw).filter(Boolean)
   if (!files.length) return
+  // 2. 发起即复位上一次结果、失败态与逐文件进度
   // 发起即清空上一次结果并复位失败态，避免把旧结果误读成本次结果（UX-22）
   summary.value = null
   importFailed.value = false
@@ -508,15 +561,20 @@ const handleImport = async () => {
   progress.success = 0
   progress.failed = 0
   importing.value = true
+  // 3. 标记本次是否提交了后台结构化解析，供完成文案区分
   let autoTaskSubmitted = false
+  // 4. 逐文件串行上传：后端是同步接口，进度只能按「文件」粒度推进
   try {
     const failures = []
     for (let i = 0; i < files.length; i++) {
+      // 5. 取消后跳出，不再提交剩余文件
       if (cancelled.value) break
       progress.current = files[i].name
+      // 6. 单文件打包：文件本体 + 是否自动结构化解析
       const fd = new FormData()
       fd.append('files', files[i])
       fd.append('autoExtract', autoExtract.value ? 'true' : 'false')
+      // 7. 提交该文件并累计成功 / 失败数与失败明细
       const res = await importRecords(fd)
       const s = res.data.summary || {}
       if (res.data.autoExtractTaskId) autoTaskSubmitted = true
@@ -525,19 +583,24 @@ const handleImport = async () => {
       if (s.failures && s.failures.length) failures.push(...s.failures)
       progress.done = i + 1
     }
+    // 8. 汇总本次统计，供结果区展示
     summary.value = {
       total: progress.success + progress.failed,
       success: progress.success,
       failed: progress.failed,
       failures
     }
+    // 9. 完成文案区分「已取消」与「已提交后台解析」两种情况
     const tail = cancelled.value ? '（已取消，未处理剩余文件）' : ''
     const autoTail = autoTaskSubmitted ? '；已提交后台结构化解析' : ''
     ElMessage.success(`导入完成：成功 ${progress.success} 条，失败 ${progress.failed} 条${autoTail}${tail}`)
+    // 10. 清空文件列表并刷新查询列表
     fileList.value = []
     handleSearch()
+  // 11. 失败则置失败态，提示「本次失败」而非沿用旧结果
   } catch {
     importFailed.value = true
+  // 12. 无论成败都要关掉 loading 并清掉当前文件名
   } finally {
     importing.value = false
     progress.current = ''
@@ -591,29 +654,41 @@ const FORM_RULES = {
   ]
 }
 
+// 重置新增表单：清回空值并清除校验红字，供提交成功后与用户手动重置两条路径复用
 const resetForm = () => {
   Object.assign(form, emptyForm())
   createFormRef.value?.clearValidate()
 }
 
+// 新增单条病历：先整体校验，通过后提交；空字符串的可选字段（接诊时间 / 就诊次数 / 年龄）
+// 不下发，避免后端把空串当成非法值；成功后重置表单、切回查询页并回到第 1 页刷新，
+// 让用户立刻确认数据已入库
 const handleCreate = async () => {
+  // 1. 先整体校验，不通过直接中止（红字由表单渲染）
   const valid = await createFormRef.value.validate().catch(() => false)
   if (!valid) return
+  // 2. 置提交中状态，防止重复提交
   creating.value = true
   try {
+    // 3. 组装提交体：空的可选字段不下发，避免后端把空串当非法值
     const payload = { ...form }
     if (!payload.visitTime) delete payload.visitTime
     if (payload.visitCount === '' || payload.visitCount == null) delete payload.visitCount
     if (payload.age === '' || payload.age == null) delete payload.age
+    // 4. 提交新增
     await createRecord(payload)
     ElMessage.success(`新增成功：登记号 ${payload.registrationNo}`)
+    // 5. 成功后清空表单并清除校验红字
     resetForm()
     // 切回查表页并回到第 1 页刷新，让用户立刻确认已入库（UX-09）
     page.value = 1
     await handleSearch()
+    // 6. 最后切回查询页，让用户看到刚入库的数据
     activeTab.value = 'query'
+  // 7. 失败由响应拦截器统一提示
   } catch {
     // 拦截器已提示
+  // 8. 无论成败都复位提交中状态
   } finally {
     creating.value = false
   }

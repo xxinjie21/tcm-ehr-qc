@@ -73,6 +73,7 @@ watch(
   }
 )
 
+// 「确认密码」自定义校验：空值与两次不一致分别给出对应文案，与后端二次校验呼应
 const validateConfirm = (rule, value, callback) => {
   if (!value) {
     callback(new Error('请再次输入密码'))
@@ -101,19 +102,25 @@ const rules = {
   confirmPassword: [{ required: true, validator: validateConfirm, trigger: 'blur' }]
 }
 
+// 提交注册：校验通过后只提交用户名与密码（角色由后端固定为审核员）；
+// 成功后带用户名跳回登录页回填，用户只需再输密码
 const handleRegister = async () => {
+  // 1. 先做表单校验（含确认密码一致性）；失败直接中止
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
+  // 2. 置加载态：按钮转圈，避免重复提交
   loading.value = true
   try {
     // 仅提交用户名与密码；角色由后端固定为审核员
     await register({ username: form.username, password: form.password })
+    // 3. 提示成功，并带用户名跳回登录页回填
     ElMessage.success('注册成功，请登录')
     // 带上用户名回填登录页，用户只需再输密码（UX-42）
     router.push({ path: '/login', query: { username: form.username } })
   } catch {
     // 拦截器已提示（如用户名已存在）
   } finally {
+    // 无论成败都复位加载态
     loading.value = false
   }
 }

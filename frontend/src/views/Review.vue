@@ -199,6 +199,9 @@
 </template>
 
 <script setup>
+// 人工复核页：上方是待复核 / 已完成任务列表，点「进入复核」在下方展开该任务的病历原文对照、
+// NLP 原始结构化数据（只读）与人工修正表单，左右并排比对。
+// 关键取舍：修正提交前只做「已补齐核心字段把对应扣分加回」的本地预估，最终评分与分级以服务端重算为准。
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
@@ -232,9 +235,13 @@ const FIELDS = [
   { key: 'visitTime', label: '接诊时间' }
 ]
 
+// 取原文展示值：接诊时间截断到秒并去掉 T（列表与对照区共用），其余字段原样返回；无行时返回空串
 const fieldOf = (row, key) => {
+  // 1. 无行直接返回空串，避免读空对象
   if (!row) return ''
+  // 2. 接诊时间截到秒并去掉 T，列表与对照区共用同一口径
   if (key === 'visitTime') return row.visitTime ? String(row.visitTime).replace('T', ' ').substring(0, 19) : ''
+  // 3. 其余字段原样返回
   return row[key]
 }
 
@@ -263,6 +270,7 @@ const FIELD_BY_ITEM = {
   中药: 'herbs'
 }
 
+// 时间格式化：去掉 T、截到分钟；空值返回「—」，避免列表里出现 Invalid Date
 const fmt = (t) => (t ? String(t).replace('T', ' ').substring(0, 16) : '—')
 
 // ===== ① 任务列表 =====
@@ -273,25 +281,32 @@ const page = ref(1)
 const pageSize = ref(10)
 const loading = ref(false)
 
+// 查询复核任务列表：传数字即跳到该页；失败由拦截器提示，不清空已有行
 const load = async (p) => {
+  // 1. 传数字即跳到该页（翻页与重试共用同一入口）
   if (typeof p === 'number') page.value = p
+  // 2. 进入加载态
   loading.value = true
   try {
+    // 3. 拉取任务列表，回填行与总数
     const res = await listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value })
     rows.value = res.data?.tasks || []
     total.value = res.data?.total || 0
   } catch {
     // 拦截器已提示
   } finally {
+    // 4. 无论成败都收掉加载态
     loading.value = false
   }
 }
 
+// 每页条数变化：回到第 1 页再查，防止页码越界后拿到空列表
 const handleSizeChange = () => {
   page.value = 1
   load()
 }
 
+// 超时任务整行标红（样式见 .row-overdue），只做视觉提醒、不自动流转
 const rowClass = ({ row }) => (row.overdue ? 'row-overdue' : '')
 
 // ===== ②~⑥ 同页复核 =====
@@ -309,10 +324,14 @@ const submittedAt = ref('')
 const editValues = reactive({})
 const originalMap = ref({})
 
+// AI 预检建议按行拆开渲染；空内容时得到空数组，模板据此整块隐藏
 const aiLines = computed(() => (aiAnswer.value || '').split('\n').filter((l) => l.trim() !== ''))
+// 质控扣分明细：precheck 未返回时兜底为空数组，模板用长度判断「无扣分项」
 const deductions = computed(() => precheck.value?.deductions || [])
+// 扣分合计（显示为负数），用于明细标题；明细缺失时累加为 0
 const totalDeduct = computed(() => deductions.value.reduce((s, d) => s + (d.points || 0), 0))
 
+// 把任务的问题类型字符串按中英文分号 / 逗号拆成标签数组，顺带去掉空白项
 const issueTags = computed(() =>
   String(current.value?.issueType || '')
     .split(/[；;，,]/)
@@ -320,6 +339,7 @@ const issueTags = computed(() =>
     .filter(Boolean)
 )
 
+// 任务卡与原文区的一句话患者摘要（性别 · 年龄 · 科室 · 就诊日）；无病历时返回空串
 const patientSummary = computed(() => {
   const r = record.value
   if (!r) return ''
@@ -333,6 +353,7 @@ const patientSummary = computed(() => {
     .join('　')
 })
 
+// 距截止时间的自然语言剩余量：按天向上取整，已过期显示超时天数，无截止时间返回空串
 const remainText = computed(() => {
   const t = current.value?.deadlineTime
   if (!t) return ''
@@ -342,39 +363,55 @@ const remainText = computed(() => {
   return `剩余 ${days} 天`
 })
 
+// 归一实体的展示词：优先 content（多数实体），草药等只有 name，两者都没有则返回空串
 const textOf = (entry) => entry?.content || entry?.name || ''
+// 把某字段的原始实体列表拼成顿号分隔的只读文本，空项过滤掉
 const originalText = (key) => (originalMap.value[key] || []).map(textOf).filter(Boolean).join('、')
+// 判断人工修正框是否与原值不同，用于整行高亮「已改动」
 const isFixed = (key) => String(editValues[key] || '') !== originalText(key)
 
+// structuredData 可能是对象也可能是一段 JSON 字符串，统一解析成对象；空值或解析失败都退回空对象
 const safeParse = (sd) => {
+  // 1. 空值直接退回空对象
   if (!sd) return {}
+  // 2. 已是对象则原样返回
   if (typeof sd === 'object') return sd
   try {
+    // 3. 字符串按 JSON 解析
     return JSON.parse(sd)
   } catch {
+    // 4. 解析失败也退回空对象，不让调用方拿到异常
     return {}
   }
 }
 
+// 用病历的结构化数据回填修正框与原值快照：两者必须同时刷新，否则「是否已改动」的判断会错位
 const fillEditors = (sd) => {
+  // 1. 先把 structuredData 统一解析成对象
   const data = safeParse(sd)
   const map = {}
+  // 2. 逐字段回填修正框，并同步记下原值快照（两者必须一起刷新）
   COMPARE_FIELDS.forEach((f) => {
     const list = Array.isArray(data[f.key]) ? data[f.key] : []
     map[f.key] = list
     editValues[f.key] = list.map(textOf).filter(Boolean).join('、')
   })
+  // 3. 快照整体落库，供「是否已改动」比对
   originalMap.value = map
 }
 
 /** 字段级表单 → structuredData；原存在的术语沿用原文溯源 sourceText */
 const buildCorrected = () => {
+  // 1. 结果对象从空开始，逐字段组装
   const out = {}
+  // 2. 逐个对照字段：先拆词，再还原成实体数组
   COMPARE_FIELDS.forEach((f) => {
+    // 3. 输入框文本按顿号 / 逗号等拆成词，去掉空项
     const words = String(editValues[f.key] || '')
       .split(/[、,，;；|]/)
       .map((s) => s.trim())
       .filter(Boolean)
+    // 4. 命中原文的术语沿用其溯源信息，新词补一份最小结构
     out[f.key] = words.map((w) => {
       const hit = (originalMap.value[f.key] || []).find((e) => textOf(e) === w)
       if (hit) return hit
@@ -383,6 +420,7 @@ const buildCorrected = () => {
         : { content: w, sourceText: '', standardTerm: '' }
     })
   })
+  // 5. 返回组装好的 structuredData
   return out
 }
 
@@ -414,9 +452,13 @@ const estimate = computed(() => {
   return { score, grade }
 })
 
+// 进入复核：先清空上一次的详情与表单，再并行拉病历原文与质控评分，随后异步取 AI 预检
+// （AI 失败不影响复核，只提示改用扣分明细），最后滚动到任务卡提示已展开
 const openReview = async (row) => {
+  // 1. 先切到该任务并进入加载态
   current.value = row
   detailLoading.value = true
+  // 2. 清空上一次的详情与表单，避免残留上一条任务的数据
   record.value = null
   precheck.value = null
   aiAnswer.value = ''
@@ -425,12 +467,15 @@ const openReview = async (row) => {
   Object.keys(editValues).forEach((k) => delete editValues[k])
   originalMap.value = {}
   try {
+    // 3. 并行拉病历原文与质控评分（互不依赖，串行会白等）
     const [raw, sr] = await Promise.all([getRawRecord(row.recordId), qcScore({ recordId: row.recordId })])
+    // 4. 落原文与扣分明细，并回填修正框
     record.value = raw.data
     precheck.value = sr.data
     // 任务列表已带 structuredData，但以病历详情为准（列表数据可能滞后）
     fillEditors(raw.data?.structuredData ?? row.structuredData)
     try {
+      // 5. 异步取 AI 预检建议，失败不影响复核（仅提示以扣分明细为准）
       const ai = await aiReview({ recordId: row.recordId })
       aiAnswer.value = ai.data?.answer || ''
       aiSource.value = ai.data?.source || ''
@@ -438,11 +483,13 @@ const openReview = async (row) => {
       aiAnswer.value = '（AI 预检不可用，请以左侧扣分明细为准）'
     }
     // 展开后滚动到任务卡，避免用户以为「点了没反应」
+    // 6. 等渲染完成再滚动到任务卡
     await Promise.resolve()
     document.querySelector('.task-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } catch {
     // 拦截器已提示
   } finally {
+    // 7. 无论成败都收掉加载态
     detailLoading.value = false
   }
 }
@@ -465,23 +512,31 @@ const closeReview = () => {
   result.value = null
 }
 
+// 提交复核：withCorrection 为 true 才带上人工修正数据（false 表示仅裁定不改数据）；
+// 成功后刷新列表，通过时直接退出详情
 const submit = async (withCorrection) => {
+  // 1. 进入提交态并清掉上一次的提交反馈
   submitting.value = true
   result.value = null
   try {
+    // 2. 组装请求体：仅「保存修改」才带人工修正数据，备注非空才带
     const body = {}
     if (withCorrection) body.correctedData = buildCorrected()
     if (remark.value.trim()) body.comment = remark.value.trim()
+    // 3. 提交复核并回填反馈（状态 / 重评分数 / 提交时间）
     const res = await submitReview(current.value.recordId, body)
     result.value = res.data
     submittedAt.value = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
     ElMessage.success(`复核完成：${res.data.status}`)
     // 复核通过即退出详情（UX-74）：任务已办结，无需用户再手动关一次
+    // 4. 仅「复核通过」才退出详情，「保存修改」留在原地继续改
     if (withCorrection) exitDetail()
+    // 5. 刷新列表，把该任务移出待复核
     await load()
   } catch {
     // 拦截器已提示
   } finally {
+    // 6. 无论成败都收掉提交态
     submitting.value = false
   }
 }
@@ -489,8 +544,11 @@ const submit = async (withCorrection) => {
 /** 取后端分级阈值（GET /api/qc/rules 是「登录即可」，审核员也能调）；取不到就沿用兜底值 */
 const loadThresholds = async () => {
   try {
+    // 1. 取后端分级规则
     const res = await getQcRules()
+    // 2. 定位到分级阈值
     const t = res.data?.rules?.thresholds
+    // 3. 取到则覆盖兜底阈值，取不到沿用初值
     if (t) thresholds.value = { qualified: t.qualified, invalid: t.invalid }
   } catch {
     // 拦截器已提示；沿用兜底阈值，不阻塞复核

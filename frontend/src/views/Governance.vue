@@ -196,6 +196,9 @@
 </template>
 
 <script setup>
+// 数据治理页：在「当前范围」内执行数据清洗与术语归一，并把质控合格病历导出为标准数据集。
+// 设计取舍：清洗只做去重标记 / 字段清理 / 格式规整 / 脏数据隔离 / 术语归一，既不删除病历、
+// 也不填充医生未书写的内容；导出恒只取质控合格病历，分级筛选只作用于清洗、不影响导出范围。
 import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
@@ -235,17 +238,25 @@ const scopeText = computed(() => {
   return parts.length ? parts.join(' · ') : '全部'
 })
 
+// 拉取治理统计（质控合格 / 待清洗 / 已清洗）并同步给 aiStore 供 AI 助手引用；
+// 失败时保留旧值但置失败态，状态行据此提示「数字可能不是最新」（UX-21）
 const loadStats = async () => {
+  // 1. 置加载态并清空上次失败态
   statsLoading.value = true
   statsFailed.value = false
   try {
+    // 2. 拉取三项统计并覆盖本地状态
     const res = await governanceStats()
     Object.assign(stats, res.data)
+    // 3. 同步给 aiStore，供 AI 助手引用
     aiStore.setStats(res.data)
+    // 4. 记下本次成功时间，失败提示里可回显
     statsLoadedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+  // 5. 保留旧值但置失败态，提示「数字可能不是最新」
   } catch {
     // 标记失败态，状态行据此提示「显示的可能不是最新值」（UX-21）
     statsFailed.value = true
+  // 6. 无论成败都关掉 loading
   } finally {
     statsLoading.value = false
   }
@@ -253,25 +264,36 @@ const loadStats = async () => {
 
 const clean = reactive({ loading: false, result: null })
 
+// 执行数据清洗：先二次确认（文案明确「只标记不删除、不补医生未写内容」），
+// 再按当前 filters 提交；成功后写入分步结果与三级命中分布，并刷新顶部统计
 const handleClean = async () => {
+  // 1. 先二次确认，文案写明「只标记不删除、不补医生未写内容」
   try {
     await ElMessageBox.confirm(
       `将对「${scopeText.value}」范围内的病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`,
       '数据清洗',
       { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }
     )
+  // 2. 用户取消就直接返回
   } catch {
     return
   }
+  // 3. 置清洗中状态
   clean.loading = true
   try {
+    // 4. 按当前范围提交清洗
     const res = await cleanApi({ filters: { ...filters } })
+    // 5. 写入分步结果，并把三级命中分布同步给 AI 助手
     clean.result = res.data
     aiStore.setNormByLevel(res.data.normByLevel || { exact: 0, contain: 0, fuzzy: 0 })
+    // 6. 提示归一命中数
     ElMessage.success(`清洗完成：归一命中 ${res.data.normalized} 处`)
+    // 7. 刷新顶部统计（待清洗 / 已清洗会变化）
     loadStats()
+  // 8. 失败由响应拦截器统一提示
   } catch {
     // 拦截器已提示
+  // 9. 无论成败都关掉清洗中状态
   } finally {
     clean.loading = false
   }
@@ -281,6 +303,8 @@ const filters = reactive({ department: '', dateRange: null, pattern: '', grade: 
 const format = ref('csv')
 const exporting = ref(false)
 
+// 组装预览 / 导出共用的请求体：只带后端约定的 department / dateRange / pattern 三个维度，
+// 刻意不含 grade —— 分级只作用于数据清洗，导出恒为质控合格病历
 const buildPayload = () => ({
   format: format.value,
   filters: {
@@ -321,7 +345,10 @@ const PREVIEW_COLS = [
 const DEFAULT_COLS = ['registrationNo', 'gender', 'age', 'westernDiagnosis', 'tcmDiagnosis',
   'chiefComplaint', 'pattern', 'prescription', 'score', 'grade']
 const visibleCols = ref([...DEFAULT_COLS])
+// 由勾选的列 prop 过滤出实际要渲染的列定义（顺序跟随 PREVIEW_COLS）；
+// 用户把列全部取消时返回空数组，表格只剩固定的「操作」列，不额外兜底回默认列
 const visibleColsList = computed(() => PREVIEW_COLS.filter((c) => visibleCols.value.includes(c.prop)))
+// 恢复默认列：把勾选回退到 DEFAULT_COLS 的关键列组合，与「全选」共同构成列显示的快捷操作
 const resetCols = () => {
   visibleCols.value = [...DEFAULT_COLS]
 }
@@ -334,8 +361,11 @@ const detailVisible = ref(false)
 
 // 点详情：写入共享状态，供 AI 助手"这份病历…"类问题使用（批C·3.2）
 const openDetail = (row) => {
+  // 1. 记下当前行作为弹窗数据
   detail.value = row
+  // 2. 写入共享状态，供 AI 助手「这份病历…」类提问引用
   aiStore.setActiveRecord(row)
+  // 3. 数据就绪后再打开弹窗
   detailVisible.value = true
 }
 
@@ -344,36 +374,55 @@ const closeDetail = () => {
   detailVisible.value = false
 }
 
+// 预览数据集：按当前范围取质控合格病历（后端只回前 10 条样本）；
+// 范围内无合格病历时 total 为 0，额外提示用户，而不是只丢一张空表出来
 const handlePreview = async () => {
+  // 1. 置加载态
   preview.loading = true
   try {
+    // 2. 按当前范围取质控合格病历（后端只回前 10 条样本）
     const res = await previewDataset(buildPayload())
+    // 3. 写入预览结果
     preview.result = res.data
+    // 4. 范围内无合格病历要额外提示，而不是只丢一张空表
     if (!res.data.total) ElMessage.warning('筛选范围内无质控合格病历')
+  // 5. 失败由响应拦截器统一提示
   } catch {
     // 拦截器已提示
+  // 6. 无论成败都关掉 loading
   } finally {
     preview.loading = false
   }
 }
 
+// 导出下载：后端成功回文件流、失败回 JSON，故先判别 blob 类型 ——
+// 是 JSON 就解析 msg 报错，否则才落盘保存，避免把一段错误 JSON 当数据集下载下来
 const handleExport = async () => {
+  // 1. 置导出中状态
   exporting.value = true
   try {
+    // 2. 请求导出：后端成功回文件流、失败回 JSON
     const blob = await exportDataset(buildPayload())
+    // 3. 失败回的是 JSON → 解析出 msg 报错，避免把错误 JSON 当数据集存下来
     if (blob && blob.type && blob.type.includes('application/json')) {
       const text = await blob.text()
       let msg = '导出失败'
       try {
         msg = JSON.parse(text).msg || msg
+      // 解析不出就沿用默认文案
       } catch { /* keep default */ }
+      // 4. 提示错误并结束，不落盘
       ElMessage.error(msg)
       return
     }
+    // 5. 确认是文件流才落盘保存
     saveBlob(blob, `tcm_ehr_dataset_${Date.now()}.${format.value}`)
+    // 6. 提示导出成功
     ElMessage.success('导出成功')
+  // 7. 失败由响应拦截器统一提示
   } catch {
     // 拦截器已提示
+  // 8. 无论成败都关掉导出中状态
   } finally {
     exporting.value = false
   }
@@ -381,10 +430,15 @@ const handleExport = async () => {
 
 // 导出区科室选项取后端实际值，避免写死科室与库中数据对不上（同 UX-03）
 const departments = ref([])
+// 加载导出区的科室下拉项（取后端实际科室值，避免写死科室与库中数据对不上）；
+// 失败时降级为空列表，不阻塞页面其余功能
 const loadDepartments = async () => {
+  // 1. 取后端实际科室值，避免写死科室与库中数据对不上
   try {
     const res = await getDepartments()
+    // 2. 填充下拉选项
     departments.value = res.data || []
+  // 3. 失败时降级为空列表，不阻塞页面其余功能
   } catch {
     departments.value = []
   }
