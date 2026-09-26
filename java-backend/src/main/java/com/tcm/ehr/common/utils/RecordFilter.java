@@ -82,6 +82,29 @@ public final class RecordFilter {
     }
 
     /**
+     * 把「无类型 Map」形态的 filters 翻译成 {@link FiltersDTO}。
+     *
+     * <p>stats 契约与导出契约的 filters 都是 {@code Map<String,Object>}，字段名与
+     * {@link FiltersDTO} 一致。有了这个翻译，那两处就不必各自手搓条件 —— 否则会多出
+     * 第二套「范围组装」，排序键、数据域这类口径就跟着漂（实测就漂过一次：
+     * 导出/预览自己 build wrapper，于是拿不到本工具的 ORDER BY）。</p>
+     */
+    public static FiltersDTO fromMap(Map<String, Object> filters) {
+        FiltersDTO f = new FiltersDTO();
+        if (filters == null) {
+            return f;
+        }
+        f.setDepartment(text(filters.get("department")));
+        f.setPattern(text(filters.get("pattern")));
+        f.setGrade(text(filters.get("grade")));
+        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2
+                && text(range.get(0)) != null && text(range.get(1)) != null) {
+            f.setDateRange(List.of(text(range.get(0)), text(range.get(1))));
+        }
+        return f;
+    }
+
+    /**
      * 把范围条件拼成审计用的一行，给 {@code OperationLog.target} 用。
      *
      * <p>批量操作（数据清洗 / 数据集导出被拒 / 批量解析 / 批量重算）原来一律传 {@code null}，
@@ -171,6 +194,10 @@ public final class RecordFilter {
                 wrapper.le("visit_time", f.getDateRange().get(1).trim() + " 23:59:59");
             }
         }
+        // 与 SearchDTO 重载同一个排序键：本工具的两种入参不该给出不同顺序（审查报告 L8）。
+        // 注意 FiltersDTO 重载的调用方多是聚合 / 批处理 / 按范围删除，排序对它们无意义，
+        // 代价是这些查询多一次按 visit_time 的排序（3.5 万条量级需留意 deleteByFilter 与 clean）。
+        wrapper.orderByDesc("visit_time");
         return wrapper;
     }
 

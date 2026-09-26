@@ -522,7 +522,7 @@ onMounted(() => {
   flex: 1;
 }
 .ded-hd {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-sub);
   margin-bottom: 6px;
 }

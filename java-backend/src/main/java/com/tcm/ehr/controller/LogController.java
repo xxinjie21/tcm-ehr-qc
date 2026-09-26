@@ -55,7 +55,7 @@ public class LogController {
                                          @RequestParam(required = false) String keyword) {
         byte[] content = logService.exportCsv(action, keyword);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=operation_logs.csv")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=audit-logs.csv")
                 .contentType(org.springframework.http.MediaType.parseMediaType("text/csv;charset=UTF-8"))
                 .body(content);
     }

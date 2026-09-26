@@ -540,7 +540,7 @@ onMounted(() => {
   padding-top: 16px;
 }
 .result-hd {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: bold;
   color: var(--ink);
   margin-bottom: 14px;

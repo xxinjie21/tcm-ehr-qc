@@ -693,7 +693,7 @@ onMounted(handleSearch)
   font-size: 12px;
   color: var(--text-sub);
 }
-.result-hd { font-size: 14px; font-weight: bold; color: var(--ink); margin-bottom: 12px; }
+.result-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 12px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
 .stat-item { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; text-align: center; }
 .stat-item .num { font-size: 22px; font-weight: bold; color: var(--ink); }

@@ -111,6 +111,14 @@ const loadActions = async () => {
   }
 }
 
+/** 导出文件名的时间戳：与后端归档名（audit-archive-YYYYMMDD_HHmmss.csv）同一格式，
+    毫秒时间戳既不可读、也与系统里另一个日志文件名风格不一致 */
+const auditStamp = () => {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+}
+
 const query = reactive({ action: '', keyword: '', page: 1, size: 10 })
 const logs = ref([])
 const total = ref(0)
@@ -148,7 +156,7 @@ const handleExport = async () => {
   exporting.value = true
   try {
     const blob = await exportLogs(query)
-    saveBlob(blob, `audit_logs_${Date.now()}.csv`)
+    saveBlob(blob, `audit-logs-${auditStamp()}.csv`)
   } catch {
     // 拦截器已按实际状态（超时 / 无权限 / 服务异常）给出提示，这里不再叠加泛化文案
   } finally {
@@ -200,7 +208,7 @@ onMounted(() => {
 }
 .purge-tip {
   margin: 0 0 12px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.8;
   color: var(--text-sub);
 }

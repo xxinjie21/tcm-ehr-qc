@@ -7,6 +7,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
+import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.ExportDTO;
@@ -352,19 +353,13 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * 但集合已被 SQL 收窄过了。</p>
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
-        Map<String, Object> filters = dto.getFilters() == null ? Map.of() : dto.getFilters();
-        QueryWrapper<Record> wrapper = new QueryWrapper<>();
+        // 条件组装走 RecordFilter（与其余读路径同一个函数）：科室 / 就诊时间 / 排序键 /
+        // 数据域都在那里定，这里只追加导出自己的硬约束。曾经这里手搓过一套 wrapper，
+        // 结果是拿不到 ORDER BY、也多了一处口径。
+        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN,
+                RecordFilter.fromMap(dto.getFilters()));
+        // 「只导出质控合格的病历」是页面的既有承诺（B5-7 甲案，不随分级控件变化）
         wrapper.eq("grade", "合格");
-        String department = str(filters.get("department"));
-        if (department != null) {
-            wrapper.eq("department", department);
-        }
-        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2) {
-            String start = str(range.get(0));
-            String end = str(range.get(1));
-            if (start != null) wrapper.ge("visit_time", start + " 00:00:00");
-            if (end != null) wrapper.le("visit_time", end + " 23:59:59");
-        }
         return wrapper;
     }
 

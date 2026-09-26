@@ -237,19 +237,9 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return RecordFilter.domainGrade(RequestUtils.currentRole());
     }
 
-    /**
-     * stats 契约里的 filters 是无类型的 {@code Map}，这里翻译成 {@link FiltersDTO}
-     * 再交给 {@link RecordFilter} —— 条件组装口径只保留一处，不再有第二套内存过滤。
-     */
+    /** stats 契约的 filters 是无类型 Map —— 翻译交给 RecordFilter（口径只有那一处） */
     private FiltersDTO toFilters(Map<String, Object> filters) {
-        FiltersDTO f = new FiltersDTO();
-        f.setDepartment(str(filters.get("department")));
-        f.setPattern(str(filters.get("pattern")));
-        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2
-                && str(range.get(0)) != null && str(range.get(1)) != null) {
-            f.setDateRange(List.of(str(range.get(0)), str(range.get(1))));
-        }
-        return f;
+        return RecordFilter.fromMap(filters);
     }
 
     private String str(Object o) {
