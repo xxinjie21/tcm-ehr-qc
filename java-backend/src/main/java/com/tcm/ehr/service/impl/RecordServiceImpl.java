@@ -593,6 +593,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return idx;
     }
 
+    /** 数据行 → 病历实体：按表头索引逐字段取值，缺列一律 null */
     private Record mapRow(Row row, Map<String, Integer> idx) {
         Record r = new Record();
         r.setRegistrationNo(get(row, idx, "registrationNo"));
@@ -615,14 +616,14 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         r.setTreatmentEffect(get(row, idx, "treatmentEffect"));
         r.setDepartment(get(row, idx, "department"));
         r.setDoctorId(get(row, idx, "doctorId"));
-        // 与同文件 get() 一致的写法：缺列时返回 null。
-        // 原写法 getCell(idx.getOrDefault("visitTime", -1)) 在缺列时 getCell(-1) 会抛
-        // IllegalArgumentException，被上层记成 POI 的「Cell index must be >= 0」，每行都失败。
+        // 缺列时返回 null：不能写 getCell(idx.getOrDefault("visitTime", -1))，
+        // 那样 getCell(-1) 会抛 IllegalArgumentException，整行都被记成解析失败
         Integer visitIdx = idx.get("visitTime");
         r.setVisitTime(visitIdx == null ? null : parseDateTime(row.getCell(visitIdx)));
         return r;
     }
 
+    /** 按字段标识取单元格文本；该列在表头里不存在时返回 null */
     private String get(Row row, Map<String, Integer> idx, String field) {
         Integer c = idx.get(field);
         return c == null ? null : cellText(row.getCell(c));

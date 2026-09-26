@@ -106,11 +106,9 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     }
 
     /**
-     * 人工校正 + 重算 + 任务流转，三段写库必须同生共死。
+     * 人工复核：校正数据 → 重算评分 → 复核任务流转。
      *
-     * <p>中途失败会让结构化数据 / 评分与 {@code review_tasks} 状态对不上
-     * （分数已回写、任务仍 pending）。加在 public 方法上才经过代理 ——
-     * 本项目此前全仓库 {@code @Transactional} 为 0（审查报告 G2）。</p>
+     * <p>三段写库必须同生共死，故加事务；否则中途失败会出现"分数已回写、任务仍 pending"的对不上。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -127,9 +125,8 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         List<ReviewTask> tasks = baseMapper.selectList(new QueryWrapper<ReviewTask>()
                 .eq("record_id", recordId).eq("is_obsolete", 0).eq("status", "pending"));
         if (tasks.isEmpty()) {
-            // 原来 return null，由 Controller 转成 Result.error(2003) —— 于是同一条「资源不存在」
-            // 有两个错误码（1006 / 2003），且这条给前端的是 data:null 而不是错误码。
-            // 统一走 ResourceNotFoundException（审查报告 M7 / 方案 B8-4）。
+            // 统一抛 ResourceNotFoundException：返回 null 会让 Controller 再造一个错误码，
+            // 同一条"资源不存在"就有 1006/2003 两个说法，且 data 为 null
             throw new ResourceNotFoundException(1006, "复核记录不存在或状态已完结");
         }
         ReviewTask task = tasks.get(0);

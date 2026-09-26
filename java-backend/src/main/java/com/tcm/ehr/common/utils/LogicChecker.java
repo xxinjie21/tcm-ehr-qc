@@ -77,11 +77,13 @@ public final class LogicChecker {
         return out;
     }
 
+    /** 类型 key → 中文名（描述冲突时用；类型不认识则原样返回 key） */
     private static String labelOf(String type) {
         EntityTypes.EntityType t = EntityTypes.byKey(type);
         return t == null ? type : t.label();
     }
 
+    /** 文本是否包含任一关键词（contains 语义，不做分词） */
     private static boolean anyContains(String text, List<String> keys) {
         if (text == null) {
             return false;
