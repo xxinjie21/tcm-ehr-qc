@@ -8,10 +8,6 @@ export function importRecords(formData) {
   })
 }
 
-export function importStatus(taskId) {
-  return request.get(`/records/import/${taskId}/status`)
-}
-
 export function createRecord(data) {
   return request.post('/records', data)
 }

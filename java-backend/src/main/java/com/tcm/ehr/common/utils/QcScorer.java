@@ -284,25 +284,4 @@ public final class QcScorer {
         }
         return "结构化结果与原始病历均无" + el.getName() + "记录";
     }
-
-    /** 取实体列表的 content（herbs 取 name）文本 */
-    private static List<String> strList(Map<String, Object> data, String key) {
-        List<String> out = new ArrayList<>();
-        // 1. 无数据或该 key 不是列表 → 空结果
-        if (data == null || !(data.get(key) instanceof List<?> list)) {
-            return out;
-        }
-        // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
-        for (Object item : list) {
-            if (item instanceof Map<?, ?> m) {
-                Object c = m.get("content") != null ? m.get("content") : m.get("name");
-                if (c != null && !String.valueOf(c).isBlank()) {
-                    out.add(String.valueOf(c).trim());
-                }
-            } else if (item != null && !String.valueOf(item).isBlank()) {
-                out.add(String.valueOf(item).trim());
-            }
-        }
-        return out;
-    }
 }

@@ -371,11 +371,6 @@ const openDetail = (row) => {
   detailVisible.value = true
 }
 
-/** 只收起弹窗、保留 detail：否则关闭动画期间内容会闪空 */
-const closeDetail = () => {
-  detailVisible.value = false
-}
-
 // 预览数据集：按当前范围取质控合格病历（后端只回前 10 条样本）；
 // 范围内无合格病历时 total 为 0，额外提示用户，而不是只丢一张空表出来
 const handlePreview = async () => {

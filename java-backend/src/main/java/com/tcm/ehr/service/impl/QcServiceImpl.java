@@ -586,20 +586,6 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
     }
 
-    /** 取列表项的文本（content 优先，其次 name） */
-    private List<String> pick(List<Map<String, Object>> list) {
-        // 1. 空列表直接给空集合，调用侧不必判空
-        if (list == null) {
-            return List.of();
-        }
-        // 2. content 优先、其次 name，逐项去空白后收集
-        return list.stream()
-                .map(m -> m.get("content") != null ? m.get("content") : m.get("name"))
-                .filter(v -> v != null && !String.valueOf(v).isBlank())
-                .map(v -> String.valueOf(v).trim())
-                .toList();
-    }
-
     /** 该结构化字段是否非空（要素"有记录"的判据之一） */
     private boolean structuredPresent(String key, Map<String, Object> data) {
         // 只有「是列表且非空」才算要素有记录；空数组与缺键同义

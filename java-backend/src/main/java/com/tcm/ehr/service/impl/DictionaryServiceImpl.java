@@ -1,7 +1,6 @@
 package com.tcm.ehr.service.impl;
 
 import com.tcm.ehr.common.utils.LlmClient;
-import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ConvertPreviewVO;
 import com.tcm.ehr.domain.vo.ImportResultVO;

@@ -340,8 +340,6 @@ const ruleWarnings = ref([])
 const descriptions = ref([])
 const catalogElements = ref([])
 const catalogFormats = ref([])
-// 注：本状态当前未被模板引用（标准面板已改为常显 + 折叠「完整规则说明」），保留待清理
-const standardOpen = ref(['std']) // 默认展开：先让用户看到"标准"
 const dedStats = ref(null)
 const dedLoading = ref(false)
 // 词典类型固定五类，供一致性规则的「期望值」下拉使用

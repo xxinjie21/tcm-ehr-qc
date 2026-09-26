@@ -89,7 +89,7 @@
 // 操作日志页：管理员查看审计留痕。
 // 对外提供三个入口 —— 查询/分页（只读）、导出 CSV、按日期清理（后端先归档再删）。
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import { getLogs, getLogActions, exportLogs, purgeLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'

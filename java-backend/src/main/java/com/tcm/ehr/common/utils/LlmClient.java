@@ -1,7 +1,5 @@
 package com.tcm.ehr.common.utils;
 
-import com.openai.client.OpenAIClient;
-import com.openai.client.OpenAIClientAsync;
 import com.openai.client.OpenAIClientAsyncImpl;
 import com.openai.client.OpenAIClientImpl;
 import com.openai.core.ClientOptions;

@@ -290,13 +290,6 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return RecordFilter.fromMap(filters);
     }
 
-    private String str(Object o) {
-        // 1. 空值给 null 2. 去空白后空串也归成 null
-        if (o == null) return null;
-        String s = String.valueOf(o).trim();
-        return s.isEmpty() ? null : s;
-    }
-
     /**
      * 从structured_data(附录A结构)按key抽取词频计数
      * Entity数组取content；Herb数组取name；fallback到实体原始字段（兼容未结构化病历）
