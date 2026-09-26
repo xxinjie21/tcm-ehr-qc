@@ -31,7 +31,7 @@ public final class StructuredDataMeta {
     /**
      * 给结构化数据 JSON 打上词典版本元信息。
      *
-     * @param json        结构化数据 JSON（可能为空）
+     * @param json 结构化数据 JSON（可能为空）
      * @param dictVersion 词典版本串；空则不打点
      * @return 打点后的 JSON；解析/序列化失败时原样返回，绝不因打点失败而丢数据
      */

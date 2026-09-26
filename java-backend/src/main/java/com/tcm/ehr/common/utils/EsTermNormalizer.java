@@ -48,9 +48,9 @@ public class EsTermNormalizer {
      * 归一结果。
      *
      * @param standardTerm 命中的标准词（未命中时=原文）
-     * @param source       术语来源（未命中为 ""）
-     * @param level        命中层级：1=精确 / 2=包含 / 3=模糊 / 0=未命中
-     * @param code         国标代码（词典收录则有，否则 null）
+     * @param source 术语来源（未命中为 ""）
+     * @param level 命中层级：1=精确 / 2=包含 / 3=模糊 / 0=未命中
+     * @param code 国标代码（词典收录则有，否则 null）
      */
     public record NormalizeResult(String standardTerm, String source, int level, String code) {
     }

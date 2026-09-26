@@ -8,7 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * 病历公共工具（批F·7.1 抽取共用）。
+ * 病历公共工具。
  *
  * <p>原始文本去重哈希口径由数据清洗（{@code GovernanceServiceImpl}）与病历导入
  * （{@code RecordServiceImpl}）共用，避免两处各写一份导致去重标准漂移。</p>

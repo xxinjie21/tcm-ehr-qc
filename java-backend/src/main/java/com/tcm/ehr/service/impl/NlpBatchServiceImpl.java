@@ -42,18 +42,18 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * NLP 批量解析任务服务实现（批K·K-a）。
+ * NLP 批量解析任务服务实现。
  *
  * <p><b>生产者-消费者</b>：{@link #queue} 存待跑任务ID，固定 {@code nlp.batch.concurrency}（默认 2）
  * 个工作线程从队列取任务执行；任务与进度写 {@code nlp_task} 表，故前端可提交后离开、轮询进度。</p>
  *
  * <ul>
- *   <li>取数走 {@link RecordFilter}（数据域 + 筛选）与分页循环，绝不一次载入全量；</li>
- *   <li>每条：{@link NlpTextComposer} 拼文本 → 抽取 → {@link EntityNormalizer} 归一 →
- *       打词典版本 → 写 {@code records.structured_data}（与单条抽取口径一致）；</li>
- *   <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 {@code failure_truncated}；</li>
- *   <li>取消：QUEUED 直接置 {@code CANCELLED}；RUNNING 置取消位，工作线程在条/页边界退出；</li>
- *   <li>重启（K-c）：{@code RUNNING}/{@code QUEUED} 一律标记 {@code INTERRUPTED}，可重跑。</li>
+ * <li>取数走 {@link RecordFilter}（数据域 + 筛选）与分页循环，绝不一次载入全量；</li>
+ * <li>每条：{@link NlpTextComposer} 拼文本 → 抽取 → {@link EntityNormalizer} 归一 →
+ * 打词典版本 → 写 {@code records.structured_data}（与单条抽取口径一致）；</li>
+ * <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 {@code failure_truncated}；</li>
+ * <li>取消：QUEUED 直接置 {@code CANCELLED}；RUNNING 置取消位，工作线程在条/页边界退出；</li>
+ * <li>重启（K-c）：{@code RUNNING}/{@code QUEUED} 一律标记 {@code INTERRUPTED}，可重跑。</li>
  * </ul>
  */
 @Slf4j
@@ -171,7 +171,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 落库 —— 序列化失败直接拒绝提交，避免任务静默退化成全库扫描。任务以 QUEUED 状态入库并投入
      * 队列，由工作线程消费；返回的视图不含失败明细。</p>
      *
-     * @param dto       批量请求（filters + 可选 limit），可为 null
+     * @param dto 批量请求（filters + 可选 limit），可为 null
      * @param createdBy 提交人
      * @return 新任务的进度视图（无失败明细）
      * @throws IllegalArgumentException 抽取服务未开启或筛选条件无法序列化时抛出
@@ -213,7 +213,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * <p>任务以 QUEUED 状态入库，ID 集合仅保存在内存（重启后任务被标记为已中断，不会续跑）。
      * ID 集合为空时直接返回 null，视为无需提交。</p>
      *
-     * @param ids       待解析病历 ID 列表
+     * @param ids 待解析病历 ID 列表
      * @param createdBy 提交人
      * @return 新任务的进度视图；{@code ids} 为空时为 null
      * @throws IllegalArgumentException 抽取服务未开启时抛出

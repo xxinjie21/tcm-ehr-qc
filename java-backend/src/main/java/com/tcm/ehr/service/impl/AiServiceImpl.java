@@ -28,7 +28,7 @@ import java.util.Map;
 import java.time.format.DateTimeFormatter;
 
 /**
- * AI 消费端服务实现（批C · 3.1 解读卡 / 3.2 助手浮窗）。
+ * AI 消费端服务实现。
  *
  * <p>规则优先：解读结论、降级问答由规则产出；LLM 只做叙述增强，异常/不可用一律降级，
  * 绝不阻塞主流程（与 LlmClient 约定一致）。读取受数据域约束（审核员仅待复核域）。</p>
@@ -50,7 +50,7 @@ public class AiServiceImpl implements IAiService {
 
     private static final String TECH_REFUSAL = "这属于系统实现细节，建议查看设计文档或咨询开发同学。";
 
-    /** 操作日志时间格式（注入个人操作上下文用，批I·I3） */
+    /** 操作日志时间格式*/
     private static final DateTimeFormatter LOG_TS = DateTimeFormatter.ofPattern("MM-dd HH:mm");
 
     private static final String KNOWLEDGE_FLOW =
@@ -361,7 +361,7 @@ public class AiServiceImpl implements IAiService {
             hit = true;
         }
 
-        // 个人操作上下文（批I·I3）：只注入"当前用户"最近 10 条，脱敏（动作/对象/时间，不含 IP）
+        // 个人操作上下文：只注入"当前用户"最近 10 条，脱敏（动作/对象/时间，不含 IP）
         if (containsAny(question, "操作", "日志", "我做了", "做了什么", "审计", "提交了", "操作记录")) {
             sb.append("【我的最近操作】");
             List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 50);
@@ -410,7 +410,7 @@ public class AiServiceImpl implements IAiService {
         return sb.toString().trim();
     }
 
-    // ------------------------------------------------------------------ 批D·5.1 复核预检
+    // ------------------------------------------------------------------ .1 复核预检
 
     @Override
     public AiReplyVO review(AiQueryDTO dto) {

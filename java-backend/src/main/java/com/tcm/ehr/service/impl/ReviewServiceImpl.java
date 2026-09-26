@@ -32,12 +32,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 复核服务实现（批D·5.1）。
+ * 复核服务实现。
  *
  * <ul>
- *   <li>列表：review_tasks 过滤 is_obsolete=0；审核员仅待复核域（status=pending）；</li>
- *   <li>复核：合并人工修正 → QcScorer 自动重算 → 合格/无效则任务完成，仍待复核则任务保持并更新分数；</li>
- *   <li>超时仅计算属性（ReviewTaskUtil），无后台定时任务、不自动流转。</li>
+ * <li>列表：review_tasks 过滤 is_obsolete=0；审核员仅待复核域（status=pending）；</li>
+ * <li>复核：合并人工修正 → QcScorer 自动重算 → 合格/无效则任务完成，仍待复核则任务保持并更新分数；</li>
+ * <li>超时仅计算属性（ReviewTaskUtil），无后台定时任务、不自动流转。</li>
  * </ul>
  */
 @Slf4j
@@ -55,9 +55,9 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
      * <p>只取未失效任务（{@code is_obsolete=0}），按创建时间倒序；审核员强制只看待复核（pending）
      * 域，其余角色按传入状态过滤（兼容中文与英文状态名）。关联病历缺失的任务直接跳过，不占位。</p>
      *
-     * @param page     页码，非法时取第 1 页
+     * @param page 页码，非法时取第 1 页
      * @param pageSize 每页条数，非法时取 20
-     * @param status   状态筛选（可空，非审核员生效）
+     * @param status 状态筛选（可空，非审核员生效）
      * @return 命中总数与任务列表项
      */
     @Override

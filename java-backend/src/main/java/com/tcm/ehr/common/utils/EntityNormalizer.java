@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * 实体术语归一（UX-63）：把抽取出的 9 类实体就地归一到国标标准术语。
+ * 实体术语归一：把抽取出的 9 类实体就地归一到国标标准术语。
  *
  * <p><b>与清洗链路的分工</b>：本类服务于<b>解析链路</b>（`POST /api/nlp/extract` 返回前即时归一），
  * 目的是让用户在解析页当场看到「原文 → 标准词」的对照，而不是等到清洗阶段才知道术语是否规范。
@@ -26,7 +26,7 @@ import java.util.function.Function;
  * <p><b>为什么不下推判定到 ES</b>：与 {@link EsTermNormalizer} 一致——ES 只负责召回候选，
  * 精确 / 包含 / 字符 Dice≥0.8 三级判定仍在 Java 侧完成。</p>
  *
- * <p><b>同标准词去重（第八轮）</b>：归一本身会把不同原文折叠到同一标准词上——原文里同时有
+ * <p><b>同标准词去重</b>：归一本身会把不同原文折叠到同一标准词上——原文里同时有
  * 「嗳气」与「嗳气频作」时，后者按「包含命中」也归成「嗳气」，于是列表里出现两个一模一样的
  * 「嗳气」，用户会以为系统出错。{@link #dedupByTerm} 是<b>唯一去重口径</b>，解析链路与清洗链路
  * 共用（与 {@link #dictionaryType} 同一思路：口径只写一处，避免两处漂移）。</p>
@@ -41,10 +41,10 @@ public class EntityNormalizer {
     /**
      * 归一统计。
      *
-     * @param hit     命中词典的实体数（level 1~3）
-     * @param exact   精确命中数
+     * @param hit 命中词典的实体数（level 1~3）
+     * @param exact 精确命中数
      * @param contain 包含命中数
-     * @param fuzzy   模糊命中数
+     * @param fuzzy 模糊命中数
      */
     public record NormStat(int hit, int exact, int contain, int fuzzy) {
         static NormStat of(int[] stat) {
@@ -55,7 +55,7 @@ public class EntityNormalizer {
     /**
      * 附录A 字段名 → 词典类型（唯一映射，解析链路与清洗链路共用，避免两处口径漂移）。
      *
-     * <p>批S 起取自 {@link com.tcm.ehr.common.config.EntityTypes}：只有"有词典"的类型参与归一，
+     * <p> 起取自 {@link com.tcm.ehr.common.config.EntityTypes}：只有"有词典"的类型参与归一，
      * 舌象/脉象/病因/治法无独立词典，返回 {@code null}。</p>
      *
      * @return 词典类型；该字段无独立词典时返回 {@code null}
@@ -83,10 +83,10 @@ public class EntityNormalizer {
      * <p>术语键为空的条目<b>不参与合并</b>（各自用唯一键占位）——否则所有缺 content 的条目
      * 会被并成一条。</p>
      *
-     * @param items      待去重列表，可为 null
-     * @param termOf     取「归一后标准词」；为空则该条不参与合并
-     * @param sourceOf   取「归一前原文」，用于比较完整性
-     * @param levelOf    取「命中层级」，可为 null（未命中）
+     * @param items 待去重列表，可为 null
+     * @param termOf 取「归一后标准词」；为空则该条不参与合并
+     * @param sourceOf 取「归一前原文」，用于比较完整性
+     * @param levelOf 取「命中层级」，可为 null（未命中）
      * @return 去重后的新列表；{@code items} 为 null 或不足 2 条时原样返回
      */
     public static <T> List<T> dedupByTerm(List<T> items,

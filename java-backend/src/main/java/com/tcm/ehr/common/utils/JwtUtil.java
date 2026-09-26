@@ -33,9 +33,9 @@ public class JwtUtil {
     /**
      * 签发令牌。
      *
-     * @param userId   用户 ID，写入 subject
+     * @param userId 用户 ID，写入 subject
      * @param username 用户名，写入 username claim
-     * @param role     角色，写入 role claim（鉴权时据此判定权限）
+     * @param role 角色，写入 role claim（鉴权时据此判定权限）
      * @return 签名后的 JWT 字符串
      */
     public String generateToken(String userId, String username, String role) {

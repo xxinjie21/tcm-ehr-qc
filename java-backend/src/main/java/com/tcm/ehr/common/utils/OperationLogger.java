@@ -17,14 +17,14 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * 操作日志（文档必做2）：关键操作（清洗 / 导出 / 词典导入 / 词典回滚 / 人工复核 / 批量重算）
- * **文件落盘 + 入库双写**（批A·C5）。
+ * **文件落盘 + 入库双写**。
  *
  * <ul>
- *   <li>文件：追加写 {@code logs/operation.log}，格式「时间 | 操作人 | 操作内容」，作为兜底备份，
- *       读取方为 {@code GET /api/logs/export}；</li>
- *   <li>库：INSERT {@code operation_log}（log_time/operator/role/action/target/detail/ip），
- *       供审计页 {@code GET /api/logs} 分页筛选（接口由批F·7.5 实现）；</li>
- *   <li>双写不做强一致，各自 try-catch：**以文件为准**，库写失败不阻塞业务（仅审计页缺该条展示）。</li>
+ * <li>文件：追加写 {@code logs/operation.log}，格式「时间 | 操作人 | 操作内容」，作为兜底备份，
+ * 读取方为 {@code GET /api/logs/export}；</li>
+ * <li>库：INSERT {@code operation_log}（log_time/operator/role/action/target/detail/ip），
+ * 供审计页 {@code GET /api/logs} 分页筛选；</li>
+ * <li>双写不做强一致，各自 try-catch：**以文件为准**，库写失败不阻塞业务（仅审计页缺该条展示）。</li>
  * </ul>
  *
  * 操作人 / 角色 / IP 取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。

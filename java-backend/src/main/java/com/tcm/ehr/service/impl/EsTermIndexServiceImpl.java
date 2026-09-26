@@ -97,7 +97,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      * 索引短暂不存在的窗口，期间检索会拿到 index_not_found；故启动路径应先用
      * {@link #indexedVersion} 比对版本，一致即跳过重建。</p>
      *
-     * @param type    术语类型
+     * @param type 术语类型
      * @param entries 全量词条
      * @param version 本次灌入的词典版本，写入 {@code _meta.version} 供下次启动比对
      * @throws IOException ES 建索引、灌数据等请求失败
@@ -165,8 +165,8 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      * 归一的唯一权威，故 ES 不可用时异常必须向上抛出，不可吞掉或返回空列表 —— 否则会把
      * 「索引挂了」误报成「词典无此词」。</p>
      *
-     * @param type          术语类型
-     * @param input         输入词，为空时直接返回空列表
+     * @param type 术语类型
+     * @param input 输入词，为空时直接返回空列表
      * @param maxCandidates 召回上限
      * @return 候选词条（按相关度排序）；无命中时为空列表
      * @throws IOException ES 检索失败或索引不存在

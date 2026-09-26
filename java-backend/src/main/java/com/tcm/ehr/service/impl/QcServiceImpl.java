@@ -47,12 +47,12 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * 质控服务实现（批B·2.3；批Q 规则可配置）。
+ * 质控服务实现。
  *
  * <ul>
- *   <li>判定地基 = 规则引擎（QcScorer + LogicChecker），规则来自 {@link QcRuleStore}；</li>
- *   <li>批量：分页分批（1000/页） + Redis SETNX 防重（tcm:task:batch）；</li>
- *   <li>review_tasks 幂等 upsert（查询过滤 is_obsolete=0）。</li>
+ * <li>判定地基 = 规则引擎（QcScorer + LogicChecker），规则来自 {@link QcRuleStore}；</li>
+ * <li>批量：分页分批（1000/页） + Redis SETNX 防重（tcm:task:batch）；</li>
+ * <li>review_tasks 幂等 upsert（查询过滤 is_obsolete=0）。</li>
  * </ul>
  */
 @Slf4j

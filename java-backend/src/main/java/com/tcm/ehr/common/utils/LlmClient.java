@@ -36,14 +36,14 @@ import java.time.Duration;
  *
  * <p><b>三条硬约束</b>（与《后续开发方案》§8.1 一致）：</p>
  * <ol>
- *   <li><b>不阻塞启动</b>：{@code ChatClient} 懒构造，首次调用才装配；配置缺失或非法只降级，
- *       绝不抛到启动期。Spring AI 的 {@code OpenAi*AutoConfiguration} 在缺 api-key 时会急切校验凭据、
- *       让整个上下文启动失败，故 {@code spring.ai.model.*} 已统一置 {@code none}，模型改由本类自行构造。</li>
- *   <li><b>不泄漏底层异常</b>：调用异常统一捕获 → 记 WARN → 返回 {@code null}，
- *       由调用方回退规则/模板兜底。<b>唯一例外是 {@link #probe}</b>——连通性探测的目的就是报出失败原因，
- *       由调用方负责脱敏后再返回给用户。</li>
- *   <li><b>配置可变</b>（UX-68）：生效参数来自 {@link LlmConfigStore} 而非直接读 {@code application.yml}，
- *       存储的版本号变化时会丢弃旧 {@code ChatClient} 并按新参数重建，实现「保存即生效、无需重启」。</li>
+ * <li><b>不阻塞启动</b>：{@code ChatClient} 懒构造，首次调用才装配；配置缺失或非法只降级，
+ * 绝不抛到启动期。Spring AI 的 {@code OpenAi*AutoConfiguration} 在缺 api-key 时会急切校验凭据、
+ * 让整个上下文启动失败，故 {@code spring.ai.model.*} 已统一置 {@code none}，模型改由本类自行构造。</li>
+ * <li><b>不泄漏底层异常</b>：调用异常统一捕获 → 记 WARN → 返回 {@code null}，
+ * 由调用方回退规则/模板兜底。<b>唯一例外是 {@link #probe}</b>——连通性探测的目的就是报出失败原因，
+ * 由调用方负责脱敏后再返回给用户。</li>
+ * <li><b>配置可变</b>：生效参数来自 {@link LlmConfigStore} 而非直接读 {@code application.yml}，
+ * 存储的版本号变化时会丢弃旧 {@code ChatClient} 并按新参数重建，实现「保存即生效、无需重启」。</li>
  * </ol>
  */
 @Slf4j
@@ -96,7 +96,7 @@ public class LlmClient {
      * 单轮对话。
      *
      * @param systemPrompt 系统提示词，可为 {@code null}
-     * @param userPrompt   用户输入
+     * @param userPrompt 用户输入
      * @return 模型输出；不可用或调用失败返回 {@code null}，调用方据此走降级路径
      */
     public String chat(String systemPrompt, String userPrompt) {
@@ -124,7 +124,7 @@ public class LlmClient {
     }
 
     /**
-     * 连通性探测（UX-68 {@code POST /api/llm/test}）：用<b>给定参数</b>（而非当前生效配置）
+     * 连通性探测：用<b>给定参数</b>（而非当前生效配置）
      * 装配模型并发一轮最小请求，让用户可以先试再存。
      *
      * <p>与 {@link #chat} 相反，本方法<b>不吞异常</b>——探测的意义就是把失败原因交给调用方。
@@ -165,7 +165,7 @@ public class LlmClient {
             """;
 
     /**
-     * AI 质控解读系统提示词（批C·3.1）：规则出结论，LLM 只负责叙述与要点摘要。
+     * AI 质控解读系统提示词：规则出结论，LLM 只负责叙述与要点摘要。
      *
      * <p>要求「严格输出 JSON」便于调用方解析 summary 段；模型不一定听话，
      * 调用方仍须剥离可能包裹的 markdown 代码块，解析失败则只取原文作 narrative。</p>
@@ -183,7 +183,7 @@ public class LlmClient {
             """;
 
     /**
-     * AI 助手系统提示词（批C·3.2）：面向使用者的项目业务问答，不答技术实现。
+     * AI 助手系统提示词：面向使用者的项目业务问答，不答技术实现。
      */
     public static final String AI_CHAT_SYSTEM_PROMPT = """
             你是「中医电子病历质控与标准化系统」的使用助手，面向临床与质控使用者。
@@ -196,7 +196,7 @@ public class LlmClient {
             """;
 
     /**
-     * AI 复核预检系统提示词（批D·5.1）：基于规则预检单生成复核建议，判定仍以规则为准。
+     * AI 复核预检系统提示词：基于规则预检单生成复核建议，判定仍以规则为准。
      */
     public static final String AI_REVIEW_SYSTEM_PROMPT = """
             你是中医电子病历质控复核助手。用户会给你一条病历的「规则预检单」与「结构化数据」。
@@ -212,7 +212,7 @@ public class LlmClient {
     // ------------------------------------------------------------------ 装配
 
     /**
-     * 取当前生效的 {@code ChatClient}；配置版本变化时按新参数重建（UX-68）。
+     * 取当前生效的 {@code ChatClient}；配置版本变化时按新参数重建。
      *
      * @return 可用客户端；未启用或装配失败返回 {@code null}
      */

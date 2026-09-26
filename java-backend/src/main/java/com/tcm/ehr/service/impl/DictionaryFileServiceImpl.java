@@ -103,7 +103,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      *
      * <p>属覆盖式落盘，调用方需自行保证已先备份。</p>
      *
-     * @param type    词典类型
+     * @param type 词典类型
      * @param entries 全量词条
      * @throws IOException 目录创建或写文件失败
      */
@@ -139,9 +139,9 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      * <p>备份文件名必须以该类型的 {@code <文件名>.bak_} 前缀开头，用以拦截路径穿越串，
      * 防止借备份名指向备份目录之外的任意文件。</p>
      *
-     * @param type           词典类型
+     * @param type 词典类型
      * @param backupFilename 备份文件名（非全路径）
-     * @throws IOException              词典目录创建或文件复制失败
+     * @throws IOException 词典目录创建或文件复制失败
      * @throws IllegalArgumentException 备份文件不存在，或文件名与该词典类型不匹配
      */
     public void restore(String type, String backupFilename) throws IOException {
@@ -214,7 +214,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      * <p>先按与 {@link #restore} 相同的前缀规则过滤：文件名为 null 或前缀不符时直接返回
      * {@code false}，避免用 {@code ../..} 之类的名字探测备份目录之外的路径。</p>
      *
-     * @param type           词典类型
+     * @param type 词典类型
      * @param backupFilename 备份文件名
      * @return 前缀合法且文件存在时为 {@code true}
      */

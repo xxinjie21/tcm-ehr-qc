@@ -51,13 +51,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 病历数据服务实现（批F·7.1）：Excel 批量导入 + 单条新增 + 导入进度（内存）。
+ * 病历数据服务实现：Excel 批量导入 + 单条新增 + 导入进度（内存）。
  *
  * <ul>
- *   <li>解析：POI {@link WorkbookFactory}（兼容 .xlsx / .xls）；表头中文名 → 21 字段；</li>
- *   <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；</li>
- *   <li>进度：内存 Map（taskId → 状态），服务重启后丢失，查询返回 404（与 openapi 一致）；</li>
- *   <li>导入同步执行：接口返回即本轮完成，status 直接为「已完成」。</li>
+ * <li>解析：POI {@link WorkbookFactory}（兼容 .xlsx / .xls）；表头中文名 → 21 字段；</li>
+ * <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；</li>
+ * <li>进度：内存 Map（taskId → 状态），服务重启后丢失，查询返回 404（与 openapi 一致）；</li>
+ * <li>导入同步执行：接口返回即本轮完成，status 直接为「已完成」。</li>
  * </ul>
  */
 @Slf4j
@@ -148,7 +148,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
      * {@code saveBatch} 一次批量插入，结果同时写入内存任务表（供进度查询，重启即失）。开启
      * {@code autoExtract} 且有成功记录时，另行提交后台 NLP 批解析任务，导入本身不阻塞等待。</p>
      *
-     * @param files       上传的 Excel 文件数组（最多 20 个）
+     * @param files 上传的 Excel 文件数组（最多 20 个）
      * @param autoExtract 是否在导入后自动提交结构化解析任务
      * @return 任务 ID、导入摘要（总数 / 成功 / 失败明细）与自动解析任务 ID（未提交为 null）
      * @throws IllegalArgumentException 未上传文件或文件数超过上限时抛出
@@ -431,7 +431,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
      * 当前词典版本戳再落库，保证结构化结果可追溯。</p>
      *
      * @param recordId 病历 ID
-     * @param body     请求体，需含 structuredData
+     * @param body 请求体，需含 structuredData
      * @throws IllegalArgumentException 病历不存在、携带原始字段、缺少 structuredData 或序列化失败时抛出
      */
     @Override

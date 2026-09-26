@@ -3,7 +3,7 @@ package com.tcm.ehr.common.utils;
 import com.tcm.ehr.domain.po.Record;
 
 /**
- * NLP 抽取输入文本拼装（批K·K0 从 {@code RecordServiceImpl} 抽出，供批量任务复用）。
+ * NLP 抽取输入文本拼装。
  *
  * <p>参与抽取的是 12 个叙述/诊断字段，顺序固定、以「。」分隔；与前端的字段分组口径一致
  * （{@code NlpExtract.vue} 的 FIELD_GROUPS）。</p>

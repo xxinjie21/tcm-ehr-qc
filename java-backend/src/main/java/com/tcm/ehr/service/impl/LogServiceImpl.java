@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 操作日志审计实现（批F·7.5 / 批I·I2）：读 operation_log（批A·C5 双写入库）做分页筛选、导出、归档清理。
+ * 操作日志审计实现：读 operation_log做分页筛选、导出、归档清理。
  */
 @Slf4j
 @Service
@@ -46,10 +46,10 @@ public class LogServiceImpl implements ILogService {
     /**
      * 分页查询操作日志。
      *
-     * @param action  操作类型，为空表示不限
+     * @param action 操作类型，为空表示不限
      * @param keyword 关键字，匹配操作人 / 操作对象 / 详情
-     * @param page    页码，从 1 开始
-     * @param size    每页条数
+     * @param page 页码，从 1 开始
+     * @param size 每页条数
      * @return total=总条数、list=当前页记录
      */
     @Override
@@ -75,7 +75,7 @@ public class LogServiceImpl implements ILogService {
     /**
      * 按条件取全部日志（不分页），供导出使用。
      *
-     * @param action  操作类型，为空表示不限
+     * @param action 操作类型，为空表示不限
      * @param keyword 关键字，匹配操作人 / 操作对象 / 详情
      * @return 命中条件的日志列表
      */
@@ -87,7 +87,7 @@ public class LogServiceImpl implements ILogService {
     /**
      * 导出日志为 CSV 字节流。
      *
-     * @param action  操作类型，为空表示不限
+     * @param action 操作类型，为空表示不限
      * @param keyword 关键字，匹配操作人 / 操作对象 / 详情
      * @return 带 UTF-8 BOM 的 CSV 内容
      */
@@ -138,7 +138,7 @@ public class LogServiceImpl implements ILogService {
      * 取某操作人最近的若干条日志，供 AI 助手理解上下文。
      *
      * @param operator 操作人
-     * @param limit    最多返回条数
+     * @param limit 最多返回条数
      * @return 按时间倒序的日志列表；入参非法时返回空列表
      */
     @Override

@@ -15,7 +15,7 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * Python NLP服务HTTP客户端封装（成员B的FastAPI服务，端口8001，批G·8.1）。
+ * Python NLP服务HTTP客户端封装。
  *
  * <p>调用 {@code POST /api/nlp/extract} 并映射为 {@link NlpExtractVO}；
  * 服务未启动 / 调用异常 / {@code nlp.enabled=false} 时返回 {@code null}，
@@ -51,13 +51,13 @@ public class PythonNlpClient {
     }
 
     /**
-     * 启动时把「抽取服务未启用」这件事说清楚（第八轮）。
+     * 启动时把「抽取服务未启用」这件事说清楚。
      *
      * <p>{@code nlp.enabled} 是 {@code @Value} 静态配置，启动时即已知，所以只在这里
      * 打一次，不必每个请求重复刷屏。级别用 warn 而非 debug：这是配置事实，生产把
      * {@code com.tcm.ehr} 调回 info 后仍应可见 —— 诊断信息不该随日志级别一起消失。</p>
      *
-     * <p>这段技术细节原先写在解析页的降级横幅上，用户看不懂；第八轮改为
+     * <p>这段技术细节原先写在解析页的降级横幅上，用户看不懂；改为
      * 横幅只说人话、细节落在这里。</p>
      */
     @PostConstruct

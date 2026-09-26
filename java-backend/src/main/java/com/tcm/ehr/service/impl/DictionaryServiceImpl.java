@@ -67,7 +67,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * <p>关键字为空表示不过滤；每次调用都直接读文件 —— 词典体量小，且本方法只服务
      * 术语词典页的列表 / 搜索。</p>
      *
-     * @param type    词典类型
+     * @param type 词典类型
      * @param keyword 搜索关键字，可为空
      * @return 命中词条（standardTerm / aliases），最多 100 条
      * @throws IOException 词典文件读取失败
@@ -109,7 +109,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @param type 词典类型
      * @param file 上传文件（.json / .xlsx / .xls / .csv）
      * @return 导入结果（总数、成功数、失败数及逐行失败原因）
-     * @throws IOException              文件解析或落盘失败；索引重建失败时也以此抛出
+     * @throws IOException 文件解析或落盘失败；索引重建失败时也以此抛出
      * @throws IllegalArgumentException 文件格式不支持，或 JSON 结构非法
      */
     public ImportResultVO importDictionary(String type, MultipartFile file) throws IOException {
@@ -256,7 +256,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         List<String[]> rows = new ArrayList<>();
         for (String line : readTextAutoCharset(file).split("\r?\n")) {
             if (line.isBlank() || line.startsWith("标准术语")) continue;
-            // 最多切 3 段（标准术语 / 别名 / 国标代码）；别名列内部请用 、 或 ; 分隔，
+            // 最多切 3 段（标准术语 / 别名 / 国标代码）；别名列内部请用、 或 ; 分隔，
             // 用半角逗号会与列分隔符冲突
             String[] parts = line.split("[,\t]", 3);
             String[] arr = new String[3];
@@ -296,7 +296,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @param type 词典类型
      * @param file 上传的 PDF 文件
      * @return 转换预览（候选词条 + 失败原因）
-     * @throws IOException              文件读取或 PDF 解析失败
+     * @throws IOException 文件读取或 PDF 解析失败
      * @throws IllegalArgumentException 功能未启用、LLM 不可用、非 PDF、无文本或未提取到术语
      */
     public ConvertPreviewVO convertFromPdf(String type, MultipartFile file) throws IOException {
@@ -400,9 +400,9 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 回滚：用备份文件覆盖当前词典，并以恢复后的内容全量重建 ES 索引。
      *
-     * @param type           词典类型
+     * @param type 词典类型
      * @param backupFilename 备份文件名
-     * @throws IOException              文件恢复或索引重建失败
+     * @throws IOException 文件恢复或索引重建失败
      * @throws IllegalArgumentException 备份文件不存在或与词典类型不匹配
      */
     public void rollback(String type, String backupFilename) throws IOException {
@@ -428,7 +428,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 备份文件是否存在，直接委托文件服务。
      *
-     * @param type           词典类型
+     * @param type 词典类型
      * @param backupFilename 备份文件名
      * @return 文件名合法且文件存在时为 {@code true}
      */

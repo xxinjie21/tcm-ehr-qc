@@ -10,14 +10,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 病历公共过滤（批F·7.4）：**数据域（行级权限）→ 用户筛选** 顺序固定、取交集。
+ * 病历公共过滤：**数据域（行级权限）→ 用户筛选** 顺序固定、取交集。
  *
  * <p>所有病历读取（查询 / 原始查看 / 后续图谱等）统一走本工具，禁止在业务方法中手写 where，
  * 避免口径漂移与"筛选条件绕过数据域"的越权。</p>
  *
  * <ul>
- *   <li>管理员 = 全库；</li>
- *   <li>审核员 = 复核域（{@code grade='待复核'}），再叠加用户筛选。</li>
+ * <li>管理员 = 全库；</li>
+ * <li>审核员 = 复核域（{@code grade='待复核'}），再叠加用户筛选。</li>
  * </ul>
  */
 public final class RecordFilter {
@@ -111,7 +111,7 @@ public final class RecordFilter {
      * 日志页「操作对象」列恒空，事后追责看不出那次操作动了哪个范围（审查报告 M4）。</p>
      *
      * @param filters {@link FiltersDTO}，或 stats 契约里的 {@code Map}（两种都要支持：
-     *                导出走 Map、其余走 DTO）
+     * 导出走 Map、其余走 DTO）
      * @return 如「科室＝中医内科 · 分级＝待复核 · 2026-09-01 至 2026-09-30」；无条件时返回「全部病历」
      */
     public static String describe(Object filters) {
@@ -174,7 +174,7 @@ public final class RecordFilter {
         return ROLE_AUDITOR.equals(role) ? "待复核" : null;
     }
 
-    /** 批B·4.1：按 filters{department,dateRange,pattern,grade} 构建（数据域→用户筛选） */
+    /** .1：按 filters{department,dateRange,pattern,grade} 构建（数据域→用户筛选） */
     public static QueryWrapper<Record> build(String role, FiltersDTO f) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
         operatorScope(wrapper, role);

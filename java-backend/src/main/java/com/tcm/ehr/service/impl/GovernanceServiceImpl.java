@@ -165,7 +165,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /**
      * 对structuredData（附录A结构）全实体做术语归一：content替换为标准词，sourceText保留原文；
-     * 命中实体写入 normLevel(1/2/3) 与 normSource（批B·2.2），供前端溯源与三级分布统计。
+     * 命中实体写入 normLevel(1/2/3) 与 normSource，供前端溯源与三级分布统计。
      *
      * @return {被替换实体数, 精确数, 包含数, 模糊数}
      */
@@ -202,7 +202,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         }
                     }
                 }
-                // 同标准词去重（第八轮）：口径与解析链路共用 EntityNormalizer.dedupByTerm
+                // 同标准词去重：口径与解析链路共用 EntityNormalizer.dedupByTerm
                 data.put(key, dedupStructuredList(list, "content"));
             }
             // herbs：name归一 + dosage格式规整（统一小写单位表示，不改数值）
@@ -242,7 +242,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * structuredData 里某一类实体的「同标准词去重」（第八轮）。
+     * structuredData 里某一类实体的「同标准词去重」。
      *
      * <p><b>不另写一套规则</b>：直接复用解析链路用的 {@link EntityNormalizer#dedupByTerm}，
      * 与 {@code mapEntityType} 同一思路——口径只写一处，避免解析链路与清洗链路漂移。</p>

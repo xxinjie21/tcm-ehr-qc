@@ -3,7 +3,7 @@ package com.tcm.ehr.common.utils;
 import java.time.LocalDateTime;
 
 /**
- * 复核任务工具（批D·5.1）。
+ * 复核任务工具。
  *
  * <p><b>无后台定时任务</b>：超时仅由前端/出参计算属性做视觉提醒，不自动流转任务状态。</p>
  */

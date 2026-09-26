@@ -13,7 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * LLM 运行时配置实现（UX-68）。
+ * LLM 运行时配置实现。
  *
  * <p><b>参数合并口径</b>：DTO 中为 null / 空串的字段一律沿用当前值，前端弹窗可以只提交改过的项。
  * 唯一的例外是 api-key —— 空串与「回传的掩码」都视为「不修改」，因为用户看不到明文，

@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * 终末质控评分（批B·2.3，批Q 改为按 {@link com.tcm.ehr.common.config.QcRuleSet} 执行）。
+ * 终末质控评分。
  *
  * <p>评分维度全部来自规则集：完整性（要素清单，真缺失/漏抽两档）、格式规则、逻辑一致性、
  * 术语标准化、重复；分级阈值同样来自规则集。规则声明依赖要素；要素缺失则跳过（不适用）。</p>
@@ -27,10 +27,10 @@ public final class QcScorer {
      * 术语标准化、重复；分级取「严重缺失 / 低于无效线 / 存在逻辑冲突 / 达到合格线」中
      * 优先级最高的一档。规则集为 {@code null} 时回退到内置默认规则。</p>
      *
-     * @param data      结构化抽取结果，{@code null} 表示未结构化（标记为缺失）
-     * @param raw       原始病历，{@code null} 时跳过格式规则
+     * @param data 结构化抽取结果，{@code null} 表示未结构化（标记为缺失）
+     * @param raw 原始病历，{@code null} 时跳过格式规则
      * @param duplicate 是否与已有病历重复
-     * @param rules     质控规则集，可为 {@code null}
+     * @param rules 质控规则集，可为 {@code null}
      * @return 评分结果（得分、分级、是否严重、扣分明细）
      */
     public static ScoreResultVO score(Map<String, Object> data, Record raw, boolean duplicate,
@@ -57,7 +57,7 @@ public final class QcScorer {
             ded.add(new ScoreResultVO.Deduction("核心字段缺失", el.getName(), points, reasonFor(el, rawHas)));
         }
 
-        // ② 逻辑一致性（类型 → 类型，批S）
+        // ② 逻辑一致性
         List<String> conflicts = LogicChecker.check(data, rs.getConsistency());
         for (String c : conflicts) {
             String name = c.contains("：") ? c.substring(0, c.indexOf("：")) : c;
@@ -131,7 +131,7 @@ public final class QcScorer {
      * （{@link #structuredPresent} / {@link #rawPresent}）。存在的意义是让 AI 解读 / 助手
      * 不再手写一份要素清单 —— 那正是「同一份病历质控说缺、AI 说齐全」的根因。</p>
      *
-     * @param full    <b>真缺失</b>：结构化结果与原始列都没有记录
+     * @param full <b>真缺失</b>：结构化结果与原始列都没有记录
      * @param partial <b>漏抽</b>：结构化结果里没有，但原始列有记录（可能未被抽取）
      */
     public record Missing(List<String> full, List<String> partial) {
