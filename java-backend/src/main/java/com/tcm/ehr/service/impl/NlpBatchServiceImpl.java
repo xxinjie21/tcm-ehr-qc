@@ -116,8 +116,28 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     @PreDestroy
     void shutdown() {
         running = false;
-        if (workers != null) {
-            workers.shutdownNow();
+        if (workers == null) {
+            return;
+        }
+        workers.shutdownNow();
+        // 先等 worker 收尾：它们的 finally 要写库落状态。不等就可能撞上容器销毁数据源，
+        // 写失败则任务留在 RUNNING —— 只能靠下次启动 init() 兜成「已中断」。
+        try {
+            if (!workers.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.warn("[批解析] 停机：worker 未在 5s 内退出，任务状态可能未落库");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        // 还排在队列里、没被 worker 取走的任务没有 finally 可跑，在这里补标。
+        // 刻意放在 awaitTermination 之后：否则会被 worker 的收尾覆盖。
+        int queued = taskMapper.update(null, new UpdateWrapper<NlpTask>()
+                .in("status", List.of(NlpTask.QUEUED))
+                .set("status", NlpTask.INTERRUPTED)
+                .set("current_label", null)
+                .set("finished_at", LocalDateTime.now().withNano(0)));
+        if (queued > 0) {
+            log.warn("[批解析] 停机：{} 个排队任务已标记为『已中断』", queued);
         }
     }
 
@@ -257,7 +277,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                     ? runByIds(id, idSource, t, failures, truncated, processed)
                     : runByFilter(id, t, failures, truncated, processed);
         } finally {
-            t.setStatus(cancelled ? NlpTask.CANCELLED : NlpTask.COMPLETED);
+            t.setStatus(endStatus(running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
             persistProgress(t, failures, truncated[0]);
@@ -373,6 +393,27 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     // ------------------------------------------------------------------ 辅助
+
+    /**
+     * 任务收尾时的最终状态。
+     *
+     * <p>停机（{@code running == false}）且<b>没跑完</b> → {@code INTERRUPTED}：不能声称「已完成」。
+     * 这里必须自己判 running —— {@link #runByFilter} / {@link #runByIds} 只认 {@code cancelFlags}、
+     * 不看 running，在途任务会在停机窗口里继续跑到取数循环自然结束。</p>
+     *
+     * <p>反过来也要留神：停机窗口内<b>恰好跑完</b>的（{@code done == total}）仍是
+     * {@code COMPLETED}，别把真跑完的误标成中断。取消优先于中断。</p>
+     *
+     * <p>单独抽出来是为了能直接测这三条分支：靠「停一次服务」验证成本很高 ——
+     * Windows 上 SIGTERM 是硬杀（{@code TerminateProcess}），根本不跑 {@code @PreDestroy}。</p>
+     */
+    static String endStatus(boolean running, boolean cancelled, Integer done, Integer total) {
+        boolean unfinished = done != null && total != null && done < total;
+        if (!running && !cancelled && unfinished) {
+            return NlpTask.INTERRUPTED;
+        }
+        return cancelled ? NlpTask.CANCELLED : NlpTask.COMPLETED;
+    }
 
     private static boolean isTerminal(String status) {
         return NlpTask.COMPLETED.equals(status) || NlpTask.CANCELLED.equals(status)
