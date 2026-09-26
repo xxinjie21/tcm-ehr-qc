@@ -11,23 +11,47 @@ import com.tcm.ehr.domain.vo.StatsVO;
 import java.util.List;
 
 /**
- * 统计服务：首页指标卡 + 按type统计（疾病/证候/症状/方剂中药频次）
- * + 看板扩展（批C·4.2：趋势/科室合格率/评分分布/词典规模）。
+ * 统计服务：首页指标卡、按类型统计、科室选项、看板一次拉取与扩展统计。
+ *
+ * <p>所有聚合都受数据域约束：管理员全库，审核员仅待复核域。</p>
  */
 public interface IStatsService extends IService<Record> {
 
-    /** 首页四个指标卡（病历总数/合格率/待复核/无效） */
+    /**
+     * 首页四个指标卡。
+     *
+     * @return total/qualified/pendingReview/invalid=各分级条数
+     */
     OverviewVO overview();
 
-    /** 按 type 统计（recordIds 圈定范围，空则按 filters 或全量） */
+    /**
+     * 按类型统计。
+     *
+     * @param dto type=统计类型；recordIds=限定病历集合，为空表示全范围
+     * @return 词频或分布结果
+     */
     StatsVO stats(StatsDTO dto);
 
-    /** 科室动态选项（批B·4.1 U11） */
+    /**
+     * 科室下拉选项。
+     *
+     * @return 当前数据域内的科室去重值
+     */
     List<String> departments();
 
-    /** 看板一次拉取：指标卡 + 4 类统计（批C·4.2 U6，filters 与范围条联动） */
+    /**
+     * 看板一次拉取：指标卡 + 四类统计。
+     *
+     * @param filters 范围条件
+     * @return 指标卡与四类统计
+     */
     StatsAllVO all(FiltersDTO filters);
 
-    /** 看板扩展统计：趋势 / 科室合格率 / 评分分布 / 词典规模（批C·4.2，并入 StatsVO 扩展字段） */
+    /**
+     * 看板扩展统计：趋势、科室合格率、评分分布、词典规模。
+     *
+     * @param filters 范围条件
+     * @return 四类扩展统计
+     */
     StatsVO extra(FiltersDTO filters);
 }

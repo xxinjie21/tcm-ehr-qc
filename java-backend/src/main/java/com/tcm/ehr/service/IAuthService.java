@@ -5,21 +5,25 @@ import com.tcm.ehr.domain.po.User;
 import com.tcm.ehr.domain.vo.LoginVO;
 
 /**
- * 登录/注册服务
+ * 认证服务：注册与登录。
  */
 public interface IAuthService extends IService<User> {
 
     /**
-     * 用户注册：仅可注册为「审核员」，不允许自助注册管理员（管理员由数据库预置）；
-     * 用户名查重、密码 BCrypt 加密入库
+     * 注册用户，角色固定为审核员。
      *
+     * @param username 用户名
+     * @param password 明文密码，落库前做 BCrypt 加密
      * @throws IllegalArgumentException 用户名已存在
      */
     void register(String username, String password);
 
     /**
-     * 用户登录：校验账号密码，返回 JWT、角色与按角色分配的菜单
+     * 校验凭证并签发访问令牌。
      *
+     * @param username 用户名
+     * @param password 明文密码
+     * @return token=JWT；role=角色；menus=该角色可见的菜单
      * @throws com.tcm.ehr.common.exception.BadCredentialsException 用户名或密码错误
      */
     LoginVO login(String username, String password);

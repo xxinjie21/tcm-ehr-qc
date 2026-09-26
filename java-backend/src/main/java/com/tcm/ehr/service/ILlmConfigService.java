@@ -5,25 +5,34 @@ import com.tcm.ehr.domain.vo.LlmConfigVO;
 import com.tcm.ehr.domain.vo.LlmTestVO;
 
 /**
- * LLM 运行时配置服务（UX-68）：读取 / 覆盖 / 连通性探测。
+ * LLM 运行时配置：读取、保存、连通性探测。
  *
- * <p>覆盖只作用于内存中的运行时层，<b>不写回 {@code application.yml}</b>，重启后回到配置文件基线。</p>
+ * <p>配置只在内存与配置文件之间合并，不写回 application.yml。</p>
  */
 public interface ILlmConfigService {
 
-    /** 当前生效配置（密钥以掩码回传） */
+    /**
+     * 读取当前生效配置。
+     *
+     * @return enabled/provider/model 等；密钥只回掩码
+     */
     LlmConfigVO get();
 
-    /** 覆盖运行时配置并立即生效；返回生效后的配置 */
+    /**
+     * 覆盖运行时配置并立即生效。
+     *
+     * @param dto 连接参数，空值沿用当前值
+     * @return 生效后的配置
+     */
     LlmConfigVO update(LlmConfigDTO dto);
 
     /**
-     * 用给定参数做一次连通性探测，<b>不落库、不生效</b>（先试后存）。
+     * 探测连通性，不改变生效配置。
      *
-     * @param dto 待探测参数；null 表示探测当前生效配置
-     * @return 探测结果
-     * @throws IllegalArgumentException 参数非法（通道非法 / openai 缺 api-key）
-     * @throws IllegalStateException    连接或鉴权失败（消息已脱敏，可直接展示）
+     * @param dto 待试参数，为 {@code null} 表示用当前生效配置
+     * @return ok=是否连通；provider/model/latencyMs=探测结果
+     * @throws IllegalArgumentException 通道或密钥不合法
+     * @throws IllegalStateException    通信或鉴权失败，消息已脱敏
      */
     LlmTestVO test(LlmConfigDTO dto);
 }

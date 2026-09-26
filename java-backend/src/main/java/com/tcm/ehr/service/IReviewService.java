@@ -7,18 +7,27 @@ import com.tcm.ehr.domain.vo.ReviewResultVO;
 import com.tcm.ehr.domain.vo.ReviewTasksVO;
 
 /**
- * 复核服务（批D·5.1）：待复核列表 + 人工校正/复核（自动重算回流）。
+ * 人工复核：任务列表与复核提交。
  */
 public interface IReviewService extends IService<ReviewTask> {
 
-    /** 待复核任务列表（is_obsolete=0；审核员仅待复核域） */
+    /**
+     * 查询待复核任务。
+     *
+     * @param page     页码
+     * @param pageSize 每页条数
+     * @param status   状态，为空表示不限
+     * @return total=总条数；tasks=任务列表
+     */
     ReviewTasksVO listTasks(Integer page, Integer pageSize, String status);
 
     /**
-     * 人工校正 + 提交复核：合并修正数据 → 自动重算评分与逻辑 → 更新任务流转。
+     * 提交人工复核并自动重算分级。
      *
-     * @return 复核结果；病历不存在抛 {@code ResourceNotFoundException}；
-     *         任务不存在或已完结返回 {@code null}（控制器回 2003）
+     * @param recordId 病历ID
+     * @param dto      correctedData=校正后的结构化数据；remark=意见
+     * @return status=复核后状态；score=重算得分
+     * @throws com.tcm.ehr.common.exception.ResourceNotFoundException 病历或复核任务不存在
      */
     ReviewResultVO review(String recordId, ReviewDTO dto);
 }

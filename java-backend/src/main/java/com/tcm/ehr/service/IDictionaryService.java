@@ -9,29 +9,64 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 术语词典服务：导入（Excel/CSV/JSON -> JSON -> 内存+ES）、PDF 智能转换预览、查询、回滚、备份列表
+ * 术语库业务：查询、导入、PDF 转换预览、回滚、版本列表。
+ *
+ * <p>写入路径固定为 Excel/CSV/JSON → JSON → 内存 + ES 索引。</p>
  */
 public interface IDictionaryService {
 
-    /** 术语查询：读词典 JSON 文件，标准词/别名关键字模糊匹配 */
+    /**
+     * 查询术语，供页面展示与输入联想。
+     *
+     * @param type    术语类型
+     * @param keyword 关键字，为空表示不过滤
+     * @return 命中的术语列表
+     */
     List<Map<String, Object>> searchTerms(String type, String keyword) throws IOException;
 
-    /** 词典导入：解析 -> 去重合并 -> 备份 -> 写文件 -> 刷内存/ES */
+    /**
+     * 导入词典文件并刷新内存与 ES 索引。
+     *
+     * @param type 术语类型
+     * @param file Excel/CSV/JSON 文件，整文件覆盖
+     * @return total/imported/failed=行数统计与失败明细
+     */
     ImportResultVO importDictionary(String type, MultipartFile file) throws IOException;
 
     /**
-     * PDF 智能转换：PDFBox 抽文本 -> LLM 提取候选 -> 返回预览。
-     * <b>不落库</b>，管理员确认后再走 {@link #importDictionary}。
-     * 开关关闭或 LLM 不可用时抛 {@link IllegalArgumentException}（回 400 + 明确文案）。
+     * 把国标 PDF 转为候选术语预览。
+     *
+     * <p>只预览不落库，确认后走 {@link #importDictionary} 入库；LLM 不可用时抛
+     * IllegalArgumentException，由上层转 400 与可读提示。</p>
+     *
+     * @param type 术语类型
+     * @param file PDF 文件
+     * @return candidates=候选术语；failed=抽取失败明细
      */
     ConvertPreviewVO convertFromPdf(String type, MultipartFile file) throws IOException;
 
-    /** 回滚：备份文件覆盖 -> 刷内存/ES */
+    /**
+     * 回滚到历史版本并刷新内存与 ES 索引。
+     *
+     * @param type           术语类型
+     * @param backupFilename 备份文件名
+     */
     void rollback(String type, String backupFilename) throws IOException;
 
-    /** 备份版本列表 */
+    /**
+     * 列出历史版本。
+     *
+     * @param type 术语类型
+     * @return 版本项：filename / time / count / delta
+     */
     List<Map<String, String>> listBackups(String type) throws IOException;
 
-    /** 备份文件是否存在 */
+    /**
+     * 判断备份文件是否存在。
+     *
+     * @param type           术语类型
+     * @param backupFilename 备份文件名
+     * @return 存在返回 true
+     */
     boolean backupExists(String type, String backupFilename);
 }
