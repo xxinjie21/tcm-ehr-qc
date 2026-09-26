@@ -33,23 +33,50 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
     private final LlmConfigStore store;
     private final LlmClient llmClient;
 
+    /**
+     * 读取当前生效配置。API Key 只回掩码，明文不出后端。
+     *
+     * @return 配置视图对象，含 {@code available}（模型是否可用）
+     */
     @Override
     public LlmConfigVO get() {
         return toVO(store.get());
     }
 
+    /**
+     * 保存配置：与当前值合并、校验后写入内存 Store，并触发 ChatClient 重建。
+     *
+     * @param dto 只提交改过的字段即可；apiKey 为空串或回传掩码表示不修改
+     * @return 保存后的配置（API Key 仍为掩码）
+     * @throws IllegalArgumentException 开启 openai 通道却没填 API Key，或参数超出取值范围
+     */
     @Override
     public LlmConfigVO update(LlmConfigDTO dto) {
+        // 1. 与当前配置合并：只提交改过的字段，其余沿用当前值
         LlmConfig next = merge(dto, store.get());
+        // 2. 参数校验：开启 openai 通道必须填 API Key
         if (next.enabled() && LlmConfig.PROVIDER_OPENAI.equals(next.provider()) && isBlank(next.apiKey())) {
             throw new IllegalArgumentException("选择 openai 通道时必须填写 API Key");
         }
+        // 3. 写入 Store（触发 ChatClient 重建），回掩码视图
         return toVO(store.update(next));
     }
 
+    /**
+     * 连通性探测：用合并后的参数试调一次模型，<b>不落盘、不改当前配置</b>。
+     *
+     * <p>探测固定按「启用」执行 —— 用户点测试连接就是要验证这套参数能不能用；
+     * 超时收紧到 {@link #PROBE_TIMEOUT_MS}，避免前端 30 秒超时先行中断后只看到一句网络异常。</p>
+     *
+     * @return 通道、模型名、往返耗时与截断到 200 字的模型回复
+     * @throws IllegalArgumentException openai 通道缺少 API Key
+     * @throws LlmProbeException 探测失败（消息已脱敏，映射为 HTTP 502 + code=1009）
+     */
     @Override
     public LlmTestVO test(LlmConfigDTO dto) {
+        // 1. 与当前配置合并（不落盘、不改当前配置）
         LlmConfig cfg = merge(dto, store.get());
+        // 2. 参数校验：openai 通道必须填 API Key
         if (LlmConfig.PROVIDER_OPENAI.equals(cfg.provider()) && isBlank(cfg.apiKey())) {
             throw new IllegalArgumentException("选择 openai 通道时必须填写 API Key");
         }
@@ -57,6 +84,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         LlmConfig probeCfg = new LlmConfig(true, cfg.provider(), cfg.baseUrl(), cfg.apiKey(),
                 cfg.model(), cfg.temperature(), Math.min(cfg.timeout(), PROBE_TIMEOUT_MS));
 
+        // 3. 计时并试调一次模型，失败即脱敏后抛探测异常
         long start = System.currentTimeMillis();
         String reply;
         try {
@@ -67,6 +95,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
             throw new LlmProbeException("连接失败：" + reason);
         }
 
+        // 4. 回填通道、模型名、耗时与截断到 200 字的回复
         LlmTestVO vo = new LlmTestVO();
         vo.setProvider(probeCfg.provider());
         vo.setModel(isBlank(probeCfg.model()) ? "(通道默认)" : probeCfg.model());

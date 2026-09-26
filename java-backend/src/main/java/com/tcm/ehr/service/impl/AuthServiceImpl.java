@@ -38,16 +38,26 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     /** 审核员菜单：首页看板（登录落地页）+ 人工复核 */
     private static final List<String> AUDITOR_MENUS = List.of("首页看板", "人工复核");
 
+    /**
+     * 注册账号：用户名重复直接拒绝；密码 BCrypt 加密后落库，角色固定为审核员。
+     *
+     * @param username 用户名（唯一）
+     * @param password 明文密码，此处加密后入库
+     * @throws IllegalArgumentException 用户名已存在（含并发注册撞唯一索引的情况）
+     */
     @Override
     public void register(String username, String password) {
+        // 1. 用户名重复直接拒绝
         if (baseMapper.findByUsername(username) != null) {
             throw new IllegalArgumentException("用户名已存在");
         }
+        // 2. 组装用户：密码 BCrypt 加密后落库，不存明文
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
         // 安全约束：注册账号角色固定为审核员，不开放管理员注册
         user.setRole(ROLE_AUDITOR);
+        // 3. 落库（唯一索引兜底并发注册竞态）
         try {
             baseMapper.insert(user);
         } catch (DuplicateKeyException e) {
@@ -56,13 +66,21 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         }
     }
 
+    /**
+     * 登录：校验用户名与密码，签发 JWT 并按角色下发菜单。
+     *
+     * @return 令牌 + 角色 + 菜单（管理员 8 项，审核员 2 项）
+     * @throws BadCredentialsException 用户名不存在或密码不匹配（两种情况同一提示，避免被用来探测账号）
+     */
     @Override
     public LoginVO login(String username, String password) {
+        // 1. 按用户名取用户
         User user = baseMapper.findByUsername(username);
         // 不区分用户不存在与密码错误，避免泄露账号是否存在
         if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
             throw new BadCredentialsException("用户名或密码错误");
         }
+        // 2. 签发 JWT，并按角色下发菜单（管理员 8 项 / 审核员 2 项）
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole()));
         vo.setRole(user.getRole());

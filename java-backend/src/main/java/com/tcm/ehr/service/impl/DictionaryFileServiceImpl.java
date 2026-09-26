@@ -43,16 +43,33 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     private volatile long cachedStamp = -1;
 
     @Override
+    /**
+     * 词典数据目录（配置项 {@code dictionary.dir}，默认 {@code data/dictionaries}）。
+     *
+     * @return 词典根目录路径，不校验其是否存在
+     */
     public Path dir() {
         return Paths.get(dictDir);
     }
 
     @Override
+    /**
+     * 备份目录，即词典目录下的 {@code backup} 子目录；不校验其是否存在。
+     *
+     * @return 备份目录路径
+     */
     public Path backupDir() {
         return dir().resolve("backup");
     }
 
     @Override
+    /**
+     * 词典类型到 JSON 文件名的映射，文件名由 EntityTypes 统一登记。
+     *
+     * @param type 词典类型（disease / pattern / symptom / herb / formula）
+     * @return 对应的 JSON 文件名
+     * @throws IllegalArgumentException 类型未登记时抛出
+     */
     public String fileNameOf(String type) {
         String name = com.tcm.ehr.common.config.EntityTypes.fileNameOf(type);
         if (name == null) {
@@ -62,6 +79,15 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     }
 
     @Override
+    /**
+     * 读取某类词典的全部词条。
+     *
+     * <p>文件不存在视为「该类词典为空」并返回空列表，而非报错 —— 首次导入时目录尚无文件。</p>
+     *
+     * @param type 词典类型
+     * @return 词条列表；文件不存在时为空列表
+     * @throws IOException 文件存在但读取或 JSON 解析失败
+     */
     public List<TermEntry> read(String type) throws IOException {
         Path file = dir().resolve(fileNameOf(type));
         if (!Files.exists(file)) {
@@ -72,6 +98,15 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     }
 
     @Override
+    /**
+     * 全量覆盖写入某类词典文件（JSON 美化输出），目录不存在时自动创建。
+     *
+     * <p>属覆盖式落盘，调用方需自行保证已先备份。</p>
+     *
+     * @param type    词典类型
+     * @param entries 全量词条
+     * @throws IOException 目录创建或写文件失败
+     */
     public void write(String type, List<TermEntry> entries) throws IOException {
         Files.createDirectories(dir());
         Path file = dir().resolve(fileNameOf(type));
@@ -79,6 +114,13 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     }
 
     @Override
+    /**
+     * 备份当前词典文件到备份目录，备份名形如 {@code <文件名>.bak_yyyyMMdd_HHmmss}。
+     *
+     * @param type 词典类型
+     * @return 备份文件名；当前词典文件不存在（首次导入）时返回 {@code null}
+     * @throws IOException 备份目录创建或文件复制失败
+     */
     public String backup(String type) throws IOException {
         Path file = dir().resolve(fileNameOf(type));
         if (!Files.exists(file)) {
@@ -91,6 +133,17 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     }
 
     @Override
+    /**
+     * 用备份文件覆盖当前词典文件，完成回滚。
+     *
+     * <p>备份文件名必须以该类型的 {@code <文件名>.bak_} 前缀开头，用以拦截路径穿越串，
+     * 防止借备份名指向备份目录之外的任意文件。</p>
+     *
+     * @param type           词典类型
+     * @param backupFilename 备份文件名（非全路径）
+     * @throws IOException              词典目录创建或文件复制失败
+     * @throws IllegalArgumentException 备份文件不存在，或文件名与该词典类型不匹配
+     */
     public void restore(String type, String backupFilename) throws IOException {
         Path src = backupDir().resolve(backupFilename);
         if (!Files.exists(src)) {
@@ -104,6 +157,17 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     }
 
     @Override
+    /**
+     * 列出该类词典的全部备份，按时间倒序。
+     *
+     * <p>每项含 filename（文件名）、time（可读时间）、count（该备份词条数）、
+     * delta（相对当前词典的增减，形如 +3 / -2 / 0）。单个备份文件解析失败时词条数按 0 计，
+     * 不因坏文件拖垮整个列表。</p>
+     *
+     * @param type 词典类型
+     * @return 备份条目列表；备份目录不存在时为空列表
+     * @throws IOException 遍历备份目录或读取当前词典失败
+     */
     public List<Map<String, String>> listBackups(String type) throws IOException {
         List<Map<String, String>> result = new ArrayList<>();
         Path backupDir = backupDir();
@@ -144,6 +208,16 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     }
 
     @Override
+    /**
+     * 判断备份文件是否存在，同时兼作路径穿越防护。
+     *
+     * <p>先按与 {@link #restore} 相同的前缀规则过滤：文件名为 null 或前缀不符时直接返回
+     * {@code false}，避免用 {@code ../..} 之类的名字探测备份目录之外的路径。</p>
+     *
+     * @param type           词典类型
+     * @param backupFilename 备份文件名
+     * @return 前缀合法且文件存在时为 {@code true}
+     */
     public boolean backupExists(String type, String backupFilename) {
         // 与 restore() 同一套前缀校验：否则 backupFilename 传 ../.. 之类可以探测任意路径是否存在
         if (backupFilename == null || !backupFilename.startsWith(fileNameOf(type) + ".bak_")) {
@@ -199,6 +273,13 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     }
 
     @Override
+    /**
+     * 以 UTF-8 读取文本文件的全部内容。
+     *
+     * @param path 目标文件路径
+     * @return 文件文本内容
+     * @throws IOException 读取失败
+     */
     public String readText(Path path) throws IOException {
         return Files.readString(path, StandardCharsets.UTF_8);
     }

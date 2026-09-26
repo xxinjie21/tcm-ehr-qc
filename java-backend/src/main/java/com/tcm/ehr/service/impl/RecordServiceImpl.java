@@ -139,8 +139,23 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         });
     }
 
+    /**
+     * Excel 批量导入病历（同步执行，返回即本轮完成）。
+     *
+     * <p>逐文件校验扩展名、大小（≤50MB）与必需列「登记号」「接诊时间」，逐行映射为 21 字段；
+     * 缺列、解析失败、门诊号为空的行计入失败明细，不影响其余行。去重先按登记号预取库内病历哈希、
+     * 再与本批内哈希比对（与数据清洗同口径的 21 字段文本哈希），命中的按重复记失败。落库走
+     * {@code saveBatch} 一次批量插入，结果同时写入内存任务表（供进度查询，重启即失）。开启
+     * {@code autoExtract} 且有成功记录时，另行提交后台 NLP 批解析任务，导入本身不阻塞等待。</p>
+     *
+     * @param files       上传的 Excel 文件数组（最多 20 个）
+     * @param autoExtract 是否在导入后自动提交结构化解析任务
+     * @return 任务 ID、导入摘要（总数 / 成功 / 失败明细）与自动解析任务 ID（未提交为 null）
+     * @throws IllegalArgumentException 未上传文件或文件数超过上限时抛出
+     */
     @Override
     public ImportTaskVO importRecords(MultipartFile[] files, boolean autoExtract) {
+        // 1. 入参校验：至少一个文件，且不超过单次上限
         if (files == null || files.length == 0) {
             throw new IllegalArgumentException("请上传至少一个文件");
         }
@@ -148,12 +163,14 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             throw new IllegalArgumentException("单次最多上传 " + MAX_FILES + " 个文件");
         }
 
+        // 2. 建立内存任务状态（重启即失），供进度查询
         String taskId = UUID.randomUUID().toString();
         ImportStatusVO status = new ImportStatusVO();
         status.setTaskId(taskId);
         status.setStatus("处理中");
         taskStore.put(taskId, status);
 
+        // 3. 初始化导入摘要与批内去重容器
         ImportSummaryVO summary = new ImportSummaryVO();
         List<Record> toInsert = new ArrayList<>();
         Set<String> seenHash = new HashSet<>();
@@ -164,6 +181,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
         List<Object[]> parsedRows = new ArrayList<>(); // [Record, filename]
 
+        // 4. 逐文件处理：先校验文件本身，再解析表头与数据行
         for (MultipartFile file : files) {
             String filename = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
             if (file.isEmpty()) {
@@ -201,6 +219,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                     summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「接诊时间」"));
                     continue;
                 }
+                // 5. 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
                 for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
                     Row row = sheet.getRow(i);
                     if (row == null || isBlank(cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
@@ -236,6 +255,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             }
         }
 
+        // 6. 逐行去重：库内哈希与本批哈希双查，命中按重复记失败
         for (Object[] item : parsedRows) {
             Record r = (Record) item[0];
             String filename = (String) item[1];
@@ -250,6 +270,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             toInsert.add(r);
         }
 
+        // 7. 批量落库并回填成功数
         if (!toInsert.isEmpty()) {
             saveBatch(toInsert);
         }
@@ -267,6 +288,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             }
         }
 
+        // 8. 回填任务状态、摘要与返回体
         status.setStatus("已完成");
         status.setTotal(summary.getTotal());
         status.setProcessed(summary.getTotal());
@@ -283,19 +305,40 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return vo;
     }
 
+    /**
+     * 查询导入任务进度，只读。
+     *
+     * <p>读取内存任务表；任务不存在（含服务重启后丢失）时返回 null，由上层转成 404。</p>
+     *
+     * @param taskId 导入任务 ID
+     * @return 任务状态；不存在时为 null
+     */
     @Override
     public ImportStatusVO importStatus(String taskId) {
         return taskStore.get(taskId);
     }
 
+    /**
+     * 单条新增病历。
+     *
+     * <p>仅做「登记号 / 门诊号非空」的必填校验，不做重复校验；主键由服务端生成 UUID，
+     * 21 个原始字段原样落库。</p>
+     *
+     * @param dto 新增请求，登记号与门诊号必填
+     * @return 新病历 ID
+     * @throws IllegalArgumentException 登记号或门诊号为空时抛出
+     */
     @Override
     public CreateRecordVO createRecord(CreateRecordDTO dto) {
+        // 1. 必填校验：登记号
         if (dto == null || isBlank(dto.getRegistrationNo())) {
             throw new IllegalArgumentException("登记号不能为空");
         }
+        // 2. 必填校验：门诊号
         if (isBlank(dto.getOutpatientNo())) {
             throw new IllegalArgumentException("门诊号不能为空");
         }
+        // 3. 组装病历实体：主键由服务端生成，21 个原始字段原样落库
         Record r = new Record();
         r.setId(UUID.randomUUID().toString());
         r.setRegistrationNo(dto.getRegistrationNo());
@@ -319,15 +362,28 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         r.setDepartment(dto.getDepartment());
         r.setDoctorId(dto.getDoctorId());
         r.setVisitTime(dto.getVisitTime());
+        // 4. 落库
         baseMapper.insert(r);
 
+        // 5. 只回传新病历 ID
         CreateRecordVO vo = new CreateRecordVO();
         vo.setId(r.getId());
         return vo;
     }
 
+    /**
+     * 查询单条原始病历（含结构化数据与质控结果），只读。
+     *
+     * <p>先按数据域校验：审核员仅可见「待复核」病历，其余角色不限；不满足即拒绝而非返回空。
+     * 病历不存在时返回 null。</p>
+     *
+     * @param recordId 病历 ID
+     * @return 原始病历视图；不存在时为 null
+     * @throws ForbiddenException 审核员访问非待复核病历时抛出
+     */
     @Override
     public RawRecordVO getRawRecord(String recordId) {
+        // 1. 按 id 取病历，不存在返回 null（由上层转 404）
         Record r = baseMapper.selectById(recordId);
         if (r == null) {
             return null;
@@ -337,6 +393,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 && !"待复核".equals(r.getGrade())) {
             throw new ForbiddenException("无权查看非待复核病历");
         }
+        // 2. 组装视图：21 个原始字段 + 结构化数据 + 评分结果
         RawRecordVO vo = new RawRecordVO();
         vo.setId(r.getId());
         vo.setRegistrationNo(r.getRegistrationNo());
@@ -367,8 +424,19 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return vo;
     }
 
+    /**
+     * 更新病历的结构化数据（原始 21 字段只读）。
+     *
+     * <p>请求体若显式携带任一原始字段即整体拒绝；仅接受 {@code structuredData}，序列化后打上
+     * 当前词典版本戳再落库，保证结构化结果可追溯。</p>
+     *
+     * @param recordId 病历 ID
+     * @param body     请求体，需含 structuredData
+     * @throws IllegalArgumentException 病历不存在、携带原始字段、缺少 structuredData 或序列化失败时抛出
+     */
     @Override
     public void updateRecord(String recordId, Map<String, Object> body) {
+        // 1. 取病历，不存在即拒绝
         Record r = baseMapper.selectById(recordId);
         if (r == null) {
             throw new IllegalArgumentException("病历不存在");
@@ -381,16 +449,19 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 }
             }
         }
+        // 2. 只接受 structuredData，缺失即拒绝
         Object sd = body == null ? null : body.get("structuredData");
         if (sd == null) {
             throw new IllegalArgumentException("未提供结构化数据");
         }
+        // 3. 序列化结构化数据（格式错误转成参数错误，不落到 500）
         String json;
         try {
             json = objectMapper.writeValueAsString(sd);
         } catch (Exception e) {
             throw new IllegalArgumentException("structuredData 格式错误");
         }
+        // 4. 打上当前词典版本戳后落库
         json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());
         baseMapper.updateStructuredData(recordId, json);
     }
@@ -460,13 +531,26 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return !isBlank(f.getDepartment()) || !isBlank(f.getPattern()) || !isBlank(f.getGrade()) || range;
     }
 
+    /**
+     * 分页检索病历列表，只读。
+     *
+     * <p>分页参数非法时回退为第 1 页 / 每页 20 条；查询条件统一经 {@link RecordFilter} 组装
+     * （先数据域、后用户筛选取交集），不手写 where。列表项摘要取主诉，缺失时依次回退中医诊断、
+     * 西医诊断，超过 40 字截断。</p>
+     *
+     * @param dto 检索请求（分页 + 筛选），可为 null
+     * @return 命中总数与当前页列表项
+     */
     @Override
     public SearchVO searchRecords(SearchDTO dto) {
+        // 1. 分页参数非法时回退为第 1 页 / 每页 20 条
         int page = dto != null && dto.getPage() != null && dto.getPage() > 0 ? dto.getPage() : 1;
         int size = dto != null && dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 20;
         // 数据域 → 用户筛选，取交集（统一走 RecordFilter，禁止手写 where）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), dto);
+        // 2. 分页查询（条件已含数据域与用户筛选）
         Page<Record> p = baseMapper.selectPage(new Page<>(page, size), wrapper);
+        // 3. 组装返回：总数与当前页列表项
         SearchVO vo = new SearchVO();
         vo.setTotal(p.getTotal());
         for (Record r : p.getRecords()) {

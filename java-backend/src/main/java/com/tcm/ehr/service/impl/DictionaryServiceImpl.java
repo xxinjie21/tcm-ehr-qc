@@ -61,6 +61,17 @@ public class DictionaryServiceImpl implements IDictionaryService {
     private boolean convertEnabled;
 
     @Override
+    /**
+     * 术语查询：读词典 JSON，按关键字对标准词与别名做包含匹配。
+     *
+     * <p>关键字为空表示不过滤；每次调用都直接读文件 —— 词典体量小，且本方法只服务
+     * 术语词典页的列表 / 搜索。</p>
+     *
+     * @param type    词典类型
+     * @param keyword 搜索关键字，可为空
+     * @return 命中词条（standardTerm / aliases），最多 100 条
+     * @throws IOException 词典文件读取失败
+     */
     public List<Map<String, Object>> searchTerms(String type, String keyword) throws IOException {
         // 词典列表直接读 JSON 文件（原先借 DictionaryStore 当文件缓存）。
         // DictionaryStore 已随「归一不再内存兜底」删除；这里每次读一次文件 ——
@@ -86,6 +97,21 @@ public class DictionaryServiceImpl implements IDictionaryService {
     // ---------------------------------------------------------------- 导入
 
     @Override
+    /**
+     * 词典导入：解析上传文件 -> 与现有词典合并去重 -> 备份 -> 覆盖写文件 -> 全量重建 ES 索引。
+     *
+     * <p>按扩展名分流：JSON 走直传解析，Excel/CSV 走表格解析。合并以标准术语为键，
+     * 同词条合并别名并保留已有的 source / code。</p>
+     *
+     * <p>索引重建失败会触发补偿：把文件退回导入前版本并尽力重建旧索引，之后仍抛异常 ——
+     * 避免出现「文件已更新、索引未建起」导致归一结果与词典页长期不一致。</p>
+     *
+     * @param type 词典类型
+     * @param file 上传文件（.json / .xlsx / .xls / .csv）
+     * @return 导入结果（总数、成功数、失败数及逐行失败原因）
+     * @throws IOException              文件解析或落盘失败；索引重建失败时也以此抛出
+     * @throws IllegalArgumentException 文件格式不支持，或 JSON 结构非法
+     */
     public ImportResultVO importDictionary(String type, MultipartFile file) throws IOException {
         List<Map<String, Object>> failures = new ArrayList<>();
         List<TermEntry> incoming = fileName(file).endsWith(".json")
@@ -260,6 +286,19 @@ public class DictionaryServiceImpl implements IDictionaryService {
     // ---------------------------------------------------------------- PDF 智能转换
 
     @Override
+    /**
+     * PDF 智能转换预览：PDFBox 抽取文本 -> 送 LLM 提取术语候选，不落库。
+     *
+     * <p>需 llm.enabled 与 llm.convert-enabled 双开关同时开启且 LLM 可用；文本超
+     * {@value #MAX_TEXT_CHARS} 字时截断并在 failed 中提示，扫描件（无文本层）直接拒绝。
+     * 管理员确认候选后再走 {@link #importDictionary} 落盘。</p>
+     *
+     * @param type 词典类型
+     * @param file 上传的 PDF 文件
+     * @return 转换预览（候选词条 + 失败原因）
+     * @throws IOException              文件读取或 PDF 解析失败
+     * @throws IllegalArgumentException 功能未启用、LLM 不可用、非 PDF、无文本或未提取到术语
+     */
     public ConvertPreviewVO convertFromPdf(String type, MultipartFile file) throws IOException {
         ConvertPreviewVO vo = new ConvertPreviewVO();
         vo.setType(type);
@@ -358,6 +397,14 @@ public class DictionaryServiceImpl implements IDictionaryService {
     // ---------------------------------------------------------------- 回滚 / 备份
 
     @Override
+    /**
+     * 回滚：用备份文件覆盖当前词典，并以恢复后的内容全量重建 ES 索引。
+     *
+     * @param type           词典类型
+     * @param backupFilename 备份文件名
+     * @throws IOException              文件恢复或索引重建失败
+     * @throws IllegalArgumentException 备份文件不存在或与词典类型不匹配
+     */
     public void rollback(String type, String backupFilename) throws IOException {
         fileService.restore(type, backupFilename);
         List<TermEntry> entries = fileService.read(type);
@@ -366,11 +413,25 @@ public class DictionaryServiceImpl implements IDictionaryService {
     }
 
     @Override
+    /**
+     * 备份版本列表，直接委托文件服务，按时间倒序。
+     *
+     * @param type 词典类型
+     * @return 备份条目列表
+     * @throws IOException 遍历备份目录或读取当前词典失败
+     */
     public List<Map<String, String>> listBackups(String type) throws IOException {
         return fileService.listBackups(type);
     }
 
     @Override
+    /**
+     * 备份文件是否存在，直接委托文件服务。
+     *
+     * @param type           词典类型
+     * @param backupFilename 备份文件名
+     * @return 文件名合法且文件存在时为 {@code true}
+     */
     public boolean backupExists(String type, String backupFilename) {
         return fileService.backupExists(type, backupFilename);
     }

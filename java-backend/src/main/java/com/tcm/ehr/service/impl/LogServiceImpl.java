@@ -31,7 +31,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LogServiceImpl implements ILogService {
 
+    /** 页面展示用的时间格式 */
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /** 归档文件名中的时间戳格式 */
     private static final DateTimeFormatter FILE_TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     private final OperationLogMapper operationLogMapper;
@@ -40,6 +43,15 @@ public class LogServiceImpl implements ILogService {
     @Value("${log.archive-dir:logs}")
     private String archiveDir;
 
+    /**
+     * 分页查询操作日志。
+     *
+     * @param action  操作类型，为空表示不限
+     * @param keyword 关键字，匹配操作人 / 操作对象 / 详情
+     * @param page    页码，从 1 开始
+     * @param size    每页条数
+     * @return total=总条数、list=当前页记录
+     */
     @Override
     public Map<String, Object> page(String action, String keyword, int page, int size) {
         Page<OperationLog> p = operationLogMapper.selectPage(
@@ -50,29 +62,57 @@ public class LogServiceImpl implements ILogService {
         return result;
     }
 
+    /**
+     * 取全部操作类型，供筛选下拉框使用。
+     *
+     * @return 去重后的操作类型列表
+     */
     @Override
     public List<String> actions() {
         return operationLogMapper.selectDistinctActions();
     }
 
+    /**
+     * 按条件取全部日志（不分页），供导出使用。
+     *
+     * @param action  操作类型，为空表示不限
+     * @param keyword 关键字，匹配操作人 / 操作对象 / 详情
+     * @return 命中条件的日志列表
+     */
     @Override
     public List<OperationLog> listForExport(String action, String keyword) {
         return operationLogMapper.selectList(buildWrapper(action, keyword));
     }
 
+    /**
+     * 导出日志为 CSV 字节流。
+     *
+     * @param action  操作类型，为空表示不限
+     * @param keyword 关键字，匹配操作人 / 操作对象 / 详情
+     * @return 带 UTF-8 BOM 的 CSV 内容
+     */
     @Override
     public byte[] exportCsv(String action, String keyword) {
         return csvBytes(listForExport(action, keyword));
     }
 
+    /**
+     * 归档并清理指定日期之前的日志。
+     *
+     * @param beforeDate 截止日期（yyyy-MM-dd），该日 00:00:00 之前的记录被清理
+     * @return deleted=清理条数、archivedFile=归档文件名（无记录时为空串）
+     */
     @Override
     public Map<String, Object> purgeBefore(String beforeDate) {
+        // 1. 解析截止日期
         LocalDate date;
         try {
             date = LocalDate.parse(beforeDate.trim());
         } catch (DateTimeParseException e) {
+            // 入参日期格式不合法 → 转成明确的参数错误返回，不落到 500
             throw new IllegalArgumentException("日期格式应为 yyyy-MM-dd");
         }
+        // 2. 取待清理记录（时间正序，与归档文件内顺序一致）
         String boundary = date + " 00:00:00";
         QueryWrapper<OperationLog> w = new QueryWrapper<OperationLog>()
                 .lt("log_time", boundary)
@@ -80,6 +120,7 @@ public class LogServiceImpl implements ILogService {
         List<OperationLog> rows = operationLogMapper.selectList(w);
 
         Map<String, Object> result = new LinkedHashMap<>();
+        // 3. 无记录直接返回，不产生空归档文件
         if (rows.isEmpty()) {
             result.put("deleted", 0);
             result.put("archivedFile", "");
@@ -93,11 +134,20 @@ public class LogServiceImpl implements ILogService {
         return result;
     }
 
+    /**
+     * 取某操作人最近的若干条日志，供 AI 助手理解上下文。
+     *
+     * @param operator 操作人
+     * @param limit    最多返回条数
+     * @return 按时间倒序的日志列表；入参非法时返回空列表
+     */
     @Override
     public List<OperationLog> listRecentByOperator(String operator, int limit) {
+        // 1. 入参缺失直接返回空，避免拼出无意义的查询
         if (operator == null || operator.isBlank() || limit <= 0) {
             return List.of();
         }
+        // 2. 按时间倒序取前 limit 条
         QueryWrapper<OperationLog> w = new QueryWrapper<OperationLog>()
                 .eq("operator", operator)
                 .orderByDesc("log_time")
@@ -115,14 +165,17 @@ public class LogServiceImpl implements ILogService {
             log.info("[日志清理] 已归档 {} 条到 {}", rows.size(), dir.resolve(name));
             return name;
         } catch (IOException e) {
+            // 目录不可写 / 磁盘异常 → 抛出终止清理，库内数据保持原样
             throw new IllegalStateException("归档失败，未执行清理：" + e.getMessage(), e);
         }
     }
 
     /** 生成带 UTF-8 BOM 的 CSV 字节（Excel 正确识别中文） */
     private byte[] csvBytes(List<OperationLog> rows) {
+        // 1. 写表头
         StringBuilder sb = new StringBuilder();
         sb.append("操作时间,操作人,角色,操作类型,操作对象,详情,IP\n");
+        // 2. 逐条拼行（字段值按 CSV 规则转义）
         for (OperationLog l : rows) {
             sb.append(csv(l.getLogTime() == null ? "" : l.getLogTime().format(TS))).append(',')
                     .append(csv(l.getOperator())).append(',')
@@ -132,6 +185,7 @@ public class LogServiceImpl implements ILogService {
                     .append(csv(l.getDetail())).append(',')
                     .append(csv(l.getIp())).append('\n');
         }
+        // 3. 前置 UTF-8 BOM 后返回
         byte[] body = sb.toString().getBytes(StandardCharsets.UTF_8);
         byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
         byte[] out = new byte[bom.length + body.length];
@@ -140,19 +194,24 @@ public class LogServiceImpl implements ILogService {
         return out;
     }
 
+    /** 组装筛选条件：操作类型精确匹配，关键字模糊匹配操作人 / 操作对象 / 详情，统一时间倒序 */
     private QueryWrapper<OperationLog> buildWrapper(String action, String keyword) {
         QueryWrapper<OperationLog> w = new QueryWrapper<>();
+        // 1. 操作类型精确匹配
         if (action != null && !action.isBlank()) {
             w.eq("action", action.trim());
         }
+        // 2. 关键字三列任一命中
         if (keyword != null && !keyword.isBlank()) {
             String k = keyword.trim();
             w.and(q -> q.like("operator", k).or().like("target", k).or().like("detail", k));
         }
+        // 3. 时间倒序
         w.orderByDesc("log_time");
         return w;
     }
 
+    /** CSV 字段转义：含逗号 / 引号 / 换行时用引号包裹，内部引号翻倍 */
     private String csv(String s) {
         if (s == null) {
             return "";

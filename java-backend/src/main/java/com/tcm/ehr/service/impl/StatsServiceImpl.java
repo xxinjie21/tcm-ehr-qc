@@ -46,11 +46,26 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     private final ObjectMapper objectMapper;
     private final IDictionaryFileService fileService;
 
+    /**
+     * 查询可选科室列表，只读。
+     *
+     * <p>按当前请求的数据域取（审核员仅待复核域，管理员不限），供筛选下拉使用。</p>
+     *
+     * @return 去重后的科室名列表
+     */
     @Override
     public List<String> departments() {
         return baseMapper.selectDepartments(domainGrade());
     }
 
+    /**
+     * 指标卡总览，只读。
+     *
+     * <p>按数据域一次性聚合总数、合格数、待复核数与无效数；合格率保留一位小数（百分数），
+     * 总数为 0 时记 0。</p>
+     *
+     * @return 总览指标
+     */
     @Override
     public OverviewVO overview() {
         Map<String, Object> row = baseMapper.selectOverview(domainGrade());
@@ -88,6 +103,15 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return statsFor(baseMapper.selectList(wrapper), dto.getType());
     }
 
+    /**
+     * 看板汇总，只读。
+     *
+     * <p>病历范围经数据域 + 用户筛选圈定后，一次性产出疾病 / 症状 / 证型 / 处方四类词频 Top10；
+     * 总览指标单独按数据域聚合。</p>
+     *
+     * @param filters 用户筛选条件，可为 null（表示不限）
+     * @return 总览 + 四类统计
+     */
     @Override
     public StatsAllVO all(FiltersDTO filters) {
         List<Record> records = recordsFor(filters);
@@ -100,6 +124,16 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return vo;
     }
 
+    /**
+     * 看板扩展统计，只读。
+     *
+     * <p>病历范围经数据域 + 用户筛选圈定后，产出四块：质控趋势（按就诊月份升序、最多最近 12
+     * 个月，含合格 / 待复核数与合格率）、科室合格率（按总数降序）、评分分布（固定分桶顺序）与
+     * 词典规模（疾病 / 症状 / 证型 / 中药 / 方剂，直接读词典文件，读取失败按 -1 上报）。</p>
+     *
+     * @param filters 用户筛选条件，可为 null（表示不限）
+     * @return 趋势、科室合格率、评分分布与词典规模
+     */
     @Override
     public StatsVO extra(FiltersDTO filters) {
         List<Record> records = recordsFor(filters);

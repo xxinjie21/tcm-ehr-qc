@@ -89,19 +89,34 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     // ------------------------------------------------------------------ 检查
 
+    /**
+     * 单条完整性 + 格式检查，只读、不落库。
+     *
+     * <p>结构化数据取请求优先、病历回退（缺省时按 {@code recordId} 载入）；完整性元素在
+     * 「结构化字段缺失且原始字段回退也为空」时记入缺失清单，格式规则仅对已载入的原始病历逐条
+     * 校验。单条检查不做重复判定，{@code duplicate} 恒为 false。</p>
+     *
+     * @param dto 检查请求（recordId + 可选 structuredData），可为 null
+     * @return 缺失字段清单与格式错误清单
+     */
     @Override
     public QcCheckVO check(QcCheckDTO dto) {
+        // 1. 载入原始病历（缺省时按 recordId 取，无则 null）
         Record raw = loadRaw(dto == null ? null : dto.getRecordId());
+        // 2. 组装结构化数据：请求内联优先、病历回退
         Map<String, Object> data = asMap(dto == null ? null : dto.getStructuredData(),
                 raw == null ? null : raw.getStructuredData());
+        // 3. 取当前生效规则
         QcRuleSet rules = ruleStore.get();
 
+        // 4. 完整性检查：结构化字段缺失且原始字段回退也为空，才记入缺失清单
         QcCheckVO vo = new QcCheckVO();
         for (QcRuleSet.Element el : rules.getCompleteness().getElements()) {
             if (!structuredPresent(el.getSource(), data) && !rawPresent(el.getFallback(), raw)) {
                 vo.getMissingFields().add(el.getName());
             }
         }
+        // 5. 格式检查：仅对已载入的原始病历逐条校验
         if (raw != null) {
             for (QcRuleSet.FormatRule fr : rules.getFormat()) {
                 String v = rawValue(raw, fr.getField());
@@ -112,19 +127,32 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 }
             }
         }
+        // 6. 单条检查不做重复判定，duplicate 恒为 false
         vo.setDuplicate(false);
         return vo;
     }
 
+    /**
+     * 一致性（逻辑冲突）检查，只读。
+     *
+     * <p>把请求中的证型 / 治法 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
+     * {@code dto} 为 null 时按空数据检查，结果视为无冲突。</p>
+     *
+     * @param dto 含 patternList / treatmentList / formulaList 的检查请求，可为 null
+     * @return 冲突清单及「是否一致」标志（冲突为空即一致）
+     */
     @Override
     public LogicCheckVO checkLogic(LogicCheckDTO dto) {
+        // 1. 组装检查数据（dto 为空按空数据检查）
         Map<String, Object> data = new java.util.LinkedHashMap<>();
         if (dto != null) {
             data.put("patternList", dto.getPatternList());
             data.put("treatmentList", dto.getTreatmentList());
             data.put("formulaList", dto.getFormulaList());
         }
+        // 2. 按当前一致性规则求冲突项
         List<String> conflicts = LogicChecker.check(data, ruleStore.get().getConsistency());
+        // 3. 冲突为空即视为一致
         LogicCheckVO vo = new LogicCheckVO();
         vo.setConflicts(conflicts);
         vo.setConsistent(conflicts.isEmpty());
@@ -133,22 +161,52 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     // ------------------------------------------------------------------ 评分
 
+    /**
+     * 单条评分，只读（不写回 records，也不生成复核任务）。
+     *
+     * <p>结构化数据取请求优先、病历回退；{@code structuredData} 与 {@code recordId} 至少提供
+     * 其一。评分按当前规则执行，重复标志固定为 false。</p>
+     *
+     * @param dto 评分请求（recordId + 可选 structuredData），可为 null
+     * @return 得分、等级与扣分明细
+     * @throws IllegalArgumentException 既无 structuredData 也无 recordId 时抛出
+     */
     @Override
     public ScoreResultVO score(QcScoreDTO dto) {
+        // 1. 载入原始病历
         Record raw = loadRaw(dto == null ? null : dto.getRecordId());
+        // 2. 取请求内联的结构化数据
         Object sd = dto == null ? null : dto.getStructuredData();
+        // 3. 两者都缺 → 参数错误，不落到空评分
         if (sd == null && raw == null) {
             throw new IllegalArgumentException("structuredData 与 recordId 至少提供一个");
         }
+        // 4. 组装数据并评分（只读：不写回 records，也不生成复核任务）
         Map<String, Object> data = asMap(sd, raw == null ? null : raw.getStructuredData());
         return QcScorer.score(data, raw, false, ruleStore.get());
     }
 
+    /**
+     * 按筛选范围批量重算质控（同步执行，有副作用）。
+     *
+     * <p>范围先经数据域过滤；总数超过 {@code qc.batch.max-records}（默认 30000）直接拒绝，
+     * 避免同步接口超时与防重锁被长期占用。执行前取 Redis 防重锁（Redis 不可用时降级为进程内
+     * 锁），已被占用则拒绝重复提交；随后按 1000 条/页循环，逐条现算评分、回写 records 评分字段
+     * 并幂等 upsert review_tasks，批内以 21 字段文本哈希去重。单条失败只累计计数、不中断整批，
+     * 失败明细最多保留 50 条。结束时无论成败都会释放锁。</p>
+     *
+     * @param dto 批量请求，filters 为筛选条件，可为 null（表示不限）
+     * @return 总数、合格 / 待复核 / 无效 / 失败计数及失败样例
+     * @throws IllegalArgumentException 超出单次上限或已有任务在跑时抛出
+     */
     @Override
     public QcBatchResultVO scoreBatch(QcBatchDTO dto) {
+        // 1. 构造数据域过滤条件（角色可见范围 + 用户筛选）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(),
                 dto == null ? null : dto.getFilters());
+        // 2. 先统计总数，用于上限校验
         long total = baseMapper.selectCount(wrapper);
+        // 3. 超过单次上限直接拒绝：本接口同步执行，避免超时与防重锁被长期占用
         if (total > maxRecords) {
             // 上限维持 30000 不提高：本接口是同步的（前端超时 200s、后端还握着 900s 的防重锁），
             // 真跑 3.5 万条只会把「干净的 400」换成「前端超时 + 锁被占满」。所以把文案写成
@@ -157,14 +215,19 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                     + " 条。请按科室或就诊时间分批重算。");
         }
 
+        // 4. 取 Redis 防重锁（不可用时降级为进程内锁）
         String lockToken = acquireLock();
+        // 5. 锁已被占用 → 拒绝重复提交
         if (lockToken == null) {
             throw new IllegalArgumentException("任务进行中，请勿重复提交");
         }
+        // 6. 初始化统计结果与批内去重集合（21 字段文本哈希）
         QcBatchResultVO result = new QcBatchResultVO();
         Set<String> seenHash = new HashSet<>();
         try {
+            // 7. 取规则快照，整批共用（避免逐条重复读取）
             QcRuleSet rules = ruleStore.get();
+            // 8. 按 1000 条/页分页扫描，直到取空或不足一页
             int pageNo = 1;
             while (true) {
                 Page<Record> page = baseMapper.selectPage(new Page<>(pageNo, BATCH_PAGE_SIZE), wrapper);
@@ -174,6 +237,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 }
                 for (Record r : records) {
                     result.setTotal(result.getTotal() + 1);
+                    // 9. 单条失败只累计计数、不中断整批（明细最多保留 50 条）
                     try {
                         processOne(r, result, seenHash, rules);
                     } catch (Exception e) {
@@ -189,9 +253,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 }
                 pageNo++;
             }
+            // 10. 记录操作日志（含总数与各状态计数）
             operationLogger.log("批量重算", RecordFilter.describe(dto == null ? null : dto.getFilters()), "总数" + result.getTotal() + "，合格" + result.getQualified()
                     + "，待复核" + result.getPendingReview() + "，无效" + result.getInvalid()
                     + "，失败" + result.getFailed());
+        // 11. 无论成败都释放锁
         } finally {
             releaseLock(lockToken);
         }
@@ -276,17 +342,37 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     // ------------------------------------------------------------------ 规则
 
+    /**
+     * 读取当前生效的质控规则，只读。
+     *
+     * <p>返回规则本体、自然语言描述、字段目录、加载告警与一致性摘要（同一来源组装）。</p>
+     *
+     * @return 当前规则视图
+     */
     @Override
     public QcRulesVO rules() {
         return buildRulesVO();
     }
 
+    /**
+     * 覆盖当前质控规则，并返回覆盖后的视图。
+     *
+     * <p>规则写入 {@link QcRuleStore} 后立即生效，后续检查 / 评分 / 重算都使用新规则。</p>
+     *
+     * @param rules 新的规则集
+     * @return 覆盖后的规则视图（含加载告警）
+     */
     @Override
     public QcRulesVO updateRules(QcRuleSet rules) {
         ruleStore.update(rules);
         return buildRulesVO();
     }
 
+    /**
+     * 恢复内置默认规则，并返回恢复后的视图。
+     *
+     * @return 重置后的规则视图
+     */
     @Override
     public QcRulesVO resetRules() {
         ruleStore.reset();
@@ -307,9 +393,21 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     // ------------------------------------------------------------------ 扣分聚合
 
+    /**
+     * 扣分聚合统计，只读。
+     *
+     * <p>范围先经数据域过滤，按 1000 条/页扫描，最多扫描 {@value #MAX_SCAN_RECORDS} 条；
+     * 触顶时置 {@code truncated} 标记并停止。每条优先读库内已存评分结果，缺失则按当前规则现算，
+     * 再按扣分类型与「类型|条目」两级聚合次数和分值，同时统计等级分布。明细按分值降序取前 20。</p>
+     *
+     * @param filters 用户筛选条件，可为 null（表示不限）
+     * @return 类型 / 条目扣分聚合、等级分布、扫描条数与是否被截断
+     */
     @Override
     public DeductionStatsVO deductionStats(FiltersDTO filters) {
+        // 1. 构造数据域过滤条件（角色可见范围 + 用户筛选）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), filters);
+        // 2. 初始化聚合容器：按类型、按条目、等级分布
         DeductionStatsVO vo = new DeductionStatsVO();
         Map<String, int[]> byType = new LinkedHashMap<>();
         Map<String, int[]> byItem = new LinkedHashMap<>();
@@ -317,6 +415,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         int scanned = 0;
         int totalPoints = 0;
         int pageNo = 1;
+        // 3. 分页扫描，每页 1000 条，最多扫 MAX_SCAN_RECORDS 条
         while (true) {
             Page<Record> page = baseMapper.selectPage(new Page<>(pageNo, BATCH_PAGE_SIZE), wrapper);
             List<Record> records = page.getRecords();
@@ -324,16 +423,20 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 break;
             }
             for (Record r : records) {
+                // 4. 触顶即置截断标记，停止本页剩余累计
                 if (scanned >= MAX_SCAN_RECORDS) {
                     vo.setTruncated(true);
                     break;
                 }
+                // 5. 计入扫描数并累计等级分布（未评分的归入「未评分」）
                 scanned++;
                 gradeDist.merge(r.getGrade() == null ? "未评分" : r.getGrade(), 1, Integer::sum);
+                // 6. 取评分结果：优先读库内 qc_results，缺失则按当前规则现算
                 ScoreResultVO sr = scoreOf(r);
                 if (sr == null || sr.getDeductions() == null) {
                     continue;
                 }
+                // 7. 按「类型」与「类型|条目」两级累计次数与分值
                 for (ScoreResultVO.Deduction d : sr.getDeductions()) {
                     totalPoints += d.getPoints();
                     int[] a = byType.computeIfAbsent(d.getType(), k -> new int[2]);
@@ -349,9 +452,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             }
             pageNo++;
         }
+        // 8. 组装类型聚合结果
         for (Map.Entry<String, int[]> e : byType.entrySet()) {
             vo.getByType().add(new DeductionStatsVO.ByType(e.getKey(), e.getValue()[0], e.getValue()[1]));
         }
+        // 9. 组装条目明细，按分值降序取前 20
         List<DeductionStatsVO.ByItem> items = new ArrayList<>();
         for (Map.Entry<String, int[]> e : byItem.entrySet()) {
             String[] k = e.getKey().split("\\|", 2);
@@ -359,6 +464,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
         items.sort((a, b) -> Integer.compare(b.getPoints(), a.getPoints()));
         vo.setByItem(new ArrayList<>(items.subList(0, Math.min(20, items.size()))));
+        // 10. 回填扫描条数、总分与等级分布
         vo.setScanned(scanned);
         vo.setTotalPoints(totalPoints);
         vo.setGradeDist(gradeDist);

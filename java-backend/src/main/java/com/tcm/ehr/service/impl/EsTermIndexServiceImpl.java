@@ -45,16 +45,36 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     private final ObjectMapper objectMapper;
 
     @Override
+    /**
+     * 索引名：{@code term_}{@code type}。
+     *
+     * @param type 术语类型
+     * @return ES 索引名
+     */
     public String indexName(String type) {
         return INDEX_PREFIX + type;
     }
 
     @Override
+    /**
+     * 判断该类术语的 ES 索引是否已存在。
+     *
+     * @param type 术语类型
+     * @return 索引存在时为 {@code true}
+     * @throws IOException ES 请求失败
+     */
     public boolean exists(String type) throws IOException {
         return client.indices().exists(new GetIndexRequest(indexName(type)), RequestOptions.DEFAULT);
     }
 
     @Override
+    /**
+     * 读取索引 mapping 的 {@code _meta.version}，即该索引灌入时所依据的词典版本。
+     *
+     * @param type 术语类型
+     * @return 版本号；索引不存在或为无该标记的旧索引时返回 {@code null}
+     * @throws IOException ES 请求失败
+     */
     public String indexedVersion(String type) throws IOException {
         GetMappingsResponse response = client.indices()
                 .getMapping(new GetMappingsRequest().indices(indexName(type)), RequestOptions.DEFAULT);
@@ -70,6 +90,18 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     }
 
     @Override
+    /**
+     * 全量重建：删旧索引 -> 建索引（单分片零副本，写入 _meta.version）-> bulk 灌入全部词条。
+     *
+     * <p>文档 id 取标准术语的 MD5，同一术语重复灌入会覆盖而非新增。删除与创建之间存在
+     * 索引短暂不存在的窗口，期间检索会拿到 index_not_found；故启动路径应先用
+     * {@link #indexedVersion} 比对版本，一致即跳过重建。</p>
+     *
+     * @param type    术语类型
+     * @param entries 全量词条
+     * @param version 本次灌入的词典版本，写入 {@code _meta.version} 供下次启动比对
+     * @throws IOException ES 建索引、灌数据等请求失败
+     */
     public void rebuild(String type, List<TermEntry> entries, String version) throws IOException {
         String index = indexName(type);
         if (exists(type)) {
@@ -126,6 +158,19 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     }
 
     @Override
+    /**
+     * 候选召回：以宽松的 OR 查询取回可能相关的词条，只求不漏、不求准。
+     *
+     * <p>命中与否不在这里判定，交由 {@code EsTermNormalizer} 按三级规则裁决。索引是当前
+     * 归一的唯一权威，故 ES 不可用时异常必须向上抛出，不可吞掉或返回空列表 —— 否则会把
+     * 「索引挂了」误报成「词典无此词」。</p>
+     *
+     * @param type          术语类型
+     * @param input         输入词，为空时直接返回空列表
+     * @param maxCandidates 召回上限
+     * @return 候选词条（按相关度排序）；无命中时为空列表
+     * @throws IOException ES 检索失败或索引不存在
+     */
     public List<TermEntry> search(String type, String input, int maxCandidates) throws IOException {
         if (input == null || input.isBlank()) {
             return List.of();

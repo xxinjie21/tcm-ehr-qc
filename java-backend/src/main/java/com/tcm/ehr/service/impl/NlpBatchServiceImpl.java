@@ -164,6 +164,18 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     // ------------------------------------------------------------------ 对外接口
 
+    /**
+     * 按筛选范围提交批量解析任务，异步入队后立即返回。
+     *
+     * <p>先统计范围内病历数作为计划总数（{@code limit > 0} 时取较小值），筛选条件经严格序列化
+     * 落库 —— 序列化失败直接拒绝提交，避免任务静默退化成全库扫描。任务以 QUEUED 状态入库并投入
+     * 队列，由工作线程消费；返回的视图不含失败明细。</p>
+     *
+     * @param dto       批量请求（filters + 可选 limit），可为 null
+     * @param createdBy 提交人
+     * @return 新任务的进度视图（无失败明细）
+     * @throws IllegalArgumentException 抽取服务未开启或筛选条件无法序列化时抛出
+     */
     @Override
     public NlpTaskVO submit(NlpBatchDTO dto, String createdBy) {
         if (!nlpClient.isEnabled()) {
@@ -195,6 +207,17 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         return toVO(t, false);
     }
 
+    /**
+     * 按病历 ID 集合提交批量解析任务（导入后自动解析走这里）。
+     *
+     * <p>任务以 QUEUED 状态入库，ID 集合仅保存在内存（重启后任务被标记为已中断，不会续跑）。
+     * ID 集合为空时直接返回 null，视为无需提交。</p>
+     *
+     * @param ids       待解析病历 ID 列表
+     * @param createdBy 提交人
+     * @return 新任务的进度视图；{@code ids} 为空时为 null
+     * @throws IllegalArgumentException 抽取服务未开启时抛出
+     */
     @Override
     public NlpTaskVO submitIds(List<String> ids, String createdBy) {
         if (ids == null || ids.isEmpty()) {
@@ -221,12 +244,28 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         return toVO(t, false);
     }
 
+    /**
+     * 查询任务详情（含失败明细），只读。
+     *
+     * @param id 任务 ID
+     * @return 任务进度视图（带失败明细）；任务不存在时为 null
+     */
     @Override
     public NlpTaskVO get(String id) {
         NlpTask t = taskMapper.selectById(id);
         return t == null ? null : toVO(t, true);
     }
 
+    /**
+     * 取消任务。
+     *
+     * <p>排队中的任务直接置为已取消并记完成时间；运行中的任务只置内存取消位，由工作线程在
+     * 条 / 页边界退出，状态待其收尾时落库。已到终态的任务不再变更。</p>
+     *
+     * @param id 任务 ID
+     * @return 取消操作后的任务视图
+     * @throws IllegalArgumentException 任务不存在时抛出
+     */
     @Override
     public NlpTaskVO cancel(String id) {
         NlpTask t = taskMapper.selectById(id);
@@ -243,6 +282,13 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         return toVO(t, false);
     }
 
+    /**
+     * 列出最近任务（最多 50 条，按创建时间倒序），只读。
+     *
+     * <p>返回项不含失败明细，需要明细请用 {@link #get(String)}。</p>
+     *
+     * @return 任务进度视图列表
+     */
     @Override
     public List<NlpTaskVO> list() {
         List<NlpTask> tasks = taskMapper.selectList(new QueryWrapper<NlpTask>()

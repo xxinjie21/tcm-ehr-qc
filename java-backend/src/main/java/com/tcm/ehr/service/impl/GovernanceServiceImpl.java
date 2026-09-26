@@ -46,6 +46,17 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private final ObjectMapper objectMapper;
     private final IDictionaryFileService dictionaryFileService;
 
+    /**
+     * 单条术语归一（清洗页的「归一测试」入口）。
+     *
+     * <p>只接受有独立词典的 5 类（疾病 / 证候 / 症状 / 中药 / 方剂），其余类型直接拒绝，
+     * 避免调用方以为舌象、脉象也有词典可查。</p>
+     *
+     * @param type 实体类型 key
+     * @param term 待归一原文
+     * @return 命中层级、标准词、来源与国标代码
+     * @throws IllegalArgumentException type 不属于 5 类词典类型
+     */
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
         if (!com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(type)) {
@@ -333,6 +344,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         });
     }
 
+    /**
+     * 清洗与导出页顶部的统计卡（待清洗 / 已清洗 / 可导出等）。
+     *
+     * @return 由 {@code RecordMapper.selectGovernanceStats()} 单条聚合 SQL 出的计数
+     */
     @Override
     public Map<String, Object> governanceStats() {
         return baseMapper.selectGovernanceStats();

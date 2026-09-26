@@ -49,13 +49,27 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     private final ObjectMapper objectMapper;
     private final com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
 
+    /**
+     * 分页查询复核任务列表，只读。
+     *
+     * <p>只取未失效任务（{@code is_obsolete=0}），按创建时间倒序；审核员强制只看待复核（pending）
+     * 域，其余角色按传入状态过滤（兼容中文与英文状态名）。关联病历缺失的任务直接跳过，不占位。</p>
+     *
+     * @param page     页码，非法时取第 1 页
+     * @param pageSize 每页条数，非法时取 20
+     * @param status   状态筛选（可空，非审核员生效）
+     * @return 命中总数与任务列表项
+     */
     @Override
     public ReviewTasksVO listTasks(Integer page, Integer pageSize, String status) {
+        // 1. 分页参数非法时回退为第 1 页 / 每页 20 条
         int p = page != null && page > 0 ? page : 1;
         int s = pageSize != null && pageSize > 0 ? pageSize : 20;
 
+        // 2. 组装查询条件：只取未失效任务，按创建时间倒序
         QueryWrapper<ReviewTask> w = new QueryWrapper<>();
         w.eq("is_obsolete", 0);
+        // 3. 数据域：审核员强制只看待复核，其余角色按传入状态过滤
         if (RecordFilter.ROLE_AUDITOR.equals(RequestUtils.currentRole())) {
             w.eq("status", "pending");
         } else {
@@ -66,7 +80,9 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         }
         w.orderByDesc("create_time");
 
+        // 4. 分页查询
         Page<ReviewTask> pg = baseMapper.selectPage(new Page<>(p, s), w);
+        // 5. 组装返回：总数与任务列表项（关联病历缺失的跳过，不占位）
         ReviewTasksVO vo = new ReviewTasksVO();
         vo.setTotal(pg.getTotal());
         for (ReviewTask t : pg.getRecords()) {
