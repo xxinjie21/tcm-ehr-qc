@@ -80,22 +80,19 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     /**
-     * 三个入口都先过数据域，再叠加各自的圈定方式。
+     * 按类型统计：先按数据域收窄范围，再按调用方给的 ID 或筛选条件圈定。
      *
-     * <p>原实现三条路都绕开了 {@link RecordFilter}：按 ID 的 {@code selectBatchIds}、
-     * 按筛选的 {@code filterByFilters}（先全表载入再内存过滤）、以及无条件的
-     * {@code selectList(null)} —— 而 {@code /api/stats} 是「登录即可」，审核员借此能读到
-     * 非待复核域病历的证型 / 方剂词频。</p>
+     * <p>数据域必须在最前面叠加，否则登录即可的接口会让审核员读到全库词频。</p>
      */
     @Override
     public StatsVO stats(StatsDTO dto) {
         String role = RequestUtils.currentRole();
         QueryWrapper<Record> wrapper;
         if (dto.getRecordIds() != null && !dto.getRecordIds().isEmpty()) {
-            // 优先：按病历ID圈定（文档契约）；ID 由调用方给，因此数据域必须先加
+            // 优先：按病历ID圈定；ID 由调用方给，数据域必须先叠加
             wrapper = RecordFilter.build(role, new FiltersDTO()).in("id", dto.getRecordIds());
         } else if (dto.getFilters() != null && !dto.getFilters().isEmpty()) {
-            // 次选：按筛选条件（department/dateRange/pattern，复用查询1字段）
+            // 次选：按筛选条件圈定
             wrapper = RecordFilter.build(role, toFilters(dto.getFilters()));
         } else {
             wrapper = RecordFilter.build(role, new FiltersDTO());
@@ -229,6 +226,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return baseMapper.selectList(wrapper);
     }
 
+    /** 按类型统计词频 Top10（中药取处方字符串，其余从结构化实体取；结果空时回退原始列） */
     private StatsVO statsFor(List<Record> records, String type) {
         StatsVO vo = new StatsVO();
         switch (type == null ? "" : type) {
@@ -244,20 +242,24 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return vo;
     }
 
+    /** 就诊月份（yyyy-MM）；接诊时间为空返回 null，该条不进趋势 */
     private static String monthOf(Record r) {
         if (r.getVisitTime() == null) return null;
         String s = r.getVisitTime().toString();
         return s.length() >= 7 ? s.substring(0, 7) : null;
     }
 
+    /** 分级是否等于给定值（空分级视为不等） */
     private static boolean isGrade(Record r, String grade) {
         return grade.equals(r.getGrade());
     }
 
+    /** 百分比，分母为 0 时记 0，保留一位小数 */
     private static double rate(long part, long total) {
         return total == 0 ? 0.0 : Math.round(part * 1000.0 / total) / 10.0;
     }
 
+    /** 评分落入哪个分桶（前端分布图按固定顺序展示） */
     private static String bucketOf(int score) {
         if (score >= 90) return "90+";
         if (score >= 80) return "80-89";
@@ -333,6 +335,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return null;
     }
 
+    /** 词频计数取 Top N（按次数降序，同次数按名称升序保证稳定） */
     private List<Map<String, Object>> top(Map<String, Integer> counter, int limit, String keyName) {
         return counter.entrySet().stream()
                 .sorted((a, b) -> b.getValue() - a.getValue())
