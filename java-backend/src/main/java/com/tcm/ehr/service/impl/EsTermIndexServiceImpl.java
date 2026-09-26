@@ -239,6 +239,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
         return value == null ? "" : String.valueOf(value);
     }
 
+    /** 文档 _id：标准词 MD5，保证同一词重复导入是覆盖而非新增 */
     private String hashId(String standardTerm) {
         try {
             byte[] digest = java.security.MessageDigest.getInstance("MD5")

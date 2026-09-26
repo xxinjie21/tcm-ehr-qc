@@ -218,6 +218,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         }
     }
 
+    /** 解析结构化数据；空或坏 JSON 返回空 map（复核时按"未结构化"继续，不中断） */
     private Map<String, Object> asMap(String json) {
         if (json == null || json.isBlank()) {
             return null;

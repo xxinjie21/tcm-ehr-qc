@@ -55,6 +55,7 @@ public final class RequestUtils {
         return remote == null || remote.isBlank() ? UNKNOWN : remote;
     }
 
+    /** 取请求属性（鉴权拦截器写入的角色等）；无请求上下文或取不到时返回 unknown */
     private static String attr(String key) {
         try {
             Object value = RequestContextHolder.currentRequestAttributes()
@@ -69,6 +70,7 @@ public final class RequestUtils {
         }
     }
 
+    /** 取当前请求；非 Web 线程（如定时任务/异步）返回 null */
     private static HttpServletRequest currentRequest() {
         try {
             RequestAttributes attributes = RequestContextHolder.currentRequestAttributes();

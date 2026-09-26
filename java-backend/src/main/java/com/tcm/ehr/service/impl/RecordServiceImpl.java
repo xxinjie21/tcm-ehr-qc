@@ -666,6 +666,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
     }
 
+    /** 单元格取文本：按显示格式取值，数字/日期型统一转字符串 */
     private String cellText(Cell cell) {
         if (cell == null) {
             return null;

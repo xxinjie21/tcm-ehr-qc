@@ -179,6 +179,7 @@ public class QcRuleStore {
         }
     }
 
+    /** 规则对象转 Map（供深合并用）；转换失败返回空 map */
     private Map<String, Object> toMap(Object o) {
         try {
             return mapper.convertValue(o, new TypeReference<LinkedHashMap<String, Object>>() {

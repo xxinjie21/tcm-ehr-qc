@@ -538,6 +538,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
+    /** 还原任务落库时冻结的筛选条件；解析不了按"不限"处理 */
     private FiltersDTO readFilters(String json) {
         if (json == null || json.isBlank() || "null".equals(json)) {
             return null;
@@ -549,6 +550,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
+    /** 任务实体 → 视图；withFailures 为 false 时不带失败清单（列表接口用，省流量） */
     private NlpTaskVO toVO(NlpTask t, boolean withFailures) {
         NlpTaskVO vo = new NlpTaskVO();
         vo.setId(t.getId());
@@ -569,6 +571,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         return vo;
     }
 
+    /** 解析失败清单 JSON；坏了就当空清单，不影响进度展示 */
     private List<NlpTaskVO.Failure> parseFailures(String json) {
         if (json == null || json.isBlank()) {
             return new ArrayList<>();

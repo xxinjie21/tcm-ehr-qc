@@ -194,6 +194,7 @@ public class AiServiceImpl implements IAiService {
         return sb.toString();
     }
 
+    /** 21 个原始字段的完整度：逐字段判空并列出缺失项 */
     private AiReplyVO.Completeness completeness(Record r) {
         LinkedHashMap<String, String> fields = new LinkedHashMap<>();
         fields.put("登记号", r.getRegistrationNo());
