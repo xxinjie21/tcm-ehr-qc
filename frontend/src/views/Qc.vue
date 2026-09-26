@@ -37,7 +37,7 @@
         </div>
         <div class="st">
           <span class="st-k">一致性</span>
-          <span class="st-v">{{ (rules.consistency || []).length }} 条（证候 → 中药 / 舌象 / 脉象）</span>
+          <span class="st-v">{{ rules.consistencySummary || '—' }}</span>
         </div>
         <div class="st">
           <span class="st-k">术语标准化</span>
@@ -172,7 +172,7 @@
             <div v-for="t in dedStats.byType" :key="t.type" class="dist-row">
               <span class="dr-l">{{ t.type }}</span>
               <div class="dr-bar"><i :style="{ width: barWidth(t.points) }"></i></div>
-              <span class="dr-v">{{ t.count }} 次 · -{{ t.points }}</span>
+              <span class="dr-v">{{ t.count }} 份 · -{{ t.points }}</span>
             </div>
           </div>
           <div v-else class="ok">本范围内没有扣分项（全部病历未触发任何扣分规则）</div>
@@ -182,7 +182,7 @@
             <el-table :data="dedStats.byItem" border size="small" max-height="240">
               <el-table-column prop="type" label="类型" width="130" />
               <el-table-column prop="item" label="项" width="110" />
-              <el-table-column prop="count" label="次数" width="80" />
+              <el-table-column prop="count" label="受影响病历数" width="110" />
               <el-table-column prop="points" label="合计扣分" width="100" />
             </el-table>
           </template>
@@ -283,7 +283,9 @@
           <el-table :data="detail.deductions" border size="small" max-height="340">
             <el-table-column prop="type" label="类型" width="110" />
             <el-table-column prop="item" label="项" width="90" />
-            <el-table-column prop="points" label="扣分" width="70" />
+            <el-table-column prop="points" label="扣分" width="70">
+              <template #default="{ row }">-{{ row.points }}</template>
+            </el-table-column>
             <el-table-column prop="reason" label="原因" show-overflow-tooltip />
             <template #empty><div class="ok">无扣分项</div></template>
           </el-table>

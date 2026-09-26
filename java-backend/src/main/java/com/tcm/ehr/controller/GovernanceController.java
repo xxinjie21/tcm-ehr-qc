@@ -8,6 +8,7 @@ import com.tcm.ehr.domain.dto.ExportDTO;
 import com.tcm.ehr.domain.dto.NormalizeDTO;
 import com.tcm.ehr.service.IGovernanceService;
 import com.tcm.ehr.common.utils.OperationLogger;
+import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.domain.vo.CleanResultVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -59,7 +60,7 @@ public class GovernanceController {
     @PostMapping("/api/governance/clean")
     public Result<CleanResultVO> clean(@RequestBody CleanDTO dto) {
         CleanResultVO result = governanceService.clean(dto.getRecordIds(), dto.getFilters());
-        operationLogger.log("数据清洗", null, "共" + result.getTotal() + "条，去重" + result.getDeduped()
+        operationLogger.log("数据清洗", RecordFilter.describe(dto == null ? null : dto.getFilters()), "共" + result.getTotal() + "条，去重" + result.getDeduped()
                 + "，隔离" + result.getIsolated() + "，归一" + result.getNormalized());
         return Result.ok(result);
     }
@@ -73,7 +74,8 @@ public class GovernanceController {
     public ResponseEntity<byte[]> export(@RequestBody ExportDTO dto) throws IOException {
         IGovernanceService.ExportedFile file = governanceService.export(dto);
         if (file == null) {
-            operationLogger.log("数据集导出", null, "被拒：筛选范围内无合格病历");
+            operationLogger.log("数据集导出", RecordFilter.describe(dto == null ? null : dto.getFilters()),
+                    "被拒：筛选范围内无合格病历");
             Result<Void> err = Result.error(2001, "质控未通过，禁止导出数据集（筛选范围内无合格病历）");
             return ResponseEntity.status(400)
                     .contentType(MediaType.APPLICATION_JSON)

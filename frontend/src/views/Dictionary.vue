@@ -8,6 +8,11 @@
       <el-tab-pane label="方剂" name="formula" />
     </el-tabs>
 
+    <!-- 演示词典规模远小于真实词表（疾病仅 10 条、别名多为空），不说明会被当成系统缺陷 -->
+    <div class="tip" style="margin: 0 0 8px">
+      当前为演示词典：规模与真实词表差距较大，未命中属正常现象；导入正式词典后可提升归一命中率。
+    </div>
+
     <PanelCard :title="`术语查询（${typeLabel}）`">
       <div class="search-row">
         <!-- 只给 placeholder 的搜索框没有无障碍名称，补 aria-label
@@ -165,7 +170,8 @@
         <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
       </div>
-      <el-table :data="backups" border style="margin-top: 12px" max-height="260">
+      <el-table :data="backups" border style="margin-top: 12px" max-height="260"
+        empty-text="暂无历史版本。导入词典时会自动备份，导入一次即可在这里回滚">
         <el-table-column prop="time" label="导入时间" min-width="180" />
         <el-table-column prop="count" label="词条数" width="110" />
         <el-table-column label="较当前" width="120">

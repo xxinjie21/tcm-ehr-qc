@@ -67,7 +67,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, entityName, pct } from '@/utils/structured'
+import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, LEVEL_UNMATCHED, entityName, pct } from '@/utils/structured'
 
 const props = defineProps({
   data: { type: [String, Object], default: null }
@@ -111,7 +111,7 @@ const emptyHint = computed(() => (neverParsed.value
   : '抽取已经执行过，只是这段原文里没有可归一的要素（疾病 / 症状 / 证候 / 方剂 / 中药等）。'))
 
 /** 实体上的归一标签文案：命中方式；未命中说「未收录」 */
-const lvText = (it) => (it.normLevel ? LEVEL_SHORT[it.normLevel] || it.normLevel : '未收录')
+const lvText = (it) => (it.normLevel ? LEVEL_SHORT[it.normLevel] || it.normLevel : LEVEL_UNMATCHED)
 /** 描边颜色：命中按精确度分三级，未收录走中性灰 —— 灰的是「没查到」，
     红黄是「查到了但可能不准」，两者不该同色 */
 const lvClass = (it) => (it.normLevel ? `lv${it.normLevel}` : 'lv0')

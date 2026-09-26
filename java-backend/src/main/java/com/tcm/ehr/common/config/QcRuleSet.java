@@ -61,6 +61,8 @@ public class QcRuleSet {
         private String label;
         /** 失败原因前缀 */
         private String reason;
+        /** 正则规则的「人话」说明（regex 类型专用）：面向用户的说明里只输出它，不输出正则本身 */
+        private String hint;
     }
 
     /**
@@ -113,7 +115,10 @@ public class QcRuleSet {
         }
 
         // 格式
-        r.format.add(format("age", "regex", "^\\d+(\\.\\d+)?(岁|个月|月|天)?$", List.of(), "年龄", "年龄格式不正确"));
+        QcRuleSet.FormatRule age = format("age", "regex", "^\\d+(\\.\\d+)?(岁|个月|月|天)?$",
+                List.of(), "年龄", "年龄格式不正确");
+        age.setHint("须为数字，可带 岁/个月/月/天 单位");
+        r.format.add(age);
         r.format.add(format("gender", "enum", null, List.of("男", "女"), "性别", "性别非 男/女"));
 
         // 一致性（证候 → 中药 / 方剂；值取自词典，当前数据无方剂则方剂规则不触发）

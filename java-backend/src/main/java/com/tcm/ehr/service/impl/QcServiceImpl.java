@@ -189,7 +189,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 }
                 pageNo++;
             }
-            operationLogger.log("批量重算", null, "总数" + result.getTotal() + "，合格" + result.getQualified()
+            operationLogger.log("批量重算", RecordFilter.describe(dto == null ? null : dto.getFilters()), "总数" + result.getTotal() + "，合格" + result.getQualified()
                     + "，待复核" + result.getPendingReview() + "，无效" + result.getInvalid()
                     + "，失败" + result.getFailed());
         } finally {
@@ -299,6 +299,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         vo.setDescriptions(com.tcm.ehr.common.config.QcRuleDescriber.describe(ruleStore.get()));
         vo.setCatalogElements(com.tcm.ehr.common.config.QcRuleDescriber.catalogElements());
         vo.setCatalogFormats(com.tcm.ehr.common.config.QcRuleDescriber.catalogFormats());
+        // 一致性那行的摘要由规则数据拼装下发 —— 前端写死过一次「（证候 → 中药 / 舌象 / 脉象）」，
+        // 而规则里没有舌象/脉象，改规则也不改文案
+        vo.setConsistencySummary(com.tcm.ehr.common.config.QcRuleDescriber.consistencySummary(ruleStore.get()));
         return vo;
     }
 

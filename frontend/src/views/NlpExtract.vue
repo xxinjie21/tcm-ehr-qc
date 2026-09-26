@@ -209,7 +209,7 @@
               <div v-if="normStat && normStat.total" class="norm-stat">
                 <div class="ns-line">
                   有词典的实体 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>
-                  <span v-if="normStat.hit">（精确 {{ normStat.exact }} / 包含 {{ normStat.contain }} / 模糊 {{ normStat.fuzzy }}）</span>，
+                  <span v-if="normStat.hit">（{{ LEVEL_TINY[1] }} {{ normStat.exact }} / {{ LEVEL_TINY[2] }} {{ normStat.contain }} / {{ LEVEL_TINY[3] }} {{ normStat.fuzzy }}）</span>，
                   未命中 <b :class="{ bad: normStat.miss > 0 }">{{ normStat.miss }}</b>
                   <span v-if="normStat.noDict">；另有 {{ normStat.noDict }} 个实体所在字段无独立词典、不参与归一</span>
                 </div>
@@ -376,7 +376,7 @@ import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
-import { LEVEL_FULL, summarizeNorm } from '@/utils/structured'
+import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
 
 const activeTab = ref('single')
 

@@ -34,6 +34,12 @@ export const LEVEL_SHORT = { 1: '精确命中', 2: '包含命中', 3: '模糊命
 /** 归一命中层级 → 悬停里的完整说法 */
 export const LEVEL_FULL = { 1: '精确匹配', 2: '包含匹配', 3: '模糊匹配' }
 
+/** 归一命中层级 → 空间紧张处（汇总行 / 分布条 / 计数）用的极简说法 */
+export const LEVEL_TINY = { 1: '精确', 2: '包含', 3: '模糊' }
+
+/** 未命中词典时的统一叫法（三档之外的第四态） */
+export const LEVEL_UNMATCHED = '未收录'
+
 /** 实体名：中药取 name，其余取 content */
 export const entityName = (sec, it) => (sec.key === 'herbs' ? it.name : it.content)
 

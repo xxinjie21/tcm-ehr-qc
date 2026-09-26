@@ -5,6 +5,7 @@ import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.PythonNlpClient;
+import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.NlpBatchDTO;
 import com.tcm.ehr.domain.dto.NlpExtractDTO;
@@ -90,7 +91,8 @@ public class NlpController {
     @PostMapping("/api/nlp/extract/batch")
     public Result<NlpTaskVO> submitBatch(@RequestBody(required = false) NlpBatchDTO dto) {
         NlpTaskVO vo = nlpBatchService.submit(dto, RequestUtils.currentUsername());
-        operationLogger.log("批量解析", null, "提交任务，计划 " + vo.getTotal() + " 条");
+        operationLogger.log("批量解析", RecordFilter.describe(dto == null ? null : dto.getFilters()),
+                "提交任务，计划 " + vo.getTotal() + " 条");
         return Result.ok("已提交，后台解析中", vo);
     }
 

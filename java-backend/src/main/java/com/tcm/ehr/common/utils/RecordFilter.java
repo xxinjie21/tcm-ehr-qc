@@ -5,6 +5,10 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.po.Record;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 病历公共过滤（批F·7.4）：**数据域（行级权限）→ 用户筛选** 顺序固定、取交集。
  *
@@ -75,6 +79,64 @@ public final class RecordFilter {
         if (scope != null) {
             wrapper.eq("grade", scope);
         }
+    }
+
+    /**
+     * 把范围条件拼成审计用的一行，给 {@code OperationLog.target} 用。
+     *
+     * <p>批量操作（数据清洗 / 数据集导出被拒 / 批量解析 / 批量重算）原来一律传 {@code null}，
+     * 日志页「操作对象」列恒空，事后追责看不出那次操作动了哪个范围（审查报告 M4）。</p>
+     *
+     * @param filters {@link FiltersDTO}，或 stats 契约里的 {@code Map}（两种都要支持：
+     *                导出走 Map、其余走 DTO）
+     * @return 如「科室＝中医内科 · 分级＝待复核 · 2026-09-01 至 2026-09-30」；无条件时返回「全部病历」
+     */
+    public static String describe(Object filters) {
+        String department = null;
+        String grade = null;
+        String pattern = null;
+        String start = null;
+        String end = null;
+        if (filters instanceof FiltersDTO f) {
+            department = f.getDepartment();
+            grade = f.getGrade();
+            pattern = f.getPattern();
+            if (f.getDateRange() != null && f.getDateRange().size() == 2) {
+                start = f.getDateRange().get(0);
+                end = f.getDateRange().get(1);
+            }
+        } else if (filters instanceof Map<?, ?> m) {
+            department = text(m.get("department"));
+            grade = text(m.get("grade"));
+            pattern = text(m.get("pattern"));
+            if (m.get("dateRange") instanceof List<?> range && range.size() == 2) {
+                start = text(range.get(0));
+                end = text(range.get(1));
+            }
+        }
+
+        List<String> parts = new ArrayList<>();
+        if (notBlank(department)) {
+            parts.add("科室＝" + department.trim());
+        }
+        if (notBlank(grade)) {
+            parts.add("分级＝" + grade.trim());
+        }
+        if (notBlank(pattern)) {
+            parts.add("证候＝" + pattern.trim());
+        }
+        if (notBlank(start) || notBlank(end)) {
+            parts.add((notBlank(start) ? start.trim() : "不限") + " 至 " + (notBlank(end) ? end.trim() : "不限"));
+        }
+        return parts.isEmpty() ? "全部病历" : String.join(" · ", parts);
+    }
+
+    private static String text(Object o) {
+        if (o == null) {
+            return null;
+        }
+        String s = String.valueOf(o).trim();
+        return s.isEmpty() || "null".equals(s) ? null : s;
     }
 
     /**

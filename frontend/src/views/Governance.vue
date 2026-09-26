@@ -2,7 +2,8 @@
   <div>
     <!-- 清洗状态行（顶部） -->
     <section v-loading="statsLoading" class="gov-stats">
-      <span class="gs"><b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
+      <span class="gs" title="这三张卡只统计「质控合格」的病历；清洗范围若包含待复核/无效，条数会对不上">
+        <b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
       <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
       <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已清洗</span>
       <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果（UX-21） -->
@@ -82,9 +83,9 @@
         </div>
         <div v-if="clean.result.normByLevel" class="level-dist">
           <span class="ld-lbl">三级命中分布</span>
-          <span class="ld exact">精确 {{ clean.result.normByLevel.exact ?? 0 }}</span>
-          <span class="ld contain">包含 {{ clean.result.normByLevel.contain ?? 0 }}</span>
-          <span class="ld fuzzy">模糊 {{ clean.result.normByLevel.fuzzy ?? 0 }}</span>
+          <span class="ld exact">{{ LEVEL_TINY[1] }} {{ clean.result.normByLevel.exact ?? 0 }}</span>
+          <span class="ld contain">{{ LEVEL_TINY[2] }} {{ clean.result.normByLevel.contain ?? 0 }}</span>
+          <span class="ld fuzzy">{{ LEVEL_TINY[3] }} {{ clean.result.normByLevel.fuzzy ?? 0 }}</span>
         </div>
       </div>
     </PanelCard>
@@ -134,7 +135,8 @@
         <el-button type="primary" :loading="exporting" @click="handleExport">导出下载</el-button>
       </div>
       <div class="tip" style="margin-top: 8px">
-        只导出质控合格的病历；导出的文件与上方预览里出现的手机号、身份证号都会自动打码。
+        只导出质控合格的病历（<b>不随上方「分级」变化</b>，分级只作用于数据清洗）；
+        导出的文件与上方预览里出现的手机号、身份证号都会自动打码。
       </div>
 
       <div v-if="preview.result" class="preview-box">
@@ -204,6 +206,7 @@ import { clean as cleanApi, exportDataset, previewDataset, governanceStats } fro
 import { getDepartments } from '@/api/stats'
 import { saveBlob } from '@/utils/download'
 import { useAiStore } from '@/stores/ai'
+import { LEVEL_TINY } from '@/utils/structured'
 
 const aiStore = useAiStore()
 

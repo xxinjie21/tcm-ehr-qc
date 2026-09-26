@@ -80,7 +80,7 @@
                 <div class="rate-fill" :style="{ width: d.qualifiedRate + '%' }" />
               </div>
               <span class="rate-val">{{ d.qualifiedRate }}%</span>
-              <span class="rate-sub">/{{ d.total }}</span>
+              <span class="rate-sub">合格 {{ d.qualified }} / 共 {{ d.total }}</span>
             </div>
           </div>
           <EmptyState

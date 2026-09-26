@@ -55,9 +55,9 @@
         <div class="aii-block">
           <div class="blk-title">归一命中（共 {{ result.normHits.total }} 处）</div>
           <div class="chips">
-            <span class="chip exact">精确 {{ result.normHits.exact }}</span>
-            <span class="chip contain">包含 {{ result.normHits.contain }}</span>
-            <span class="chip fuzzy">模糊 {{ result.normHits.fuzzy }}</span>
+            <span class="chip exact">{{ LEVEL_TINY[1] }} {{ result.normHits.exact }}</span>
+            <span class="chip contain">{{ LEVEL_TINY[2] }} {{ result.normHits.contain }}</span>
+            <span class="chip fuzzy">{{ LEVEL_TINY[3] }} {{ result.normHits.fuzzy }}</span>
           </div>
         </div>
 
@@ -81,6 +81,7 @@
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { aiInterpret } from '@/api/ai'
+import { LEVEL_TINY } from '@/utils/structured'
 
 const props = defineProps({
   recordId: { type: String, default: '' }
