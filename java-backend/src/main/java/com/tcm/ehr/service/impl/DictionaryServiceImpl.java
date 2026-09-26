@@ -79,6 +79,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         List<TermEntry> entries = fileService.read(type);
         List<Map<String, Object>> result = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
+        // 1. 逐条比对标准术语与别名，任一命中即算命中
         for (TermEntry e : entries) {
             boolean hit = kw.isEmpty()
                     || e.getStandardTerm().contains(kw)
@@ -88,6 +89,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
                 m.put("standardTerm", e.getStandardTerm());
                 m.put("aliases", e.getAliases());
                 result.add(m);
+                // 2. 满 100 条就停：词典页一次只渲染前 100 条，全量返回没有意义
                 if (result.size() >= 100) break;
             }
         }
@@ -114,11 +116,12 @@ public class DictionaryServiceImpl implements IDictionaryService {
      */
     public ImportResultVO importDictionary(String type, MultipartFile file) throws IOException {
         List<Map<String, Object>> failures = new ArrayList<>();
+        // 1. 按扩展名分流解析：JSON 直传解析，Excel/CSV 走表格解析
         List<TermEntry> incoming = fileName(file).endsWith(".json")
                 ? parseJsonEntries(file, failures)
                 : parseTabularEntries(type, file, failures);
 
-        // 合并：现有词典打底，新条目并入（同 standardTerm 合并别名，保留已有 source/code）
+        // 2. 合并：现有词典打底，新条目并入（同 standardTerm 合并别名，保留已有 source/code）
         List<TermEntry> previous = fileService.read(type);
         Map<String, TermEntry> merged = new LinkedHashMap<>();
         for (TermEntry e : previous) {
@@ -129,8 +132,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
         }
 
         List<TermEntry> entries = new ArrayList<>(merged.values());
+        // 3. 先备份再覆盖写文件：回滚要靠这份备份
         String backupName = fileService.backup(type);
         fileService.write(type, entries);
+        // 4. 覆盖成功后重建索引；失败走补偿回滚
         try {
             esTermIndexService.rebuild(type, entries, fileService.currentVersion());
         } catch (Exception e) {
@@ -144,6 +149,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             throw new IOException("词典已回滚到导入前（ES 重建失败：" + e.getMessage() + "）", e);
         }
 
+        // 5. 汇总导入结果：解析失败逐行带原因返回，不中断整体导入
         ImportResultVO vo = new ImportResultVO();
         vo.setType(type);
         vo.setTotal(incoming.size() + failures.size());
@@ -163,6 +169,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * 无备份（首次导入、原先没有文件）时用 {@code previous} 写回，通常是空列表。</p>
      */
     private void compensateFailedRebuild(String type, String backupName, List<TermEntry> previous) {
+        // 1. 先把文件退回导入前的版本（首次导入无备份时按原内容写回）
         try {
             if (backupName != null) {
                 fileService.restore(type, backupName);
@@ -170,9 +177,11 @@ public class DictionaryServiceImpl implements IDictionaryService {
                 fileService.write(type, previous);
             }
         } catch (Exception e) {
+            // 文件都退不回去就没必要再试索引，记日志交人工重新导入
             log.error("[词典] {} 文件回滚失败，文件与索引可能不一致，需重新导入修复: {}", type, e.getMessage());
             return;
         }
+        // 2. 再尽力把索引建回旧版本；失败只记日志，不掩盖最初的异常
         try {
             esTermIndexService.rebuild(type, previous, fileService.currentVersion());
             log.warn("[词典] {} 已回滚到导入前的词典并重建索引", type);
@@ -184,6 +193,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /** JSON 直传：TermEntry 数组 [{standardTerm, aliases[], source?, code?}] */
     private List<TermEntry> parseJsonEntries(MultipartFile file, List<Map<String, Object>> failures) throws IOException {
         List<TermEntry> parsed;
+        // 1. 整个文件按 TermEntry 数组解析；结构不对直接报错，不做部分导入
         try {
             parsed = objectMapper.readValue(readTextAutoCharset(file), new TypeReference<List<TermEntry>>() {
             });
@@ -191,6 +201,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             throw new IllegalArgumentException(
                     "JSON 解析失败：需为 TermEntry 数组，形如 [{\"standardTerm\":\"消渴\",\"aliases\":[\"消渴病\"],\"source\":\"...\",\"code\":\"...\"}]");
         }
+        // 2. 逐条校验并规整，标准术语为空的记失败继续
         List<TermEntry> ok = new ArrayList<>();
         for (int i = 0; i < parsed.size(); i++) {
             TermEntry e = parsed.get(i);
@@ -208,6 +219,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
                                                 List<Map<String, Object>> failures) throws IOException {
         String name = fileName(file);
         List<String[]> rows;
+        // 1. 按扩展名选解析器；都不匹配直接拒绝，避免把二进制当文本读
         if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
             rows = readExcelRows(file);
         } else if (name.endsWith(".csv")) {
@@ -216,6 +228,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             throw new IllegalArgumentException("文件格式不支持：仅支持 Excel(.xlsx/.xls)、CSV 或 JSON");
         }
 
+        // 2. 逐行组装词条：标准术语为空记失败，别名按多种分隔符拆开
         List<TermEntry> ok = new ArrayList<>();
         for (int i = 0; i < rows.size(); i++) {
             String[] row = rows.get(i);
@@ -231,6 +244,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
                 }
             }
             String code = row[2] == null || row[2].isBlank() ? null : row[2].trim();
+            // 3. 缺省来源按词典类型填，避免每行都让上传者填一遍
             ok.add(new TermEntry(standard, aliases, defaultSource(type), code));
         }
         return ok;
@@ -241,12 +255,15 @@ public class DictionaryServiceImpl implements IDictionaryService {
         List<String[]> rows = new ArrayList<>();
         try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = wb.getSheetAt(0);
+            // 1. 只读第一个工作表，逐行取前三列
             for (Row r : sheet) {
+                // 2. 首行是表头就跳过
                 if (r.getRowNum() == 0 && isHeaderRow(r)) continue;
                 String[] arr = new String[3];
                 arr[0] = cellText(r.getCell(0));
                 arr[1] = cellText(r.getCell(1));
                 arr[2] = cellText(r.getCell(2));
+                // 3. 三列全空的行直接丢，避免尾部空行混进失败清单
                 if (arr[0] != null || arr[1] != null || arr[2] != null) rows.add(arr);
             }
         }
@@ -256,12 +273,14 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /** 读 CSV 全部行（自动识别 UTF-8/GBK），分隔符兼容逗号与制表符 */
     private List<String[]> readCsvRows(MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
+        // 1. 按行切分，空行与以「标准术语」开头的表头行都跳过
         for (String line : readTextAutoCharset(file).split("\r?\n")) {
             if (line.isBlank() || line.startsWith("标准术语")) continue;
             // 最多切 3 段（标准术语 / 别名 / 国标代码）；别名列内部请用、 或 ; 分隔，
             // 用半角逗号会与列分隔符冲突
             String[] parts = line.split("[,\t]", 3);
             String[] arr = new String[3];
+            // 2. 补齐到三列，缺列给 null 交给上层判空
             for (int i = 0; i < 3; i++) {
                 arr[i] = i < parts.length && !parts[i].isBlank() ? parts[i].trim() : null;
             }
@@ -272,8 +291,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     /** 规整词条：去空白、别名去重、缺省来源按类型填 */
     private TermEntry normalize(TermEntry e) {
+        // 1. 标准术语去首尾空白
         String standard = e.getStandardTerm().trim();
         List<String> aliases = new ArrayList<>();
+        // 2. 别名逐个去空白去重；与标准术语相同的别名丢掉（否则归一会自命中）
         if (e.getAliases() != null) {
             for (String a : e.getAliases()) {
                 if (a == null || a.isBlank()) continue;
@@ -281,6 +302,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
                 if (!t.equals(standard) && !aliases.contains(t)) aliases.add(t);
             }
         }
+        // 3. 来源与代码规整，代码为空给 null（区别于空串）
         String source = e.getSource() == null ? "" : e.getSource().trim();
         String code = e.getCode() == null || e.getCode().isBlank() ? null : e.getCode().trim();
         return new TermEntry(standard, aliases, source, code);
@@ -311,32 +333,38 @@ public class DictionaryServiceImpl implements IDictionaryService {
         // 明确文案（而非 500 系统异常）。
         // 文案一律说人话、不出现配置项名：用户看到 llm.enabled / llm.convert-enabled 只会
         // 以为是配置文件的问题，而这两个开关在页面上本来就打不开，说了也解决不了。
+        // 1. 开关未开 → 预期内不可用，400 + 明确替代方案
         if (!llmClient.isEnabled() || !convertEnabled) {
             throw new IllegalArgumentException(
                     "PDF 智能转换未启用 —— 需要先开启 AI 能力：请让系统管理员在「导入 LLM」里"
                             + "填写通道与密钥并保存，之后即可直接上传 PDF。"
                             + "也可以改用 JSON 直传，或用离线脚本 tools/convert-standard-pdf.py 转换后导入。");
         }
+        // 2. 开关开了但服务连不上 → 同样 400，文案指向「联系管理员」而非配置项名
         if (!llmClient.isAvailable()) {
             throw new IllegalArgumentException(
                     "AI 服务当前连不上，无法智能转换。请让系统管理员确认 AI 服务已启动、"
                             + "配置填写正确后重试；也可以改用 JSON 直传 / 离线脚本。");
         }
 
+        // 3. 抽文本并前置校验：扫描件（无文本层）直接拒绝，不浪费一次模型调用
         String text = extractPdfText(file);
         if (text.isBlank()) {
             throw new IllegalArgumentException("PDF 未抽取到文本（可能是扫描件），请改用离线脚本或 JSON 直传");
         }
+        // 4. 超长截断并把这件事写进 failed，让用户知道只转了前半部分
         if (text.length() > MAX_TEXT_CHARS) {
             text = text.substring(0, MAX_TEXT_CHARS);
             vo.getFailed().add(new ConvertPreviewVO.Failed("（PDF 超出 " + MAX_TEXT_CHARS + " 字，已截断）",
                     "文本过长，仅转换前 " + MAX_TEXT_CHARS + " 字；建议用离线脚本分批处理"));
         }
 
+        // 5. 送模型抽术语；返回空按失败处理，不当成功
         String raw = llmClient.chat(LlmClient.DICT_CONVERT_SYSTEM_PROMPT, text);
         if (raw == null || raw.isBlank()) {
             throw new IllegalArgumentException("LLM 调用失败（已降级），请稍后重试或改用 JSON 直传 / 离线脚本");
         }
+        // 6. 解析候选；一条都没提到且没有失败项，说明模型没给出可用内容
         parseCandidates(raw, vo);
         if (vo.getCandidates().isEmpty() && vo.getFailed().isEmpty()) {
             throw new IllegalArgumentException("LLM 未从 PDF 中提取到术语条目，请确认 PDF 内容或改用离线脚本");
@@ -347,9 +375,11 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     /** 抽 PDF 全文（PDFBox）；无文本层时返回空串，由上层转成失败明细 */
     private String extractPdfText(MultipartFile file) throws IOException {
+        // 1. 只收 PDF，其余格式走导入通道
         if (!fileName(file).endsWith(".pdf")) {
             throw new IllegalArgumentException("智能转换仅支持 .pdf；Excel/CSV/JSON 请直接走导入");
         }
+        // 2. 按坐标排序抽文本，多栏排版才不会串行
         try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
             PDFTextStripper stripper = new PDFTextStripper();
             stripper.setSortByPosition(true);
@@ -361,6 +391,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
     private void parseCandidates(String raw, ConvertPreviewVO vo) {
         String json = stripCodeFence(raw);
         List<ConvertPreviewVO.Candidate> list;
+        // 1. 整体按数组解析；解析不了就把原文记进失败明细，不静默丢弃
         try {
             list = objectMapper.readValue(json, new TypeReference<List<ConvertPreviewVO.Candidate>>() {
             });
@@ -369,6 +400,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             vo.getFailed().add(new ConvertPreviewVO.Failed(truncate(raw, 500), "LLM 返回不是合法 JSON 数组"));
             return;
         }
+        // 2. 逐个校验标准术语，坏的记失败、好的收进候选
         int idx = 0;
         for (ConvertPreviewVO.Candidate c : list) {
             idx++;
@@ -385,7 +417,9 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /** 模型常把 JSON 包在 markdown 代码块里，解析前剥掉 */
     private String stripCodeFence(String s) {
         String t = s == null ? "" : s.trim();
+        // 1. 不是围栏开头就原样返回
         if (t.startsWith("```")) {
+            // 2. 去掉首行 ```lang，再去掉末尾 ```
             int nl = t.indexOf('\n');
             if (nl > 0) t = t.substring(nl + 1);
             int end = t.lastIndexOf("```");
@@ -396,6 +430,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     /** 截断超长文本，避免单个字段把行撑爆 */
     private String truncate(String s, int max) {
+        // 1. 超长才截断并补省略号，短文本原样返回
         if (s == null) return "";
         return s.length() <= max ? s : s.substring(0, max) + "…";
     }
@@ -412,7 +447,9 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @throws IllegalArgumentException 备份文件不存在或与词典类型不匹配
      */
     public void rollback(String type, String backupFilename) throws IOException {
+        // 1. 先用备份覆盖词典文件
         fileService.restore(type, backupFilename);
+        // 2. 再按恢复后的内容重建索引；文件与索引必须同版本，否则归一会拿到旧数据
         List<TermEntry> entries = fileService.read(type);
         esTermIndexService.rebuild(type, entries, fileService.currentVersion());
         log.info("[词典] {} 回滚到 {}，现有{}条", type, backupFilename, entries.size());
@@ -446,8 +483,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     /** 合并同标准词的两条词条：别名取并集，其余字段以新条目为准 */
     private TermEntry mergeEntries(TermEntry oldE, TermEntry newE) {
+        // 1. 别名取并集（LinkedHashSet 保序去重）
         Set<String> aliases = new LinkedHashSet<>(oldE.getAliases() == null ? List.of() : oldE.getAliases());
         if (newE.getAliases() != null) aliases.addAll(newE.getAliases());
+        // 2. 来源与代码以旧条目优先：已核过的出处不该被一次导入覆盖成空
         String source = oldE.getSource() == null || oldE.getSource().isBlank() ? newE.getSource() : oldE.getSource();
         String code = oldE.getCode() == null || oldE.getCode().isBlank() ? newE.getCode() : oldE.getCode();
         return new TermEntry(oldE.getStandardTerm(), new ArrayList<>(aliases), source, code);
@@ -476,8 +515,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
     }
 
     private String cellText(Cell cell) {
+        // 1. 空单元格给 null
         if (cell == null) return null;
         CellType type = cell.getCellType();
+        // 2. 按单元格类型取值
         return switch (type) {
             case STRING -> cell.getStringCellValue().trim();
             // 整数按 long 输出（避免 1.0 这种尾数）；非整数保留小数（国标代码常形如 3.01）
@@ -495,8 +536,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /** 读文本并自动判定编码（优先 UTF-8，解出乱码则回退 GBK） */
     private String readTextAutoCharset(MultipartFile file) throws IOException {
         byte[] bytes = file.getBytes();
+        // 1. 先按 UTF-8 解；不含替换字符说明解对了
         String utf8 = new String(bytes, StandardCharsets.UTF_8);
         if (!utf8.contains("\uFFFD")) return utf8;
+        // 2. 出现替换字符说明是 GBK 存的，回退重解
         return new String(bytes, "GBK");
     }
 }

@@ -87,7 +87,8 @@ public class AiServiceImpl implements IAiService {
 
         AiReplyVO vo = new AiReplyVO();
 
-        // ① 规则结论（完整性 / 核心缺项 / 归一命中 / 关键提示）
+        // 1. 先用规则把结论定下来：完整性 / 核心缺项 / 归一命中 / 关键提示
+        //    这一步不依赖 LLM，模型挂了它就是最终答案
         vo.setCompleteness(completeness(r));
         QcScorer.Missing core = coreMissing(data, r);
         vo.setCoreMissing(core.full());
@@ -98,11 +99,12 @@ public class AiServiceImpl implements IAiService {
         String template = templateNarrative(vo, r);
         vo.setAnswer(template);
 
-        // ② LLM 叙述 + 要点摘要（不可用/异常 → 保留模板叙述）
+        // 2. 再让 LLM 改写叙述并给要点摘要；不可用或异常都保留上一步的模板叙述
         String raw = llmClient.chat(LlmClient.AI_INTERPRET_SYSTEM_PROMPT, interpretPrompt(vo, r, data));
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);
         vo.setSource(llmOk ? "llm" : "rule");
+        // 3. 模型可能不按 JSON 返回，解析失败时按纯文本叙述处理，结论仍然有效
         if (llmOk) {
             applyLlmInterpret(vo, raw, template);
         } else {
@@ -114,16 +116,19 @@ public class AiServiceImpl implements IAiService {
     /** 把 LLM 返回的 JSON 叙述覆盖到模板叙述上；模型没按 JSON 返回则原文即叙述 */
     private void applyLlmInterpret(AiReplyVO vo, String raw, String fallback) {
         try {
+            // 1. 模型回的是 JSON 文本，可能带 ``` 围栏，先剥掉
             String json = stripCodeFence(raw);
             Map<String, Object> parsed = objectMapper.readValue(json,
                     new TypeReference<Map<String, Object>>() {
                     });
+            // 2. 有叙述就覆盖模板叙述，没有就沿用模板
             String narrative = str(parsed.get("narrative"));
             if (narrative != null && !narrative.isBlank()) {
                 vo.setAnswer(narrative.trim());
             } else {
                 vo.setAnswer(fallback);
             }
+            // 3. 摘要是可选字段，缺了不影响叙述
             if (parsed.get("summary") instanceof Map<?, ?> sm) {
                 AiReplyVO.Summary s = new AiReplyVO.Summary();
                 s.setChiefComplaint(str(sm.get("chiefComplaint")));
@@ -142,6 +147,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 解读 prompt：把规则结论 + 病历关键字段拼给模型，要求只回 JSON */
     private String interpretPrompt(AiReplyVO vo, Record r, Map<String, Object> data) {
+        // 1. 先给规则结论，模型只做叙述加工，避免它自己下结论
         StringBuilder sb = new StringBuilder("【规则预检结论】\n");
         sb.append("- 完整性：21 字段完整 ").append(vo.getCompleteness().getPresent())
                 .append(" 项，缺失：").append(join(vo.getCompleteness().getMissing())).append('\n');
@@ -153,8 +159,7 @@ public class AiServiceImpl implements IAiService {
                 .append(n.getExact()).append(" / 包含 ").append(n.getContain())
                 .append(" / 模糊 ").append(n.getFuzzy()).append("）\n");
         sb.append("- 关键提示：").append(join(vo.getKeyHints())).append('\n');
-        sb.append("\n【病历关键字段】\n")
-                .append("主诉：").append(nz(r.getChiefComplaint())).append('\n')
+        sb.append("\n【病历关键字段】\n")                .append("主诉：").append(nz(r.getChiefComplaint())).append('\n')
                 .append("中医诊断：").append(nz(r.getTcmDiagnosis())).append('\n')
                 .append("辨证结论：").append(nz(r.getPattern())).append('\n')
                 .append("治法（结构化）：").append(join(contents(data, "treatmentList"))).append('\n')
@@ -168,13 +173,15 @@ public class AiServiceImpl implements IAiService {
         AiReplyVO.Completeness c = vo.getCompleteness();
         AiReplyVO.NormHits n = vo.getNormHits();
         StringBuilder sb = new StringBuilder();
+        // 1. 先说 21 字段完整度与缺失项
         sb.append("规则预检：21 字段中完整 ").append(c.getPresent()).append(" 项");
         if (!c.getMissing().isEmpty()) {
             sb.append("，缺失 ").append(c.getMissing().size()).append(" 项（")
                     .append(join(c.getMissing())).append("）");
         }
         sb.append("。");
-        // 两档都要说：只说真缺失会得出「核心字段齐全」，而质控侧此时可能正在扣「漏抽」的分
+        // 2. 核心要素两档都要说：只说真缺失会得出「核心字段齐全」，
+        //    而质控侧此时可能正在扣「漏抽」的分
         if (vo.getCoreMissing().isEmpty() && vo.getCorePartial().isEmpty()) {
             sb.append("核心字段齐全。");
         } else {
@@ -185,6 +192,7 @@ public class AiServiceImpl implements IAiService {
                 sb.append("核心字段未抽取到（原始病历有记录）：").append(join(vo.getCorePartial())).append("。");
             }
         }
+        // 3. 再给归一命中分布与关键提示
         sb.append("术语归一命中 ").append(n.getTotal()).append(" 处（精确 ").append(n.getExact())
                 .append(" / 包含 ").append(n.getContain()).append(" / 模糊 ").append(n.getFuzzy()).append("）。");
         if (!vo.getKeyHints().isEmpty()) {
@@ -196,6 +204,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 21 个原始字段的完整度：逐字段判空并列出缺失项 */
     private AiReplyVO.Completeness completeness(Record r) {
+        // 1. 按固定顺序摆 21 个字段，保证前端展示与统计口径一致
         LinkedHashMap<String, String> fields = new LinkedHashMap<>();
         fields.put("登记号", r.getRegistrationNo());
         fields.put("门诊号", r.getOutpatientNo());
@@ -219,6 +228,7 @@ public class AiServiceImpl implements IAiService {
         fields.put("医生工号", r.getDoctorId());
         fields.put("接诊时间", r.getVisitTime() == null ? null : r.getVisitTime().toString());
 
+        // 2. 逐字段判空：非空计 present，空的记进缺失清单
         AiReplyVO.Completeness c = new AiReplyVO.Completeness();
         c.setTotal(fields.size());
         int present = 0;
@@ -245,6 +255,7 @@ public class AiServiceImpl implements IAiService {
     /** 统计 9 类实体的归一命中数，按精确/包含/模糊分档 */
     private AiReplyVO.NormHits normHits(Map<String, Object> data) {
         AiReplyVO.NormHits n = new AiReplyVO.NormHits();
+        // 1. 只数带 normLevel 的实体（未归一/未命中词典的不计）
         for (String key : LIST_KEYS) {
             if (!(data.get(key) instanceof List<?> list)) continue;
             for (Object item : list) {
@@ -257,6 +268,7 @@ public class AiServiceImpl implements IAiService {
                 else if (level == 3) n.setFuzzy(n.getFuzzy() + 1);
             }
         }
+        // 2. 合计 = 精确 + 包含 + 模糊（按归一动作计，不按去重后条数）
         n.setTotal(n.getExact() + n.getContain() + n.getFuzzy());
         return n;
     }
@@ -264,10 +276,12 @@ public class AiServiceImpl implements IAiService {
     /** 关键提示：常见空缺 + 核心要素缺失/漏抽 */
     private List<String> keyHints(Map<String, Object> data, Record r) {
         List<String> hints = new ArrayList<>();
+        // 1. 先列最常见的空缺：辨证/处方/主诉/中医诊断
         if (blank(r.getPattern())) hints.add("辨证结论为空");
         if (blank(r.getPrescription()) && listEmpty(data, "herbs")) hints.add("处方缺失");
         if (blank(r.getChiefComplaint())) hints.add("主诉为空");
         if (blank(r.getTcmDiagnosis())) hints.add("中医诊断为空");
+        // 2. 再把核心要素的两档缺失补进提示（与质控同一口径）
         QcScorer.Missing core = coreMissing(data, r);
         if (!core.full().isEmpty()) {
             hints.add("核心字段真缺失 " + core.full().size() + " 项：" + join(core.full()));
@@ -294,7 +308,7 @@ public class AiServiceImpl implements IAiService {
             throw new IllegalArgumentException("question不能为空");
         }
 
-        // 技术实现问题兜底拒答（面向使用者）
+        // 1. 命中技术实现类关键词就兜底拒答：这类问题不该由业务助手回答
         String lower = question.toLowerCase();
         if (TECH_KEYWORDS.stream().anyMatch(k -> lower.contains(k.toLowerCase()))) {
             vo.setAnswer(TECH_REFUSAL);
@@ -303,7 +317,7 @@ public class AiServiceImpl implements IAiService {
             return vo;
         }
 
-        // 规则检索：把相关业务上下文拼进 prompt；同时准备降级答案
+        // 2. 拼业务上下文 + 上文对话，一起交给模型
         String context = buildContext(question, dto == null ? null : dto.getRecordId());
         String history = dto == null ? null : dto.getHistory();
         String historyBlock = (history == null || history.isBlank())
@@ -312,6 +326,7 @@ public class AiServiceImpl implements IAiService {
                 "【业务上下文】\n" + context + historyBlock + "\n\n【使用者问题】\n" + question);
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);
+        // 3. 模型不可用时退到规则答案（从已拼好的上下文里摘一段）
         if (llmOk) {
             vo.setAnswer(raw.trim());
             vo.setSource("llm");
@@ -327,6 +342,7 @@ public class AiServiceImpl implements IAiService {
         StringBuilder sb = new StringBuilder();
         boolean hit = false;
 
+        // 1. 统计类问题 → 看板指标
         if (containsAny(question, "合格率", "合格", "待复核", "无效", "记录数", "病历数", "总数", "统计", "构成")) {
             var ov = statsService.overview();
             sb.append("【看板统计】全库病历 ").append(ov.getTotalRecords()).append(" 条：合格 ")
@@ -335,6 +351,7 @@ public class AiServiceImpl implements IAiService {
             hit = true;
         }
 
+        // 2. 归一/标准类问题 → 标准依据 + 当前病历命中分布
         if (containsAny(question, "归一", "命中", "标准化", "标准依据", "术语")) {
             sb.append("【归一/标准】").append(KNOWLEDGE_STANDARD).append('\n');
             if (recordId != null && !recordId.isBlank()) {
@@ -349,6 +366,7 @@ public class AiServiceImpl implements IAiService {
             hit = true;
         }
 
+        // 3. 指向具体病历的问题 → 当前病历上下文（没打开病历时明确说）
         if (containsAny(question, "这份病历", "当前病历", "该病历", "这个病历", "本病例", "这条病历")) {
             Record r = load(recordId);
             if (r == null) {
@@ -367,13 +385,14 @@ public class AiServiceImpl implements IAiService {
             hit = true;
         }
 
+        // 4. 用法/流程类问题 → 功能与流程说明
         if (containsAny(question, "功能", "怎么用", "如何使用", "流程", "标准依据", "接下来", "下一步")) {
             sb.append("【功能】").append(KNOWLEDGE_FUNCTION).append('\n');
             sb.append("【流程】").append(KNOWLEDGE_FLOW).append('\n');
             hit = true;
         }
 
-        // 个人操作上下文：只注入"当前用户"最近 10 条，脱敏（动作/对象/时间，不含 IP）
+        // 5. 问"我做了什么" → 本人最近操作（脱敏：动作/对象/时间，不含 IP）
         if (containsAny(question, "操作", "日志", "我做了", "做了什么", "审计", "提交了", "操作记录")) {
             sb.append("【我的最近操作】");
             List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 50);
@@ -395,6 +414,7 @@ public class AiServiceImpl implements IAiService {
             hit = true;
         }
 
+        // 6. 一条都没命中 → 至少给功能与流程，别让模型空答
         if (!hit) {
             sb.append("【知识】").append(KNOWLEDGE_FUNCTION).append('\n').append(KNOWLEDGE_FLOW).append('\n');
         }
@@ -403,6 +423,7 @@ public class AiServiceImpl implements IAiService {
 
     /** LLM 不可用时的降级答案：从已拼好的上下文里摘出最相关的一段，没有就回功能与流程说明 */
     private String ruleAnswer(String question, String context) {
+        // 1. 优先回"当前病历"，其次"我做了什么"，再次"看板统计"
         StringBuilder sb = new StringBuilder();
         sb.append("（规则问答）");
         if (context.contains("【当前病历】")) {
@@ -438,15 +459,17 @@ public class AiServiceImpl implements IAiService {
         }
         Map<String, Object> data = structured(r);
 
-        // 判定地基：规则重算预检单（与 records.qc_results 同源，确定性一致）
+        // 1. 结论来自规则重算（与 records.qc_results 同源，页面看到的判定和这里一致）
         ScoreResultVO sr = QcScorer.score(data, r, false, qcRuleStore.get());
         String precheck = precheckText(sr, r);
 
         AiReplyVO vo = new AiReplyVO();
+        // 2. 扣分项逐条转成提示，用户一眼看到"为什么被扣"
         for (ScoreResultVO.Deduction d : sr.getDeductions()) {
             vo.getKeyHints().add(d.getType() + "：" + d.getReason());
         }
 
+        // 3. LLM 只补建议，失败就直接回规则预检单
         String raw = llmClient.chat(LlmClient.AI_REVIEW_SYSTEM_PROMPT, reviewPrompt(precheck, r, data));
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);

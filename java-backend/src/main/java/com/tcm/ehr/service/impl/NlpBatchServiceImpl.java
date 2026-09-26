@@ -281,15 +281,18 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     @Override
     public NlpTaskVO cancel(String id) {
+        // 1. 取任务，不存在直接报错
         NlpTask t = taskMapper.selectById(id);
         if (t == null) {
             throw new IllegalArgumentException("任务不存在");
         }
+        // 2. 排队中：还没进 worker，直接落终态
         if (NlpTask.QUEUED.equals(t.getStatus())) {
             t.setStatus(NlpTask.CANCELLED);
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             taskMapper.updateById(t);
         } else if (NlpTask.RUNNING.equals(t.getStatus())) {
+            // 3. 运行中：不能直接改状态（worker 还会覆写），只置取消位让它自己收尾
             cancelFlags.add(id);
         }
         return toVO(t, false);
@@ -304,8 +307,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     @Override
     public List<NlpTaskVO> list() {
+        // 1. 按创建时间倒序取最近 50 条
         List<NlpTask> tasks = taskMapper.selectList(new QueryWrapper<NlpTask>()
                 .orderByDesc("create_time").last("LIMIT 50"));
+        // 2. 不带失败明细：列表页不需要，明细走 get(id)
         List<NlpTaskVO> out = new ArrayList<>();
         for (NlpTask t : tasks) {
             out.add(toVO(t, false));
@@ -411,11 +416,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 处理单条并更新进度（两条取数路径共用） */
     private void step(String id, Record r, NlpTask t, List<NlpTaskVO.Failure> failures,
                       boolean[] truncated, int[] processed) {
+        // 1. 处理前先计数：done 以「已尝试」为准，失败也算一条
         processed[0]++;
         try {
+            // 2. 成功则累加成功数
             processOne(r);
             t.setSuccess(t.getSuccess() + 1);
         } catch (Exception e) {
+            // 3. 失败累加并记明细；明细只留前 MAX_FAILURES 条，超出置截断标记
             t.setFailed(t.getFailed() + 1);
             if (failures.size() < MAX_FAILURES) {
                 failures.add(new NlpTaskVO.Failure(labelOf(r), reasonOf(e)));
@@ -423,8 +431,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 truncated[0] = true;
             }
         }
+        // 4. 回写进度与当前条目标签（页面据此显示"正在处理第几条"）
         t.setDone(processed[0]);
         t.setCurrentLabel(labelOf(r));
+        // 5. 每 PROGRESS_EVERY 条落一次库：每条都写会把库压垮
         if (processed[0] % PROGRESS_EVERY == 0) {
             persistProgress(t, failures, truncated[0]);
         }
@@ -432,31 +442,38 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     /** 单条：拼文本 → 抽取 → 归一 → 打词典版本 → 写库（与单条抽取口径一致） */
     private void processOne(Record r) throws Exception {
+        // 1. 拼可抽取文本；空文本直接判失败，不去调抽取服务
         String text = NlpTextComposer.compose(r);
         if (text.isBlank()) {
             throw new IllegalArgumentException("该病历无可抽取的文本字段");
         }
+        // 2. 调抽取服务；返回 null 说明服务没起来
         NlpExtractVO vo = nlpClient.extract(text);
         if (vo == null) {
             throw new IllegalStateException("抽取服务连不上（:8001 未启动）");
         }
+        // 3. 归一到标准术语（ES 索引不可用时抛异常，由上层计失败）
         entityNormalizer.normalize(vo);
+        // 4. 打上词典版本再写库：归一结果与当时词典版本必须成对，否则事后无法判断该不该重算
         String json = objectMapper.writeValueAsString(vo);
         json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());
         recordMapper.updateStructuredData(r.getId(), json);
     }
 
     private void markFailed(String id) {
+        // 1. 不存在或已是终态就不用改（终态不能被回退）
         NlpTask t = taskMapper.selectById(id);
         if (t == null || isTerminal(t.getStatus())) {
             return;
         }
+        // 2. 落失败终态
         t.setStatus(NlpTask.FAILED);
         t.setFinishedAt(LocalDateTime.now().withNano(0));
         taskMapper.updateById(t);
     }
 
     private void persistProgress(NlpTask t, List<NlpTaskVO.Failure> failures, boolean truncated) {
+        // 1. 失败明细与截断标记一起落库，进度和明细始终同一条记录
         t.setFailureList(writeJson(failures));
         t.setFailureTruncated(truncated);
         taskMapper.updateById(t);
@@ -486,23 +503,28 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     private static boolean isTerminal(String status) {
+        // 四个终态：完成 / 取消 / 中断 / 失败
         return NlpTask.COMPLETED.equals(status) || NlpTask.CANCELLED.equals(status)
                 || NlpTask.INTERRUPTED.equals(status) || NlpTask.FAILED.equals(status);
     }
 
     private static String reasonOf(Exception e) {
+        // 1. 索引不可用单独给一句人话，否则前端只会显示裸异常名
         if (e instanceof TermIndexUnavailableException) {
             return "术语索引不可用（ES），归一无法完成";
         }
+        // 2. 其余取异常消息，空的兜底成「抽取失败」
         String m = e.getMessage();
         return m == null || m.isBlank() ? "抽取失败" : m;
     }
 
     private static String labelOf(Record r) {
+        // 1. 优先用登记号做标签，没有就用 ID
         String label = r.getRegistrationNo();
         if (label == null || label.isBlank()) {
             label = r.getId();
         }
+        // 2. 截到 200 字：这列会写进 current_label，不能被超长内容撑爆
         return label == null ? "" : (label.length() > 200 ? label.substring(0, 200) : label);
     }
 
@@ -531,6 +553,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 而失败明细丢了不影响任务语义。</p>
      */
     private String writeJson(Object o) {
+        // 1. 序列化失败退回 "null"（读回即无明细），不抛
         try {
             return objectMapper.writeValueAsString(o);
         } catch (Exception e) {
@@ -540,9 +563,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     /** 还原任务落库时冻结的筛选条件；解析不了按"不限"处理 */
     private FiltersDTO readFilters(String json) {
+        // 1. null / 空 / 字面 "null" 都表示「不限范围」
         if (json == null || json.isBlank() || "null".equals(json)) {
             return null;
         }
+        // 2. 解析不了也按「不限」兜底，但这条路径只在历史脏数据上出现
         try {
             return objectMapper.readValue(json, FiltersDTO.class);
         } catch (Exception e) {
@@ -553,6 +578,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 任务实体 → 视图；withFailures 为 false 时不带失败清单（列表接口用，省流量） */
     private NlpTaskVO toVO(NlpTask t, boolean withFailures) {
         NlpTaskVO vo = new NlpTaskVO();
+        // 1. 逐字段搬运，计数为 null 时归零（前端不必判空）
         vo.setId(t.getId());
         vo.setStatus(t.getStatus());
         vo.setTotal(t.getTotal() == null ? 0 : t.getTotal());
@@ -565,6 +591,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         vo.setStartedAt(t.getStartedAt());
         vo.setFinishedAt(t.getFinishedAt());
         vo.setFailureTruncated(Boolean.TRUE.equals(t.getFailureTruncated()));
+        // 2. 失败明细按需带上（列表接口不带，省流量）
         if (withFailures) {
             vo.setFailures(parseFailures(t.getFailureList()));
         }
@@ -573,9 +600,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     /** 解析失败清单 JSON；坏了就当空清单，不影响进度展示 */
     private List<NlpTaskVO.Failure> parseFailures(String json) {
+        // 1. 没有明细就给空清单
         if (json == null || json.isBlank()) {
             return new ArrayList<>();
         }
+        // 2. 解析失败同样给空清单：明细坏了不该让整个任务页报错
         try {
             List<NlpTaskVO.Failure> list = objectMapper.readValue(json,
                     new TypeReference<List<NlpTaskVO.Failure>>() {

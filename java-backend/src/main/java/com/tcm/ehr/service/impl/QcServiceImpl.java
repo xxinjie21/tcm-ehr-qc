@@ -300,9 +300,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * <p>作废而不是删除：历史复核轨迹要留，查询侧按 {@code is_obsolete=0} 过滤。</p>
      */
     private void upsertReviewTask(Record r, ScoreResultVO vo) {
+        // 1. 先取该病历还没作废的任务（作废的保留历史轨迹，不参与幂等）
         List<ReviewTask> existing = reviewTaskMapper.selectList(new QueryWrapper<ReviewTask>()
                 .eq("record_id", r.getId()).eq("is_obsolete", 0));
         if ("待复核".equals(vo.getGrade())) {
+            // 2. 已有未作废任务就原地更新：重复提交不会堆出第二条待办
             if (!existing.isEmpty()) {
                 ReviewTask t = existing.get(0);
                 t.setScore(vo.getScore());
@@ -310,6 +312,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 t.setStatus("pending");
                 reviewTaskMapper.updateById(t);
             } else {
+                // 3. 没有就新建，时限默认 7 个工作日
                 ReviewTask t = new ReviewTask();
                 t.setRecordId(r.getId());
                 t.setStatus("pending");
@@ -321,6 +324,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 reviewTaskMapper.insert(t);
             }
         } else {
+            // 4. 已达标则把未作废任务作废而不是删除，历史复核轨迹要留
             for (ReviewTask t : existing) {
                 t.setIsObsolete(1);
                 reviewTaskMapper.updateById(t);
@@ -330,6 +334,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 问题类型取最"重"的一项：逻辑冲突 > 缺失字段 > 评分不达标 */
     private String issueType(ScoreResultVO vo) {
+        // 从重到轻取第一项命中：逻辑冲突 > 缺失字段 > 评分不达标，
+        // 只报一项是因为复核列表要按类型分组，混着报没法分派
         if (!vo.getLogicConflicts().isEmpty()) {
             return "逻辑冲突";
         }
@@ -343,6 +349,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private LocalDateTime addWorkdays(LocalDateTime start, int days) {
         LocalDateTime d = start;
         int added = 0;
+        // 1. 逐日推进，只在工作日计数；周末不消耗额度
         while (added < days) {
             d = d.plusDays(1);
             DayOfWeek w = d.getDayOfWeek();
@@ -394,7 +401,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 组装：规则 + 自然语言描述 + 目录 + 告警（单一来源） */
     private QcRulesVO buildRulesVO() {
+        // 1. 规则本体与加载告警直接来自 store，保证前端看到的和评分用的是同一份
         QcRulesVO vo = new QcRulesVO(ruleStore.get(), ruleStore.warnings());
+        // 2. 自然语言描述与字段目录同源生成，规则一改文案跟着改
         vo.setDescriptions(com.tcm.ehr.common.config.QcRuleDescriber.describe(ruleStore.get()));
         vo.setCatalogElements(com.tcm.ehr.common.config.QcRuleDescriber.catalogElements());
         vo.setCatalogFormats(com.tcm.ehr.common.config.QcRuleDescriber.catalogFormats());
@@ -486,6 +495,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 取该病历的评分结果：优先读 qc_results，缺失则按当前规则现算 */
     private ScoreResultVO scoreOf(Record r) {
+        // 1. 优先读库内已存评分：历史统计要与当初的判定一致，不能按新规则重算
         if (r.getQcResults() != null && !r.getQcResults().isBlank()) {
             try {
                 return objectMapper.readValue(r.getQcResults(), ScoreResultVO.class);
@@ -493,6 +503,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 // 落库格式异常则退回现算
             }
         }
+        // 2. 没有存值就按当前规则现算；算不出来返回 null，由调用侧跳过这一条
         try {
             return QcScorer.score(asMap(null, r.getStructuredData()), r, false, ruleStore.get());
         } catch (Exception e) {
@@ -512,11 +523,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      */
     private String acquireLock() {
         String token = UUID.randomUUID().toString();
+        // 1. 正常路径：Redis setIfAbsent 带 TTL，抢不到返回 null 由上层拒绝
         try {
             Boolean ok = redis.opsForValue()
                     .setIfAbsent(BATCH_LOCK_KEY, token, Duration.ofSeconds(LOCK_TTL_SECONDS));
             return Boolean.TRUE.equals(ok) ? token : null;
         } catch (Exception e) {
+            // 2. Redis 挂了降级进程内锁（多实例下无效，见 Javadoc）
             log.warn("[质控重算] Redis 不可用，降级为进程内防重锁（多实例部署下不生效）: {}", e.getMessage());
             return localLock.tryLock() ? LOCAL_LOCK_TOKEN : null;
         }
@@ -530,13 +543,16 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * 「比对通过、删除前恰好过期被他人取走」的竞态。</p>
      */
     private void releaseLock(String token) {
+        // 1. 没拿到过锁就不用释放
         if (token == null) {
             return;
         }
+        // 2. 进程内锁走本地解锁
         if (LOCAL_LOCK_TOKEN.equals(token)) {
             localLock.unlock();
             return;
         }
+        // 3. Redis 锁用 Lua 比对令牌再删，避免删掉别人的锁
         try {
             redis.execute(RELEASE_IF_OWNER, List.of(BATCH_LOCK_KEY), token);
         } catch (Exception e) {
@@ -551,11 +567,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 结构化数据：优先用入参对象，否则解析 JSON；空/坏数据返回 null 交由评分按"未结构化"处理 */
     private Map<String, Object> asMap(Object inline, String json) {
+        // 1. 入参对象优先，JSON 文本兜底
         Object src = inline != null ? inline : json;
         if (src == null) {
             return null;
         }
         try {
+            // 2. 文本走 JSON 解析，对象走类型转换
             if (src instanceof String s) {
                 return s.isBlank() ? null : objectMapper.readValue(s, new TypeReference<Map<String, Object>>() {
                 });
@@ -563,15 +581,18 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             return objectMapper.convertValue(src, new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
+            // 3. 解析失败返回 null，由评分按「未结构化」处理，不算病历本身有错
             return null;
         }
     }
 
     /** 取列表项的文本（content 优先，其次 name） */
     private List<String> pick(List<Map<String, Object>> list) {
+        // 1. 空列表直接给空集合，调用侧不必判空
         if (list == null) {
             return List.of();
         }
+        // 2. content 优先、其次 name，逐项去空白后收集
         return list.stream()
                 .map(m -> m.get("content") != null ? m.get("content") : m.get("name"))
                 .filter(v -> v != null && !String.valueOf(v).isBlank())
@@ -581,11 +602,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 该结构化字段是否非空（要素"有记录"的判据之一） */
     private boolean structuredPresent(String key, Map<String, Object> data) {
+        // 只有「是列表且非空」才算要素有记录；空数组与缺键同义
         return key != null && data != null && data.get(key) instanceof List<?> list && !list.isEmpty();
     }
 
     /** 原始列里任一回退字段有值（判"漏抽"：病历写了但没被抽出来） */
     private boolean rawPresent(List<String> fields, Record raw) {
+        // 1. 任一回退字段有值就算「病历写了」——用于区分真缺失与漏抽
         if (raw == null || fields == null) {
             return false;
         }
@@ -599,24 +622,29 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 格式规则是否通过：enum 看白名单，regex 匹表达式；表达式非法时放行（不算病历错） */
     private boolean formatOk(QcRuleSet.FormatRule fr, String v) {
+        // 1. enum 规则看值是否在白名单里
         if ("enum".equalsIgnoreCase(fr.getType())) {
             return fr.getValues() != null && fr.getValues().contains(v);
         }
+        // 2. 没配表达式就跳过校验
         if (fr.getExpr() == null || fr.getExpr().isBlank()) {
             return true;
         }
         try {
             return Pattern.compile(fr.getExpr()).matcher(v).matches();
         } catch (Exception e) {
+            // 3. 规则自身写错（表达式非法）时放行：宁可漏判也不能给病历记错
             return true;
         }
     }
 
     /** 按字段名取原始列值（空白视作无值），字段名由规则集配置 */
     private String rawValue(Record r, String field) {
+        // 1. 字段名由规则集配置，null 字段或 null 病历都按无值处理
         if (r == null || field == null) {
             return null;
         }
+        // 2. 按字段名映射到列；未配置的字段返回 null
         String v = switch (field) {
             case "registrationNo" -> r.getRegistrationNo();
             case "outpatientNo" -> r.getOutpatientNo();
@@ -637,6 +665,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             case "treatmentEffect" -> r.getTreatmentEffect();
             default -> null;
         };
+        // 3. 空白视作无值，避免把空格当内容做存在性判断
         return v == null || v.isBlank() ? null : v.trim();
     }
 }

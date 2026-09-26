@@ -476,9 +476,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     @Transactional(rollbackFor = Exception.class)
     @Override
     public DeleteRecordsVO deleteRecords(DeleteRecordsDTO dto) {
+        // 1. 没选 id 直接拒：空删会静默"成功"，用户以为删掉了
         if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
             throw new IllegalArgumentException("未选择要操作的病历");
         }
+        // 2. 交给同一段删除逻辑（事务已加在本方法上）
         return doDelete(dto.getIds());
     }
 
@@ -493,12 +495,15 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     @Transactional(rollbackFor = Exception.class)
     @Override
     public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
+        // 1. 必须至少有一个筛选条件，否则就是「删全库」
         if (!hasAnyFilter(filters)) {
             throw new IllegalArgumentException("请至少设置一个筛选条件，避免误删全库");
         }
+        // 2. 只取 id 列，不取整行数据
         QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, filters);
         List<Record> rows = baseMapper.selectList(wrapper.select("id"));
         List<String> ids = rows.stream().map(Record::getId).toList();
+        // 3. 走同一段删除逻辑
         return doDelete(ids);
     }
 
@@ -507,13 +512,16 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
      */
     private DeleteRecordsVO doDelete(List<String> ids) {
         DeleteRecordsVO vo = new DeleteRecordsVO();
+        // 1. 空集合按删 0 条返回
         if (ids == null || ids.isEmpty()) {
             vo.setDeletedCount(0);
             return vo;
         }
+        // 2. 分块删：一条 IN 塞几万个 id 会让 SQL 慢到超时
         int deleted = 0;
         for (int i = 0; i < ids.size(); i += DELETE_CHUNK) {
             List<String> chunk = ids.subList(i, Math.min(i + DELETE_CHUNK, ids.size()));
+            // 3. 顺序不能反：先删子表再删主表，反了会撞外键
             reviewTaskMapper.delete(new QueryWrapper<com.tcm.ehr.domain.po.ReviewTask>().in("record_id", chunk));
             deleted += baseMapper.deleteBatchIds(chunk);
         }
@@ -523,11 +531,14 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     /** 范围条件是否至少有一个（部门/证候/分级任一非空，或时间区间两端齐全） */
     private boolean hasAnyFilter(FiltersDTO f) {
+        // 1. 没有条件对象就没有任何筛选
         if (f == null) {
             return false;
         }
+        // 2. 时间区间要两端都有才算一个条件，缺一端会变成"从某时到最新"这种误删口径
         boolean range = f.getDateRange() != null && f.getDateRange().size() == 2
                 && !isBlank(f.getDateRange().get(0)) && !isBlank(f.getDateRange().get(1));
+        // 3. 任一维度非空即算有筛选
         return !isBlank(f.getDepartment()) || !isBlank(f.getPattern()) || !isBlank(f.getGrade()) || range;
     }
 
@@ -561,6 +572,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     }
 
     private String summarize(Record r) {
+        // 1. 主诉优先，缺了依次回退中医诊断、西医诊断
         String s = r.getChiefComplaint();
         if (isBlank(s)) {
             s = r.getTcmDiagnosis();
@@ -571,6 +583,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (s == null) {
             return "";
         }
+        // 2. 去空白并截到 40 字：列表页只放得下一行
         s = s.trim();
         return s.length() > 40 ? s.substring(0, 40) + "…" : s;
     }
@@ -580,12 +593,14 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /** 表头行 → 字段标识:列索引 */
     private Map<String, Integer> buildHeaderIndex(Row header) {
         Map<String, Integer> idx = new HashMap<>();
+        // 1. 逐列取表头文本，空列跳过
         for (Cell cell : header) {
             String text = cellText(cell);
             if (isBlank(text)) {
                 continue;
             }
             String field = HEADER_FIELD.get(text.trim());
+            // 2. 只认能映射的列；同名字段取第一次出现的列，避免后面重复表头覆盖它
             if (field != null && !idx.containsKey(field)) {
                 idx.put(field, cell.getColumnIndex());
             }
@@ -596,6 +611,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /** 数据行 → 病历实体：按表头索引逐字段取值，缺列一律 null */
     private Record mapRow(Row row, Map<String, Integer> idx) {
         Record r = new Record();
+        // 1. 文本列按表头索引逐字段取，缺列由 get() 兜成 null
         r.setRegistrationNo(get(row, idx, "registrationNo"));
         r.setOutpatientNo(get(row, idx, "outpatientNo"));
         r.setGender(get(row, idx, "gender"));
@@ -625,14 +641,17 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     /** 按字段标识取单元格文本；该列在表头里不存在时返回 null */
     private String get(Row row, Map<String, Integer> idx, String field) {
+        // 1. 表头里没这列就返回 null，调用侧不必判存在性
         Integer c = idx.get(field);
         return c == null ? null : cellText(row.getCell(c));
     }
 
     private Integer parseInt(String s) {
+        // 1. 空值直接给 null
         if (isBlank(s)) {
             return null;
         }
+        // 2. 按 double 解析：Excel 数值列读出来常带 ".0"；解析不了给 null，不让整行失败
         try {
             return (int) Double.parseDouble(s.trim());
         } catch (NumberFormatException e) {
@@ -642,18 +661,22 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     /** 接诊时间：支持 Excel 日期数值与常见字符串格式 */
     private LocalDateTime parseDateTime(Cell cell) {
+        // 1. 空单元格给 null
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             return null;
         }
+        // 2. Excel 真正的日期型单元格直接取值，避开时区与格式转换
         if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
             return cell.getLocalDateTimeCellValue();
         }
+        // 3. 其余按文本处理
         String s = cellText(cell);
         if (isBlank(s)) {
             return null;
         }
         s = s.trim().replace('T', ' ');
         try {
+            // 4. 三种长度分别对应 只到日 / 到秒 / 原样
             if (s.length() == 10) {
                 return LocalDateTime.parse(s + " 00:00:00", DT);
             }
@@ -662,15 +685,18 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             }
             return LocalDateTime.parse(s, DT);
         } catch (Exception e) {
+            // 5. 格式不认识给 null：宁可缺接诊时间，也不要让整行导入失败
             return null;
         }
     }
 
     /** 单元格取文本：按显示格式取值，数字/日期型统一转字符串 */
     private String cellText(Cell cell) {
+        // 1. 空单元格给 null
         if (cell == null) {
             return null;
         }
+        // 2. 按单元格类型取值
         return switch (cell.getCellType()) {
             case STRING -> {
                 String v = cell.getStringCellValue();
