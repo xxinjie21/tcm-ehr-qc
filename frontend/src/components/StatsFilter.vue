@@ -1,4 +1,5 @@
 <template>
+  <!-- 筛选条按 flex-wrap 单行排布，窄屏时逐项换行；控件顺序即视觉顺序 -->
   <section class="filter">
     <span class="cap">统计范围</span>
     <!-- 视觉标签必须带 for 才能关联到控件：只写 <label> 文本的话，
@@ -24,17 +25,22 @@
 </template>
 
 <script setup>
+// 统计筛选条：开单科室 + 就诊日期区间。
+// 筛选状态由父组件持有（model 为受控对象），本组件只负责展示，
+// 点「查询 / 重置」时把动作抛给父组件执行，自身不发起请求。
 defineProps({
+  // 受控筛选对象，字段：department / start / end
   model: { type: Object, required: true },
   // 默认空数组：原来的 ['内科','外科','儿科','针灸科'] 在演示数据里根本不存在，
-    // 一旦调用方忘了传就会显示假选项（Dashboard 目前恒传真实值，所以从未暴露）
-    departments: { type: Array, default: () => [] }
+  // 一旦调用方忘了传就会显示假选项（Dashboard 目前恒传真实值，所以从未暴露）
+  departments: { type: Array, default: () => [] }
 })
 
 defineEmits(['search', 'reset'])
 </script>
 
 <style scoped>
+/* 卡片式筛选条：与下方统计面板同底色同圆角，构成一组视觉单元 */
 .filter {
   background: #fff;
   border: 1px solid var(--line);
@@ -53,6 +59,7 @@ defineEmits(['search', 'reset'])
   margin-right: 6px;
   align-self: center;
 }
+/* 标签压在各自控件上方（block + 下间距），与 align-items:flex-end 配合对齐控件底边 */
 .filter label {
   display: block;
   font-size: 12px;

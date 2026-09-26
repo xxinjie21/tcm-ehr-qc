@@ -108,6 +108,7 @@ const breadcrumb = computed(() => {
 const isAdmin = computed(() => userStore.role === '管理员')
 const llmVisible = ref(false)
 
+// 退出登录：清除本地登录状态后跳回登录页
 const handleLogout = () => {
   userStore.logout()
   router.push('/login')

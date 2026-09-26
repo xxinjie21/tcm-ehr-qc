@@ -11,6 +11,7 @@
 </template>
 
 <script setup>
+// 通用面板容器：统一标题样式与内边距；标题可用 header 插槽覆盖（如放操作按钮）
 defineProps({
   title: { type: String, default: '' }
 })
@@ -39,6 +40,7 @@ defineProps({
   align-items: center;
   gap: 8px;
 }
+/* 标题左侧的竖条装饰 */
 .panel-hd::before {
   content: '';
   width: 3px;

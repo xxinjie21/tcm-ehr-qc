@@ -1,4 +1,7 @@
 <template>
+  <!-- 导入 LLM 配置弹窗（管理员）：切换运行时模型通道并就地探测连通性。
+       每次打开都从服务端重读配置（@open）；禁止点遮罩关闭，避免填了一半误关。
+       保存后立即生效，无需重启后端。 -->
   <el-dialog
     v-model="visible"
     class="llm-dialog"
@@ -8,6 +11,8 @@
     :close-on-click-modal="false"
     @open="loadConfig"
   >
+    <!-- 两条告警互斥：读失败说明「表单里不是服务端现状」，存失败说明「改动没有生效」。
+         都必须放在表单上方说清，否则用户会把旧值当成已保存的值 -->
     <p v-if="loadFailed" class="llm-warn">
       配置读取失败，下面显示的不是服务端的当前配置 —— 请关闭本弹窗后重开，或检查后端是否可用。
     </p>
@@ -48,6 +53,7 @@
             <span class="llm-hint">留空用通道默认地址</span>
           </el-form-item>
 
+          <!-- API Key 只在 openai 通道出现；ollama 走本机不需要密钥 -->
           <el-form-item v-if="form.provider === 'openai'" label="API Key">
             <el-input
               v-model="form.apiKey"
@@ -64,6 +70,7 @@
         <div class="col-hd">模型参数</div>
         <el-form label-position="top" class="llm-form">
           <el-form-item label="模型名">
+            <!-- filterable + allow-create：既能从候选里挑，也能手输自定义模型名 -->
             <el-select
               v-model="form.model"
               filterable
@@ -111,6 +118,8 @@
 </template>
 
 <script setup>
+// LLM 配置弹窗：左栏「通道与接入」，右栏「模型参数 + 探测结果」。
+// 配置存在服务端内存（LlmConfigStore），保存即生效；API Key 不回显、不落盘。
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getLlmConfig, updateLlmConfig, testLlmConfig } from '@/api/llm'
@@ -122,14 +131,17 @@ const MODEL_OPTIONS = {
   openai: ['deepseek-chat', 'deepseek-reasoner', 'gpt-4o-mini', 'qwen-plus', 'glm-4', 'moonshot-v1-8k']
 }
 
+// 显隐由父组件 v-model 控制；saved 事件用于通知父组件刷新当前通道显示
 const visible = defineModel({ type: Boolean, default: false })
 const emit = defineEmits(['saved'])
 
+// loading 覆盖整个表单区（读配置时）；saving / testing 分别驱动对应按钮
 const loading = ref(false)
 const saving = ref(false)
 /** 读配置失败 / 保存失败 —— 都不该让表单停在上一次的值而不说明 */
 const loadFailed = ref(false)
 const saveFailed = ref(false)
+// testing 驱动「测试连接」按钮的 loading；testResult 为 null 表示尚未探测
 const testing = ref(false)
 const testResult = ref(null)
 
@@ -154,11 +166,14 @@ const form = reactive({
 /** 下拉候选：按当前通道给常用模型 */
 const modelOptions = computed(() => MODEL_OPTIONS[form.provider] || MODEL_OPTIONS.openai)
 
+// 每次打开弹窗都重读服务端配置，保证表单反映的是当前生效值
 async function loadConfig() {
+  // 1. 进入加载态，并清掉上一次的探测结果与失败标记
   loading.value = true
   testResult.value = null
   loadFailed.value = false
   try {
+    // 2. 拉取服务端配置并逐项回填表单与只读展示
     const { data } = await getLlmConfig()
     form.enabled = !!data.enabled
     form.provider = data.provider || 'ollama'
@@ -174,10 +189,13 @@ async function loadConfig() {
     // 原来只有 try/finally：读配置失败后表单还停在上一次的值，会被当成服务端现状
     loadFailed.value = true
   } finally {
+    // 3. 无论成败都收起 loading
     loading.value = false
   }
 }
 
+// 组装提交体。apiKey 为空串 = 不修改（后端约定：空值或回显掩码都视为不修改），
+// 所以这里不能做「空则不传」的裁剪，必须原样带上。
 function payload() {
   return {
     enabled: form.enabled,
@@ -190,10 +208,13 @@ function payload() {
   }
 }
 
+// 探测连通性：把当前表单值直接提交给后端试连，不要求先保存
 async function handleTest() {
   testing.value = true
+  // 1. 先清空上一次结果，避免旧的成功 / 失败信息与本次混淆
   testResult.value = null
   try {
+    // 2. 成功：就地展示通道 / 模型 / 往返耗时与一句模型回复
     const { data } = await testLlmConfig(payload())
     testResult.value = { ok: true, ...data }
   } catch (e) {
@@ -206,11 +227,13 @@ async function handleTest() {
   }
 }
 
+// 保存并生效：成功后关窗，并通知父组件刷新
 async function handleSave() {
   saving.value = true
   try {
     await updateLlmConfig(payload())
     ElMessage.success('LLM 配置已生效')
+    // 1. 关窗 + 通知父组件（父组件据此更新当前通道标签）
     visible.value = false
     emit('saved')
   } catch {
@@ -223,6 +246,7 @@ async function handleSave() {
 </script>
 
 <style scoped>
+/* 顶部提示条：左竖线 + 浅色底；提示用 ochre、告警用 danger，两者一眼可辨 */
 .llm-tip {
   margin: 0 0 14px;
   padding: 9px 12px;
@@ -233,6 +257,7 @@ async function handleSave() {
   line-height: 1.8;
   color: #6b5a44;
 }
+/* 读配置 / 保存失败时的告警条 */
 .llm-warn {
   margin: 0 0 10px;
   padding: 9px 12px;
@@ -244,6 +269,7 @@ async function handleSave() {
   color: var(--danger);
 }
 
+/* 提示条里的 <b> 只用来加重语义，不加粗，避免整段显得嘈杂 */
 .llm-tip b {
   color: var(--ink);
   font-weight: normal;
@@ -255,10 +281,12 @@ async function handleSave() {
   gap: 26px;
   align-items: flex-start;
 }
+/* flex:1 + min-width:0：两栏等宽且可收缩，长模型名不会撑破一栏 */
 .llm-col {
   flex: 1;
   min-width: 0;
 }
+/* 右栏左侧的分隔线（窄屏收单栏时在媒体查询里去掉） */
 .llm-col + .llm-col {
   border-left: 1px solid var(--line);
   padding-left: 26px;
@@ -273,6 +301,7 @@ async function handleSave() {
     padding-left: 0;
   }
 }
+/* 栏标题：下边框与内容分隔 */
 .col-hd {
   font-size: 12.5px;
   font-weight: bold;
@@ -291,11 +320,13 @@ async function handleSave() {
   padding-bottom: 2px;
   line-height: 1.6;
 }
+/* 字段下方的补充说明（比 label 更小、更弱） */
 .llm-hint {
   font-size: 11.5px;
   color: var(--text-sub);
   line-height: 1.7;
 }
+/* 温度与超时并排一行 */
 .llm-row {
   display: flex;
   gap: 16px;
@@ -304,6 +335,7 @@ async function handleSave() {
   flex: 1;
   min-width: 0;
 }
+/* 探测结果：正常 / 失败 / 未探测三态，靠左边框与底色区分 */
 .llm-result {
   margin-top: 2px;
   padding: 9px 12px;
@@ -326,6 +358,7 @@ async function handleSave() {
   border-style: dashed;
   color: var(--text-sub);
 }
+/* 模型回复单独一行、用次级色，与「连接正常」这类结论区分开 */
 .llm-reply {
   color: var(--text-sub);
 }

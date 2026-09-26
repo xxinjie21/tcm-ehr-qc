@@ -1,4 +1,6 @@
 <template>
+  <!-- 宽度 min(1180px, 94vw) 保证窄屏不横向溢出；top 6vh 让弹窗偏上，
+       避免长内容把底部页脚顶出视口 -->
   <el-dialog
     v-model="visible"
     :title="title"
@@ -32,6 +34,8 @@
 </template>
 
 <script setup>
+// 病历详情弹窗（共用）：病历数据页（UX-69）与清洗页（UX-77）都用它，差别只在标题。
+// 左栏为原始 21 字段只读，右栏为结构化数据 + AI 解读，左右同屏可比对。
 import StructuredDataCard from './StructuredDataCard.vue'
 import AiInterpretCard from './AiInterpretCard.vue'
 
@@ -42,8 +46,11 @@ defineProps({
   record: { type: Object, default: null }
 })
 
+// 显隐由父组件 v-model 控制（defineModel），本组件不持有开关状态
 const visible = defineModel({ type: Boolean, default: false })
 
+// 左栏「原始字段」的展示清单，与 Excel 原始列一一对应（共 21 项）。
+// wide = 该字段内容较长，在描述列表里占满两列（span 2）。
 const FIELDS = [
   { key: 'registrationNo', label: '登记号' },
   { key: 'outpatientNo', label: '门诊号' },
@@ -68,6 +75,8 @@ const FIELDS = [
   { key: 'visitTime', label: '接诊时间' }
 ]
 
+// 取字段值：visitTime 后端下发的是 ISO 串（含 T），这里换成「日期 时间」可读形式；
+// 其余字段直接取值，模板侧统一用 `|| '—'` 兜空。
 const fieldOf = (row, key) => {
   if (!row) return ''
   if (key === 'visitTime') {
@@ -90,14 +99,18 @@ const fieldOf = (row, key) => {
   max-height: calc(86vh - 140px);
   overflow: auto;
 }
+/* min-width:0 让 grid 子项可收缩：grid 子项默认 min-width:auto，
+   长文本（如现病史）会撑破两栏宽度 */
 .detail-col {
   min-width: 0;
 }
+/* 栏标题：小字次级色，只作分区提示 */
 .col-hd {
   font-size: 12.5px;
   color: var(--text-sub);
   margin-bottom: 8px;
 }
+/* 窄屏（<900px）两栏塌成单列，避免每栏过窄导致长文本逐字换行 */
 @media (max-width: 900px) {
   .detail-2col {
     grid-template-columns: 1fr;

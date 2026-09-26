@@ -11,6 +11,7 @@
 <script setup>
 import { computed } from 'vue'
 
+// 指标卡片：一个大数字 + 标签 + 细线图标；tone 决定数字配色（green / ochre / red）
 const props = defineProps({
   label: { type: String, required: true },
   value: { type: [Number, String], required: true },
@@ -27,12 +28,14 @@ const ICONS = {
   invalid: '<path d="M12 3.2 2.4 20.4h19.2z"/><path d="M12 9.5v4.2"/><path d="M12 16.8v.4"/>'
 }
 
+// 按 icon 名拼出完整 SVG；未登记的图标名返回空串，模板不渲染
 const iconSvg = computed(() => {
   const path = ICONS[props.icon]
   if (!path) return ''
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`
 })
 
+// 数字加千分位便于阅读；字符串值（如已格式化过的比例）原样展示
 const display = computed(() =>
   typeof props.value === 'number' ? props.value.toLocaleString() : props.value
 )
@@ -75,6 +78,7 @@ const display = computed(() =>
   width: 14px;
   height: 14px;
 }
+/* tone 对应的数字配色：green=达标、ochre=待办、red=异常 */
 .stat.green .num {
   color: var(--ink-mid);
 }

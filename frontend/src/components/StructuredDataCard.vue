@@ -66,6 +66,9 @@
 </template>
 
 <script setup>
+// 结构化数据卡片：把一条病历抽取出的 9 类要素（疾病 / 症状 / 证候 / 方剂 / 中药 / 舌象 / 脉象 / 病因 / 治法）
+// 按「有无独立词典」分组渲染，实体上标注来源（规则 / 模型）与归一命中等级。
+// 设计取舍：空态必须区分「压根没抽过」与「抽过但没识别出要素」——两者的下一步动作不同。
 import { computed } from 'vue'
 import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, LEVEL_UNMATCHED, entityName, pct } from '@/utils/structured'
 
@@ -75,6 +78,8 @@ const props = defineProps({
 
 const sections = ENTITY_SECTIONS
 
+// 把 data 归一成对象：入参可能是已解析对象、JSON 字符串，也可能为 null / 空串 / 坏 JSON；
+// 后三者一律返回 null，由 neverParsed 判定为「未抽取」
 const parsed = computed(() => {
   const d = props.data
   if (!d) return null
@@ -86,16 +91,19 @@ const parsed = computed(() => {
   }
 })
 
+// 取某类要素的数组；无数据、键不存在或值不是数组都返回空数组，调用方无需二次判空
 const list = (key) => {
   const d = parsed.value
   if (!d || !Array.isArray(d[key])) return []
   return d[key]
 }
 
+// 9 类要素是否至少有一类非空 —— 决定渲染实体列表还是空态
 const hasAny = computed(() => sections.some((s) => list(s.key).length > 0))
 
 /** 词典版本元信息（落库时打点，见 StructuredDataMeta）；旧数据没有则为空、不展示 */
 const dictVersion = computed(() => parsed.value?._meta?.dictVersion || '')
+/** 词典采集时间（与 dictVersion 同一处 _meta 打点）；旧数据没有则空串、不展示 */
 const dictCapturedAt = computed(() => parsed.value?._meta?.dictCapturedAt || '')
 
 /**
@@ -105,7 +113,9 @@ const dictCapturedAt = computed(() => parsed.value?._meta?.dictCapturedAt || '')
  * 反之为「有数据但 9 类都空」，即抽取执行过、只是没识别出要素。</p>
  */
 const neverParsed = computed(() => parsed.value === null)
+/** 空态标题：按 neverParsed 区分「尚未抽取」与「已抽取但无要素」 */
 const emptyTitle = computed(() => (neverParsed.value ? '尚未抽取标准化数据' : '已抽取，但没有识别出要素'))
+/** 空态副文案：给出与标题对应的下一步动作（去执行抽取 / 无需处理） */
 const emptyHint = computed(() => (neverParsed.value
   ? '这份病历还没有跑过结构化抽取。可在「结构化解析」页载入该病历后点「执行抽取」，结果会写入这里。'
   : '抽取已经执行过，只是这段原文里没有可归一的要素（疾病 / 症状 / 证候 / 方剂 / 中药等）。'))
@@ -134,10 +144,12 @@ const tpTitle = (sec, it) => {
  * 不再重复。三档分级与置信度的含义移到结果区图例统一说明，这里不逐条复述。</p>
  */
 const tpRows = (sec, it) => {
+  // 1. 取出原文与标准词，并初始化结果行
   const rows = []
   const raw = it.sourceText
   const name = entityName(sec, it)
 
+  // 2. 按「无词典 / 命中 / 未命中」三档生成归一相关行
   if (!sec.dict) {
     rows.push({ k: '归一', v: '该字段没有独立词典，不做归一，保留原文' })
   } else if (it.normLevel) {
@@ -150,6 +162,7 @@ const tpRows = (sec, it) => {
     rows.push({ k: '归一', v: '未命中词典，按原文返回' })
   }
 
+  // 3. 追加来源行并返回（保证任何实体至少「归一 + 来源」两行）
   rows.push({ k: '来源', v: sourceLine(it) })
   return rows
 }

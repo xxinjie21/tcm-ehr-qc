@@ -1,4 +1,7 @@
 <template>
+  <!-- 病历检索筛选条：科室 / 就诊时间 / 证候 / 分级。
+       与 StatsFilter 的分工：本组件用 v-model 双向绑定（受控 + 自更新），
+       供病历数据、复核等列表页复用；StatsFilter 只读展示 + 向上抛动作事件。 -->
   <div class="range-filter">
     <div class="rf-item">
       <label for="rf-department">科室</label>
@@ -42,11 +45,15 @@
 </template>
 
 <script setup>
+// 筛选条（受控组件）：自身不持有筛选状态，通过 v-model 与父组件同步；
+// 科室候选来自后端 DISTINCT，证候输入走词典联想（TermInput）。
 import { computed, onMounted, ref } from 'vue'
 import TermInput from '@/components/TermInput.vue'
 import { getDepartments } from '@/api/stats'
 
 const props = defineProps({
+  // 筛选值对象，字段：department / dateRange / pattern / grade。
+  // 默认值给出完整空结构，父组件少传字段时子控件也不会取到 undefined。
   modelValue: {
     type: Object,
     default: () => ({ department: '', dateRange: null, pattern: '', grade: '' })
@@ -54,6 +61,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
+// v-model 桥接：读直接透传 props，写立刻 emit 回父组件
+// （不在本地复制一份状态，避免出现双份真相）
 const inner = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v)
@@ -66,12 +75,15 @@ onMounted(async () => {
     const res = await getDepartments()
     departments.value = res.data || []
   } catch {
+    // 候选拉取失败 → 退化为空列表，不阻断用户手输证候 / 选分级
     departments.value = []
   }
 })
 </script>
 
 <style scoped>
+/* 与 StatsFilter 同构的单行卡片布局；两者共用 styles/theme.css 的视觉令牌 */
 .range-filter { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+/* 标签压在各自控件上方（与 StatsFilter 一致） */
 .rf-item label { display: block; font-size: 12px; color: var(--text-sub); margin-bottom: 3px; }
 </style>

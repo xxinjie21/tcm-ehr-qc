@@ -1,7 +1,11 @@
 <template>
+  <!-- AI 质控解读卡片：点「生成解读」后调后端，结果 = 规则预检结论 + LLM 叙述。
+       未生成时只显示引导文案，不预先渲染空壳 -->
   <section class="ai-interpret">
     <div class="aii-hd">
       <span class="aii-title">AI 质控解读</span>
+      <!-- 来源标签：明示这份解读是「规则 + AI」还是「仅规则」，
+           不让用户把规则结论误当成模型产出 -->
       <span v-if="result" class="aii-src">{{ result.llmAvailable ? '规则 + AI 叙述' : '规则（LLM 未启用）' }}</span>
       <el-button
         class="aii-btn"
@@ -36,6 +40,7 @@
 
       <!-- 规则结论 -->
       <div class="aii-blocks">
+        <!-- 完整性 = 全部结构化字段（21 项）的覆盖情况，分母是字段总数 -->
         <div class="aii-block">
           <div class="blk-title">完整性（{{ result.completeness.present }}/{{ result.completeness.total }}）</div>
           <div v-if="result.completeness.missing.length" class="chips">
@@ -44,6 +49,8 @@
           <div v-else class="blk-ok">21 字段完整</div>
         </div>
 
+        <!-- 核心字段 = 必填的少数几项（不含全部 21 项），只有两处都没有才算缺失；
+             与上一块的「完整性」分母不同，两者数值不一致属正常 -->
         <div class="aii-block">
           <div class="blk-title">缺项重点（核心字段）</div>
           <div v-if="result.coreMissing.length" class="chips">
@@ -52,6 +59,7 @@
           <div v-else class="blk-ok">核心字段齐全</div>
         </div>
 
+        <!-- 归一命中按三级判定分档计数；标签文案取自 utils/structured.js（唯一副本） -->
         <div class="aii-block">
           <div class="blk-title">归一命中（共 {{ result.normHits.total }} 处）</div>
           <div class="chips">
@@ -78,23 +86,31 @@
 </template>
 
 <script setup>
+// AI 质控解读卡片：点「生成解读」后调后端取结果。
+// 结果 = 规则预检结论（完整性 / 缺项 / 归一命中 / 关键提示）+ LLM 叙述；
+// LLM 未启用时仍出规则部分，由标题旁的来源标签标明。
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { aiInterpret } from '@/api/ai'
 import { LEVEL_TINY } from '@/utils/structured'
 
 const props = defineProps({
+  // 当前病历 ID；为空时「生成解读」按钮禁用
   recordId: { type: String, default: '' }
 })
 
+// loading 驱动骨架屏；result 为 null 表示「尚未生成」
 const loading = ref(false)
 const result = ref(null)
 
+// 生成解读：请求规则预检 + LLM 叙述。无 recordId 时直接拦下；
+// 骨架屏与请求并行（至少展示 1 秒），切换病历会清空旧结果避免新旧同屏
 const run = async () => {
   if (!props.recordId) {
     ElMessage.warning('缺少病历ID')
     return
   }
+  // 1. 进入加载态并清空上一次结果，避免新旧解读同屏
   loading.value = true
   result.value = null
   try {
@@ -107,6 +123,7 @@ const run = async () => {
   } catch {
     // 拦截器已提示
   } finally {
+    // 2. 无论成败都要收起骨架屏
     loading.value = false
   }
 }
@@ -118,6 +135,7 @@ watch(() => props.recordId, () => {
 </script>
 
 <style scoped>
+/* 卡片容器：浅纸色底 + 细边框，与详情弹窗内其他分区保持同一视觉层级 */
 .ai-interpret {
   margin-top: 14px;
   background: var(--paper);
@@ -125,6 +143,7 @@ watch(() => props.recordId, () => {
   border-radius: 6px;
   padding: 14px 16px;
 }
+/* 标题行：标题 + 来源标签 + 右侧按钮 */
 .aii-hd {
   display: flex;
   align-items: center;
@@ -142,9 +161,11 @@ watch(() => props.recordId, () => {
   font-size: 11.5px;
   color: var(--text-sub);
 }
+/* margin-left:auto 把按钮推到标题行最右 */
 .aii-btn {
   margin-left: auto;
 }
+/* 骨架屏：渐变扫光动画；行宽由模板按序号递减，模拟段落长短不一 */
 .aii-skeleton .sk-line {
   height: 12px;
   border-radius: 3px;
@@ -170,6 +191,7 @@ watch(() => props.recordId, () => {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
 }
+/* 要点摘要：两列网格 */
 .aii-summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -184,6 +206,7 @@ watch(() => props.recordId, () => {
   display: flex;
   gap: 8px;
 }
+/* flex-shrink:0 保证标签不被长文本挤窄 */
 .sum-item .sum-key {
   font-size: 12px;
   color: var(--text-sub);
@@ -194,6 +217,7 @@ watch(() => props.recordId, () => {
   color: var(--ink);
   word-break: break-all;
 }
+/* LLM 叙述正文：加宽行距便于长段阅读 */
 .aii-narrative {
   font-size: 13px;
   line-height: 1.8;
@@ -204,6 +228,7 @@ watch(() => props.recordId, () => {
   padding: 10px 12px;
   margin-bottom: 12px;
 }
+/* 四块规则结论：两列网格 */
 .aii-blocks {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -221,6 +246,7 @@ watch(() => props.recordId, () => {
   color: var(--ink);
   margin-bottom: 8px;
 }
+/* 「无缺项 / 无提示」时的正向文案，用次级色与警示标签区分 */
 .blk-ok {
   font-size: 12.5px;
   color: var(--ink-mid);
@@ -230,6 +256,7 @@ watch(() => props.recordId, () => {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* 描边标签：用于归一命中分档；实心感留给「怎么来的」类标签 */
 .chip {
   font-size: 11.5px;
   padding: 2px 8px;
@@ -250,6 +277,7 @@ watch(() => props.recordId, () => {
   color: var(--ink);
   line-height: 1.8;
 }
+/* 免责声明：右上分隔线，与正文拉开距离 */
 .aii-disclaimer {
   margin-top: 12px;
   font-size: 11.5px;
@@ -262,6 +290,7 @@ watch(() => props.recordId, () => {
   font-size: 12.5px;
   color: var(--text-sub);
 }
+/* 窄屏（<1200px）摘要与结论块由两列塌成一列 */
 @media (max-width: 1200px) {
   .aii-summary,
   .aii-blocks {
