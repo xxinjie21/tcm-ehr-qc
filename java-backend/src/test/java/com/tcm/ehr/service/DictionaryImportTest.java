@@ -256,7 +256,7 @@ class DictionaryImportTest {
         // 归一已改为只认 ES 索引，所以「导入的新词能不能归上」全看这一步：
         // 断言灌进索引的就是刚导入的那条，而不是只断言 rebuild 被调用过
         ArgumentCaptor<List<TermEntry>> captor = ArgumentCaptor.forClass(List.class);
-        Mockito.verify(esIndex).rebuild(Mockito.eq(TYPE), captor.capture());
+        Mockito.verify(esIndex).rebuild(Mockito.eq(TYPE), captor.capture(), Mockito.any());
         assertEquals(1, captor.getValue().size());
         assertEquals("喉痹", captor.getValue().get(0).getStandardTerm());
     }

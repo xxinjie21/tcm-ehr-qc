@@ -13,6 +13,9 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.GetIndexRequest;
+import org.elasticsearch.client.indices.GetMappingsRequest;
+import org.elasticsearch.client.indices.GetMappingsResponse;
+import org.elasticsearch.cluster.metadata.MappingMetadata;
 import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
@@ -52,14 +55,33 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     }
 
     @Override
-    public void rebuild(String type, List<TermEntry> entries) throws IOException {
+    public String indexedVersion(String type) throws IOException {
+        GetMappingsResponse response = client.indices()
+                .getMapping(new GetMappingsRequest().indices(indexName(type)), RequestOptions.DEFAULT);
+        MappingMetadata meta = response.mappings().get(indexName(type));
+        if (meta == null) {
+            return null;
+        }
+        Object m = meta.getSourceAsMap().get("_meta");
+        if (m instanceof Map<?, ?> map && map.get("version") != null) {
+            return String.valueOf(map.get("version"));
+        }
+        return null;
+    }
+
+    @Override
+    public void rebuild(String type, List<TermEntry> entries, String version) throws IOException {
         String index = indexName(type);
         if (exists(type)) {
             client.indices().delete(new DeleteIndexRequest(index), RequestOptions.DEFAULT);
         }
         CreateIndexRequest create = new CreateIndexRequest(index);
         create.settings(Map.of("number_of_shards", 1, "number_of_replicas", 0));
-        create.mapping(Map.of("properties", mappingProperties()));
+        // _meta.version 让下次启动能判断「索引是否已经是当前词典的版本」——
+        // 一致就跳过重建，重启期间就不会再出现「索引短暂不存在 → 归一 503」的窗口
+        create.mapping(Map.of(
+                "_meta", Map.of("version", version == null ? "" : version),
+                "properties", mappingProperties()));
 
         client.indices().create(create, RequestOptions.DEFAULT);
 

@@ -93,8 +93,9 @@ public class DictionaryServiceImpl implements IDictionaryService {
                 : parseTabularEntries(type, file, failures);
 
         // 合并：现有词典打底，新条目并入（同 standardTerm 合并别名，保留已有 source/code）
+        List<TermEntry> previous = fileService.read(type);
         Map<String, TermEntry> merged = new LinkedHashMap<>();
-        for (TermEntry e : fileService.read(type)) {
+        for (TermEntry e : previous) {
             merged.merge(e.getStandardTerm(), e, this::mergeEntries);
         }
         for (TermEntry e : incoming) {
@@ -104,7 +105,18 @@ public class DictionaryServiceImpl implements IDictionaryService {
         List<TermEntry> entries = new ArrayList<>(merged.values());
         String backupName = fileService.backup(type);
         fileService.write(type, entries);
-        esTermIndexService.rebuild(type, entries);
+        try {
+            esTermIndexService.rebuild(type, entries, fileService.currentVersion());
+        } catch (Exception e) {
+            // 文件已经覆盖而索引没建起来（rebuild 先 delete 再 create，失败时索引可能根本不存在）
+            // → 归一结果与词典页会长期不一致。回滚文件并尽力恢复索引，回到「同版本」状态。
+            log.error("[词典] {} ES 重建失败，回滚文件并尝试恢复索引: {}", type, e.getMessage());
+            compensateFailedRebuild(type, backupName, previous);
+            if (e instanceof IOException io) {
+                throw io;
+            }
+            throw new IOException("词典已回滚到导入前（ES 重建失败：" + e.getMessage() + "）", e);
+        }
 
         ImportResultVO vo = new ImportResultVO();
         vo.setType(type);
@@ -116,6 +128,31 @@ public class DictionaryServiceImpl implements IDictionaryService {
                 type, incoming.size(), failures.size(), entries.size(),
                 backupName == null ? "无(首次)" : backupName);
         return vo;
+    }
+
+    /**
+     * ES 重建失败后的补偿：把文件退回导入前的版本，再尽力把索引也建回旧版本。
+     *
+     * <p>两步都可能再失败 —— 那时只记日志，不掩盖最初的异常（调用方会把它抛出去）。
+     * 无备份（首次导入、原先没有文件）时用 {@code previous} 写回，通常是空列表。</p>
+     */
+    private void compensateFailedRebuild(String type, String backupName, List<TermEntry> previous) {
+        try {
+            if (backupName != null) {
+                fileService.restore(type, backupName);
+            } else {
+                fileService.write(type, previous);
+            }
+        } catch (Exception e) {
+            log.error("[词典] {} 文件回滚失败，文件与索引可能不一致，需重新导入修复: {}", type, e.getMessage());
+            return;
+        }
+        try {
+            esTermIndexService.rebuild(type, previous, fileService.currentVersion());
+            log.warn("[词典] {} 已回滚到导入前的词典并重建索引", type);
+        } catch (Exception e) {
+            log.error("[词典] {} 索引恢复失败（该类术语的归一不可用，请重新导入）: {}", type, e.getMessage());
+        }
     }
 
     /** JSON 直传：TermEntry 数组 [{standardTerm, aliases[], source?, code?}] */
@@ -324,7 +361,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
     public void rollback(String type, String backupFilename) throws IOException {
         fileService.restore(type, backupFilename);
         List<TermEntry> entries = fileService.read(type);
-        esTermIndexService.rebuild(type, entries);
+        esTermIndexService.rebuild(type, entries, fileService.currentVersion());
         log.info("[词典] {} 回滚到 {}，现有{}条", type, backupFilename, entries.size());
     }
 

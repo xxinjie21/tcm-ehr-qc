@@ -73,6 +73,8 @@ public class DataInitializationListener implements ApplicationRunner {
      * 日志里必须能看出是哪一类、什么原因。</p>
      */
     private void loadDictionaries() {
+        // 词典版本只算一次：它对 5 类词典是同一个值（各文件都参与哈希）
+        String version = fileService.currentVersion();
         for (String type : TermTypes.ALL) {
             try {
                 List<TermEntry> entries = fileService.read(type);
@@ -80,7 +82,14 @@ public class DataInitializationListener implements ApplicationRunner {
                     log.warn("[词典] {} 词典文件为空或不存在，跳过（可到术语词典页导入）", type);
                     continue;
                 }
-                esTermIndexService.rebuild(type, entries);
+                // 索引已是这个版本就跳过重建。rebuild 是 delete+create，中间有个窗口，
+                // 期内归一检索会拿 index_not_found → 归一接口回 503（表现为「重启后第一次解析偶发失败」）。
+                // 词典没变却每次重启都重建 5 次，纯属白付这个代价。
+                if (esTermIndexService.exists(type) && version.equals(esTermIndexService.indexedVersion(type))) {
+                    log.info("[词典] {} 索引已是最新（{}），跳过重建", type, version);
+                    continue;
+                }
+                esTermIndexService.rebuild(type, entries, version);
                 log.info("[词典] {} 加载 {} 条术语", type, entries.size());
             } catch (Exception e) {
                 log.error("[词典] {} 加载失败（该类术语的归一将不可用）: {}", type, e.getMessage());

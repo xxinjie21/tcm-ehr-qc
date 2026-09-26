@@ -19,8 +19,24 @@ public interface IEsTermIndexService {
     /** 索引是否存在 */
     boolean exists(String type) throws IOException;
 
-    /** 全量重建：删除旧索引 -> 建索引 -> bulk灌入 */
-    void rebuild(String type, List<TermEntry> entries) throws IOException;
+    /**
+     * 全量重建：删除旧索引 → 建索引 → bulk 灌入，并把词典版本写进索引的 {@code _meta}。
+     *
+     * <p>{@code delete} 与 {@code create} 之间有一个窗口，期内任何检索都会拿到
+     * {@code index_not_found} —— 归一接口据此回 503。所以启动路径要先比对
+     * {@link #indexedVersion}，一致就别重建（见 {@code DataInitializationListener}）。</p>
+     *
+     * @param version 本次灌入的词典版本（{@code IDictionaryFileService#currentVersion()}），
+     *                供下次启动判断「是否白重建一次」
+     */
+    void rebuild(String type, List<TermEntry> entries, String version) throws IOException;
+
+    /**
+     * 索引里记录的词典版本：重建时写进 mapping 的 {@code _meta.version}。
+     *
+     * @return 版本号；索引不存在、或没有该标记（旧索引）时返回 {@code null}
+     */
+    String indexedVersion(String type) throws IOException;
 
     /**
      * 候选召回（宽松，宁可多召回）：精确(标准词/别名) + 分词命中(标准词/别名) 的 OR 组合。
