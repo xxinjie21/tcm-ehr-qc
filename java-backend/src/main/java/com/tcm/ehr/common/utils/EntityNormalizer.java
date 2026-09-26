@@ -139,7 +139,7 @@ public class EntityNormalizer {
         return s == null ? 0 : s.length();
     }
 
-    /** 就地归一抽取结果中的 7 类 Entity 与 herbs，返回命中统计 */
+    /** 就地归一抽取结果中的 8 类 Entity 与 herbs（共 9 路），返回命中统计 */
     public NormStat normalize(NlpExtractVO vo) {
         // 1. 没抽取出东西就不做归一
         if (vo == null) {

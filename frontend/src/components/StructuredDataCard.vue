@@ -44,8 +44,8 @@
                 <em v-if="it.source" class="tag" :class="it.source">{{ it.source === 'rule' ? '规则' : '模型' }}</em>
                 <!-- 置信度只对模型实体有意义：规则兜底是确定性匹配，没有概率可言 -->
                 <span v-if="it.confidence != null" class="conf">置信 {{ pct(it.confidence) }}</span>
-                <!-- 描边标签＝归一「准不准、走哪条路」。命中方式与途径都写出来，
-                     避免用户只看到「精确」而不知道是跟谁比、也不知道这次是 ES 索引给的还是内存兜的 -->
+                <!-- 描边标签＝归一「准不准」。命中层级写出来，避免用户只看到「精确」而不知道比的是什么；
+                     途径（ES / 内存）已不再区分：ES 是唯一权威，没有内存兜底 -->
                 <em v-if="sec.dict" class="tag lv" :class="lvClass(it)">{{ lvText(it) }}</em>
               </span>
             </el-tooltip>

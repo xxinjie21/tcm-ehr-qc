@@ -70,7 +70,7 @@ public class GovernanceController {
     /**
      * 对指定范围执行清洗。
      *
-     * <p>【权限：仅管理员】五步流水线：去重（只标记）→ 字段清理 → 格式规整 → 脏数据隔离 → 术语归一。</p>
+     * <p>【权限：仅管理员】五步流水线：去重（只标记）→ 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。</p>
      *
      * @param dto recordIds=限定病历集合；filters=范围条件，二选一
      * @return total/deduped/repaired/isolated/normalized=各步处理条数

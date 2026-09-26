@@ -67,7 +67,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 数据清洗五步流水线：去重 → 字段清理 → 格式规整 → 脏数据隔离 → 术语归一。
+     * 数据清洗五步流水线：去重 → 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。
      *
      * <p>只规整与标记，<b>不填充医生未书写的内容，也不删除任何病历</b>；各步的判断口径见方法体注释。</p>
      */

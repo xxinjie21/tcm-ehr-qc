@@ -197,7 +197,7 @@
 
 <script setup>
 // 数据治理页：在「当前范围」内执行数据清洗与术语归一，并把质控合格病历导出为标准数据集。
-// 设计取舍：清洗只做去重标记 / 字段清理 / 格式规整 / 脏数据隔离 / 术语归一，既不删除病历、
+// 设计取舍：清洗只做去重标记 / 字段清理 / 空值规整 / 脏数据隔离 / 术语归一，既不删除病历、
 // 也不填充医生未书写的内容；导出恒只取质控合格病历，分级筛选只作用于清洗、不影响导出范围。
 import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -216,7 +216,7 @@ const aiStore = useAiStore()
 const STEPS = [
   { title: '去重', desc: '重复病历只标记，不删除' },
   { title: '字段清理', desc: '只去多余空格，不改内容' },
-  { title: '格式规整', desc: '统一剂量与日期的写法' },
+  { title: '空值规整', desc: '仅有空格等空白字符的字段记一次规整' },
   { title: '脏数据隔离', desc: '无法修复的病历标记为无效' },
   { title: '术语归一', desc: '把「咽喉痛」这类写法统一成标准术语' }
 ]

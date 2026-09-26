@@ -235,7 +235,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return baseMapper.selectList(wrapper);
     }
 
-    /** 按类型统计词频 Top10（中药取处方字符串，其余从结构化实体取；结果空时回退原始列） */
+    /** 按类型统计词频 Top10：全部取自结构化实体（仅证候在缺失时回退原始辨证结论，中药/方剂不回退） */
     private StatsVO statsFor(List<Record> records, String type) {
         StatsVO vo = new StatsVO();
         // 1. 按类型分派：中药/方剂走"处方"这一档（同时出方剂与中药两组）

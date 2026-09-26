@@ -328,7 +328,9 @@ public class DictionaryServiceImpl implements IDictionaryService {
         ConvertPreviewVO vo = new ConvertPreviewVO();
         vo.setType(type);
 
-        // 双开关：llm.enabled 总控 + llm.convert-enabled 子控（子控默认已开），两个都在 llm 段下。
+        // 双开关：llm.enabled 总控 + llm.convert-enabled 子控，两个都在 llm 段下。
+        // 子控由 application.yml 显式置 true（随包即开）；代码里的兜底值是 false，
+        // 所以 yml 缺这个键时会静默变成「默认关」——改 yml 时别漏掉这一行。
         // 关闭属「预期内不可用」，用 IllegalArgumentException 让 GlobalExceptionHandler 回 400 +
         // 明确文案（而非 500 系统异常）。
         // 文案一律说人话、不出现配置项名：用户看到 llm.enabled / llm.convert-enabled 只会

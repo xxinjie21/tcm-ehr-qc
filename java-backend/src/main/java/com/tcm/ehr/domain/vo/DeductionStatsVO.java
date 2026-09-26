@@ -11,7 +11,7 @@ import java.util.Map;
  * 范围扣分维度聚合：把范围内各病历的扣分明细按维度/明细汇总。
  *
  * <p>数据优先读 {@code records.qc_results}（已算过），缺失则按当前规则现算；
- * 扫描上限沿用质控图谱口径，超限 {@code truncated=true}。</p>
+ * 扫描上限取 {@code QcServiceImpl.MAX_SCAN_RECORDS}（3000 条），超限 {@code truncated=true}。</p>
  */
 @Data
 public class DeductionStatsVO {
@@ -22,7 +22,7 @@ public class DeductionStatsVO {
     private boolean truncated;
     /** 本范围扣分总点数 */
     private int totalPoints;
-    /** 按维度（核心字段缺失 / 逻辑冲突 / 格式错误 / 重复数据）汇总 */
+    /** 按维度汇总（核心字段缺失 / 逻辑冲突 / 格式错误 / 术语未标准化 / 重复数据，与 QcScorer 产出的五类扣分一一对应） */
     private List<ByType> byType = new ArrayList<>();
     /** 按明细项（维度+item）汇总，按扣分降序，取前 N */
     private List<ByItem> byItem = new ArrayList<>();

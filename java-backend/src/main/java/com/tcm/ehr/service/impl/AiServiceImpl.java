@@ -56,7 +56,7 @@ public class AiServiceImpl implements IAiService {
     private static final String KNOWLEDGE_FLOW =
             "业务主线：原始病历 → 接入 → 结构化解析 → 术语归一 → 质控判定 → 人工复核 → 清洗导出 → 统计评估。";
     private static final String KNOWLEDGE_FUNCTION =
-            "系统功能：病历导入/查询、NLP 结构化解析、质控评分（完整性/逻辑/格式三层扣分，分级为合格/待复核/无效）、"
+            "系统功能：病历导入/查询、NLP 结构化解析、质控评分（完整性/逻辑冲突/格式/术语标准化/重复五类扣分，分级为合格/待复核/无效）、"
             + "人工复核（7 个工作日时限）、数据清洗与术语归一（精确/包含/模糊三级）、标准数据集导出、术语词典管理、日志审计。";
     private static final String KNOWLEDGE_STANDARD =
             "术语标准化依据：疾病用《中医临床诊疗术语 疾病》、证候用《中医病证分类与代码 GB/T 15657-2021》、"
