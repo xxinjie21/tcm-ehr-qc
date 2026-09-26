@@ -95,7 +95,7 @@ import { getLogs, getLogActions, exportLogs, purgeLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 import { confirmBox } from '@/utils/confirm'
 
-/** 图例配色；具体选项由后端返回（UX-19），未匹配到的走默认色 */
+/** 图例配色；具体选项由后端返回，未匹配到的走默认色 */
 const TAG_TYPES = {
   数据清洗: 'warning',
   数据集导出: 'primary',
@@ -107,7 +107,7 @@ const TAG_TYPES = {
   病历删除: 'danger'
 }
 
-// 操作类型下拉候选：由后端返回（UX-19），不在前端硬编码枚举
+// 操作类型下拉候选：由后端返回，不在前端硬编码枚举
 const actionOptions = ref([])
 
 // 拉取操作类型候选；失败退化为空列表，仍可用关键字搜索
@@ -163,7 +163,7 @@ const loadLogs = async () => {
   }
 }
 
-/** 每页条数变化回到第 1 页（UX-24） */
+/** 每页条数变化回到第 1 页*/
 const handleSizeChange = () => {
   query.page = 1
   loadLogs()

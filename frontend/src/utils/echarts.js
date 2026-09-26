@@ -1,5 +1,5 @@
 /**
- * ECharts 按需引入（UX-14）。
+ * ECharts 按需引入。
  *
  * <p>只注册实际用到的图表与组件，避免把整个 echarts 打进首屏 chunk
  * （原实现 `import * as echarts from 'echarts'` 使看板路由 chunk 约 1.03MB）。

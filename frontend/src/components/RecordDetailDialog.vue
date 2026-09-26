@@ -8,8 +8,8 @@
     top="6vh"
     class="record-detail-dialog"
   >
-    <!-- 左右两栏（UX-65）：左＝原始 21 字段只读，右＝结构化数据 + AI 解读，同屏可比对；
-         改为弹窗后（UX-69 / UX-77）不再占用页面纵向空间 -->
+    <!-- 左右两栏：左＝原始 21 字段只读，右＝结构化数据 + AI 解读，同屏可比对；
+         改为弹窗后不再占用页面纵向空间 -->
     <div v-if="record" class="detail-2col">
       <div class="detail-col">
         <div class="col-hd">原始字段</div>
@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-// 病历详情弹窗（共用）：病历数据页（UX-69）与清洗页（UX-77）都用它，差别只在标题。
+// 病历详情弹窗（共用）：病历数据页与清洗页都用它，差别只在标题。
 // 左栏为原始 21 字段只读，右栏为结构化数据 + AI 解读，左右同屏可比对。
 import StructuredDataCard from './StructuredDataCard.vue'
 import AiInterpretCard from './AiInterpretCard.vue'
@@ -87,9 +87,9 @@ const fieldOf = (row, key) => {
 </script>
 
 <style scoped>
-/* 左右两栏（UX-65）：左＝原始 21 字段只读，右＝结构化数据 + AI 解读，同屏可比对；
-   改为弹窗后（UX-69 / UX-77）不再占用页面纵向空间。
-   内容超长时只让两栏内部滚动（第七轮）：页脚「关闭」始终留在视口内，
+/* 左右两栏：左＝原始 21 字段只读，右＝结构化数据 + AI 解读，同屏可比对；
+   改为弹窗后不再占用页面纵向空间。
+   内容超长时只让两栏内部滚动：页脚「关闭」始终留在视口内，
    不会出现「要看关闭按钮还得先滚到最底」 */
 .detail-2col {
   display: grid;

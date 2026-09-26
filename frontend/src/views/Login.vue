@@ -3,7 +3,7 @@
     <h3>登 录</h3>
     <p class="hint">请使用系统分配的账号登录</p>
 
-    <!-- 回车提交提到表单容器，任一输入框回车都生效（UX-43） -->
+    <!-- 回车提交提到表单容器，任一输入框回车都生效-->
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @keyup.enter="handleLogin">
       <el-form-item label="用户名" prop="username">
         <el-input
@@ -59,7 +59,7 @@ const formRef = ref(null)
 const pwdRef = ref(null)
 const loading = ref(false)
 
-// 注册成功跳转时会带 ?username=，回填后只需输入密码（UX-42）
+// 注册成功跳转时会带 ?username=，回填后只需输入密码
 const form = reactive({
   username: (route.query.username || '').toString(),
   password: ''
@@ -73,7 +73,7 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
-/** 只接受站内路径，避免 ?redirect= 被用作开放重定向（UX-07） */
+/** 只接受站内路径，避免 ?redirect= 被用作开放重定向*/
 const safeRedirect = () => {
   const target = route.query.redirect
   return typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')
@@ -84,7 +84,7 @@ const safeRedirect = () => {
 // 提交登录：先校验表单（validate 失败会 reject，需 catch 兜住避免未处理异常）；
 // 成功后写入登录态并按 redirect 还原目标页，失败由请求拦截器统一提示
 const handleLogin = async () => {
-  // validate() 失败会 reject，未捕获会产生未处理的 Promise 异常（UX-26）
+  // validate 失败会 reject，未捕获会产生未处理的 Promise 异常
   // 1. 先做表单校验；失败直接中止（validate 会 reject，需 catch 兜住）
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
@@ -95,7 +95,7 @@ const handleLogin = async () => {
     const res = await login(form)
     userStore.setLogin(res.data)
     ElMessage.success('登录成功')
-    // 还原登录前的目标页（如会话过期时被中断的页面）（UX-07）
+    // 还原登录前的目标页（如会话过期时被中断的页面）
     router.push(safeRedirect())
   } catch {
     // 拦截器已提示（凭证错误 / 网络异常）

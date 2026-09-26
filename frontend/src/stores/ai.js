@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 
 /**
- * AI 消费端的跨页状态共享（批C·3.1 解读卡 / 3.2 助手浮窗 复用）。
+ * AI 消费端的跨页状态共享。
  *
  * 生产者是「清洗与导出」页：点详情写 `activeRecord`、跑完 clean 写 `normByLevel`、
  * 清洗状态行同步 `stats`。消费端通过 hasXxx 判空后给降级提示——

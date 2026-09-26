@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-// LLM 运行时配置（UX-68）。
+// LLM 运行时配置。
 // 密钥只回传掩码（apiKeyMask），明文只在服务端内存中；前端不得写入 localStorage。
 
 export function getLlmConfig() {

@@ -1,5 +1,5 @@
 <template>
-  <!-- 失败态：区分「加载失败」与「确实没有数据」，并给出重试与上报两条出口（UX-05 / UX-06） -->
+  <!-- 失败态：区分「加载失败」与「确实没有数据」，并给出重试与上报两条出口-->
   <el-empty v-if="failed" description="数据加载失败" :image-size="80">
     <el-button size="small" @click="$emit('retry')">重 试</el-button>
     <el-button size="small" plain @click="reportHint">联系管理员</el-button>
@@ -23,7 +23,7 @@ defineProps({
 
 defineEmits(['retry'])
 
-// 5xx 的响应体里带后端生成的追踪码，提示用户复制它上报，便于按日志定位（UX-06）
+// 5xx 的响应体里带后端生成的追踪码，提示用户复制它上报，便于按日志定位
 const reportHint = () => {
   ElMessage.info('请把提示中的「追踪码」（或浏览器控制台里的错误信息）转给系统管理员')
 }

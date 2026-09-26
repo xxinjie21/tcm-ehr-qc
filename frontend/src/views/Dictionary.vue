@@ -82,7 +82,7 @@
           </el-button>
           <div class="tip" style="margin-top: 8px">导入前会自动备份，可在下方「版本回滚」恢复。</div>
 
-          <!-- 格式说明移出 el-upload 拖拽区（UX-78）：原先嵌在拖拽热区里，
+          <!-- 格式说明移出 el-upload 拖拽区：原先嵌在拖拽热区里，
                点 <summary> 会冒泡触发原生文件选择框 -->
           <details class="fmt-detail">
             <summary>查看格式说明</summary>
@@ -109,7 +109,7 @@
     </PanelCard>
 
     <!-- PDF 智能转换预览：预览阶段不落库，确认后才写入。
-         由弹窗改为同页展开（UX-66 修订）——弹窗内嵌宽表格必然出现滚动条，
+         由弹窗改为同页展开——弹窗内嵌宽表格必然出现滚动条，
          且用户看不到它属于「术语库导入」这一步的上下文。左＝候选，右＝失败明细与确认操作 -->
     <PanelCard
       v-if="convertVisible"
@@ -254,7 +254,7 @@ const loadTerms = async () => {
 watch(activeTab, () => {
   keyword.value = ''
   // 切换词典类型时清空上一次的导入/转换结果与已选文件，
-  // 否则会把「上一类词典的结果」误读成本次的结果（UX-23）
+  // 否则会把「上一类词典的结果」误读成本次的结果
   importResult.value = null
   convert.candidates = []
   convert.failed = []
@@ -278,7 +278,7 @@ const isPdfFile = computed(() => (importFile.value?.name || '').toLowerCase().en
 const MAX_FILE_MB = 50
 const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.json', '.pdf']
 
-/** 预校验扩展名与大小，不合格直接剔除并说明原因（UX-27） */
+/** 预校验扩展名与大小，不合格直接剔除并说明原因*/
 const rejectFile = (raw, reason) => {
   ElMessage.error(`「${raw.name}」${reason}`)
   dictFileList.value = []
@@ -310,7 +310,7 @@ const onFileRemove = () => {
   importFile.value = null
 }
 
-/** limit=1 时再次选择会走这里；主动替换旧文件，避免「换了文件却没反应」（UX-28） */
+/** limit=1 时再次选择会走这里；主动替换旧文件，避免「换了文件却没反应」*/
 const onFileExceed = (files) => {
   // 1. 先清空旧文件：上传列表与待提交引用都要清，避免提交到上一个文件
   const file = files[0]
@@ -380,7 +380,7 @@ const handleConvert = async () => {
     }
     // 6. 展开预览面板，并清空已选文件（候选已进预览框）
     convertVisible.value = true
-    // 转换成功、候选已进预览框，这时才清空已选文件（UX-28）
+    // 转换成功、候选已进预览框，这时才清空已选文件
     uploadRef.value?.clearFiles()
     importFile.value = null
   } catch {
@@ -542,8 +542,8 @@ onMounted(() => {
   color: var(--text-sub);
   margin-top: 4px;
 }
-/* 详细格式收进折叠说明，避免一上来把数据结构摊给用户（UX-58）；
-   位置在 import-actions 内，不再落在上传热区（UX-78） */
+/* 详细格式收进折叠说明，避免一上来把数据结构摊给用户；
+   位置在 import-actions 内，不再落在上传热区*/
 .fmt-detail {
   margin-top: 10px;
   font-size: 12px;
@@ -603,7 +603,7 @@ onMounted(() => {
   font-size: 12.5px;
 }
 
-/* ===== PDF 转换预览：同页展开，左右两栏（UX-66 修订） ===== */
+/* ===== PDF 转换预览：同页展开，左右两栏===== */
 .convert-panel {
   margin-top: 14px;
 }

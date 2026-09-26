@@ -61,8 +61,8 @@
     </PanelCard>
 
     <div v-loading="detailLoading">
-      <!-- ② 当前任务卡：详情区头部，右上角固定「关闭详情」出口（UX-73 第七轮）。
-           第六轮只把关闭入口放进底部吸底条，用户实测仍反馈「只有保存修改 / 复核通过」——
+      <!-- ② 当前任务卡：详情区头部，右上角固定「关闭详情」出口。
+           只把关闭入口放进底部吸底条，用户实测仍反馈「只有保存修改 / 复核通过」——
            进入复核后视线落在头部，出口必须在这里就出现，位置与弹窗右上角关闭同侧 -->
       <section v-if="current" class="task-card">
         <span class="task-id">{{ current.recordId }}</span>
@@ -187,8 +187,8 @@
           点击「复核通过」后系统会自动重新执行质控评分与诊疗逻辑校验；不填修正内容表示仅裁定不修改数据。
         </span>
         <div class="btns">
-          <!-- 补关闭入口（UX-73）：此前只有保存 / 通过两个出口，想只读退出无处可点。
-               第七轮在任务卡右上角再加一处，底部这处保留 —— 读到最底也有出口 -->
+          <!-- 补关闭入口：此前只有保存 / 通过两个出口，想只读退出无处可点。
+               在任务卡右上角再加一处，底部这处保留 —— 读到最底也有出口 -->
           <el-button :disabled="submitting" @click="closeReview">关闭详情</el-button>
           <el-button :loading="submitting" @click="submit(false)">保存修改</el-button>
           <el-button type="primary" :loading="submitting" @click="submit(true)">复核通过</el-button>
@@ -506,7 +506,7 @@ const exitDetail = () => {
   originalMap.value = {}
 }
 
-/** 关闭详情：连提交反馈一起收起，回到纯任务列表（UX-73） */
+/** 关闭详情：连提交反馈一起收起，回到纯任务列表*/
 const closeReview = () => {
   exitDetail()
   result.value = null
@@ -528,7 +528,7 @@ const submit = async (withCorrection) => {
     result.value = res.data
     submittedAt.value = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
     ElMessage.success(`复核完成：${res.data.status}`)
-    // 复核通过即退出详情（UX-74）：任务已办结，无需用户再手动关一次
+    // 复核通过即退出详情：任务已办结，无需用户再手动关一次
     // 4. 仅「复核通过」才退出详情，「保存修改」留在原地继续改
     if (withCorrection) exitDetail()
     // 5. 刷新列表，把该任务移出待复核
@@ -631,7 +631,7 @@ onMounted(() => {
 .deadline b {
   color: var(--danger);
 }
-/* 详情区右上角出口（UX-73 第七轮）：与病历详情弹窗右上角关闭同侧，
+/* 详情区右上角出口：与病历详情弹窗右上角关闭同侧，
    进入复核即可见，不必先滚到页面底部 */
 .task-card .close-top {
   flex-shrink: 0;
@@ -703,7 +703,7 @@ onMounted(() => {
 }
 .compare .panel {
   margin-bottom: 0;
-  /* 补齐面板外框（UX-75）：本页自写 .panel / .panel-hd / .panel-bd，
+  /* 补齐面板外框：本页自写 .panel / .panel-hd / .panel-bd，
      原先漏了 .panel 的外框，左右对比区看起来没有边界，与病历数据页不一致 */
   background: #fff;
   border: 1px solid var(--line);
@@ -908,7 +908,7 @@ onMounted(() => {
   border-radius: 6px;
   padding: 13px 20px;
   flex-wrap: wrap;
-  /* 吸底（UX-73）：对照区很长，关闭 / 提交入口始终可见，不必滚到底 */
+  /* 吸底：对照区很长，关闭 / 提交入口始终可见，不必滚到底 */
   position: sticky;
   bottom: 0;
   margin-top: auto;

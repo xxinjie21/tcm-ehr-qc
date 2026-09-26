@@ -26,7 +26,7 @@
       通道与模型会保存、重启后仍回显；<b>API Key 不落盘，每次需重新填写</b>。
     </p>
 
-    <!-- 左右两栏（UX-65 修订）：原先 7 个表单项纵向堆叠，窗口一矮就要滚动才能
+    <!-- 左右两栏：原先 7 个表单项纵向堆叠，窗口一矮就要滚动才能
          填到最后一项、也看不到探测结果。改为左「通道与接入」/ 右「模型参数 + 探测结果」，
          一屏内可填完并即时看到连接是否可用 -->
     <div v-loading="loading" class="llm-body">
@@ -95,7 +95,7 @@
           </div>
         </el-form>
 
-        <!-- 探测结果就地展示，不用额外弹窗（UX-66 口径） -->
+        <!-- 探测结果就地展示，不用额外弹窗-->
         <div v-if="testResult" class="llm-result" :class="testResult.ok ? 'is-ok' : 'is-bad'">
           <template v-if="testResult.ok">
             连接正常 · {{ testResult.provider }} / {{ testResult.model }} · 往返 {{ testResult.latencyMs }} ms

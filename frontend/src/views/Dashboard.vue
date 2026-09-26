@@ -1,10 +1,10 @@
 <template>
-  <!-- 首页看板（UX-60）：只留 4 块 —— 待办快捷条 + 4 张指标卡 + 质控趋势 + 评分分布/科室合格率 -->
+  <!-- 首页看板：只留 4 块 —— 待办快捷条 + 4 张指标卡 + 质控趋势 + 评分分布/科室合格率 -->
   <div>
     <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilter" />
 
-    <!-- 待办快捷条；无权限的卡片置灰并标注，避免点了才被 403 弹回（UX-02）
-         用 button 而非 div：天然可聚焦、支持 Enter/Space（UX-18） -->
+    <!-- 待办快捷条；无权限的卡片置灰并标注，避免点了才被 403 弹回
+         用 button 而非 div：天然可聚焦、支持 Enter/Space-->
     <section class="todo-bar">
       <button
         type="button"
@@ -107,7 +107,7 @@ import { useUserStore } from '@/stores/user'
 const router = useRouter()
 const userStore = useUserStore()
 
-// 科室选项取自后端，与站内其他筛选器同一数据源（UX-03）
+// 科室选项取自后端，与站内其他筛选器同一数据源
 const departments = ref([])
 // 拉取科室下拉选项；失败退化为空列表，筛选器仍可用日期区间查询
 const loadDepartments = async () => {
@@ -120,7 +120,7 @@ const loadDepartments = async () => {
   }
 }
 
-// 待办卡片按登录返回的菜单判断可达性；无权限时置灰并说明原因（UX-02）
+// 待办卡片按登录返回的菜单判断可达性；无权限时置灰并说明原因
 const canVisit = (menuTitle) => (userStore.menus || []).includes(menuTitle)
 // 待办卡片跳转：先按菜单判断可达性，无权限时只提示不跳转（避免点了才被 403 弹回）
 const go = (path, menuTitle) => {
@@ -134,7 +134,7 @@ const go = (path, menuTitle) => {
 // 筛选条件：科室 + 就诊日期区间；只作用于图表接口
 const filter = reactive({ department: '', start: '', end: '' })
 const loading = ref(false)
-// 区分「加载失败」与「确实为空」（UX-05）
+// 区分「加载失败」与「确实为空」
 const failed = ref(false)
 
 // 指标卡数据（无参接口，不受筛选影响）
@@ -157,7 +157,7 @@ let distChart = null
 // 评分分布全为 0 时不画图（否则是一根空柱）
 const hasScores = computed(() => (extra.value.scoreDistribution || []).some((b) => b.count > 0))
 
-// 图表的文本替代：给屏幕阅读器与无法看图的环境提供关键结论（UX-35）
+// 图表的文本替代：给屏幕阅读器与无法看图的环境提供关键结论
 const trendLabel = computed(() => {
   const t = extra.value.trend || []
   if (!t.length) return '质控趋势图，暂无数据'
@@ -241,7 +241,7 @@ const params = () => ({
   pattern: ''
 })
 
-// 看板只拉主线口径：指标卡走 /stats/overview（轻量），趋势/分布走 /stats/extra（UX-60）
+// 看板只拉主线口径：指标卡走 /stats/overview（轻量），趋势/分布走 /stats/extra
 const loadAll = async () => {
   // 1. 置加载态并清掉上一次的失败标记
   loading.value = true
@@ -265,7 +265,7 @@ const loadAll = async () => {
       }
     }
   } catch {
-    // 拦截器已提示；标记失败态，空态区据此给出重试入口（UX-05）
+    // 拦截器已提示；标记失败态，空态区据此给出重试入口
     failed.value = true
   } finally {
     // 5. 收尾：重画两张图并复位加载态
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
   padding: 9px 18px;
   cursor: pointer;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
-  /* button 元素重置：保持原卡片观感（UX-18） */
+  /* button 元素重置：保持原卡片观感*/
   width: 100%;
   text-align: left;
   font-family: inherit;
@@ -331,7 +331,7 @@ onBeforeUnmount(() => {
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(47, 70, 57, 0.1);
 }
-/* 无权限卡片：置灰、取消悬浮反馈，并标注原因（UX-02） */
+/* 无权限卡片：置灰、取消悬浮反馈，并标注原因*/
 .todo.readonly {
   cursor: default;
   opacity: 0.72;

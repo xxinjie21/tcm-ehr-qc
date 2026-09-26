@@ -26,7 +26,7 @@ function redirectToLogin() {
   useUserStore().logout()
   // 3. 非登录页则跳登录页并带上 redirect
   if (current.path !== '/login') {
-    // 带上被中断的目标页（含 query），登录成功后由 Login.vue 还原（UX-07）
+    // 带上被中断的目标页（含 query），登录成功后由 Login.vue 还原
     router.push({ path: '/login', query: { redirect: current.fullPath } })
   }
 }

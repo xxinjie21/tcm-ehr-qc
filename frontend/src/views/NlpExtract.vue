@@ -1,6 +1,6 @@
 <template>
   <div>
-    <!-- ① 选择病历：看板式列表，常驻可见（第七轮确认：载入后仍需看到列表，方便随时切换病历） -->
+    <!-- ① 选择病历：看板式列表，常驻可见-->
     <PanelCard title="选择病历">
       <RangeFilter v-model="query" />
       <div class="actions">
@@ -29,7 +29,7 @@
         <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
         <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
         <el-table-column prop="grade" label="分级" width="90" />
-        <!-- 接诊时间（第八轮）：常态只到日，悬停给秒级原值。
+        <!-- 接诊时间：常态只到日，悬停给秒级原值。
              只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
              会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
         <el-table-column label="接诊时间" width="110">
@@ -39,7 +39,7 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <!-- 年龄/性别（第八轮）：单块自包含，需回滚时整块删掉即可 ——
+        <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
              后端两字段是追加、向后兼容，回滚不需要动后端 -->
         <el-table-column label="年龄/性别" width="110">
           <template #default="{ row }">
@@ -78,7 +78,7 @@
               已载入病历：<b>{{ loadedLabel }}</b>
               <span v-if="loadedMeta" class="tip">{{ loadedMeta }}</span>
               <span class="tip">关闭详情将清空当前病历与抽取结果</span>
-              <!-- 与人工复核一致的「关闭详情」出口（第七轮）：清空当前病历，列表仍常驻可见 -->
+              <!-- 与人工复核一致的「关闭详情」出口：清空当前病历，列表仍常驻可见 -->
               <el-button
                 link
                 type="primary"
@@ -92,10 +92,10 @@
             <span v-else class="tip">请在上方「选择病历」列表中点选一份病历</span>
           </div>
 
-          <!-- 无产出时把原因讲清楚（UX-63 第七轮；第八轮按原因细分）：
+          <!-- 无产出时把原因讲清楚：
                术语归一依赖上游实体，没有实体就没有可归的内容，不能让用户以为「归一没执行」。
-               第七轮只能把「功能没开」与「服务挂了」合写成一句「未开启，或…」，用户看不出该找谁；
-               第八轮后端下发 unavailableReason，这里按原因分别给结论与下一步，四态各说一件事。
+               只能把「功能没开」与「服务挂了」合写成一句「未开启，或…」，用户看不出该找谁；
+               后端下发 unavailableReason，这里按原因分别给结论与下一步，四态各说一件事。
                这段是给用户看的，一律说人话 —— 配置项、端口、字段名等技术细节
                已挪到后端 slf4j 日志（PythonNlpClient 启动时 warn 一次），此处不再出现。 -->
           <div v-if="emptyReason" class="nlp-off">
@@ -132,12 +132,12 @@
           </div>
 
           <div class="split">
-            <!-- 原文：按字段模块化，可单独修改（UX-62） -->
+            <!-- 原文：按字段模块化，可单独修改-->
             <div class="pane">
               <div class="pane-hd">原文（按字段模块化，可单独修改）</div>
-              <!-- 分区常显 + 多列栅格（UX-70）：原先 4 组折叠、默认只开 2 组，
-                   用户仍要逐组展开、整页依旧要滚动；与病历数据页 UX-51 同一口径。
-                   第七轮再压控件高度（标签左置 + small + 文本域单行起步，见 theme.css） -->
+              <!-- 分区常显 + 多列栅格：原先 4 组折叠、默认只开 2 组，
+                   用户仍要逐组展开、整页依旧要滚动；与病历数据页  同一口径。
+                   再压控件高度（标签左置 + small + 文本域单行起步，见 theme.css） -->
               <el-form
                 class="compact-form field-form"
                 label-width="68px"
@@ -159,7 +159,7 @@
                 </div>
               </el-form>
 
-              <!-- 整段文本只读对照：抽取请求就是这段拼接结果（UX-62） -->
+              <!-- 整段文本只读对照：抽取请求就是这段拼接结果-->
               <details class="composed-panel">
                 <summary class="composed-hd">整段文本（只读对照）</summary>
                 <div class="composed">{{ composedText || '（当前无内容）' }}</div>
@@ -174,17 +174,17 @@
                   title="把本次抽取结果写入该病历的结构化数据（覆盖原有的），不是新增病历"
                   @click="save"
                 >写回结构化数据</el-button>
-                <!-- 禁用时说明原因，而不是让用户猜（UX-01） -->
+                <!-- 禁用时说明原因，而不是让用户猜-->
                 <span v-if="!recordId" class="tip">先在上方列表点选一份病历才能保存</span>
                 <span v-else-if="!result" class="tip">先执行抽取才能保存</span>
               </div>
             </div>
 
-            <!-- 抽取结果：术语已归一，展示「原文 → 标准词」对照（UX-63） -->
+            <!-- 抽取结果：术语已归一，展示「原文 → 标准词」对照-->
             <div class="pane">
               <div class="pane-hd">
                 抽取结果
-                <!-- 来源标注同样按原因细分（第八轮）：原先只有「模型抽取 + 规则补充」与
+                <!-- 来源标注同样按原因细分：原先只有「模型抽取 + 规则补充」与
                      「自动抽取未开启」两种，后者会把「服务连不上」也说成「未开启」。 -->
                 <span v-if="result" class="src-note" :class="{ warn: !result.modelAvailable }">
                   {{ sourceNote }}
@@ -195,7 +195,7 @@
                 <b>本次抽取没有完成</b> —— {{ extractError }}
                 抽取与术语归一依赖 ES 术语索引，索引不可用时不会退化成「全部未收录」，请处理后再重试。
               </div>
-              <!-- 归一状态行（UX-63 第七轮）：明说「归一跑没跑、跑出了什么」 -->
+              <!-- 归一状态行：明说「归一跑没跑、跑出了什么」 -->
               <div v-if="result" class="norm-note" :class="{ warn: !!emptyReason }">
                 <template v-if="emptyReason">
                   本次没有抽取到要素，<b>术语归一没有可归的内容</b>（原因见上方提示）。
@@ -226,7 +226,7 @@
               <StructuredDataCard v-if="result" :data="result" />
               <el-empty v-else description="尚未抽取" :image-size="80" />
 
-              <!-- 术语归一试算（UX-63 第七轮）：词典直查，不依赖 Python NLP 服务，
+              <!-- 术语归一试算：词典直查，不依赖 Python NLP 服务，
                    让用户在本页就能亲自跑一次归一、看到「原文 → 标准词」 -->
               <div class="norm-tool">
                 <div class="nt-hd">术语归一试算（直查词典，不依赖 NLP 服务）</div>
@@ -276,7 +276,7 @@
         </PanelCard>
       </el-tab-pane>
 
-      <!-- ============ 批量解析（批K：后端异步任务，仅管理员） ============ -->
+      <!-- ============ 批量解析============ -->
       <el-tab-pane v-if="isAdmin" label="批量解析" name="batch" lazy>
         <PanelCard title="批量结构化解析">
           <div class="tip">
@@ -386,7 +386,7 @@ import { confirmBox } from '@/utils/confirm'
 
 const activeTab = ref('single')
 
-// ===== 病历列表（UX-61）=====
+// ===== 病历列表=====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const rows = ref([])
 const total = ref(0)
@@ -434,7 +434,7 @@ const resetQuery = () => {
 }
 
 const recordId = ref('')
-/** 已载入病历的展示标识（优先登记号），保存确认与成功提示都要回显它（UX-01） */
+/** 已载入病历的展示标识（优先登记号），保存确认与成功提示都要回显它*/
 const loadedLabel = ref('')
 /** 病历基本信息（只读）：给出上下文，但不参与抽取 */
 const loadedMeta = ref('')
@@ -442,7 +442,7 @@ const loadedMeta = ref('')
 // 高亮当前已载入病历所在行，方便在列表里定位（样式见 .row-active）
 const rowClass = ({ row }) => (row.id === recordId.value ? 'row-active' : '')
 
-// ===== 原文：模块化字段（UX-62）=====
+// ===== 原文：模块化字段=====
 /**
  * 抽取输入字段与分组，与「病历数据」的单条新增保持同一套分区命名；
  * 只列真正参与抽取的 12 个字段，基本信息另在载入条里只读展示。
@@ -455,7 +455,7 @@ const FIELD_GROUPS = [
 ]
 
 /**
- * 字段标签与形态（UX-70 第七轮）。
+ * 字段标签与形态。
  *
  * <p>`wide` 只留给长叙述（主诉 / 自诉 / 现病史 / 草药），占 2 列；
  * `multi` 用文本域、单行起步随输入自增，其余短字段单行输入。
@@ -507,7 +507,7 @@ const extractError = ref('')
 // 可写回的前提：既载入了病历、又有抽取结果；两者缺一即禁用保存并给出对应提示
 const canSave = computed(() => !!recordId.value && !!result.value)
 
-/** 载入一份病历：换病历时必须清空上一次抽取结果，否则会把 A 的结果存进 B（UX-01） */
+/** 载入一份病历：换病历时必须清空上一次抽取结果，否则会把 A 的结果存进 B*/
 const loadRecord = async (row) => {
   // 1. 无有效行号直接返回，避免拿空 id 发请求
   if (!row?.id) return
@@ -542,7 +542,7 @@ const loadRecord = async (row) => {
   }
 }
 
-/** 关闭详情（与人工复核一致的出口，第七轮）：清空当前病历与抽取结果，列表常驻可见 */
+/** 关闭详情：清空当前病历与抽取结果，列表常驻可见 */
 const closeDetail = () => {
   recordId.value = ''
   loadedLabel.value = ''
@@ -579,14 +579,14 @@ const runExtract = async () => {
 }
 
 /**
- * 抽取无产出（UX-63 第七轮；第八轮按原因细分）。
+ * 抽取无产出。
  *
- * <p>用户在第七轮再次提出「结构化解析也应该执行术语归一」。实测
- * {@code NlpController.extract()} 确实调用了 {@code EntityNormalizer.normalize}，
+ * <p>用户在再次提出「结构化解析也应该执行术语归一」。实测
+ * {@code NlpController.extract} 确实调用了 {@code EntityNormalizer.normalize}，
  * 归一一直有跑；之所以看起来「没执行」，是因为上游降级只回空 9 类，归一没有可归的内容。
  * 所以这里把「有没有产出、为什么没有」直接讲出来，而不是让一片空白自己表达。</p>
  *
- * <p>第八轮：{@code modelAvailable} 只是一个布尔值，「功能没开」与「服务挂了」在前端无法区分，
+ * <p>：{@code modelAvailable} 只是一个布尔值，「功能没开」与「服务挂了」在前端无法区分，
  * 文案只能写成「未开启，或抽取服务暂时不可用」，用户看不出该找谁、也不知道能不能自助解决。
  * 后端现在下发 {@code unavailableReason}，这里按原因分开：开关没开要找管理员开、服务连不上要找
  * 管理员恢复服务、模型没加载只出规则兜底、四者都不是则是原文确实没写要素。</p>
@@ -634,7 +634,7 @@ const sourceNote = computed(() => {
  */
 const normStat = computed(() => summarizeNorm(result.value))
 
-// ===== 术语归一试算（UX-63 第七轮）=====
+// ===== 术语归一试算=====
 /** 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射 */
 const NORM_TYPES = [
   { value: 'disease', label: '疾病' },
@@ -697,7 +697,7 @@ const save = async () => {
   }
 }
 
-// ===== 批量解析（批K：后端异步任务；仅管理员）=====
+// ===== 批量解析=====
 const userStore = useUserStore()
 // 批量解析入口仅管理员可见（与后端权限一致，前端只做入口收敛）
 const isAdmin = computed(() => userStore.role === '管理员')
@@ -888,7 +888,7 @@ onBeforeUnmount(stopPoll)
 .actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .nlp-tabs :deep(.el-tabs__header) { margin-bottom: 12px; }
 .nlp-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
-/* 「换病历」入口（UX-70 第七轮）：选择病历卡收起后挂在载入条右侧 */
+/* 「换病历」入口：选择病历卡收起后挂在载入条右侧 */
 .picker-toggle { font-weight: normal; margin-left: auto; }
 .loaded-bar {
   display: flex;
@@ -905,7 +905,7 @@ onBeforeUnmount(stopPoll)
 }
 .loaded-bar b { color: var(--ink); }
 /* 左栏（原文）给 1.25 份宽（第九轮实测校准，原为 1.5）。
-   第九轮改回「同页展开」：第七轮曾把滚动收到这个框内部（max-height + overflow:auto），
+   第九轮改回「同页展开」：曾把滚动收到这个框内部（max-height + overflow:auto），
    为的是整页不出下拉条；但用户明确不要这一层的上下滚动条 —— 框内滚动等于把内容切成
    两个滚动上下文，找实体要滚两次。现在框不限高，内容自然撑开、由页面统一滚动，
    与项目「长内容同页展开」的既有口径一致。左栏主操作条仍是 sticky bottom，滚动时恒在视口内。
@@ -980,7 +980,7 @@ onBeforeUnmount(stopPoll)
 .dot.solid { background: var(--ink-mid); }
 .dot.hollow { background: transparent; border: 1px solid var(--ochre); }
 .dot.none { background: transparent; }
-/* 无产出提示（UX-63 第七轮）：把「为什么没有结果」摆到填写区上方，不藏在空态里 */
+/* 无产出提示：把「为什么没有结果」摆到填写区上方，不藏在空态里 */
 .nlp-off {
   background: #fdf6f4;
   border: 1px solid #e3c3bb;
@@ -994,7 +994,7 @@ onBeforeUnmount(stopPoll)
 }
 .nlp-off b { color: var(--danger); }
 
-/* 术语归一试算（UX-63 第七轮）：词典直查，不依赖 NLP 服务 */
+/* 术语归一试算：词典直查，不依赖 NLP 服务 */
 .norm-tool {
   margin-top: 12px;
   padding: 10px 12px;
@@ -1021,9 +1021,9 @@ onBeforeUnmount(stopPoll)
 .nt-src { font-size: 11.5px; color: var(--text-sub); margin-left: auto; }
 .nt-hint { margin-top: 8px; font-size: 11.5px; color: var(--text-sub); line-height: 1.7; }
 
-/* 原文模块化字段（UX-62）；分区常显 + 3 列栅格（UX-70，与病历数据页同一口径）：
+/* 原文模块化字段；分区常显 + 3 列栅格：
    wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。
-   第七轮再收紧行距与列间距，控件高度由 .compact-form 统一压到 small（24px） */
+   再收紧行距与列间距，控件高度由 .compact-form 统一压到 small（24px） */
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
 .form-grid .wide { grid-column: span 2; }
 .form-group { margin-bottom: 4px; }
@@ -1066,7 +1066,7 @@ onBeforeUnmount(stopPoll)
 .composed-hd::before { content: '▸ '; color: var(--ink-mid); }
 .composed-panel[open] .composed-hd::before { content: '▾ '; }
 .composed-panel[open] { padding-bottom: 10px; }
-/* 执行抽取 / 保存吸底（UX-70）：字段区较长，主操作始终可见 */
+/* 执行抽取 / 保存吸底：字段区较长，主操作始终可见 */
 .pane-actions {
   position: sticky;
   bottom: 0;

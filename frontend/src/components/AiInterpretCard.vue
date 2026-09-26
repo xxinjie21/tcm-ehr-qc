@@ -28,7 +28,7 @@
     <template v-else-if="result">
       <!-- 要点摘要（LLM 可用时） -->
       <div v-if="result.summary" class="aii-summary">
-        <!-- 只读展示，不是表单标签：用 span 避免出现无关联控件的 <label>（UX-34） -->
+        <!-- 只读展示，不是表单标签：用 span 避免出现无关联控件的 <label>-->
         <div class="sum-item"><span class="sum-key">主诉</span><span>{{ result.summary.chiefComplaint || '—' }}</span></div>
         <div class="sum-item"><span class="sum-key">诊断</span><span>{{ result.summary.diagnosis || '—' }}</span></div>
         <div class="sum-item"><span class="sum-key">辨证</span><span>{{ result.summary.syndrome || '—' }}</span></div>

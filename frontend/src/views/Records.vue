@@ -1,6 +1,6 @@
 <template>
   <div>
-    <!-- 三块能力改为标签页切换（UX-51）：原先「查表 / 批量导入 / 单条新增」纵向堆叠，
+    <!-- 三块能力改为标签页切换：原先「查表 / 批量导入 / 单条新增」纵向堆叠，
          用户到达表单本身就要滚动整屏；切换后每屏只面对一件事 -->
     <el-tabs v-model="activeTab" class="records-tabs">
       <!-- ============ 病历查询 ============ -->
@@ -43,7 +43,7 @@
             <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
             <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
             <el-table-column prop="grade" label="分级" width="90" />
-            <!-- 接诊时间（第八轮）：常态只到日，悬停给秒级原值。
+            <!-- 接诊时间：常态只到日，悬停给秒级原值。
                  只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
                  会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
             <el-table-column label="接诊时间" width="110">
@@ -53,7 +53,7 @@
                 </el-tooltip>
               </template>
             </el-table-column>
-            <!-- 年龄/性别（第八轮）：单块自包含，需回滚时整块删掉即可 ——
+            <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
                  后端两字段是追加、向后兼容，回滚不需要动后端 -->
             <el-table-column label="年龄/性别" width="110">
               <template #default="{ row }">
@@ -84,8 +84,8 @@
           />
         </PanelCard>
 
-        <!-- 详情改回弹窗（UX-69）：用户第六轮明确指定用弹窗，属 UX-66 的例外。
-             弹窗内仍是左右两栏对照（UX-65），排版与「病历完整详情」共用同一组件 -->
+        <!-- 详情改回弹窗：用户明确指定用弹窗，属  的例外。
+             弹窗内仍是左右两栏对照，排版与「病历完整详情」共用同一组件 -->
         <RecordDetailDialog v-model="detailVisible" :record="raw" />
       </el-tab-pane>
 
@@ -127,7 +127,7 @@
             <el-button v-else :disabled="!fileList.length" @click="fileList = []">清空</el-button>
           </div>
 
-          <!-- 逐文件进度（UX-15）：给出「第 n/N 个」与已入库统计，并说明不可关页面 -->
+          <!-- 逐文件进度：给出「第 n/N 个」与已入库统计，并说明不可关页面 -->
           <div v-if="importing" class="import-progress">
             <div class="ip-hd">
               正在导入第 {{ Math.min(progress.done + 1, progress.total) }}/{{ progress.total }} 个文件：
@@ -142,7 +142,7 @@
             </div>
           </div>
 
-          <!-- 失败态独立于上一次结果，避免误读为「本次结果」（UX-22） -->
+          <!-- 失败态独立于上一次结果，避免误读为「本次结果」-->
           <div v-if="importFailed" class="import-failed">
             本次导入失败，请根据上方提示排查后重试（上一次结果已清除）。
           </div>
@@ -165,8 +165,8 @@
       <!-- ============ 单条新增病历 ============ -->
       <el-tab-pane label="单条新增病历" name="create" lazy>
         <PanelCard title="单条新增病历">
-          <!-- 紧凑口径（UX-51 第七轮修订）：标签左置 + 控件 small + 文本域单行起步。
-               第六轮只做了「分区常显 + 3 列栅格」，控件仍是 32px、标签各占一行，
+          <!-- 紧凑口径：标签左置 + 控件 small + 文本域单行起步。
+               只做了「分区常显 + 3 列栅格」，控件仍是 32px、标签各占一行，
                用户实测仍要下拉；本轮直接压控件高度（.compact-form 见 theme.css） -->
           <el-form
             ref="createFormRef"
@@ -176,7 +176,7 @@
             label-width="72px"
             size="small"
           >
-            <!-- 语义分区 + 多列栅格（UX-51 修订）：原先 21 字段平铺是 1000px+ 长表单，
+            <!-- 语义分区 + 多列栅格：原先 21 字段平铺是 1000px+ 长表单，
                  改成折叠分组后用户仍要逐组展开、整页依旧要滚动。
                  现改为分区常显 + 3 列栅格：21 字段压到约 12 行，常规屏幕一屏内可填完，
                  校验失败的红字也直接可见（不再藏在折叠区里） -->
@@ -184,7 +184,7 @@
               <div class="group-hd">{{ g.title }}</div>
               <div class="form-grid">
                 <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
-                  <!-- 性别改枚举下拉：自由文本会写进脏数据（UX-10） -->
+                  <!-- 性别改枚举下拉：自由文本会写进脏数据-->
                   <el-select
                     v-if="f.key === 'gender'"
                     v-model="form.gender"
@@ -240,15 +240,15 @@ import { useAiStore } from '@/stores/ai'
 
 const aiStore = useAiStore()
 
-// 当前标签页（UX-51）；导入与新增懒加载，首屏只渲染查询表
+// 当前标签页；导入与新增懒加载，首屏只渲染查询表
 const activeTab = ref('query')
 
 /**
- * 21 个原始字段（UX-51）。
+ * 21 个原始字段。
  *
  * <p>`wide` 只留给真正需要整行宽度的长叙述（主诉 / 自诉 / 现病史 / 草药）；
  * `multi` 表示用文本域（单行起步、随输入自增），其余短字段走单行输入。
- * 第七轮之前 wide 有 11 个，span 2 在 3 列栅格里排不紧，纵向白白多出 4 行，
+ * 之前 wide 有 11 个，span 2 在 3 列栅格里排不紧，纵向白白多出 4 行，
  * 这也是用户反复说「填写框还是太大」的直接原因。</p>
  */
 const FIELDS = [
@@ -276,7 +276,7 @@ const FIELDS = [
 ]
 
 /**
- * 单条新增的分区（UX-51）：21 个字段平铺会产生 1000px+ 的长表单，
+ * 单条新增的分区：21 个字段平铺会产生 1000px+ 的长表单，
  * 按语义分 5 组，只有含必填项的第一组默认展开。
  */
 const FIELD_MAP = FIELDS.reduce((m, f) => ({ ...m, [f.key]: f }), {})
@@ -328,7 +328,7 @@ const handleSearch = async () => {
   }
 }
 
-/** 每页条数变化回到第 1 页（UX-24） */
+/** 每页条数变化回到第 1 页*/
 const handleSizeChange = () => {
   page.value = 1
   handleSearch()
@@ -347,7 +347,7 @@ const handleReset = () => {
   handleSearch()
 }
 
-// ===== 详情（弹窗，UX-69）=====
+// ===== 详情=====
 const raw = ref(null)
 const detailVisible = ref(false)
 const activeId = ref('')
@@ -374,7 +374,7 @@ const openDetail = async (id) => {
   }
 }
 
-/** 只收起弹窗、保留 raw：否则关闭动画期间内容会闪空（UX-69） */
+/** 只收起弹窗、保留 raw：否则关闭动画期间内容会闪空*/
 const closeDetail = () => {
   detailVisible.value = false
 }
@@ -511,7 +511,7 @@ const autoExtract = ref(false)
 const importing = ref(false)
 const summary = ref(null)
 const importFailed = ref(false)
-// 逐文件分批上传的进度（UX-15）：后端导入是同步接口，拿不到中间 taskId，
+// 逐文件分批上传的进度：后端导入是同步接口，拿不到中间 taskId，
 // 因此按「文件」粒度推进度 —— 既真实可取消，也避免单次超大请求
 const progress = reactive({ done: 0, total: 0, current: '', success: 0, failed: 0 })
 const cancelled = ref(false)
@@ -520,7 +520,7 @@ const cancelled = ref(false)
 // 不显式提示用户会以为文件没被选中是卡住了
 const onExceed = () => ElMessage.warning('单次最多上传 20 个文件')
 
-/** 前端预校验：类型与大小不合法直接剔除，不用等服务端返回（UX-27） */
+/** 前端预校验：类型与大小不合法直接剔除，不用等服务端返回*/
 const onFileChange = (file, list) => {
   // 1. 取原始 File 对象，没有就跳过（如已有文件的回显）
   const raw = file.raw
@@ -551,7 +551,7 @@ const handleImport = async () => {
   const files = fileList.value.map((f) => f.raw).filter(Boolean)
   if (!files.length) return
   // 2. 发起即复位上一次结果、失败态与逐文件进度
-  // 发起即清空上一次结果并复位失败态，避免把旧结果误读成本次结果（UX-22）
+  // 发起即清空上一次结果并复位失败态，避免把旧结果误读成本次结果
   summary.value = null
   importFailed.value = false
   cancelled.value = false
@@ -619,7 +619,7 @@ const form = reactive(emptyForm())
 const creating = ref(false)
 const createFormRef = ref(null)
 
-/** 字段级校验（UX-10）：必填口径 + 数值范围 + 枚举 + 长度上限 */
+/** 字段级校验：必填口径 + 数值范围 + 枚举 + 长度上限 */
 const FORM_RULES = {
   registrationNo: [
     { required: true, message: '登记号不能为空', trigger: 'blur' },
@@ -680,7 +680,7 @@ const handleCreate = async () => {
     ElMessage.success(`新增成功：登记号 ${payload.registrationNo}`)
     // 5. 成功后清空表单并清除校验红字
     resetForm()
-    // 切回查表页并回到第 1 页刷新，让用户立刻确认已入库（UX-09）
+    // 切回查表页并回到第 1 页刷新，让用户立刻确认已入库
     page.value = 1
     await handleSearch()
     // 6. 最后切回查询页，让用户看到刚入库的数据
@@ -698,7 +698,7 @@ onMounted(handleSearch)
 </script>
 
 <style scoped>
-/* 标签页（UX-51）：去掉底部分隔线，避免与面板边框叠成双线 */
+/* 标签页：去掉底部分隔线，避免与面板边框叠成双线 */
 .records-tabs :deep(.el-tabs__header) {
   margin-bottom: 12px;
 }
@@ -747,7 +747,7 @@ onMounted(handleSearch)
   font-size: 12.5px;
   color: var(--danger);
 }
-/* 逐文件导入进度（UX-15） */
+/* 逐文件导入进度*/
 .import-progress {
   margin-top: 14px;
   padding: 10px 14px;
@@ -775,9 +775,9 @@ onMounted(handleSearch)
 .stat-item .lbl { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.red .num { color: var(--danger); }
-/* 多列栅格（UX-51 修订）：3 列时 21 字段压到约 11 行，常规屏幕一屏可填完。
+/* 多列栅格：3 列时 21 字段压到约 11 行，常规屏幕一屏可填完。
    wide（长文本）占 2 列而非整行 —— 否则每行拉满宽度、纵向白白多出数行；
-   第七轮进一步只把主诉 / 自诉 / 现病史 / 草药 4 项定为 wide（原先 11 项），
+   进一步只把主诉 / 自诉 / 现病史 / 草药 4 项定为 wide（原先 11 项），
    并把控件高度统一压到 small（24px，见 theme.css 的 .compact-form） */
 .form-grid {
   display: grid;
@@ -795,7 +795,7 @@ onMounted(handleSearch)
   line-height: 1.5;
   padding-bottom: 0;
 }
-/* 分区常显（UX-51 修订）：不再折叠，标题只作视觉分隔 */
+/* 分区常显：不再折叠，标题只作视觉分隔 */
 .form-group {
   margin-bottom: 4px;
 }
@@ -817,7 +817,7 @@ onMounted(handleSearch)
   height: 12px;
   background: var(--ink-mid);
 }
-/* 提交按钮吸底，长表单滚动时始终可见（UX-51） */
+/* 提交按钮吸底，长表单滚动时始终可见*/
 .create-actions {
   position: sticky;
   bottom: 0;
@@ -830,7 +830,7 @@ onMounted(handleSearch)
 :deep(.row-active) td {
   background: var(--ink-light) !important;
 }
-/* 栅格降级（UX-51 第七轮，按真机量测定断点）：
+/* 栅格降级：
    1500px 以下如果取消 span 2，21 字段从 11 行降到 8 行，比降到 2 列更省高度；
    1200px 以下 3 列每列已不足 320px，标签左置后控件过窄，才收 2 列 */
 @media (max-width: 1559px) {

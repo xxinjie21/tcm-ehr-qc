@@ -1,7 +1,7 @@
 <template>
   <!-- 质控页：范围查询（整页口径）+ 评分标准 + 规则配置（仅管理员）+ 扣分构成 + AI 预检列表 + 扣分明细弹窗 -->
   <div>
-    <!-- 范围查询提升为整页生效（第八轮）：此前 RangeFilter 只喂图谱，
+    <!-- 范围查询提升为整页生效：此前 RangeFilter 只喂图谱，
          而「AI 预检列表」另挂一个独立的分级下拉，同一页存在两个互不相干的范围口径 -->
     <PanelCard title="范围查询">
       <div class="filter-bar">
@@ -15,7 +15,7 @@
       </div>
     </PanelCard>
 
-    <!-- 质控评分标准（批R）：直接展示自然语言描述（与规则同源） -->
+    <!-- 质控评分标准：直接展示自然语言描述（与规则同源） -->
     <PanelCard title="质控评分标准">
       <template #header>
         <span>质控评分标准</span>
@@ -168,7 +168,7 @@
       </template>
     </el-dialog>
 
-    <!-- 本范围扣分构成（批P）：范围内各病历扣分明细聚合 -->
+    <!-- 本范围扣分构成：范围内各病历扣分明细聚合 -->
     <PanelCard title="本范围扣分构成">
       <div v-loading="dedLoading">
         <template v-if="dedStats">
@@ -215,7 +215,7 @@
         <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
         <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
         <el-table-column prop="grade" label="分级" width="90" />
-        <!-- 接诊时间（第八轮）：常态只到日，悬停给秒级原值。
+        <!-- 接诊时间：常态只到日，悬停给秒级原值。
              只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
              会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
         <el-table-column label="接诊时间" width="110">
@@ -225,7 +225,7 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <!-- 年龄/性别（第八轮）：单块自包含，需回滚时整块删掉即可 ——
+        <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
              后端两字段是追加、向后兼容，回滚不需要动后端 -->
         <el-table-column label="年龄/性别" width="110">
           <template #default="{ row }">
@@ -258,7 +258,7 @@
       />
     </PanelCard>
 
-    <!-- 扣分明细弹窗（UX-71）：评分/分级 + 评分构成瀑布 + 扣分明细表 -->
+    <!-- 扣分明细弹窗：评分/分级 + 评分构成瀑布 + 扣分明细表 -->
     <el-dialog
       v-model="detailVisible"
       title="规则预检单（扣分明细）"
@@ -273,7 +273,7 @@
             <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
           </el-descriptions>
 
-          <!-- 评分构成瀑布（批P）：100 分起逐项扣到最终分，一眼看分扣在哪 -->
+          <!-- 评分构成瀑布：100 分起逐项扣到最终分，一眼看分扣在哪 -->
           <div class="sd-title">评分构成（100 分起，逐项扣）</div>
           <div class="wf">
             <div class="wf-item"><span class="wf-l">总分</span><b class="wf-num">100</b></div>
@@ -333,7 +333,7 @@ const isAdmin = computed(() => userStore.role === '管理员')
 // 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 
-// ===== 评分标准 / 扣分构成（批P/Q） =====
+// ===== 评分标准 / 扣分构成=====
 // 评分标准：rules 为当前生效规则，descriptions 为自然语言说明，catalog* 为可选项目录
 const rules = ref(null)
 const ruleWarnings = ref([])
@@ -597,7 +597,7 @@ const resetRules = async () => {
 
 // ===== 预检列表 / 扣分明细 =====
 // 分级不再单独持有：统一由上方「范围查询」的 filters.grade 驱动，
-// 否则同一页会出现两个互不相干的分级口径（第八轮）
+// 否则同一页会出现两个互不相干的分级口径
 // 预检列表状态
 const precheckRows = ref([])
 const precheckTotal = ref(0)
@@ -653,7 +653,7 @@ const resetFilters = () => {
   applyFilters()
 }
 
-// 质控评分计算（批T：从清洗页移来）：按当前范围重算评分与分级
+// 质控评分计算：按当前范围重算评分与分级
 const recomputing = ref(false)
 // 质控评分计算：二次确认后按当前范围重算评分与分级，完成后刷新两块数据
 const handleRecompute = async () => {
@@ -687,12 +687,12 @@ const handleRecompute = async () => {
   }
 }
 
-// 扣分明细改回弹窗（UX-71）；关闭时只收起、不清数据，避免关闭动画期间内容闪空
+// 扣分明细改回弹窗；关闭时只收起、不清数据，避免关闭动画期间内容闪空
 const detail = ref(null)
 const detailVisible = ref(false)
 
 // 扣分合计：弹窗里直接给出，省得用户在长表里自己加
-/** 扣分合计：两栏弹窗里直接给出，省得用户在长表里自己加（UX-65 第七轮） */
+/** 扣分合计：两栏弹窗里直接给出，省得用户在长表里自己加*/
 const detailTotal = computed(() =>
   (detail.value?.deductions || []).reduce((s, d) => s + (d.points || 0), 0)
 )
@@ -725,7 +725,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 页面级范围查询条（第八轮）：与 RangeFilter 同一行，控件底对齐 */
+/* 页面级范围查询条：与 RangeFilter 同一行，控件底对齐 */
 .filter-bar {
   display: flex;
   align-items: flex-end;
@@ -788,7 +788,7 @@ onMounted(() => {
   padding-left: 8px;
 }
 
-/* ===== 评分标准面板（批P） ===== */
+/* ===== 评分标准面板===== */
 /* 以下 .std-title / .std-body / .std-cols / .std-col / .std-dim / .std-grade / .rule-card
    为旧版标准面板样式；当前模板已改用 .std-grid / .st / .chip，这些类暂无引用（保留待清理） */
 .std-title {

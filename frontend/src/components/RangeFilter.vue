@@ -15,7 +15,7 @@
            label 只能关联其中一个控件（取起始那个），结束那个因此没有标签，
            Chrome 的 Issues 面板会报「No label associated with a form field」。
            aria-label 是 Picker 的显式 prop（ariaLabel）：范围分支把它透传给
-           PickerRangeTrigger，而后者用 useAttrs() 把同一份 attrs 合并进「两个」input
+           PickerRangeTrigger，而后者用 useAttrs 把同一份 attrs 合并进「两个」input
            —— 所以这一行同时给起止两个框补上无障碍名称，且不会污染外层 div。 -->
       <label for="rf-date-start">就诊时间</label>
       <el-date-picker

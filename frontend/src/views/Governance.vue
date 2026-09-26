@@ -6,7 +6,7 @@
         <b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
       <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
       <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已清洗</span>
-      <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果（UX-21） -->
+      <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果-->
       <span v-if="statsFailed" class="gs-fail">
         统计加载失败{{ statsLoadedAt ? `（上次成功 ${statsLoadedAt}）` : '' }}
         <el-button link type="primary" size="small" @click="loadStats">重试</el-button>
@@ -23,7 +23,7 @@
 
     <!-- 数据清洗与术语归一（流程图） -->
     <PanelCard title="数据清洗与术语自动归一">
-      <!-- 总述只保留这一处（UX-57）；每步的一句话解释回到步骤卡内（UX-76） -->
+      <!-- 总述只保留这一处；每步的一句话解释回到步骤卡内-->
       <div class="flow-tip">
         清洗<b>不会填充医生未书写的内容</b>，也<b>不会删除任何病历</b>；术语按最新词典统一为标准写法。
       </div>
@@ -33,11 +33,11 @@
           <div class="step-card">
             <div class="step-num">{{ i + 1 }}</div>
             <div class="step-title">{{ s.title }}</div>
-            <!-- 还原每步解释（UX-76）：UX-57 收敛过度，5 步说明全收进折叠区后
+            <!-- 还原每步解释： 收敛过度，5 步说明全收进折叠区后
                  步骤卡只剩序号与标题，用户看不出每步到底做什么 -->
             <div class="step-desc">{{ s.desc }}</div>
           </div>
-          <!-- 末步留占位箭头，保证 5 张卡片等宽（UX-64） -->
+          <!-- 末步留占位箭头，保证 5 张卡片等宽-->
           <div class="step-arrow" :class="{ ghost: i === STEPS.length - 1 }" aria-hidden="true">→</div>
         </div>
       </div>
@@ -46,7 +46,7 @@
         <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
           {{ clean.loading ? '清洗执行中…' : '执行数据清洗' }}
         </el-button>
-        <!-- 执行期间说明「在做什么、要等多久、结果在哪看」，而不是只转一个圈（UX-37） -->
+        <!-- 执行期间说明「在做什么、要等多久、结果在哪看」，而不是只转一个圈-->
         <span v-if="clean.loading" class="tip">
           正在按 5 步依次处理，请勿关闭页面；完成后下方会给出分步结果
         </span>
@@ -97,7 +97,7 @@
           <!-- 单选按钮组是「一组」控件，而 <label for> 只能关联「单个」控件：
                指向 el-radio-group 的根 div（role=radiogroup）会命中非可标注元素，
                Chrome 的 Issues 面板报「Incorrect use of <label for=FORM_ELEMENT>」。
-               正解是视觉文案用 span（同 AiInterpretCard 的 UX-34 做法），
+               正解是视觉文案用 span，
                组本身用 aria-label 命名 —— 组内每个 radio 由 element-plus 自己的
                <label> 包裹，已经各自有名字，不需要我们再管。 -->
           <span class="field-lbl">导出格式</span>
@@ -142,7 +142,7 @@
       <div v-if="preview.result" class="preview-box">
         <div class="preview-hd">
           <span>预览：共 {{ preview.result.total }} 条合格病历（样本前10条，点击行查看完整详情）</span>
-          <!-- 21 列全出会横向滚很长，改为默认只显示关键列，其余按需勾选（UX-38） -->
+          <!-- 21 列全出会横向滚很长，改为默认只显示关键列，其余按需勾选-->
           <el-popover placement="bottom-end" :width="260" trigger="click">
             <template #reference>
               <el-button size="small" plain>
@@ -177,7 +177,7 @@
             :formatter="c.formatter"
             show-overflow-tooltip
           />
-          <!-- 行内「查看」入口：键盘用户也能打开详情，且给鼠标用户明确的「可点」提示（UX-18） -->
+          <!-- 行内「查看」入口：键盘用户也能打开详情，且给鼠标用户明确的「可点」提示-->
           <el-table-column label="操作" width="70" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
@@ -190,7 +190,7 @@
       </div>
     </PanelCard>
 
-    <!-- 单条完整详情改弹窗（UX-77）：排版与病历数据页的「病历详情」共用同一组件 -->
+    <!-- 单条完整详情改弹窗：排版与病历数据页的「病历详情」共用同一组件 -->
     <RecordDetailDialog v-model="detailVisible" :record="detail" title="病历完整详情" />
   </div>
 </template>
@@ -224,11 +224,11 @@ const STEPS = [
 const stats = reactive({ qualified: 0, pendingGovern: 0, governedCount: 0 })
 const statsLoading = ref(false)
 // 写操作失败后数字会停在旧值，需显式失败态 + 上次成功时间，
-// 否则用户会把这些数字当成最新结果（UX-21）
+// 否则用户会把这些数字当成最新结果
 const statsFailed = ref(false)
 const statsLoadedAt = ref('')
 
-// 当前范围（批B·4.1）：清洗 / 导出 只作用于该范围（filters 见下方声明）
+// 当前范围：清洗 / 导出 只作用于该范围（filters 见下方声明）
 const scopeText = computed(() => {
   const parts = []
   if (filters.department) parts.push(filters.department)
@@ -239,7 +239,7 @@ const scopeText = computed(() => {
 })
 
 // 拉取治理统计（质控合格 / 待清洗 / 已清洗）并同步给 aiStore 供 AI 助手引用；
-// 失败时保留旧值但置失败态，状态行据此提示「数字可能不是最新」（UX-21）
+// 失败时保留旧值但置失败态，状态行据此提示「数字可能不是最新」
 const loadStats = async () => {
   // 1. 置加载态并清空上次失败态
   statsLoading.value = true
@@ -254,7 +254,7 @@ const loadStats = async () => {
     statsLoadedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
   // 5. 保留旧值但置失败态，提示「数字可能不是最新」
   } catch {
-    // 标记失败态，状态行据此提示「显示的可能不是最新值」（UX-21）
+    // 标记失败态，状态行据此提示「显示的可能不是最新值」
     statsFailed.value = true
   // 6. 无论成败都关掉 loading
   } finally {
@@ -315,7 +315,7 @@ const buildPayload = () => ({
 })
 
 /**
- * 预览表列定义（UX-38）。21 列全出横向滚动很长，默认只显示关键列，
+ * 预览表列定义。21 列全出横向滚动很长，默认只显示关键列，
  * 其余在「列显示」里按需勾选；formatter 处理接诊时间这类要截断展示的字段。
  */
 const PREVIEW_COLS = [
@@ -355,11 +355,11 @@ const resetCols = () => {
 
 const preview = reactive({ loading: false, result: null })
 
-// ===== 详情（弹窗，UX-77）=====
+// ===== 详情=====
 const detail = ref(null)
 const detailVisible = ref(false)
 
-// 点详情：写入共享状态，供 AI 助手"这份病历…"类问题使用（批C·3.2）
+// 点详情：写入共享状态，供 AI 助手"这份病历…"类问题使用
 const openDetail = (row) => {
   // 1. 记下当前行作为弹窗数据
   detail.value = row
@@ -428,7 +428,7 @@ const handleExport = async () => {
   }
 }
 
-// 导出区科室选项取后端实际值，避免写死科室与库中数据对不上（同 UX-03）
+// 导出区科室选项取后端实际值，避免写死科室与库中数据对不上
 const departments = ref([])
 // 加载导出区的科室下拉项（取后端实际科室值，避免写死科室与库中数据对不上）；
 // 失败时降级为空列表，不阻塞页面其余功能
@@ -470,14 +470,14 @@ onMounted(() => {
   color: var(--ink);
   margin-right: 6px;
 }
-/* 统计失败提示（UX-21） */
+/* 统计失败提示*/
 .gs-fail {
   margin-left: auto;
   font-size: 12.5px;
   color: var(--danger);
 }
 
-/* 当前范围条（批B·4.1） */
+/* 当前范围条*/
 .scope-bar {
   background: #fff;
   border: 1px solid var(--line);
@@ -495,7 +495,7 @@ onMounted(() => {
 .scope-tip b { color: var(--ink); }
 
 /* ===== 流程说明条 =====
-   边框与圆角统一为 --line / 6px，与 .step-card、.level-dist .ld 同一套规格（UX-64） */
+   边框与圆角统一为 --line / 6px，与 .step-card、.level-dist .ld 同一套规格*/
 .flow-tip {
   background: var(--ink-light);
   border: 1px solid var(--line);
@@ -554,14 +554,14 @@ onMounted(() => {
   font-weight: bold;
   color: var(--ink);
 }
-/* 每步的一句话解释（UX-76）：卡内常显，不再收进折叠区 */
+/* 每步的一句话解释：卡内常显，不再收进折叠区 */
 .step-desc {
   margin-top: 6px;
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-sub);
 }
-/* 箭头定宽，末步用同宽占位，保证 5 张卡片等宽（UX-64） */
+/* 箭头定宽，末步用同宽占位，保证 5 张卡片等宽*/
 .step-arrow {
   width: 20px;
   flex-shrink: 0;
@@ -625,7 +625,7 @@ onMounted(() => {
 .stat-item.ochre .num { color: var(--ochre); }
 .stat-item.red .num { color: var(--danger); }
 
-/* 三级命中分布（批B·2.2）；圆角与流程区统一为 6px（UX-64） */
+/* 三级命中分布；圆角与流程区统一为 6px*/
 .level-dist {
   display: flex;
   align-items: center;
@@ -671,7 +671,7 @@ label,
   justify-content: space-between;
   gap: 12px;
 }
-/* 列显示选择器（UX-38） */
+/* 列显示选择器*/
 .col-picker :deep(.el-checkbox-group) {
   display: flex;
   flex-direction: column;
@@ -689,13 +689,13 @@ label,
   border-top: 1px solid var(--line);
   padding-top: 8px;
 }
-/* 预览行可点击下钻，给出指针提示（UX-18） */
+/* 预览行可点击下钻，给出指针提示*/
 .preview-box :deep(.el-table__body tr) {
   cursor: pointer;
 }
 
 @media (max-width: 1200px) {
-  /* 窄屏改 3 列网格并隐藏箭头，保证每行卡片等宽（UX-64） */
+  /* 窄屏改 3 列网格并隐藏箭头，保证每行卡片等宽*/
   .flow-wrapper {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

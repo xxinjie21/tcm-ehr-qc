@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-// 待复核任务列表（批D·5.1）：page/pageSize/status（待复核|已完成）
+// 待复核任务列表：page/pageSize/status（待复核|已完成）
 export function listReviewTasks(params) {
   return request.get('/review/tasks', { params })
 }

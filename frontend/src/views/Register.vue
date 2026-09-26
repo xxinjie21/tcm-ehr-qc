@@ -5,7 +5,7 @@
 
     <div class="auth-role-tip">注册账号角色为「审核员」，管理员账号由系统预置。</div>
 
-    <!-- 回车提交提到表单容器，任一输入框回车都生效（UX-43） -->
+    <!-- 回车提交提到表单容器，任一输入框回车都生效-->
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @keyup.enter="handleRegister">
       <el-form-item label="用户名" prop="username">
         <el-input
@@ -63,7 +63,7 @@ const loading = ref(false)
 
 const form = reactive({ username: '', password: '', confirmPassword: '' })
 
-// 密码变了，上一次「确认密码」的一致性结论就失效，需要重新判定（UX-25）
+// 密码变了，上一次「确认密码」的一致性结论就失效，需要重新判定
 watch(
   () => form.password,
   () => {
@@ -115,7 +115,7 @@ const handleRegister = async () => {
     await register({ username: form.username, password: form.password })
     // 3. 提示成功，并带用户名跳回登录页回填
     ElMessage.success('注册成功，请登录')
-    // 带上用户名回填登录页，用户只需再输密码（UX-42）
+    // 带上用户名回填登录页，用户只需再输密码
     router.push({ path: '/login', query: { username: form.username } })
   } catch {
     // 拦截器已提示（如用户名已存在）

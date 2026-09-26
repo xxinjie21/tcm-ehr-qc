@@ -64,7 +64,7 @@ router.beforeEach((to) => {
 
 const APP_NAME = '中医电子病历质控与标准化系统'
 
-// 浏览器标签页标题随页面变化（UX-32）
+// 浏览器标签页标题随页面变化
 router.afterEach((to) => {
   const title = to.meta && to.meta.title
   document.title = title ? `${title} · ${APP_NAME}` : APP_NAME

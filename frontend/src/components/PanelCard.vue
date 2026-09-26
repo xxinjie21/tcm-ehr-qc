@@ -1,6 +1,6 @@
 <template>
   <section class="panel">
-    <!-- 面板标题用 h2，与页面级 h1 构成标题层级（UX-17） -->
+    <!-- 面板标题用 h2，与页面级 h1 构成标题层级-->
     <h2 class="panel-hd">
       <slot name="header">{{ title }}</slot>
     </h2>
