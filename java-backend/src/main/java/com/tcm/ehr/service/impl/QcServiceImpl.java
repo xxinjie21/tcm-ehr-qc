@@ -43,6 +43,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -60,6 +61,19 @@ import java.util.regex.Pattern;
 public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements com.tcm.ehr.service.IQcService {
 
     private static final String BATCH_LOCK_KEY = "tcm:task:batch";
+    /** 防重锁 TTL：超过它就认为上一轮已经异常结束，允许重新提交 */
+    private static final long LOCK_TTL_SECONDS = 900;
+    /** 降级为进程内锁时用的哨兵令牌（与 Redis 的 UUID 令牌区分开） */
+    private static final String LOCAL_LOCK_TOKEN = "local";
+    /** Redis 不可用时的兜底锁；final 且有初值 → 不进 @RequiredArgsConstructor */
+    private final java.util.concurrent.locks.ReentrantLock localLock = new java.util.concurrent.locks.ReentrantLock();
+
+    /** 只删除「值等于本次令牌」的锁，GET 与 DEL 之间不可被打断 */
+    private static final org.springframework.data.redis.core.script.RedisScript<Long> RELEASE_IF_OWNER =
+            org.springframework.data.redis.core.script.RedisScript.of(
+                    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+                    Long.class);
+
     private static final int BATCH_PAGE_SIZE = 1000;
     /** 扣分聚合/扫描上限 */
     private static final int MAX_SCAN_RECORDS = 3000;
@@ -139,8 +153,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             throw new IllegalArgumentException("超过单次上限（" + maxRecords + " 条），请缩小范围或子集操作");
         }
 
-        boolean locked = acquireLock();
-        if (!locked) {
+        String lockToken = acquireLock();
+        if (lockToken == null) {
             throw new IllegalArgumentException("任务进行中，请勿重复提交");
         }
         QcBatchResultVO result = new QcBatchResultVO();
@@ -175,7 +189,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                     + "，待复核" + result.getPendingReview() + "，无效" + result.getInvalid()
                     + "，失败" + result.getFailed());
         } finally {
-            releaseLock();
+            releaseLock(lockToken);
         }
         return result;
     }
@@ -362,19 +376,43 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     // ------------------------------------------------------------------ 辅助
 
-    private boolean acquireLock() {
+    /**
+     * 取防重锁：成功返回本次的锁令牌，已被别人持有返回 {@code null}。
+     *
+     * <p>Redis 不可用时<b>降级为进程内锁</b>，而不是原来的「放行」—— 放行会让并发提交
+     * 真的跑两份，产生重复扣分与重复 review_tasks。本项目单实例部署，进程内锁在这个前提下
+     * 与 Redis 锁等效；<b>多实例部署下进程内锁无效</b>，那时 Redis 挂了就只能拒绝提交
+     * （日志里已写明这条限制）。</p>
+     */
+    private String acquireLock() {
+        String token = UUID.randomUUID().toString();
         try {
-            return Boolean.TRUE.equals(redis.opsForValue()
-                    .setIfAbsent(BATCH_LOCK_KEY, "1", Duration.ofSeconds(900)));
+            Boolean ok = redis.opsForValue()
+                    .setIfAbsent(BATCH_LOCK_KEY, token, Duration.ofSeconds(LOCK_TTL_SECONDS));
+            return Boolean.TRUE.equals(ok) ? token : null;
         } catch (Exception e) {
-            log.warn("[质控重算] Redis 不可用，跳过防重锁: {}", e.getMessage());
-            return true;
+            log.warn("[质控重算] Redis 不可用，降级为进程内防重锁（多实例部署下不生效）: {}", e.getMessage());
+            return localLock.tryLock() ? LOCAL_LOCK_TOKEN : null;
         }
     }
 
-    private void releaseLock() {
+    /**
+     * 释放锁：只删「本次持有」的那一把。
+     *
+     * <p>原来直接 {@code redis.delete(BATCH_LOCK_KEY)} —— 900 秒 TTL 过期后锁可能已被别人取走，
+     * 无条件删就是把别人的锁删了，防重彻底失效。用 Lua 原子比对 value 再删，避免
+     * 「比对通过、删除前恰好过期被他人取走」的竞态。</p>
+     */
+    private void releaseLock(String token) {
+        if (token == null) {
+            return;
+        }
+        if (LOCAL_LOCK_TOKEN.equals(token)) {
+            localLock.unlock();
+            return;
+        }
         try {
-            redis.delete(BATCH_LOCK_KEY);
+            redis.execute(RELEASE_IF_OWNER, List.of(BATCH_LOCK_KEY), token);
         } catch (Exception e) {
             log.warn("[质控重算] 释放锁失败（将由 EX 过期兜底）: {}", e.getMessage());
         }
