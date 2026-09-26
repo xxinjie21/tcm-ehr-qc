@@ -33,24 +33,29 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  // 1. 取用户 store 与公开页标记
   const userStore = useUserStore()
   const isPublic = to.path === '/login' || to.path === '/register'
 
   // 未登录只能访问公开页
   if (!isPublic && !userStore.token) {
+    // 2. 回登录页
     return '/login'
   }
   if (isPublic) {
+    // 3. 公开页直接放行
     return true
   }
   // 登录态存在但角色缺失或非法（localStorage 被清、旧版本残留）→ 强制重新登录。
   // 若在此放行，下面的角色守卫会把自己重定向到 /dashboard，形成无限循环。
   if (!KNOWN_ROLES.includes(userStore.role)) {
+    // 4. 强制回登录页重登
     return '/login'
   }
   // 角色守卫：直输管理页 URL 时退回角色落地页，不进入无权限页面
   const roles = to.meta && to.meta.roles
   if (roles && !roles.includes(userStore.role)) {
+    // 5. 提示无权限并退回角色落地页
     ElMessage.error('无权限访问该页面')
     return '/dashboard'
   }

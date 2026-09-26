@@ -9,7 +9,9 @@ const request = axios.create({
 })
 
 request.interceptors.request.use((config) => {
+  // 1. 取本地登录 token
   const token = localStorage.getItem('token')
+  // 2. 有 token 则注入 Authorization 请求头
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -18,8 +20,11 @@ request.interceptors.request.use((config) => {
 
 // 401：清登录态（token / role / menus）并回登录页；403：仅提示无权限，不跳转
 function redirectToLogin() {
+  // 1. 记录当前路由（用于登录后回跳）
   const current = router.currentRoute.value
+  // 2. 清登录态
   useUserStore().logout()
+  // 3. 非登录页则跳登录页并带上 redirect
   if (current.path !== '/login') {
     // 带上被中断的目标页（含 query），登录成功后由 Login.vue 还原（UX-07）
     router.push({ path: '/login', query: { redirect: current.fullPath } })
@@ -30,9 +35,12 @@ request.interceptors.response.use(
   (response) => {
     // 文件流（blob）不套 Result，直接返回
     if (response.config.responseType === 'blob') {
+      // 1. 文件流直接透传原始数据
       return response.data
     }
+    // 2. 取出统一响应体 Result
     const res = response.data
+    // 3. 非 200 视为失败：提示后 reject，401 额外清登录态
     if (res.code !== 200) {
       ElMessage.error(res.msg || '请求失败')
       if (res.code === 401) {
@@ -43,15 +51,19 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
+    // 1. 取出状态码与后端 msg
     const status = error.response && error.response.status
     const msg = error.response && error.response.data && error.response.data.msg
+    // 2. 401 未授权：提示并清登录态
     if (status === 401) {
       // 凭证错误 / token 过期：以后端 msg 为准（登录页密码错误也走这里）
       ElMessage.error(msg || '登录已过期，请重新登录')
       redirectToLogin()
     } else if (status === 403) {
+      // 3. 403 无权限：仅提示，不跳转
       ElMessage.error(msg || '无权限执行该操作')
     } else {
+      // 4. 其余情况：通用错误提示
       ElMessage.error(msg || error.message || '网络异常')
     }
     return Promise.reject(error)

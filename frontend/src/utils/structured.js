@@ -67,7 +67,9 @@ export const pct = (v) => {
  * @returns 统计对象；入参为空时返回 null
  */
 export function summarizeNorm(vo) {
+  // 1. 入参为空直接返回 null
   if (!vo) return null
+  // 2. 初始化各计数累加器
   const s = {
     total: 0,      // 参与统计的实体总数（有词典的 5 类）
     hit: 0,        // 命中词典
@@ -77,12 +79,14 @@ export function summarizeNorm(vo) {
     miss: 0,       // 未命中词典
     noDict: 0      // 无独立词典、不参与归一的实体数（舌/脉/病因/治法）
   }
+  // 3. 遍历 9 类分区，按「有无词典」分流累计
   for (const sec of ENTITY_SECTIONS) {
     const arr = Array.isArray(vo[sec.key]) ? vo[sec.key] : []
     if (!sec.dict) {
       s.noDict += arr.length
       continue
     }
+    // 4. 有词典的逐条按命中层级累加
     for (const it of arr) {
       if (!it) continue
       s.total += 1

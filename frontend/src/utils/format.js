@@ -18,8 +18,11 @@ const MODE_LEN = { date: 10, minute: 16, second: 19 }
  * @returns {string}
  */
 export function fmtDateTime(v, mode = 'second', empty = '—') {
+  // 1. 空值直接返回占位符
   if (v === null || v === undefined || v === '') return empty
+  // 2. 归一化 ISO 串：T 换成空格
   const s = String(v).replace('T', ' ')
+  // 3. 按精度取长度截断（缺省秒级）
   const n = MODE_LEN[mode] || MODE_LEN.second
   return s.length > n ? s.substring(0, n) : s
 }
