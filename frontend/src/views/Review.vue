@@ -206,7 +206,7 @@ import TermInput from '@/components/TermInput.vue'
 import { listReviewTasks, submitReview } from '@/api/review'
 import { getRawRecord } from '@/api/records'
 import { aiReview } from '@/api/ai'
-import { qcScore } from '@/api/qc'
+import { qcScore, getQcRules } from '@/api/qc'
 
 const FIELDS = [
   { key: 'registrationNo', label: '登记号' },
@@ -387,6 +387,15 @@ const buildCorrected = () => {
 }
 
 /**
+ * 分级阈值：来自后端规则（管理员可在「规则配置」里改），不在前端写死。
+ *
+ * 初值只是「请求还没回来 / 失败」时的兜底，取值与后端 QcRuleSet 的出厂默认一致 ——
+ * 原来的写法是把 90 / 60 直接写在判级那行，而注释还写着「不复制规则表」：
+ * 管理员把合格线改成 85 后，这一栏的预估分级就与服务端重算结果对不上（审查报告 G8）。
+ */
+const thresholds = ref({ qualified: 90, invalid: 60 })
+
+/**
  * 复核后预估评分（原型「复核后预估评分」区）。
  * 只做「已补齐的核心字段把对应扣分加回」这一条，且明确标注以服务端重算为准 ——
  * 前端不复制规则表，避免与服务端判定口径漂移。
@@ -400,7 +409,8 @@ const estimate = computed(() => {
     if (key && String(editValues[key] || '').trim()) gain += d.points || 0
   })
   const score = Math.max(0, Math.min(100, base + gain))
-  const grade = score >= 90 ? '合格 → 进入数据清洗' : score >= 60 ? '待复核' : '无效'
+  const { qualified, invalid } = thresholds.value
+  const grade = score >= qualified ? '合格 → 进入数据清洗' : score >= invalid ? '待复核' : '无效'
   return { score, grade }
 })
 
@@ -476,7 +486,21 @@ const submit = async (withCorrection) => {
   }
 }
 
-onMounted(() => load(1))
+/** 取后端分级阈值（GET /api/qc/rules 是「登录即可」，审核员也能调）；取不到就沿用兜底值 */
+const loadThresholds = async () => {
+  try {
+    const res = await getQcRules()
+    const t = res.data?.rules?.thresholds
+    if (t) thresholds.value = { qualified: t.qualified, invalid: t.invalid }
+  } catch {
+    // 拦截器已提示；沿用兜底阈值，不阻塞复核
+  }
+}
+
+onMounted(() => {
+  load(1)
+  loadThresholds()
+})
 </script>
 
 <style scoped>
