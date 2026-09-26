@@ -5,6 +5,12 @@ import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.common.config.LlmProperties;
 import org.junit.jupiter.api.Test;
 
+import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.ObjectMapper;
+
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -20,15 +26,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class LlmClientTest {
 
+    /**
+     * 每个用例一个**唯一且尚不存在**的配置文件路径。
+     *
+     * <p>必须隔离：{@link LlmConfigStore} 构造时会读 {@code llm.configFile} 并用其中的非密钥字段
+     * 覆盖 yml 基线，而 {@code update()} 又会把配置<b>写回</b>该文件。默认路径是
+     * {@code data/llm-config.json} —— 这是开发机上的真实运行时配置（且被 .gitignore 忽略），
+     * 用它会让断言变成「看本机文件内容」，跑完还会污染用户的配置。</p>
+     *
+     * <p>目录用 {@link TempDir}（每次运行新建、跑完删除）而不是固定的 {@code target/} 子目录：
+     * 只要路径在同一台机器上跨运行可复用，后一次运行就会读到前一次 {@code update()} 写下的
+     * {@code enabled=true}，断言随之翻车 —— 这个顺序依赖踩过一次。</p>
+     */
+    @TempDir
+    static Path configDir;
+
+    private static final AtomicInteger CONFIG_SEQ = new AtomicInteger();
+
     private static LlmProperties props(boolean enabled, String provider) {
         LlmProperties p = new LlmProperties();
         p.setEnabled(enabled);
         p.setProvider(provider);
+        p.setConfigFile(configDir.resolve("llm-config-" + CONFIG_SEQ.incrementAndGet() + ".json").toString());
         return p;
     }
 
     private static LlmClient clientOf(LlmProperties p) {
-        return new LlmClient(new LlmConfigStore(p));
+        return new LlmClient(new LlmConfigStore(p, new ObjectMapper()));
     }
 
     /** 关闭（默认态）：不装配、不可用，调用返回 null 且不抛 */
@@ -89,7 +113,7 @@ class LlmClientTest {
     /** 基线关闭 → 运行时覆盖为开启：立即生效，无需重启 */
     @Test
     void runtimeOverride_takesEffectWithoutRestart() {
-        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"));
+        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper());
         LlmClient client = new LlmClient(store);
 
         assertFalse(client.isAvailable(), "覆盖前应为关闭态");
@@ -104,7 +128,7 @@ class LlmClientTest {
     /** 覆盖为非法参数：仍只降级，不得抛（否则保存动作会把接口打 500） */
     @Test
     void runtimeOverrideWithIllegalProvider_shouldDegradeInsteadOfThrowing() {
-        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"));
+        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper());
         LlmClient client = new LlmClient(store);
 
         store.update(new LlmConfig(true, "not-a-provider", "", "", "", null, 0));

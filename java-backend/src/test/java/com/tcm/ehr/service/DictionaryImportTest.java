@@ -58,11 +58,26 @@ class DictionaryImportTest {
         service = newService(false, false);
     }
 
-    /** 按开关状态构造服务（避免反射改 final 字段） */
+    /**
+     * 按开关状态构造服务（避免反射改 final 字段）。
+     *
+     * <p>两处刻意的构造参数，别删：</p>
+     * <ul>
+     *   <li>{@code configFile} 指到 {@code target/} 下的不存在路径 —— 默认的
+     *       {@code data/llm-config.json} 是开发机真实配置（enabled=true/provider=openai），
+     *       不隔离的话断言取决于本机文件；</li>
+     *   <li>{@code provider = "ollama"} —— {@code convertFromPdf} 先过
+     *       {@code isEnabled()} 再过 {@code isAvailable()}，最后才检查扩展名。
+     *       非 PDF 用例要走到扩展名那一关，前置的可用性判断就必须能通过（ollama 通道无需凭据、
+     *       装配不联网）。</li>
+     * </ul>
+     */
     private DictionaryServiceImpl newService(boolean llmEnabled, boolean convertEnabled) {
         LlmProperties props = new LlmProperties();
         props.setEnabled(llmEnabled);
-        LlmClient client = new LlmClient(new LlmConfigStore(props));
+        props.setProvider("ollama");
+        props.setConfigFile("target/nonexistent-llm-config.json");
+        LlmClient client = new LlmClient(new LlmConfigStore(props, new ObjectMapper()));
         DictionaryServiceImpl s = new DictionaryServiceImpl(fileService, esIndex,
                 new ObjectMapper(), client);
         ReflectionTestUtils.setField(s, "convertEnabled", convertEnabled);

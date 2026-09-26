@@ -3,9 +3,11 @@ package com.tcm.ehr.controller;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
+import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
+import com.tcm.ehr.service.INlpBatchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 
@@ -31,7 +33,9 @@ class NlpControllerTest {
     /** 构造 controller；termNormalizer 传 null 表示该用例不关心归一行为 */
     private NlpController controller(PythonNlpClient client, EsTermNormalizer termNormalizer) {
         EsTermNormalizer normalizer = termNormalizer == null ? mock(EsTermNormalizer.class) : termNormalizer;
-        return new NlpController(client, new EntityNormalizer(normalizer));
+        // 批量解析依赖（批K 起构造器新增）：本测试不碰批量接口，用替身占位
+        return new NlpController(client, new EntityNormalizer(normalizer),
+                mock(INlpBatchService.class), mock(OperationLogger.class));
     }
 
     @Test
