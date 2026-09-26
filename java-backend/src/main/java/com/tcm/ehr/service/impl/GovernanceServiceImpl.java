@@ -469,7 +469,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return oldV != null && !oldV.equals(newV);
     }
 
+    /** 导出文件名用毫秒精度：秒级会让同一秒内的两次导出得到同名文件 */
     private String ts() {
-        return java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        return java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS"));
     }
 }

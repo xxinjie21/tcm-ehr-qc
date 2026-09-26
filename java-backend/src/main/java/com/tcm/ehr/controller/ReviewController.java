@@ -63,7 +63,13 @@ public class ReviewController {
         // 病历不存在与"复核记录不存在/已完结"共用 1006，由 GlobalExceptionHandler 统一转 404
         ReviewResultVO vo = reviewService.review(recordId, dto);
         // 2. 留痕：复核结论与评分必须可追溯
-        operationLogger.log("人工复核", recordId, "结果：" + vo.getStatus() + "，评分：" + vo.getScore());
+        String detail = "结果：" + vo.getStatus() + "，评分：" + vo.getScore();
+        // 3. 复核意见随操作日志落库：review_tasks 没有该列，日志是它唯一的去处
+        String comment = dto == null ? null : dto.getComment();
+        if (comment != null && !comment.isBlank()) {
+            detail = detail + "，意见：" + comment.trim();
+        }
+        operationLogger.log("人工复核", recordId, detail);
         return Result.ok(vo);
     }
 }

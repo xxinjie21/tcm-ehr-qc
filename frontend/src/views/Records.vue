@@ -623,11 +623,11 @@ const createFormRef = ref(null)
 const FORM_RULES = {
   registrationNo: [
     { required: true, message: '登记号不能为空', trigger: 'blur' },
-    { max: 64, message: '登记号不超过 64 字', trigger: 'blur' }
+    { max: 50, message: '登记号不超过 50 字', trigger: 'blur' }
   ],
   outpatientNo: [
     { required: true, message: '门诊号不能为空', trigger: 'blur' },
-    { max: 64, message: '门诊号不超过 64 字', trigger: 'blur' }
+    { max: 50, message: '门诊号不超过 50 字', trigger: 'blur' }
   ],
   gender: [{ pattern: /^(男|女)$/, message: '性别只能选「男」或「女」', trigger: 'change' }],
   age: [

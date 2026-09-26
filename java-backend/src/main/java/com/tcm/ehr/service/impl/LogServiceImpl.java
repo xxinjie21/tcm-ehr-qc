@@ -35,7 +35,8 @@ public class LogServiceImpl implements ILogService {
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** 归档文件名中的时间戳格式 */
-    private static final DateTimeFormatter FILE_TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+    /** 归档文件名用毫秒精度：秒级会让同一秒内的两次清理互相覆盖，归档后删库的数据就再也追不回来 */
+    private static final DateTimeFormatter FILE_TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
 
     private final OperationLogMapper operationLogMapper;
 
@@ -159,12 +160,16 @@ public class LogServiceImpl implements ILogService {
 
     /** 写归档 CSV 到 logs/，返回文件名；失败抛 IOException（由上层转 500，不静默丢数据） */
     private String writeArchive(List<OperationLog> rows) {
-        // 1. 归档文件名带时间戳，多次清理不会互相覆盖
-        String name = "audit-archive-" + LocalDateTime.now().format(FILE_TS) + ".csv";
+        // 1. 归档文件名带毫秒时间戳；万一仍撞名（同一毫秒），追加 _2、_3 去重
+        String base = "audit-archive-" + LocalDateTime.now().format(FILE_TS);
         try {
             // 2. 落盘到 logs/
             Path dir = Paths.get(archiveDir);
             Files.createDirectories(dir);
+            String name = base + ".csv";
+            for (int i = 2; Files.exists(dir.resolve(name)); i++) {
+                name = base + "_" + i + ".csv";
+            }
             Files.write(dir.resolve(name), csvBytes(rows));
             log.info("[日志清理] 已归档 {} 条到 {}", rows.size(), dir.resolve(name));
             return name;

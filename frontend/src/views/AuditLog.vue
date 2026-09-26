@@ -120,12 +120,12 @@ const loadActions = async () => {
   }
 }
 
-/** 导出文件名的时间戳：与后端归档名（audit-archive-YYYYMMDD_HHmmss.csv）同一格式，
+/** 导出文件名的时间戳：与后端归档名（audit-archive-YYYYMMDD_HHmmss_SSS.csv）同一格式，
     毫秒时间戳既不可读、也与系统里另一个日志文件名风格不一致 */
 const auditStamp = () => {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}_${p(d.getMilliseconds())}`
 }
 
 // 查询条件；page / size 直接双向绑定分页组件

@@ -32,6 +32,11 @@ import java.util.Map;
 public class DictionaryFileServiceImpl implements IDictionaryFileService {
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+    /** 备份名用毫秒精度：秒级会让同一秒内的两次导入互相覆盖，丢掉一个回滚点 */
+    private static final DateTimeFormatter TS_MILLI = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
+    /** 从备份名里取时间戳：兼容秒级旧名、毫秒级新名，末尾的去重序号（_2、_3）不参与解析 */
+    private static final java.util.regex.Pattern TS_IN_NAME =
+            java.util.regex.Pattern.compile("^(\\d{8}_\\d{6}(?:_\\d{3})?)");
 
     private final ObjectMapper mapper;
 
@@ -120,7 +125,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
 
     @Override
     /**
-     * 备份当前词典文件到备份目录，备份名形如 {@code <文件名>.bak_yyyyMMdd_HHmmss}。
+     * 备份当前词典文件到备份目录，备份名形如 {@code <文件名>.bak_yyyyMMdd_HHmmss_SSS}。
      *
      * @param type 词典类型
      * @return 备份文件名；当前词典文件不存在（首次导入）时返回 {@code null}
@@ -132,10 +137,15 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         if (!Files.exists(file)) {
             return null;
         }
-        // 2. 备份名带时间戳，同一秒内两次备份才会撞名（此时覆盖旧的）
+        // 2. 备份名带毫秒时间戳；万一仍撞名（同一毫秒），追加 _2、_3 去重，保证不覆盖已有回滚点
         Files.createDirectories(backupDir());
-        String backupName = fileNameOf(type) + ".bak_" + LocalDateTime.now().format(TS);
-        Files.copy(file, backupDir().resolve(backupName), StandardCopyOption.REPLACE_EXISTING);
+        String base = fileNameOf(type) + ".bak_" + LocalDateTime.now().format(TS_MILLI);
+        String backupName = base;
+        for (int i = 2; Files.exists(backupDir().resolve(backupName)); i++) {
+            backupName = base + "_" + i;
+        }
+        // 刻意不加 REPLACE_EXISTING：宁可让并发下的撞名抛出来，也不要静默覆盖掉一份备份
+        Files.copy(file, backupDir().resolve(backupName));
         return backupName;
     }
 
@@ -193,7 +203,16 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
             for (Path p : stream) {
                 String name = p.getFileName().toString();
                 String ts = name.substring(prefix.length());
-                LocalDateTime t = LocalDateTime.parse(ts, TS);
+                // 逐个解析时间戳；认不出的坏名跳过，不让一个坏文件拖垮整个列表
+                var m = TS_IN_NAME.matcher(ts);
+                if (!m.find()) {
+                    log.warn("[词典] 备份文件名无法解析时间戳，已跳过: {}", name);
+                    continue;
+                }
+                String stamp = m.group(1);
+                LocalDateTime t = stamp.length() > 15
+                        ? LocalDateTime.parse(stamp, TS_MILLI)
+                        : LocalDateTime.parse(stamp, TS);
                 int count = countOf(p);
                 int delta = count - currentCount;
                 Map<String, String> row = new LinkedHashMap<>();

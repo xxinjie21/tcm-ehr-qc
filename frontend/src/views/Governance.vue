@@ -302,6 +302,8 @@ const handleClean = async () => {
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const format = ref('csv')
 const exporting = ref(false)
+// 导出文件名去重序号：Date.now() 是毫秒级，同一毫秒内连点两次导出仍会同名
+let exportSeq = 0
 
 // 组装预览 / 导出共用的请求体：只带后端约定的 department / dateRange / pattern 三个维度，
 // 刻意不含 grade —— 分级只作用于数据清洗，导出恒为质控合格病历
@@ -415,8 +417,8 @@ const handleExport = async () => {
       ElMessage.error(msg)
       return
     }
-    // 5. 确认是文件流才落盘保存
-    saveBlob(blob, `tcm_ehr_dataset_${Date.now()}.${format.value}`)
+    // 5. 确认是文件流才落盘保存；文件名带毫秒 + 递增序号，避免同一毫秒内两次导出得到同名文件
+    saveBlob(blob, `tcm_ehr_dataset_${Date.now()}_${exportSeq++}.${format.value}`)
     // 6. 提示导出成功
     ElMessage.success('导出成功')
   // 7. 失败由响应拦截器统一提示
