@@ -163,7 +163,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setDone(0);
         t.setSuccess(0);
         t.setFailed(0);
-        t.setFiltersJson(writeJson(filters));
+        // 严格版：序列化失败宁可拒绝提交，也不能让任务退化成全库扫描（原用 writeJson 会静默变 "null"）
+        t.setFiltersJson(writeJsonStrict(objectMapper, filters));
         t.setCreatedBy(createdBy);
         t.setFailureList("[]");
         t.setFailureTruncated(false);
@@ -394,6 +395,30 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         return label == null ? "" : (label.length() > 200 ? label.substring(0, 200) : label);
     }
 
+    /**
+     * 提交期的严格序列化：失败即抛，任务不提交。
+     *
+     * <p>筛选条件序列化失败若被吞掉，{@link #readFilters} 会把结果读成 {@code null}，
+     * 任务就从「指定范围」静默退化成「全库扫描」—— 用户以为只跑了筛出来的几百条。</p>
+     *
+     * <p>注意 {@code o == null} 不是失败：Jackson 把 null 序列化成字符串 {@code "null"}，
+     * 读回时同样得到 {@code null}，语义是「不限范围」，这是<b>合法</b>路径
+     * （提交时不带 filters 就是全库），不要连它一起禁掉。</p>
+     */
+    static String writeJsonStrict(ObjectMapper mapper, Object o) {
+        try {
+            return mapper.writeValueAsString(o);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("筛选条件无法序列化，任务未提交：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 进度落库用的宽松序列化：失败退回 {@code "null"}（读回即「无失败明细」）。
+     *
+     * <p>刻意与提交路径分开：这条在任务收尾里被调用，抛异常会盖掉任务本身的收尾；
+     * 而失败明细丢了不影响任务语义。</p>
+     */
     private String writeJson(Object o) {
         try {
             return objectMapper.writeValueAsString(o);
