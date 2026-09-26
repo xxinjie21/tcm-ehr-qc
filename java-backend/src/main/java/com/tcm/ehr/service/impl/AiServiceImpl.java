@@ -72,6 +72,11 @@ public class AiServiceImpl implements IAiService {
 
     // ------------------------------------------------------------------ 3.1 解读
 
+    /**
+     * 解读：规则先出结论（完整性/核心缺项/归一命中/关键提示），LLM 只做叙述增强。
+     *
+     * <p>LLM 不可用或返回非 JSON 时保留规则模板叙述，结论始终可用。</p>
+     */
     @Override
     public AiReplyVO interpret(AiQueryDTO dto) {
         Record r = load(dto == null ? null : dto.getRecordId());
@@ -106,6 +111,7 @@ public class AiServiceImpl implements IAiService {
         return vo;
     }
 
+    /** 把 LLM 返回的 JSON 叙述覆盖到模板叙述上；模型没按 JSON 返回则原文即叙述 */
     private void applyLlmInterpret(AiReplyVO vo, String raw, String fallback) {
         try {
             String json = stripCodeFence(raw);
@@ -134,6 +140,7 @@ public class AiServiceImpl implements IAiService {
         }
     }
 
+    /** 解读 prompt：把规则结论 + 病历关键字段拼给模型，要求只回 JSON */
     private String interpretPrompt(AiReplyVO vo, Record r, Map<String, Object> data) {
         StringBuilder sb = new StringBuilder("【规则预检结论】\n");
         sb.append("- 完整性：21 字段完整 ").append(vo.getCompleteness().getPresent())
@@ -226,17 +233,15 @@ public class AiServiceImpl implements IAiService {
     }
 
     /**
-     * 核心要素缺失 —— 直接问 {@link QcScorer}，不再在这里手写要素清单。
+     * 核心要素缺失，直接问评分器，两侧共用同一份要素清单与判空口径。
      *
-     * <p>此前这里硬编码 5 项（不含疾病），而质控按规则集评 6 项，导致「同一份病历质控说缺、
-     * AI 说齐全」（审查报告 H1 / G1）。现在两侧共用 `QcScorer.missingElements`：
-     * 同一份要素清单、同一套判空，且**同样是两档**
-     * （{@code coreMissing} = 真缺失，{@code corePartial} = 漏抽）。</p>
+     * <p>也分两档：真缺失 / 漏抽（原始病历有记录但未结构化）。</p>
      */
     private QcScorer.Missing coreMissing(Map<String, Object> data, Record r) {
         return QcScorer.missingElements(data, r, qcRuleStore.get());
     }
 
+    /** 统计 9 类实体的归一命中数，按精确/包含/模糊分档 */
     private AiReplyVO.NormHits normHits(Map<String, Object> data) {
         AiReplyVO.NormHits n = new AiReplyVO.NormHits();
         for (String key : LIST_KEYS) {
@@ -255,6 +260,7 @@ public class AiServiceImpl implements IAiService {
         return n;
     }
 
+    /** 关键提示：常见空缺 + 核心要素缺失/漏抽 */
     private List<String> keyHints(Map<String, Object> data, Record r) {
         List<String> hints = new ArrayList<>();
         if (blank(r.getPattern())) hints.add("辨证结论为空");
@@ -273,6 +279,11 @@ public class AiServiceImpl implements IAiService {
 
     // ------------------------------------------------------------------ 3.2 问答
 
+    /**
+     * 问答：命中技术实现类关键词直接兜底拒答；否则拼业务上下文交给 LLM，失败降级为规则答案。
+     *
+     * <p>支持追问：{@code history} 为上文对话，一并进 prompt。</p>
+     */
     @Override
     public AiReplyVO chat(AiQueryDTO dto) {
         String question = dto == null ? "" : nz(dto.getQuestion()).trim();
@@ -389,6 +400,7 @@ public class AiServiceImpl implements IAiService {
         return sb.toString();
     }
 
+    /** LLM 不可用时的降级答案：从已拼好的上下文里摘出最相关的一段，没有就回功能与流程说明 */
     private String ruleAnswer(String question, String context) {
         StringBuilder sb = new StringBuilder();
         sb.append("（规则问答）");
@@ -410,8 +422,13 @@ public class AiServiceImpl implements IAiService {
         return sb.toString().trim();
     }
 
-    // ------------------------------------------------------------------ .1 复核预检
+    // ------------------------------------------------------------------ 复核预检
 
+    /**
+     * 复核预检：结论来自规则重算（与 records.qc_results 同源），LLM 只补建议。
+     *
+     * <p>LLM 不可用时直接回规则预检单，保证"有结论可看"。</p>
+     */
     @Override
     public AiReplyVO review(AiQueryDTO dto) {
         Record r = load(dto == null ? null : dto.getRecordId());
@@ -437,6 +454,7 @@ public class AiServiceImpl implements IAiService {
         return vo;
     }
 
+    /** 规则预检单文本（评分/分级 + 扣分项 + 逻辑冲突 + 当前辨证） */
     private String precheckText(ScoreResultVO sr, Record r) {
         StringBuilder sb = new StringBuilder();
         sb.append("规则预检单：评分 ").append(sr.getScore()).append("，分级 ").append(sr.getGrade()).append("。");
@@ -456,6 +474,7 @@ public class AiServiceImpl implements IAiService {
         return sb.toString();
     }
 
+    /** 复核 prompt：预检单 + 结构化要素，要求给出复核建议 */
     private String reviewPrompt(String precheck, Record r, Map<String, Object> data) {
         StringBuilder sb = new StringBuilder("【规则预检单】\n").append(precheck).append('\n');
         sb.append("【结构化数据】\n")
@@ -485,6 +504,7 @@ public class AiServiceImpl implements IAiService {
         return r;
     }
 
+    /** 解析结构化数据；为空或坏 JSON 时返回空 map，不抛（AI 侧降级为"无结构化"） */
     @SuppressWarnings("unchecked")
     private Map<String, Object> structured(Record r) {
         if (r.getStructuredData() == null || r.getStructuredData().isBlank()) {
@@ -502,6 +522,7 @@ public class AiServiceImpl implements IAiService {
         return !(data.get(key) instanceof List<?> list) || list.isEmpty();
     }
 
+    /** 取某类实体的文本：herbs 取 name，其余取 content */
     private List<String> contents(Map<String, Object> data, String key) {
         List<String> out = new ArrayList<>();
         if (!(data.get(key) instanceof List<?> list)) return out;
@@ -549,6 +570,7 @@ public class AiServiceImpl implements IAiService {
         return s == null || s.isBlank();
     }
 
+    /** 去掉模型可能加上的 ``` 围栏，只留 JSON 本体 */
     private String stripCodeFence(String s) {
         String t = s == null ? "" : s.trim();
         if (t.startsWith("```")) {

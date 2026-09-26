@@ -66,12 +66,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 数据清洗5步流水线（项目设计文档9.5）——绝不填充医生未书写的内容：
-     * ① 去重 —— 原始文本哈希重复仅保留一条，其余标记无效（不删除）
-     * ② 字段清理 —— 仅trim/空值置null（统一格式，绝不填值；缺失由质控扣分、人工复核补充）
-     * ③ 格式规整 —— structuredData内herbs剂量单位统一小写表示（只统一写法不改数值）；日期在导出/展示层统一
-     * ④ 脏数据隔离 —— 仅"无法修复"的数据（核心文本全空/结构化数据无法解析）标记invalid，格式小问题交质控评分
-     * ⑤ 术语归一（兜底） —— 解析环节已首次归一，此处按最新词典对合格病历全库实体补归一
+     * 数据清洗五步流水线：去重 → 字段清理 → 格式规整 → 脏数据隔离 → 术语归一。
+     *
+     * <p>只规整与标记，<b>不填充医生未书写的内容，也不删除任何病历</b>；各步的判断口径见方法体注释。</p>
      */
     @Override
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters) {
@@ -154,6 +151,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return s == null || s.isBlank();
     }
 
+    /** 判断是否为可解析的 JSON（隔离脏数据用；不可解析即视为"无法修复"） */
     private boolean isValidJson(String s) {
         try {
             objectMapper.readTree(s);
@@ -164,10 +162,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 对structuredData（附录A结构）全实体做术语归一：content替换为标准词，sourceText保留原文；
-     * 命中实体写入 normLevel(1/2/3) 与 normSource，供前端溯源与三级分布统计。
+     * 对结构化数据的全实体补做术语归一：content 换成标准词、sourceText 保留原文，
+     * 并写入 normLevel(1/2/3) 与 normSource 供前端溯源与三级分布统计。
      *
-     * @return {被替换实体数, 精确数, 包含数, 模糊数}
+     * @return 依次为 被替换实体数、精确数、包含数、模糊数
      */
     private int[] normalizeStructuredData(Record r) {
         int[] stat = {0, 0, 0, 0};
@@ -242,14 +240,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * structuredData 里某一类实体的「同标准词去重」。
+     * 某一类实体的"同标准词去重"，直接复用解析链路的 {@link EntityNormalizer#dedupByTerm}。
      *
-     * <p><b>不另写一套规则</b>：直接复用解析链路用的 {@link EntityNormalizer#dedupByTerm}，
-     * 与 {@code mapEntityType} 同一思路——口径只写一处，避免解析链路与清洗链路漂移。</p>
-     *
-     * <p>键取 {@code termField}（实体为 {@code content}、中药为 {@code name}）；键为空的元素
-     * 由 dedupByTerm 用唯一键占位，不参与合并。归一后 content 相同者只留一条，
-     * 代表条目的选取规则见 dedupByTerm 的注释。</p>
+     * <p>合并键取 {@code termField}（实体 content、中药 name）；代表条目的选取规则见该方法注释。</p>
      */
     @SuppressWarnings("unchecked")
     private List<Object> dedupStructuredList(List<?> list, String termField) {
@@ -282,9 +275,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 标准数据集导出：仅质控合格病历 + 敏感信息脱敏（手机号/身份证号→***）
-     * filters复用基础查询条件（查询1字段）：department、dateRange、pattern
-     * 无合格数据返回null（Controller返回2001）
+     * 标准数据集导出：只含质控合格病历，并对手机号/身份证号脱敏。
+     *
+     * <p>范围内无合格病历时返回 {@code null}，由 Controller 转 400 + code=2001。</p>
      */
     @Override
     public ExportedFile export(ExportDTO dto) throws IOException {
@@ -302,13 +295,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 预览：只要前 10 条 + 总数。
+     * 导出预览：返回总条数 + 前 10 条样本。
      *
-     * <p>不带证候筛选时走「COUNT + LIMIT 10」两条轻查询 —— 预览再也不用先把全表读进堆
-     * （原实现里预览与导出共用同一条全表载入，只为显示 10 行）。</p>
-     *
-     * <p>带证候筛选时必须先把候选读出来（证候在 JSON 里，SQL 筛不了），此时退化为
-     * 「SQL 收窄后内存筛 + 取前 10」，与导出同一条路径。</p>
+     * <p>不带证候筛选时走 COUNT 与 LIMIT 两条轻查询，不把全表读进内存；
+     * 带证候筛选时证候在 JSON 里 SQL 表达不了，退化为"SQL 收窄后内存筛 + 取前 10"。</p>
      */
     @Override
     public Map<String, Object> previewDataset(ExportDTO dto) {
@@ -330,13 +320,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 样本记录按导出同一口径脱敏：先序列化，再用 {@link #mask} 打码，最后解析回结构。
+     * 样本按导出同一口径脱敏：先序列化、再打码、最后解析回结构，键名与类型不变。
      *
-     * <p>键名与类型不变，前端预览表格（按 prop 取值）无需改动；visitTime 仍是字符串，
-     * 所以列上的 {@code substring(0,10)} 照常可用。</p>
-     *
-     * <p>刻意<b>不</b>捕获异常：脱敏失败就应当让这一次预览失败（与导出路径一致），
-     * 而不是静默返回未脱敏的样本 —— 后者是把「承诺打码却出了明文」当成正常结果。</p>
+     * <p>刻意不捕获异常：脱敏失败就让这次预览失败，而不是静默返回未脱敏的样本。</p>
      */
     private Object maskedSample(List<Record> sample) {
         String json = objectMapper.writeValueAsString(sample);
@@ -354,27 +340,15 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return baseMapper.selectGovernanceStats();
     }
 
-    /** 导出过滤：质控合格 + filters复用查询1条件（department/dateRange/pattern） */
     /**
-     * 导出/预览共用的范围条件。
+     * 导出/预览共用的范围条件：能下推 SQL 的都下推，再追加"只含合格"这条硬约束。
      *
-     * <p><b>能下推的条件都下推</b>：原实现是 {@code selectList(null)} 把整表（含
-     * {@code structured_data} / {@code qc_results} 两个大 JSON 列）读进堆再内存筛 ——
-     * 3.5 万条时内存峰值与 GC 压力都在这里（审查报告 M2）。</p>
-     *
-     * <p>「只导出质控合格病历」是页面的既有承诺，所以 {@code grade='合格'}} 是硬条件
-     * （B5-7 定为甲案：导出固定只含合格病历，不随分级控件变化）。</p>
-     *
-     * <p>证候在 {@code structured_data} 的 JSON 里，SQL 表达不了，只能留在内存筛 ——
-     * 但集合已被 SQL 收窄过了。</p>
+     * <p>证候存在 {@code structured_data} 的 JSON 里，SQL 表达不了，只能留给调用方在内存筛。</p>
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
-        // 条件组装走 RecordFilter（与其余读路径同一个函数）：科室 / 就诊时间 / 排序键 /
-        // 数据域都在那里定，这里只追加导出自己的硬约束。曾经这里手搓过一套 wrapper，
-        // 结果是拿不到 ORDER BY、也多了一处口径。
+        // 条件组装复用 RecordFilter（与其余读路径同一个函数），这里只追加导出自己的硬约束
         QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN,
                 RecordFilter.fromMap(dto.getFilters()));
-        // 「只导出质控合格的病历」是页面的既有承诺（B5-7 甲案，不随分级控件变化）
         wrapper.eq("grade", "合格");
         return wrapper;
     }
@@ -384,6 +358,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return str(filters.get("pattern"));
     }
 
+    /** 取范围内合格病历；带证候筛选时额外做内存筛（证候在 JSON 里，SQL 筛不了） */
     private List<Record> filterQualified(ExportDTO dto) {
         List<Record> records = baseMapper.selectList(qualifiedWrapper(dto));
         String pattern = patternOf(dto);

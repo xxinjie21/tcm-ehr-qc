@@ -264,13 +264,17 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return result;
     }
 
+    /** 处理单条：现算评分 → 回写 records → 幂等 upsert 复核任务 → 计入分级统计 */
     private void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception {
+        // 1. 批内按 21 字段文本哈希判重（与导入去重、清洗去重同口径）
         String hash = RecordUtil.textHash(r);
         boolean duplicate = !seenHash.add(hash);
 
+        // 2. 现算评分：读当前规则集，规则改完重算即生效
         Map<String, Object> data = asMap(null, r.getStructuredData());
         ScoreResultVO vo = QcScorer.score(data, r, duplicate, rules);
 
+        // 3. 回写评分字段与 qc_results（留档可溯源）
         String status = switch (vo.getGrade()) {
             case "合格" -> "completed";
             case "待复核" -> "reviewing";
@@ -278,8 +282,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         };
         baseMapper.updateScoreFields(r.getId(), vo.getScore(), vo.getGrade(), status,
                 objectMapper.writeValueAsString(vo));
+
+        // 4. 复核任务幂等维护
         upsertReviewTask(r, vo);
 
+        // 5. 计入分级统计
         switch (vo.getGrade()) {
             case "合格" -> result.setQualified(result.getQualified() + 1);
             case "待复核" -> result.setPendingReview(result.getPendingReview() + 1);
@@ -287,7 +294,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
     }
 
-    /** review_tasks 幂等 upsert */
+    /**
+     * 复核任务幂等 upsert：待复核则新增/更新，否则把该病历未作废的任务置为作废。
+     *
+     * <p>作废而不是删除：历史复核轨迹要留，查询侧按 {@code is_obsolete=0} 过滤。</p>
+     */
     private void upsertReviewTask(Record r, ScoreResultVO vo) {
         List<ReviewTask> existing = reviewTaskMapper.selectList(new QueryWrapper<ReviewTask>()
                 .eq("record_id", r.getId()).eq("is_obsolete", 0));
@@ -317,6 +328,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
     }
 
+    /** 问题类型取最"重"的一项：逻辑冲突 > 缺失字段 > 评分不达标 */
     private String issueType(ScoreResultVO vo) {
         if (!vo.getLogicConflicts().isEmpty()) {
             return "逻辑冲突";
@@ -327,6 +339,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return "评分不达标";
     }
 
+    /** 顺延 N 个工作日（跳过周末），用作复核时限 */
     private LocalDateTime addWorkdays(LocalDateTime start, int days) {
         LocalDateTime d = start;
         int added = 0;
@@ -531,10 +544,12 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
     }
 
+    /** 按 ID 取病历；ID 为空返回 null（由上层转 400/404） */
     private Record loadRaw(String recordId) {
         return recordId == null || recordId.isBlank() ? null : baseMapper.selectById(recordId);
     }
 
+    /** 结构化数据：优先用入参对象，否则解析 JSON；空/坏数据返回 null 交由评分按"未结构化"处理 */
     private Map<String, Object> asMap(Object inline, String json) {
         Object src = inline != null ? inline : json;
         if (src == null) {
@@ -552,6 +567,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
     }
 
+    /** 取列表项的文本（content 优先，其次 name） */
     private List<String> pick(List<Map<String, Object>> list) {
         if (list == null) {
             return List.of();
@@ -563,10 +579,12 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 .toList();
     }
 
+    /** 该结构化字段是否非空（要素"有记录"的判据之一） */
     private boolean structuredPresent(String key, Map<String, Object> data) {
         return key != null && data != null && data.get(key) instanceof List<?> list && !list.isEmpty();
     }
 
+    /** 原始列里任一回退字段有值（判"漏抽"：病历写了但没被抽出来） */
     private boolean rawPresent(List<String> fields, Record raw) {
         if (raw == null || fields == null) {
             return false;
@@ -579,6 +597,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return false;
     }
 
+    /** 格式规则是否通过：enum 看白名单，regex 匹表达式；表达式非法时放行（不算病历错） */
     private boolean formatOk(QcRuleSet.FormatRule fr, String v) {
         if ("enum".equalsIgnoreCase(fr.getType())) {
             return fr.getValues() != null && fr.getValues().contains(v);
@@ -593,6 +612,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
     }
 
+    /** 按字段名取原始列值（空白视作无值），字段名由规则集配置 */
     private String rawValue(Record r, String field) {
         if (r == null || field == null) {
             return null;

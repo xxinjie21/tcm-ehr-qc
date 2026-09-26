@@ -91,7 +91,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     @PostConstruct
     void init() {
-        // K-c：重启后未完成的任务无法续跑，标记为已中断
+        // 1. 重启兜底：上次没跑完的任务无法续跑，统一标为已中断（可重跑）
         int n = taskMapper.update(null, new UpdateWrapper<NlpTask>()
                 .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED))
                 .set("status", NlpTask.INTERRUPTED)
@@ -100,6 +100,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (n > 0) {
             log.warn("[批解析] 重启：{} 个未完成任务已标记为『已中断』", n);
         }
+        // 2. 起固定大小的守护线程池：并发固定，Python 服务不会被多个任务同时压垮
         int threads = Math.max(1, concurrency);
         running = true;
         workers = Executors.newFixedThreadPool(threads, r -> {
@@ -107,6 +108,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             t.setDaemon(true);
             return t;
         });
+        // 3. 每个线程跑同一个"取任务"循环
         for (int i = 0; i < threads; i++) {
             workers.submit(this::workerLoop);
         }
@@ -142,6 +144,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     private void workerLoop() {
+        // 1. 常驻轮询取任务：1s 间隔让 running=false 能被及时看到
         while (running) {
             String id;
             try {
@@ -153,6 +156,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             if (id == null) {
                 continue;
             }
+            // 2. 执行任务；兜底异常走标记失败，避免线程静默死掉
             try {
                 runTask(id);
             } catch (Exception e) {
@@ -178,16 +182,19 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     @Override
     public NlpTaskVO submit(NlpBatchDTO dto, String createdBy) {
+        // 1. 前置校验：没开抽取就不要排任务，避免整批必然失败
         if (!nlpClient.isEnabled()) {
             throw new IllegalArgumentException("抽取服务未开启（nlp.enabled=false），无法执行批量解析");
         }
         FiltersDTO filters = dto == null ? null : dto.getFilters();
         int limit = dto == null || dto.getLimit() == null ? 0 : dto.getLimit();
 
+        // 2. 统计计划条数：limit 大于 0 时以它封顶
         QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, filters);
         long count = recordMapper.selectCount(wrapper);
         int total = limit > 0 ? (int) Math.min(count, limit) : (int) count;
 
+        // 3. 任务落库为排队态；筛选条件严格序列化，失败宁可拒绝也不让任务退化成全库扫描
         NlpTask t = new NlpTask();
         t.setId(UUID.randomUUID().toString());
         t.setStatus(NlpTask.QUEUED);
@@ -195,13 +202,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setDone(0);
         t.setSuccess(0);
         t.setFailed(0);
-        // 严格版：序列化失败宁可拒绝提交，也不能让任务退化成全库扫描（原用 writeJson 会静默变 "null"）
         t.setFiltersJson(writeJsonStrict(objectMapper, filters));
         t.setCreatedBy(createdBy);
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
         taskMapper.insert(t);
+
+        // 4. 入队后立即返回，由工作线程异步消费
         queue.offer(t.getId());
         log.info("[批解析] 已提交任务 {}：计划 {} 条", t.getId(), total);
         return toVO(t, false);
@@ -220,12 +228,15 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     @Override
     public NlpTaskVO submitIds(List<String> ids, String createdBy) {
+        // 1. 空集合视为无需提交
         if (ids == null || ids.isEmpty()) {
             return null;
         }
+        // 2. 前置校验：没开抽取就跳过自动解析
         if (!nlpClient.isEnabled()) {
             throw new IllegalArgumentException("抽取服务未开启（nlp.enabled=false），已跳过自动解析");
         }
+        // 3. 任务落库为排队态（不记筛选条件，范围由 ID 集合决定）
         NlpTask t = new NlpTask();
         t.setId(UUID.randomUUID().toString());
         t.setStatus(NlpTask.QUEUED);
@@ -238,6 +249,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
         taskMapper.insert(t);
+
+        // 4. ID 集合只留在内存（重启后任务标中断、不会续跑），再入队
         idBatches.put(t.getId(), new ArrayList<>(ids));
         queue.offer(t.getId());
         log.info("[批解析] 已提交按ID任务 {}：计划 {} 条", t.getId(), ids.size());
@@ -303,6 +316,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     // ------------------------------------------------------------------ 执行
 
     private void runTask(String id) {
+        // 1. 取出任务；已取消或已不存在直接清理内存态了事
         NlpTask t = taskMapper.selectById(id);
         if (t == null || NlpTask.CANCELLED.equals(t.getStatus())) {
             idBatches.remove(id);
@@ -310,10 +324,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
         List<String> idSource = idBatches.get(id);
 
+        // 2. 标记运行中并记录开始时间（此刻起进度才对外可见）
         t.setStatus(NlpTask.RUNNING);
         t.setStartedAt(LocalDateTime.now().withNano(0));
         taskMapper.updateById(t);
 
+        // 3. 按取数来源分派：导入来的按 ID 集合，其余按筛选范围
         List<NlpTaskVO.Failure> failures = new ArrayList<>();
         boolean[] truncated = {false};
         int[] processed = {0};
@@ -323,6 +339,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                     ? runByIds(id, idSource, t, failures, truncated, processed)
                     : runByFilter(id, t, failures, truncated, processed);
         } finally {
+            // 4. 无论正常跑完、取消还是异常，都要在这里落终态，否则任务会永远停在"运行中"
             t.setStatus(endStatus(running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
@@ -336,9 +353,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 按筛选范围分页处理；返回是否被取消 */
     private boolean runByFilter(String id, NlpTask t, List<NlpTaskVO.Failure> failures,
                                 boolean[] truncated, int[] processed) {
+        // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）
         int limit = t.getTotal() == null ? 0 : t.getTotal();
         QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, readFilters(t.getFiltersJson()));
         int pageNo = 1;
+        // 2. 分页循环取数：每页都先看取消位，避免停得慢
         while (true) {
             if (cancelFlags.contains(id)) {
                 return true;
@@ -348,6 +367,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             if (list.isEmpty()) {
                 break;
             }
+            // 3. 逐条处理
             for (Record r : list) {
                 if (cancelFlags.contains(id)) {
                     return true;
@@ -357,6 +377,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 }
                 step(id, r, t, failures, truncated, processed);
             }
+            // 4. 不满一页即到末尾
             if (list.size() < PAGE_SIZE) {
                 break;
             }
@@ -368,11 +389,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 按记录ID集合分块处理（导入后自动解析用）；返回是否被取消 */
     private boolean runByIds(String id, List<String> ids, NlpTask t, List<NlpTaskVO.Failure> failures,
                              boolean[] truncated, int[] processed) {
+        // 1. 按页大小切块：IN 过长会让 SQL 变慢
         for (int off = 0; off < ids.size(); off += PAGE_SIZE) {
+            // 2. 每块开始前看取消位
             if (cancelFlags.contains(id)) {
                 return true;
             }
             List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
+            // 3. 一次批量取回该块，再逐条处理
             List<Record> list = recordMapper.selectBatchIds(chunk);
             for (Record r : list) {
                 if (cancelFlags.contains(id)) {

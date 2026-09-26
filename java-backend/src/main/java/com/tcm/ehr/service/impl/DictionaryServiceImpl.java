@@ -236,6 +236,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         return ok;
     }
 
+    /** 读 Excel 全部行（POI），空单元格补空串以保持列位 */
     private List<String[]> readExcelRows(MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
         try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
@@ -252,6 +253,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         return rows;
     }
 
+    /** 读 CSV 全部行（自动识别 UTF-8/GBK），分隔符兼容逗号与制表符 */
     private List<String[]> readCsvRows(MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
         for (String line : readTextAutoCharset(file).split("\r?\n")) {
@@ -268,6 +270,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         return rows;
     }
 
+    /** 规整词条：去空白、别名去重、缺省来源按类型填 */
     private TermEntry normalize(TermEntry e) {
         String standard = e.getStandardTerm().trim();
         List<String> aliases = new ArrayList<>();
@@ -342,6 +345,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         return vo;
     }
 
+    /** 抽 PDF 全文（PDFBox）；无文本层时返回空串，由上层转成失败明细 */
     private String extractPdfText(MultipartFile file) throws IOException {
         if (!fileName(file).endsWith(".pdf")) {
             throw new IllegalArgumentException("智能转换仅支持 .pdf；Excel/CSV/JSON 请直接走导入");
@@ -353,6 +357,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         }
     }
 
+    /** 从模型返回里解析候选词条；解析失败的行进失败明细，不影响其余候选 */
     private void parseCandidates(String raw, ConvertPreviewVO vo) {
         String json = stripCodeFence(raw);
         List<ConvertPreviewVO.Candidate> list;
@@ -389,6 +394,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         return t.trim();
     }
 
+    /** 截断超长文本，避免单个字段把行撑爆 */
     private String truncate(String s, int max) {
         if (s == null) return "";
         return s.length() <= max ? s : s.substring(0, max) + "…";
@@ -438,6 +444,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     // ---------------------------------------------------------------- 内部工具
 
+    /** 合并同标准词的两条词条：别名取并集，其余字段以新条目为准 */
     private TermEntry mergeEntries(TermEntry oldE, TermEntry newE) {
         Set<String> aliases = new LinkedHashSet<>(oldE.getAliases() == null ? List.of() : oldE.getAliases());
         if (newE.getAliases() != null) aliases.addAll(newE.getAliases());
@@ -462,6 +469,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         return name == null ? "" : name.toLowerCase();
     }
 
+    /** 判断是否表头行（首行且含"标准术语"或"别名"字样） */
     private boolean isHeaderRow(Row r) {
         String first = cellText(r.getCell(0));
         return first != null && (first.contains("标准术语") || first.equalsIgnoreCase("standardTerm"));
@@ -484,6 +492,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         };
     }
 
+    /** 读文本并自动判定编码（优先 UTF-8，解出乱码则回退 GBK） */
     private String readTextAutoCharset(MultipartFile file) throws IOException {
         byte[] bytes = file.getBytes();
         String utf8 = new String(bytes, StandardCharsets.UTF_8);
