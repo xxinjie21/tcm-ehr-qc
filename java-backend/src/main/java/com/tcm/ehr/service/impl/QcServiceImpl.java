@@ -150,7 +150,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 dto == null ? null : dto.getFilters());
         long total = baseMapper.selectCount(wrapper);
         if (total > maxRecords) {
-            throw new IllegalArgumentException("超过单次上限（" + maxRecords + " 条），请缩小范围或子集操作");
+            // 上限维持 30000 不提高：本接口是同步的（前端超时 200s、后端还握着 900s 的防重锁），
+            // 真跑 3.5 万条只会把「干净的 400」换成「前端超时 + 锁被占满」。所以把文案写成
+            // 可执行的下一步，而不是让用户反复试。
+            throw new IllegalArgumentException("本次范围 " + total + " 条，超过单次上限 " + maxRecords
+                    + " 条。请按科室或就诊时间分批重算。");
         }
 
         String lockToken = acquireLock();

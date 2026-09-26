@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
@@ -36,6 +37,9 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> implements IGovernanceService {
+
+    /** 预览只回前 10 条 */
+    private static final int PREVIEW_SAMPLE_SIZE = 10;
 
     private final EsTermNormalizer termNormalizer;
     private final ObjectMapper objectMapper;
@@ -285,12 +289,28 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return new ExportedFile("tcm_ehr_dataset_" + ts() + ".csv", maskCsv(toCsv(records)));
     }
 
+    /**
+     * 预览：只要前 10 条 + 总数。
+     *
+     * <p>不带证候筛选时走「COUNT + LIMIT 10」两条轻查询 —— 预览再也不用先把全表读进堆
+     * （原实现里预览与导出共用同一条全表载入，只为显示 10 行）。</p>
+     *
+     * <p>带证候筛选时必须先把候选读出来（证候在 JSON 里，SQL 筛不了），此时退化为
+     * 「SQL 收窄后内存筛 + 取前 10」，与导出同一条路径。</p>
+     */
     @Override
     public Map<String, Object> previewDataset(ExportDTO dto) {
-        List<Record> records = filterQualified(dto);
         Map<String, Object> result = new HashMap<>();
-        result.put("total", records.size());
-        List<Record> sample = records.subList(0, Math.min(10, records.size()));
+        List<Record> sample;
+        if (patternOf(dto) == null) {
+            result.put("total", baseMapper.selectCount(qualifiedWrapper(dto)));
+            // LIMIT 只加在这里：导出要全量，预览只要 10 条
+            sample = baseMapper.selectList(qualifiedWrapper(dto).last("LIMIT " + PREVIEW_SAMPLE_SIZE));
+        } else {
+            List<Record> records = filterQualified(dto);
+            result.put("total", (long) records.size());
+            sample = records.subList(0, Math.min(PREVIEW_SAMPLE_SIZE, records.size()));
+        }
         // 预览与导出必须走同一套脱敏。此前预览直接把实体塞进响应 ——
         // 于是同一条现病史（可能写着手机号）在导出件里打码、在预览表格里明文。
         result.put("sample", maskedSample(sample));
@@ -318,34 +338,47 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /** 导出过滤：质控合格 + filters复用查询1条件（department/dateRange/pattern） */
-    private List<Record> filterQualified(ExportDTO dto) {
+    /**
+     * 导出/预览共用的范围条件。
+     *
+     * <p><b>能下推的条件都下推</b>：原实现是 {@code selectList(null)} 把整表（含
+     * {@code structured_data} / {@code qc_results} 两个大 JSON 列）读进堆再内存筛 ——
+     * 3.5 万条时内存峰值与 GC 压力都在这里（审查报告 M2）。</p>
+     *
+     * <p>「只导出质控合格病历」是页面的既有承诺，所以 {@code grade='合格'}} 是硬条件
+     * （B5-7 定为甲案：导出固定只含合格病历，不随分级控件变化）。</p>
+     *
+     * <p>证候在 {@code structured_data} 的 JSON 里，SQL 表达不了，只能留在内存筛 ——
+     * 但集合已被 SQL 收窄过了。</p>
+     */
+    private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
         Map<String, Object> filters = dto.getFilters() == null ? Map.of() : dto.getFilters();
+        QueryWrapper<Record> wrapper = new QueryWrapper<>();
+        wrapper.eq("grade", "合格");
         String department = str(filters.get("department"));
-        String pattern = str(filters.get("pattern"));
-        String start = null;
-        String end = null;
-        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2) {
-            start = str(range.get(0));
-            end = str(range.get(1));
+        if (department != null) {
+            wrapper.eq("department", department);
         }
+        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2) {
+            String start = str(range.get(0));
+            String end = str(range.get(1));
+            if (start != null) wrapper.ge("visit_time", start + " 00:00:00");
+            if (end != null) wrapper.le("visit_time", end + " 23:59:59");
+        }
+        return wrapper;
+    }
 
-        final String dep = department;
-        final String pat = pattern;
-        final String dateStart = start;
-        final String dateEnd = end;
+    private String patternOf(ExportDTO dto) {
+        Map<String, Object> filters = dto.getFilters() == null ? Map.of() : dto.getFilters();
+        return str(filters.get("pattern"));
+    }
 
-        return baseMapper.selectList(null).stream()
-                // 仅质控合格（分级路由：合格→导出；待复核/无效禁止进入数据集）
-                .filter(r -> "合格".equals(r.getGrade()))
-                .filter(r -> dep == null || dep.equals(r.getDepartment()))
-                .filter(r -> {
-                    if (dateStart == null && dateEnd == null) return true;
-                    String d = r.getVisitTime() == null ? "" : r.getVisitTime().toString().substring(0, 10);
-                    return (dateStart == null || (d.compareTo(dateStart) >= 0))
-                            && (dateEnd == null || (d.compareTo(dateEnd) <= 0));
-                })
-                .filter(r -> pat == null || structuredPatternContains(r, pat))
-                .toList();
+    private List<Record> filterQualified(ExportDTO dto) {
+        List<Record> records = baseMapper.selectList(qualifiedWrapper(dto));
+        String pattern = patternOf(dto);
+        return pattern == null
+                ? records
+                : records.stream().filter(r -> structuredPatternContains(r, pattern)).toList();
     }
 
     /** structuredData.patternList 是否包含指定证候（模糊包含匹配） */

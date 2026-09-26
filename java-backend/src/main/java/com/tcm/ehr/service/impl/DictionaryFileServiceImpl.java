@@ -148,22 +148,41 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         return Files.exists(backupDir().resolve(backupFilename));
     }
 
+    /**
+     * 词典内容版本（5 个文件内容拼接后的 MD5 前 12 位）。
+     *
+     * <p>先算「文件指纹」（修改时间 + 大小）判缓存，<b>命中就不再读文件</b>。
+     * 原实现把读取与拼接放在缓存判断之前，等于每次调用都全量读 5 个文件 ——
+     * 而批量解析是<b>逐条病历</b>调它（`NlpBatchServiceImpl.processOne`），
+     * 3.5 万条就是约 17.5 万次文件读取，缓存只省下最后一次的 MD5（审查报告 G4）。</p>
+     *
+     * <p>指纹用「修改时间 + 大小」：本项目改词典只有两条路径（导入、回滚），
+     * 都是整文件覆盖，两者都会变；不存在「内容变了而指纹没变」的情形。</p>
+     */
     @Override
     public String currentVersion() {
         try {
-            StringBuilder sb = new StringBuilder();
             long stamp = 0;
+            boolean allPresent = true;
             for (String type : com.tcm.ehr.common.config.EntityTypes.dictKeys()) {
                 Path f = dir().resolve(fileNameOf(type));
                 if (Files.exists(f)) {
                     stamp = stamp * 31 + Files.getLastModifiedTime(f).toMillis() + Files.size(f);
-                    sb.append(type).append('=').append(Files.readString(f, StandardCharsets.UTF_8)).append('\n');
                 } else {
-                    sb.append(type).append("=\n");
+                    allPresent = false;
                 }
             }
-            if (cachedVersion != null && stamp == cachedStamp) {
+            if (allPresent && cachedVersion != null && stamp == cachedStamp) {
                 return cachedVersion;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (String type : com.tcm.ehr.common.config.EntityTypes.dictKeys()) {
+                Path f = dir().resolve(fileNameOf(type));
+                sb.append(type).append('=');
+                if (Files.exists(f)) {
+                    sb.append(Files.readString(f, StandardCharsets.UTF_8));
+                }
+                sb.append('\n');
             }
             String v = RecordUtil.md5Hex(sb.toString()).substring(0, 12);
             cachedVersion = v;

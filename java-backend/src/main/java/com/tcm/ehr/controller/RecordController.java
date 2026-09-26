@@ -2,6 +2,7 @@ package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
+import jakarta.validation.Valid;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.CreateRecordDTO;
 import com.tcm.ehr.domain.dto.DeleteRecordsDTO;
@@ -109,7 +110,7 @@ public class RecordController {
 
     /** 多条件分页查询；【权限：登录即可 + 数据域（审核员恒为待复核域）】 */
     @PostMapping("/api/records/search")
-    public Result<SearchVO> search(@RequestBody SearchDTO dto) {
+    public Result<SearchVO> search(@Valid @RequestBody SearchDTO dto) {
         return Result.ok(recordService.searchRecords(dto));
     }
 }
