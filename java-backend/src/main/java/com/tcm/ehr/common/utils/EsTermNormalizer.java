@@ -55,7 +55,19 @@ public class EsTermNormalizer {
     public record NormalizeResult(String standardTerm, String source, int level, String code) {
     }
 
+    /**
+     * 把单个术语归一到标准词：ES 召回候选 → 三级判定（精确 / 双向包含 / Dice ≥ 阈值）。
+     *
+     * <p>没召回、或三级都不中，即判「未命中」（standardTerm 回填原文、level=0）；
+     * 但 ES 本身不可用时<b>不是</b>未命中而是抛异常，由上层返回 503 —— 两者不可混为一谈。</p>
+     *
+     * @param type 实体类型 key（见 {@link EntityTypes}），决定查哪本词典
+     * @param term 待归一的原文
+     * @return 命中层级、标准词、来源与国标代码
+     * @throws TermIndexUnavailableException ES 索引不可用
+     */
     public NormalizeResult normalize(String type, String term) {
+        // 1. 归一原文（null 视作空串）
         String input = term == null ? "" : term.trim();
         if (input.isEmpty()) {
             return new NormalizeResult(term, "", 0, null);
@@ -71,6 +83,7 @@ public class EsTermNormalizer {
             }
         }
 
+        // 2. 未召回或三级都不中 → 判未命中，standardTerm 回填原文
         return new NormalizeResult(input, "", 0, null);
     }
 

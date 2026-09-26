@@ -15,6 +15,14 @@ public final class QcRuleDescriber {
     private QcRuleDescriber() {
     }
 
+    /**
+     * 把一套质控规则摊成一组给业务用户看的句子，顺序为：完整性 → 格式 → 一致性 → 标准化 → 重复 → 分级。
+     *
+     * <p>这里是规则文案的唯一来源：质控标准面板与规则配置弹窗都消费它，避免前端各写一套措辞（批R）。</p>
+     *
+     * @param r 当前生效规则；为 {@code null} 时返回空列表
+     * @return 逐条说明，顺序即界面展示顺序
+     */
     public static List<String> describe(QcRuleSet r) {
         List<String> out = new ArrayList<>();
         if (r == null) {

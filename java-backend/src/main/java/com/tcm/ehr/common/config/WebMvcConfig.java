@@ -18,6 +18,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final RoleInterceptor roleInterceptor;
 
     @Override
+    /**
+     * 注册两个拦截器：先 JWT 鉴权（401），再角色校验（403）。
+     * 两者都放行登录与注册接口 —— 这两个接口不需要 token。
+     *
+     * @param registry 拦截器注册表
+     */
     public void addInterceptors(InterceptorRegistry registry) {
         // 顺序即执行顺序：先鉴权（401），再校验角色（403）
         registry.addInterceptor(jwtInterceptor)

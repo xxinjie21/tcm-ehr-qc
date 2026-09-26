@@ -33,6 +33,11 @@ public class RoleInterceptor implements HandlerInterceptor {
     private final ObjectMapper objectMapper;
 
     @Override
+    /**
+     * 取「方法级优先、类级兜底」的 {@link RequireRole}，与 JWT 里的当前角色做包含匹配。
+     *
+     * @return true 放行（未标注注解 = 登录即可）；false 表示已写出 403 响应
+     */
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
         // 放行预检请求（与 JwtInterceptor 一致：此时 request 属性尚未写入）
@@ -43,19 +48,23 @@ public class RoleInterceptor implements HandlerInterceptor {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }
+        // 1. 取生效注解：方法级优先，其次类级
         RequireRole required = AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getMethod(), RequireRole.class);
         if (required == null) {
             required = AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getBeanType(), RequireRole.class);
         }
+        // 2. 未标注或未声明角色 → 一律放行（登录即可）
         if (required == null || required.roles().length == 0) {
             return true;
         }
+        // 3. 与 JWT 当前角色做包含匹配，命中即放行
         String currentRole = RequestUtils.currentRole();
         for (String allowed : required.roles()) {
             if (allowed != null && allowed.equals(currentRole)) {
                 return true;
             }
         }
+        // 4. 未命中 → 写出 403
         return reject(response, required.roles());
     }
 

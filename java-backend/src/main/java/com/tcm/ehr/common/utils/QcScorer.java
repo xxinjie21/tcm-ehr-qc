@@ -20,6 +20,19 @@ public final class QcScorer {
     private QcScorer() {
     }
 
+    /**
+     * 对单份病历做终末质控评分，输出得分、分级与逐条扣分。
+     *
+     * <p>依次累计五类扣分：完整性（要素缺失分真缺失 / 漏抽两档）、逻辑一致性、格式、
+     * 术语标准化、重复；分级取「严重缺失 / 低于无效线 / 存在逻辑冲突 / 达到合格线」中
+     * 优先级最高的一档。规则集为 {@code null} 时回退到内置默认规则。</p>
+     *
+     * @param data      结构化抽取结果，{@code null} 表示未结构化（标记为缺失）
+     * @param raw       原始病历，{@code null} 时跳过格式规则
+     * @param duplicate 是否与已有病历重复
+     * @param rules     质控规则集，可为 {@code null}
+     * @return 评分结果（得分、分级、是否严重、扣分明细）
+     */
     public static ScoreResultVO score(Map<String, Object> data, Record raw, boolean duplicate,
                                       com.tcm.ehr.common.config.QcRuleSet rules) {
         com.tcm.ehr.common.config.QcRuleSet rs = rules == null ? com.tcm.ehr.common.config.QcRuleSet.defaults() : rules;

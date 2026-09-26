@@ -53,13 +53,25 @@ public class NlpController {
     @Value("${nlp.enabled:false}")
     private boolean nlpEnabled;
 
+    /**
+     * 单条文本抽取 + 术语归一。
+     *
+     * <p>上游不可用时<b>不报错</b>，而是返回空 9 类 + {@code unavailableReason}，
+     * 让页面照常渲染并显示降级横幅；只有入参为空才回 400。</p>
+     *
+     * @param dto 待抽取文本
+     * @return 9 类实体（含归一结果与来源原文）；降级时为空结构 + 原因枚举
+     */
     @PostMapping("/api/nlp/extract")
     public ResponseEntity<Result<NlpExtractVO>> extract(@RequestBody NlpExtractDTO dto) {
+        // 1. 取待抽取文本，为空回 400（其余情况一律降级，不报错）
         String text = dto == null ? null : dto.getText();
         if (text == null || text.isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "待抽取文本不能为空"));
         }
+        // 2. 转发 Python 抽取服务
         NlpExtractVO vo = nlpClient.extract(text);
+        // 3. 上游不可用（vo 为 null）→ 降级为空 9 类并给出原因
         if (vo == null) {
             // 上游未启用 / 不可用：降级为空 9 类（modelAvailable=false）。
             // 具体原因见 PythonNlpClient 的启动 warn 与调用期 warn/debug；
@@ -73,11 +85,13 @@ public class NlpController {
             empty.setUnavailableReason(reason);
             return ResponseEntity.ok(Result.ok(empty));
         }
+        // 4. 服务在跑但模型未加载 → 只标记原因，规则兜底结果照常返回
         if (!vo.isModelAvailable()) {
             // 服务在跑但模型没加载：仍会返回规则兜底的少数类别，不算「没产出」，
             // 但要让用户知道这次少了模型那一半。
             vo.setUnavailableReason(NlpExtractVO.REASON_MODEL_MISSING);
         }
+        // 5. 对抽取结果做术语归一（content=标准词、sourceText=归一前原文）
         EntityNormalizer.NormStat stat = entityNormalizer.normalize(vo);
         log.debug("[NLP] 抽取完成并归一：命中 {} 条（精确 {} / 包含 {} / 模糊 {}）",
                 stat.hit(), stat.exact(), stat.contain(), stat.fuzzy());

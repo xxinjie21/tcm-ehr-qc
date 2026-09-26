@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * 认证接口：注册与登录。
+ * 这两个接口在 WebMvcConfig 里被显式放行（无需 token），其余接口一律先过 JWT 鉴权。
+ */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor

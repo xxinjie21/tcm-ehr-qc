@@ -94,6 +94,7 @@ public final class EntityTypes {
         return out;
     }
 
+    /** 按类型 key 取类型定义；key 为 {@code null} 或未登记时返回 {@code null}，调用方需自行兜底 */
     public static EntityType byKey(String key) {
         return key == null ? null : BY_KEY.get(key);
     }

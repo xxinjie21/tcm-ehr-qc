@@ -16,6 +16,7 @@ public class ResourceNotFoundException extends RuntimeException {
         this(1006, message);
     }
 
+    /** 业务错误码（默认 1006），由 GlobalExceptionHandler 写进 Result.code。 */
     public int getCode() {
         return code;
     }

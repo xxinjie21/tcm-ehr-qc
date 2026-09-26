@@ -33,6 +33,14 @@ public class DataInitializationListener implements ApplicationRunner {
     private final IEsTermIndexService esTermIndexService;
     private final RestHighLevelClient esClient;
 
+    /**
+     * 启动后依次做四件事：探 Redis、探 ES、打印数据源、把词典 JSON 重建进 ES 索引。
+     *
+     * <p>探活失败一律只记日志、不让启动失败 —— ES / Redis 不可用时系统仍能起来，
+     * 由归一相关接口返回 503 说明原因（见类注释）。</p>
+     *
+     * @param args 启动参数，此处未使用
+     */
     @Override
     public void run(ApplicationArguments args) {
         log.info("========== 系统启动初始化开始 ==========");
