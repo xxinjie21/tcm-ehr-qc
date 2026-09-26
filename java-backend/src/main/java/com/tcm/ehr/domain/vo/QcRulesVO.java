@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 质控规则读/写响应（批Q/R）：规则集 + 自然语言描述 + 目录 + 告警。 */
+/** 质控规则读/写响应：规则集 + 自然语言描述 + 目录 + 告警。 */
 @Data
 public class QcRulesVO {
 

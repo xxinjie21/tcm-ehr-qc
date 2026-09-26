@@ -8,7 +8,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Web MVC配置：注册JWT拦截器（登录接口放行）与角色拦截器（批A·1.2）
+ * Web MVC配置：注册JWT拦截器（登录接口放行）与角色拦截器
  */
 @Configuration
 @RequiredArgsConstructor

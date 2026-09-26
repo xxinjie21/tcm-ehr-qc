@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 质控规则 → 自然语言描述（批R，单一来源）。
+ * 质控规则 → 自然语言描述。
  *
  * <p>标准面板与规则配置弹窗都消费这里的句子，避免前端各写一套措辞。</p>
  */
@@ -18,7 +18,7 @@ public final class QcRuleDescriber {
     /**
      * 把一套质控规则摊成一组给业务用户看的句子，顺序为：完整性 → 格式 → 一致性 → 标准化 → 重复 → 分级。
      *
-     * <p>这里是规则文案的唯一来源：质控标准面板与规则配置弹窗都消费它，避免前端各写一套措辞（批R）。</p>
+     * <p>这里是规则文案的唯一来源：质控标准面板与规则配置弹窗都消费它，避免前端各写一套措辞。</p>
      *
      * @param r 当前生效规则；为 {@code null} 时返回空列表
      * @return 逐条说明，顺序即界面展示顺序
@@ -59,7 +59,7 @@ public final class QcRuleDescriber {
             out.add("格式检查：" + String.join("；", fmts) + "。");
         }
 
-        // 一致性（类型 → 类型，批S）
+        // 一致性
         for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
             if (c.getTriggerType() == null || c.getExpectType() == null) {
                 continue;

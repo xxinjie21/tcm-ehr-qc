@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 诊疗逻辑一致性检查请求（批B·2.3，对应 openapi LogicCheckDTO）。
+ * 诊疗逻辑一致性检查请求。
  */
 @Data
 public class LogicCheckDTO {

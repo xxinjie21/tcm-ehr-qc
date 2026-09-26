@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 批量质控评分结果（批B·2.3）：分级分布 + 失败清单（明细仅前 50 条示例）。
+ * 批量质控评分结果：分级分布 + 失败清单（明细仅前 50 条示例）。
  */
 @Data
 public class QcBatchResultVO {

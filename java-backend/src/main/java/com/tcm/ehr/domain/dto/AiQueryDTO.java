@@ -3,12 +3,12 @@ package com.tcm.ehr.domain.dto;
 import lombok.Data;
 
 /**
- * AI 解读/问答/复核请求（入参，对应 openapi AiQueryDTO；批C 3.1/3.2，批D 复用）。
+ * AI 解读/问答/复核请求。
  *
  * <ul>
  *   <li>interpret：{@code recordId} 必填；</li>
  *   <li>chat：{@code question} 必填，{@code recordId} 可选（"这份病历…"类问题）；</li>
- *   <li>review（批D）：{@code recordId} + 修正数据。</li>
+ *   <li>review：{@code recordId} + 修正数据。</li>
  * </ul>
  */
 @Data

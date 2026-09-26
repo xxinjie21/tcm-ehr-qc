@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 多条件病历查询请求（批F·7.4，对应 openapi SearchDTO）。
+ * 多条件病历查询请求。
  */
 @Data
 public class SearchDTO {

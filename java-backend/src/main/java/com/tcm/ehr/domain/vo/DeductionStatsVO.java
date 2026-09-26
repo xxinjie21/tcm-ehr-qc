@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 范围扣分维度聚合（出参，批P）：把范围内各病历的扣分明细按维度/明细汇总。
+ * 范围扣分维度聚合：把范围内各病历的扣分明细按维度/明细汇总。
  *
  * <p>数据优先读 {@code records.qc_results}（已算过），缺失则按当前规则现算；
  * 扫描上限沿用质控图谱口径，超限 {@code truncated=true}。</p>

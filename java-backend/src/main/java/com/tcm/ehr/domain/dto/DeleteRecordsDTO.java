@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 批量删除病历请求（批F·7.3）。
+ * 批量删除病历请求。
  */
 @Data
 public class DeleteRecordsDTO {

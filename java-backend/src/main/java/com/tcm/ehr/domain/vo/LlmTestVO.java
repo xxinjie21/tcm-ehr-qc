@@ -3,7 +3,7 @@ package com.tcm.ehr.domain.vo;
 import lombok.Data;
 
 /**
- * LLM 连通性探测结果（UX-68，{@code POST /api/llm/test}）。
+ * LLM 连通性探测结果。
  */
 @Data
 public class LlmTestVO {

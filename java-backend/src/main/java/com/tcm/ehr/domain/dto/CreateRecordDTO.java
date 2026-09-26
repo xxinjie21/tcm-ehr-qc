@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 单条新增病历请求（批F·7.1，21 个原始字段）。
+ * 单条新增病历请求。
  * 契约见 openapi CreateRecordDTO；registrationNo / outpatientNo 必填由服务层校验。
  */
 @Data

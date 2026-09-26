@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 导入摘要（批F·7.1，对应 openapi ImportSummaryVO）。
+ * 导入摘要。
  */
 @Data
 public class ImportSummaryVO {

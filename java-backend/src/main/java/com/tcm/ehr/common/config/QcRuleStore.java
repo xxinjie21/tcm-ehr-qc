@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 质控规则存储（批Q）：启动加载 {@code qc-rules.json} 并与内置默认<b>深合并</b>；
+ * 质控规则存储：启动加载 {@code qc-rules.json} 并与内置默认<b>深合并</b>；
  * 读写单一数据源，保存即生效。
  *
  * <p>兜底语义：文件缺失 → 用内置默认；字段缺失 → 用默认补；单条非法 → 只影响该条；
@@ -133,7 +133,7 @@ public class QcRuleStore {
         if (r.getConsistency() == null) {
             r.setConsistency(new ArrayList<>());
         } else {
-            // 过滤旧格式/非法条目（批S 一致性结构升级：需 triggerType/expectType/values）
+            // 过滤旧格式/非法条目
             List<QcRuleSet.ConsistencyRule> valid = new ArrayList<>();
             for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
                 boolean ok = c.getTriggerType() != null && c.getExpectType() != null

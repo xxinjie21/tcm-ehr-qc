@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * NLP 批量解析任务视图（批K·K-a）。
+ * NLP 批量解析任务视图。
  */
 @Data
 public class NlpTaskVO {

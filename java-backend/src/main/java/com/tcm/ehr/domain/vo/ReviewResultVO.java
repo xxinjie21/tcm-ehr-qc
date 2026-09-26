@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 复核结果（出参，批D·5.1，对应 openapi ReviewResultVO）。
+ * 复核结果。
  */
 @Data
 public class ReviewResultVO {

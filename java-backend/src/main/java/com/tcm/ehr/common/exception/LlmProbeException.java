@@ -1,7 +1,7 @@
 package com.tcm.ehr.common.exception;
 
 /**
- * LLM 连通性探测失败（UX-68）。
+ * LLM 连通性探测失败。
  *
  * <p>与 {@link com.tcm.ehr.common.utils.LlmClient#chat} 的「静默降级」刻意相反：探测接口的意义
  * 就是把失败原因告诉用户，所以这里要把原因抛出来。消息在抛出前<b>已脱敏</b>

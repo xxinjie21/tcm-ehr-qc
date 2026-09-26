@@ -70,7 +70,7 @@ public interface RecordMapper extends BaseMapper<Record> {
     int updateStructuredData(@Param("id") String id, @Param("structuredData") String structuredData);
 
     /**
-     * 科室动态选项（批B·4.1 U11）：distinct 非空科室。
+     * 科室动态选项：distinct 非空科室。
      *
      * <p>{@code grade} 同 {@link #selectOverview} 的数据域参数 ——
      * 不传的话审核员能从下拉选项里看到自己域外的科室名。</p>
@@ -83,7 +83,7 @@ public interface RecordMapper extends BaseMapper<Record> {
             """)
     List<String> selectDepartments(@Param("grade") String grade);
 
-    /** 质控评分结果回写（批B·2.3）：分数 / 分级 / 状态 / 预检单 */
+    /** 质控评分结果回写：分数 / 分级 / 状态 / 预检单 */
     @Update("""
             UPDATE records
             SET score = #{score}, grade = #{grade}, status = #{status}, qc_results = #{qcResults}

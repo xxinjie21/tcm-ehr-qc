@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 原始病历查看（批F·7.2，对应 openapi RawRecordVO）：21 个原始字段只读 + 结构化数据/质控结果。
+ * 原始病历查看：21 个原始字段只读 + 结构化数据/质控结果。
  */
 @Data
 public class RawRecordVO {

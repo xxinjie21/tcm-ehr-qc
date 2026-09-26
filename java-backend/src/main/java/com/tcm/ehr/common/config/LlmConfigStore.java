@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * LLM 运行时配置存储（UX-68 / 批I 持久化）。
+ * LLM 运行时配置存储。
  *
  * <p>启动时以 {@link LlmProperties}（{@code application.yml} 的 {@code llm} 段）为基线，
  * 再用 {@code data/llm-config.json}（若存在）覆盖其中的<b>非密钥字段</b>；

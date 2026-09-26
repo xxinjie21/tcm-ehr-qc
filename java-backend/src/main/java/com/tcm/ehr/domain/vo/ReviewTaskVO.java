@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 复核任务（出参，批D·5.1，对应 openapi ReviewTaskVO）。
+ * 复核任务。
  *
  * <p>超时仅前端高亮提醒，系统不自动变更任务状态。</p>
  */

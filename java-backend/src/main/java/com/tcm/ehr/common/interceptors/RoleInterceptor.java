@@ -16,7 +16,7 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
- * 角色校验（批A·1.2 RBAC 双角色落实）：
+ * 角色校验：
  * 读取 JwtInterceptor 写入的 currentRole，与 {@link RequireRole} 声明的角色做<b>包含匹配</b>。
  *
  * <ul>

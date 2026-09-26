@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 事前质控检查结果（批B·2.3，对应 openapi QcCheckVO）。
+ * 事前质控检查结果。
  */
 @Data
 public class QcCheckVO {

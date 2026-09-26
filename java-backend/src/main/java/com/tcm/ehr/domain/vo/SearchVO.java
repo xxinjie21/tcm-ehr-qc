@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 多条件病历查询响应（批F·7.4，对应 openapi SearchVO）：总数 + 摘要列表。
+ * 多条件病历查询响应：总数 + 摘要列表。
  */
 @Data
 public class SearchVO {

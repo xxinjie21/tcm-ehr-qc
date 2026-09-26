@@ -3,7 +3,7 @@ package com.tcm.ehr.domain.dto;
 import lombok.Data;
 
 /**
- * LLM 配置入参（UX-68，{@code PUT /api/llm/config} 与 {@code POST /api/llm/test} 共用）。
+ * LLM 配置入参。
  *
  * <p>字段为「可空 = 沿用当前值」语义：前端弹窗只提交用户改过的项也不会把其他项清空。
  * {@code apiKey} 传空串或回传掩码均表示<b>不修改</b>密钥，避免用户看不到明文就无法保存。</p>

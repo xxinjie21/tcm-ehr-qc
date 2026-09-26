@@ -11,7 +11,7 @@ import java.util.List;
 public interface OperationLogMapper extends BaseMapper<OperationLog> {
 
     /**
-     * 库中实际出现过的操作类型（供前端筛选下拉动态取值，避免与后端调用点漂移 —— UX-19）。
+     * 库中实际出现过的操作类型。
      */
     @Select("SELECT DISTINCT action FROM operation_log WHERE action IS NOT NULL ORDER BY action")
     List<String> selectDistinctActions();

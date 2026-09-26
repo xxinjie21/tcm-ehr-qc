@@ -3,7 +3,7 @@ package com.tcm.ehr.domain.vo;
 import lombok.Data;
 
 /**
- * 数据清洗结果（批B·2.2 增三级命中分布）。
+ * 数据清洗结果。
  */
 @Data
 public class CleanResultVO {
@@ -15,7 +15,7 @@ public class CleanResultVO {
     /** 归一命中实体总数 */
     private int normalized;
     private int total;
-    /** 三级命中分布（批B·2.2）：精确 / 包含 / 模糊 */
+    /** 三级命中分布：精确 / 包含 / 模糊 */
     private NormByLevel normByLevel = new NormByLevel();
 
     @Data

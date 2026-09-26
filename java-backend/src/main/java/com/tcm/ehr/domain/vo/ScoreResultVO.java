@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 终末质控评分结果（批B·2.3，对应 openapi QcScoreVO 的超集，入 records.qc_results 可溯源）。
+ * 终末质控评分结果。
  */
 @Data
 public class ScoreResultVO {

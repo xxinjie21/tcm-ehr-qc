@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 操作日志（批A·C5）：与 logs/operation.log 文件双写，审计页读本表做分页/筛选。
+ * 操作日志：与 logs/operation.log 文件双写，审计页读本表做分页/筛选。
  * 字段与 database-init.sql 的 operation_log 表一一对应。
  */
 @Data

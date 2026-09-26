@@ -1,7 +1,7 @@
 package com.tcm.ehr.common.config;
 
 /**
- * LLM 生效配置的一份快照（UX-68）。
+ * LLM 生效配置的一份快照。
  *
  * <p>与 {@link LlmProperties}（{@code application.yml} 基线）区分：本记录表示<b>当前实际生效</b>的参数，
  * 可能来自配置文件，也可能来自运行时覆盖（topbar「导入 LLM」弹窗）。覆盖只改内存、不写回

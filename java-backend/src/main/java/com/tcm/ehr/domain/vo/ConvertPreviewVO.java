@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 词典 PDF 智能转换预览结果（批A·1.4）。
+ * 词典 PDF 智能转换预览结果。
  *
  * <p>流程：上传 PDF → PDFBox 抽文本 → LLM 按 Prompt 提取 → 本 VO 返回候选预览 →
  * 管理员确认后再走 {@code POST /api/dictionary/import} 入库。

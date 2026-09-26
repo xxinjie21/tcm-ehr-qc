@@ -3,7 +3,7 @@ package com.tcm.ehr.domain.dto;
 import lombok.Data;
 
 /**
- * NLP 批量解析提交请求（批K·K-a）。
+ * NLP 批量解析提交请求。
  */
 @Data
 public class NlpBatchDTO {

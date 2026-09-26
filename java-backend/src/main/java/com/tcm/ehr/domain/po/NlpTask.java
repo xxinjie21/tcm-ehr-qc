@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * NLP 批量解析任务（批K·K-a）。对应 {@code nlp_task} 表。
+ * NLP 批量解析任务。对应 {@code nlp_task} 表。
  *
  * <p>进度与失败清单落库，故服务重启后仍可查询；重启时把未完成任务标为 {@code INTERRUPTED}（K-c）。</p>
  */

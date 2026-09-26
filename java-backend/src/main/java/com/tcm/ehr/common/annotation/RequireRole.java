@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 角色校验（批A·1.2 RBAC 双角色落实）：
+ * 角色校验：
  * 标注在 Controller 方法或类上，由 {@code RoleInterceptor} 读取 request 属性 currentRole 做
  * <b>包含匹配</b>（任一角色命中即放行），未命中返回 HTTP 403 + Result{code=403}。
  *

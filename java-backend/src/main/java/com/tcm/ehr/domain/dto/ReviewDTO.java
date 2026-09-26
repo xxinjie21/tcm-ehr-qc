@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.Map;
 
 /**
- * 人工校正与复核请求（入参，批D·5.1，对应 openapi ReviewDTO）。
+ * 人工校正与复核请求。
  *
  * <p>{@code correctedData} 允许为 null，代表仅裁定不修改数据。</p>
  */
