@@ -16,7 +16,8 @@ import java.util.Map;
 
 /**
  * 认证接口：注册与登录。
- * 这两个接口在 WebMvcConfig 里被显式放行（无需 token），其余接口一律先过 JWT 鉴权。
+ *
+ * <p>这两个接口在 WebMvcConfig 中显式放行，其余接口一律先过 JWT 鉴权。</p>
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -26,21 +27,26 @@ public class AuthController {
     private final IAuthService authService;
 
     /**
-     * 用户注册：用户名/密码/角色（管理员、审核员）。
-     * 成功：HTTP 200 + code=200；
-     * 参数非法 / 用户名已存在：由 GlobalExceptionHandler 统一返回 HTTP 400 + code=400。
+     * 注册账号。
+     *
+     * <p>角色由后端固定为审核员，不采信前端传入的角色；用户名重复或参数非法返回 400。</p>
+     *
+     * @param dto 用户名与密码，字段级校验由 @Valid 触发
+     * @return username=注册的用户名；role=固定「审核员」
      */
     @PostMapping("/register")
     public Result<Map<String, String>> register(@Valid @RequestBody RegisterDTO dto) {
-        // 注册角色后端固定为「审核员」，不接受前端传入的角色（伪传 role 也会被忽略）
         authService.register(dto.getUsername(), dto.getPassword());
         return Result.ok("注册成功", Map.of("username", dto.getUsername(), "role", "审核员"));
     }
 
     /**
-     * 用户登录（必做1）。
-     * 成功：HTTP 200 + code=200，下发 JWT、角色与按角色分配的菜单；
-     * 参数非法：HTTP 400 + code=400；用户名或密码错误：HTTP 401 + code=401（均由 GlobalExceptionHandler 统一处理）。
+     * 登录并下发访问凭证。
+     *
+     * <p>用户名或密码错误返回 401，由 GlobalExceptionHandler 统一转换。</p>
+     *
+     * @param dto 用户名与密码
+     * @return token=JWT；role=角色；menus=该角色可见的菜单标题
      */
     @PostMapping("/login")
     public Result<LoginVO> login(@Valid @RequestBody LoginDTO dto) {

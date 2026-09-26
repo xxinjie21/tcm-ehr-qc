@@ -30,9 +30,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 
 /**
- * 病历数据（批F · 成员A 线）。
- * 7.1 导入/新增/进度 · 7.2 原始查看 · 7.3 修改/删除 · 7.4 多条件查询。
- * 7.5 日志审计见 {@code LogController}。
+ * 病历数据：批量导入、单条新增、原始查看、修改、删除、多条件查询。
+ *
+ * <p>导入进度查询按 {@code LogController} 之外的审计链路处理；写操作统一记入操作日志。</p>
  */
 @RestController
 @RequiredArgsConstructor
@@ -41,7 +41,15 @@ public class RecordController {
     private final IRecordService recordService;
     private final OperationLogger operationLogger;
 
-    /** 病历批量导入（多文件 .xlsx/.xls）；autoExtract=导入后自动结构化解析（后台任务）；【权限：仅管理员】 */
+    /**
+     * 批量导入病历文件。
+     *
+     * <p>【权限：仅管理员】单文件 ≤50MB、单次 ≤20 个；21 字段全一致的记录视为重复并跳过。</p>
+     *
+     * @param files       病历文件（.xlsx/.xls）
+     * @param autoExtract 是否在导入后自动投递结构化解析任务
+     * @return taskId=导入任务ID；summary=本轮成功/失败条数与失败明细
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records/import")
     public Result<ImportTaskVO> importRecords(@RequestParam("files") MultipartFile[] files,
@@ -53,7 +61,14 @@ public class RecordController {
         return Result.ok(vo);
     }
 
-    /** 导入进度查询（内存态，服务重启返回 404）；【权限：仅管理员】 */
+    /**
+     * 查询导入任务进度。
+     *
+     * <p>【权限：仅管理员】进度存在内存中，服务重启后查询返回 404。</p>
+     *
+     * @param taskId 导入任务ID
+     * @return status=任务状态；processed/success/failed=处理进度
+     */
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/records/import/{taskId}/status")
     public ResponseEntity<Result<ImportStatusVO>> importStatus(@PathVariable String taskId) {
@@ -64,14 +79,28 @@ public class RecordController {
         return ResponseEntity.ok(Result.ok(vo));
     }
 
-    /** 单条新增病历；【权限：仅管理员】 */
+    /**
+     * 单条新增病历。
+     *
+     * <p>【权限：仅管理员】</p>
+     *
+     * @param dto 21 字段原始记录，登记号必填
+     * @return id=新病历ID
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records")
     public Result<CreateRecordVO> createRecord(@RequestBody CreateRecordDTO dto) {
         return Result.ok("新增成功", recordService.createRecord(dto));
     }
 
-    /** 原始病历只读查看（21 字段）；【权限：登录即可 + 数据域】 */
+    /**
+     * 查看病历原始数据。
+     *
+     * <p>【权限：登录即可 + 数据域】21 个原始字段只读，附结构化数据与评分结果；不存在返回 404。</p>
+     *
+     * @param recordId 病历ID
+     * @return 21 原始字段 + structuredData + score/grade
+     */
     @GetMapping("/api/records/raw/{recordId}")
     public ResponseEntity<Result<RawRecordVO>> rawRecord(@PathVariable String recordId) {
         RawRecordVO vo = recordService.getRawRecord(recordId);
@@ -81,7 +110,15 @@ public class RecordController {
         return ResponseEntity.ok(Result.ok(vo));
     }
 
-    /** 病历修改（仅 structuredData，原始字段只读）；【权限：仅管理员】 */
+    /**
+     * 修改病历的结构化数据。
+     *
+     * <p>【权限：仅管理员】只允许改 structuredData，携带原始字段按只读冲突返回 1007。</p>
+     *
+     * @param recordId 病历ID
+     * @param body     仅接受 structuredData 键
+     * @return 无数据体，仅成功标记
+     */
     @RequireRole(roles = {"管理员"})
     @PutMapping("/api/records/{recordId}")
     public Result<Void> updateRecord(@PathVariable String recordId, @RequestBody Map<String, Object> body) {
@@ -90,7 +127,14 @@ public class RecordController {
         return Result.ok("修改成功", null);
     }
 
-    /** 批量删除病历；【权限：仅管理员】 */
+    /**
+     * 按 ID 批量删除病历。
+     *
+     * <p>【权限：仅管理员】先清复核任务再删，避免外键约束失败。</p>
+     *
+     * @param dto ids=待删除的病历ID集合
+     * @return deletedCount=实际删除条数
+     */
     @RequireRole(roles = {"管理员"})
     @DeleteMapping("/api/records")
     public Result<DeleteRecordsVO> deleteRecords(@RequestBody DeleteRecordsDTO dto) {
@@ -99,7 +143,14 @@ public class RecordController {
         return Result.ok("删除成功", vo);
     }
 
-    /** 按筛选范围批量删除病历（条件全空拒绝，防误删全库）；【权限：仅管理员】 */
+    /**
+     * 按筛选范围批量删除病历。
+     *
+     * <p>【权限：仅管理员】条件全空时拒绝，避免误删全库。</p>
+     *
+     * @param filters department/dateRange/pattern/grade，至少一项非空
+     * @return deletedCount=实际删除条数
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records/delete-by-filter")
     public Result<DeleteRecordsVO> deleteByFilter(@RequestBody FiltersDTO filters) {
@@ -108,7 +159,14 @@ public class RecordController {
         return Result.ok("删除成功", vo);
     }
 
-    /** 多条件分页查询；【权限：登录即可 + 数据域（审核员恒为待复核域）】 */
+    /**
+     * 多条件分页查询病历。
+     *
+     * <p>【权限：登录即可 + 数据域】审核员恒为待复核域。</p>
+     *
+     * @param dto 查询条件与分页参数
+     * @return total=总条数；records=当前页摘要列表
+     */
     @PostMapping("/api/records/search")
     public Result<SearchVO> search(@Valid @RequestBody SearchDTO dto) {
         return Result.ok(recordService.searchRecords(dto));

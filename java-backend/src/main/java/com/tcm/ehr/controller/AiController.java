@@ -13,10 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * AI 消费端接口（批C · 3.1 解读卡 / 3.2 助手浮窗；批D 复用本控制器加 /review）。
+ * AI 消费端接口：质控解读、助手问答、复核预检。
  *
- * <p>【权限：登录即可】；读取受数据域约束（审核员仅待复核域）。LLM 不可用一律降级，
- * 不阻塞、不泄漏底层异常。</p>
+ * <p>读病历受数据域约束（审核员仅待复核域）；LLM 不可用时降级为规则输出，不阻塞也不外泄底层异常。</p>
  */
 @RestController
 @RequestMapping("/api/ai")
@@ -25,7 +24,14 @@ public class AiController {
 
     private final IAiService aiService;
 
-    /** AI 质控解读：规则出结论 + LLM 叙述；【权限：登录即可】 */
+    /**
+     * 生成单份病历的质控解读。
+     *
+     * <p>【权限：登录即可】规则出结论，LLM 仅做叙述增强；病历不存在返回 404。</p>
+     *
+     * @param dto recordId=病历ID（必填）
+     * @return answer=解读正文；source=结果来源（rule/llm）；llmAvailable=LLM 是否可用
+     */
     @PostMapping("/interpret")
     public ResponseEntity<Result<AiReplyVO>> interpret(@RequestBody AiQueryDTO dto) {
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
@@ -38,7 +44,14 @@ public class AiController {
         return ResponseEntity.ok(Result.ok(vo));
     }
 
-    /** AI 助手问答：业务问题 LLM+规则检索，技术实现问题兜底拒答；【权限：登录即可】 */
+    /**
+     * 业务问答。
+     *
+     * <p>【权限：登录即可】技术实现类问题按兜底拒答，不回答系统内部细节；问题为空返回 400。</p>
+     *
+     * @param dto question=问题文本（必填）；recordId=可选，命中"这份病历…"类问题时带上下文
+     * @return answer=回答正文；source=rule/llm；llmAvailable=LLM 是否可用
+     */
     @PostMapping("/chat")
     public ResponseEntity<Result<AiReplyVO>> chat(@RequestBody AiQueryDTO dto) {
         if (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank()) {
@@ -47,7 +60,14 @@ public class AiController {
         return ResponseEntity.ok(Result.ok(aiService.chat(dto)));
     }
 
-    /** AI 复核预检意见（批D·5.1）；【权限：管理员 / 审核员】 */
+    /**
+     * 生成复核预检意见。
+     *
+     * <p>【权限：管理员 / 审核员】基于规则重算的扣分明细给出建议，病历不存在返回 404。</p>
+     *
+     * @param dto recordId=病历ID（必填）
+     * @return answer=预检建议；source=rule/llm；llmAvailable=LLM 是否可用
+     */
     @RequireRole(roles = {"管理员", "审核员"})
     @PostMapping("/review")
     public ResponseEntity<Result<AiReplyVO>> review(@RequestBody AiQueryDTO dto) {

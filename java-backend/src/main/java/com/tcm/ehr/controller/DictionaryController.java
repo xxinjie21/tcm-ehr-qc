@@ -22,8 +22,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 术语词典：导入 / 查询 / 版本回滚 / 备份列表
- * type非法统一返回 HTTP 400 + code=4001（附录B错误码表）
+ * 术语词典：导入、PDF 转换预览、查询、版本回滚、备份列表。
+ *
+ * <p>词典以 JSON 文件存放，每次导入自动备份。{@code type} 非法统一返回 400 + code=4001。</p>
  */
 @RestController
 @RequestMapping("/api/dictionary")
@@ -34,7 +35,15 @@ public class DictionaryController {
     private final OperationLogger operationLogger;
 
 
-    /** 上传术语库文件（Excel/CSV/JSON），解析校验后写入词典（自动备份旧版本）；【权限：仅管理员】 */
+    /**
+     * 导入术语库文件。
+     *
+     * <p>【权限：仅管理员】整文件覆盖，导入前自动备份旧版本；行级失败不中断，整批照常返回。</p>
+     *
+     * @param file 术语文件（.xlsx/.xls/.csv/.json）
+     * @param type 术语类型（疾病/证候/症状/中药/方剂）
+     * @return total=总行数；imported/failed=成功与失败条数；failures=失败明细
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/import")
     public ResponseEntity<Result<ImportResultVO>> importDict(@RequestParam("file") MultipartFile file,
@@ -50,10 +59,14 @@ public class DictionaryController {
     }
 
     /**
-     * PDF 智能转换（国标 PDF 免手工转 JSON）：上传 PDF → 抽文本 → LLM 提取候选 → 返回预览。
-     * <b>预览不落库</b>，管理员确认后再走 {@code /import} 入库。
-     * AI 能力未开启（总控 llm.enabled 关闭）或通道连不上时回 HTTP 400 + 友好提示，
-     * 引导走离线脚本或 JSON 直传；提示文案不出现配置项名；【权限：仅管理员】
+     * 把国标 PDF 转换成候选术语供预览。
+     *
+     * <p>【权限：仅管理员】预览不落库，确认后走 {@code /import} 入库。LLM 未开启或通道不可达时
+     * 返回 400 与可读提示，引导改用离线脚本或 JSON 直传。</p>
+     *
+     * @param file 国标 PDF 文件
+     * @param type 术语类型
+     * @return candidates=候选术语；failed=抽取失败明细
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/convert")
@@ -68,7 +81,15 @@ public class DictionaryController {
         return ResponseEntity.ok(Result.ok(vo));
     }
 
-    /** 只读查询/自动补全（读词典 JSON 文件，标准词+别名关键字模糊匹配） */
+    /**
+     * 查询术语（供页面展示与输入联想）。
+     *
+     * <p>【权限：登录即可】按标准词与别名做模糊匹配。</p>
+     *
+     * @param type    术语类型
+     * @param keyword 关键字，为空表示不过滤
+     * @return terms=命中的术语列表
+     */
     @GetMapping("/terms")
     public ResponseEntity<Result<Map<String, Object>>> terms(@RequestParam("type") String type,
                                                              @RequestParam(value = "keyword", required = false) String keyword)
@@ -79,7 +100,14 @@ public class DictionaryController {
         return ResponseEntity.ok(Result.ok(Map.of("terms", dictionaryService.searchTerms(type, keyword))));
     }
 
-    /** 版本回滚：从备份文件恢复指定版本；【权限：仅管理员】 */
+    /**
+     * 回滚到指定历史版本。
+     *
+     * <p>【权限：仅管理员】立即生效并重建索引；备份文件不存在返回 400。</p>
+     *
+     * @param body type=术语类型；backupFilename=备份文件名
+     * @return 无数据体，仅成功标记
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/rollback")
     public ResponseEntity<Result<Void>> rollback(@RequestBody Map<String, String> body) throws IOException {
@@ -96,7 +124,14 @@ public class DictionaryController {
         return ResponseEntity.ok(Result.ok(null));
     }
 
-    /** 备份版本列表 */
+    /**
+     * 查询历史版本列表。
+     *
+     * <p>【权限：登录即可】</p>
+     *
+     * @param type 术语类型
+     * @return backups=版本项（导入时间、词条数、相对当前增减）
+     */
     @GetMapping("/backups")
     public ResponseEntity<Result<Map<String, Object>>> backups(@RequestParam("type") String type) throws IOException {
         if (!TermTypes.ALL.contains(type)) {

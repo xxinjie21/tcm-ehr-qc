@@ -27,7 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 质控：事前检查 / 逻辑一致性 / 单条评分 / 批量重算；批Q 增规则读/写/重置与扣分聚合。
+ * 质控：事前检查、逻辑一致性、单条评分、批量重算，以及评分规则的读/写/重置与扣分聚合。
+ *
+ * <p>评分口径由 {@link QcRuleSet} 决定，判定不经过 LLM。</p>
  */
 @RestController
 @RequiredArgsConstructor
@@ -35,55 +37,113 @@ public class QcController {
 
     private final IQcService qcService;
 
-    /** 事前质控（缺失 / 格式 / 查重）；【权限：仅管理员】 */
+    /**
+     * 事前质控：要素缺失与格式校验。
+     *
+     * <p>【权限：仅管理员】缺失按"结构化与原始列都为空"判定。</p>
+     *
+     * @param dto recordId=病历ID（必填）；structuredData=可选，缺省时读取库中结构化数据
+     * @return missingFields=缺失的核心要素；formatErrors=年龄/性别格式问题
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/check")
     public Result<QcCheckVO> check(@RequestBody QcCheckDTO dto) {
         return Result.ok(qcService.check(dto));
     }
 
-    /** 诊疗逻辑一致性；【权限：仅管理员】 */
+    /**
+     * 诊疗逻辑一致性检查。
+     *
+     * <p>【权限：仅管理员】按当前规则表判定，规则未覆盖的要素不判冲突。</p>
+     *
+     * @param dto patternList/treatmentList/formulaList 待判定的要素
+     * @return conflicts=冲突描述；consistent=是否无冲突
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/check/logic")
     public Result<LogicCheckVO> checkLogic(@RequestBody LogicCheckDTO dto) {
         return Result.ok(qcService.checkLogic(dto));
     }
 
-    /** 单条评分；【权限：仅管理员】 */
+    /**
+     * 单条病历评分（不落库）。
+     *
+     * <p>【权限：仅管理员】</p>
+     *
+     * @param dto recordId=病历ID；structuredData=可选，缺省时读取库中结构化数据
+     * @return score=得分；grade=分级；deductions=扣分明细
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/score")
     public Result<ScoreResultVO> score(@RequestBody QcScoreDTO dto) {
         return Result.ok(qcService.score(dto));
     }
 
-    /** 全库/范围内批量重算；【权限：仅管理员】 */
+    /**
+     * 按范围批量重算评分与分级（写库）。
+     *
+     * <p>【权限：仅管理员】会覆盖既有分数并同步复核任务状态；超上限返回 400。</p>
+     *
+     * @param dto filters=范围条件，为空表示全库
+     * @return total/qualified/pendingReview/invalid/failed=分级汇总；failureSamples=失败样本
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/score/batch")
     public Result<QcBatchResultVO> scoreBatch(@RequestBody(required = false) QcBatchDTO dto) {
         return Result.ok(qcService.scoreBatch(dto));
     }
 
-    /** 读取质控规则；【权限：登录即可】 */
+    /**
+     * 读取当前生效的质控规则。
+     *
+     * <p>【权限：登录即可】</p>
+     *
+     * @return rules=规则集；descriptions=自然语言描述；warnings=加载告警
+     */
     @GetMapping("/api/qc/rules")
     public Result<QcRulesVO> rules() {
         return Result.ok(qcService.rules());
     }
 
-    /** 保存质控规则（立即生效）；【权限：仅管理员】 */
+    /**
+     * 保存质控规则并立即生效。
+     *
+     * <p>【权限：仅管理员】落盘到 qc-rules.json，下次启动沿用；缺项按默认补齐。</p>
+     *
+     * @param rules 规则集
+     * @return 保存后的规则集
+     */
     @RequireRole(roles = {"管理员"})
     @PutMapping("/api/qc/rules")
     public Result<QcRulesVO> updateRules(@RequestBody QcRuleSet rules) {
         return Result.ok("规则已保存并生效", qcService.updateRules(rules));
     }
 
-    /** 恢复默认规则；【权限：仅管理员】 */
+    /**
+     * 恢复默认质控规则。
+     *
+     * <p>【权限：仅管理员】删除规则文件并回退到内置默认。</p>
+     *
+     * @return 恢复后的规则集
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/rules/reset")
     public Result<QcRulesVO> resetRules() {
         return Result.ok("已恢复默认规则", qcService.resetRules());
     }
 
-    /** 范围扣分维度聚合；【权限：仅管理员】 */
+    /**
+     * 汇总范围内的扣分分布。
+     *
+     * <p>【权限：仅管理员】优先读已落库的 qc_results，未算过的按当前规则现算。</p>
+     *
+     * @param department 科室，空表示不限
+     * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
+     * @param end        接诊时间上界（yyyy-MM-dd）
+     * @param pattern    证候关键字，模糊匹配
+     * @param grade      分级
+     * @return scanned=统计条数；byType/byItem=维度与明细扣分；gradeDist=分级分布
+     */
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/qc/deduction-stats")
     public Result<DeductionStatsVO> deductionStats(
@@ -95,7 +155,7 @@ public class QcController {
         return Result.ok(qcService.deductionStats(filters(department, start, end, pattern, grade)));
     }
 
-    /** GET query 参数 → FiltersDTO */
+    /** GET 查询参数 → 统一的范围过滤对象（时间需上下界同时存在） */
     private FiltersDTO filters(String department, String start, String end, String pattern, String grade) {
         FiltersDTO f = new FiltersDTO();
         f.setDepartment(department);

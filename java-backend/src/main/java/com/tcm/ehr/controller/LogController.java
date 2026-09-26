@@ -18,8 +18,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 日志审计（批F·7.5 / 批I·I2）：读库分页筛选 + 导出（文件流，不套 Result）+ 归档清理。
- * 数据源为 operation_log（批A·C5 双写入库）；文件 logs/operation.log 为兜底。
+ * 操作日志审计：分页查询、类型选项、CSV 导出、归档清理。
+ *
+ * <p>数据源是 operation_log 表；文件 logs/operation.log 是兜底副本，导出与查询都不读它。</p>
  */
 @RestController
 @RequiredArgsConstructor
@@ -28,7 +29,17 @@ public class LogController {
     private final ILogService logService;
     private final OperationLogger operationLogger;
 
-    /** 操作日志分页查询；【权限：仅管理员】 */
+    /**
+     * 分页查询操作日志。
+     *
+     * <p>【权限：仅管理员】</p>
+     *
+     * @param action  操作类型，空表示不限
+     * @param keyword 关键字，匹配操作人/对象/详情
+     * @param page    页码，从 1 开始
+     * @param size    每页条数
+     * @return total=总条数；list=当前页记录
+     */
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/logs")
     public Result<Map<String, Object>> logs(@RequestParam(required = false) String action,
@@ -39,8 +50,11 @@ public class LogController {
     }
 
     /**
-     * 操作类型选项：取库中实际出现过的值，前端下拉据此渲染，
-     * 避免前端写死清单与后端调用点漂移（UX-19）；【权限：仅管理员】
+     * 查询操作类型选项。
+     *
+     * <p>【权限：仅管理员】取库中出现过的值，前端据此渲染下拉，避免写死清单与调用点漂移。</p>
+     *
+     * @return 去重后的操作类型列表
      */
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/logs/actions")
@@ -48,7 +62,15 @@ public class LogController {
         return Result.ok(logService.actions());
     }
 
-    /** 操作日志导出（CSV 文件流，不套 Result）；【权限：仅管理员】 */
+    /**
+     * 导出操作日志为 CSV。
+     *
+     * <p>【权限：仅管理员】文件流直出，不套 Result 包装。</p>
+     *
+     * @param action  操作类型，空表示导出全部
+     * @param keyword 关键字
+     * @return 带 UTF-8 BOM 的 CSV 字节流
+     */
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/logs/export")
     public ResponseEntity<byte[]> export(@RequestParam(required = false) String action,
@@ -60,7 +82,14 @@ public class LogController {
                 .body(content);
     }
 
-    /** 归档并清理指定日期之前的日志（先归档落盘、成功再删）；【权限：仅管理员】 */
+    /**
+     * 归档并清理指定日期之前的操作日志。
+     *
+     * <p>【权限：仅管理员】先归档落盘、成功才删；本次清理本身也记入审计。</p>
+     *
+     * @param dto beforeDate=截止日期（yyyy-MM-dd），该日 00:00:00 之前的记录被清理
+     * @return deleted=清理条数；archivedFile=归档文件名（无记录时为空串）
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/logs/purge")
     public Result<Map<String, Object>> purge(@RequestBody PurgeLogDTO dto) {

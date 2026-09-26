@@ -17,8 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 人工复核（批D·5.1）：待复核任务列表 + 人工校正/提交复核（自动重算回流）。
- * 超时仅前端高亮，无后台定时任务、不自动流转。
+ * 人工复核：待复核任务列表 + 人工校正提交。
+ *
+ * <p>超时只在前端高亮，没有定时任务、不会自动流转。</p>
  */
 @RestController
 @RequiredArgsConstructor
@@ -27,7 +28,16 @@ public class ReviewController {
     private final IReviewService reviewService;
     private final OperationLogger operationLogger;
 
-    /** 待复核任务列表；【权限：管理员 / 审核员】 */
+    /**
+     * 查询待复核任务。
+     *
+     * <p>【权限：管理员 / 审核员】已作废的任务不返回。</p>
+     *
+     * @param page     页码，从 1 开始
+     * @param pageSize 每页条数
+     * @param status   任务状态，为空表示不限
+     * @return total=总条数；tasks=任务列表
+     */
     @RequireRole(roles = {"管理员", "审核员"})
     @GetMapping("/api/review/tasks")
     public Result<ReviewTasksVO> tasks(@RequestParam(defaultValue = "1") Integer page,
@@ -36,13 +46,20 @@ public class ReviewController {
         return Result.ok(reviewService.listTasks(page, pageSize, status));
     }
 
-    /** 人工校正与复核；【权限：管理员 / 审核员】 */
+    /**
+     * 提交人工复核结果。
+     *
+     * <p>【权限：管理员 / 审核员】校正后的结构化数据会回流重算分级。</p>
+     *
+     * @param recordId 病历ID
+     * @param dto      correctedData=人工校正后的结构化数据；remark=复核意见，均可为空
+     * @return status=复核后状态；score=重算得分
+     */
     @RequireRole(roles = {"管理员", "审核员"})
     @PostMapping("/api/records/{recordId}/review")
     public Result<ReviewResultVO> review(@PathVariable String recordId,
                                          @RequestBody(required = false) ReviewDTO dto) {
-        // 「病历不存在」与「复核记录不存在或状态已完结」都走 ResourceNotFoundException(1006)
-        // → GlobalExceptionHandler 统一回 404 + code=1006，不再有第二套码（B8-4）
+        // 病历不存在与"复核记录不存在/已完结"共用 1006，由 GlobalExceptionHandler 统一转 404
         ReviewResultVO vo = reviewService.review(recordId, dto);
         operationLogger.log("人工复核", recordId, "结果：" + vo.getStatus() + "，评分：" + vo.getScore());
         return Result.ok(vo);
