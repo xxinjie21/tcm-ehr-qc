@@ -17,7 +17,14 @@ import java.util.Map;
 @Mapper
 public interface RecordMapper extends BaseMapper<Record> {
 
-    /** 指标卡聚合（按 grade 口径，与质控分级一致） */
+    /**
+     * 指标卡聚合（按 grade 口径，与质控分级一致）。
+     *
+     * <p>{@code grade} 是<b>数据域</b>参数（取值来自
+     * {@link com.tcm.ehr.common.utils.RecordFilter#domainGrade}）：审核员传「待复核」，
+     * 只在这个域内聚合；管理员传 {@code null}，条件失效即全库。
+     * 没有它，审核员调 {@code /api/stats/overview} 就能读到全库的分级分布。</p>
+     */
     @Select("""
             SELECT
                 COUNT(*) AS totalRecords,
@@ -25,8 +32,9 @@ public interface RecordMapper extends BaseMapper<Record> {
                 COALESCE(SUM(CASE WHEN grade = '待复核' THEN 1 ELSE 0 END), 0) AS pendingReviewCount,
                 COALESCE(SUM(CASE WHEN grade = '无效' THEN 1 ELSE 0 END), 0) AS invalidCount
             FROM records
+            WHERE (#{grade} IS NULL OR grade = #{grade})
             """)
-    Map<String, Object> selectOverview();
+    Map<String, Object> selectOverview(@Param("grade") String grade);
 
     /** 清洗状态统计：合格总数/已清洗/待清洗 */
     @Select("""
@@ -61,13 +69,19 @@ public interface RecordMapper extends BaseMapper<Record> {
     @Update("UPDATE records SET structured_data = #{structuredData} WHERE id = #{id}")
     int updateStructuredData(@Param("id") String id, @Param("structuredData") String structuredData);
 
-    /** 科室动态选项（批B·4.1 U11）：distinct 非空科室 */
+    /**
+     * 科室动态选项（批B·4.1 U11）：distinct 非空科室。
+     *
+     * <p>{@code grade} 同 {@link #selectOverview} 的数据域参数 ——
+     * 不传的话审核员能从下拉选项里看到自己域外的科室名。</p>
+     */
     @Select("""
             SELECT DISTINCT department FROM records
             WHERE department IS NOT NULL AND department <> ''
+              AND (#{grade} IS NULL OR grade = #{grade})
             ORDER BY department
             """)
-    List<String> selectDepartments();
+    List<String> selectDepartments(@Param("grade") String grade);
 
     /** 质控评分结果回写（批B·2.3）：分数 / 分级 / 状态 / 预检单 */
     @Update("""

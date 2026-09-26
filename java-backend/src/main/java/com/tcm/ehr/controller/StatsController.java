@@ -21,6 +21,10 @@ import java.util.List;
 /**
  * 统计：首页指标卡 + 按type统计（症状频次/证型分布/方剂中药频次）
  * + 看板扩展（批C·4.2：stats/all 一次拉取 / stats/extra 趋势·科室·评分分布）。
+ *
+ * <p>【权限：登录即可】，但读取<b>受数据域约束</b>——审核员仅待复核域，管理员全库
+ * （openapi 全局声明）。聚合 SQL 与列表查询都必须带数据域：漏一处，审核员就能读到
+ * 全库的分级分布与证型 / 方剂词频。</p>
  */
 @RestController
 @RequestMapping("/api/stats")
@@ -61,7 +65,7 @@ public class StatsController {
         return Result.ok(statsService.extra(filters(department, start, end, pattern, grade)));
     }
 
-    /** 按type统计（recordIds圈定范围，空=全量）；type非法由 GlobalExceptionHandler 统一返回 400 */
+    /** 按type统计（recordIds圈定范围，空=全量）；【权限：登录即可 + 数据域（审核员恒为待复核域）】；type非法由 GlobalExceptionHandler 统一返回 400 */
     @PostMapping
     public Result<StatsVO> stats(@RequestBody StatsDTO dto) {
         return Result.ok(statsService.stats(dto));

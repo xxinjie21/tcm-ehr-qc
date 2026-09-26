@@ -48,12 +48,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     @Override
     public List<String> departments() {
-        return baseMapper.selectDepartments();
+        return baseMapper.selectDepartments(domainGrade());
     }
 
     @Override
     public OverviewVO overview() {
-        Map<String, Object> row = baseMapper.selectOverview();
+        Map<String, Object> row = baseMapper.selectOverview(domainGrade());
         OverviewVO vo = new OverviewVO();
         vo.setTotalRecords(num(row.get("totalRecords")));
         vo.setQualifiedCount(num(row.get("qualifiedCount")));
@@ -64,19 +64,28 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return vo;
     }
 
+    /**
+     * 三个入口都先过数据域，再叠加各自的圈定方式。
+     *
+     * <p>原实现三条路都绕开了 {@link RecordFilter}：按 ID 的 {@code selectBatchIds}、
+     * 按筛选的 {@code filterByFilters}（先全表载入再内存过滤）、以及无条件的
+     * {@code selectList(null)} —— 而 {@code /api/stats} 是「登录即可」，审核员借此能读到
+     * 非待复核域病历的证型 / 方剂词频。</p>
+     */
     @Override
     public StatsVO stats(StatsDTO dto) {
-        List<Record> records;
+        String role = RequestUtils.currentRole();
+        QueryWrapper<Record> wrapper;
         if (dto.getRecordIds() != null && !dto.getRecordIds().isEmpty()) {
-            // 优先：按病历ID圈定（文档契约）
-            records = baseMapper.selectBatchIds(dto.getRecordIds());
+            // 优先：按病历ID圈定（文档契约）；ID 由调用方给，因此数据域必须先加
+            wrapper = RecordFilter.build(role, new FiltersDTO()).in("id", dto.getRecordIds());
         } else if (dto.getFilters() != null && !dto.getFilters().isEmpty()) {
             // 次选：按筛选条件（department/dateRange/pattern，复用查询1字段）
-            records = filterByFilters(dto.getFilters());
+            wrapper = RecordFilter.build(role, toFilters(dto.getFilters()));
         } else {
-            records = baseMapper.selectList(null);
+            wrapper = RecordFilter.build(role, new FiltersDTO());
         }
-        return statsFor(records, dto.getType());
+        return statsFor(baseMapper.selectList(wrapper), dto.getType());
     }
 
     @Override
@@ -223,32 +232,24 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return "60以下";
     }
 
-    /** 按筛选条件过滤病历（department/dateRange/pattern，与导出过滤口径一致） */
-    private List<Record> filterByFilters(Map<String, Object> filters) {
-        String department = str(filters.get("department"));
-        String pattern = str(filters.get("pattern"));
-        String start = null;
-        String end = null;
-        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2) {
-            start = str(range.get(0));
-            end = str(range.get(1));
-        }
-        final String dep = department;
-        final String pat = pattern;
-        final String dateStart = start;
-        final String dateEnd = end;
+    /** 本请求的数据域分级：审核员 = 待复核，管理员 = null（不限） */
+    private String domainGrade() {
+        return RecordFilter.domainGrade(RequestUtils.currentRole());
+    }
 
-        return baseMapper.selectList(null).stream()
-                .filter(r -> dep == null || dep.equals(r.getDepartment()))
-                .filter(r -> {
-                    if (dateStart == null && dateEnd == null) return true;
-                    String d = r.getVisitTime() == null ? "" : r.getVisitTime().toString().substring(0, 10);
-                    return (dateStart == null || (d.compareTo(dateStart) >= 0))
-                            && (dateEnd == null || (d.compareTo(dateEnd) <= 0));
-                })
-                .filter(r -> pat == null
-                        || (r.getPattern() != null && r.getPattern().contains(pat)))
-                .toList();
+    /**
+     * stats 契约里的 filters 是无类型的 {@code Map}，这里翻译成 {@link FiltersDTO}
+     * 再交给 {@link RecordFilter} —— 条件组装口径只保留一处，不再有第二套内存过滤。
+     */
+    private FiltersDTO toFilters(Map<String, Object> filters) {
+        FiltersDTO f = new FiltersDTO();
+        f.setDepartment(str(filters.get("department")));
+        f.setPattern(str(filters.get("pattern")));
+        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2
+                && str(range.get(0)) != null && str(range.get(1)) != null) {
+            f.setDateRange(List.of(str(range.get(0)), str(range.get(1))));
+        }
+        return f;
     }
 
     private String str(Object o) {

@@ -71,9 +71,22 @@ public final class RecordFilter {
 
     /** 数据域（行级权限）：审核员强制待复核域；管理员全库 */
     private static void operatorScope(QueryWrapper<Record> wrapper, String role) {
-        if (ROLE_AUDITOR.equals(role)) {
-            wrapper.eq("grade", "待复核");
+        String scope = domainGrade(role);
+        if (scope != null) {
+            wrapper.eq("grade", scope);
         }
+    }
+
+    /**
+     * 数据域落在「分级」列上的取值：审核员 = {@code 待复核}；管理员 = {@code null}（不限）。
+     *
+     * <p>给 QueryWrapper 表达不了的聚合 SQL 用 —— Mapper 里以
+     * {@code WHERE (#{grade} IS NULL OR grade = #{grade})} 落地。
+     * 存在的意义是让「审核员的数据域是哪个分级」这个口径仍然只有一处，
+     * 不在 Mapper 里再写一遍中文字面量。</p>
+     */
+    public static String domainGrade(String role) {
+        return ROLE_AUDITOR.equals(role) ? "待复核" : null;
     }
 
     /** 批B·4.1：按 filters{department,dateRange,pattern,grade} 构建（数据域→用户筛选） */
