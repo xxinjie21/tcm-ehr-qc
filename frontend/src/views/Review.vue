@@ -254,7 +254,7 @@ const COMPARE_FIELDS = [
   { key: 'causeList', label: '病因', termType: '' }
 ]
 
-/** 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算（核心 5 要素） */
+/** 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算（核心 6 要素，取自规则集目录） */
 const FIELD_BY_ITEM = {
   症状: 'symptoms',
   证候: 'patternList',

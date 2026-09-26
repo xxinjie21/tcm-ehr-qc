@@ -944,7 +944,7 @@ components:
           description: 事前质控结果
     QcScoreVO:
       type: object
-      description: 评分响应（出参；满分100，最低0）。核心要素 5 项（症状/证候/舌象/脉象/中药），判定以结构化结果为准；治法、方剂不参与评分
+      description: 评分响应（出参；满分100，最低0）。核心要素取自规则集目录，默认 6 项（症状/疾病/证候/舌象/脉象/中药），两档扣分（真缺失 -12 / 漏抽 -6），判定以结构化结果为准；治法、方剂不参与评分
       properties:
         score:
           type: integer
@@ -1438,7 +1438,12 @@ components:
                 type: string
         coreMissing:
           type: array
-          description: 核心要素缺失清单（interpret；症状/证候/舌象/脉象/中药，真缺失口径）
+          description: 核心要素缺失清单（interpret；要素取自规则集目录，默认 6 项：症状/疾病/证候/舌象/脉象/中药。真缺失口径 = 结构化结果与原始列都没有记录）
+          items:
+            type: string
+        corePartial:
+          type: array
+          description: 核心要素「漏抽」清单（interpret）：结构化结果里没有、但原始列有记录，可能未被抽取。与 coreMissing 合起来才等于质控侧「核心字段缺失」两档扣分的口径
           items:
             type: string
         normHits:

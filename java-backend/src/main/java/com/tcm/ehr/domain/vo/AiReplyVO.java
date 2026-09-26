@@ -29,8 +29,17 @@ public class AiReplyVO {
     /** 完整性分析（interpret）；chat 时为 null */
     private Completeness completeness;
 
-    /** 核心字段缺失清单（interpret） */
+    /** 核心字段缺失清单（interpret）；**真缺失**口径：结构化结果与原始列都没有记录 */
     private List<String> coreMissing = new ArrayList<>();
+
+    /**
+     * 核心字段「漏抽」清单（interpret）：结构化结果里没有、但原始列有记录，可能未被抽取。
+     *
+     * <p>{@link #coreMissing} 只覆盖真缺失，光看它会得出「核心字段齐全」——而质控侧的
+     * 「核心字段缺失」扣分是<b>两档</b>（真缺失 -12 / 漏抽 -6）。两者合起来才与质控同口径，
+     * 缺了本字段就会出现「同一份病历质控说缺、AI 说齐全」（审查报告 H1）。</p>
+     */
+    private List<String> corePartial = new ArrayList<>();
 
     /** 归一命中分布（interpret）；chat 时为 null */
     private NormHits normHits;

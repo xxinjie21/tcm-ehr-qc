@@ -126,7 +126,7 @@ public class QcRuleStore {
         warnings.clear();
         if (r.getCompleteness() == null || r.getCompleteness().getElements() == null
                 || r.getCompleteness().getElements().isEmpty()) {
-            warnings.add("完整性要素为空，已回填内置 5 要素");
+            warnings.add("完整性要素为空，已回填内置 6 要素");
             r.setCompleteness(QcRuleSet.defaults().getCompleteness());
         }
         if (r.getConsistency() == null) {

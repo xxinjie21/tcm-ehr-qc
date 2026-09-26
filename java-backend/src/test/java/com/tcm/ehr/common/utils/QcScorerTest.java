@@ -6,8 +6,11 @@ import com.tcm.ehr.domain.vo.ScoreResultVO;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -168,5 +171,39 @@ class QcScorerTest {
         assertTrue(vo.getDeductions().stream()
                         .anyMatch(d -> "术语未标准化".equals(d.getType()) && d.getPoints() == 5),
                 () -> "应有 5 分的术语未标准化扣分：" + vo.getDeductions());
+    }
+
+    /**
+     * 反漂移：{@link QcScorer#missingElements} 与 score() 的完整性扣分必须同口径。
+     *
+     * <p>AI 解读 / 助手现在复用 missingElements。这两者一旦分家，就会重现
+     * 「同一份病历质控说缺、AI 说齐全」（审查报告 H1 / G1）—— 所以用一个用例把
+     * 「要素清单 + 两档归属」钉死在两侧一致上。</p>
+     */
+    @Test
+    void missingElementsAgreesWithCompletenessDeductions() {
+        Map<String, Object> data = new HashMap<>(fullData());
+        data.remove("pulseList"); // 结构化为空、原始列也空 → 真缺失
+        Record raw = raw();
+        raw.setTongue("舌淡红");
+        data.remove("tongueList"); // 结构化为空、原始列有记录 → 漏抽
+
+        QcRuleSet rules = QcRuleSet.defaults();
+        QcScorer.Missing miss = QcScorer.missingElements(data, raw, rules);
+        ScoreResultVO vo = QcScorer.score(data, raw, false, rules);
+
+        assertEquals(Set.of("脉象"), new HashSet<>(miss.full()));
+        assertEquals(Set.of("舌象"), new HashSet<>(miss.partial()));
+
+        assertEquals(itemsWithPoints(vo, 12), new HashSet<>(miss.full()), "真缺失应两侧一致");
+        assertEquals(itemsWithPoints(vo, 6), new HashSet<>(miss.partial()), "漏抽应两侧一致");
+    }
+
+    /** 核心字段缺失里扣指定分值（12 = 真缺失 / 6 = 漏抽）的要素名 */
+    private static Set<String> itemsWithPoints(ScoreResultVO vo, int points) {
+        return vo.getDeductions().stream()
+                .filter(d -> "核心字段缺失".equals(d.getType()) && d.getPoints() == points)
+                .map(ScoreResultVO.Deduction::getItem)
+                .collect(Collectors.toSet());
     }
 }

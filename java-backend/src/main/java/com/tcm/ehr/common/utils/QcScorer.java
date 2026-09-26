@@ -110,6 +110,41 @@ public final class QcScorer {
         return vo;
     }
 
+    /**
+     * 「核心要素」的缺失情况，分两档。
+     *
+     * <p><b>与 {@link #score} 的完整性扣分同源</b>：同一份要素清单
+     * （{@code rules.getCompleteness().getElements()}）、同一套判空原语
+     * （{@link #structuredPresent} / {@link #rawPresent}）。存在的意义是让 AI 解读 / 助手
+     * 不再手写一份要素清单 —— 那正是「同一份病历质控说缺、AI 说齐全」的根因。</p>
+     *
+     * @param full    <b>真缺失</b>：结构化结果与原始列都没有记录
+     * @param partial <b>漏抽</b>：结构化结果里没有，但原始列有记录（可能未被抽取）
+     */
+    public record Missing(List<String> full, List<String> partial) {
+    }
+
+    /** 按规则集判定核心要素缺失；{@code rules} 为 null 时用内置默认（与 score 一致） */
+    public static Missing missingElements(Map<String, Object> data, Record raw,
+                                          com.tcm.ehr.common.config.QcRuleSet rules) {
+        com.tcm.ehr.common.config.QcRuleSet rs =
+                rules == null ? com.tcm.ehr.common.config.QcRuleSet.defaults() : rules;
+        List<String> full = new ArrayList<>();
+        List<String> partial = new ArrayList<>();
+        for (com.tcm.ehr.common.config.QcRuleSet.Element el : rs.getCompleteness().getElements()) {
+            if (structuredPresent(el.getSource(), data)) {
+                continue;
+            }
+            String name = el.getName();
+            if (rawPresent(el.getFallback(), raw)) {
+                partial.add(name);
+            } else {
+                full.add(name);
+            }
+        }
+        return new Missing(full, partial);
+    }
+
     private static int weightOf(com.tcm.ehr.common.config.QcRuleSet rs, String name) {
         for (com.tcm.ehr.common.config.QcRuleSet.ConsistencyRule c : rs.getConsistency()) {
             if (c.getName() != null && c.getName().equals(name)) {

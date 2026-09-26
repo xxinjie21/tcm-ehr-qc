@@ -84,7 +84,9 @@ public class AiServiceImpl implements IAiService {
 
         // ① 规则结论（完整性 / 核心缺项 / 归一命中 / 关键提示）
         vo.setCompleteness(completeness(r));
-        vo.setCoreMissing(coreMissing(data, r));
+        QcScorer.Missing core = coreMissing(data, r);
+        vo.setCoreMissing(core.full());
+        vo.setCorePartial(core.partial());
         vo.setNormHits(normHits(data));
         vo.setKeyHints(keyHints(data, r));
 
@@ -137,6 +139,8 @@ public class AiServiceImpl implements IAiService {
         sb.append("- 完整性：21 字段完整 ").append(vo.getCompleteness().getPresent())
                 .append(" 项，缺失：").append(join(vo.getCompleteness().getMissing())).append('\n');
         sb.append("- 核心字段缺失：").append(join(vo.getCoreMissing())).append('\n');
+        sb.append("- 核心字段未抽取（原始病历有记录，可能未被抽取）：")
+                .append(join(vo.getCorePartial())).append('\n');
         AiReplyVO.NormHits n = vo.getNormHits();
         sb.append("- 归一命中：共 ").append(n.getTotal()).append(" 处（精确 ")
                 .append(n.getExact()).append(" / 包含 ").append(n.getContain())
@@ -163,10 +167,16 @@ public class AiServiceImpl implements IAiService {
                     .append(join(c.getMissing())).append("）");
         }
         sb.append("。");
-        if (!vo.getCoreMissing().isEmpty()) {
-            sb.append("核心字段缺失：").append(join(vo.getCoreMissing())).append("。");
-        } else {
+        // 两档都要说：只说真缺失会得出「核心字段齐全」，而质控侧此时可能正在扣「漏抽」的分
+        if (vo.getCoreMissing().isEmpty() && vo.getCorePartial().isEmpty()) {
             sb.append("核心字段齐全。");
+        } else {
+            if (!vo.getCoreMissing().isEmpty()) {
+                sb.append("核心字段缺失：").append(join(vo.getCoreMissing())).append("。");
+            }
+            if (!vo.getCorePartial().isEmpty()) {
+                sb.append("核心字段未抽取到（原始病历有记录）：").append(join(vo.getCorePartial())).append("。");
+            }
         }
         sb.append("术语归一命中 ").append(n.getTotal()).append(" 处（精确 ").append(n.getExact())
                 .append(" / 包含 ").append(n.getContain()).append(" / 模糊 ").append(n.getFuzzy()).append("）。");
@@ -215,15 +225,16 @@ public class AiServiceImpl implements IAiService {
         return c;
     }
 
-    /** 核心要素缺失（5 项；真缺失口径，结构化为空且原始列也空；症状无原始列） */
-    private List<String> coreMissing(Map<String, Object> data, Record r) {
-        List<String> missing = new ArrayList<>();
-        if (listEmpty(data, "symptoms")) missing.add("症状");
-        if (listEmpty(data, "patternList") && blank(r.getPattern())) missing.add("证候");
-        if (listEmpty(data, "tongueList") && blank(r.getTongue())) missing.add("舌象");
-        if (listEmpty(data, "pulseList") && blank(r.getPulse())) missing.add("脉象");
-        if (listEmpty(data, "herbs") && blank(r.getPrescription())) missing.add("中药");
-        return missing;
+    /**
+     * 核心要素缺失 —— 直接问 {@link QcScorer}，不再在这里手写要素清单。
+     *
+     * <p>此前这里硬编码 5 项（不含疾病），而质控按规则集评 6 项，导致「同一份病历质控说缺、
+     * AI 说齐全」（审查报告 H1 / G1）。现在两侧共用 `QcScorer.missingElements`：
+     * 同一份要素清单、同一套判空，且**同样是两档**
+     * （{@code coreMissing} = 真缺失，{@code corePartial} = 漏抽）。</p>
+     */
+    private QcScorer.Missing coreMissing(Map<String, Object> data, Record r) {
+        return QcScorer.missingElements(data, r, qcRuleStore.get());
     }
 
     private AiReplyVO.NormHits normHits(Map<String, Object> data) {
@@ -250,8 +261,13 @@ public class AiServiceImpl implements IAiService {
         if (blank(r.getPrescription()) && listEmpty(data, "herbs")) hints.add("处方缺失");
         if (blank(r.getChiefComplaint())) hints.add("主诉为空");
         if (blank(r.getTcmDiagnosis())) hints.add("中医诊断为空");
-        List<String> core = coreMissing(data, r);
-        if (!core.isEmpty()) hints.add("核心字段缺失 " + core.size() + " 项：" + join(core));
+        QcScorer.Missing core = coreMissing(data, r);
+        if (!core.full().isEmpty()) {
+            hints.add("核心字段真缺失 " + core.full().size() + " 项：" + join(core.full()));
+        }
+        if (!core.partial().isEmpty()) {
+            hints.add("核心字段未抽取 " + core.partial().size() + " 项：" + join(core.partial()));
+        }
         return hints;
     }
 
@@ -331,8 +347,10 @@ public class AiServiceImpl implements IAiService {
                         .append("；评分：").append(r.getScore() == null ? "未评分" : r.getScore())
                         .append("（").append(nz(r.getGrade())).append("）。");
                 Map<String, Object> data = structured(r);
-                List<String> core = coreMissing(data, r);
-                sb.append("核心字段缺失：").append(core.isEmpty() ? "无" : join(core)).append("。\n");
+                QcScorer.Missing core = coreMissing(data, r);
+                sb.append("核心字段缺失：").append(core.full().isEmpty() ? "无" : join(core.full())).append("；");
+                sb.append("未抽取到（原始病历有记录）：")
+                        .append(core.partial().isEmpty() ? "无" : join(core.partial())).append("。\n");
             }
             hit = true;
         }
