@@ -124,12 +124,14 @@ public class QcRuleStore {
 
     /** 关键项兜底：空标准/非法阈值一律回默认并告警（不允许空标准导致人人满分） */
     private QcRuleSet normalize(QcRuleSet r) {
+        // 1. 完整性要素为空 → 回填内置 6 要素
         warnings.clear();
         if (r.getCompleteness() == null || r.getCompleteness().getElements() == null
                 || r.getCompleteness().getElements().isEmpty()) {
             warnings.add("完整性要素为空，已回填内置 6 要素");
             r.setCompleteness(QcRuleSet.defaults().getCompleteness());
         }
+        // 2. 过滤旧格式/不完整的一致性规则（缺触发或期望值 → 丢弃并告警）
         if (r.getConsistency() == null) {
             r.setConsistency(new ArrayList<>());
         } else {
@@ -150,9 +152,11 @@ public class QcRuleStore {
         if (r.getFormat() == null) {
             r.setFormat(new ArrayList<>());
         }
+        // 3. 标准化配置缺失 → 回默认
         if (r.getStandardization() == null) {
             r.setStandardization(QcRuleSet.defaults().getStandardization());
         }
+        // 4. 分级阈值非法（合格线 ≤ 无效线等）→ 回默认并告警
         QcRuleSet.Thresholds t = r.getThresholds();
         if (t == null || t.getQualified() <= t.getInvalid() || t.getInvalid() < 0 || t.getSeriousFullMissing() < 1) {
             warnings.add("分级阈值非法，已回默认 90/60/3");
@@ -161,6 +165,7 @@ public class QcRuleStore {
         return r;
     }
 
+    /** 递归深合并：override 覆盖 base，缺字段保留默认（实现"字段级补默认"） */
     @SuppressWarnings("unchecked")
     private void deepMerge(Map<String, Object> base, Map<String, Object> override) {
         for (Map.Entry<String, Object> e : override.entrySet()) {
