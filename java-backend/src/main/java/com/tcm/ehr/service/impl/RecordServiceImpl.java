@@ -41,6 +41,7 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -48,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 病历数据服务实现（批F·7.1）：Excel 批量导入 + 单条新增 + 导入进度（内存）。
@@ -112,8 +112,32 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /** 内存里最多保留多少条导入任务状态；超出淘汰最早的 */
+    private static final int TASK_STORE_MAX = 200;
+
     /** 导入任务状态（内存；重启丢失，符合 openapi 约定） */
-    private final Map<String, ImportStatusVO> taskStore = new ConcurrentHashMap<>();
+    private final Map<String, ImportStatusVO> taskStore = newTaskStore(TASK_STORE_MAX);
+
+    /**
+     * 有界任务表：超过上限就淘汰最早插入的那条。
+     *
+     * <p>原来是无上限的 {@code ConcurrentHashMap} 且全文件没有 {@code remove} ——
+     * 每次导入新增一条（还带失败明细），长期运行内存持续增长（审查报告 M5）。</p>
+     *
+     * <p>用 {@code LinkedHashMap.removeEldestEntry} 做有界是零依赖的做法（仓库里没有 Caffeine）；
+     * 外面套 {@code synchronizedMap} 保持线程安全 —— 导入与查进度是两个请求线程。</p>
+     *
+     * <p>不做 TTL：任务状态是给导入后回看用的，有界即可，不值得为它加依赖或定时任务。</p>
+     */
+    static Map<String, ImportStatusVO> newTaskStore(int maxEntries) {
+        // 匿名内部类 + 菱形推断会退化成 LinkedHashMap<Object,Object>，这里显式写泛型
+        return Collections.synchronizedMap(new LinkedHashMap<String, ImportStatusVO>(16, 0.75f, false) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, ImportStatusVO> eldest) {
+                return size() > maxEntries;
+            }
+        });
+    }
 
     @Override
     public ImportTaskVO importRecords(MultipartFile[] files, boolean autoExtract) {
