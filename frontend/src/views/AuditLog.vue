@@ -86,6 +86,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import { getLogs, getLogActions, exportLogs, purgeLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
+import { confirmBox } from '@/utils/confirm'
 
 /** 图例配色；具体选项由后端返回（UX-19），未匹配到的走默认色 */
 const TAG_TYPES = {
@@ -160,11 +161,10 @@ const purgeDate = ref('')
 const purging = ref(false)
 
 const handlePurge = async () => {
-  await ElMessageBox.confirm(
-    `确定清理 ${purgeDate.value} 之前的日志吗？会先归档到 logs/ 再删除。`,
-    '清理操作日志',
-    { type: 'warning' }
-  )
+  if (!(await confirmBox(`确定清理 ${purgeDate.value} 之前的日志吗？会先归档到 logs/ 再删除。`,
+    '清理操作日志'))) {
+    return
+  }
   purging.value = true
   try {
     const res = await purgeLogs(purgeDate.value)

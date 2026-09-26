@@ -19,9 +19,12 @@
             <el-button
               type="danger"
               :disabled="searching || !hasFilter"
-              title="按上方筛选范围删除全部匹配病历"
               @click="handleRangeDelete"
             >删除范围内病历</el-button>
+            <!-- 禁用态下 title 不弹出，所以把前置条件写成常驻说明 -->
+            <span class="tip-inline">
+              {{ searching ? '正在查询…' : (hasFilter ? '删除上方范围内全部匹配病历' : '需先设置筛选范围') }}
+            </span>
             <span class="tip-inline">共 {{ total }} 条</span>
           </div>
 
@@ -64,7 +67,8 @@
               </template>
             </el-table-column>
             <template #empty>
-              <el-empty description="无符合条件的病历" :image-size="80" />
+              <EmptyState :failed="listFailed" :loading="searching"
+                text="无符合条件的病历" @retry="handleSearch" />
             </template>
           </el-table>
 
@@ -93,7 +97,7 @@
             与数据清洗同一去重口径（21 字段完全一致视为重复，跳过并记录）。
           </div>
           <div class="import-auto">
-            <el-switch v-model="autoExtract" />
+            <el-switch v-model="autoExtract" aria-label="导入后自动结构化解析" />
             <span>导入后自动结构化解析（后台任务，需抽取服务已开启）</span>
             <span class="tip">开启后导入秒回，解析交由后台队列，可在「结构化解析」页看进度</span>
           </div>
@@ -224,6 +228,7 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
@@ -297,14 +302,18 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const searching = ref(false)
+/** 列表加载失败：与「确实没有匹配」区分开（三态统一） */
+const listFailed = ref(false)
 
 const handleSearch = async () => {
   searching.value = true
+  listFailed.value = false
   try {
     const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
     rows.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch {
+    listFailed.value = true
     // 拦截器已提示
   } finally {
     searching.value = false

@@ -52,7 +52,8 @@
           </template>
         </el-table-column>
         <template #empty>
-          <el-empty description="无符合条件的病历" :image-size="80" />
+          <EmptyState :failed="listFailed" :loading="listLoading"
+            text="无符合条件的病历" @retry="() => search(1)" />
         </template>
       </el-table>
 
@@ -352,7 +353,7 @@
                   <el-button v-if="isActive(row)" link type="danger" @click="cancelBatch(row.id)">取消</el-button>
                   <template v-else>
                     <el-button link type="primary" @click="viewTask(row.id)">查看</el-button>
-                    <el-button link type="primary" @click="rerun">重跑</el-button>
+                    <el-button link type="primary" @click="rerun">按当前范围重新提交</el-button>
                   </template>
                 </template>
               </el-table-column>
@@ -367,6 +368,7 @@
 <script setup>
 import { computed, reactive, ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -377,6 +379,7 @@ import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
 import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
+import { confirmBox } from '@/utils/confirm'
 
 const activeTab = ref('single')
 
@@ -387,15 +390,19 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const listLoading = ref(false)
+/** 列表加载失败：与「确实没有匹配」区分开（三态统一） */
+const listFailed = ref(false)
 
 const search = async (p) => {
   if (typeof p === 'number') page.value = p
   listLoading.value = true
+  listFailed.value = false
   try {
     const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
     rows.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch {
+    listFailed.value = true
     // 拦截器已提示
   } finally {
     listLoading.value = false
@@ -715,7 +722,41 @@ const startPoll = () => {
   }, 2000)
 }
 
+/**
+ * 当前批量范围的可读描述 + 条数。
+ *
+ * 「开始批量解析」与行内「按当前范围重新提交」是同一个动作、两个入口，
+ * 原来都没有二次确认，而空范围等于全库（约 90 秒、覆盖已有结构化数据）。
+ */
+const describeBatchScope = async () => {
+  const parts = []
+  if (batchFilters.department) parts.push(`科室＝${batchFilters.department}`)
+  if (batchFilters.dateRange && batchFilters.dateRange.length === 2) {
+    parts.push(`${batchFilters.dateRange[0]}~${batchFilters.dateRange[1]}`)
+  }
+  if (batchFilters.pattern) parts.push(`证候＝${batchFilters.pattern}`)
+  if (batchFilters.grade) parts.push(`分级＝${batchFilters.grade}`)
+  let count = '未知'
+  try {
+    const res = await searchRecords({ ...batchFilters, page: 1, pageSize: 1 })
+    count = res.data?.total ?? '未知'
+  } catch {
+    // 取不到条数不阻塞确认，退化成「未知」
+  }
+  return { scope: parts.length ? parts.join(' · ') : '全部病历（未设筛选）', count }
+}
+
 const submitBatch = async () => {
+  const { scope, count } = await describeBatchScope()
+  const limited = batchMode.value === 'limit' ? `（本次只处理前 ${batchLimit.value} 条）` : ''
+  const ok = await confirmBox(
+    `将对「${scope}」范围内约 ${count} 条病历执行批量解析${limited}，耗时较长，`
+      + '且会覆盖这些病历已有的结构化数据。确定提交？',
+    '批量解析'
+  )
+  if (!ok) {
+    return
+  }
   submitting.value = true
   try {
     const res = await submitNlpBatch({
@@ -734,7 +775,9 @@ const submitBatch = async () => {
 }
 
 const cancelBatch = async (id) => {
-  await ElMessageBox.confirm('确定取消该批量解析任务吗？已处理的不回滚。', '取消任务', { type: 'warning' })
+  if (!(await confirmBox('确定取消该批量解析任务吗？已处理的不回滚。', '取消任务'))) {
+    return
+  }
   try {
     const res = await cancelNlpBatch(id)
     if (activeTask.value?.id === id) {
@@ -751,11 +794,14 @@ const viewTask = async (id) => {
   try {
     const res = await getNlpBatch(id)
     activeTask.value = res.data
+    // 原来只赋值、不启动轮询，进度不会自刷新
+    startPoll()
   } catch {
     // 拦截器已提示
   }
 }
 
+// 与「开始批量解析」同一条路径：按**当前表单范围**重新提交，不是重跑那一条任务
 const rerun = () => submitBatch()
 
 onMounted(() => {

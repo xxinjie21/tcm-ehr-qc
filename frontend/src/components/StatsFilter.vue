@@ -19,14 +19,16 @@
       <el-date-picker id="sf-end" v-model="model.end" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
     </div>
     <el-button type="primary" size="small" @click="$emit('search')">查 询</el-button>
-    <el-button size="small" @click="$emit('reset')">重置为全部</el-button>
+    <el-button size="small" @click="$emit('reset')">重 置</el-button>
   </section>
 </template>
 
 <script setup>
 defineProps({
   model: { type: Object, required: true },
-  departments: { type: Array, default: () => ['内科', '外科', '儿科', '针灸科'] }
+  // 默认空数组：原来的 ['内科','外科','儿科','针灸科'] 在演示数据里根本不存在，
+    // 一旦调用方忘了传就会显示假选项（Dashboard 目前恒传真实值，所以从未暴露）
+    departments: { type: Array, default: () => [] }
 })
 
 defineEmits(['search', 'reset'])

@@ -26,18 +26,8 @@
           <span v-else class="todo-lock">仅管理员</span>
         </span>
       </button>
-      <button
-        type="button"
-        class="todo"
-        :class="{ readonly: !canVisit('质控校验') }"
-        @click="go('/qc-check', '质控校验')"
-      >
-        <span class="todo-num">{{ overview.totalRecords }}</span>
-        <span class="todo-lbl">
-          病历总数 <span v-if="canVisit('质控校验')">›</span>
-          <span v-else class="todo-lock">仅管理员</span>
-        </span>
-      </button>
+      <!-- 「病历总数」原来也在这里占一张可点卡片，但它没有动作语义（点进去只是跳质控页），
+           而且与下方指标卡的同一个数字重复。待办条只留动作型入口，数字看指标卡。 -->
     </section>
 
     <!-- 只遮数据区：筛选条保持可交互，避免整页白屏 -->

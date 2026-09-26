@@ -8,6 +8,13 @@
     :close-on-click-modal="false"
     @open="loadConfig"
   >
+    <p v-if="loadFailed" class="llm-warn">
+      配置读取失败，下面显示的不是服务端的当前配置 —— 请关闭本弹窗后重开，或检查后端是否可用。
+    </p>
+    <p v-if="saveFailed" class="llm-warn">
+      保存失败，本次修改<b>没有生效</b>；表单里是你刚填的值，可修正后重试。
+    </p>
+
     <p class="llm-tip">
       配置运行时生效的模型通道：<b>ollama</b> 走本机、无需 API Key；<b>openai</b> 兼容三方网关，
       改接口地址即可接入 DeepSeek / 通义 / 智谱等。保存后立即生效，<b>无需重启</b>。
@@ -120,6 +127,9 @@ const emit = defineEmits(['saved'])
 
 const loading = ref(false)
 const saving = ref(false)
+/** 读配置失败 / 保存失败 —— 都不该让表单停在上一次的值而不说明 */
+const loadFailed = ref(false)
+const saveFailed = ref(false)
 const testing = ref(false)
 const testResult = ref(null)
 
@@ -147,6 +157,7 @@ const modelOptions = computed(() => MODEL_OPTIONS[form.provider] || MODEL_OPTION
 async function loadConfig() {
   loading.value = true
   testResult.value = null
+  loadFailed.value = false
   try {
     const { data } = await getLlmConfig()
     form.enabled = !!data.enabled
@@ -159,6 +170,9 @@ async function loadConfig() {
     config.apiKeySet = !!data.apiKeySet
     config.apiKeyMask = data.apiKeyMask || ''
     config.available = !!data.available
+  } catch {
+    // 原来只有 try/finally：读配置失败后表单还停在上一次的值，会被当成服务端现状
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -199,6 +213,9 @@ async function handleSave() {
     ElMessage.success('LLM 配置已生效')
     visible.value = false
     emit('saved')
+  } catch {
+    // 保存失败不关窗，用户改过的值还在；拦截器已按状态提示原因
+    saveFailed.value = true
   } finally {
     saving.value = false
   }
@@ -216,6 +233,17 @@ async function handleSave() {
   line-height: 1.8;
   color: #6b5a44;
 }
+.llm-warn {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--danger);
+  border-left: 3px solid var(--danger);
+  background: #f8ece9;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--danger);
+}
+
 .llm-tip b {
   color: var(--ink);
   font-weight: normal;

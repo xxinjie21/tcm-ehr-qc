@@ -199,7 +199,7 @@
 
     <PanelCard title="AI 预检列表 / 扣分明细">
       <div class="precheck-bar">
-        <span class="tip">点击行查看规则扣分明细；范围沿用上方「范围查询」，不再单独设分级</span>
+        <span class="tip">点击行查看规则扣分明细；扣分范围沿用上方「范围查询」</span>
       </div>
 
       <el-table v-loading="precheckLoading" :data="precheckRows" border size="small" max-height="360">
@@ -231,7 +231,8 @@
         <template #empty>
           <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一套 searchRecords 查询，
                原先只写「无数据」，用户不知道是没查到、还是页面坏了 -->
-          <el-empty description="筛选范围内没有病历" :image-size="80" />
+          <EmptyState :failed="precheckFailed" :loading="precheckLoading"
+            text="筛选范围内没有病历" @retry="() => loadPrecheck(1)" />
         </template>
       </el-table>
       <el-pagination
@@ -301,6 +302,7 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules, recomputeQc } from '@/api/qc'
@@ -532,15 +534,19 @@ const precheckTotal = ref(0)
 const precheckPage = ref(1)
 const precheckSize = ref(10)
 const precheckLoading = ref(false)
+/** 预检列表加载失败：与「范围内确实没有病历」区分开（三态统一） */
+const precheckFailed = ref(false)
 
 const loadPrecheck = async (p) => {
   if (typeof p === 'number') precheckPage.value = p
   precheckLoading.value = true
+  precheckFailed.value = false
   try {
     const res = await searchRecords({ ...filters, page: precheckPage.value, pageSize: precheckSize.value })
     precheckRows.value = res.data?.records || []
     precheckTotal.value = res.data?.total || 0
   } catch {
+    precheckFailed.value = true
     // 拦截器已提示
   } finally {
     precheckLoading.value = false

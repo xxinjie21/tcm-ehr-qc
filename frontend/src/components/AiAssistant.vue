@@ -253,7 +253,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .ai-assistant {
   position: fixed;
-  z-index: 2000;
+  /* 必须高于 Element Plus 的遮罩：它的 z-index 从 2000 起「运行期自增」，
+     每开一次 dialog / popper / select 下拉就 +1，而遮罩实测在 2008 起。
+     原来写 2000 会被遮罩整个吞掉（球点不动、面板点不到）。
+     5000 在一次会话里要分配 3000 次才可能被反超，实际到不了；
+     代价是助手面板可能盖住弹窗内容 —— 面板可拖动，必要时移开。
+     （更稳的长期做法是「弹窗打开时收起全局球、在弹窗内给入口」，见方案 B6-3 乙案） */
+  z-index: 5000;
 }
 .aii-ball {
   width: 48px;

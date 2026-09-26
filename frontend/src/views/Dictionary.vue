@@ -28,7 +28,8 @@
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms">查 询</el-button>
         <span class="tip">共 {{ terms.length }} 条</span>
       </div>
-      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
+      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360"
+        :empty-text="termsFailed ? '加载失败，请点「查 询」重试' : '没有匹配的术语'">
         <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
           <template #default="{ row }">
@@ -171,7 +172,8 @@
         <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
       </div>
       <el-table :data="backups" border style="margin-top: 12px" max-height="260"
-        empty-text="暂无历史版本。导入词典时会自动备份，导入一次即可在这里回滚">
+        :empty-text="backupsFailed ? '历史版本加载失败，请点「刷新历史版本」重试'
+          : '暂无历史版本。导入词典时会自动备份，导入一次即可在这里回滚'">
         <el-table-column prop="time" label="导入时间" min-width="180" />
         <el-table-column prop="count" label="词条数" width="110" />
         <el-table-column label="较当前" width="120">
@@ -201,6 +203,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
 import { getTerms, importDict, convertDict, rollback, getBackups } from '@/api/dictionary'
 import { saveBlob } from '@/utils/download'
+import { confirmBox } from '@/utils/confirm'
 
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
 
@@ -211,12 +214,19 @@ const typeLabel = computed(() => TYPE_LABELS[activeTab.value])
 const keyword = ref('')
 const terms = ref([])
 const loadingTerms = ref(false)
+/** 词条查询失败：与「确实没有匹配」区分开 */
+const termsFailed = ref(false)
 
 const loadTerms = async () => {
   loadingTerms.value = true
+  termsFailed.value = false
   try {
     const res = await getTerms({ type: activeTab.value, keyword: keyword.value })
     terms.value = res.data.terms || []
+  } catch {
+    // 原来只有 try/finally：接口挂了列表还停在上一次的结果，用户会把旧数据当最新
+    termsFailed.value = true
+    terms.value = []
   } finally {
     loadingTerms.value = false
   }
@@ -385,6 +395,8 @@ const downloadFailed = () => {
 }
 
 const backups = ref([])
+/** 历史版本读取失败：与「确实没有备份」区分开 */
+const backupsFailed = ref(false)
 
 /** 较当前增减：正=备份比现在多，负=少，0=一致 */
 const deltaText = (d) => {
@@ -400,16 +412,23 @@ const deltaClass = (d) => {
 }
 
 const loadBackups = async () => {
-  const res = await getBackups({ type: activeTab.value })
-  backups.value = res.data.backups || []
+  try {
+    const res = await getBackups({ type: activeTab.value })
+    backups.value = res.data.backups || []
+    backupsFailed.value = false
+  } catch {
+    // 原来连 try 都没有；且失败后表头的「暂无历史版本」会让人以为真的没有备份
+    backupsFailed.value = true
+    backups.value = []
+  }
 }
 
 const handleRollback = async (row) => {
-  await ElMessageBox.confirm(
+  if (!(await confirmBox(
     `确定将「${TYPE_LABELS[activeTab.value]}」词典回滚到 ${row.time} 的版本吗？覆盖当前词典并立即生效。`,
-    '版本回滚',
-    { type: 'warning' }
-  )
+    '版本回滚'))) {
+    return
+  }
   const res = await rollback({ type: activeTab.value, backupFilename: row.filename })
   ElMessage.success(res.msg || '回滚成功')
   loadTerms()
