@@ -68,10 +68,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public OverviewVO overview() {
+        // 1. 指标在库里聚合，只按数据域过滤（总览不受页面筛选影响）
         Map<String, Object> row = baseMapper.selectOverview(domainGrade());
         OverviewVO vo = new OverviewVO();
         vo.setTotalRecords(num(row.get("totalRecords")));
         vo.setQualifiedCount(num(row.get("qualifiedCount")));
+        // 2. 合格率保留一位小数；总数为 0 时给 0 而不是除零
         vo.setQualifiedRate(vo.getTotalRecords() == 0 ? 0.0
                 : Math.round(vo.getQualifiedCount() * 1000.0 / vo.getTotalRecords()) / 10.0);
         vo.setPendingReviewCount(num(row.get("pendingReviewCount")));
@@ -88,6 +90,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     public StatsVO stats(StatsDTO dto) {
         String role = RequestUtils.currentRole();
         QueryWrapper<Record> wrapper;
+        // 1. 三种圈定方式：病历ID → 筛选条件 → 全域（都不给时就是数据域内全部）
         if (dto.getRecordIds() != null && !dto.getRecordIds().isEmpty()) {
             // 优先：按病历ID圈定；ID 由调用方给，数据域必须先叠加
             wrapper = RecordFilter.build(role, new FiltersDTO()).in("id", dto.getRecordIds());
@@ -111,9 +114,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public StatsAllVO all(FiltersDTO filters) {
+        // 1. 先把范围内的病历一次取出，四类词频共用这一份（避免查四次库）
         List<Record> records = recordsFor(filters);
         StatsAllVO vo = new StatsAllVO();
+        // 2. 总览单独按数据域聚合，不受本次筛选影响
         vo.setOverview(overview());
+        // 3. 四类词频各自取 Top10
         vo.setDisease(statsFor(records, "disease"));
         vo.setSymptom(statsFor(records, "symptom"));
         vo.setPattern(statsFor(records, "pattern"));
@@ -136,7 +142,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         List<Record> records = recordsFor(filters);
         StatsVO vo = new StatsVO();
 
-        // ① 质控趋势：按就诊月份聚合（升序，最多最近 12 个月）
+        // 1. 质控趋势：按就诊月份聚合（升序，最多最近 12 个月）
         TreeMap<String, long[]> byMonth = new TreeMap<>();
         for (Record r : records) {
             String month = monthOf(r);
@@ -160,7 +166,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             vo.getTrend().add(p);
         }
 
-        // ② 科室合格率
+        // 2. 科室合格率
         Map<String, long[]> byDept = new HashMap<>();
         for (Record r : records) {
             String dept = r.getDepartment() == null || r.getDepartment().isBlank() ? "未填科室" : r.getDepartment().trim();
@@ -179,7 +185,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
                     vo.getDepartmentRates().add(d);
                 });
 
-        // ③ 评分分布直方图（固定桶顺序）
+        // 3. 评分分布直方图（固定桶顺序）
         Map<String, Long> dist = new LinkedHashMap<>();
         SCORE_BUCKETS.forEach(b -> dist.put(b, 0L));
         for (Record r : records) {
@@ -193,7 +199,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             vo.getScoreDistribution().add(b);
         });
 
-        // ④ 词典规模（5 类术语数量）：读词典文件，见 termCount
+        // 4. 词典规模（5 类术语数量）：读词典文件，见 termCount
         vo.getDictionary().put("disease", termCount("disease"));
         vo.getDictionary().put("symptom", termCount("symptom"));
         vo.getDictionary().put("pattern", termCount("pattern"));
@@ -212,9 +218,11 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      * <p>读文件失败时返回 <b>-1</b> 而不是 0 —— 0 会被读成「词典是空的」，属于另一种误导。</p>
      */
     private int termCount(String type) {
+        // 1. 直接读词典 JSON 文件数条数
         try {
             return fileService.read(type).size();
         } catch (IOException e) {
+            // 2. 读不到给 -1 而不是 0：0 会被当成"词典是空的"，-1 才能让页面显示"不可用"
             log.warn("[统计] {} 词典读取失败，词条数按 -1 上报: {}", type, e.getMessage());
             return -1;
         }
@@ -222,6 +230,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     /** 按数据域 + 用户筛选取病历（看板扩展口径） */
     private List<Record> recordsFor(FiltersDTO filters) {
+        // 条件组装统一走 RecordFilter：数据域与用户筛选的交集口径只有那一处
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), filters);
         return baseMapper.selectList(wrapper);
     }
@@ -229,6 +238,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /** 按类型统计词频 Top10（中药取处方字符串，其余从结构化实体取；结果空时回退原始列） */
     private StatsVO statsFor(List<Record> records, String type) {
         StatsVO vo = new StatsVO();
+        // 1. 按类型分派：中药/方剂走"处方"这一档（同时出方剂与中药两组）
         switch (type == null ? "" : type) {
             case "disease" -> vo.setStatistics(top(agg(records, "diseases", "disease"), 10, "disease"));
             case "pattern" -> vo.setDistribution(top(agg(records, "patternList", "pattern"), 10, "pattern"));
@@ -244,6 +254,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     /** 就诊月份（yyyy-MM）；接诊时间为空返回 null，该条不进趋势 */
     private static String monthOf(Record r) {
+        // 1. 无接诊时间不进趋势（否则会多出一个空月份桶）
         if (r.getVisitTime() == null) return null;
         String s = r.getVisitTime().toString();
         return s.length() >= 7 ? s.substring(0, 7) : null;
@@ -261,6 +272,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     /** 评分落入哪个分桶（前端分布图按固定顺序展示） */
     private static String bucketOf(int score) {
+        // 从高到低匹配，前端按固定桶顺序画分布图
         if (score >= 90) return "90+";
         if (score >= 80) return "80-89";
         if (score >= 70) return "70-79";
@@ -279,6 +291,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     private String str(Object o) {
+        // 空值与空白都归成 null：结构化数据里空串很常见
         if (o == null) return null;
         String s = String.valueOf(o).trim();
         return s.isEmpty() ? null : s;
@@ -290,15 +303,18 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     private Map<String, Integer> agg(List<Record> records, String jsonKey, String fallbackField) {
         Map<String, Integer> counter = new LinkedHashMap<>();
+        // 1. 逐条抽词
         for (Record r : records) {
             List<String> terms = extractFromStructured(r, jsonKey);
+            // 2. 证候这一类特殊：结构化没抽到时回退原始辨证结论并切分多证组合串
             if ((terms == null || terms.isEmpty()) && "pattern".equals(fallbackField) && r.getPattern() != null) {
                 // 原始辨证结论是多证候组合串（顿号/逗号分隔），切分防整串污染统计
                 terms = Arrays.stream(r.getPattern().split("[、，,；;]"))
                         .map(String::trim).filter(s -> !s.isEmpty()).toList();
             }
-            // formula无fallback：formulaList为空说明方剂未推断成功，处方串不是方剂名，不计数
+            // 3. 方剂不回退：formulaList 空说明没推断出方剂名，处方串不是方剂名，计进去是脏数据
             if (terms == null) continue;
+            // 4. 逐词累加
             for (String t : terms) {
                 if (t != null && !t.isBlank()) counter.merge(t.trim(), 1, Integer::sum);
             }
@@ -308,12 +324,14 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     /** 解析附录A结构：Entity数组取content，Herb数组取name；无数据返回null（触发fallback） */
     private List<String> extractFromStructured(Record r, String key) {
+        // 1. 没有结构化数据直接给 null，由调用方决定是否回退原始列
         if (r.getStructuredData() == null || r.getStructuredData().isBlank()) return null;
         try {
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
                     new TypeReference<Map<String, Object>>() {
                     });
             Object val = data.get(key);
+            // 2. 数组：逐项取文本
             if (val instanceof List<?> list) {
                 List<String> result = new java.util.ArrayList<>();
                 for (Object item : list) {
@@ -327,16 +345,19 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
                 }
                 return result;
             }
+            // 3. 单值字符串：当成单元素列表
             if (val instanceof String s) {
                 return List.of(s);
             }
         } catch (JacksonException ignored) {
+            // 解析不了按"没抽到"处理，交给上层回退
         }
         return null;
     }
 
     /** 词频计数取 Top N（按次数降序，同次数按名称升序保证稳定） */
     private List<Map<String, Object>> top(Map<String, Integer> counter, int limit, String keyName) {
+        // 1. 降序取前 limit 条，装成 {keyName: 词, count: 次数}
         return counter.entrySet().stream()
                 .sorted((a, b) -> b.getValue() - a.getValue())
                 .limit(limit)

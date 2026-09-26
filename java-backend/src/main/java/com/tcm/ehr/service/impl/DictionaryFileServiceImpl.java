@@ -71,6 +71,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      * @throws IllegalArgumentException 类型未登记时抛出
      */
     public String fileNameOf(String type) {
+        // 1. 文件名只认 EntityTypes 登记的那 5 类，未登记直接拒绝
         String name = com.tcm.ehr.common.config.EntityTypes.fileNameOf(type);
         if (name == null) {
             throw new IllegalArgumentException("未知词典类型: " + type);
@@ -90,9 +91,11 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      */
     public List<TermEntry> read(String type) throws IOException {
         Path file = dir().resolve(fileNameOf(type));
+        // 1. 文件不存在按「该类词典为空」处理，不报错（首次导入时目录尚无文件）
         if (!Files.exists(file)) {
             return new ArrayList<>();
         }
+        // 2. 存在但内容坏了要报错：那属于数据损坏，静默当空会让人以为词典被清空了
         return mapper.readValue(file.toFile(),
                 mapper.getTypeFactory().constructCollectionType(List.class, TermEntry.class));
     }
@@ -108,7 +111,9 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      * @throws IOException 目录创建或写文件失败
      */
     public void write(String type, List<TermEntry> entries) throws IOException {
+        // 1. 先建目录（首次导入时目录还不存在）
         Files.createDirectories(dir());
+        // 2. 美化输出整文件覆盖：JSON 要能被人读懂并手工核对
         Path file = dir().resolve(fileNameOf(type));
         mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), entries);
     }
@@ -123,9 +128,11 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      */
     public String backup(String type) throws IOException {
         Path file = dir().resolve(fileNameOf(type));
+        // 1. 没有原文件就没得备份，返回 null 让调用方知道这次没有可回滚点
         if (!Files.exists(file)) {
             return null;
         }
+        // 2. 备份名带时间戳，同一秒内两次备份才会撞名（此时覆盖旧的）
         Files.createDirectories(backupDir());
         String backupName = fileNameOf(type) + ".bak_" + LocalDateTime.now().format(TS);
         Files.copy(file, backupDir().resolve(backupName), StandardCopyOption.REPLACE_EXISTING);
@@ -146,12 +153,15 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      */
     public void restore(String type, String backupFilename) throws IOException {
         Path src = backupDir().resolve(backupFilename);
+        // 1. 备份不存在直接报错
         if (!Files.exists(src)) {
             throw new IllegalArgumentException("备份文件不存在: " + backupFilename);
         }
+        // 2. 前缀不符即拒绝：这是防路径穿越的关键一步，必须在 copy 之前
         if (!backupFilename.startsWith(fileNameOf(type) + ".bak_")) {
             throw new IllegalArgumentException("备份文件与词典类型不匹配");
         }
+        // 3. 校验通过才覆盖当前词典
         Files.createDirectories(dir());
         Files.copy(src, dir().resolve(fileNameOf(type)), StandardCopyOption.REPLACE_EXISTING);
     }
@@ -171,11 +181,14 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     public List<Map<String, String>> listBackups(String type) throws IOException {
         List<Map<String, String>> result = new ArrayList<>();
         Path backupDir = backupDir();
+        // 1. 备份目录都没有就当没备份过
         if (!Files.exists(backupDir)) {
             return result;
         }
+        // 2. 先算当前词条数，delta 要拿它做基准
         int currentCount = read(type).size();
         String prefix = fileNameOf(type) + ".bak_";
+        // 3. 只扫本类型前缀的文件（不扫别的类型的备份）
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(backupDir, prefix + "*")) {
             for (Path p : stream) {
                 String name = p.getFileName().toString();
@@ -187,16 +200,19 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
                 row.put("filename", name);
                 row.put("time", t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 row.put("count", String.valueOf(count));
+                // 正数带 + 号：页面上要能一眼看出是多了还是少了
                 row.put("delta", (delta > 0 ? "+" : "") + delta);
                 result.add(row);
             }
         }
+        // 4. 按时间倒序：最近的备份在最上面
         result.sort((a, b) -> b.get("time").compareTo(a.get("time")));
         return result;
     }
 
     /** 备份文件词条数；解析失败按 0 计（不因单个坏文件拖垮整个列表） */
     private int countOf(Path path) {
+        // 1. 数词条数；坏文件给 0，只记警告，不让整个备份列表挂掉
         try {
             List<TermEntry> entries = mapper.readValue(path.toFile(),
                     mapper.getTypeFactory().constructCollectionType(List.class, TermEntry.class));
@@ -240,6 +256,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     @Override
     public String currentVersion() {
         try {
+            // 1. 先算指纹（修改时间 + 大小），这一步不读文件内容
             long stamp = 0;
             boolean allPresent = true;
             for (String type : com.tcm.ehr.common.config.EntityTypes.dictKeys()) {
@@ -250,9 +267,11 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
                     allPresent = false;
                 }
             }
+            // 2. 指纹没变且上次算过 → 直接返回缓存，省掉 5 次文件读取
             if (allPresent && cachedVersion != null && stamp == cachedStamp) {
                 return cachedVersion;
             }
+            // 3. 指纹变了（或首次）才真读 5 个文件拼串算 MD5
             StringBuilder sb = new StringBuilder();
             for (String type : com.tcm.ehr.common.config.EntityTypes.dictKeys()) {
                 Path f = dir().resolve(fileNameOf(type));
@@ -263,10 +282,12 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
                 sb.append('\n');
             }
             String v = RecordUtil.md5Hex(sb.toString()).substring(0, 12);
+            // 4. 连同指纹一起缓存，供下次比对
             cachedVersion = v;
             cachedStamp = stamp;
             return v;
         } catch (Exception e) {
+            // 5. 算不出来给固定串：版本只用于判断"要不要重算"，不能因为算不出就报错
             log.warn("[词典] 版本计算失败: {}", e.getMessage());
             return "unknown";
         }

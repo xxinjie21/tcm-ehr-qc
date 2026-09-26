@@ -76,12 +76,15 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      * @throws IOException ES 请求失败
      */
     public String indexedVersion(String type) throws IOException {
+        // 1. 取该索引的 mapping
         GetMappingsResponse response = client.indices()
                 .getMapping(new GetMappingsRequest().indices(indexName(type)), RequestOptions.DEFAULT);
         MappingMetadata meta = response.mappings().get(indexName(type));
+        // 2. 索引不存在 → 没有版本可言
         if (meta == null) {
             return null;
         }
+        // 3. 从 _meta.version 取版本；旧索引没有这个标记，同样给 null（触发重建）
         Object m = meta.getSourceAsMap().get("_meta");
         if (m instanceof Map<?, ?> map && map.get("version") != null) {
             return String.valueOf(map.get("version"));
@@ -104,9 +107,11 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      */
     public void rebuild(String type, List<TermEntry> entries, String version) throws IOException {
         String index = indexName(type);
+        // 1. 存在就先删（重建是全量替换，不做增量更新）
         if (exists(type)) {
             client.indices().delete(new DeleteIndexRequest(index), RequestOptions.DEFAULT);
         }
+        // 2. 建索引：单分片零副本（演示库数据量小，副本只会拖慢灌入）
         CreateIndexRequest create = new CreateIndexRequest(index);
         create.settings(Map.of("number_of_shards", 1, "number_of_replicas", 0));
         // _meta.version 让下次启动能判断「索引是否已经是当前词典的版本」——
@@ -117,6 +122,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
 
         client.indices().create(create, RequestOptions.DEFAULT);
 
+        // 3. 攒成一次 bulk 灌入：逐条发请求会让几千个词条花掉几十秒
         BulkRequest bulk = new BulkRequest();
         for (TermEntry e : entries) {
             // 交给 Jackson 生成文档 JSON，避免手写转义在别名含引号/反斜杠时出错
@@ -124,9 +130,11 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
             doc.put("standard_term", e.getStandardTerm());
             doc.put("aliases", e.getAliases() == null ? List.of() : e.getAliases());
             doc.put("source", e.getSource() == null ? "" : e.getSource());
+            // 文档 id 取术语哈希：同一术语重复灌入是覆盖，不会出现两条
             bulk.add(new IndexRequest(index).id(hashId(e.getStandardTerm()))
                     .source(objectMapper.writeValueAsString(doc), XContentType.JSON));
         }
+        // 4. 词条为空时不发 bulk（ES 会报错，而空索引本身是合法状态）
         if (bulk.numberOfActions() > 0) {
             client.bulk(bulk, RequestOptions.DEFAULT);
         }
@@ -141,18 +149,20 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      */
     private Map<String, Object> mappingProperties() {
         Map<String, Object> properties = new LinkedHashMap<>();
-
+        // 1. 标准词：主字段 keyword（精确命中）+ text 子字段（分词后模糊命中）
         Map<String, Object> standardTerm = new LinkedHashMap<>();
         standardTerm.put("type", "keyword");
         standardTerm.put("fields", Map.of("text", Map.of("type", "text", "analyzer", "ik_max_word")));
         properties.put("standard_term", standardTerm);
 
+        // 2. 别名：主字段 text + keyword 子字段（见上方 Javadoc：数组才能逐个别名精确匹配）
         Map<String, Object> aliases = new LinkedHashMap<>();
         aliases.put("type", "text");
         aliases.put("analyzer", "ik_max_word");
         aliases.put("fields", Map.of("keyword", Map.of("type", "keyword")));
         properties.put("aliases", aliases);
 
+        // 3. 来源只做展示，不检索
         properties.put("source", Map.of("type", "keyword"));
         return properties;
     }
@@ -175,6 +185,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
         if (input == null || input.isBlank()) {
             return List.of();
         }
+        // 1. 宽松 OR 召回，只取三个字段（source 只用于页面上标注出处）
         SearchSourceBuilder source = new SearchSourceBuilder()
                 .size(maxCandidates)
                 .query(recallQuery(input))
@@ -183,6 +194,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
         SearchRequest request = new SearchRequest(indexName(type)).source(source);
         SearchResponse response = client.search(request, RequestOptions.DEFAULT);
 
+        // 2. 命中的文档逐条转成词条交给上层裁决（这里不做命中判定）
         List<TermEntry> candidates = new ArrayList<>();
         for (SearchHit hit : response.getHits().getHits()) {
             candidates.add(toEntry(hit.getSourceAsMap()));
@@ -208,6 +220,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     }
 
     private TermEntry toEntry(Map<String, Object> src) {
+        // 1. ES 字段名是下划线，转成词条对象
         TermEntry entry = new TermEntry();
         entry.setStandardTerm(str(src.get("standard_term")));
         entry.setAliases(toStringList(src.get("aliases")));
@@ -216,6 +229,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     }
 
     private List<String> toStringList(Object value) {
+        // 1. 正常情况是数组
         if (value instanceof List<?> raw) {
             List<String> list = new ArrayList<>(raw.size());
             for (Object item : raw) {
@@ -225,10 +239,11 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
             }
             return list;
         }
-        // 兼容别名曾被存成「空格拼接单串」的旧文档
+        // 2. null 给空列表
         if (value == null) {
             return new ArrayList<>();
         }
+        // 3. 兼容别名曾被存成「空格拼接单串」的旧文档
         String s = String.valueOf(value).trim();
         return s.isEmpty()
                 ? new ArrayList<>()
@@ -236,11 +251,13 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     }
 
     private String str(Object value) {
+        // ES 缺字段给空串而不是 null：词条字段不接受 null
         return value == null ? "" : String.valueOf(value);
     }
 
     /** 文档 _id：标准词 MD5，保证同一词重复导入是覆盖而非新增 */
     private String hashId(String standardTerm) {
+        // 1. 正常走 MD5
         try {
             byte[] digest = java.security.MessageDigest.getInstance("MD5")
                     .digest(standardTerm.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -250,6 +267,7 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
             }
             return sb.toString();
         } catch (java.security.NoSuchAlgorithmException e) {
+            // 2. MD5 不可用（不该发生）时退回 hashCode，保证 id 仍可用
             return Integer.toHexString(standardTerm.hashCode());
         }
     }

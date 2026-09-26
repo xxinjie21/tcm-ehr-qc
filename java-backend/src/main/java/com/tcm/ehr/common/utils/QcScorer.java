@@ -43,7 +43,7 @@ public final class QcScorer {
         boolean structuredMissing = data == null;
         vo.setStructuredMissing(structuredMissing);
 
-        // ① 完整性（两档）
+        // 1. 完整性（两档）
         int fullMissing = 0;
         for (com.tcm.ehr.common.config.QcRuleSet.Element el : rs.getCompleteness().getElements()) {
             if (structuredPresent(el.getSource(), data)) {
@@ -57,7 +57,7 @@ public final class QcScorer {
             ded.add(new ScoreResultVO.Deduction("核心字段缺失", el.getName(), points, reasonFor(el, rawHas)));
         }
 
-        // ② 逻辑一致性
+        // 2. 逻辑一致性
         List<String> conflicts = LogicChecker.check(data, rs.getConsistency());
         for (String c : conflicts) {
             String name = c.contains("：") ? c.substring(0, c.indexOf("：")) : c;
@@ -66,7 +66,7 @@ public final class QcScorer {
         }
         vo.setLogicConflicts(conflicts);
 
-        // ③ 格式
+        // 3. 格式
         if (raw != null) {
             for (com.tcm.ehr.common.config.QcRuleSet.FormatRule fr : rs.getFormat()) {
                 String v = rawValue(raw, fr.getField());
@@ -81,7 +81,7 @@ public final class QcScorer {
             }
         }
 
-        // ④ 术语标准化
+        // 4. 术语标准化
         com.tcm.ehr.common.config.QcRuleSet.Standardization st = rs.getStandardization();
         if (st.isEnabled() && data != null && !st.getElementTypes().isEmpty()) {
             int miss = 0;
@@ -95,7 +95,7 @@ public final class QcScorer {
             }
         }
 
-        // ⑤ 重复
+        // 5. 重复
         if (duplicate) {
             ded.add(new ScoreResultVO.Deduction("重复数据", "重复标记", rs.getDuplicateWeight(), "与已有病历内容完全一致"));
         }
@@ -144,11 +144,13 @@ public final class QcScorer {
                 rules == null ? com.tcm.ehr.common.config.QcRuleSet.defaults() : rules;
         List<String> full = new ArrayList<>();
         List<String> partial = new ArrayList<>();
+        // 1. 逐个核心要素判两档：结构化里有 → 跳过（不扣）
         for (com.tcm.ehr.common.config.QcRuleSet.Element el : rs.getCompleteness().getElements()) {
             if (structuredPresent(el.getSource(), data)) {
                 continue;
             }
             String name = el.getName();
+            // 2. 原始病历里有 → 漏抽（半档）；两边都没有 → 真缺失（全档）
             if (rawPresent(el.getFallback(), raw)) {
                 partial.add(name);
             } else {
@@ -159,18 +161,22 @@ public final class QcScorer {
     }
 
     private static int weightOf(com.tcm.ehr.common.config.QcRuleSet rs, String name) {
+        // 1. 按规则名找对应权重
         for (com.tcm.ehr.common.config.QcRuleSet.ConsistencyRule c : rs.getConsistency()) {
             if (c.getName() != null && c.getName().equals(name)) {
                 return c.getWeight();
             }
         }
+        // 2. 规则里没配这项时给默认 10，不让冲突变成 0 分
         return 10;
     }
 
     private static boolean formatOk(com.tcm.ehr.common.config.QcRuleSet.FormatRule fr, String v) {
+        // 1. enum 规则看白名单
         if ("enum".equalsIgnoreCase(fr.getType())) {
             return fr.getValues() != null && fr.getValues().contains(v);
         }
+        // 2. 没配表达式就跳过
         if (fr.getExpr() == null || fr.getExpr().isBlank()) {
             return true;
         }
@@ -182,16 +188,20 @@ public final class QcScorer {
     }
 
     private static boolean structuredPresent(String key, Map<String, Object> data) {
+        // 1. 无 key 或无数据一律视为没抽到
         if (key == null || data == null) {
             return false;
         }
+        // 2. 只有非空列表才算有记录（空数组等同缺失）
         return data.get(key) instanceof List<?> list && !list.isEmpty();
     }
 
     private static boolean rawPresent(List<String> fields, Record raw) {
+        // 1. 无回退字段或无原始病历时判为「原始也没写」
         if (raw == null || fields == null) {
             return false;
         }
+        // 2. 任一字段有值即算原始写了
         for (String f : fields) {
             String v = rawValue(raw, f);
             if (v != null) {
@@ -203,9 +213,11 @@ public final class QcScorer {
 
     /** 原始列取值（按 Record 属性名） */
     private static String rawValue(Record r, String field) {
+        // 1. 无病历或无字段名一律无值
         if (r == null || field == null) {
             return null;
         }
+        // 2. 按属性名映射到列，未配置的字段给 null
         String v = switch (field) {
             case "registrationNo" -> r.getRegistrationNo();
             case "outpatientNo" -> r.getOutpatientNo();
@@ -228,11 +240,13 @@ public final class QcScorer {
             case "doctorId" -> r.getDoctorId();
             default -> null;
         };
+        // 3. 空白视作无值，避免空格被当成内容
         return v == null || v.isBlank() ? null : v.trim();
     }
 
     /** 术语类型 → 结构化 key */
     private static String keyOf(String type) {
+        // 只映射参与标准化判定的 5 类；其余类型不查词典
         return switch (type) {
             case "disease" -> "diseases";
             case "pattern" -> "patternList";
@@ -246,9 +260,11 @@ public final class QcScorer {
     /** 该类型下未命中词典（无 normLevel）的实体数 */
     private static int countUnnormalized(Map<String, Object> data, String type) {
         String key = keyOf(type);
+        // 1. 该类型没有对应列表（未抽取）就不计未命中
         if (key == null || !(data.get(key) instanceof List<?> list)) {
             return 0;
         }
+        // 2. 逐个实体看有没有 normLevel：没有就是没命中词典
         int n = 0;
         for (Object item : list) {
             if (item instanceof Map<?, ?> m) {
@@ -262,6 +278,7 @@ public final class QcScorer {
     }
 
     private static String reasonFor(com.tcm.ehr.common.config.QcRuleSet.Element el, boolean rawHas) {
+        // 两档给不同说法：用户要能分清「该写没写」和「写了没抽出来」
         if (rawHas) {
             return "结构化结果中无" + el.getName() + "（原始病历有记录，可能未被抽取）";
         }
@@ -271,9 +288,11 @@ public final class QcScorer {
     /** 取实体列表的 content（herbs 取 name）文本 */
     private static List<String> strList(Map<String, Object> data, String key) {
         List<String> out = new ArrayList<>();
+        // 1. 无数据或该 key 不是列表 → 空结果
         if (data == null || !(data.get(key) instanceof List<?> list)) {
             return out;
         }
+        // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
         for (Object item : list) {
             if (item instanceof Map<?, ?> m) {
                 Object c = m.get("content") != null ? m.get("content") : m.get("name");

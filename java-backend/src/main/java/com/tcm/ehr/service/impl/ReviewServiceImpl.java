@@ -131,7 +131,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         }
         ReviewTask task = tasks.get(0);
 
-        // ① 人工修正（可选）：合并 correctedData 回写 structured_data
+        // 1. 人工修正（可选）：合并 correctedData 回写 structured_data
         if (dto != null && dto.getCorrectedData() != null) {
             String json;
             try {
@@ -143,7 +143,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             r.setStructuredData(json);
         }
 
-        // ② 自动重算（判定地基仍是规则）
+        // 2. 自动重算（判定地基仍是规则）
         ScoreResultVO sr = QcScorer.score(asMap(r.getStructuredData()), r, false, qcRuleStore.get());
         String status = switch (sr.getGrade()) {
             case "合格" -> "completed";
@@ -157,7 +157,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             throw new IllegalStateException("评分结果写入失败", e);
         }
 
-        // ③ 任务流转：仍待复核 → 保持 pending 并刷新；否则完成
+        // 3. 任务流转：仍待复核 → 保持 pending 并刷新；否则完成
         ReviewResultVO result = new ReviewResultVO();
         result.setScore(sr.getScore());
         if ("待复核".equals(sr.getGrade())) {
@@ -185,9 +185,11 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     }
 
     private String dbStatus(String status) {
+        // 1. 空状态给 null，调用侧保持原样
         if (status == null || status.isBlank()) {
             return null;
         }
+        // 2. 中英文都收：页面传中文、历史数据是英文，两种都要归一到库里的值
         return switch (status) {
             case "待复核", "pending" -> "pending";
             case "已完成", "completed" -> "completed";
@@ -196,6 +198,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     }
 
     private String issueType(ScoreResultVO vo) {
+        // 从重到轻取第一项：逻辑冲突 > 缺失字段 > 评分不达标
         if (!vo.getLogicConflicts().isEmpty()) {
             return "逻辑冲突";
         }
@@ -207,9 +210,11 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
 
     /** 解析 structured_data 字符串为对象（供左侧对照）；失败/空返回 null */
     private Object parse(String json) {
+        // 1. 空值给 null
         if (json == null || json.isBlank()) {
             return null;
         }
+        // 2. 解析不了也给 null：左侧对照区没内容比整页报错好
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
@@ -220,9 +225,11 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
 
     /** 解析结构化数据；空或坏 JSON 返回空 map（复核时按"未结构化"继续，不中断） */
     private Map<String, Object> asMap(String json) {
+        // 1. 空值给 null
         if (json == null || json.isBlank()) {
             return null;
         }
+        // 2. 坏 JSON 也给 null：复核要能继续走完，不能因为一条脏数据卡住复核员
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });

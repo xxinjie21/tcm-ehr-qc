@@ -31,9 +31,9 @@ public final class RecordFilter {
     /** 构建查询条件：先数据域、后用户筛选 */
     public static QueryWrapper<Record> build(String role, SearchDTO dto) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
-        // ① 数据域（行级权限）——必须先于用户筛选
+        // 1. 数据域（行级权限）——必须先于用户筛选
         operatorScope(wrapper, role);
-        // ② 用户筛选
+        // 2. 用户筛选（与数据域取交集，各条件之间取并集）
         if (dto != null) {
             if (notBlank(dto.getRegistrationNo())) {
                 wrapper.like("registration_no", dto.getRegistrationNo().trim());

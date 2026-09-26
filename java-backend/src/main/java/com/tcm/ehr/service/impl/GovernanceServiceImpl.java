@@ -59,6 +59,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
+        // 1. 只收词典里的 5 类：舌象/脉象等无词典，归一了也没有权威结果可依
         if (!com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(type)) {
             throw new IllegalArgumentException("type必须为disease/pattern/symptom/herb/formula");
         }
@@ -94,7 +95,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 continue;
             }
 
-            // ① 去重：原始文本哈希（21字段拼接）
+            // 1. 去重：原始文本哈希（21字段拼接）
             String textHash = RecordUtil.textHash(r);
             if (!seenTextHash.add(textHash)) {
                 baseMapper.updateCleanFields(r.getId(), trim(r.getGender()), trim(r.getAge()),
@@ -103,7 +104,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 continue;
             }
 
-            // ② 字段清理（trim + 空白置null，不填充任何内容）
+            // 2. 字段清理（trim + 空白置null，不填充任何内容）
             String gender = trim(r.getGender());
             String age = trim(r.getAge());
             String pattern = trim(r.getPattern());
@@ -114,12 +115,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (changed(r.getPattern(), pattern)) repaired++;
             if (changed(r.getPrescription(), prescription)) repaired++;
             vo.setRepaired(vo.getRepaired() + repaired);
-            // 空值规整：非空但仅由空白字符构成（trim 后为空）的字段，计为一次"空值规整"
+            // 3. 空值规整：非空但仅由空白字符构成（trim 后为空）的字段，计为一次"空值规整"
             vo.setCleared(vo.getCleared()
                     + (int) Arrays.asList(r.getGender(), r.getAge(), r.getPattern(), r.getPrescription())
                     .stream().filter(v -> v != null && !v.isEmpty() && v.trim().isEmpty()).count());
 
-            // ④ 脏数据隔离（收紧：仅"无法修复"）——核心文本全空 或 structuredData存在但无法解析
+            // 4. 脏数据隔离（收紧：仅"无法修复"）——核心文本全空 或 structuredData存在但无法解析
             boolean unrecoverable = (isBlank(r.getChiefComplaint()) && isBlank(r.getTcmDiagnosis())
                     && isBlank(r.getPresentIllness()) && isBlank(r.getSelfReport()))
                     || (r.getStructuredData() != null && !r.getStructuredData().isBlank()
@@ -132,7 +133,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
             baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, status, grade);
 
-            // ⑤ 术语归一（兜底）：仅对合格病历执行，归一后标记已清洗
+            // 5. 术语归一（兜底）：仅对合格病历执行，归一后标记已清洗
             if ("合格".equals(grade) && r.getStructuredData() != null && !r.getStructuredData().isBlank()) {
                 int[] norm = normalizeStructuredData(r);
                 vo.setNormalized(vo.getNormalized() + norm[0]);
@@ -153,6 +154,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 判断是否为可解析的 JSON（隔离脏数据用；不可解析即视为"无法修复"） */
     private boolean isValidJson(String s) {
+        // 解析成功即有效；解析不了就归为"无法修复"的脏数据
         try {
             objectMapper.readTree(s);
             return true;
@@ -173,12 +175,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
                     new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
-            // Entity数组：content归一（diseases/symptoms/patternList/formulaList有对应词典）
+            // 1. 逐类归一：content 换成标准词，sourceText 保留原文
             for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
                     "causeList", "treatmentList", "formulaList")) {
                 if (!(data.get(key) instanceof List<?> list)) continue;
                 String type = mapEntityType(key);
-                // 无词典的 4 类（舌/脉/病因/治法）不做归一，但仍要走下面的同标准词去重
+                // 2. 有词典的才做词形归一；舌/脉/病因/治法这 4 类无词典，但仍要走去重
                 if (type != null) {
                     for (Object item : list) {
                         if (!(item instanceof Map)) continue;
@@ -187,6 +189,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         Object content = entity.get("content");
                         if (content == null || String.valueOf(content).isBlank()) continue;
                         var result = termNormalizer.normalize(type, String.valueOf(content));
+                        // 3. 只在"命中词典且词形确实变了"时才改写并记统计，
+                        //    否则会把未命中的实体也标成已归一
                         if (result.source() != null && !result.source().isBlank()
                                 && !result.standardTerm().equals(String.valueOf(content))) {
                             entity.put("content", result.standardTerm());
@@ -200,10 +204,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         }
                     }
                 }
-                // 同标准词去重：口径与解析链路共用 EntityNormalizer.dedupByTerm
+                // 4. 同标准词去重：口径与解析链路共用 EntityNormalizer.dedupByTerm
                 data.put(key, dedupStructuredList(list, "content"));
             }
-            // herbs：name归一 + dosage格式规整（统一小写单位表示，不改数值）
+            // 5. 中药走另一套：name 归一 + 剂量单位小写（数值不动，改数值会失真）
             if (data.get("herbs") instanceof List<?> list) {
                 for (Object item : list) {
                     if (!(item instanceof Map)) continue;
@@ -230,10 +234,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 }
                 data.put("herbs", dedupStructuredList(list, "name"));
             }
+            // 6. 打上词典版本再写库：归一结果与当时词典版本必须成对
             String json = StructuredDataMeta.stamp(objectMapper, objectMapper.writeValueAsString(data),
                     dictionaryFileService.currentVersion());
             baseMapper.updateStructuredData(r.getId(), json);
         } catch (JacksonException e) {
+            // 7. 单条解析失败只记警告：一条脏数据不该中断整批清洗
             log.warn("[清洗] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
         }
         return stat;
@@ -246,9 +252,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @SuppressWarnings("unchecked")
     private List<Object> dedupStructuredList(List<?> list, String termField) {
+        // 1. 少于两条无从去重，原样返回
         if (list == null || list.size() < 2) {
             return (List<Object>) list;
         }
+        // 2. 合并键与代表条目选取规则都复用解析链路，避免两处口径漂移
         return EntityNormalizer.dedupByTerm((List<Object>) list,
                 item -> mapStr(item, termField),
                 item -> mapStr(item, "sourceText"),
@@ -257,6 +265,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 取 structuredData 实体里的字符串字段；非 Map 或字段缺失返回 null */
     private static String mapStr(Object item, String field) {
+        // 非 Map（脏数据）或字段缺失都返回 null，交给上层跳过
         if (!(item instanceof Map<?, ?> m)) return null;
         Object v = m.get(field);
         return v == null ? null : String.valueOf(v);
@@ -281,16 +290,19 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public ExportedFile export(ExportDTO dto) throws IOException {
+        // 1. 只导合格病历；一条都没有就返回 null，由 Controller 转 400
         List<Record> records = filterQualified(dto);
         if (records.isEmpty()) {
             return null;
         }
 
+        // 2. JSON：序列化后整体打码
         if ("json".equalsIgnoreCase(dto.getFormat())) {
             String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(records);
             return new ExportedFile("tcm_ehr_dataset_" + ts() + ".json",
                     mask(json).getBytes(StandardCharsets.UTF_8));
         }
+        // 3. CSV：先生成再对字节打码
         return new ExportedFile("tcm_ehr_dataset_" + ts() + ".csv", maskCsv(toCsv(records)));
     }
 
@@ -304,16 +316,18 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     public Map<String, Object> previewDataset(ExportDTO dto) {
         Map<String, Object> result = new HashMap<>();
         List<Record> sample;
+        // 1. 无证候筛选：走 SQL（COUNT 与 LIMIT 两条轻查询，不把全表读进内存）
         if (patternOf(dto) == null) {
             result.put("total", baseMapper.selectCount(qualifiedWrapper(dto)));
             // LIMIT 只加在这里：导出要全量，预览只要 10 条
             sample = baseMapper.selectList(qualifiedWrapper(dto).last("LIMIT " + PREVIEW_SAMPLE_SIZE));
         } else {
+            // 2. 带证候筛选：证候在 JSON 里 SQL 筛不了，退化为内存筛后取前 10
             List<Record> records = filterQualified(dto);
             result.put("total", (long) records.size());
             sample = records.subList(0, Math.min(PREVIEW_SAMPLE_SIZE, records.size()));
         }
-        // 预览与导出必须走同一套脱敏。此前预览直接把实体塞进响应 ——
+        // 3. 预览样本与导出件走同一套脱敏。此前预览直接塞实体 ——
         // 于是同一条现病史（可能写着手机号）在导出件里打码、在预览表格里明文。
         result.put("sample", maskedSample(sample));
         return result;
@@ -360,7 +374,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 取范围内合格病历；带证候筛选时额外做内存筛（证候在 JSON 里，SQL 筛不了） */
     private List<Record> filterQualified(ExportDTO dto) {
+        // 1. 先用 SQL 收窄（数据域 + 用户筛选 + 只含合格）
         List<Record> records = baseMapper.selectList(qualifiedWrapper(dto));
+        // 2. 证候筛选在 JSON 里，只能内存筛；没这项就直接返回
         String pattern = patternOf(dto);
         return pattern == null
                 ? records
@@ -369,11 +385,13 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** structuredData.patternList 是否包含指定证候（模糊包含匹配） */
     private boolean structuredPatternContains(Record r, String pattern) {
+        // 1. 没有结构化数据就只剩原始列可比
         if (r.getStructuredData() == null) return false;
         try {
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
                     new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
+            // 2. 先看归一后的证候列表（这是质控实际认的证候）
             if (data.get("patternList") instanceof List<?> list) {
                 for (Object item : list) {
                     if (item instanceof Map<?, ?> m) {
@@ -382,8 +400,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     }
                 }
             }
+            // 3. 再回退原始辨证结论：未结构化的病历只能靠这一列
             return r.getPattern() != null && r.getPattern().contains(pattern);
         } catch (JacksonException e) {
+            // 4. JSON 坏了当不匹配，不让一条脏数据把整个导出带崩
             return false;
         }
     }
@@ -401,12 +421,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     private String str(Object o) {
+        // 空值与空白都归成 null，避免把 "" 当成有效筛选条件
         if (o == null) return null;
         String s = String.valueOf(o).trim();
         return s.isEmpty() ? null : s;
     }
 
     private byte[] toCsv(List<Record> records) throws IOException {
+        // 1. 表头与列顺序一一对应，改一处必须改另一处
         String[] headers = {"id", "挂号号", "门诊号", "性别", "年龄", "就诊次数", "西医诊断", "中医诊断",
                 "现病史", "主诉", "自述", "望诊", "脉象", "舌象", "体格检查", "辨证结论", "处方",
                 "随访", "治疗效果", "科室", "医生ID", "就诊时间"};
@@ -415,9 +437,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 "selfReport", "inspection", "pulse", "tongue", "physicalExam", "pattern",
                 "prescription", "followUp", "treatmentEffect", "department", "doctorId", "visitTime");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        out.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF}); // UTF-8 BOM
+        // 2. 先写 UTF-8 BOM：Excel 靠它认编码，否则中文列名会乱码
+        out.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         out.write(String.join(",", headers).getBytes(StandardCharsets.UTF_8));
         out.write('\n');
+        // 3. 逐行输出，所有单元格加引号并转义内部引号/换行
         for (Record r : records) {
             List<String> cells = new ArrayList<>();
             for (String col : cols) {

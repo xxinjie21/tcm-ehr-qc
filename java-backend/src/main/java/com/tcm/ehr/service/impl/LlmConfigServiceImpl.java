@@ -108,9 +108,11 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
 
     /** DTO 合并到当前配置；只做参数层面的合法性归一，不做业务校验 */
     private LlmConfig merge(LlmConfigDTO dto, LlmConfig cur) {
+        // 1. DTO 为空就保持原配置（不改任何字段）
         if (dto == null) {
             return cur;
         }
+        // 2. 逐字段「DTO 给了就用新值，否则沿用当前值」——部分提交是页面常态
         boolean enabled = dto.getEnabled() == null ? cur.enabled() : dto.getEnabled();
 
         String provider = isBlank(dto.getProvider()) ? cur.provider() : dto.getProvider();
@@ -120,6 +122,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         }
 
         Double temperature = dto.getTemperature() == null ? cur.temperature() : dto.getTemperature();
+        // 3. 参数合法性校验：范围写死在代码里，不接受前端传的范围
         if (temperature != null && (temperature < 0 || temperature > 2)) {
             throw new IllegalArgumentException("温度需在 0~2 之间");
         }
@@ -129,6 +132,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
             throw new IllegalArgumentException("超时需在 1000~300000 毫秒之间");
         }
 
+        // 4. 密钥单独走 resolveApiKey：回传的掩码不该被当成新密钥存下来
         return new LlmConfig(enabled, normProvider,
                 dto.getBaseUrl() == null ? cur.baseUrl() : dto.getBaseUrl().trim(),
                 resolveApiKey(dto.getApiKey(), cur.apiKey()),
@@ -138,14 +142,17 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
 
     /** 空串 / 回传的掩码 = 不修改，其余视为新密钥 */
     private String resolveApiKey(String incoming, String existing) {
+        // 1. 空串 = 没改密钥
         if (isBlank(incoming)) {
             return existing;
         }
+        // 2. 回传值等于当前密钥的掩码 = 页面没动它，也算没改
         String v = incoming.trim();
         return v.equals(mask(existing)) ? existing : v;
     }
 
     private LlmConfigVO toVO(LlmConfig cfg) {
+        // 1. 逐字段搬运；密钥只回掩码与"是否已设置"，绝不回明文
         LlmConfigVO vo = new LlmConfigVO();
         vo.setEnabled(cfg.enabled());
         vo.setProvider(cfg.provider());
@@ -161,26 +168,32 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
 
     /** 掩码：保留通道前缀（如 sk-）与末 4 位，形如 {@code sk-****abcd} */
     private String mask(String key) {
+        // 1. 没设密钥就给空串
         if (isBlank(key)) {
             return "";
         }
         String k = key.trim();
+        // 2. 短密钥整体打码：留末 4 位等于没打
         if (k.length() <= 8) {
             return "****";
         }
+        // 3. 保留 sk- 之类的通道前缀与末 4 位，其余打码
         String head = k.startsWith("sk-") ? "sk-" : k.substring(0, 3);
         return head + "****" + k.substring(k.length() - 4);
     }
 
     /** 异常信息脱敏：三方 SDK 常把密钥回显在错误里（如 "Incorrect API key: sk-xxx"） */
     private String sanitize(String message, String apiKey) {
+        // 1. 空消息给一句通用文案，别把 null 甩给前端
         if (message == null || message.isBlank()) {
             return "无法连接模型服务";
         }
         String out = message;
+        // 2. 把消息里出现的密钥明文换成掩码
         if (!isBlank(apiKey)) {
             out = out.replace(apiKey.trim(), mask(apiKey));
         }
+        // 3. 截到 300 字：SDK 错误常带整段请求体
         return out.length() > 300 ? out.substring(0, 300) + "…" : out;
     }
 
