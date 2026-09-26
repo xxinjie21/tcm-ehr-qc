@@ -49,12 +49,15 @@ public class GovernanceController {
      */
     @PostMapping("/api/governance/normalize")
     public ResponseEntity<Result<Map<String, Object>>> normalize(@RequestBody NormalizeDTO dto) {
+        // 1. 术语必填
         if (dto.getTerm() == null || dto.getTerm().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error("请输入术语"));
         }
+        // 2. 类型必须是 5 类词典之一（与词表单一来源一致）
         if (dto.getType() == null || !com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(dto.getType())) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
+        // 3. 归一（未命中时 standardTerm 原样返回、level 为 null）
         var r = governanceService.normalize(dto.getType(), dto.getTerm());
         Map<String, Object> data = new java.util.LinkedHashMap<>();
         data.put("standardTerm", r.standardTerm());
@@ -75,6 +78,7 @@ public class GovernanceController {
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/governance/clean")
     public Result<CleanResultVO> clean(@RequestBody CleanDTO dto) {
+        // 1. 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
         CleanResultVO result = governanceService.clean(dto.getRecordIds(), dto.getFilters());
         operationLogger.log("数据清洗", RecordFilter.describe(dto == null ? null : dto.getFilters()), "共" + result.getTotal() + "条，去重" + result.getDeduped()
                 + "，隔离" + result.getIsolated() + "，归一" + result.getNormalized());
@@ -92,8 +96,10 @@ public class GovernanceController {
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/export/dataset")
     public ResponseEntity<byte[]> export(@RequestBody ExportDTO dto) throws IOException {
+        // 1. 取导出件；null = 范围内无合格病历
         IGovernanceService.ExportedFile file = governanceService.export(dto);
         if (file == null) {
+            // 2. 被拒也要留痕：谁在什么时候试图导出过
             operationLogger.log("数据集导出", RecordFilter.describe(dto == null ? null : dto.getFilters()),
                     "被拒：筛选范围内无合格病历");
             Result<Void> err = Result.error(2001, "质控未通过，禁止导出数据集（筛选范围内无合格病历）");
@@ -101,7 +107,9 @@ public class GovernanceController {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(objectMapper.writeValueAsBytes(err));
         }
+        // 3. 成功也留痕（对象记文件名）
         operationLogger.log("数据集导出", file.filename(), null);
+        // 4. 文件名做 URL 编码：中文名不编码会让部分浏览器存成乱码
         String encoded = URLEncoder.encode(file.filename(), StandardCharsets.UTF_8).replace("+", "%20");
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)

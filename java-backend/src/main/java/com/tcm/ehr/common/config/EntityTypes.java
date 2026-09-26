@@ -86,7 +86,7 @@ public final class EntityTypes {
 
     /** 有词典的类型 key 集合（顺序稳定） */
     public static Set<String> dictKeys() {
-        // 与 dictTypes 同源，只是换成 key 形态；用 LinkedHashSet 保住顺序
+        // 1. 与 dictTypes 同源，只是换成 key 形态；LinkedHashSet 保住顺序
         Set<String> out = new LinkedHashSet<>();
         for (EntityType t : BY_KEY.values()) {
             if (t.dict()) {

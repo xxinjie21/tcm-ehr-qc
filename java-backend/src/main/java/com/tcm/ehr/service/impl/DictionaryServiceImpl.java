@@ -493,6 +493,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
     }
 
     private String defaultSource(String type) {
+        // 按词典类型给出权威出处；未登记的类型给空串（让词条由上传者自行标注）
         return switch (type) {
             case "disease" -> "中医临床诊疗术语 疾病";
             case "pattern" -> "中医病证分类与代码 GB/T 15657-2021";

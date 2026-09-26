@@ -334,8 +334,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 问题类型取最"重"的一项：逻辑冲突 > 缺失字段 > 评分不达标 */
     private String issueType(ScoreResultVO vo) {
-        // 从重到轻取第一项命中：逻辑冲突 > 缺失字段 > 评分不达标，
-        // 只报一项是因为复核列表要按类型分组，混着报没法分派
+        // 1. 从重到轻取第一项命中：逻辑冲突 > 缺失字段 > 评分不达标
+        //    只报一项是因为复核列表要按类型分组，混着报没法分派
         if (!vo.getLogicConflicts().isEmpty()) {
             return "逻辑冲突";
         }

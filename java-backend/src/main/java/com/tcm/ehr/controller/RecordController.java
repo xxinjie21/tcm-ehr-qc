@@ -54,6 +54,7 @@ public class RecordController {
     @PostMapping("/api/records/import")
     public Result<ImportTaskVO> importRecords(@RequestParam("files") MultipartFile[] files,
                                               @RequestParam(value = "autoExtract", defaultValue = "false") boolean autoExtract) {
+        // 1. 导入并逐行给失败原因 2. 留痕（含是否已提交后台解析）
         ImportTaskVO vo = recordService.importRecords(files, autoExtract);
         operationLogger.log("病历导入", "文件" + files.length + "个",
                 "成功" + vo.getSummary().getSuccess() + "条，失败" + vo.getSummary().getFailed() + "条"
@@ -72,6 +73,7 @@ public class RecordController {
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/records/import/{taskId}/status")
     public ResponseEntity<Result<ImportStatusVO>> importStatus(@PathVariable String taskId) {
+        // 1. 进度在内存里，任务不存在与"服务重启后丢失"是同一种表现
         ImportStatusVO vo = recordService.importStatus(taskId);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "任务不存在或服务重启后任务状态丢失"));
@@ -103,6 +105,7 @@ public class RecordController {
      */
     @GetMapping("/api/records/raw/{recordId}")
     public ResponseEntity<Result<RawRecordVO>> rawRecord(@PathVariable String recordId) {
+        // 1. 取原始数据；不存在与无权限都归为 404：数据域过滤在 service 内完成，不泄露"存在但看不到"
         RawRecordVO vo = recordService.getRawRecord(recordId);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "病历不存在"));
@@ -122,7 +125,9 @@ public class RecordController {
     @RequireRole(roles = {"管理员"})
     @PutMapping("/api/records/{recordId}")
     public Result<Void> updateRecord(@PathVariable String recordId, @RequestBody Map<String, Object> body) {
+        // 1. 只改结构化数据；带原始字段的冲突由 service 抛 1007
         recordService.updateRecord(recordId, body);
+        // 2. 留痕：改了什么病历必须可查
         operationLogger.log("病历修改", recordId, "更新结构化数据");
         return Result.ok("修改成功", null);
     }
@@ -138,6 +143,7 @@ public class RecordController {
     @RequireRole(roles = {"管理员"})
     @DeleteMapping("/api/records")
     public Result<DeleteRecordsVO> deleteRecords(@RequestBody DeleteRecordsDTO dto) {
+        // 1. 删（service 内先清复核任务再删病历）2. 留痕
         DeleteRecordsVO vo = recordService.deleteRecords(dto);
         operationLogger.log("病历删除", "共" + vo.getDeletedCount() + "条", null);
         return Result.ok("删除成功", vo);
@@ -154,6 +160,7 @@ public class RecordController {
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records/delete-by-filter")
     public Result<DeleteRecordsVO> deleteByFilter(@RequestBody FiltersDTO filters) {
+        // 1. 按范围删；条件全空会被 service 拒绝（防误删全库）2. 留痕
         DeleteRecordsVO vo = recordService.deleteByFilter(filters);
         operationLogger.log("病历删除", "按范围", "共" + vo.getDeletedCount() + "条");
         return Result.ok("删除成功", vo);

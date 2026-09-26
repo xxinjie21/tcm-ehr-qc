@@ -100,7 +100,9 @@ public class NlpController {
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/nlp/extract/batch")
     public Result<NlpTaskVO> submitBatch(@RequestBody(required = false) NlpBatchDTO dto) {
+        // 1. 提交即返回（异步任务）；dto 可空 = 全库范围
         NlpTaskVO vo = nlpBatchService.submit(dto, RequestUtils.currentUsername());
+        // 2. 留痕：把操作范围写进日志，便于事后核对这次解析动了哪些病历
         operationLogger.log("批量解析", RecordFilter.describe(dto == null ? null : dto.getFilters()),
                 "提交任务，计划 " + vo.getTotal() + " 条");
         return Result.ok("已提交，后台解析中", vo);
@@ -117,6 +119,7 @@ public class NlpController {
     @RequireRole(roles = {"管理员"})
     @GetMapping("/api/nlp/extract/batch/{id}")
     public ResponseEntity<Result<NlpTaskVO>> batchStatus(@PathVariable String id) {
+        // 1. 取任务；2. 不存在回 404（前端轮询时据此停止轮询）
         NlpTaskVO vo = nlpBatchService.get(id);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "任务不存在"));

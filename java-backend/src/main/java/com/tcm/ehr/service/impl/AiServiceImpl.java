@@ -481,7 +481,9 @@ public class AiServiceImpl implements IAiService {
     /** 规则预检单文本（评分/分级 + 扣分项 + 逻辑冲突 + 当前辨证） */
     private String precheckText(ScoreResultVO sr, Record r) {
         StringBuilder sb = new StringBuilder();
+        // 1. 评分与分级
         sb.append("规则预检单：评分 ").append(sr.getScore()).append("，分级 ").append(sr.getGrade()).append("。");
+        // 2. 逐条扣分项，让模型知道"为什么扣"
         if (sr.getDeductions().isEmpty()) {
             sb.append("无扣分项。");
         } else {
@@ -491,6 +493,7 @@ public class AiServiceImpl implements IAiService {
                     .toList()));
             sb.append("。");
         }
+        // 3. 逻辑冲突与当前辨证：让模型对着实际内容给建议
         if (!sr.getLogicConflicts().isEmpty()) {
             sb.append("逻辑冲突：").append(String.join("；", sr.getLogicConflicts())).append("。");
         }
@@ -500,6 +503,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 复核 prompt：预检单 + 结构化要素，要求给出复核建议 */
     private String reviewPrompt(String precheck, Record r, Map<String, Object> data) {
+        // 1. 先给规则预检单（判定地基），再给结构化要素供模型对照
         StringBuilder sb = new StringBuilder("【规则预检单】\n").append(precheck).append('\n');
         sb.append("【结构化数据】\n")
                 .append("证候：").append(join(contents(data, "patternList"))).append('\n')
@@ -515,6 +519,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 载入病历并做数据域校验；不存在返回 null（控制器回 404） */
     private Record load(String recordId) {
+        // 1. ID 为空或查不到都返回 null，由控制器统一回 404
         if (recordId == null || recordId.isBlank()) {
             return null;
         }
@@ -522,6 +527,7 @@ public class AiServiceImpl implements IAiService {
         if (r == null) {
             return null;
         }
+        // 2. 数据域校验：审核员只能看待复核域
         if (RecordFilter.ROLE_AUDITOR.equals(RequestUtils.currentRole()) && !"待复核".equals(r.getGrade())) {
             throw new ForbiddenException("无权查看非待复核病历");
         }
@@ -531,6 +537,7 @@ public class AiServiceImpl implements IAiService {
     /** 解析结构化数据；为空或坏 JSON 时返回空 map，不抛（AI 侧降级为"无结构化"） */
     @SuppressWarnings("unchecked")
     private Map<String, Object> structured(Record r) {
+        // 1. 没结构化数据给空 map（不是 null：调用侧直接 .get 就行）
         if (r.getStructuredData() == null || r.getStructuredData().isBlank()) {
             return Map.of();
         }
@@ -538,6 +545,7 @@ public class AiServiceImpl implements IAiService {
             return objectMapper.readValue(r.getStructuredData(), new TypeReference<Map<String, Object>>() {
             });
         } catch (JacksonException e) {
+            // 2. 坏 JSON 同样给空 map：AI 解读不该被一条脏数据卡住
             return Map.of();
         }
     }
@@ -549,7 +557,9 @@ public class AiServiceImpl implements IAiService {
     /** 取某类实体的文本：herbs 取 name，其余取 content */
     private List<String> contents(Map<String, Object> data, String key) {
         List<String> out = new ArrayList<>();
+        // 1. 该 key 不是列表就当没有
         if (!(data.get(key) instanceof List<?> list)) return out;
+        // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
         for (Object item : list) {
             if (item instanceof Map<?, ?> m) {
                 String c = str(m.get("content") != null ? m.get("content") : m.get("name"));
@@ -563,6 +573,7 @@ public class AiServiceImpl implements IAiService {
     }
 
     private static boolean containsAny(String text, String... keys) {
+        // 任一关键词被包含即算命中
         for (String k : keys) {
             if (text.contains(k)) return true;
         }
@@ -574,10 +585,12 @@ public class AiServiceImpl implements IAiService {
     }
 
     private static int parseInt(Object o) {
+        // 1. 数值类型直接取整（JSON 解析出来的整数就是 Number）
         if (o instanceof Number n) return n.intValue();
         try {
             return Integer.parseInt(String.valueOf(o).trim());
         } catch (NumberFormatException e) {
+            // 2. 解析不了给 -1：调用侧据此判断"年龄/次数无效"
             return -1;
         }
     }
@@ -597,7 +610,9 @@ public class AiServiceImpl implements IAiService {
     /** 去掉模型可能加上的 ``` 围栏，只留 JSON 本体 */
     private String stripCodeFence(String s) {
         String t = s == null ? "" : s.trim();
+        // 1. 不是围栏开头就原样返回
         if (t.startsWith("```")) {
+            // 2. 去掉首行 ```lang，再去掉末尾 ```
             int nl = t.indexOf('\n');
             if (nl > 0) t = t.substring(nl + 1);
             int end = t.lastIndexOf("```");

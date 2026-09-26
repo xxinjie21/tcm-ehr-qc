@@ -114,12 +114,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Result<Void>> handleValidation(MethodArgumentNotValidException e) {
         List<FieldError> errors = e.getBindingResult().getFieldErrors();
+        // 1. 拿不到字段错误就只给通用文案
         if (errors.isEmpty()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请求参数非法"));
         }
+        // 2. 只有一个错误时直接说那一条，不要"字段：xxx"的前缀噪音
         if (errors.size() == 1) {
             return ResponseEntity.badRequest().body(Result.error(400, messageOf(errors.get(0))));
         }
+        // 3. 多个错误逐条拼（去重：同一字段可能触发多条约束）
         String msg = errors.stream()
                 .map(fe -> fe.getField() + "：" + messageOf(fe))
                 .distinct()
@@ -228,8 +231,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleException(Exception e) {
+        // 1. 生成追踪码：用户报障时凭它定位日志，响应里不带堆栈
         String traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         log.error("[全局异常][trace={}] {}", traceId, e.getMessage(), e);
+        // 2. 异常原文只进日志，不回给前端
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Result.error(500, "系统异常，请联系管理员（追踪码 " + traceId + "）"));
     }

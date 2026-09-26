@@ -164,7 +164,7 @@ public class QcRuleSet {
     }
 
     private static Element el(String name, String source, List<String> fallback) {
-        // 兜底字段列要新建一份 ArrayList：规则集可能被序列化后复用，不能共享入参列表
+        // 1. 逐字段装配 2. 兜底字段列新建 ArrayList：不能共享入参列表
         Element e = new Element();
         e.setName(name);
         e.setSource(source);
@@ -173,6 +173,7 @@ public class QcRuleSet {
     }
 
     private static FormatRule format(String field, String type, String expr, List<String> values, String label, String reason) {
+        // 1. 逐字段装配；values 拷一份
         FormatRule f = new FormatRule();
         f.setField(field);
         f.setType(type);
@@ -186,6 +187,7 @@ public class QcRuleSet {
     private static ConsistencyRule rule(String name, String triggerType, List<String> triggerValues,
                                         String expectType, List<String> expectValues) {
         // 触发/期望两组值都要拷贝成新列表
+        // 1. 逐字段装配 2. 两组值各拷一份
         ConsistencyRule c = new ConsistencyRule();
         c.setName(name);
         c.setTriggerType(triggerType);

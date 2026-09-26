@@ -78,9 +78,10 @@ public final class RequestUtils {
 
     /** 取当前请求；非 Web 线程（如定时任务/异步）返回 null */
     private static HttpServletRequest currentRequest() {
+        // 1. 非 Web 线程（定时任务/异步）取不到上下文，给 null
         try {
             RequestAttributes attributes = RequestContextHolder.currentRequestAttributes();
-            // 不是 Servlet 上下文（如 reactive）也当没有
+            // 2. 不是 Servlet 上下文（如 reactive）也当没有
             return attributes instanceof ServletRequestAttributes sra ? sra.getRequest() : null;
         } catch (Exception e) {
             return null;

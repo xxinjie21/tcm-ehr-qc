@@ -48,11 +48,14 @@ public class DictionaryController {
     @PostMapping("/import")
     public ResponseEntity<Result<ImportResultVO>> importDict(@RequestParam("file") MultipartFile file,
                                                              @RequestParam("type") String type) throws IOException {
+        // 1. 类型先校验（4001 与全局的 400 不同码，前端按它提示"类型选错"）
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         // 文件格式不支持等 IllegalArgumentException 由 GlobalExceptionHandler 统一返回 400
+        // 2. 导入（内部含合并、备份、覆盖写、重建索引与失败补偿）
         ImportResultVO vo = dictionaryService.importDictionary(type, file);
+        // 3. 留痕：词典变更影响全库归一结果，必须可追溯
         operationLogger.log("词典导入", type, "成功" + vo.getImported()
                 + "条，失败" + vo.getFailed() + "条");
         return ResponseEntity.ok(Result.ok(vo));
@@ -72,10 +75,13 @@ public class DictionaryController {
     @PostMapping("/convert")
     public ResponseEntity<Result<ConvertPreviewVO>> convert(@RequestParam("file") MultipartFile file,
                                                            @RequestParam("type") String type) throws IOException {
+        // 1. 类型校验
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
+        // 2. 只出候选不落库；LLM 未开/不可达在 service 里抛 400
         ConvertPreviewVO vo = dictionaryService.convertFromPdf(type, file);
+        // 3. 留痕并注明"待确认入库"
         operationLogger.log("词典转换", type, "候选" + vo.getCandidates().size()
                 + "条，失败" + vo.getFailed().size() + "条（待确认入库）");
         return ResponseEntity.ok(Result.ok(vo));
@@ -94,6 +100,7 @@ public class DictionaryController {
     public ResponseEntity<Result<Map<String, Object>>> terms(@RequestParam("type") String type,
                                                              @RequestParam(value = "keyword", required = false) String keyword)
             throws IOException {
+        // 1. 类型校验（keyword 可空 = 不过滤，最多返回 100 条）
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
@@ -113,12 +120,15 @@ public class DictionaryController {
     public ResponseEntity<Result<Void>> rollback(@RequestBody Map<String, String> body) throws IOException {
         String type = body.get("type");
         String backupFilename = body.get("backupFilename");
+        // 1. 类型校验
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
+        // 2. 先确认备份存在（含路径穿越前缀校验），再执行覆盖
         if (backupFilename == null || !dictionaryService.backupExists(type, backupFilename)) {
             return ResponseEntity.badRequest().body(Result.error("备份文件不存在"));
         }
+        // 3. 回滚并重建索引
         dictionaryService.rollback(type, backupFilename);
         operationLogger.log("词典回滚", type, "恢复备份 " + backupFilename);
         return ResponseEntity.ok(Result.ok(null));
@@ -134,9 +144,11 @@ public class DictionaryController {
      */
     @GetMapping("/backups")
     public ResponseEntity<Result<Map<String, Object>>> backups(@RequestParam("type") String type) throws IOException {
+        // 1. 类型校验；无备份时返回空列表而不是 404
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
+        // 2. 按时间倒序返回（含词条数与相对当前增减）
         return ResponseEntity.ok(Result.ok(Map.of("backups", dictionaryService.listBackups(type))));
     }
 }

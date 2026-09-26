@@ -93,10 +93,13 @@ public class LogController {
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/logs/purge")
     public Result<Map<String, Object>> purge(@RequestBody PurgeLogDTO dto) {
+        // 1. 截止日期必填：没给日期就等于"清空全部"，不能让它静默发生
         if (dto == null || dto.getBeforeDate() == null || dto.getBeforeDate().isBlank()) {
             throw new IllegalArgumentException("请提供清理截止日期 beforeDate");
         }
+        // 2. 删除并归档（service 内先导出再删）
         Map<String, Object> result = logService.purgeBefore(dto.getBeforeDate());
+        // 3. 留痕：归档文件名有就带上
         Object archived = result.get("archivedFile");
         operationLogger.log("日志清理", "清理至 " + dto.getBeforeDate(),
                 "删除 " + result.get("deleted") + " 条"

@@ -34,9 +34,11 @@ public class AiController {
      */
     @PostMapping("/interpret")
     public ResponseEntity<Result<AiReplyVO>> interpret(@RequestBody AiQueryDTO dto) {
+        // 1. 必填校验在前：缺参数是 400，不该走到 service 才失败
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }
+        // 2. 调服务；返回 null = 病历不存在
         AiReplyVO vo = aiService.interpret(dto);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(1006, "病历不存在"));
@@ -54,6 +56,7 @@ public class AiController {
      */
     @PostMapping("/chat")
     public ResponseEntity<Result<AiReplyVO>> chat(@RequestBody AiQueryDTO dto) {
+        // 1. 问题必填；2. 问答永不返回 null，兜底答案也是结果
         if (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入问题"));
         }
@@ -71,6 +74,7 @@ public class AiController {
     @RequireRole(roles = {"管理员", "审核员"})
     @PostMapping("/review")
     public ResponseEntity<Result<AiReplyVO>> review(@RequestBody AiQueryDTO dto) {
+        // 1. 必填校验 2. 病历不存在回 404
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }

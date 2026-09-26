@@ -198,7 +198,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     }
 
     private String issueType(ScoreResultVO vo) {
-        // 从重到轻取第一项：逻辑冲突 > 缺失字段 > 评分不达标
+        // 1. 从重到轻取第一项：逻辑冲突 > 缺失字段 > 评分不达标
         if (!vo.getLogicConflicts().isEmpty()) {
             return "逻辑冲突";
         }

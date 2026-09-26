@@ -157,10 +157,12 @@ public class QcController {
 
     /** GET 查询参数 → 统一的范围过滤对象（时间需上下界同时存在） */
     private FiltersDTO filters(String department, String start, String end, String pattern, String grade) {
+        // 1. 三个标量条件直接搬
         FiltersDTO f = new FiltersDTO();
         f.setDepartment(department);
         f.setPattern(pattern);
         f.setGrade(grade);
+        // 2. 时间要上下界同时存在才生效：只给一端会被当成"从某时到最新"，那不是用户的意思
         if (start != null && !start.isBlank() && end != null && !end.isBlank()) {
             List<String> range = new ArrayList<>(2);
             range.add(start);

@@ -59,8 +59,10 @@ public class ReviewController {
     @PostMapping("/api/records/{recordId}/review")
     public Result<ReviewResultVO> review(@PathVariable String recordId,
                                          @RequestBody(required = false) ReviewDTO dto) {
+        // 1. 复核（dto 可空 = 不做人工修正，只重算）
         // 病历不存在与"复核记录不存在/已完结"共用 1006，由 GlobalExceptionHandler 统一转 404
         ReviewResultVO vo = reviewService.review(recordId, dto);
+        // 2. 留痕：复核结论与评分必须可追溯
         operationLogger.log("人工复核", recordId, "结果：" + vo.getStatus() + "，评分：" + vo.getScore());
         return Result.ok(vo);
     }

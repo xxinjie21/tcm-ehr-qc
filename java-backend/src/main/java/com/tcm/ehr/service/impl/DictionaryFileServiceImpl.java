@@ -235,10 +235,11 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      * @return 前缀合法且文件存在时为 {@code true}
      */
     public boolean backupExists(String type, String backupFilename) {
-        // 与 restore() 同一套前缀校验：否则 backupFilename 传 ../.. 之类可以探测任意路径是否存在
+        // 1. 与 restore() 同一套前缀校验：否则 backupFilename 传 ../.. 之类可以探测任意路径是否存在
         if (backupFilename == null || !backupFilename.startsWith(fileNameOf(type) + ".bak_")) {
             return false;
         }
+        // 2. 前缀合法才查存在性
         return Files.exists(backupDir().resolve(backupFilename));
     }
 

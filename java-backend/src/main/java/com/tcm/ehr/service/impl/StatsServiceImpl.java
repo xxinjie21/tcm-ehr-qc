@@ -272,7 +272,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     /** 评分落入哪个分桶（前端分布图按固定顺序展示） */
     private static String bucketOf(int score) {
-        // 从高到低匹配，前端按固定桶顺序画分布图
+        // 1. 从高到低匹配，前端按固定桶顺序画分布图
         if (score >= 90) return "90+";
         if (score >= 80) return "80-89";
         if (score >= 70) return "70-79";
@@ -291,7 +291,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     private String str(Object o) {
-        // 空值与空白都归成 null：结构化数据里空串很常见
+        // 1. 空值给 null 2. 去空白后空串也归成 null
         if (o == null) return null;
         String s = String.valueOf(o).trim();
         return s.isEmpty() ? null : s;

@@ -54,8 +54,10 @@ public class LogServiceImpl implements ILogService {
      */
     @Override
     public Map<String, Object> page(String action, String keyword, int page, int size) {
+        // 1. 分页参数兜底为 1（非法分页会让 SQL 报错），条件走统一 wrapper
         Page<OperationLog> p = operationLogMapper.selectPage(
                 new Page<>(Math.max(page, 1), Math.max(size, 1)), buildWrapper(action, keyword));
+        // 2. 固定顺序装 total / list，前端按 key 取
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", p.getTotal());
         result.put("list", p.getRecords());
@@ -157,8 +159,10 @@ public class LogServiceImpl implements ILogService {
 
     /** 写归档 CSV 到 logs/，返回文件名；失败抛 IOException（由上层转 500，不静默丢数据） */
     private String writeArchive(List<OperationLog> rows) {
+        // 1. 归档文件名带时间戳，多次清理不会互相覆盖
         String name = "audit-archive-" + LocalDateTime.now().format(FILE_TS) + ".csv";
         try {
+            // 2. 落盘到 logs/
             Path dir = Paths.get(archiveDir);
             Files.createDirectories(dir);
             Files.write(dir.resolve(name), csvBytes(rows));
@@ -213,10 +217,13 @@ public class LogServiceImpl implements ILogService {
 
     /** CSV 字段转义：含逗号 / 引号 / 换行时用引号包裹，内部引号翻倍 */
     private String csv(String s) {
+        // 1. null 给空串（CSV 里空字段就是空）
         if (s == null) {
             return "";
         }
+        // 2. 内部引号翻倍
         String v = s.replace("\"", "\"\"");
+        // 3. 含分隔符或换行才加引号包裹
         if (v.contains(",") || v.contains("\n") || v.contains("\"")) {
             return "\"" + v + "\"";
         }

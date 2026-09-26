@@ -44,12 +44,12 @@ public final class RecordUtil {
 
     /** MD5(UTF-8) → 32 位小写十六进制 */
     public static String md5Hex(String s) {
+        // 1. 固定 UTF-8 编码：编码不同则同一内容算出不同哈希
         try {
-            // 固定 UTF-8 编码：编码不同则同一内容算出不同哈希
             MessageDigest md = MessageDigest.getInstance("MD5");
             return HexFormat.of().formatHex(md.digest(s.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
-            // MD5 为 JDK 必备算法，正常不会发生
+            // 2. MD5 为 JDK 必备算法，真拿不到就抛（不能退化成弱哈希）
             throw new IllegalStateException("MD5 算法不可用", e);
         }
     }

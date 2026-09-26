@@ -495,10 +495,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * Windows 上 SIGTERM 是硬杀（{@code TerminateProcess}），根本不跑 {@code @PreDestroy}。</p>
      */
     static String endStatus(boolean running, boolean cancelled, Integer done, Integer total) {
+        // 1. 停机且没跑完 → 中断（不能声称"已完成"）
         boolean unfinished = done != null && total != null && done < total;
         if (!running && !cancelled && unfinished) {
             return NlpTask.INTERRUPTED;
         }
+        // 2. 取消优先于完成
         return cancelled ? NlpTask.CANCELLED : NlpTask.COMPLETED;
     }
 
@@ -539,6 +541,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * （提交时不带 filters 就是全库），不要连它一起禁掉。</p>
      */
     static String writeJsonStrict(ObjectMapper mapper, Object o) {
+        // 序列化失败即抛：筛选条件丢了会让任务从"指定范围"静默变成"全库扫描"
         try {
             return mapper.writeValueAsString(o);
         } catch (Exception e) {

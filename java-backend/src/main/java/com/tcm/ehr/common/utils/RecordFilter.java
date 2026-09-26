@@ -162,7 +162,7 @@ public final class RecordFilter {
     }
 
     private static String text(Object o) {
-        // 空值、空白、字面 "null" 一律归成 null（前端会传字符串 "null"）
+        // 1. 空值直接返回 2. 空白与字面 "null" 归成 null（前端会传字符串 "null"）
         if (o == null) {
             return null;
         }

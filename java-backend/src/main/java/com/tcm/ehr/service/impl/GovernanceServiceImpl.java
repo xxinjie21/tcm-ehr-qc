@@ -154,7 +154,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 判断是否为可解析的 JSON（隔离脏数据用；不可解析即视为"无法修复"） */
     private boolean isValidJson(String s) {
-        // 解析成功即有效；解析不了就归为"无法修复"的脏数据
+        // 1. 能解析即有效 2. 解析不了 = 无法修复的脏数据
         try {
             objectMapper.readTree(s);
             return true;
@@ -265,7 +265,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 取 structuredData 实体里的字符串字段；非 Map 或字段缺失返回 null */
     private static String mapStr(Object item, String field) {
-        // 非 Map（脏数据）或字段缺失都返回 null，交给上层跳过
+        // 1. 非 Map（脏数据）返回 null 2. 取字段值并转字符串
         if (!(item instanceof Map<?, ?> m)) return null;
         Object v = m.get(field);
         return v == null ? null : String.valueOf(v);
@@ -273,6 +273,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 取 normLevel；非数字返回 null（未归一 / 未命中词典） */
     private static Integer mapLevel(Object item) {
+        // 非数字（未归一/脏数据）返回 null，让去重时按"层级未知"处理
         if (!(item instanceof Map<?, ?> m)) return null;
         Object v = m.get("normLevel");
         return (v instanceof Number n) ? n.intValue() : null;
@@ -360,9 +361,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * <p>证候存在 {@code structured_data} 的 JSON 里，SQL 表达不了，只能留给调用方在内存筛。</p>
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
-        // 条件组装复用 RecordFilter（与其余读路径同一个函数），这里只追加导出自己的硬约束
+        // 1. 条件组装复用 RecordFilter（与其余读路径同一个函数）
         QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN,
                 RecordFilter.fromMap(dto.getFilters()));
+        // 2. 追加导出自己的硬约束：只导合格病历
         wrapper.eq("grade", "合格");
         return wrapper;
     }
@@ -421,7 +423,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     private String str(Object o) {
-        // 空值与空白都归成 null，避免把 "" 当成有效筛选条件
+        // 1. 空值直接返回 2. 去空白，空串与字面 "null" 归成 null
         if (o == null) return null;
         String s = String.valueOf(o).trim();
         return s.isEmpty() ? null : s;
