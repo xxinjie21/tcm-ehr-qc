@@ -100,6 +100,7 @@ public class LlmClient {
      * @return 模型输出；不可用或调用失败返回 {@code null}，调用方据此走降级路径
      */
     public String chat(String systemPrompt, String userPrompt) {
+        // 1. 取客户端；不可用（未启用或配置非法）就降级，调用方据 null 走规则路径
         ChatClient client = resolve();
         if (client == null) {
             LlmConfig cfg = configStore.get();
@@ -107,12 +108,14 @@ public class LlmClient {
             return null;
         }
         try {
+            // 2. 系统提示词可空，传空串而不是 null（部分模型不接受 null）
             return client.prompt()
                     .system(systemPrompt == null ? "" : systemPrompt)
                     .user(userPrompt)
                     .call()
                     .content();
         } catch (Exception e) {
+            // 3. 调用失败也降级：LLM 是增强项，不能让它把主流程带崩
             log.warn("[LLM] 调用失败，降级：{}", e.getMessage());
             return null;
         }
@@ -134,7 +137,9 @@ public class LlmClient {
      * @throws IllegalStateException 参数非法或连接/鉴权失败
      */
     public String probe(LlmConfig cfg) {
+        // 1. 用待保存的参数现装一个模型（不碰当前生效配置，用户可以先试再存）
         ChatModel model = buildModel(cfg);
+        // 2. 发一轮最小请求；异常向上抛，失败原因要如实告诉用户
         String reply = ChatClient.builder(model).build()
                 .prompt()
                 .user(PROBE_PROMPT)
@@ -218,13 +223,16 @@ public class LlmClient {
      */
     private ChatClient resolve() {
         LlmConfig cfg = configStore.get();
+        // 1. 未启用直接给 null，调用方走降级
         if (!cfg.enabled()) {
             return null;
         }
         long v = configStore.version();
+        // 2. 配置没变就复用已装配的（null 也算"试过了"，避免每次调用都重试装配）
         if (v == builtVersion) {
-            return chatClient;   // 本版本已尝试过装配（chatClient 为 null 即表示失败）
+            return chatClient;
         }
+        // 3. 配置变了才重建；双检锁：并发的首次调用只装配一次
         synchronized (this) {
             if (v != builtVersion) {
                 chatClient = null;
@@ -233,8 +241,10 @@ public class LlmClient {
                     log.info("[LLM] 已启用：provider={}，model={}", cfg.provider(),
                             isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
                 } catch (Exception e) {
+                    // 装配失败保留 null，本次配置下都降级
                     log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
                 }
+                // 4. 无论成败都记下版本，避免坏配置被反复重试
                 builtVersion = v;
             }
             return chatClient;
@@ -243,10 +253,12 @@ public class LlmClient {
 
     /** 按给定参数装配底层模型；参数非法直接抛出（由调用方决定降级还是上报） */
     private ChatModel buildModel(LlmConfig cfg) {
+        // 1. 先归一 provider（大小写/别名统一），不合法直接抛
         String provider = LlmConfig.normalizeProvider(cfg.provider());
         if (provider == null) {
             throw new IllegalStateException("llm.provider 非法：" + cfg.provider() + "（仅支持 ollama / openai）");
         }
+        // 2. 按通道分派
         return switch (provider) {
             case LlmConfig.PROVIDER_OLLAMA -> buildOllama(cfg);
             case LlmConfig.PROVIDER_OPENAI -> buildOpenAi(cfg);
@@ -256,9 +268,11 @@ public class LlmClient {
 
     /** 本机通道：无需 api-key；Ollama 未启动时在调用期失败并降级 */
     private ChatModel buildOllama(LlmConfig cfg) {
+        // 1. 没配 base-url 就用本机默认
         String baseUrl = isBlank(cfg.baseUrl()) ? DEFAULT_OLLAMA_BASE_URL : cfg.baseUrl().trim();
 
         // OllamaApi 默认不设超时，连不上时会一直挂着；必须显式给连接与读取超时
+        // 2. 显式设连接/读取超时
         int timeout = cfg.timeout() > 0 ? cfg.timeout() : DEFAULT_TIMEOUT_MS;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(timeout));
@@ -269,6 +283,7 @@ public class LlmClient {
                 .restClientBuilder(RestClient.builder().requestFactory(factory))
                 .build();
 
+        // 3. 模型名与温度只在配了才设：留空即用通道默认值
         OllamaChatOptions.Builder options = OllamaChatOptions.builder();
         if (!isBlank(cfg.model())) {
             options.model(cfg.model().trim());
@@ -276,6 +291,7 @@ public class LlmClient {
         if (cfg.temperature() != null) {
             options.temperature(cfg.temperature());
         }
+        // 4. NO_RETRY：不退避重试，失败就快失败，交给上层降级
         return OllamaChatModel.builder()
                 .ollamaApi(api)
                 .options(options.build())
@@ -286,6 +302,7 @@ public class LlmClient {
 
     /** OpenAI 兼容通道：只认 OpenAI 协议，base-url 指向三方网关即可复用 */
     private ChatModel buildOpenAi(LlmConfig cfg) {
+        // 1. 缺密钥直接抛：没有凭据的请求注定 401，不如早失败
         if (isBlank(cfg.apiKey())) {
             throw new IllegalStateException("provider=openai 但 api-key 为空");
         }
@@ -294,6 +311,7 @@ public class LlmClient {
             http.timeout(Duration.ofMillis(cfg.timeout()));
         }
 
+        // 2. 显式给 base-url 就能指向三方网关复用（不限官方 OpenAI）
         ClientOptions.Builder clientOptions = ClientOptions.builder()
                 .apiKey(cfg.apiKey().trim())
                 .maxRetries(0)          // 与 Ollama 通道同口径：快速失败，不做退避重试
@@ -303,6 +321,7 @@ public class LlmClient {
         }
         ClientOptions options = clientOptions.build();
 
+        // 3. 模型名与温度可选，留空用通道默认
         OpenAiChatOptions.Builder chatOptions = OpenAiChatOptions.builder();
         if (!isBlank(cfg.model())) {
             chatOptions.model(cfg.model().trim());

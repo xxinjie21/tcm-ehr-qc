@@ -55,8 +55,11 @@ public class LlmConfigStore {
 
     /** 覆盖运行时配置：更新内存、自增版本、并把非密钥字段落盘 */
     public LlmConfig update(LlmConfig next) {
+        // 1. 换内存配置
         this.current = next;
+        // 2. 版本号自增：LlmClient 据此判断要不要重建客户端
         long v = version.incrementAndGet();
+        // 3. 非密钥字段落盘（api-key 只留在内存）
         persist(next);
         log.info("[LLM] 运行时配置已更新(v{})：enabled={}，provider={}，model={}（非密钥字段已落盘）",
                 v, next.enabled(), next.provider(), next.model());
@@ -69,9 +72,12 @@ public class LlmConfigStore {
     private LlmConfig load(LlmProperties p) {
         LlmConfig base = LlmConfig.from(p);
         Map<String, Object> m = readFile(p.getConfigFile());
+        // 1. 没有落盘文件就纯用 yml 基线
         if (m == null) {
             return base;
         }
+        // 2. 逐字段覆盖；类型不符或缺失时回落到基线值
+        // 3. apiKey 恒取基线（yml）——落盘文件里没有密钥，也不该有
         return new LlmConfig(
                 m.get("enabled") instanceof Boolean b ? b : base.enabled(),
                 m.get("provider") != null ? String.valueOf(m.get("provider")) : base.provider(),
@@ -85,12 +91,14 @@ public class LlmConfigStore {
     private Map<String, Object> readFile(String path) {
         try {
             Path f = Paths.get(path);
+            // 1. 文件不存在是正常状态（还没保存过），不是错误
             if (!Files.exists(f)) {
                 return null;
             }
             return mapper.readValue(f.toFile(), new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
+            // 2. 坏了就用 yml 基线继续跑，不让配置问题拦住服务启动
             log.warn("[LLM] 读取运行时配置失败（用 yml 基线）: {}", e.getMessage());
             return null;
         }
@@ -98,6 +106,7 @@ public class LlmConfigStore {
 
     /** 落盘非密钥字段（api-key 绝不写入） */
     private void persist(LlmConfig c) {
+        // 1. 只列非密钥字段——这个 map 是落盘内容的唯一来源，别顺手把密钥加进来
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("enabled", c.enabled());
         m.put("provider", c.provider());

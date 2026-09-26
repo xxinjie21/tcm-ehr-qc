@@ -57,6 +57,8 @@ public class QcRuleStore {
 
     /** 覆盖并落盘，返回生效规则 */
     public QcRuleSet update(QcRuleSet next) {
+        // 1. 先归一（补齐关键项），再落盘、换内存 —— 顺序不能反：
+        //    落盘的必须是校验过的版本，否则重启会读到残缺规则
         QcRuleSet normalized = normalize(next == null ? QcRuleSet.defaults() : next);
         persist(normalized);
         this.current = normalized;
@@ -66,12 +68,14 @@ public class QcRuleStore {
 
     /** 恢复默认（删除文件 + 用内置默认） */
     public QcRuleSet reset() {
+        // 1. 删规则文件：否则重启后又会被它覆盖回来
         try {
             Path f = Paths.get(rulesFile);
             Files.deleteIfExists(f);
         } catch (Exception e) {
             log.warn("[质控规则] 删除规则文件失败: {}", e.getMessage());
         }
+        // 2. 清告警并换回内置默认
         warnings.clear();
         this.current = QcRuleSet.defaults();
         return current;
@@ -81,7 +85,9 @@ public class QcRuleStore {
 
     /** 默认 → 文件覆盖 → 归一校验 */
     private QcRuleSet loadWithMerge() {
+        // 1. 以默认规则为底
         Map<String, Object> merged = toMap(QcRuleSet.defaults());
+        // 2. 有文件就深合并（文件里只写要改的字段，缺失的沿用默认）
         Map<String, Object> fromFile = readFile();
         if (fromFile != null) {
             deepMerge(merged, fromFile);
@@ -90,21 +96,25 @@ public class QcRuleStore {
         try {
             rules = mapper.convertValue(merged, QcRuleSet.class);
         } catch (Exception e) {
+            // 3. 解析不了就整份回默认：半份规则比默认更危险
             warnings.add("规则文件解析失败，已回退默认：" + e.getMessage());
             rules = QcRuleSet.defaults();
         }
+        // 4. 最后统一归一校验
         return normalize(rules);
     }
 
     private Map<String, Object> readFile() {
         try {
             Path f = Paths.get(rulesFile);
+            // 1. 文件不存在是正常状态（从未改过规则）
             if (!Files.exists(f)) {
                 return null;
             }
             return mapper.readValue(f.toFile(), new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
+            // 2. 坏了记告警并按"无文件"处理，服务照常起
             warnings.add("读取规则文件失败，已用默认：" + e.getMessage());
             return null;
         }
@@ -112,12 +122,15 @@ public class QcRuleStore {
 
     private void persist(QcRuleSet rules) {
         try {
+            // 1. 确保父目录存在
             Path f = Paths.get(rulesFile);
             if (f.getParent() != null) {
                 Files.createDirectories(f.getParent());
             }
+            // 2. 美化输出，便于管理员手工核对规则内容
             mapper.writerWithDefaultPrettyPrinter().writeValue(f.toFile(), rules);
         } catch (Exception e) {
+            // 3. 落盘失败只告警：内存里已生效，不该让保存操作整个失败
             log.warn("[质控规则] 落盘失败（本次仅内存生效）: {}", e.getMessage());
         }
     }
@@ -168,12 +181,15 @@ public class QcRuleStore {
     /** 递归深合并：override 覆盖 base，缺字段保留默认（实现"字段级补默认"） */
     @SuppressWarnings("unchecked")
     private void deepMerge(Map<String, Object> base, Map<String, Object> override) {
+        // 1. 逐 key 处理覆盖项
         for (Map.Entry<String, Object> e : override.entrySet()) {
             Object bv = base.get(e.getKey());
             Object ov = e.getValue();
+            // 2. 两边都是对象 → 递归合并（保留 base 里 override 没提到的字段）
             if (bv instanceof Map && ov instanceof Map) {
                 deepMerge((Map<String, Object>) bv, (Map<String, Object>) ov);
             } else if (ov != null) {
+                // 3. 标量直接覆盖；override 里显式给 null 视为"没给"，保留默认
                 base.put(e.getKey(), ov);
             }
         }
@@ -185,6 +201,7 @@ public class QcRuleStore {
             return mapper.convertValue(o, new TypeReference<LinkedHashMap<String, Object>>() {
             });
         } catch (Exception e) {
+            // 转换失败给空 map：深合并会退化成"只用文件内容"，后续 normalize 再兜底
             return new LinkedHashMap<>();
         }
     }

@@ -113,6 +113,7 @@ public class EsTermNormalizer {
      */
     private NormalizeResult judge(List<TermEntry> entries, String input) {
         // 一级·精确：标准词/别名完全相等
+        // 1. 精确优先：命中即返回，不给后面的宽松规则机会
         for (TermEntry e : entries) {
             if (e.getStandardTerm().equals(input)) {
                 return new NormalizeResult(e.getStandardTerm(), e.getSource(), 1, e.getCode());
@@ -123,6 +124,7 @@ public class EsTermNormalizer {
         }
 
         // 二级·包含（双向）：输入包含标准词/别名 或 标准词/别名包含输入，多命中取最短标准词
+        // 2. 双向包含：多命中时取最短标准词（"胃痛" 优先于 "胃脘痛"）
         TermEntry bestContains = null;
         for (TermEntry e : entries) {
             boolean hit = e.getStandardTerm().contains(input)
@@ -139,6 +141,7 @@ public class EsTermNormalizer {
         }
 
         // 三级·模糊：字符Dice相似度 ≥ 阈值，取最高分
+        // 3. 模糊：标准词与各别名都算一遍，取最高分
         TermEntry bestFuzzy = null;
         double bestScore = 0;
         for (TermEntry e : entries) {
@@ -153,6 +156,7 @@ public class EsTermNormalizer {
                 bestFuzzy = e;
             }
         }
+        // 4. 最高分仍不到阈值就算未命中，给 null
         if (bestFuzzy != null && bestScore >= scoreThreshold) {
             return new NormalizeResult(bestFuzzy.getStandardTerm(), bestFuzzy.getSource(), 3,
                     bestFuzzy.getCode());
@@ -162,7 +166,9 @@ public class EsTermNormalizer {
     }
 
     private boolean containsAnyAlias(TermEntry e, String input) {
+        // 1. 没别名就不参与包含判定
         if (e.getAliases() == null) return false;
+        // 2. 任一别名双向包含即算命中
         for (String a : e.getAliases()) {
             if (a.contains(input) || input.contains(a)) return true;
         }
@@ -171,11 +177,14 @@ public class EsTermNormalizer {
 
     /** 字符集合Dice系数：2*|A∩B| / (|A|+|B|) */
     private double dice(String a, String b) {
+        // 1. 任一为空直接 0（不除零）
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) return 0;
+        // 2. 各自去重成字符集合
         Set<Character> sa = new HashSet<>();
         for (char c : a.toCharArray()) sa.add(c);
         Set<Character> sb = new HashSet<>();
         for (char c : b.toCharArray()) sb.add(c);
+        // 3. 数交集大小
         int inter = 0;
         for (Character c : sa) {
             if (sb.contains(c)) inter++;

@@ -74,6 +74,7 @@ public class JwtUtil {
      * @return 可解析且在有效期内为 true
      */
     public boolean isValid(String token) {
+        // 1. 能解析且在有效期内即有效
         try {
             parseToken(token);
             return true;

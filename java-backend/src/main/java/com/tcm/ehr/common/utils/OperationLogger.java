@@ -56,6 +56,7 @@ public class OperationLogger {
      * @param detail 操作明细，可为 null
      */
     public void log(String action, String target, String detail) {
+        // 1. 从当前请求取操作人上下文（脱离 Web 请求时各字段为空）
         String operator = RequestUtils.currentUsername();
         String role = RequestUtils.currentRole();
         String ip = RequestUtils.currentIp();
@@ -63,16 +64,20 @@ public class OperationLogger {
         // 不截断会导致同一操作在文件与库中相差 1 秒，审计对不上账
         LocalDateTime now = LocalDateTime.now().withNano(0);
 
+        // 2. 文件先写：它是兜底留痕，即使入库失败操作也留得下
         writeFile(now, operator, buildContent(action, target, detail));
         insertDb(now, operator, role, action, target, detail, ip);
     }
 
     /** 文件行内容：`操作类型：操作对象，操作明细`（缺省段自动省略） */
     private String buildContent(String action, String target, String detail) {
+        // 1. 操作类型必有（null 归成空串）
         StringBuilder sb = new StringBuilder(nvl(action));
+        // 2. 有对象才补「：对象」
         if (target != null && !target.isBlank()) {
             sb.append('：').append(target.trim());
         }
+        // 3. 有明细才补「，明细」
         if (detail != null && !detail.isBlank()) {
             sb.append('，').append(detail.trim());
         }
@@ -82,15 +87,18 @@ public class OperationLogger {
     /** 文件落盘（兜底备份，重启不丢失） */
     private synchronized void writeFile(LocalDateTime now, String operator, String content) {
         try {
+            // 1. 确保父目录存在（首次运行时目录还没有）
             Path path = Paths.get(logFile);
             if (path.getParent() != null) {
                 Files.createDirectories(path.getParent());
             }
+            // 2. 追加一行；synchronized 防并发写把行写串
             String line = now.format(TS) + " | " + nvl(operator) + " | " + content
                     + System.lineSeparator();
             Files.writeString(path, line, StandardCharsets.UTF_8,
                     java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
         } catch (IOException e) {
+            // 3. 写文件失败只告警：不能因为留痕失败让业务操作回滚
             log.warn("[操作日志] 文件写入失败: {}", e.getMessage());
         }
     }
@@ -99,24 +107,29 @@ public class OperationLogger {
     private void insertDb(LocalDateTime now, String operator, String role,
                           String action, String target, String detail, String ip) {
         try {
+            // 1. 各字段按列宽截断：超长会撞库列长度限制
             OperationLog row = new OperationLog();
             row.setLogTime(now);
             row.setOperator(cut(operator, MAX_OPERATOR));
             row.setRole(cut(role, MAX_ROLE));
             row.setAction(cut(action, MAX_ACTION));
             row.setTarget(cut(target, MAX_TARGET));
+            // 2. 明细列不截断（TEXT 列），只去首尾空白
             row.setDetail(detail == null ? null : detail.trim());
             row.setIp(cut(ip, MAX_IP));
             operationLogMapper.insert(row);
         } catch (Exception e) {
+            // 3. 入库失败只告警：文件里已经留了痕，不该因此中断业务
             log.warn("[操作日志] 入库失败（不影响业务，文件已留痕）: {}", e.getMessage());
         }
     }
 
     private static String cut(String s, int max) {
+        // 1. null 保持 null（区分"没值"与"空串"）
         if (s == null) {
             return null;
         }
+        // 2. 超长则截断到上限
         String text = s.trim();
         return text.length() <= max ? text : text.substring(0, max);
     }

@@ -93,9 +93,11 @@ public class EntityNormalizer {
                                           Function<T, String> termOf,
                                           Function<T, String> sourceOf,
                                           Function<T, Integer> levelOf) {
+        // 1. 不足两条无从去重，原样返回
         if (items == null || items.size() < 2) {
             return items;
         }
+        // 2. 按标准词建索引，LinkedHashMap 保住原有顺序
         Map<String, T> kept = new LinkedHashMap<>();
         int blankSeq = 0;
         for (T item : items) {
@@ -106,6 +108,7 @@ public class EntityNormalizer {
             // 术语为空：用唯一键占位，保证「不参与合并」而不是「全部并成一条」
             String key = (term == null || term.isBlank()) ? "\u0000" + (blankSeq++) : term;
             T prev = kept.get(key);
+            // 3. 同键时二选一：新来的更代表就替换，否则保留先出现的那条
             if (prev == null || isMoreRepresentative(item, prev, sourceOf, levelOf)) {
                 kept.put(key, item);
             }
@@ -117,11 +120,13 @@ public class EntityNormalizer {
     private static <T> boolean isMoreRepresentative(T candidate, T current,
                                                     Function<T, String> sourceOf,
                                                     Function<T, Integer> levelOf) {
+        // 1. 原文更长者优先：信息量大的那条更可能是完整表述
         int lc = lengthOf(sourceOf.apply(candidate));
         int lp = lengthOf(sourceOf.apply(current));
         if (lc != lp) {
             return lc > lp;
         }
+        // 2. 长度打平再看层级（精确优于包含优于模糊）；完全一样返回 false，即先出现者胜
         return rankOf(levelOf.apply(candidate)) < rankOf(levelOf.apply(current));
     }
 
@@ -136,12 +141,13 @@ public class EntityNormalizer {
 
     /** 就地归一抽取结果中的 7 类 Entity 与 herbs，返回命中统计 */
     public NormStat normalize(NlpExtractVO vo) {
+        // 1. 没抽取出东西就不做归一
         if (vo == null) {
             return new NormStat(0, 0, 0, 0);
         }
         int[] stat = {0, 0, 0, 0};
 
-        // 7 类 Entity 走同一字段→类型映射；无词典的 4 类只回填 sourceText（供前端展示原文）
+        // 2. 8 类 Entity 走同一字段→类型映射；无词典的 4 类只回填 sourceText（供前端展示原文）
         vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat));
         vo.setSymptoms(normEntities(vo.getSymptoms(), "symptoms", stat));
         vo.setTongueList(normEntities(vo.getTongueList(), "tongueList", stat));
@@ -151,6 +157,7 @@ public class EntityNormalizer {
         vo.setTreatmentList(normEntities(vo.getTreatmentList(), "treatmentList", stat));
         vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat));
 
+        // 3. 中药单独处理：归一目标是 name 而不是 content
         for (NlpExtractVO.Herb herb : vo.getHerbs()) {
             if (herb == null) continue;
             // 中药以 name 为归一目标，sourceText 保留原文（模型侧 name 与 sourceText 同源）
@@ -160,6 +167,7 @@ public class EntityNormalizer {
                 herb.setSourceText(raw);
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", raw);
+            // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
             if (r.source() == null || r.source().isBlank() || r.level() < 1 || r.level() > 3) {
                 continue;
             }
@@ -170,6 +178,7 @@ public class EntityNormalizer {
             stat[0]++;
             stat[r.level()]++;
         }
+        // 5. 中药也按标准词去重
         vo.setHerbs(dedupByTerm(vo.getHerbs(), NlpExtractVO.Herb::getName,
                 NlpExtractVO.Herb::getSourceText, NlpExtractVO.Herb::getNormLevel));
 
@@ -177,10 +186,13 @@ public class EntityNormalizer {
     }
 
     private List<NlpExtractVO.Entity> normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat) {
+        // 1. 该字段没抽到东西就保持 null，别把 null 换成空列表
         if (entities == null) {
             return null;
         }
+        // 2. 该字段对应哪类词典（舌/脉/病因/治法返回 null）
         String type = dictionaryType(fieldKey);
+        // 3. 逐个实体归一
         for (NlpExtractVO.Entity e : entities) {
             if (e == null) continue;
             String raw = rawOf(e.getContent(), e.getSourceText());
@@ -192,6 +204,7 @@ public class EntityNormalizer {
                 continue; // 该字段无独立词典，仅保留原文
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, raw);
+            // 4. 未命中词典就保持原样，不写 normLevel
             if (r.source() == null || r.source().isBlank() || r.level() < 1 || r.level() > 3) {
                 continue;
             }
@@ -202,7 +215,7 @@ public class EntityNormalizer {
             stat[0]++;
             stat[r.level()]++;
         }
-        // 归一之后再合并同标准词。统计仍按「归一动作」计（去重前），
+        // 5. 归一之后再合并同标准词。统计仍按「归一动作」计（去重前），
         // 即 NormStat 描述的是做了多少次归一，去重只影响下发给前端的列表。
         return dedupByTerm(entities, NlpExtractVO.Entity::getContent,
                 NlpExtractVO.Entity::getSourceText, NlpExtractVO.Entity::getNormLevel);
@@ -210,7 +223,9 @@ public class EntityNormalizer {
 
     /** 归一目标值：优先 content，缺失时退回 sourceText（两者在模型侧同源） */
     private String rawOf(String primary, String fallback) {
+        // 1. 主值可用就用主值
         if (!isBlank(primary)) return primary.trim();
+        // 2. 否则退回原文；两边都空给空串
         if (!isBlank(fallback)) return fallback.trim();
         return "";
     }

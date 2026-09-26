@@ -45,6 +45,7 @@ public final class RecordUtil {
     /** MD5(UTF-8) → 32 位小写十六进制 */
     public static String md5Hex(String s) {
         try {
+            // 固定 UTF-8 编码：编码不同则同一内容算出不同哈希
             MessageDigest md = MessageDigest.getInstance("MD5");
             return HexFormat.of().formatHex(md.digest(s.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {

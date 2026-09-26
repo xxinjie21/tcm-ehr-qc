@@ -74,6 +74,7 @@ public final class EntityTypes {
 
     /** 有词典的类型（疾病/证候/症状/中药/方剂，按 order） */
     public static List<EntityType> dictTypes() {
+        // 1. 从 9 类里筛出有词典的那 5 类；按 order 保持稳定顺序
         List<EntityType> out = new ArrayList<>();
         for (EntityType t : BY_KEY.values()) {
             if (t.dict()) {
@@ -85,6 +86,7 @@ public final class EntityTypes {
 
     /** 有词典的类型 key 集合（顺序稳定） */
     public static Set<String> dictKeys() {
+        // 与 dictTypes 同源，只是换成 key 形态；用 LinkedHashSet 保住顺序
         Set<String> out = new LinkedHashSet<>();
         for (EntityType t : BY_KEY.values()) {
             if (t.dict()) {

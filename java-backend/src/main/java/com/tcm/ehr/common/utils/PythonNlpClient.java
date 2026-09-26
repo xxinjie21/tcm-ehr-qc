@@ -62,10 +62,12 @@ public class PythonNlpClient {
      */
     @PostConstruct
     public void reportDisabledOnStartup() {
+        // 1. 启用时只记一行地址，出问题才需要看
         if (enabled) {
             log.info("[NLP] 抽取服务已启用，目标地址 {}", serviceUrl);
             return;
         }
+        // 2. 未启用要写清后果与开启方式：抽取页"抽不出东西"多半就是这条
         log.warn("[NLP] 抽取服务未启用（nlp.enabled=false）：本次抽取将返回空 9 类、"
                 + "modelAvailable=false。术语归一仍在执行（NlpController.extract 内调 "
                 + "EntityNormalizer.normalize），但上游无实体可归。启用方式：application.yml "
@@ -79,11 +81,13 @@ public class PythonNlpClient {
      * @return 抽取结果；未启用 / 服务不可用 / 异常时返回 null（调用方降级）
      */
     public NlpExtractVO extract(String text) {
+        // 1. 未启用直接返回 null：省掉一次注定失败的 HTTP
         if (!enabled) {
             log.debug("[NLP] 已禁用（nlp.enabled=false），跳过调用；本次降级为空 9 类，术语归一无可归内容");
             return null;
         }
         try {
+            // 2. POST 文本到抽取服务
             String body = mapper.writeValueAsString(Map.of("text", text));
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(serviceUrl + "/api/nlp/extract"))
@@ -92,6 +96,7 @@ public class PythonNlpClient {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            // 3. 非 200 一律降级，不解析错误响应体
             if (response.statusCode() != 200) {
                 log.warn("[NLP] 调用失败: HTTP {}（{}），已降级为空 9 类、modelAvailable=false，术语归一无可归内容",
                         response.statusCode(), serviceUrl);
@@ -99,6 +104,7 @@ public class PythonNlpClient {
             }
             return mapper.readValue(response.body(), NlpExtractVO.class);
         } catch (Exception e) {
+            // 4. 连不上/超时/解析失败都降级：抽取是增强项，不能拖垮主流程
             log.warn("[NLP] 调用异常（{}），已降级为空 9 类、modelAvailable=false，术语归一无可归内容: {}",
                     serviceUrl, e.getMessage());
             return null;

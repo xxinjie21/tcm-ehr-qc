@@ -36,10 +36,12 @@ public final class StructuredDataMeta {
      * @return 打点后的 JSON；解析/序列化失败时原样返回，绝不因打点失败而丢数据
      */
     public static String stamp(ObjectMapper mapper, String json, String dictVersion) {
+        // 1. 没内容或没版本号就不打点，原样返回
         if (json == null || json.isBlank() || dictVersion == null || dictVersion.isBlank()) {
             return json;
         }
         try {
+            // 2. 解析后塞 _meta（版本 + 打点时刻），再序列化回去
             Map<String, Object> data = mapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
             Map<String, Object> meta = new LinkedHashMap<>();
@@ -48,6 +50,7 @@ public final class StructuredDataMeta {
             data.put(META_KEY, meta);
             return mapper.writeValueAsString(data);
         } catch (Exception e) {
+            // 3. 打点失败原样返回：宁可没有版本信息，也不能弄丢结构化数据本身
             return json;
         }
     }

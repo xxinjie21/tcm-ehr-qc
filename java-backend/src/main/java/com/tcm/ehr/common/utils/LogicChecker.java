@@ -25,10 +25,13 @@ public final class LogicChecker {
      */
     public static List<String> check(Map<String, Object> data, List<QcRuleSet.ConsistencyRule> rules) {
         List<String> conflicts = new ArrayList<>();
+        // 1. 没规则或没数据就无冲突可判
         if (rules == null || data == null) {
             return conflicts;
         }
+        // 2. 逐条规则独立判定，一条冲突记一项（便于前端逐条显示与扣分）
         for (QcRuleSet.ConsistencyRule rule : rules) {
+            // 规则自身配置不全（缺类型或缺值）→ 跳过，不能拿半条规则去判病历
             if (rule.getTriggerType() == null || rule.getExpectType() == null
                     || rule.getTriggerValues() == null || rule.getTriggerValues().isEmpty()
                     || rule.getExpectValues() == null || rule.getExpectValues().isEmpty()) {
@@ -36,7 +39,7 @@ public final class LogicChecker {
             }
             List<String> triggers = listOf(data, rule.getTriggerType());
             List<String> expects = listOf(data, rule.getExpectType());
-            // 触发类型无该实体 → 不适用
+            // 3. 触发类型无该实体 → 不适用
             if (triggers.isEmpty()) {
                 continue;
             }
@@ -48,6 +51,7 @@ public final class LogicChecker {
             if (expects.isEmpty()) {
                 continue;
             }
+            // 4. 触发条件满足、期望条件一条都不满足才算冲突
             boolean ok = expects.stream().anyMatch(e -> anyContains(e, rule.getExpectValues()));
             if (!ok) {
                 String name = rule.getName() == null ? "一致性" : rule.getName();
@@ -60,10 +64,12 @@ public final class LogicChecker {
     /** 取某实体类型在结构化数据中的实体文本列表（herbs 取 name，其余取 content） */
     private static List<String> listOf(Map<String, Object> data, String type) {
         List<String> out = new ArrayList<>();
+        // 1. 类型未登记或该 key 不是列表 → 空结果
         EntityTypes.EntityType t = EntityTypes.byKey(type);
         if (t == null || !(data.get(t.structuredKey()) instanceof List<?> list)) {
             return out;
         }
+        // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
         for (Object item : list) {
             if (item instanceof Map<?, ?> m) {
                 Object v = m.get("content") != null ? m.get("content") : m.get("name");
@@ -85,9 +91,11 @@ public final class LogicChecker {
 
     /** 文本是否包含任一关键词（contains 语义，不做分词） */
     private static boolean anyContains(String text, List<String> keys) {
+        // 1. 文本为空无从匹配
         if (text == null) {
             return false;
         }
+        // 2. 任一非空关键词被包含即算命中（contains 语义，不做分词）
         for (String k : keys) {
             if (k != null && !k.isBlank() && text.contains(k)) {
                 return true;

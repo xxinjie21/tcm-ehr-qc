@@ -19,6 +19,7 @@ public class MybatisPlusConfig {
      * @return MyBatis-Plus 拦截器链
      */
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        // 1. 只挂分页插件；DbType 必须显式给 MySQL，否则多数据源场景会猜错方言
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
         return interceptor;

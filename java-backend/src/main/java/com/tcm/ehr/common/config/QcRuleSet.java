@@ -108,7 +108,7 @@ public class QcRuleSet {
     public static QcRuleSet defaults() {
         QcRuleSet r = new QcRuleSet();
 
-        // 完整性 6 要素（症状/疾病/证候/舌象/脉象/中药），取自实体类型目录
+        // 1. 完整性 6 要素（症状/疾病/证候/舌象/脉象/中药），取自实体类型目录
         for (String key : List.of("symptom", "disease", "pattern", "tongue", "pulse", "herb")) {
             EntityTypes.EntityType t = EntityTypes.byKey(key);
             r.completeness.elements.add(el(t.label(), t.structuredKey(), t.fallback()));
@@ -153,7 +153,7 @@ public class QcRuleSet {
         r.consistency.add(rule("肾阴亏虚-方剂", "pattern", List.of("肾阴亏虚", "虚阳上亢"),
                 "formula", List.of("知柏地黄丸")));
 
-        // 术语标准化
+        // 2. 术语标准化：覆盖全部 5 类词典类型，每处 1 分、封顶 5 分
         r.standardization.setEnabled(true);
         r.standardization.setElementTypes(new ArrayList<>(EntityTypes.dictKeys()));
         r.standardization.setWeightEach(1);
@@ -164,6 +164,7 @@ public class QcRuleSet {
     }
 
     private static Element el(String name, String source, List<String> fallback) {
+        // 兜底字段列要新建一份 ArrayList：规则集可能被序列化后复用，不能共享入参列表
         Element e = new Element();
         e.setName(name);
         e.setSource(source);
@@ -184,6 +185,7 @@ public class QcRuleSet {
 
     private static ConsistencyRule rule(String name, String triggerType, List<String> triggerValues,
                                         String expectType, List<String> expectValues) {
+        // 触发/期望两组值都要拷贝成新列表
         ConsistencyRule c = new ConsistencyRule();
         c.setName(name);
         c.setTriggerType(triggerType);

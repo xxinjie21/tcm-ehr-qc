@@ -246,7 +246,7 @@ public final class QcScorer {
 
     /** 术语类型 → 结构化 key */
     private static String keyOf(String type) {
-        // 只映射参与标准化判定的 5 类；其余类型不查词典
+        // 1. 只映射参与标准化判定的 5 类；其余类型不查词典
         return switch (type) {
             case "disease" -> "diseases";
             case "pattern" -> "patternList";
@@ -278,7 +278,7 @@ public final class QcScorer {
     }
 
     private static String reasonFor(com.tcm.ehr.common.config.QcRuleSet.Element el, boolean rawHas) {
-        // 两档给不同说法：用户要能分清「该写没写」和「写了没抽出来」
+        // 1. 两档给不同说法：用户要能分清「该写没写」和「写了没抽出来」
         if (rawHas) {
             return "结构化结果中无" + el.getName() + "（原始病历有记录，可能未被抽取）";
         }

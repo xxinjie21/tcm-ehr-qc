@@ -25,10 +25,13 @@ public record LlmConfig(boolean enabled, String provider, String baseUrl, String
      * @return 合法值 {@code ollama} / {@code openai}；其他返回 {@code null}
      */
     public static String normalizeProvider(String provider) {
+        // 1. 空值给 null（由调用方给默认值或报错）
         if (provider == null) {
             return null;
         }
+        // 2. 去空白并统一小写，容忍 "OpenAI" / " openai " 这类输入
         String v = provider.trim().toLowerCase();
+        // 3. 不认识的通道给 null，不猜
         return (PROVIDER_OLLAMA.equals(v) || PROVIDER_OPENAI.equals(v)) ? v : null;
     }
 }

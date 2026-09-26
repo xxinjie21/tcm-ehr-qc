@@ -37,12 +37,15 @@ public final class RequestUtils {
      * 本项目不经过 nginx，实际取到的就是 remoteAddr（127.0.0.1）。
      */
     public static String currentIp() {
+        // 1. 非 Web 线程没有 IP
         HttpServletRequest request = currentRequest();
         if (request == null) {
             return UNKNOWN;
         }
+        // 2. 三级降级：XFF 首个地址 → X-Real-IP → remoteAddr
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
+            // XFF 是「客户端, 代理1, 代理2」，第一个才是原始客户端
             int comma = forwarded.indexOf(',');
             String first = comma > 0 ? forwarded.substring(0, comma) : forwarded;
             return first.trim();
@@ -58,14 +61,17 @@ public final class RequestUtils {
     /** 取请求属性（鉴权拦截器写入的角色等）；无请求上下文或取不到时返回 unknown */
     private static String attr(String key) {
         try {
+            // 1. 从当前请求属性里取
             Object value = RequestContextHolder.currentRequestAttributes()
                     .getAttribute(key, RequestAttributes.SCOPE_REQUEST);
             if (value == null) {
                 return UNKNOWN;
             }
+            // 2. 空白与字面 "null" 都算取不到（属性可能被序列化成字符串 "null"）
             String text = String.valueOf(value);
             return text.isBlank() || "null".equals(text) ? UNKNOWN : text;
         } catch (Exception e) {
+            // 3. 无请求上下文也返回 unknown，不抛给业务代码
             return UNKNOWN;
         }
     }
@@ -74,6 +80,7 @@ public final class RequestUtils {
     private static HttpServletRequest currentRequest() {
         try {
             RequestAttributes attributes = RequestContextHolder.currentRequestAttributes();
+            // 不是 Servlet 上下文（如 reactive）也当没有
             return attributes instanceof ServletRequestAttributes sra ? sra.getRequest() : null;
         } catch (Exception e) {
             return null;
