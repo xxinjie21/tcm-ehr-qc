@@ -32,7 +32,7 @@ import java.time.Duration;
  * DeepSeek / 通义 / 智谱等改 {@code llm.base-url} 即可接入）。
  * <b>判定地基仍是规则引擎</b>——评分 / 分级 / 归一不依赖本类，本类只负责把规则结论叙述成人话。</p>
  *
- * <p><b>三条硬约束</b>（与《后续开发方案》§8.1 一致）：</p>
+ * <p><b>三条硬约束</b>（与《开发指南与待办》「二、开发规范 · 后端」一致）：</p>
  * <ol>
  * <li><b>不阻塞启动</b>：{@code ChatClient} 懒构造，首次调用才装配；配置缺失或非法只降级，
  * 绝不抛到启动期。Spring AI 的 {@code OpenAi*AutoConfiguration} 在缺 api-key 时会急切校验凭据、
