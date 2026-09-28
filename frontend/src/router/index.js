@@ -2,8 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
-// 已登录用户的合法角色（与后端 AuthServiceImpl 的 ROLE_ADMIN / ROLE_AUDITOR 一致）
-const KNOWN_ROLES = ['管理员', '审核员']
+// 已登录用户的合法系统级角色（与后端一致：管理员 / 用户。
+// 组长、组员、待分配池在前端都归「用户」，组内区分看 groupRole）
+const KNOWN_ROLES = ['管理员', '用户']
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
@@ -13,16 +14,18 @@ const routes = [
     component: () => import('@/layouts/MainLayout.vue'),
     redirect: '/dashboard',
     children: [
-      // 双角色（meta.title 与登录返回的 menus 名称一致，MainLayout 按 menus 渲染）
-      { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '首页看板', roles: ['管理员', '审核员'] } },
-      { path: 'review', name: 'Review', component: () => import('@/views/Review.vue'), meta: { title: '人工复核', roles: ['管理员', '审核员'] } },
-      // 仅管理员
-      { path: 'records', name: 'Records', component: () => import('@/views/Records.vue'), meta: { title: '病历数据', roles: ['管理员'] } },
-      { path: 'nlp-extract', name: 'NlpExtract', component: () => import('@/views/NlpExtract.vue'), meta: { title: '结构化解析', roles: ['管理员'] } },
-      { path: 'qc-check', name: 'QcCheck', component: () => import('@/views/Qc.vue'), meta: { title: '质控校验', roles: ['管理员'] } },
-      { path: 'governance', name: 'Governance', component: () => import('@/views/Governance.vue'), meta: { title: '清洗与导出', roles: ['管理员'] } },
-      { path: 'dictionary', name: 'Dictionary', component: () => import('@/views/Dictionary.vue'), meta: { title: '术语词典', roles: ['管理员'] } },
-      { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '日志审计', roles: ['管理员'] } }
+      // meta.title 与登录返回的 menus 名称一致，MainLayout 按 menus 渲染侧栏
+      { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '首页看板' } },
+      { path: 'review', name: 'Review', component: () => import('@/views/Review.vue'), meta: { title: '人工复核' } },
+      { path: 'records', name: 'Records', component: () => import('@/views/Records.vue'), meta: { title: '病历数据' } },
+      { path: 'nlp-extract', name: 'NlpExtract', component: () => import('@/views/NlpExtract.vue'), meta: { title: '结构化解析' } },
+      { path: 'qc-check', name: 'QcCheck', component: () => import('@/views/Qc.vue'), meta: { title: '质控校验' } },
+      { path: 'governance', name: 'Governance', component: () => import('@/views/Governance.vue'), meta: { title: '清洗与导出' } },
+      { path: 'dictionary', name: 'Dictionary', component: () => import('@/views/Dictionary.vue'), meta: { title: '术语词典' } },
+      { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '日志审计' } },
+      // 阶段2：课题组管理（仅管理员）与我的课题组（组长/组员/申请人）
+      { path: 'groups', name: 'Groups', component: () => import('@/views/Groups.vue'), meta: { title: '课题组管理', roles: ['管理员'] } },
+      { path: 'my-group', name: 'MyGroup', component: () => import('@/views/MyGroup.vue'), meta: { title: '我的课题组' } }
     ]
   }
 ]
@@ -33,38 +36,37 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  // 1. 取用户 store 与公开页标记
   const userStore = useUserStore()
   const isPublic = to.path === '/login' || to.path === '/register'
 
-  // 未登录只能访问公开页
   if (!isPublic && !userStore.token) {
-    // 2. 回登录页
     return '/login'
   }
   if (isPublic) {
-    // 3. 公开页直接放行
     return true
   }
-  // 登录态存在但角色缺失或非法（localStorage 被清、旧版本残留）→ 强制重新登录。
-  // 若在此放行，下面的角色守卫会把自己重定向到 /dashboard，形成无限循环。
+  // 登录态存在但角色缺失或非法（localStorage 被清、旧版本残留）→ 强制重新登录
   if (!KNOWN_ROLES.includes(userStore.role)) {
-    // 4. 强制回登录页重登
     return '/login'
   }
-  // 角色守卫：直输管理页 URL 时退回角色落地页，不进入无权限页面
+  // 角色守卫：直输管理页 URL 时退回落地页
   const roles = to.meta && to.meta.roles
   if (roles && !roles.includes(userStore.role)) {
-    // 5. 提示无权限并退回角色落地页
     ElMessage.error('无权限访问该页面')
     return '/dashboard'
+  }
+  // 无组用户的落地页（阶段2 §7.2）：路由守卫把数据页全拦到「我的课题组」，
+  // 由 MyGroup.vue 按身份渲染「待分配池 / 审批中」引导文案。
+  // 哪些页面算「数据页」：7 个数据处理页 + 日志审计 + 术语词典（管理员不受影响）。
+  if (!userStore.hasGroup && userStore.role !== '管理员'
+      && to.path !== '/my-group' && to.name !== 'MyGroup') {
+    return '/my-group'
   }
   return true
 })
 
 const APP_NAME = '中医电子病历质控与标准化系统'
 
-// 浏览器标签页标题随页面变化
 router.afterEach((to) => {
   const title = to.meta && to.meta.title
   document.title = title ? `${title} · ${APP_NAME}` : APP_NAME

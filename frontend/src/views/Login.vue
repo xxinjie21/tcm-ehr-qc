@@ -39,7 +39,7 @@
 
     <!-- U13：演示账号提示 -->
     <div class="auth-demo">
-      <b>演示账号</b>　管理员 <code>admin / 123456</code>　｜　审核员 <code>auditor / 123456</code>
+      <b>演示账号</b>　管理员 <code>admin / 123456</code>　｜　组长 <code>auditor / 123456</code>（已在默认课题组），注册新账号入待分配池等组长拉入
     </div>
   </AuthShell>
 </template>

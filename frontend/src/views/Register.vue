@@ -3,7 +3,23 @@
     <h3>注册新账号</h3>
     <p class="hint">注册后可直接登录系统</p>
 
-    <div class="auth-role-tip">注册账号角色为「审核员」，管理员账号由系统预置。</div>
+    <div class="auth-role-tip">注册账号为「用户」（组长/组员/待分配池），管理员账号由系统预置。</div>
+
+    <!-- 阶段 2：可选「同时创建课题组」（代码必填、名称必填） -->
+    <el-collapse v-model="form.groupOpen" class="group-collapse">
+      <el-collapse-item title="同时创建课题组（可选）" name="group">
+        <p class="hint">勾选后提交会注册并申请建组，等管理员审批=你成为组长。不选则入待分配池等组长拉入。</p>
+        <el-form-item v-if="form.groupOpen" label="课题组编码" prop="groupCode">
+          <el-input v-model="form.groupCode" placeholder="如 NEURO-2026（2~50 位字母数字短横线下划线）" size="large" />
+        </el-form-item>
+        <el-form-item v-if="form.groupOpen" label="课题组名称" prop="groupName">
+          <el-input v-model="form.groupName" placeholder="组名可重复，最长 100 字" size="large" />
+        </el-form-item>
+        <el-form-item v-if="form.groupOpen" label="用途说明（可选）">
+          <el-input v-model="form.groupPurpose" type="textarea" :rows="2" placeholder="供管理员审批判断" />
+        </el-form-item>
+      </el-collapse-item>
+    </el-collapse>
 
     <!-- 回车提交提到表单容器，任一输入框回车都生效-->
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @keyup.enter="handleRegister">
@@ -61,7 +77,7 @@ const router = useRouter()
 const formRef = ref(null)
 const loading = ref(false)
 
-const form = reactive({ username: '', password: '', confirmPassword: '' })
+const form = reactive({ username: '', password: '', confirmPassword: '', groupOpen: false, groupCode: '', groupName: '', groupPurpose: '' })
 
 // 密码变了，上一次「确认密码」的一致性结论就失效，需要重新判定
 watch(
@@ -99,7 +115,12 @@ const rules = {
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少 6 位', trigger: 'blur' }
   ],
-  confirmPassword: [{ required: true, validator: validateConfirm, trigger: 'blur' }]
+  confirmPassword: [{ required: true, validator: validateConfirm, trigger: 'blur' }],
+  groupCode: [
+    { required: true, whitespace: true, message: '请输入课题组编码', trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9_-]{2,50}$/, message: '编码为 2~50 位字母、数字、短横线或下划线', trigger: 'blur' }
+  ],
+  groupName: [{ required: true, whitespace: true, message: '请输入课题组名称', trigger: 'blur' }]
 }
 
 // 提交注册：校验通过后只提交用户名与密码（角色由后端固定为审核员）；
@@ -111,11 +132,18 @@ const handleRegister = async () => {
   // 2. 置加载态：按钮转圈，避免重复提交
   loading.value = true
   try {
-    // 仅提交用户名与密码；角色由后端固定为审核员
-    await register({ username: form.username, password: form.password })
-    // 3. 提示成功，并带用户名跳回登录页回填
-    ElMessage.success('注册成功，请登录')
-    // 带上用户名回填登录页，用户只需再输密码
+    // 构建请求体：同时建组时勾上 createGroup；角色由后端固定为「用户」
+    const payload = { username: form.username, password: form.password }
+    if (form.groupOpen) {
+      payload.createGroup = {
+        code: form.groupCode,
+        name: form.groupName,
+        purpose: form.groupPurpose || undefined
+      }
+    }
+    await register(payload)
+    // 3. 提示成功：建组请求与单纯注册用不同的口径提示
+    ElMessage.success(form.groupOpen ? '课题组申请已提交，等待管理员审批' : '注册成功，请等待课题组接收')
     router.push({ path: '/login', query: { username: form.username } })
   } catch {
     // 拦截器已提示（如用户名已存在）

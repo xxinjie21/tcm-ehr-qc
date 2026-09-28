@@ -282,7 +282,7 @@
       </el-tab-pane>
 
       <!-- ============ 批量解析============ -->
-      <el-tab-pane v-if="isAdmin" label="批量解析" name="batch" lazy>
+      <el-tab-pane label="批量解析" name="batch" lazy>
         <PanelCard title="批量结构化解析">
           <div class="tip">
             选定范围后提交，由<b>后台任务</b>逐条抽取并写入病历。提交后可关闭本页，任务在服务端继续；
@@ -711,8 +711,6 @@ const save = async () => {
 
 // ===== 批量解析=====
 const userStore = useUserStore()
-// 批量解析入口仅管理员可见（与后端权限一致，前端只做入口收敛）
-const isAdmin = computed(() => userStore.role === '管理员')
 
 // §七 L4：上限与目标数据集规模对齐（40000），同时是后端 NlpBatchDTO.limit 的 @Max
 // 默认值也从 1000 提到 40000：用户要批量解析时常常就是「全部」，

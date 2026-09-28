@@ -22,10 +22,7 @@
         @click="go('/governance', '清洗与导出')"
       >
         <span class="todo-num">{{ govern.pendingGovern }}</span>
-        <span class="todo-lbl">
-          待清洗 <span v-if="canVisit('清洗与导出')">›</span>
-          <span v-else class="todo-lock">仅管理员</span>
-        </span>
+        <span class="todo-lbl">待清洗 <span v-if="canVisit('清洗与导出')">›</span></span>
       </button>
       <!-- 「病历总数」原来也在这里占一张可点卡片，但它没有动作语义（点进去只是跳质控页），
            而且与下方指标卡的同一个数字重复。待办条只留动作型入口，数字看指标卡。 -->
@@ -125,7 +122,7 @@ const canVisit = (menuTitle) => (userStore.menus || []).includes(menuTitle)
 // 待办卡片跳转：先按菜单判断可达性，无权限时只提示不跳转（避免点了才被 403 弹回）
 const go = (path, menuTitle) => {
   if (!canVisit(menuTitle)) {
-    ElMessage.info(`「${menuTitle}」仅管理员可访问`)
+    ElMessage.info(`「${menuTitle}」不在你的菜单里，不可访问`)
     return
   }
   router.push(path)

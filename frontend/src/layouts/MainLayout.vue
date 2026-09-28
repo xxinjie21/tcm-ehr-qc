@@ -13,7 +13,7 @@
           导入 LLM
         </el-button>
         <span class="avatar" aria-hidden="true">{{ userStore.role?.charAt(0) || '用' }}</span>
-        <span>{{ userStore.role || '用户' }}</span>
+        <span>{{ roleLabel }}</span>
         <el-button link class="logout" @click="handleLogout">退出</el-button>
       </div>
     </header>
@@ -80,12 +80,14 @@ const ALL_MENUS = [
   { group: '数据处理', title: '人工复核', path: '/review' },
   { group: '数据处理', title: '清洗与导出', path: '/governance' },
   { group: '系统配置', title: '术语词典', path: '/dictionary' },
-  { group: '系统配置', title: '日志审计', path: '/audit-log' }
+  { group: '系统配置', title: '日志审计', path: '/audit-log' },
+  { group: '系统配置', title: '课题组管理', path: '/groups' },
+  { group: '系统配置', title: '我的课题组', path: '/my-group' }
 ]
 
 const GROUP_ORDER = ['数据处理', '系统配置']
 
-// 管理员 8 项全量；审核员仅「首页看板 + 人工复核」（与 AuthServiceImpl 一致）；空分组不渲染
+// 菜单由登录响应的 menus 决定（与 AuthServiceImpl 一致）；空分组不渲染
 const menuGroups = computed(() => {
   const allowed = userStore.menus || []
   return GROUP_ORDER
@@ -106,6 +108,13 @@ const breadcrumb = computed(() => {
 
 /** LLM 配置入口仅管理员可见（后端接口同为【权限：仅管理员】，前端只是不展示无效入口） */
 const isAdmin = computed(() => userStore.role === '管理员')
+/** 身份下标：管理员 / 组长 / 组员 / 待分配池 / 审批中 */
+const roleLabel = computed(() => {
+  if (userStore.role === '管理员') return '管理员'
+  if (userStore.groupRole === 'owner') return '组长'
+  if (userStore.hasGroup) return '组员'
+  return userStore.pendingGroup ? '审批中' : '待分配池'
+})
 const llmVisible = ref(false)
 
 // 退出登录：清除本地登录状态后跳回登录页
