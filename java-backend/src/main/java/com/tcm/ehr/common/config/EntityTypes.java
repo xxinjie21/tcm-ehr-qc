@@ -50,18 +50,24 @@ public final class EntityTypes {
                     List.of(), 9)
     );
 
-    private static final Map<String, EntityType> BY_KEY = new LinkedHashMap<>();
-    private static final Map<String, EntityType> DICT_BY_STRUCTURED = new LinkedHashMap<>();
+    // P5.4：构建期用临时可变表，构建完即包成 unmodifiable 后赋给 final 字段，
+    // 避免全局共享的 static map 被外部代码意外修改（单一来源被破坏难排查）。
+    private static final Map<String, EntityType> BY_KEY;
+    private static final Map<String, EntityType> DICT_BY_STRUCTURED;
 
     static {
+        Map<String, EntityType> byKey = new LinkedHashMap<>();
+        Map<String, EntityType> dictByStructured = new LinkedHashMap<>();
         List<EntityType> sorted = new ArrayList<>(ALL);
         sorted.sort((a, b) -> Integer.compare(a.order(), b.order()));
         for (EntityType t : sorted) {
-            BY_KEY.put(t.key(), t);
+            byKey.put(t.key(), t);
             if (t.dict()) {
-                DICT_BY_STRUCTURED.put(t.structuredKey(), t);
+                dictByStructured.put(t.structuredKey(), t);
             }
         }
+        BY_KEY = java.util.Collections.unmodifiableMap(byKey);
+        DICT_BY_STRUCTURED = java.util.Collections.unmodifiableMap(dictByStructured);
     }
 
     private EntityTypes() {

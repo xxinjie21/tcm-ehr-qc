@@ -288,39 +288,6 @@ components:
           type: string
         summary:
           $ref: '#/components/schemas/ImportSummaryVO'
-    ImportStatusVO:
-      type: object
-      description: 导入进度（出参）
-      properties:
-        taskId:
-          type: string
-        status:
-          type: string
-          enum:
-            - 处理中
-            - 已完成
-        total:
-          type: integer
-          description: 有效数据行总数
-        processed:
-          type: integer
-          description: 已处理行数
-        success:
-          type: integer
-          description: 成功入库数
-        failed:
-          type: integer
-          description: 失败数
-        failures:
-          type: array
-          description: 失败明细（文件名 + 原因）
-          items:
-            type: object
-            properties:
-              filename:
-                type: string
-              reason:
-                type: string
     CreateRecordDTO:
       type: object
       description: 单条新增病历请求（入参，21个字段）
@@ -1717,41 +1684,6 @@ paths:
                 $ref: '#/components/schemas/ErrorVO'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-  /api/records/import/{taskId}/status:
-    get:
-      tags:
-        - 病历管理
-      summary: 导入进度查询
-      description: 【权限：登录即可】查询批量导入任务处理进度。任务状态暂存服务内存，服务重启后丢失
-      parameters:
-        - name: taskId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: 任务状态
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 200
-                  data:
-                    $ref: '#/components/schemas/ImportStatusVO'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: 任务不存在或服务重启后任务状态丢失
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'
   /api/records:

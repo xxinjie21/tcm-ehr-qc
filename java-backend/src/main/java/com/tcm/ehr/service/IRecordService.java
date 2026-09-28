@@ -8,7 +8,6 @@ import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CreateRecordVO;
 import com.tcm.ehr.domain.vo.DeleteRecordsVO;
-import com.tcm.ehr.domain.vo.ImportStatusVO;
 import com.tcm.ehr.domain.vo.ImportTaskVO;
 import com.tcm.ehr.domain.vo.RawRecordVO;
 import com.tcm.ehr.domain.vo.SearchVO;
@@ -24,21 +23,13 @@ import java.util.Map;
 public interface IRecordService extends IService<Record> {
 
     /**
-     * 批量导入病历。
+     * Excel 批量导入病历（同步执行，返回即本轮完成）。
      *
-     * @param files       病历文件（.xlsx/.xls）
-     * @param autoExtract 是否在入库后投递后台批量解析任务
-     * @return taskId=导入任务ID；summary=本轮成功/失败条数与失败明细
+     * @param files       .xlsx / .xls 文件，单次 ≤20 个、单文件 ≤50MB
+     * @param autoExtract 导入后是否自动投递后台结构化解析任务
+     * @return taskId=本次标识；summary=成功/失败条数与失败明细
      */
     ImportTaskVO importRecords(MultipartFile[] files, boolean autoExtract);
-
-    /**
-     * 查询导入进度。
-     *
-     * @param taskId 导入任务ID
-     * @return 任务状态与进度；任务不存在（含服务重启）返回 {@code null}，由 Controller 转 404
-     */
-    ImportStatusVO importStatus(String taskId);
 
     /**
      * 单条新增病历。

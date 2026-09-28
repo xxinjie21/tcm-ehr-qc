@@ -10,7 +10,6 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.vo.CreateRecordVO;
 import com.tcm.ehr.domain.vo.DeleteRecordsVO;
-import com.tcm.ehr.domain.vo.ImportStatusVO;
 import com.tcm.ehr.domain.vo.ImportTaskVO;
 import com.tcm.ehr.domain.vo.RawRecordVO;
 import com.tcm.ehr.domain.vo.SearchVO;
@@ -59,24 +58,6 @@ public class RecordController {
                 "成功" + vo.getSummary().getSuccess() + "条，失败" + vo.getSummary().getFailed() + "条"
                         + (vo.getAutoExtractTaskId() == null ? "" : "，已提交后台解析"));
         return Result.ok(vo);
-    }
-
-    /**
-     * 查询导入任务进度。
-     *
-     * <p>【权限：登录即可】进度存在内存中，服务重启后查询返回 404。</p>
-     *
-     * @param taskId 导入任务ID
-     * @return status=任务状态；processed/success/failed=处理进度
-     */
-    @GetMapping("/api/records/import/{taskId}/status")
-    public ResponseEntity<Result<ImportStatusVO>> importStatus(@PathVariable String taskId) {
-        // 1. 进度在内存里，任务不存在与"服务重启后丢失"是同一种表现
-        ImportStatusVO vo = recordService.importStatus(taskId);
-        if (vo == null) {
-            return ResponseEntity.status(404).body(Result.error(404, "任务不存在或服务重启后任务状态丢失"));
-        }
-        return ResponseEntity.ok(Result.ok(vo));
     }
 
     /**

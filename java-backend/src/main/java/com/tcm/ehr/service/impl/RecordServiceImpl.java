@@ -17,7 +17,6 @@ import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CreateRecordVO;
 import com.tcm.ehr.domain.vo.DeleteRecordsVO;
-import com.tcm.ehr.domain.vo.ImportStatusVO;
 import com.tcm.ehr.domain.vo.ImportSummaryVO;
 import com.tcm.ehr.domain.vo.ImportTaskVO;
 import com.tcm.ehr.domain.vo.RawRecordVO;
@@ -42,7 +41,6 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -85,31 +83,34 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     private static final int DELETE_CHUNK = 500;
 
     /** 表头中文名 → 字段标识（与 docs/电子病历精简脱敏数据_500行.xlsx 的表头一致） */
-    private static final Map<String, String> HEADER_FIELD = new LinkedHashMap<>();
+    // P5.4：构建期填充，完成后 unmodifiable（同 EntityTypes）
+    private static final Map<String, String> HEADER_FIELD;
 
     static {
-        HEADER_FIELD.put("登记号", "registrationNo");
-        HEADER_FIELD.put("门诊号", "outpatientNo");
-        HEADER_FIELD.put("性别", "gender");
-        HEADER_FIELD.put("年龄", "age");
-        HEADER_FIELD.put("就诊次数", "visitCount");
-        HEADER_FIELD.put("西医诊断", "westernDiagnosis");
-        HEADER_FIELD.put("中医诊断", "tcmDiagnosis");
-        HEADER_FIELD.put("现病史", "presentIllness");
-        HEADER_FIELD.put("主诉", "chiefComplaint");
-        HEADER_FIELD.put("自诉", "selfReport");
-        HEADER_FIELD.put("望诊", "inspection");
-        HEADER_FIELD.put("脉诊", "pulse");
-        HEADER_FIELD.put("舌诊", "tongue");
-        HEADER_FIELD.put("查体", "physicalExam");
-        HEADER_FIELD.put("辨证结论", "pattern");
-        HEADER_FIELD.put("证型", "pattern"); // 兼容旧表头
-        HEADER_FIELD.put("草药", "prescription");
-        HEADER_FIELD.put("随访", "followUp");
-        HEADER_FIELD.put("治疗效果", "treatmentEffect");
-        HEADER_FIELD.put("开单科室", "department");
-        HEADER_FIELD.put("医生工号", "doctorId");
-        HEADER_FIELD.put("接诊时间", "visitTime");
+        Map<String, String> header = new LinkedHashMap<>();
+        header.put("登记号", "registrationNo");
+        header.put("门诊号", "outpatientNo");
+        header.put("性别", "gender");
+        header.put("年龄", "age");
+        header.put("就诊次数", "visitCount");
+        header.put("西医诊断", "westernDiagnosis");
+        header.put("中医诊断", "tcmDiagnosis");
+        header.put("现病史", "presentIllness");
+        header.put("主诉", "chiefComplaint");
+        header.put("自诉", "selfReport");
+        header.put("望诊", "inspection");
+        header.put("脉诊", "pulse");
+        header.put("舌诊", "tongue");
+        header.put("查体", "physicalExam");
+        header.put("辨证结论", "pattern");
+        header.put("证型", "pattern"); // 兼容旧表头
+        header.put("草药", "prescription");
+        header.put("随访", "followUp");
+        header.put("治疗效果", "treatmentEffect");
+        header.put("开单科室", "department");
+        header.put("医生工号", "doctorId");
+        header.put("接诊时间", "visitTime");
+        HEADER_FIELD = java.util.Collections.unmodifiableMap(header);
     }
 
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -120,32 +121,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /** 导入告警里最多列几条「接诊时间」解析失败样例；全列出来会把日志刷爆 */
     private static final int VISIT_TIME_WARN_SAMPLE_MAX = 10;
 
-    /** 内存里最多保留多少条导入任务状态；超出淘汰最早的 */
-    private static final int TASK_STORE_MAX = 200;
-
-    /** 导入任务状态（内存；重启丢失，符合 openapi 约定） */
-    private final Map<String, ImportStatusVO> taskStore = newTaskStore(TASK_STORE_MAX);
-
-    /**
-     * 有界任务表：超过上限就淘汰最早插入的那条。
-     *
-     * <p>原来是无上限的 {@code ConcurrentHashMap} 且全文件没有 {@code remove} ——
-     * 每次导入新增一条（还带失败明细），长期运行内存持续增长（审查报告 M5）。</p>
-     *
-     * <p>用 {@code LinkedHashMap.removeEldestEntry} 做有界是零依赖的做法（仓库里没有 Caffeine）；
-     * 外面套 {@code synchronizedMap} 保持线程安全 —— 导入与查进度是两个请求线程。</p>
-     *
-     * <p>不做 TTL：任务状态是给导入后回看用的，有界即可，不值得为它加依赖或定时任务。</p>
-     */
-    static Map<String, ImportStatusVO> newTaskStore(int maxEntries) {
-        // 匿名内部类 + 菱形推断会退化成 LinkedHashMap<Object,Object>，这里显式写泛型
-        return Collections.synchronizedMap(new LinkedHashMap<String, ImportStatusVO>(16, 0.75f, false) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, ImportStatusVO> eldest) {
-                return size() > maxEntries;
-            }
-        });
-    }
 
     /**
      * Excel 批量导入病历（同步执行，返回即本轮完成）。
@@ -171,12 +146,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             throw new IllegalArgumentException("单次最多上传 " + MAX_FILES + " 个文件");
         }
 
-        // 2. 建立内存任务状态（重启即失），供进度查询
+        // 2. 任务 ID：仅作本次请求的回执标识（P5.11：导入是同步的，不再维护内存进度表）
         String taskId = UUID.randomUUID().toString();
-        ImportStatusVO status = new ImportStatusVO();
-        status.setTaskId(taskId);
-        status.setStatus("处理中");
-        taskStore.put(taskId, status);
 
         // 3. 初始化导入摘要与批内去重容器
         ImportSummaryVO summary = new ImportSummaryVO();
@@ -242,13 +213,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
 
         // 8. 回填任务状态、摘要与返回体
-        status.setStatus("已完成");
-        status.setTotal(summary.getTotal());
-        status.setProcessed(summary.getTotal());
-        status.setSuccess(summary.getSuccess());
-        status.setFailed(summary.getFailed());
-        status.setFailures(summary.getFailures());
-
         ImportTaskVO vo = new ImportTaskVO();
         vo.setTaskId(taskId);
         vo.setSummary(summary);
@@ -360,18 +324,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             r.setGroupId(RequestUtils.currentGroupId());
             toInsert.add(r);
         }
-    }
-
-    /**
-     *
-     * <p>读取内存任务表；任务不存在（含服务重启后丢失）时返回 null，由上层转成 404。</p>
-     *
-     * @param taskId 导入任务 ID
-     * @return 任务状态；不存在时为 null
-     */
-    @Override
-    public ImportStatusVO importStatus(String taskId) {
-        return taskStore.get(taskId);
     }
 
     /**
