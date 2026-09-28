@@ -89,6 +89,7 @@
 <script setup>
 // 首页看板：待办快捷条 + 指标卡 + 两张图（趋势折线、评分分布柱状）。
 // 数据来自 /stats/overview（指标卡）与 /stats/extra（图表），筛选条件只影响后者。
+import { useDepartments } from '@/composables/useDepartments'
 import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -97,7 +98,7 @@ import StatsFilter from '@/components/StatsFilter.vue'
 import StatCard from '@/components/StatCard.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
-import { getOverview, getExtraStats, getDepartments } from '@/api/stats'
+
 import { governanceStats } from '@/api/governance'
 import { useUserStore } from '@/stores/user'
 
@@ -105,17 +106,8 @@ const router = useRouter()
 const userStore = useUserStore()
 
 // 科室选项取自后端，与站内其他筛选器同一数据源
-const departments = ref([])
-// 拉取科室下拉选项；失败退化为空列表，筛选器仍可用日期区间查询
-const loadDepartments = async () => {
-  try {
-    const res = await getDepartments()
-    departments.value = res.data || []
-  } catch {
-    // 拉取失败退化为空列表，筛选器仍可用日期区间查询
-    departments.value = []
-  }
-}
+// 科室下拉选项（缓存：useDepartments 单例）
+const { departments, reload: loadDepartments } = useDepartments()
 
 // 待办卡片按登录返回的菜单判断可达性；无权限时置灰并说明原因
 const canVisit = (menuTitle) => (userStore.menus || []).includes(menuTitle)

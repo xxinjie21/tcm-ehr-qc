@@ -51,7 +51,7 @@
           <el-table v-loading="loading" :data="poolUsers" border stripe>
             <el-table-column prop="username" label="用户名" min-width="160" />
             <el-table-column prop="createTime" label="注册时间" width="200">
-              <template #default="{ row }">{{ (row.createTime || '').replace('T', ' ').substring(0, 19) }}</template>
+              <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
             </el-table-column>
           </el-table>
           <p class="pool-tip">待分配池用户只有组长「我的课题组」页里的拉人入口能接收。</p>

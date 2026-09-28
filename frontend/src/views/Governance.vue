@@ -199,6 +199,7 @@
 // 数据治理页：在「当前范围」内执行数据清洗与术语归一，并把质控合格病历导出为标准数据集。
 // 设计取舍：清洗只做去重标记 / 字段清理 / 空值规整 / 脏数据隔离 / 术语归一，既不删除病历、
 // 也不填充医生未书写的内容；导出恒只取质控合格病历，分级筛选只作用于清洗、不影响导出范围。
+import { useDepartments } from '@/composables/useDepartments'
 import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
@@ -206,7 +207,6 @@ import TermInput from '@/components/TermInput.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import { clean as cleanApi, exportDataset, previewDataset, governanceStats } from '@/api/governance'
-import { getDepartments } from '@/api/stats'
 import { saveBlob } from '@/utils/download'
 import { useAiStore } from '@/stores/ai'
 import { LEVEL_TINY } from '@/utils/structured'

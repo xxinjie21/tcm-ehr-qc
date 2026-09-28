@@ -47,9 +47,9 @@
 <script setup>
 // 筛选条（受控组件）：自身不持有筛选状态，通过 v-model 与父组件同步；
 // 科室候选来自后端 DISTINCT，证候输入走词典联想（TermInput）。
+import { useDepartments } from '@/composables/useDepartments'
 import { computed, onMounted, ref } from 'vue'
 import TermInput from '@/components/TermInput.vue'
-import { getDepartments } from '@/api/stats'
 
 const props = defineProps({
   // 筛选值对象，字段：department / dateRange / pattern / grade。
@@ -68,17 +68,9 @@ const inner = computed({
   set: (v) => emit('update:modelValue', v)
 })
 
-// U11：科室选项由后端动态获取（records.department DISTINCT）
-const departments = ref([])
-onMounted(async () => {
-  try {
-    const res = await getDepartments()
-    departments.value = res.data || []
-  } catch {
-    // 候选拉取失败 → 退化为空列表，不阻断用户手输证候 / 选分级
-    departments.value = []
-  }
-})
+// U11：科室选项由后端动态获取（records.department DISTINCT），缓存收敛到 useDepartments
+const { departments, reload } = useDepartments()
+onMounted(reload)
 </script>
 
 <style scoped>

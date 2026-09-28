@@ -24,7 +24,7 @@
 
       <el-table v-loading="loading" :data="logs" border stripe style="margin-top: 12px">
         <el-table-column label="操作时间" width="170">
-          <template #default="{ row }">{{ (row.logTime || '').replace('T', ' ').substring(0, 19) }}</template>
+          <template #default="{ row }">{{ fmtDateTime(row.logTime) }}</template>
         </el-table-column>
         <el-table-column prop="operator" label="操作人" width="100" />
         <el-table-column prop="role" label="角色" width="90" />

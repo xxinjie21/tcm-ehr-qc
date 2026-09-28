@@ -26,3 +26,21 @@ export function fmtDateTime(v, mode = 'second', empty = '—') {
   const n = MODE_LEN[mode] || MODE_LEN.second
   return s.length > n ? s.substring(0, n) : s
 }
+
+/**
+ * 取病历原始字段的展示值（P3.2：Review 与 RecordDetailDialog 各一份，收敛于此）。
+ *
+ * <p>接诊时间后端下发 ISO 串（含 T），这里统一换成「日期 时间」可读形式；
+ * 其余字段原样返回。模板侧统一用 {@code || '—'} 兜空。</p>
+ *
+ * @param {object|null} row 病历行对象
+ * @param {string} key 字段名（visitTime 特殊处理）
+ * @returns {*} 展示值；无行时返回空串
+ */
+export function fieldOf(row, key) {
+  if (!row) return ''
+  if (key === 'visitTime') {
+    return row.visitTime ? fmtDateTime(row.visitTime, 'second', '') : ''
+  }
+  return row[key]
+}

@@ -75,16 +75,7 @@ const FIELDS = [
   { key: 'visitTime', label: '接诊时间' }
 ]
 
-// 取字段值：visitTime 后端下发的是 ISO 串（含 T），这里换成「日期 时间」可读形式；
-// 其余字段直接取值，模板侧统一用 `|| '—'` 兜空。
-const fieldOf = (row, key) => {
-  if (!row) return ''
-  if (key === 'visitTime') {
-    return row.visitTime ? String(row.visitTime).replace('T', ' ').substring(0, 19) : ''
-  }
-  return row[key]
-}
-</script>
+// 取字段值：visitTime 后端下发的是 ISO 串（含 T），这里换成「日期 时间」可读形式；</script>
 
 <style scoped>
 /* 左右两栏：左＝原始 21 字段只读，右＝结构化数据 + AI 解读，同屏可比对；

@@ -60,7 +60,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="joinTime" label="加入时间" width="180">
-              <template #default="{ row }">{{ (row.joinTime || '').replace('T', ' ').substring(0, 19) }}</template>
+              <template #default="{ row }">{{ fmtDateTime(row.joinTime) }}</template>
             </el-table-column>
             <el-table-column label="操作" width="150">
               <template #default="{ row }">

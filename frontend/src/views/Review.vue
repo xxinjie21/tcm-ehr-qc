@@ -235,16 +235,6 @@ const FIELDS = [
   { key: 'visitTime', label: '接诊时间' }
 ]
 
-// 取原文展示值：接诊时间截断到秒并去掉 T（列表与对照区共用），其余字段原样返回；无行时返回空串
-const fieldOf = (row, key) => {
-  // 1. 无行直接返回空串，避免读空对象
-  if (!row) return ''
-  // 2. 接诊时间截到秒并去掉 T，列表与对照区共用同一口径
-  if (key === 'visitTime') return row.visitTime ? String(row.visitTime).replace('T', ' ').substring(0, 19) : ''
-  // 3. 其余字段原样返回
-  return row[key]
-}
-
 /**
  * 对照区的字段（功能设计附录A 的 9 类实体）。
  * termType 指向词典类型；治法/病因在现有词典里没有对应类别，故用普通输入框。
@@ -272,7 +262,7 @@ const FIELD_BY_ITEM = {
 }
 
 // 时间格式化：去掉 T、截到分钟；空值返回「—」，避免列表里出现 Invalid Date
-const fmt = (t) => (t ? String(t).replace('T', ' ').substring(0, 16) : '—')
+const fmt = (t) => (t ? fmtDateTime(t,'minute') : '—')
 
 // ===== ① 任务列表 =====
 const status = ref('待复核')
@@ -355,7 +345,7 @@ const patientSummary = computed(() => {
     r.gender,
     r.age ? `${r.age} 岁` : '',
     r.department,
-    r.visitTime ? `${String(r.visitTime).replace('T', ' ').substring(0, 10)} 就诊` : ''
+    r.visitTime ? `${fmtDateTime(r.visitTime,'date','')} 就诊` : ''
   ]
     .filter(Boolean)
     .join('　')
