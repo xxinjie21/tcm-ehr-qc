@@ -31,6 +31,8 @@ public class StatsVO {
 
     /** 质控趋势：按就诊月份升序，最近 12 个月 */
     private List<TrendPoint> trend = new ArrayList<>();
+    /** 趋势是否被截断（仅保留最近 12 个月）—— P5.2 */
+    private boolean trendTruncated;
 
     /** 科室合格率*/
     private List<DeptRate> departmentRates = new ArrayList<>();

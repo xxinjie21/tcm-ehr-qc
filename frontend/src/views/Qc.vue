@@ -207,6 +207,8 @@
               <el-table-column prop="count" label="受影响病历数" width="110" />
               <el-table-column prop="points" label="合计扣分" width="100" />
             </el-table>
+            <!-- P5.2：明细被截断时告知，避免「为什么只看到 20 条」的隔屏疑问 -->
+            <div v-if="dedStats.itemsTruncated" class="trunc-hint">扣分项较多，仅展示扣分最高的 20 项</div>
           </template>
 
           <!-- 分级分布；扫描份数可能被上限截断，截断时下方另有提示 -->

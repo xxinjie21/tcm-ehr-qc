@@ -48,6 +48,8 @@
           :aria-label="trendLabel"
         />
         <EmptyState v-else :failed="failed" :loading="loading" text="暂无趋势数据" @retry="loadAll" />
+        <!-- P5.2：趋势被截到最近 12 个月时告知，避免误以为只有这些数据 -->
+        <p v-if="extra.trendTruncated" class="trend-trunc">仅展示最近 12 个月（更早的月份已省略）</p>
       </PanelCard>
 
       <div class="grid-2 mb">
@@ -436,4 +438,6 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 }
+/* P5.2：趋势截断提示 */
+.trend-trunc { margin: 8px 0 0; font-size: 12.5px; color: var(--text-sub); }
 </style>

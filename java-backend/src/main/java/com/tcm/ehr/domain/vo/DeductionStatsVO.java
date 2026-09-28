@@ -26,6 +26,8 @@ public class DeductionStatsVO {
     private List<ByType> byType = new ArrayList<>();
     /** 按明细项（维度+item）汇总，按扣分降序，取前 N */
     private List<ByItem> byItem = new ArrayList<>();
+    /** 明细是否被截断（仅保留按分值降序的前 20 条）—— P5.2 */
+    private boolean itemsTruncated;
     /** 分级分布 */
     private Map<String, Integer> gradeDist = new LinkedHashMap<>();
 

@@ -1238,6 +1238,9 @@ components:
                 type: string
               count:
                 type: integer
+        trendTruncated:
+          type: boolean
+          description: 趋势是否被截断（仅保留最近 12 个月）—— P5.2
         trend:
           type: array
           description: 质控趋势（批C·4.2，/api/stats/extra）：按就诊月份，最近 12 个月升序
@@ -2839,6 +2842,9 @@ paths:
                           type: object
                       gradeDist:
                         type: object
+                      itemsTruncated:
+                        type: boolean
+                        description: 明细是否被截断（仅保留按分值降序前 20 条）
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

@@ -153,6 +153,8 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             else if (isGrade(r, "待复核")) acc[2]++;
         }
         List<Map.Entry<String, long[]>> months = new java.util.ArrayList<>(byMonth.entrySet());
+        // P5.2：超 12 个月会截断，告知前端（否则“为何只有最近 12 个月”无从判断）
+        vo.setTrendTruncated(months.size() > 12);
         if (months.size() > 12) {
             months = months.subList(months.size() - 12, months.size());
         }

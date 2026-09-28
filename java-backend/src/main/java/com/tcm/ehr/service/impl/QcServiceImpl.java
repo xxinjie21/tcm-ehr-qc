@@ -422,6 +422,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
         items.sort((a, b) -> Integer.compare(b.getPoints(), a.getPoints()));
         vo.setByItem(new ArrayList<>(items.subList(0, Math.min(20, items.size()))));
+        // P5.2：明细被截断时告知前端，避免“为什么只看到 20 条”的隔屏疑问
+        vo.setItemsTruncated(items.size() > 20);
         // 10. 回填扫描条数、总分与等级分布
         vo.setScanned(scanned);
         vo.setTotalPoints(totalPoints);
