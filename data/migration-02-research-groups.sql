@@ -93,6 +93,19 @@ SET @sql := IF(
   'DO 0');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- 2.6 qc_task 加 group_id（幂等）。任务表在 database-init.sql 里建表时没有该列，
+--    是 QcBatchServiceImpl 提交快照列（R3 起 RecordFilter 取 group_id 而非 role），
+--    漏加会导致批量重算 INSERT 直接 SQLSyntaxErrorException。新装库由
+--    database-init.sql 的 DDL 列覆盖，这里是存量库升级路径。
+SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'qc_task' AND COLUMN_NAME = 'group_id') = 0,
+  "ALTER TABLE qc_task
+     ADD COLUMN group_id VARCHAR(36) COMMENT '提交时所属组快照，供 worker 重建 RecordFilter',
+     ADD INDEX idx_qc_task_group (group_id)",
+  'DO 0');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- ---------------------------------------------------------------------------
 -- 3. 存量数据归入兜底组（全部幂等）
 -- ---------------------------------------------------------------------------

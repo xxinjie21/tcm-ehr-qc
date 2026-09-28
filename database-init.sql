@@ -166,14 +166,16 @@ CREATE TABLE IF NOT EXISTS qc_task (
   current_label VARCHAR(255) COMMENT '当前处理的病历标识',
   filters_json TEXT COMMENT '筛选范围(JSON)',
   created_by VARCHAR(50) COMMENT '提交人用户名',
-  role VARCHAR(20) COMMENT '提交时角色快照，供 worker 重建 RecordFilter',
+  role VARCHAR(20) COMMENT '提交时角色快照，仅用于审计日志回填',
+  group_id VARCHAR(36) COMMENT '提交时所属组快照，供 worker 重建 RecordFilter（数据域）',
   failure_list JSON COMMENT '失败清单(仅存前500条)',
   failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   started_at DATETIME COMMENT '开始时间',
   finished_at DATETIME COMMENT '结束时间',
   INDEX idx_status (status),
-  INDEX idx_create_time (create_time)
+  INDEX idx_create_time (create_time),
+  INDEX idx_qc_task_group (group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='质控批量重算任务表';
 
 -- 初始化账号（密码均为123456的BCrypt加密）
