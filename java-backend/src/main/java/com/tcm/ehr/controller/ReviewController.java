@@ -1,6 +1,5 @@
 package com.tcm.ehr.controller;
 
-import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.ReviewDTO;
@@ -30,14 +29,13 @@ public class ReviewController {
     /**
      * 查询待复核任务。
      *
-     * <p>【权限：管理员 / 审核员】已作废的任务不返回。</p>
+     * <p>【权限：登录即可】已作废的任务不返回。</p>
      *
      * @param page     页码，从 1 开始
      * @param pageSize 每页条数
      * @param status   任务状态，为空表示不限
      * @return total=总条数；tasks=任务列表
      */
-    @RequireRole(roles = {"管理员", "审核员"})
     @GetMapping("/api/review/tasks")
     public Result<ReviewTasksVO> tasks(@RequestParam(defaultValue = "1") Integer page,
                                        @RequestParam(defaultValue = "20") Integer pageSize,
@@ -48,13 +46,12 @@ public class ReviewController {
     /**
      * 提交人工复核结果。
      *
-     * <p>【权限：管理员 / 审核员】校正后的结构化数据会回流重算分级。</p>
+     * <p>【权限：登录即可】校正后的结构化数据会回流重算分级。</p>
      *
      * @param recordId 病历ID
      * @param dto      correctedData=人工校正后的结构化数据；remark=复核意见，均可为空
      * @return status=复核后状态；score=重算得分
      */
-    @RequireRole(roles = {"管理员", "审核员"})
     @PostMapping("/api/records/{recordId}/review")
     public Result<ReviewResultVO> review(@PathVariable String recordId,
                                          @RequestBody(required = false) ReviewDTO dto) {

@@ -75,7 +75,8 @@
     </PanelCard>
 
     <!-- 术语库导入：非 PDF 直接覆盖入库（导入前自动备份）；PDF 先转换出候选、确认后才写入 -->
-    <PanelCard title="术语库导入">
+    <!-- 写入入口仅管理员（后端 import/rollback/convert 仍 @RequireRole(管理员)）；后端要求保持一致 -->
+    <PanelCard v-if="isAdmin" title="术语库导入">
       <div class="import-row">
         <el-upload
           ref="uploadRef"
@@ -130,7 +131,7 @@
          由弹窗改为同页展开——弹窗内嵌宽表格必然出现滚动条，
          且用户看不到它属于「术语库导入」这一步的上下文。左＝候选，右＝失败明细与确认操作 -->
     <PanelCard
-      v-if="convertVisible"
+      v-if="isAdmin && convertVisible"
       ref="convertRef"
       title="PDF 转换预览"
       class="convert-panel"
@@ -192,7 +193,7 @@
     </PanelCard>
 
     <!-- 版本回滚：每次导入前自动备份，选任一版本覆盖当前词典并立即生效 -->
-    <PanelCard title="版本回滚">
+    <PanelCard v-if="isAdmin" title="版本回滚">
       <div class="rollback-row">
         <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
@@ -232,7 +233,12 @@ import StatCard from '@/components/StatCard.vue'
 import { getTerms, importDict, convertDict, rollback, getBackups } from '@/api/dictionary'
 import { saveBlob } from '@/utils/download'
 import { confirmBox } from '@/utils/confirm'
+import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES, PAGE_SIZES_LARGE } from '@/utils/constants'
+
+const userStore = useUserStore()
+// 术语词典的写入入口（导入/转换/回滚）仅管理员；只读浏览对所有登录用户开放
+const isAdmin = computed(() => userStore.role === '管理员')
 
 // 词典类型 → 界面文案；键名与后端 type 参数一致（disease / pattern / symptom / herb / formula）
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }

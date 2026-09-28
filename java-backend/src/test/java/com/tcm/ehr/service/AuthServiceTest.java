@@ -232,4 +232,30 @@ class AuthServiceTest {
                 () -> authService.login("zhangsan", "123456"));
         assertTrue(ex.getMessage().contains("停用"), ex.getMessage());
     }
+
+    /** 组长菜单：本组数据 + 术语词典/日志审计 + 我的课题组 */
+    @Test
+    void ownerMenuIncludesSharedReadOnlyAndMyGroup() {
+        when(userMapper.findByUsername("zu")).thenReturn(user("u-zu", "zu", "用户"));
+        resolvesToGroup("grp-a", "owner");
+
+        LoginVO vo = authService.login("zu", "123456");
+
+        assertTrue(vo.getMenus().contains("术语词典"), vo.getMenus().toString());
+        assertTrue(vo.getMenus().contains("日志审计"), vo.getMenus().toString());
+        assertTrue(vo.getMenus().contains("我的课题组"), vo.getMenus().toString());
+    }
+
+    /** 组员菜单：同样可用术语词典/日志审计，但无成员管理页 */
+    @Test
+    void memberMenuHasDictionaryAndLogsButNotMyGroup() {
+        when(userMapper.findByUsername("yu")).thenReturn(user("u-yu", "yu", "用户"));
+        resolvesToGroup("grp-a", "member");
+
+        LoginVO vo = authService.login("yu", "123456");
+
+        assertTrue(vo.getMenus().contains("术语词典"), vo.getMenus().toString());
+        assertTrue(vo.getMenus().contains("日志审计"), vo.getMenus().toString());
+        assertFalse(vo.getMenus().contains("我的课题组"), vo.getMenus().toString());
+    }
 }

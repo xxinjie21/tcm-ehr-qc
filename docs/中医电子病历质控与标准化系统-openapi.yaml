@@ -2259,7 +2259,7 @@ paths:
       tags:
         - 复核
       summary: 待复核任务列表
-      description: 【权限：管理员 / 审核员】分页查询待复核病历任务，展示复核时限
+      description: 【权限：登录即可】分页查询待复核病历任务，展示复核时限
       parameters:
         - name: page
           in: query
@@ -2300,7 +2300,7 @@ paths:
       tags:
         - 复核
       summary: 人工校正与复核
-      description: 【权限：管理员 / 审核员】合并「人工校正 + 提交复核」，修改数据并复核通过后系统自动重新执行评分与逻辑校验
+      description: 【权限：登录即可】合并「人工校正 + 提交复核」，修改数据并复核通过后系统自动重新执行评分与逻辑校验
       parameters:
         - name: recordId
           in: path
