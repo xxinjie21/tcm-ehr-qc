@@ -236,16 +236,14 @@
              会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
         <el-table-column label="接诊时间" width="110">
           <template #default="{ row }">
-            <el-tooltip :content="fmtDateTime(row.visitTime, 'second')" placement="top">
-              <span>{{ fmtDateTime(row.visitTime, 'date') }}</span>
-            </el-tooltip>
+            <VisitTimeCell :visit-time="row.visitTime" />
           </template>
         </el-table-column>
         <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
              后端两字段是追加、向后兼容，回滚不需要动后端 -->
         <el-table-column label="年龄/性别" width="110">
           <template #default="{ row }">
-            <span>{{ [row.age ? row.age + '岁' : '', row.gender].filter(Boolean).join(' / ') || '—' }}</span>
+            <AgeGenderCell :age="row.age" :gender="row.gender" />
           </template>
         </el-table-column>
         <!-- 操作列固定在右侧：表格横向滚动时始终可见 -->
@@ -330,6 +328,8 @@
 <script setup>
 // 质控页：范围查询是整页口径 —— 一次「查询」同时刷新「扣分构成」与「AI 预检列表」两块。
 // 管理员另有「规则配置」弹窗，保存后规则立即生效，无需重启后端。
+import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
+import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'

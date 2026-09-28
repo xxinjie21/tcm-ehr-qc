@@ -48,16 +48,14 @@
                  会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
             <el-table-column label="接诊时间" width="110">
               <template #default="{ row }">
-                <el-tooltip :content="fmtDateTime(row.visitTime, 'second')" placement="top">
-                  <span>{{ fmtDateTime(row.visitTime, 'date') }}</span>
-                </el-tooltip>
+                <VisitTimeCell :visit-time="row.visitTime" />
               </template>
             </el-table-column>
             <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
                  后端两字段是追加、向后兼容，回滚不需要动后端 -->
             <el-table-column label="年龄/性别" width="110">
               <template #default="{ row }">
-                <span>{{ [row.age ? row.age + '岁' : '', row.gender].filter(Boolean).join(' / ') || '—' }}</span>
+                <AgeGenderCell :age="row.age" :gender="row.gender" />
               </template>
             </el-table-column>
             <el-table-column label="操作" width="150" fixed="right">
@@ -255,29 +253,8 @@ const activeTab = ref('query')
  */
 // max = 该列在 database-init.sql 里的 VARCHAR 宽度（前端限长与 DB 列宽对齐，
 // 免得超长内容在表单里输得下、落库时被截断或报错）。TEXT 列不设限。
-const FIELDS = [
-  { key: 'registrationNo', label: '登记号', max: 50 },
-  { key: 'outpatientNo', label: '门诊号', max: 50 },
-  { key: 'gender', label: '性别' },
-  { key: 'age', label: '年龄', max: 20 },
-  { key: 'visitCount', label: '就诊次数' },
-  { key: 'westernDiagnosis', label: '西医诊断', multi: true },
-  { key: 'tcmDiagnosis', label: '中医诊断', multi: true },
-  { key: 'chiefComplaint', label: '主诉', multi: true, wide: true },
-  { key: 'selfReport', label: '自述', multi: true, wide: true },
-  { key: 'presentIllness', label: '现病史', multi: true, wide: true },
-  { key: 'inspection', label: '望诊', multi: true },
-  { key: 'pulse', label: '脉诊', multi: true },
-  { key: 'tongue', label: '舌诊', multi: true },
-  { key: 'physicalExam', label: '查体', multi: true },
-  { key: 'pattern', label: '辨证结论', multi: true },
-  { key: 'prescription', label: '草药', multi: true, wide: true },
-  { key: 'followUp', label: '随访', multi: true },
-  { key: 'treatmentEffect', label: '治疗效果', multi: true },
-  { key: 'department', label: '开单科室', max: 50 },
-  { key: 'doctorId', label: '医生工号', max: 50 },
-  { key: 'visitTime', label: '接诊时间' }
-]
+// 字段定义收敛到 @/utils/recordFields（P3.5）；wide 仅表单布局属性
+const FIELDS = fieldsWithWide(['chiefComplaint', 'selfReport', 'presentIllness', 'prescription'])
 
 /**
  * 单条新增的分区：21 个字段平铺会产生 1000px+ 的长表单，

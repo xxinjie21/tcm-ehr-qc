@@ -211,29 +211,11 @@ import { getRawRecord } from '@/api/records'
 import { aiReview } from '@/api/ai'
 import { qcScore, getQcRules } from '@/api/qc'
 
-const FIELDS = [
-  { key: 'registrationNo', label: '登记号' },
-  { key: 'outpatientNo', label: '门诊号' },
-  { key: 'gender', label: '性别' },
-  { key: 'age', label: '年龄' },
-  { key: 'visitCount', label: '就诊次数' },
-  { key: 'westernDiagnosis', label: '西医诊断', wide: true },
-  { key: 'tcmDiagnosis', label: '中医诊断', wide: true },
-  { key: 'chiefComplaint', label: '主诉', wide: true },
-  { key: 'selfReport', label: '自诉', wide: true },
-  { key: 'presentIllness', label: '现病史', wide: true },
-  { key: 'inspection', label: '望诊', wide: true },
-  { key: 'pulse', label: '脉诊', wide: true },
-  { key: 'tongue', label: '舌诊', wide: true },
-  { key: 'physicalExam', label: '查体', wide: true },
-  { key: 'pattern', label: '辨证结论', wide: true },
-  { key: 'prescription', label: '草药', wide: true },
-  { key: 'followUp', label: '随访', wide: true },
-  { key: 'treatmentEffect', label: '治疗效果' },
-  { key: 'department', label: '开单科室' },
-  { key: 'doctorId', label: '医生工号' },
-  { key: 'visitTime', label: '接诊时间' }
-]
+// 字段定义收敛到 @/utils/recordFields（P3.5）；复核列表的整行集合
+const FIELDS = fieldsWithWide([
+  'westernDiagnosis', 'tcmDiagnosis', 'chiefComplaint', 'selfReport', 'presentIllness',
+  'inspection', 'pulse', 'tongue', 'physicalExam', 'pattern', 'prescription', 'followUp'
+])
 
 /**
  * 对照区的字段（功能设计附录A 的 9 类实体）。

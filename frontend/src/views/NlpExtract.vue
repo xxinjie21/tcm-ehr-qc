@@ -34,16 +34,14 @@
              会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
         <el-table-column label="接诊时间" width="110">
           <template #default="{ row }">
-            <el-tooltip :content="fmtDateTime(row.visitTime, 'second')" placement="top">
-              <span>{{ fmtDateTime(row.visitTime, 'date') }}</span>
-            </el-tooltip>
+            <VisitTimeCell :visit-time="row.visitTime" />
           </template>
         </el-table-column>
         <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
              后端两字段是追加、向后兼容，回滚不需要动后端 -->
         <el-table-column label="年龄/性别" width="110">
           <template #default="{ row }">
-            <span>{{ [row.age ? row.age + '岁' : '', row.gender].filter(Boolean).join(' / ') || '—' }}</span>
+            <AgeGenderCell :age="row.age" :gender="row.gender" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="90" fixed="right">
@@ -374,6 +372,8 @@
 // 单条 / 批量 NLP 结构化解析页：上方病历列表点行载入原文，下方「单条解析」「批量解析」两个 Tab。
 // 单条：原文按字段模块化可逐项改，抽取后展示归一结果、可写回该病历结构化数据（覆盖原有）；
 // 批量：仅管理员可见，走后端异步任务，提交后可关页面、靠轮询刷新进度。归一只认 ES 词典，索引不可用即整体失败。
+import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
+import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { computed, reactive, ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
