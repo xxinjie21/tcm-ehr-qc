@@ -48,7 +48,7 @@
 
       <el-pagination
         v-model:current-page="query.page"
-        v-model:page-size="query.size"
+        v-model:page-size="query.pageSize"
         :page-sizes="PAGE_SIZES"
         :total="total"
         layout="total, sizes, prev, pager, next"
@@ -102,8 +102,8 @@ const auditStamp = () => {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}_${p(d.getMilliseconds())}`
 }
 
-// 查询条件；page / size 直接双向绑定分页组件
-const query = reactive({ action: '', keyword: '', page: 1, size: 10 })
+// 查询条件；page / pageSize 直接双向绑定分页组件（与其余列表页与 /api/logs 契约一致）
+const query = reactive({ action: '', keyword: '', page: 1, pageSize: 10 })
 const logs = ref([])
 const total = ref(0)
 const loading = ref(false)

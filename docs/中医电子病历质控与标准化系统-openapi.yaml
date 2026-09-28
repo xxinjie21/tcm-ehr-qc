@@ -1588,7 +1588,7 @@ paths:
           schema:
             type: integer
             default: 1
-        - name: size
+        - name: pageSize
           in: query
           required: false
           schema:

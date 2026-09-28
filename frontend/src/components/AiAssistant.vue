@@ -85,10 +85,10 @@
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { aiChat } from '@/api/ai'
-import { useAiStore } from '@/stores/ai'
+import { useAiContextStore } from '@/stores/ai'
 
 // 跨组件读取「当前打开的病历」，作为提问上下文
-const aiStore = useAiStore()
+const aiStore = useAiContextStore()
 // 拖动位置的 localStorage 键；BALL = 悬浮球边长（用于边界收敛与默认落点）
 const POS_KEY = 'aiAssistantPos'
 const BALL = 48

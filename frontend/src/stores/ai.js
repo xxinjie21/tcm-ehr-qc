@@ -7,7 +7,7 @@ import { defineStore } from 'pinia'
  * 清洗状态行同步 `stats`。消费端通过 hasXxx 判空后给降级提示——
  * 这里不编造默认值，没有就是没有。
  */
-export const useAiStore = defineStore('ai', {
+export const useAiContextStore = defineStore('ai', {
   state: () => ({
     activeRecord: null,
     normByLevel: null,

@@ -236,9 +236,9 @@ import {
   importRecords, createRecord, searchRecords, getRawRecord, deleteRecords, deleteRecordsByFilter
 } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
-import { useAiStore } from '@/stores/ai'
+import { useAiContextStore } from '@/stores/ai'
 
-const aiStore = useAiStore()
+const aiStore = useAiContextStore()
 
 // 当前标签页；导入与新增懒加载，首屏只渲染查询表
 const activeTab = ref('query')

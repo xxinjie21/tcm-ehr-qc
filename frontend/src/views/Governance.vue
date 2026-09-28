@@ -208,10 +208,10 @@ import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import { clean as cleanApi, exportDataset, previewDataset, governanceStats } from '@/api/governance'
 import { saveBlob } from '@/utils/download'
-import { useAiStore } from '@/stores/ai'
+import { useAiContextStore } from '@/stores/ai'
 import { LEVEL_TINY } from '@/utils/structured'
 
-const aiStore = useAiStore()
+const aiStore = useAiContextStore()
 
 const STEPS = [
   { title: '去重', desc: '重复病历只标记，不删除' },

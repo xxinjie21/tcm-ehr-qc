@@ -35,15 +35,15 @@ public class LogController {
      * @param action  操作类型，空表示不限
      * @param keyword 关键字，匹配操作人/对象/详情
      * @param page    页码，从 1 开始
-     * @param size    每页条数
+     * @param pageSize 每页条数
      * @return total=总条数；list=当前页记录
      */
     @GetMapping("/api/logs")
     public Result<Map<String, Object>> logs(@RequestParam(required = false) String action,
                                             @RequestParam(required = false) String keyword,
                                             @RequestParam(defaultValue = "1") int page,
-                                            @RequestParam(defaultValue = "10") int size) {
-        return Result.ok(logService.page(action, keyword, page, size));
+                                            @RequestParam(defaultValue = "10") int pageSize) {
+        return Result.ok(logService.page(action, keyword, page, pageSize));
     }
 
     /**
