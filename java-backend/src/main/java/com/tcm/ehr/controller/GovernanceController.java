@@ -1,6 +1,5 @@
 package com.tcm.ehr.controller;
 
-import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.domain.dto.CleanDTO;
@@ -35,7 +34,6 @@ public class GovernanceController {
 
     private final IGovernanceService governanceService;
     private final OperationLogger operationLogger;
-    private final ObjectMapper objectMapper;
 
 
     /**
@@ -48,13 +46,13 @@ public class GovernanceController {
      */
     @PostMapping("/api/governance/normalize")
     public ResponseEntity<Result<Map<String, Object>>> normalize(@RequestBody NormalizeDTO dto) {
-        // 1. 术语必填
+        // 1. 术语必填（错误体下沉：抛 BusinessException 由 GlobalExceptionHandler 统一出口）
         if (dto.getTerm() == null || dto.getTerm().isBlank()) {
-            return ResponseEntity.badRequest().body(Result.error("请输入术语"));
+            throw new com.tcm.ehr.common.exception.BusinessException(400, "请输入术语");
         }
         // 2. 类型必须是 5 类词典之一（与词表单一来源一致）
         if (dto.getType() == null || !com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(dto.getType())) {
-            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+            throw new com.tcm.ehr.common.exception.BusinessException(4001, "术语类型非法");
         }
         // 3. 归一（未命中时 standardTerm 原样返回、level 为 null）
         var r = governanceService.normalize(dto.getType(), dto.getTerm());
@@ -99,10 +97,9 @@ public class GovernanceController {
             // 2. 被拒也要留痕：谁在什么时候试图导出过
             operationLogger.log("数据集导出", RecordFilter.describe(dto == null ? null : dto.getFilters()),
                     "被拒：筛选范围内无合格病历");
-            Result<Void> err = Result.error(2001, "质控未通过，禁止导出数据集（筛选范围内无合格病历）");
-            return ResponseEntity.status(400)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(objectMapper.writeValueAsBytes(err));
+            // 错误体下沉：抛 BusinessException（code=2001 + 400），出口在 GlobalExceptionHandler
+            throw new com.tcm.ehr.common.exception.BusinessException(2001,
+                    "质控未通过，禁止导出数据集（筛选范围内无合格病历）");
         }
         // 3. 成功也留痕（对象记文件名）
         operationLogger.log("数据集导出", file.filename(), null);

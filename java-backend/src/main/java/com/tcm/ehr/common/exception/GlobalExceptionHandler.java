@@ -53,6 +53,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 通用业务异常（P3.6 下沉）：异常自带业务码与 HTTP 状态。
+     *
+     * <p>替代 Controller 里手拼 {@code ResponseEntity.badRequest().body(Result.error(...))}
+     * 的错误体，让错误码/状态只在本处出口、外部可统一审计。</p>
+     *
+     * @param e 携带 code / message / status
+     * @return HTTP 状态取自异常 + 异常自带业务码
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<Result<Void>> handleBusiness(BusinessException e) {
+        return ResponseEntity.status(e.getStatus()).body(Result.error(e.getCode(), e.getMessage()));
+    }
+
+    /**
      * 数据域越权。
      *
      * @param e 携带可展示的提示文案
