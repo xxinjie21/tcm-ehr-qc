@@ -81,7 +81,6 @@ CREATE TABLE IF NOT EXISTS operation_log (
   action VARCHAR(50) COMMENT '操作类型：数据清洗/数据集导出/词典导入/词典回滚/人工复核/批量重算',
   target VARCHAR(255) COMMENT '操作对象：筛选范围/文件名/词典类型/病历ID',
   detail TEXT COMMENT '操作明细',
-  ip VARCHAR(45) COMMENT '客户端IP（兼容IPv6）',
   INDEX idx_log_time (log_time),
   INDEX idx_operator (operator),
   INDEX idx_action (action)

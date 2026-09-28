@@ -20,14 +20,16 @@ import java.time.format.DateTimeFormatter;
  * **文件落盘 + 入库双写**。
  *
  * <ul>
- * <li>文件：追加写 {@code logs/operation.log}，格式「时间 | 操作人 | 操作内容」，作为兜底备份，
- * 读取方为 {@code GET /api/logs/export}；</li>
- * <li>库：INSERT {@code operation_log}（log_time/operator/role/action/target/detail/ip），
+ *   <li>文件：追加写 {@code logs/operation.log}，格式「时间 | 操作人 | 操作内容」，作为兜底备份；</li>
+ *   <li>库：INSERT {@code operation_log}（log_time/operator/role/action/target/detail），
  * 供审计页 {@code GET /api/logs} 分页筛选；</li>
- * <li>双写不做强一致，各自 try-catch：**以文件为准**，库写失败不阻塞业务（仅审计页缺该条展示）。</li>
+ *   <li>双写不做强一致，各自 try-catch：**以文件为准**，库写失败不阻塞业务（仅审计页缺该条展示）。</li>
  * </ul>
  *
- * 操作人 / 角色 / IP 取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。
+ * <p>不记 IP（PIPL 最小必要）：{@code operation_log.ip} 列与 {@code RequestUtils.currentIp()}
+ * 已由 §七 L1 一并删除。</p>
+ *
+ * 操作人 / 角色 取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。
  */
 @Slf4j
 @Component
@@ -41,7 +43,6 @@ public class OperationLogger {
     private static final int MAX_ROLE = 20;
     private static final int MAX_ACTION = 50;
     private static final int MAX_TARGET = 255;
-    private static final int MAX_IP = 45;
 
     private final OperationLogMapper operationLogMapper;
 
@@ -59,14 +60,13 @@ public class OperationLogger {
         // 1. 从当前请求取操作人上下文（脱离 Web 请求时各字段为空）
         String operator = RequestUtils.currentUsername();
         String role = RequestUtils.currentRole();
-        String ip = RequestUtils.currentIp();
         // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，文件格式化是截断，
         // 不截断会导致同一操作在文件与库中相差 1 秒，审计对不上账
         LocalDateTime now = LocalDateTime.now().withNano(0);
 
         // 2. 文件先写：它是兜底留痕，即使入库失败操作也留得下
         writeFile(now, operator, buildContent(action, target, detail));
-        insertDb(now, operator, role, action, target, detail, ip);
+        insertDb(now, operator, role, action, target, detail);
     }
 
     /** 文件行内容：`操作类型：操作对象，操作明细`（缺省段自动省略） */
@@ -105,7 +105,7 @@ public class OperationLogger {
 
     /** 入库（审计页数据源）；失败仅告警，不阻塞业务 */
     private void insertDb(LocalDateTime now, String operator, String role,
-                          String action, String target, String detail, String ip) {
+                          String action, String target, String detail) {
         try {
             // 1. 各字段按列宽截断：超长会撞库列长度限制
             OperationLog row = new OperationLog();
@@ -116,7 +116,6 @@ public class OperationLogger {
             row.setTarget(cut(target, MAX_TARGET));
             // 2. 明细列不截断（TEXT 列），只去首尾空白
             row.setDetail(detail == null ? null : detail.trim());
-            row.setIp(cut(ip, MAX_IP));
             operationLogMapper.insert(row);
         } catch (Exception e) {
             // 3. 入库失败只告警：文件里已经留了痕，不该因此中断业务

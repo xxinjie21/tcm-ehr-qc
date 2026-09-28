@@ -59,7 +59,6 @@
         </el-table-column>
         <el-table-column prop="target" label="操作对象" width="200" show-overflow-tooltip />
         <el-table-column prop="detail" label="详情" min-width="240" show-overflow-tooltip />
-        <el-table-column prop="ip" label="IP" width="130" />
         <!-- 空态分两种：确实没日志 vs 加载失败（后者才给「重试」入口） -->
         <template #empty>
           <el-empty

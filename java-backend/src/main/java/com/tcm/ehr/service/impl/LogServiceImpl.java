@@ -183,7 +183,7 @@ public class LogServiceImpl implements ILogService {
     private byte[] csvBytes(List<OperationLog> rows) {
         // 1. 写表头
         StringBuilder sb = new StringBuilder();
-        sb.append("操作时间,操作人,角色,操作类型,操作对象,详情,IP\n");
+        sb.append("操作时间,操作人,角色,操作类型,操作对象,详情\n");
         // 2. 逐条拼行（字段值按 CSV 规则转义）
         for (OperationLog l : rows) {
             sb.append(csv(l.getLogTime() == null ? "" : l.getLogTime().format(TS))).append(',')
@@ -191,8 +191,7 @@ public class LogServiceImpl implements ILogService {
                     .append(csv(l.getRole())).append(',')
                     .append(csv(l.getAction())).append(',')
                     .append(csv(l.getTarget())).append(',')
-                    .append(csv(l.getDetail())).append(',')
-                    .append(csv(l.getIp())).append('\n');
+                    .append(csv(l.getDetail())).append('\n');
         }
         // 3. 前置 UTF-8 BOM 后返回
         byte[] body = sb.toString().getBytes(StandardCharsets.UTF_8);
