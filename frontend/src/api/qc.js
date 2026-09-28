@@ -21,7 +21,23 @@ export function getDeductionStats(params) {
   return request.get('/qc/deduction-stats', { params })
 }
 
-// 质控评分重算（全库/范围内，长耗时同步接口）
+// ===== 质控批量重算（§七 L5/L6：异步任务，4 个接口）=====
+// 提交：返回 taskId，不等结果（原先是长耗时同步接口，前端要放宽到 200s 超时）
 export function recomputeQc(data) {
-  return request.post('/qc/score/batch', data, { timeout: 200000 })
+  return request.post('/qc/score/batch', data)
+}
+
+// 任务列表（最近 50 条，不含失败明细）
+export function listQcBatch() {
+  return request.get('/qc/score/batch')
+}
+
+// 任务进度 + 分级汇总（含失败明细）；前端 2s 轮询本接口
+export function getQcBatch(id) {
+  return request.get(`/qc/score/batch/${id}`)
+}
+
+// 取消任务：排队中的直接落终态，运行中的置取消位由 worker 自行收尾
+export function cancelQcBatch(id) {
+  return request.post(`/qc/score/batch/${id}/cancel`)
 }

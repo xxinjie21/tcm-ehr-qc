@@ -8,8 +8,15 @@
         <RangeFilter v-model="filters" />
         <el-button type="primary" size="small" :loading="queryLoading" @click="applyFilters">查 询</el-button>
         <el-button size="small" :disabled="queryLoading" @click="resetFilters">重置</el-button>
-        <el-button type="warning" size="small" :loading="recomputing" @click="handleRecompute">
-          {{ recomputing ? '重算执行中…' : '质控评分计算' }}
+        <!-- 重算是异步任务（§七 L5）：提交后按钮立刻解锁，进度单独显示，别让按钮一直转圈 -->
+        <el-button
+          type="warning"
+          size="small"
+          :loading="recomputing"
+          :disabled="isActiveTask(recomputeProgress)"
+          @click="handleRecompute"
+        >
+          {{ recomputeButtonText }}
         </el-button>
         <span class="tip">范围对本页各块同时生效；「质控评分计算」按当前范围重算评分与分级</span>
       </div>
@@ -323,12 +330,12 @@
 <script setup>
 // 质控页：范围查询是整页口径 —— 一次「查询」同时刷新「扣分构成」与「AI 预检列表」两块。
 // 管理员另有「规则配置」弹窗，保存后规则立即生效，无需重启后端。
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules, recomputeQc } from '@/api/qc'
+import { recomputeQc, getQcBatch, qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 import { getTerms } from '@/api/dictionary'
 import { useUserStore } from '@/stores/user'
@@ -680,9 +687,59 @@ const resetFilters = () => {
   applyFilters()
 }
 
-// 质控评分计算：按当前范围重算评分与分级
+// ===== 质控评分计算（§七 L5/L6：异步任务）=====
+// 重算已从「同步等结果」改为「提交拿 taskId → 2s 轮询进度 → 终态提示分级汇总」。
+// 同步跑 40000 条会把请求挂到超时，用户关页面任务也还在跑；异步后可以离开再回来。
 const recomputing = ref(false)
-// 质控评分计算：二次确认后按当前范围重算评分与分级，完成后刷新两块数据
+/** 当前任务进度：{ done, total, status, ... }，用于按钮上的进度文案 */
+const recomputeProgress = ref(null)
+/** 轮询句柄；null 表示当前没有在轮询 */
+let pollTimer = null
+
+/** 终态判定：不再变化的状态 */
+const isActiveTask = (t) => !!t && (t.status === 'QUEUED' || t.status === 'RUNNING')
+
+/** 按钮文案：运行中显示进度，终态回到常态 */
+const recomputeButtonText = computed(() => {
+  const t = recomputeProgress.value
+  if (!isActiveTask(t)) return '质控评分计算'
+  return t.status === 'QUEUED' ? '重算排队中…' : `重算中 ${t.done} / ${t.total}…`
+})
+
+/** 停掉轮询并清空句柄，防止重复启动或组件卸载后继续发请求 */
+const stopPoll = () => {
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+/** 进度轮询：2s 一次（与 NlpExtract 的批量解析同频率），终态自动停 */
+const pollTask = async (id) => {
+  try {
+    const res = await getQcBatch(id)
+    const t = res.data || {}
+    recomputeProgress.value = t
+    if (!isActiveTask(t)) {
+      // 终态：提示分级汇总 + 刷新两块依赖评分的列表
+      stopPoll()
+      ElMessage.success(
+        t.status === 'COMPLETED'
+          ? `重算完成：合格 ${t.qualified}，待复核 ${t.pendingReview}，无效 ${t.invalid}，失败 ${t.failed}`
+          : `重算${t.status === 'CANCELLED' ? '已取消' : t.status === 'INTERRUPTED' ? '被中断（服务重启，可重新提交）' : '失败'}：已处理 ${t.done} / ${t.total}`
+      )
+      loadPrecheck(1)
+      loadDedStats()
+      return
+    }
+    pollTimer = setTimeout(() => pollTask(id), 2000)
+  } catch {
+    // 轮询失败不重试：任务多半已被清理或服务异常，停止即可，用户可刷新页面看结果
+    stopPoll()
+  }
+}
+
+// 质控评分计算：二次确认后提交异步任务，轮询进度直到终态
 const handleRecompute = async () => {
   try {
     // 1. 二次确认：重算会覆盖现有分数，取消即整体中止
@@ -697,22 +754,30 @@ const handleRecompute = async () => {
   }
   // 2. 置重算态：按钮进入 loading，避免重复触发
   recomputing.value = true
+  recomputeProgress.value = null
+  stopPoll()
   try {
-    // 3. 按当前范围提交重算
+    // 3. 按当前范围提交重算（只拿 taskId，不等结果）
     const res = await recomputeQc({ filters: { ...filters } })
-    // 4. 取结果数并一次性告知用户（合格 / 待复核 / 无效 / 失败）
-    const d = res.data || {}
-    ElMessage.success(`重算完成：合格 ${d.qualified}，待复核 ${d.pendingReview}，无效 ${d.invalid}，失败 ${d.failed}`)
-    // 5. 评分已变 → 两块数据同步刷新（整页口径）
-    loadPrecheck(1)
-    loadDedStats()
+    const t = res.data || {}
+    recomputeProgress.value = t
+    // 4. 空范围提交出来的是 total=0 的任务：直接当完成，不必轮询
+    if (isActiveTask(t)) {
+      pollTask(t.id)
+    } else {
+      ElMessage.success('重算完成：范围内没有需要重算的病历')
+    }
   } catch {
-    // 拦截器已提示
+    // 拦截器已提示（超上限 / 已有任务在跑）
+    stopPoll()
   } finally {
-    // 无论成败都复位，避免按钮卡在 loading
+    // 4. 按钮立刻解锁：进度由 recomputeProgress 单独表达，不该让按钮一直转圈
     recomputing.value = false
   }
 }
+
+// 组件卸载时停掉轮询，避免离开页面后还在发请求
+onBeforeUnmount(stopPoll)
 
 // 扣分明细改回弹窗；关闭时只收起、不清数据，避免关闭动画期间内容闪空
 const detail = ref(null)
