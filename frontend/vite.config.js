@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import compression from 'vite-plugin-compression'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
@@ -13,7 +14,10 @@ export default defineConfig({
     // ElMessage / ElMessageBox 等命令式 API 仍由各文件显式 import，
     // 其样式在 main.js 里显式引一次，避免依赖解析器改名时机。
     AutoImport({ resolvers: [ElementPlusResolver()] }),
-    Components({ resolvers: [ElementPlusResolver()] })
+    Components({ resolvers: [ElementPlusResolver()] }),
+    // P4.15：产出 .gz 预压缩副本（部署端 nginx 直接 send_file 即可，省 CPU）。
+    // 只在部署侧生效：本地 dev/未配 gzip 的静态服务不受影响。
+    compression({ algorithm: 'gzip', threshold: 1024, deleteOriginFile: false })
   ],
   resolve: {
     alias: {

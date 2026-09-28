@@ -20,7 +20,8 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "unplugin-auto-import": "^21.1.0",
     "unplugin-vue-components": "^32.1.0",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vite-plugin-compression": "^0.5.1"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
