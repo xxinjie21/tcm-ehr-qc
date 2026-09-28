@@ -123,8 +123,13 @@ const defaultPos = () => ({
 })
 const pos = ref(defaultPos())
 
-// 面板与悬浮球的定位：把 pos（视口坐标）转成行内 left / top；坐标已在 clampPos 收敛到视口内
-const containerStyle = computed(() => ({ left: `${pos.value.x}px`, top: `${pos.value.y}px` }))
+// 面板与悬浮球的定位（P4.13）：用 transform: translate（合成层）而非 left/top（触发布局）；
+// 坐标已在 clampPos 收敛到视口内。基准锚点改为 left:0/top:0 + translate。
+const containerStyle = computed(() => ({
+  left: '0px',
+  top: '0px',
+  transform: `translate(${pos.value.x}px, ${pos.value.y}px)`
+}))
 
 // 边界收敛：保证整颗球始终在视口内（左右各留 4px）
 const clampPos = (x, y) => ({
@@ -149,18 +154,33 @@ let startY = 0
 let originX = 0
 let originY = 0
 
+// pointermove 只记最新坐标，rAF 合并到下一帧统一更新（P4.13：拖动不逐次触发渲染/布局）
+let rafId = 0
+let pendingX = 0
+let pendingY = 0
+const applyMove = () => {
+  rafId = 0
+  pos.value = clampPos(pendingX, pendingY)
+}
 // 拖动中：位移超过 4px 即认定为拖动（避免手抖把点击判成拖动）
 const onMove = (e) => {
   if (!dragging) return
   const dx = e.clientX - startX
   const dy = e.clientY - startY
   if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true
-  pos.value = clampPos(originX + dx, originY + dy)
+  pendingX = originX + dx
+  pendingY = originY + dy
+  if (!rafId) rafId = requestAnimationFrame(applyMove)
 }
 // 抬起：只有真的拖动过才落盘，纯点击不写 localStorage
 const onUp = () => {
   if (!dragging) return
   dragging = false
+  // 收尾把最后一帧落实，避免抬起时位置停在上一帧
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    applyMove()
+  }
   if (moved) savePos()
   window.removeEventListener('pointermove', onMove)
   window.removeEventListener('pointerup', onUp)
@@ -283,6 +303,7 @@ onMounted(() => {
   window.addEventListener('resize', onResize)
 })
 onBeforeUnmount(() => {
+  if (rafId) cancelAnimationFrame(rafId)
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', onResize)
   // 拖到一半被卸载时，清掉挂在 window 上的 move/up 监听
