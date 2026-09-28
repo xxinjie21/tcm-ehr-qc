@@ -116,6 +116,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /** 「接诊时间」列里的纯数字紧凑串：8 位到日 / 12 位到分 / 14 位到秒 */
     private static final Pattern COMPACT_DT = Pattern.compile("\\d{8}|\\d{12}|\\d{14}");
 
+    /** 导入告警里最多列几条「接诊时间」解析失败样例；全列出来会把日志刷爆 */
+    private static final int VISIT_TIME_WARN_SAMPLE_MAX = 10;
+
     /** 内存里最多保留多少条导入任务状态；超出淘汰最早的 */
     private static final int TASK_STORE_MAX = 200;
 
@@ -185,6 +188,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
         List<Object[]> parsedRows = new ArrayList<>(); // [Record, filename]
 
+        // 「接诊时间」有原值却解析不出来的行数与前若干条样例。
+        // 这类行照旧入库（见 parseDateTime 的取舍），但必须留痕 —— 见文件循环之后的 warn
+        int visitTimeWarnCount = 0;
+        List<String> visitTimeWarnSamples = new ArrayList<>();
+
         // 4. 逐文件处理：先校验文件本身，再解析表头与数据行
         for (MultipartFile file : files) {
             String filename = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
@@ -237,6 +245,16 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                         }
                         batchRegNos.add(r.getRegistrationNo());
                         parsedRows.add(new Object[]{r, filename});
+                        // 5. 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕。
+                        // 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、
+                        // 日期范围筛选、去重哈希同时悄悄退化（2026-09-28 的实际故障）
+                        String rawVisit = cellText(row.getCell(colIndex.get("visitTime")));
+                        if (r.getVisitTime() == null && !isBlank(rawVisit)) {
+                            visitTimeWarnCount++;
+                            if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
+                                visitTimeWarnSamples.add("第 " + (i + 1) + " 行「" + rawVisit + "」");
+                            }
+                        }
                     } catch (Exception e) {
                         summary.setFailed(summary.getFailed() + 1);
                         summary.getFailures().add(new ImportSummaryVO.Failure(filename,
@@ -247,6 +265,14 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 summary.setFailed(summary.getFailed() + 1);
                 summary.getFailures().add(new ImportSummaryVO.Failure(filename, "解析失败：" + e.getMessage()));
             }
+        }
+
+        // 「接诊时间」解析失败不阻断导入，但必须留痕：只写日志、不改接口与摘要，
+        // 因为「有值却认不出」既不是失败也不是跳过，塞进 failures 会让「失败/跳过」计数自相矛盾
+        if (visitTimeWarnCount > 0) {
+            log.warn("[导入] {} 行的「接诊时间」格式无法识别，已按空值入库 —— 这些病历不会进就诊趋势、"
+                            + "按接诊时间筛选也筛不出来，请核对导入源。示例：{}",
+                    visitTimeWarnCount, String.join("、", visitTimeWarnSamples));
         }
 
         // 库内已存在哈希（按登记号预筛，避免全表扫描）
