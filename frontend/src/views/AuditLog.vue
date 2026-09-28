@@ -22,7 +22,7 @@
         <span class="tip">共 {{ total }} 条</span>
       </div>
 
-      <el-table v-loading="loading" :data="logs" border stripe style="margin-top: 12px">
+      <el-table v-loading="loading" :data="logs" border stripe max-height="520" style="margin-top: 12px">
         <el-table-column label="操作时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.logTime) }}</template>
         </el-table-column>

@@ -1036,6 +1036,11 @@ onMounted(() => {
   margin-top: 4px;
   padding-top: 6px;
 }
+/* P4.11：最终得分要突出扫读，字号比扣分项（默认）放大一档加粗 */
+.wf-item.end .wf-num {
+  font-size: 17px;
+  font-weight: 700;
+}
 /* 最终得分旁的分级胶囊 */
 .wf-grade {
   font-size: 12px;

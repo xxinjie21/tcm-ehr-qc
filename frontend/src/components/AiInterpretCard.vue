@@ -165,14 +165,13 @@ watch(() => props.recordId, () => {
 .aii-btn {
   margin-left: auto;
 }
-/* 骨架屏：渐变扫光动画；行宽由模板按序号递减，模拟段落长短不一 */
+/* 骨架屏：纯色 + opacity 呼吸（项目硬规则禁渐变）；行宽由模板按序号递减，模拟段落长短不一 */
 .aii-skeleton .sk-line {
   height: 12px;
   border-radius: 3px;
   margin-bottom: 8px;
-  background: linear-gradient(90deg, #efece3 25%, #e4e0d5 37%, #efece3 63%);
-  background-size: 400% 100%;
-  animation: sk 1.2s ease infinite;
+  background: #e8e4da;
+  animation: sk 1.2s ease-in-out infinite;
 }
 .aii-skeleton .sk-grid {
   display: grid;
@@ -183,9 +182,8 @@ watch(() => props.recordId, () => {
 .aii-skeleton .sk-box {
   height: 40px;
   border-radius: 4px;
-  background: linear-gradient(90deg, #efece3 25%, #e4e0d5 37%, #efece3 63%);
-  background-size: 400% 100%;
-  animation: sk 1.2s ease infinite;
+  background: #e8e4da;
+  animation: sk 1.2s ease-in-out infinite;
 }
 @keyframes sk {
   0% { background-position: 100% 50%; }

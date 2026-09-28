@@ -781,9 +781,13 @@ const poll = async () => {
 const startPoll = () => {
   stopPoll()
   pollTimer = setInterval(() => {
+    if (document.visibilityState !== 'visible') {
+      // P4.8：页面不可见时暂停轮询（省请求），回可见后再前进度
+      return
+    }
     poll()
     loadBatchList()
-  }, 2000)
+  }, 10000)
 }
 
 /**

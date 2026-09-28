@@ -780,7 +780,7 @@ onMounted(() => {
 }
 .term-note {
   font-size: 11.5px;
-  color: #a09c90;
+  color: var(--text-sub);
   margin: 6px 0 8px 78px;
 }
 .ded-hd {

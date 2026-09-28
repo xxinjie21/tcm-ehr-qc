@@ -237,7 +237,7 @@ aside {
 .menu .sec {
   padding: 14px 18px 4px;
   font-size: 12px;
-  color: #a09c90;
+  color: var(--text-sub);
 }
 
 main {
@@ -251,7 +251,7 @@ main {
 }
 /* 内层内容仍限宽居中，但滚动容器保持通宽 */
 main > * {
-  max-width: 1600px;
+  max-width: 1600px /* P4.18：与设计稿一致，超出横向留白不拉伸数据区；改动此值需两档视口实测 */;
   margin: 0 auto;
 }
 

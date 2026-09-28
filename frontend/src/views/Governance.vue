@@ -451,6 +451,8 @@ onMounted(() => {
 /* ===== 清洗状态行（顶部） ===== */
 .gov-stats {
   background: #fff;
+  display: flex;
+  flex-wrap: wrap;
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 14px 24px;

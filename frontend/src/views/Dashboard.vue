@@ -236,22 +236,16 @@ const loadAll = async () => {
   loading.value = true
   failed.value = false
   try {
-    // 2. 并行拉取指标卡（无参）与图表数据（带筛选），两块互不依赖
-    const [ov, ex] = await Promise.all([getOverview(), getExtraStats(params())])
-    // 3. 分别回填指标卡与图表数据
+    // 2. 并行拉取指标卡 / 图表数据（带筛选）与清洗统计，三块互不依赖（P4.6）
+    const govTask = userStore.role === '管理员'
+      ? governanceStats().catch(() => ({ data: { pendingGovern: 0 } }))
+      : Promise.resolve(null)
+    const [ov, ex, gc] = await Promise.all([getOverview(), getExtraStats(params()), govTask])
+    // 3. 分别回填指标卡与图表数据；清洗统计失败/非管理员不影响其余看板
     overview.value = ov.data
     extra.value = ex.data
-
-    // 待清洗（仅管理员可读清洗统计）
-    // 4. 管理员追加待清洗数（失败归零，不影响其余看板数据）
-    if (userStore.role === '管理员') {
-      try {
-        const g = await governanceStats()
-        govern.pendingGovern = g.data.pendingGovern ?? 0
-      } catch {
-        // 清洗统计拉取失败 → 归零，不影响其余看板数据
-        govern.pendingGovern = 0
-      }
+    if (gc) {
+      govern.pendingGovern = gc.data?.pendingGovern ?? 0
     }
   } catch {
     // 拦截器已提示；标记失败态，空态区据此给出重试入口
@@ -280,14 +274,20 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
 })
 
-// 窗口尺寸变化时让图表跟随容器重算
+// 窗口尺寸变化时让图表跟随容器重算（P4.7：rAF 合并，拖动不逐帧重排）
+let rafId = null
 const handleResize = () => {
-  if (trendChart) trendChart.resize()
-  if (distChart) distChart.resize()
+  if (rafId) return
+  rafId = requestAnimationFrame(() => {
+    rafId = null
+    if (trendChart) trendChart.resize()
+    if (distChart) distChart.resize()
+  })
 }
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (rafId) cancelAnimationFrame(rafId)
   // 卸载时销毁两个 ECharts 实例，避免残留监听与内存泄漏
   ;[trendChart, distChart].forEach((c) => c && c.dispose())
   trendChart = distChart = null
@@ -298,7 +298,7 @@ onBeforeUnmount(() => {
 /* 待办快捷条：三列等宽网格；当前只放 2 张卡（病历总数卡已移除），第 3 列留空 */
 .todo-bar {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   margin-bottom: 10px;
 }
