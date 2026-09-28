@@ -14,19 +14,39 @@
   --text: #33322e;         /* 主文本 */
   --text-sub: #726d63;     /* 次文本；对 --paper 4.64:1、对 #fff 5.14:1，满足 WCAG AA 4.5:1 */
   --danger: #a04335;       /* 警示红 */
+}
 
-  /* ===== Element Plus 变量覆盖 ===== */
+/* ===== Element Plus 变量覆盖 =====
+   ⚠️ 选择器必须用 `:root:root`（特异性 0,2,0）而不是单 `:root`（0,1,0）：
+   P4.1 改按需引入后，Element Plus 的基础变量（含默认蓝 --el-color-primary:#409eff）
+   由「组件样式运行期注入」带进产物，注入顺序晚于本文件，同为 :root 时后者胜出，
+   会把主色刷回默认蓝（本次实际踩到：按钮/链接/选中态变蓝）。提高特异性后与顺序无关。 */
+:root:root {
   --el-color-primary: var(--ink-mid);
+  /* 主色浅色梯度（Element Plus 用 light-1~9 派生 hover / 边框 / 禁用底）；
+     必须整套改成墨绿系 —— 默认的 light-1/2/4/6 是蓝色调，漏改会在
+     hover、边框、禁用态露出蓝色。 */
+  --el-color-primary-light-1: #506a5e;
+  --el-color-primary-light-2: #647b70;
   --el-color-primary-light-3: #6b8a79;
+  --el-color-primary-light-4: #8b9c94;
   --el-color-primary-light-5: #93a99e;
+  --el-color-primary-light-6: #b2bdb7;
   --el-color-primary-light-7: #c2cfc7;
   --el-color-primary-light-8: #d9e3dc;
   --el-color-primary-light-9: #f2f6f3;
   --el-color-primary-dark-2: var(--ink);
   --el-color-success: var(--ink-mid);
+  --el-color-success-light-3: #6b8a79;
+  --el-color-success-light-5: #93a99e;
+  --el-color-success-light-7: #c2cfc7;
+  --el-color-success-light-8: #d9e3dc;
+  --el-color-success-light-9: #f2f6f3;
+  --el-color-success-dark-2: var(--ink);
   --el-color-warning: var(--ochre);
   --el-color-danger: var(--danger);
   --el-color-error: var(--danger);
+  --el-color-info: var(--text-sub);
   --el-border-radius-base: 2px;
   --el-border-radius-small: 2px;
   --el-border-color: var(--line);
