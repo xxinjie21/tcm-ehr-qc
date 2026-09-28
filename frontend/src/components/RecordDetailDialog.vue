@@ -22,7 +22,7 @@
         </el-descriptions>
       </div>
       <div class="detail-col">
-        <div class="col-hd">结构化数据（术语已归一，sourceText 为原文溯源）</div>
+        <div class="col-hd">结构化数据（术语已归一，灰色小字为归一前原文）</div>
         <StructuredDataCard :data="record.structuredData" />
         <AiInterpretCard :record-id="record.id" />
       </div>
