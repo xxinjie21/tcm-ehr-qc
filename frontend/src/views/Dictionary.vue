@@ -33,9 +33,9 @@
       </div>
       <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动，页面本身不出现滚动条。
            每页条数可调（20~200），故按可视行数固定高度，超出的行在表格内部滚动 -->
-      <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360"
-        :empty-text="termsFailed ? '加载失败，请点「查 询」重试' : '没有匹配的术语'">
-        <el-table-column prop="standardTerm" label="标准术语" width="220" />
+<el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
+          <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
+          <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
           <template #default="{ row }">
             <el-tag
@@ -49,10 +49,15 @@
           </template>
         </el-table-column>
         <template #empty>
+          <!-- P5.8：空态必须解释「为什么空 / 怎么才有内容」；加载失败与真为空分开 -->
           <el-empty
-            :description="keyword ? `没有匹配「${keyword}」的术语` : '该词典暂无术语'"
+            :description="termsFailed
+              ? '术语加载失败，请点击「查 询」重试'
+              : (keyword ? `没有匹配「${keyword}」的术语：换个更短的关键词，或确认该类型已导入过词条` : '该词典暂无术语：使用「术语库导入」上传词典后可在此检索')"
             :image-size="80"
-          />
+          >
+            <el-button v-if="termsFailed" size="small" @click="loadTerms(true)">重 试</el-button>
+          </el-empty>
         </template>
       </el-table>
       <!-- 分页：词典已从演示的十几条涨到上千条（如疾病 1357、证候 2080），
