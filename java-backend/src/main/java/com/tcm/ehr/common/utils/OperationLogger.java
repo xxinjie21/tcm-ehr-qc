@@ -4,39 +4,28 @@ import com.tcm.ehr.domain.po.OperationLog;
 import com.tcm.ehr.mapper.OperationLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 /**
  * 操作日志（文档必做2）：关键操作（清洗 / 导出 / 词典导入 / 词典回滚 / 人工复核 / 批量重算）
- * **文件落盘 + 入库双写**。
+ * <b>只入库</b>，写 {@code operation_log} 表，是审计页 {@code GET /api/logs} 的唯一数据源。
  *
- * <ul>
- *   <li>文件：追加写 {@code logs/operation.log}，格式「时间 | 操作人 | 操作内容」，作为兜底备份；</li>
- *   <li>库：INSERT {@code operation_log}（log_time/operator/role/action/target/detail），
- * 供审计页 {@code GET /api/logs} 分页筛选；</li>
- *   <li>双写不做强一致，各自 try-catch：**以文件为准**，库写失败不阻塞业务（仅审计页缺该条展示）。</li>
- * </ul>
+ * <p>§七 L2 起不再落文件：原「文件 + 库」双写已删，配置项 {@code log.operation-file}
+ * 与 {@code logs/operation.log} 一并作废（{@code logs/} 目录此后后端零引用，
+ * {@code .gitignore} 里的 {@code logs/} 保留无害）。</p>
  *
- * <p>不记 IP（PIPL 最小必要）：{@code operation_log.ip} 列与 {@code RequestUtils.currentIp()}
- * 已由 §七 L1 一并删除。</p>
+ * <p>§七 L1 起不记 IP（PIPL 最小必要）。</p>
  *
- * 操作人 / 角色 取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。
+ * <p><b>已知代价</b>（用户已同意）：入库失败时没有文件兜底，仅打 WARN。该条操作在审计页缺失。</p>
+ *
+ * <p>操作人 / 角色取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OperationLogger {
-
-    private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** 库字段长度上限（与 database-init.sql 对齐），超长截断，避免插入失败丢整条 */
     private static final int MAX_OPERATOR = 50;
@@ -46,64 +35,23 @@ public class OperationLogger {
 
     private final OperationLogMapper operationLogMapper;
 
-    @Value("${log.operation-file:logs/operation.log}")
-    private String logFile;
-
     /**
-     * 记录一条关键操作（文件 + 库）
+     * 记录一条关键操作
      *
      * @param action 操作类型（数据清洗 / 数据集导出 / 词典导入 / 词典回滚 / 人工复核 / 批量重算）
      * @param target 操作对象（筛选范围 / 文件名 / 词典类型 / 病历ID），可为 null
      * @param detail 操作明细，可为 null
      */
     public void log(String action, String target, String detail) {
-        // 1. 从当前请求取操作人上下文（脱离 Web 请求时各字段为空）
+        // 1. 从当前请求取操作人上下文（脱离 Web 请求时各字段为 "unknown"）
         String operator = RequestUtils.currentUsername();
         String role = RequestUtils.currentRole();
-        // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，文件格式化是截断，
-        // 不截断会导致同一操作在文件与库中相差 1 秒，审计对不上账
+        // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，不截断会让同一操作在不同出口相差 1 秒
         LocalDateTime now = LocalDateTime.now().withNano(0);
-
-        // 2. 文件先写：它是兜底留痕，即使入库失败操作也留得下
-        writeFile(now, operator, buildContent(action, target, detail));
         insertDb(now, operator, role, action, target, detail);
     }
 
-    /** 文件行内容：`操作类型：操作对象，操作明细`（缺省段自动省略） */
-    private String buildContent(String action, String target, String detail) {
-        // 1. 操作类型必有（null 归成空串）
-        StringBuilder sb = new StringBuilder(nvl(action));
-        // 2. 有对象才补「：对象」
-        if (target != null && !target.isBlank()) {
-            sb.append('：').append(target.trim());
-        }
-        // 3. 有明细才补「，明细」
-        if (detail != null && !detail.isBlank()) {
-            sb.append('，').append(detail.trim());
-        }
-        return sb.toString();
-    }
-
-    /** 文件落盘（兜底备份，重启不丢失） */
-    private synchronized void writeFile(LocalDateTime now, String operator, String content) {
-        try {
-            // 1. 确保父目录存在（首次运行时目录还没有）
-            Path path = Paths.get(logFile);
-            if (path.getParent() != null) {
-                Files.createDirectories(path.getParent());
-            }
-            // 2. 追加一行；synchronized 防并发写把行写串
-            String line = now.format(TS) + " | " + nvl(operator) + " | " + content
-                    + System.lineSeparator();
-            Files.writeString(path, line, StandardCharsets.UTF_8,
-                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            // 3. 写文件失败只告警：不能因为留痕失败让业务操作回滚
-            log.warn("[操作日志] 文件写入失败: {}", e.getMessage());
-        }
-    }
-
-    /** 入库（审计页数据源）；失败仅告警，不阻塞业务 */
+    /** 入库（审计页唯一数据源）；失败仅告警，不阻塞业务 */
     private void insertDb(LocalDateTime now, String operator, String role,
                           String action, String target, String detail) {
         try {
@@ -118,8 +66,8 @@ public class OperationLogger {
             row.setDetail(detail == null ? null : detail.trim());
             operationLogMapper.insert(row);
         } catch (Exception e) {
-            // 3. 入库失败只告警：文件里已经留了痕，不该因此中断业务
-            log.warn("[操作日志] 入库失败（不影响业务，文件已留痕）: {}", e.getMessage());
+            // 3. 入库失败只告警，不该因此中断业务（代价：审计页缺该条，用户已知悉）
+            log.warn("[操作日志] 入库失败（不影响业务）: {}", e.getMessage());
         }
     }
 
@@ -131,9 +79,5 @@ public class OperationLogger {
         // 2. 超长则截断到上限
         String text = s.trim();
         return text.length() <= max ? text : text.substring(0, max);
-    }
-
-    private String nvl(String s) {
-        return s == null || s.isBlank() ? "unknown" : s;
     }
 }

@@ -20,7 +20,8 @@ import java.util.Map;
 /**
  * 操作日志审计：分页查询、类型选项、CSV 导出、归档清理。
  *
- * <p>数据源是 operation_log 表；文件 logs/operation.log 是兜底副本，导出与查询都不读它。</p>
+ * <p>数据源唯一：{@code operation_log} 表。§七 L2 起不再有文件副本，
+ * 导出与查询都直接读库。</p>
  */
 @RestController
 @RequiredArgsConstructor

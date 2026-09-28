@@ -99,9 +99,8 @@ llm:
   timeout: 60000              # 毫秒
   config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化（重启回显）；api-key 不落盘
 
-# 操作日志（绝对路径，避免随启动目录漂移）
-log:
-  operation-file: D:/ZISHIKU/AI/tcm-ehr-qc/logs/operation.log
+# 操作日志：§七 L2 起只入库（operation_log 表），不再落文件，故无 log.* 配置项。
+# ⚠️ 下面的 logging: 是 Spring 应用日志（另一回事），不要一起删。
 
 logging:
   level:
