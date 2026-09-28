@@ -56,7 +56,12 @@ dictionary:
 # 质控（规则可配置；rules-file 缺失则用内置默认）
 qc:
   batch:
-    max-records: 30000
+    # §七 L4：40000 = 目标数据集规模（实测 35355 条 × 1.13 KB/条 ≈ 40MB）。
+    # 原 30000 小于真实数据集，全库重算会直接抛「超出上限」。配合 L5 异步化后，
+    # 这个值退化为「提交时的范围校验」，不再是同步长任务的硬瓶颈。
+    max-records: 40000
+    # §七 L5：异步重算 worker 的并发（重算写密集，不与在线查询抢库）
+    concurrency: 1
   rules-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/qc-rules.json
 
 # MyBatis-Plus（实体/Mapper由注解与BaseMapper自动管理）

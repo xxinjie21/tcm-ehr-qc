@@ -304,7 +304,7 @@
               v-if="batchMode === 'limit'"
               v-model="batchLimit"
               :min="1"
-              :max="100000"
+              :max="40000"
               :step="100"
               size="small"
               :disabled="submitting"
@@ -714,7 +714,10 @@ const userStore = useUserStore()
 // 批量解析入口仅管理员可见（与后端权限一致，前端只做入口收敛）
 const isAdmin = computed(() => userStore.role === '管理员')
 
-const batchLimit = ref(1000)
+// §七 L4：上限与目标数据集规模对齐（40000），同时是后端 NlpBatchDTO.limit 的 @Max
+// 默认值也从 1000 提到 40000：用户要批量解析时常常就是「全部」，
+// 默认 1000 会让他以为只解析了 1000 条。上限由后端强制，这里只是提示。
+const batchLimit = ref(40000)
 const batchMode = ref('all')
 const submitting = ref(false)
 /** 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选 */

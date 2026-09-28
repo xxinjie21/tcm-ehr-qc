@@ -75,8 +75,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                     Long.class);
 
     private static final int BATCH_PAGE_SIZE = 1000;
-    /** 扣分聚合/扫描上限 */
-    private static final int MAX_SCAN_RECORDS = 3000;
+    /**
+     * 扣分聚合的扫描上限：40000（目标数据集规模，实测 35355 条 × 1.13 KB/条 ≈ 40MB）。
+     * 触顶时置 {@code truncated} 标记 —— 这是「真的超过上限」，不再是无谓的 3000 硬顶。
+     */
+    private static final int MAX_SCAN_RECORDS = 40000;
+    /** 回退子集的分批回查大小：只对「库内没有 qc_results」的记录做，故通常很小 */
+    private static final int FALLBACK_CHUNK = 500;
 
     private final ReviewTaskMapper reviewTaskMapper;
     private final ObjectMapper objectMapper;
@@ -422,8 +427,21 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * 扣分聚合统计，只读。
      *
      * <p>范围先经数据域过滤，按 1000 条/页扫描，最多扫描 {@value #MAX_SCAN_RECORDS} 条；
-     * 触顶时置 {@code truncated} 标记并停止。每条优先读库内已存评分结果，缺失则按当前规则现算，
-     * 再按扣分类型与「类型|条目」两级聚合次数和分值，同时统计等级分布。明细按分值降序取前 20。</p>
+     * 触顶时置 {@code truncated} 标记并停止。等级分布按 {@code grade} 列直接统计，
+     * 扣分数据优先读库内已存评分结果（{@code qc_results}），缺失则按当前规则现算，
+     * 再按扣分类型与「类型|条目」两级聚合次数和分值。明细按分值降序取前 20。</p>
+     *
+     * <p><b>两段式扫描（§七 L4）</b>：主扫描只 SELECT {@code id / grade / qc_results} 三列
+     * —— 原来的 {@code selectPage} 拉的是整行，含 {@code present_illness} /
+     * {@code chief_complaint} 等 TEXT 大字段，40000 条会把这些列全部拉进堆里。
+     * 只有「{@code qc_results} 为空」的记录才需要现算，而现算必须拿到
+     * {@code structured_data} + 19 个原始列（{@code QcScorer} 的回退要用），
+     * 故这些 id 收集起来、分批回查整行再算（慢路径，重算后通常几乎为空集）。
+     * ⚠️ 不可「只选 3 列就直接现算」—— 那样未评分记录会被误判为「要素全缺失」而扣满分。</p>
+     *
+     * <p><b>已知边界</b>：导入后未重算时 {@code qc_results} 全为空 → 回退子集 = 全库，
+     * 两段式退化为「全量回查」，收益归零（与改造前同慢）。重算后才几乎命中不到回退。
+     * 若首屏仍慢，先跑一次重算（§七 L5），或给本接口加 60s Redis 缓存。</p>
      *
      * @param filters 用户筛选条件，可为 null（表示不限）
      * @return 类型 / 条目扣分聚合、等级分布、扫描条数与是否被截断
@@ -432,15 +450,19 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     public DeductionStatsVO deductionStats(FiltersDTO filters) {
         // 1. 构造数据域过滤条件（角色可见范围 + 用户筛选）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), filters);
-        // 2. 初始化聚合容器：按类型、按条目、等级分布
+        // 2. 主扫描只取 3 列（见方法注释的「两段式扫描」）
+        wrapper.select("id", "grade", "qc_results");
+        // 3. 初始化聚合容器：按类型、按条目、等级分布
         DeductionStatsVO vo = new DeductionStatsVO();
         Map<String, int[]> byType = new LinkedHashMap<>();
         Map<String, int[]> byItem = new LinkedHashMap<>();
         Map<String, Integer> gradeDist = new LinkedHashMap<>();
+        // 4. 慢路径待回查的 id：库内没有可用的 qc_results
+        List<String> fallbackIds = new ArrayList<>();
         int scanned = 0;
         int totalPoints = 0;
         int pageNo = 1;
-        // 3. 分页扫描，每页 1000 条，最多扫 MAX_SCAN_RECORDS 条
+        // 5. 分页扫描，每页 1000 条，最多扫 MAX_SCAN_RECORDS 条
         while (true) {
             Page<Record> page = baseMapper.selectPage(new Page<>(pageNo, BATCH_PAGE_SIZE), wrapper);
             List<Record> records = page.getRecords();
@@ -448,34 +470,38 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 break;
             }
             for (Record r : records) {
-                // 4. 触顶即置截断标记，停止本页剩余累计
+                // 5.1 触顶即置截断标记，停止本页剩余累计
                 if (scanned >= MAX_SCAN_RECORDS) {
                     vo.setTruncated(true);
                     break;
                 }
-                // 5. 计入扫描数并累计等级分布（未评分的归入「未评分」）
+                // 5.2 计入扫描数并累计等级分布（未评分的归入「未评分」）
                 scanned++;
                 gradeDist.merge(r.getGrade() == null ? "未评分" : r.getGrade(), 1, Integer::sum);
-                // 6. 取评分结果：优先读库内 qc_results，缺失则按当前规则现算
-                ScoreResultVO sr = scoreOf(r);
-                if (sr == null || sr.getDeductions() == null) {
-                    continue;
-                }
-                // 7. 按「类型」与「类型|条目」两级累计次数与分值
-                for (ScoreResultVO.Deduction d : sr.getDeductions()) {
-                    totalPoints += d.getPoints();
-                    int[] a = byType.computeIfAbsent(d.getType(), k -> new int[2]);
-                    a[0]++;
-                    a[1] += d.getPoints();
-                    int[] b = byItem.computeIfAbsent(d.getType() + "|" + d.getItem(), k -> new int[2]);
-                    b[0]++;
-                    b[1] += d.getPoints();
+                // 5.3 快路径：qc_results 命中即直接聚合，无需任何原始列
+                ScoreResultVO sr = readStoredScore(r);
+                if (sr != null) {
+                    totalPoints += accumulate(sr, byType, byItem);
+                } else {
+                    // 5.4 慢路径：记下 id，等主扫描结束后回查整行再算
+                    fallbackIds.add(r.getId());
                 }
             }
             if (vo.isTruncated() || records.size() < BATCH_PAGE_SIZE) {
                 break;
             }
             pageNo++;
+        }
+        // 6. 慢路径：分批回查整行（含 structured_data 与 19 个原始列）后现算并聚合
+        for (int i = 0; i < fallbackIds.size(); i += FALLBACK_CHUNK) {
+            List<String> chunk = fallbackIds.subList(i, Math.min(i + FALLBACK_CHUNK, fallbackIds.size()));
+            List<Record> full = baseMapper.selectList(new QueryWrapper<Record>().select().in("id", chunk));
+            for (Record r : full) {
+                ScoreResultVO sr = scoreOf(r);
+                if (sr != null && sr.getDeductions() != null) {
+                    totalPoints += accumulate(sr, byType, byItem);
+                }
+            }
         }
         // 8. 组装类型聚合结果
         for (Map.Entry<String, int[]> e : byType.entrySet()) {
@@ -496,15 +522,50 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         return vo;
     }
 
-    /** 取该病历的评分结果：优先读 qc_results，缺失则按当前规则现算 */
+    /**
+     * 按「类型」与「类型|条目」两级累计扣分次数与分值。
+     *
+     * @return 本条记录贡献的总扣分
+     */
+    private int accumulate(ScoreResultVO sr, Map<String, int[]> byType, Map<String, int[]> byItem) {
+        int points = 0;
+        for (ScoreResultVO.Deduction d : sr.getDeductions()) {
+            points += d.getPoints();
+            int[] a = byType.computeIfAbsent(d.getType(), k -> new int[2]);
+            a[0]++;
+            a[1] += d.getPoints();
+            int[] b = byItem.computeIfAbsent(d.getType() + "|" + d.getItem(), k -> new int[2]);
+            b[0]++;
+            b[1] += d.getPoints();
+        }
+        return points;
+    }
+
+    /**
+     * 快路径：只读库内已存的 {@code qc_results}；没有或解析失败返回 {@code null}（交慢路径现算）。
+     *
+     * <p>单独拆出来是因为它<b>不需要任何原始列</b>，可以在「只 SELECT id/grade/qc_results」
+     * 的窄扫描里跑完；慢路径 {@link #scoreOf} 则依赖 {@code structured_data} 与 19 个原始列，
+     * 必须回查整行。</p>
+     */
+    private ScoreResultVO readStoredScore(Record r) {
+        if (r.getQcResults() == null || r.getQcResults().isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(r.getQcResults(), ScoreResultVO.class);
+        } catch (Exception ignored) {
+            // 落库格式异常则退回现算（走慢路径）
+            return null;
+        }
+    }
+
+    /** 取该病历的评分结果：优先读 qc_results，缺失则按当前规则现算（需整行 Record） */
     private ScoreResultVO scoreOf(Record r) {
         // 1. 优先读库内已存评分：历史统计要与当初的判定一致，不能按新规则重算
-        if (r.getQcResults() != null && !r.getQcResults().isBlank()) {
-            try {
-                return objectMapper.readValue(r.getQcResults(), ScoreResultVO.class);
-            } catch (Exception ignored) {
-                // 落库格式异常则退回现算
-            }
+        ScoreResultVO stored = readStoredScore(r);
+        if (stored != null) {
+            return stored;
         }
         // 2. 没有存值就按当前规则现算；算不出来返回 null，由调用侧跳过这一条
         try {
