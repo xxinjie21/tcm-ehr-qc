@@ -1,5 +1,5 @@
 <template>
-  <!-- 操作日志页（管理员）：筛选 + 分页表格 + 导出 CSV + 按日期清理（清理前先归档） -->
+  <!-- 操作日志页（管理员）：筛选 + 分页表格 + 导出 CSV（§七 L3 起无日志删除入口） -->
   <div>
     <PanelCard title="操作日志">
       <div class="filter-row">
@@ -17,34 +17,10 @@
           @keyup.enter="loadLogs"
         />
         <el-button type="primary" :loading="loading" @click="loadLogs">查 询</el-button>
-        <!-- 导出 / 清理都依赖「日志可用」：加载失败时一并禁用，避免对空列表做写操作 -->
+        <!-- 导出依赖「日志可用」：加载失败时禁用，避免对空列表做导出 -->
         <el-button :loading="exporting" :disabled="!available" @click="handleExport">导出 CSV</el-button>
-        <el-button type="danger" plain :disabled="!available" @click="purgeVisible = true">清 理</el-button>
         <span class="tip">共 {{ total }} 条</span>
       </div>
-
-      <!-- 清理确认弹窗：内容只有一段说明 + 一个日期选择，用窄弹窗（440px）即可，
-           不必套页面里其它弹窗的左右分栏形态 -->
-      <el-dialog v-model="purgeVisible" title="清理操作日志" width="440px">
-        <p class="purge-tip">
-          将清理所选日期<b>之前</b>的日志。系统先把它们导出为归档 CSV 存到 <code>logs/</code>，
-          <b>归档成功后才删除</b>；本次清理本身也会记入审计。
-        </p>
-        <el-date-picker
-          v-model="purgeDate"
-          type="date"
-          value-format="YYYY-MM-DD"
-          placeholder="选择截止日期（清理该日之前）"
-          :disabled-date="(d) => d.getTime() > Date.now()"
-          style="width: 100%"
-        />
-        <template #footer>
-          <el-button @click="purgeVisible = false">取消</el-button>
-          <el-button type="danger" :loading="purging" :disabled="!purgeDate" @click="handlePurge">
-            清理
-          </el-button>
-        </template>
-      </el-dialog>
 
       <el-table v-loading="loading" :data="logs" border stripe style="margin-top: 12px">
         <el-table-column label="操作时间" width="170">
@@ -86,13 +62,12 @@
 
 <script setup>
 // 操作日志页：管理员查看审计留痕。
-// 对外提供三个入口 —— 查询/分页（只读）、导出 CSV、按日期清理（后端先归档再删）。
+// 对外只提供两个入口 —— 查询/分页（只读）与导出 CSV。
+// 日志只增不删（§七 L3）：日志删除功能已删，清理只能由运维人工归档。
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
-import { getLogs, getLogActions, exportLogs, purgeLogs } from '@/api/log'
+import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
-import { confirmBox } from '@/utils/confirm'
 
 /** 图例配色；具体选项由后端返回，未匹配到的走默认色 */
 const TAG_TYPES = {
@@ -153,7 +128,7 @@ const loadLogs = async () => {
     // 2. 按当前查询条件（类型 / 关键字 / 分页）拉取日志
     const res = await getLogs(query)
     if (mine !== listSeq) return
-    // 3. 回填列表与总数，并标记日志可用（导出 / 清理按钮据此解禁）
+    // 3. 回填列表与总数，并标记日志可用（导出按钮据此解禁）
     logs.value = res.data?.list || []
     total.value = res.data?.total || 0
     available.value = true
@@ -192,37 +167,6 @@ const handleExport = async () => {
   }
 }
 
-// 清理弹窗状态：purgeDate 为空时「清理」按钮不可点
-const purgeVisible = ref(false)
-const purgeDate = ref('')
-const purging = ref(false)
-
-// 清理流程：二次确认 → 后端归档并删除 → 刷新列表
-const handlePurge = async () => {
-  // 1. 二次确认（交互形态统一走 utils/confirm.js）
-  if (!(await confirmBox(`确定清理 ${purgeDate.value} 之前的日志吗？会先归档到 logs/ 再删除。`,
-    '清理操作日志'))) {
-    return
-  }
-  purging.value = true
-  try {
-    // 2. 后端先归档到 logs/ 再删除，返回删除条数与归档文件名
-    const res = await purgeLogs(purgeDate.value)
-    const d = res.data || {}
-    const n = d.deleted || 0
-    // 3. 提示文案区分「清理了 N 条」与「本就没有可清理的」，不让空结果看起来像失败
-    ElMessage.success(n > 0 ? `已清理 ${n} 条，归档 ${d.archivedFile}` : '该日期之前没有日志，无需清理')
-    purgeVisible.value = false
-    purgeDate.value = ''
-    query.page = 1
-    // 4. 刷新列表；操作类型候选也可能随清理变化，一并重取
-    loadLogs()
-    loadActions()
-  } finally {
-    purging.value = false
-  }
-}
-
 // 进页面并行拉取「操作类型候选」与「首屏日志」
 onMounted(() => {
   loadActions()
@@ -242,17 +186,5 @@ onMounted(() => {
 .tip {
   font-size: 12.5px;
   color: var(--text-sub);
-}
-/* 清理弹窗的说明文案：多行阅读，行距放宽 */
-.purge-tip {
-  margin: 0 0 12px;
-  font-size: 13px;
-  line-height: 1.8;
-  color: var(--text-sub);
-}
-.purge-tip code {
-  background: var(--paper);
-  padding: 0 4px;
-  border-radius: 3px;
 }
 </style>

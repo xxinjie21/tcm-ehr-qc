@@ -1511,7 +1511,7 @@ paths:
       tags:
         - 日志
       summary: 操作日志分页查询
-      description: 【权限：仅管理员】读 operation_log 表（批A·C5 双写入库）分页筛选；文件 logs/operation.log 为兜底备份
+      description: 【权限：仅管理员】读 operation_log 表分页筛选。§七 L1/L2 后该表是唯一数据源（不记 IP、不再落文件）；§七 L3 后日志只增不删
       parameters:
         - name: action
           in: query
@@ -1592,7 +1592,7 @@ paths:
       tags:
         - 日志
       summary: 操作日志导出
-      description: 【权限：仅管理员】读取 logs/operation.log 日志文件，作为文件流返回下载（不套 Result 包装）
+      description: 【权限：仅管理员】按筛选条件读 operation_log 表并导出为 CSV（带 UTF-8 BOM）文件流，不套 Result 包装
       responses:
         '200':
           description: 日志文件流
@@ -1604,60 +1604,11 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
-          description: 日志文件不存在或读取失败（code=500）
+          description: 导出读取失败（code=500）
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorVO'
-  /api/logs/purge:
-    post:
-      tags:
-        - 日志
-      summary: 归档并清理操作日志
-      description: 【权限：仅管理员】清理 beforeDate（yyyy-MM-dd，不含当天）之前的 operation_log。服务端先导出归档 CSV 到 logs/，成功后才删除；本次清理动作本身也记入审计
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                beforeDate:
-                  type: string
-                  description: 清理截止日期（yyyy-MM-dd）
-                  example: '2026-01-01'
-      responses:
-        '200':
-          description: 清理结果 {deleted, archivedFile}
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 200
-                  msg:
-                    type: string
-                  data:
-                    type: object
-                    properties:
-                      deleted:
-                        type: integer
-                        description: 删除条数
-                      archivedFile:
-                        type: string
-                        description: 归档文件名（无删除时为空串）
-        '400':
-          description: 未提供 beforeDate 或日期格式错误
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorVO'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
   /api/records/import:
     post:
       tags:

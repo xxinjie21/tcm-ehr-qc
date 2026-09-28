@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 操作日志审计：分页查询、类型选项、导出、归档清理。
+ * 操作日志审计：分页查询、类型选项、导出。
+ * §七 L3 已删 {@code purgeBefore}（日志只增不删）。
  */
 public interface ILogService {
 
@@ -45,14 +46,6 @@ public interface ILogService {
      * @return 带 UTF-8 BOM 的 CSV 字节
      */
     byte[] exportCsv(String action, String keyword);
-
-    /**
-     * 归档并清理指定日期之前的日志。
-     *
-     * @param beforeDate 截止日期（yyyy-MM-dd），该日之前的记录被清理
-     * @return deleted=删除条数；archivedFile=归档文件名（无记录时为空串）
-     */
-    java.util.Map<String, Object> purgeBefore(String beforeDate);
 
     /**
      * 某操作人最近的 n 条日志，供 AI 助手拼装"我做了什么"上下文。

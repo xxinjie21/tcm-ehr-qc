@@ -2,15 +2,11 @@ package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
-import com.tcm.ehr.common.utils.OperationLogger;
-import com.tcm.ehr.domain.dto.PurgeLogDTO;
 import com.tcm.ehr.service.ILogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,7 +14,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 操作日志审计：分页查询、类型选项、CSV 导出、归档清理。
+ * 操作日志审计：分页查询、类型选项、CSV 导出。
+ *
+ * <p>§七 L3：归档清理（{@code POST /api/logs/purge}）已删 —— 日志只增不删，
+ * 无界增长为已知未闭环项，清理只能由运维人工归档。</p>
  *
  * <p>数据源唯一：{@code operation_log} 表。§七 L2 起不再有文件副本，
  * 导出与查询都直接读库。</p>
@@ -28,7 +27,6 @@ import java.util.Map;
 public class LogController {
 
     private final ILogService logService;
-    private final OperationLogger operationLogger;
 
     /**
      * 分页查询操作日志。
@@ -81,30 +79,5 @@ public class LogController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=audit-logs.csv")
                 .contentType(org.springframework.http.MediaType.parseMediaType("text/csv;charset=UTF-8"))
                 .body(content);
-    }
-
-    /**
-     * 归档并清理指定日期之前的操作日志。
-     *
-     * <p>【权限：仅管理员】先归档落盘、成功才删；本次清理本身也记入审计。</p>
-     *
-     * @param dto beforeDate=截止日期（yyyy-MM-dd），该日 00:00:00 之前的记录被清理
-     * @return deleted=清理条数；archivedFile=归档文件名（无记录时为空串）
-     */
-    @RequireRole(roles = {"管理员"})
-    @PostMapping("/api/logs/purge")
-    public Result<Map<String, Object>> purge(@RequestBody PurgeLogDTO dto) {
-        // 1. 截止日期必填：没给日期就等于"清空全部"，不能让它静默发生
-        if (dto == null || dto.getBeforeDate() == null || dto.getBeforeDate().isBlank()) {
-            throw new IllegalArgumentException("请提供清理截止日期 beforeDate");
-        }
-        // 2. 删除并归档（service 内先导出再删）
-        Map<String, Object> result = logService.purgeBefore(dto.getBeforeDate());
-        // 3. 留痕：归档文件名有就带上
-        Object archived = result.get("archivedFile");
-        operationLogger.log("日志清理", "清理至 " + dto.getBeforeDate(),
-                "删除 " + result.get("deleted") + " 条"
-                        + (archived == null || String.valueOf(archived).isBlank() ? "" : "，归档 " + archived));
-        return Result.ok("清理完成", result);
     }
 }

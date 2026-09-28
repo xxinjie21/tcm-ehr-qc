@@ -7,24 +7,17 @@ import com.tcm.ehr.mapper.OperationLogMapper;
 import com.tcm.ehr.service.ILogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 操作日志审计实现：读 operation_log做分页筛选、导出、归档清理。
+ * 操作日志审计实现：读 operation_log 做分页筛选与导出。
+ * §七 L2/L3：归档文件与 purge 均已删，现在只剩「读库 + 导 CSV」。
  */
 @Slf4j
 @Service
@@ -34,15 +27,7 @@ public class LogServiceImpl implements ILogService {
     /** 页面展示用的时间格式 */
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /** 归档文件名中的时间戳格式 */
-    /** 归档文件名用毫秒精度：秒级会让同一秒内的两次清理互相覆盖，归档后删库的数据就再也追不回来 */
-    private static final DateTimeFormatter FILE_TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
-
     private final OperationLogMapper operationLogMapper;
-
-    /** 归档 CSV 目录（清理前先落盘） */
-    @Value("${log.archive-dir:logs}")
-    private String archiveDir;
 
     /**
      * 分页查询操作日志。
@@ -100,44 +85,6 @@ public class LogServiceImpl implements ILogService {
     }
 
     /**
-     * 归档并清理指定日期之前的日志。
-     *
-     * @param beforeDate 截止日期（yyyy-MM-dd），该日 00:00:00 之前的记录被清理
-     * @return deleted=清理条数、archivedFile=归档文件名（无记录时为空串）
-     */
-    @Override
-    public Map<String, Object> purgeBefore(String beforeDate) {
-        // 1. 解析截止日期
-        LocalDate date;
-        try {
-            date = LocalDate.parse(beforeDate.trim());
-        } catch (DateTimeParseException e) {
-            // 入参日期格式不合法 → 转成明确的参数错误返回，不落到 500
-            throw new IllegalArgumentException("日期格式应为 yyyy-MM-dd");
-        }
-        // 2. 取待清理记录（时间正序，与归档文件内顺序一致）
-        String boundary = date + " 00:00:00";
-        QueryWrapper<OperationLog> w = new QueryWrapper<OperationLog>()
-                .lt("log_time", boundary)
-                .orderByAsc("log_time");
-        List<OperationLog> rows = operationLogMapper.selectList(w);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        // 3. 无记录直接返回，不产生空归档文件
-        if (rows.isEmpty()) {
-            result.put("deleted", 0);
-            result.put("archivedFile", "");
-            return result;
-        }
-        // 先归档落盘，成功后再删（归档失败则抛错、不删除）
-        String file = writeArchive(rows);
-        int deleted = operationLogMapper.delete(w);
-        result.put("deleted", deleted);
-        result.put("archivedFile", file);
-        return result;
-    }
-
-    /**
      * 取某操作人最近的若干条日志，供 AI 助手理解上下文。
      *
      * @param operator 操作人
@@ -156,27 +103,6 @@ public class LogServiceImpl implements ILogService {
                 .orderByDesc("log_time")
                 .last("LIMIT " + limit);
         return operationLogMapper.selectList(w);
-    }
-
-    /** 写归档 CSV 到 logs/，返回文件名；失败抛 IOException（由上层转 500，不静默丢数据） */
-    private String writeArchive(List<OperationLog> rows) {
-        // 1. 归档文件名带毫秒时间戳；万一仍撞名（同一毫秒），追加 _2、_3 去重
-        String base = "audit-archive-" + LocalDateTime.now().format(FILE_TS);
-        try {
-            // 2. 落盘到 logs/
-            Path dir = Paths.get(archiveDir);
-            Files.createDirectories(dir);
-            String name = base + ".csv";
-            for (int i = 2; Files.exists(dir.resolve(name)); i++) {
-                name = base + "_" + i + ".csv";
-            }
-            Files.write(dir.resolve(name), csvBytes(rows));
-            log.info("[日志清理] 已归档 {} 条到 {}", rows.size(), dir.resolve(name));
-            return name;
-        } catch (IOException e) {
-            // 目录不可写 / 磁盘异常 → 抛出终止清理，库内数据保持原样
-            throw new IllegalStateException("归档失败，未执行清理：" + e.getMessage(), e);
-        }
     }
 
     /** 生成带 UTF-8 BOM 的 CSV 字节（Excel 正确识别中文） */
