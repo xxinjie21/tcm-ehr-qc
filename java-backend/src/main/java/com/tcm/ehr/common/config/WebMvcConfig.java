@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.config;
 
+import com.tcm.ehr.common.interceptors.GroupRoleInterceptor;
 import com.tcm.ehr.common.interceptors.JwtInterceptor;
 import com.tcm.ehr.common.interceptors.RoleInterceptor;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final JwtInterceptor jwtInterceptor;
     private final RoleInterceptor roleInterceptor;
+    private final GroupRoleInterceptor groupRoleInterceptor;
 
     @Override
     /**
@@ -30,6 +32,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/api/auth/login", "/api/auth/register");
         registry.addInterceptor(roleInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns("/api/auth/login", "/api/auth/register");
+        // 组内角色（组长）校验：在系统级角色之后执行
+        registry.addInterceptor(groupRoleInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/api/auth/login", "/api/auth/register");
     }
