@@ -8,6 +8,18 @@ spring:
     username: root
     password: "123456"
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # §八 C1：不配 hikari 段时用 Hikari 默认的 maximum-pool-size=10，那是当前唯一的
+    # 并发硬瓶颈（Tomcat 200 线程、Redis 共享连接都够）。多课题组 R2 要给**每个请求**
+    # 加一次查组 DB 往返，不先抬池子的话并发能力会不升反降 —— 故 C1 是 R2 的前置条件。
+    hikari:
+      # 20 而不是 50：单实例 + 每请求 1 次短查询，20 已远超实际需要；
+      # 连接数是 MySQL 端的上限（默认 max_connections=151），盲目调大会先撞库上限。
+      maximum-pool-size: 20
+      # 空闲连接回收：池长期保持 20 条会一直占着 MySQL 的连接槽
+      minimum-idle: 5
+      # 连接最长存活 30min：MySQL 默认 wait_timeout 是 8h，先于它回收可避免拿到死连接
+      max-lifetime: 1800000
+      connection-timeout: 30000
 
   # Redis（连接 Docker 中的 windows-redis 容器，宿主机端口6379）
   data:
