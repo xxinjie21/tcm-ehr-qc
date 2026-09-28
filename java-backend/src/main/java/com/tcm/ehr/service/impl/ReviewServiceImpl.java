@@ -101,7 +101,8 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             rv.setCreateTime(t.getCreateTime());
             rv.setDeadlineTime(t.getDeadlineTime());
             rv.setOverdue(ReviewTaskUtil.isOverdue(t.getDeadlineTime()));
-            rv.setStructuredData(parse(r.getStructuredData()));
+            // P5.3：列表不再内联整份 structuredData（每行一份很胖），详情由 /raw/按需拉；
+            // 前端原本就以详情为准，列表份只是“列表数据可能滞后”的兜底，去掉不影响正确性
             vo.getTasks().add(rv);
         }
         vo.setSkippedMissing(skippedMissing);
@@ -209,21 +210,6 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             return "缺失字段";
         }
         return "评分不达标";
-    }
-
-    /** 解析 structured_data 字符串为对象（供左侧对照）；失败/空返回 null */
-    private Object parse(String json) {
-        // 1. 空值给 null
-        if (json == null || json.isBlank()) {
-            return null;
-        }
-        // 2. 解析不了也给 null：左侧对照区没内容比整页报错好
-        try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (JacksonException e) {
-            return null;
-        }
     }
 
     /** 解析结构化数据；空或坏 JSON 返回空 map（复核时按"未结构化"继续，不中断） */
