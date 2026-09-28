@@ -96,7 +96,8 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBox } from '@/utils/confirm'
 import PanelCard from '@/components/PanelCard.vue'
 import { getMyGroup, listMembers, addMember, removeMember, transferOwner, leaveGroup, listPendingUsers } from '@/api/group'
 import { useUserStore } from '@/stores/user'
@@ -159,9 +160,7 @@ const doAdd = async () => {
 }
 
 const doRemove = async (row) => {
-  try {
-    await ElMessageBox.confirm(`确定将「${row.username}」移出本组？`, '移除成员', { type: 'warning' })
-  } catch {
+  if (!(await confirmBox(`确定将「${row.username}」移出本组？`, '移除成员', { type: 'warning' }))) {
     return
   }
   try {
@@ -175,9 +174,7 @@ const doRemove = async (row) => {
 }
 
 const doTransfer = async (row) => {
-  try {
-    await ElMessageBox.confirm(`把组长转让给「${row.username}」？转让后你自动降为组员。`, '转让组长', { type: 'warning' })
-  } catch {
+  if (!(await confirmBox(`把组长转让给「${row.username}」？转让后你自动降为组员。`, '转让组长', { type: 'warning' }))) {
     return
   }
   try {
@@ -191,9 +188,7 @@ const doTransfer = async (row) => {
 }
 
 const doLeave = async () => {
-  try {
-    await ElMessageBox.confirm('退出后你立即失去本组数据访问权限。确定退出？', '退出课题组', { type: 'warning' })
-  } catch {
+  if (!(await confirmBox('退出后你立即失去本组数据访问权限。确定退出？', '退出课题组', { type: 'warning' }))) {
     return
   }
   leaving.value = true

@@ -333,7 +333,8 @@
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -609,11 +610,7 @@ const applyRules = (res) => {
 
 // 恢复默认规则：二次确认后调后端重置
 const resetRules = async () => {
-  try {
-    // 1. 二次确认：重置会覆盖当前自定义规则，取消即整体中止
-    await ElMessageBox.confirm('确定恢复默认质控规则吗？当前自定义规则将被覆盖。', '恢复默认', { type: 'warning' })
-  } catch {
-    // 用户点取消 → 直接返回，不发重置请求
+  if (!(await confirmBox('确定恢复默认质控规则吗？当前自定义规则将被覆盖。', '恢复默认', { type: 'warning' }))) {
     return
   }
   try {
@@ -749,15 +746,10 @@ const pollTask = async (id) => {
 
 // 质控评分计算：二次确认后提交异步任务，轮询进度直到终态
 const handleRecompute = async () => {
-  try {
-    // 1. 二次确认：重算会覆盖现有分数，取消即整体中止
-    await ElMessageBox.confirm(
+  if (!(await confirmBox(
       '将按质控规则重算当前筛选范围内病历的评分与分级（覆盖现有分数），确认？',
       '质控评分计算',
-      { type: 'warning', confirmButtonText: '确认重算', cancelButtonText: '取消' }
-    )
-  } catch {
-    // 用户点取消 → 直接返回，不触发重算
+      { type: 'warning', confirmButtonText: '确认重算', cancelButtonText: '取消' }))) {
     return
   }
   // 2. 置重算态：按钮进入 loading，避免重复触发

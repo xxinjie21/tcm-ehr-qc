@@ -375,7 +375,7 @@
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { computed, reactive, ref, onMounted, onBeforeUnmount } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
@@ -689,15 +689,10 @@ const runNormalize = async () => {
 const save = async () => {
   // 1. 取用于回显的病历标识（优先登记号）
   const label = loadedLabel.value || recordId.value
-  try {
-    // 2. 二次确认：写回会覆盖原有内容且不可撤销
-    await ElMessageBox.confirm(
+  if (!(await confirmBox(
       `将本次抽取结果写入病历「${label}」的结构化数据，覆盖原有内容。确认？`,
       '写回结构化数据',
-      { type: 'warning', confirmButtonText: '确认保存', cancelButtonText: '取消' }
-    )
-  } catch {
-    // 3. 取消确认则直接返回，不发请求
+      { type: 'warning', confirmButtonText: '确认保存', cancelButtonText: '取消' }))) {
     return
   }
   try {

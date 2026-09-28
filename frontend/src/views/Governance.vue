@@ -201,7 +201,8 @@
 // 也不填充医生未书写的内容；导出恒只取质控合格病历，分级筛选只作用于清洗、不影响导出范围。
 import { useDepartments } from '@/composables/useDepartments'
 import { reactive, ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBox } from '@/utils/confirm'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -268,14 +269,10 @@ const clean = reactive({ loading: false, result: null })
 // 再按当前 filters 提交；成功后写入分步结果与三级命中分布，并刷新顶部统计
 const handleClean = async () => {
   // 1. 先二次确认，文案写明「只标记不删除、不补医生未写内容」
-  try {
-    await ElMessageBox.confirm(
+  if (!(await confirmBox(
       `将对「${scopeText.value}」范围内的病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`,
       '数据清洗',
-      { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }
-    )
-  // 2. 用户取消就直接返回
-  } catch {
+      { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }))) {
     return
   }
   // 3. 置清洗中状态

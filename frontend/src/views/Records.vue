@@ -227,7 +227,8 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -371,12 +372,9 @@ const closeDetail = () => {
 // 若删的正是当前详情记录，则一并收起弹窗、清空 raw，避免弹窗继续指向已删数据
 const handleDelete = async (id) => {
   // 1. 先二次确认：删除不可恢复且会留痕
-  try {
-    await ElMessageBox.confirm('确认删除该病历？删除后不可恢复（会留痕）。', '删除病历', {
+  if (!(await confirmBox('确认删除该病历？删除后不可恢复（会留痕）。', '删除病历', {
       type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'
-    })
-  // 2. 用户取消就直接返回，不发删除请求
-  } catch {
+    }))) {
     return
   }
   // 3. 确认后提交删除
@@ -412,14 +410,10 @@ const handleBatchDelete = async () => {
   const ids = selectedIds.value
   if (!ids.length) return
   // 2. 二次确认，确认文案带上将删条数
-  try {
-    await ElMessageBox.confirm(
+  if (!(await confirmBox(
       `确认删除选中的 ${ids.length} 份病历？删除后不可恢复（会留痕）。`,
       '批量删除病历',
-      { type: 'warning', confirmButtonText: `删除 ${ids.length} 条`, cancelButtonText: '取消' }
-    )
-  // 3. 用户取消就直接返回
-  } catch {
+      { type: 'warning', confirmButtonText: `删除 ${ids.length} 条`, cancelButtonText: '取消' }))) {
     return
   }
   // 4. 一次提交全部 id
@@ -464,14 +458,10 @@ const handleRangeDelete = async () => {
     return
   }
   // 5. 二次确认，文案写明将删除多少条
-  try {
-    await ElMessageBox.confirm(
+  if (!(await confirmBox(
       `将删除当前筛选范围内全部 ${n} 份病历，删除后不可恢复（会留痕）。确认？`,
       '删除范围内病历',
-      { type: 'warning', confirmButtonText: `删除 ${n} 条`, cancelButtonText: '取消' }
-    )
-  // 6. 用户取消就直接返回
-  } catch {
+      { type: 'warning', confirmButtonText: `删除 ${n} 条`, cancelButtonText: '取消' }))) {
     return
   }
   // 7. 提交范围删除

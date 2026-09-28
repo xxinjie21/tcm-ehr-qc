@@ -226,7 +226,7 @@
 // 词典管理页：类型切换会同时刷新「术语查询」与「版本回滚」两块数据。
 // 导入有两条路径 —— 非 PDF 直接覆盖入库；PDF 先转换预览，确认后再把候选转成 JSON 复用同一入库接口。
 import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, genFileId } from 'element-plus'
+import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
 import { getTerms, importDict, convertDict, rollback, getBackups } from '@/api/dictionary'
@@ -374,12 +374,11 @@ const handleImport = async () => {
     return
   }
   // 3. 其余格式覆盖式入库，先二次确认（取消则中止）
-  const ok = await ElMessageBox.confirm(
+  if (!(await confirmBox(
     `确定用「${importFile.value.name}」覆盖【${typeLabel.value}】词典吗？`,
     '术语库导入',
     { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' }
-  ).catch(() => false)
-  if (!ok) return
+  ))) return
   // 4. 执行入库，成功后清空已选文件与上传列表
   await doImport(importFile.value)
   uploadRef.value?.clearFiles()
