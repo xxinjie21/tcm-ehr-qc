@@ -8,13 +8,11 @@ import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.config.QcRuleSet;
 import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.utils.LogicChecker;
-import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.LogicCheckDTO;
-import com.tcm.ehr.domain.dto.QcBatchDTO;
 import com.tcm.ehr.domain.dto.QcCheckDTO;
 import com.tcm.ehr.domain.dto.QcScoreDTO;
 import com.tcm.ehr.domain.dto.FiltersDTO;
@@ -31,11 +29,9 @@ import com.tcm.ehr.mapper.ReviewTaskMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -43,7 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -51,7 +46,9 @@ import java.util.regex.Pattern;
  *
  * <ul>
  * <li>判定地基 = 规则引擎（QcScorer + LogicChecker），规则来自 {@link QcRuleStore}；</li>
- * <li>批量：分页分批（1000/页） + Redis SETNX 防重（tcm:task:batch）；</li>
+ * <li>批量重算（§七 L5 起异步）：不在本类的请求线程里跑，改由 {@code QcBatchServiceImpl}
+ * 以 {@code qc_task} 表 + 固定并发 1 的 worker 执行；本类只保留单条处理
+ * {@link #processOne}，分页取数、进度落库、取消与防重都在那边。</li>
  * <li>review_tasks 幂等 upsert（查询过滤 is_obsolete=0）。</li>
  * </ul>
  */
@@ -59,20 +56,6 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements com.tcm.ehr.service.IQcService {
-
-    private static final String BATCH_LOCK_KEY = "tcm:task:batch";
-    /** 防重锁 TTL：超过它就认为上一轮已经异常结束，允许重新提交 */
-    private static final long LOCK_TTL_SECONDS = 900;
-    /** 降级为进程内锁时用的哨兵令牌（与 Redis 的 UUID 令牌区分开） */
-    private static final String LOCAL_LOCK_TOKEN = "local";
-    /** Redis 不可用时的兜底锁；final 且有初值 → 不进 @RequiredArgsConstructor */
-    private final java.util.concurrent.locks.ReentrantLock localLock = new java.util.concurrent.locks.ReentrantLock();
-
-    /** 只删除「值等于本次令牌」的锁，GET 与 DEL 之间不可被打断 */
-    private static final org.springframework.data.redis.core.script.RedisScript<Long> RELEASE_IF_OWNER =
-            org.springframework.data.redis.core.script.RedisScript.of(
-                    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
-                    Long.class);
 
     private static final int BATCH_PAGE_SIZE = 1000;
     /**
@@ -85,12 +68,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     private final ReviewTaskMapper reviewTaskMapper;
     private final ObjectMapper objectMapper;
-    private final StringRedisTemplate redis;
-    private final OperationLogger operationLogger;
     private final QcRuleStore ruleStore;
-
-    @Value("${qc.batch.max-records:30000}")
-    private int maxRecords;
 
     // ------------------------------------------------------------------ 检查
 
@@ -195,85 +173,12 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     }
 
     /**
-     * 按筛选范围批量重算质控（同步执行，有副作用）。
+     * 处理单条：现算评分 → 回写 records → 幂等 upsert 复核任务 → 计入分级统计。
      *
-     * <p>范围先经数据域过滤；总数超过 {@code qc.batch.max-records}（默认 30000）直接拒绝，
-     * 避免同步接口超时与防重锁被长期占用。执行前取 Redis 防重锁（Redis 不可用时降级为进程内
-     * 锁），已被占用则拒绝重复提交；随后按 1000 条/页循环，逐条现算评分、回写 records 评分字段
-     * 并幂等 upsert review_tasks，批内以 21 字段文本哈希去重。单条失败只累计计数、不中断整批，
-     * 失败明细最多保留 50 条。结束时无论成败都会释放锁。</p>
-     *
-     * @param dto 批量请求，filters 为筛选条件，可为 null（表示不限）
-     * @return 总数、合格 / 待复核 / 无效 / 失败计数及失败样例
-     * @throws IllegalArgumentException 超出单次上限或已有任务在跑时抛出
+     * <p>§七 L5：改为<b>包级可见</b>——异步 worker（{@code QcBatchServiceImpl}）复用本方法处理单条，
+     * 避免在两个类里实现两份「现算 + 回写 + 复核任务」逻辑（两者口径一旦分岔就会让重算结果对不上）。</p>
      */
-    @Override
-    public QcBatchResultVO scoreBatch(QcBatchDTO dto) {
-        // 1. 构造数据域过滤条件（角色可见范围 + 用户筛选）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(),
-                dto == null ? null : dto.getFilters());
-        // 2. 先统计总数，用于上限校验
-        long total = baseMapper.selectCount(wrapper);
-        // 3. 超过单次上限直接拒绝：本接口同步执行，避免超时与防重锁被长期占用
-        if (total > maxRecords) {
-            // 上限维持 30000 不提高：本接口是同步的（前端超时 200s、后端还握着 900s 的防重锁），
-            // 真跑 3.5 万条只会把「干净的 400」换成「前端超时 + 锁被占满」。所以把文案写成
-            // 可执行的下一步，而不是让用户反复试。
-            throw new IllegalArgumentException("本次范围 " + total + " 条，超过单次上限 " + maxRecords
-                    + " 条。请按科室或就诊时间分批重算。");
-        }
-
-        // 4. 取 Redis 防重锁（不可用时降级为进程内锁）
-        String lockToken = acquireLock();
-        // 5. 锁已被占用 → 拒绝重复提交
-        if (lockToken == null) {
-            throw new IllegalArgumentException("任务进行中，请勿重复提交");
-        }
-        // 6. 初始化统计结果与批内去重集合（21 字段文本哈希）
-        QcBatchResultVO result = new QcBatchResultVO();
-        Set<String> seenHash = new HashSet<>();
-        try {
-            // 7. 取规则快照，整批共用（避免逐条重复读取）
-            QcRuleSet rules = ruleStore.get();
-            // 8. 按 1000 条/页分页扫描，直到取空或不足一页
-            int pageNo = 1;
-            while (true) {
-                Page<Record> page = baseMapper.selectPage(new Page<>(pageNo, BATCH_PAGE_SIZE), wrapper);
-                List<Record> records = page.getRecords();
-                if (records.isEmpty()) {
-                    break;
-                }
-                for (Record r : records) {
-                    result.setTotal(result.getTotal() + 1);
-                    // 9. 单条失败只累计计数、不中断整批（明细最多保留 50 条）
-                    try {
-                        processOne(r, result, seenHash, rules);
-                    } catch (Exception e) {
-                        result.setFailed(result.getFailed() + 1);
-                        if (result.getFailureSamples().size() < 50) {
-                            result.getFailureSamples().add(new QcBatchResultVO.Failure(r.getId(), e.getMessage()));
-                        }
-                        log.warn("[质控重算] 病历 {} 失败: {}", r.getId(), e.getMessage());
-                    }
-                }
-                if (records.size() < BATCH_PAGE_SIZE) {
-                    break;
-                }
-                pageNo++;
-            }
-            // 10. 记录操作日志（含总数与各状态计数）
-            operationLogger.log("批量重算", RecordFilter.describe(dto == null ? null : dto.getFilters()), "总数" + result.getTotal() + "，合格" + result.getQualified()
-                    + "，待复核" + result.getPendingReview() + "，无效" + result.getInvalid()
-                    + "，失败" + result.getFailed());
-        // 11. 无论成败都释放锁
-        } finally {
-            releaseLock(lockToken);
-        }
-        return result;
-    }
-
-    /** 处理单条：现算评分 → 回写 records → 幂等 upsert 复核任务 → 计入分级统计 */
-    private void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception {
+    void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception {
         // 1. 批内按 21 字段文本哈希判重（与导入去重、清洗去重同口径）
         String hash = RecordUtil.textHash(r);
         boolean duplicate = !seenHash.add(hash);
@@ -576,53 +481,6 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     }
 
     // ------------------------------------------------------------------ 辅助
-
-    /**
-     * 取防重锁：成功返回本次的锁令牌，已被别人持有返回 {@code null}。
-     *
-     * <p>Redis 不可用时<b>降级为进程内锁</b>，而不是原来的「放行」—— 放行会让并发提交
-     * 真的跑两份，产生重复扣分与重复 review_tasks。本项目单实例部署，进程内锁在这个前提下
-     * 与 Redis 锁等效；<b>多实例部署下进程内锁无效</b>，那时 Redis 挂了就只能拒绝提交
-     * （日志里已写明这条限制）。</p>
-     */
-    private String acquireLock() {
-        String token = UUID.randomUUID().toString();
-        // 1. 正常路径：Redis setIfAbsent 带 TTL，抢不到返回 null 由上层拒绝
-        try {
-            Boolean ok = redis.opsForValue()
-                    .setIfAbsent(BATCH_LOCK_KEY, token, Duration.ofSeconds(LOCK_TTL_SECONDS));
-            return Boolean.TRUE.equals(ok) ? token : null;
-        } catch (Exception e) {
-            // 2. Redis 挂了降级进程内锁（多实例下无效，见 Javadoc）
-            log.warn("[质控重算] Redis 不可用，降级为进程内防重锁（多实例部署下不生效）: {}", e.getMessage());
-            return localLock.tryLock() ? LOCAL_LOCK_TOKEN : null;
-        }
-    }
-
-    /**
-     * 释放锁：只删「本次持有」的那一把。
-     *
-     * <p>原来直接 {@code redis.delete(BATCH_LOCK_KEY)} —— 900 秒 TTL 过期后锁可能已被别人取走，
-     * 无条件删就是把别人的锁删了，防重彻底失效。用 Lua 原子比对 value 再删，避免
-     * 「比对通过、删除前恰好过期被他人取走」的竞态。</p>
-     */
-    private void releaseLock(String token) {
-        // 1. 没拿到过锁就不用释放
-        if (token == null) {
-            return;
-        }
-        // 2. 进程内锁走本地解锁
-        if (LOCAL_LOCK_TOKEN.equals(token)) {
-            localLock.unlock();
-            return;
-        }
-        // 3. Redis 锁用 Lua 比对令牌再删，避免删掉别人的锁
-        try {
-            redis.execute(RELEASE_IF_OWNER, List.of(BATCH_LOCK_KEY), token);
-        } catch (Exception e) {
-            log.warn("[质控重算] 释放锁失败（将由 EX 过期兜底）: {}", e.getMessage());
-        }
-    }
 
     /** 按 ID 取病历；ID 为空返回 null（由上层转 400/404） */
     private Record loadRaw(String recordId) {

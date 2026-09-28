@@ -20,8 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>另外两处<b>刻意不加</b>事务，不在这里断言、只在实现里写了原因：
  * {@code DictionaryServiceImpl.importDictionary}（方法内没有 DB 写，只有文件与 ES，
- * 都不随事务回滚）与 {@code QcServiceImpl.processOne}（private + 调用处吞异常，
- * 逐条独立提交是那里的既有设计）。</p>
+ * 都不随事务回滚）与 {@code QcServiceImpl.processOne}（<b>§七 L5 起改为包级可见</b>，
+ * 供异步 worker {@code QcBatchServiceImpl} 跨类复用；调用处吞异常、逐条独立提交
+ * 是那里的既有设计 —— 一条病历失败不该把整批回滚）。</p>
  */
 class TransactionAnnotationTest {
 

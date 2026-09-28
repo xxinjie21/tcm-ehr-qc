@@ -20,7 +20,9 @@ import java.time.LocalDateTime;
  *
  * <p><b>已知代价</b>（用户已同意）：入库失败时没有文件兜底，仅打 WARN。该条操作在审计页缺失。</p>
  *
- * <p>操作人 / 角色取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。</p>
+ * <p>操作人 / 角色取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。
+ * ⚠️ 后台线程（异步任务）读不到线程绑定的 request 属性，会取到 {@code "unknown"}；
+ * 异步任务须用 {@link #log(String, String, String, String, String)} 显式传提交时捕获的操作人与角色。</p>
  */
 @Slf4j
 @Component
@@ -44,8 +46,24 @@ public class OperationLogger {
      */
     public void log(String action, String target, String detail) {
         // 1. 从当前请求取操作人上下文（脱离 Web 请求时各字段为 "unknown"）
-        String operator = RequestUtils.currentUsername();
-        String role = RequestUtils.currentRole();
+        log(action, target, detail, RequestUtils.currentUsername(), RequestUtils.currentRole());
+    }
+
+    /**
+     * 记录一条关键操作，<b>操作人与角色由调用方指定</b>。
+     *
+     * <p>供后台线程（批量重算 / 批量解析等异步任务）使用：这些线程没有
+     * {@code RequestContextHolder} 上下文，{@link #log(String, String, String)} 会把操作人
+     * 记成 {@code "unknown"}。异步任务应在<b>提交线程</b>捕获操作人与角色，
+     * 由 worker 线程回填 —— 与 {@code qc_task.role} 快照是同一个理由。</p>
+     *
+     * @param action   操作类型
+     * @param target   操作对象，可为 null
+     * @param detail   操作明细，可为 null
+     * @param operator 操作人用户名
+     * @param role     操作人角色
+     */
+    public void log(String action, String target, String detail, String operator, String role) {
         // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，不截断会让同一操作在不同出口相差 1 秒
         LocalDateTime now = LocalDateTime.now().withNano(0);
         insertDb(now, operator, role, action, target, detail);

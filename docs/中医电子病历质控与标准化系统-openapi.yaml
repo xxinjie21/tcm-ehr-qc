@@ -515,6 +515,61 @@ components:
         detail:
           type: string
           description: 操作明细
+    QcTaskVO:
+      type: object
+      description: 质控批量重算任务（出参，qc_task 表字段 + 分级汇总）
+      properties:
+                            id:
+                              type: string
+                            status:
+                              type: string
+                              description: QUEUED / RUNNING / COMPLETED / CANCELLED / INTERRUPTED / FAILED
+                            total:
+                              type: integer
+                              description: 计划处理条数
+                            done:
+                              type: integer
+                              description: 已处理条数
+                            success:
+                              type: integer
+                            failed:
+                              type: integer
+                            qualified:
+                              type: integer
+                              description: 合格数
+                            pendingReview:
+                              type: integer
+                              description: 待复核数
+                            invalid:
+                              type: integer
+                              description: 无效数
+                            current:
+                              type: string
+                              description: 当前处理的病历标识
+                            createdBy:
+                              type: string
+                            createTime:
+                              type: string
+                              format: date-time
+                            startedAt:
+                              type: string
+                              format: date-time
+                            finishedAt:
+                              type: string
+                              format: date-time
+                            failureTruncated:
+                              type: boolean
+                              description: 失败清单是否被截断（仅存前 500 条）
+                            failures:
+                              type: array
+                              description: 失败明细；列表接口不带，详情接口带
+                              items:
+                                type: object
+                                properties:
+                                  recordId:
+                                    type: string
+                                  reason:
+                                    type: string
     SearchDTO:
       type: object
       description: 多条件查询请求（入参）
@@ -2492,11 +2547,17 @@ paths:
     post:
       tags:
         - 质控
-      summary: 全库质控评分重算
-      description: 【权限：仅管理员】对全库病历批量重算质控评分与分级（覆盖现有分数），生成AI预检单（records.qc_results），并对待复核病历自动创建复核任务。【长耗时同步接口（3 万上限 ≤3min）：前端放宽超时、勿重复提交；失败明细仅返回前 50 条示例，完整失败数见 failed】
+      summary: 提交质控批量重算任务（异步）
+      description: "【权限：仅管理员】§七 L5 起改为**异步**：提交后立即返回 taskId，由后台 worker（并发 1）执行，可关页面、靠 GET 轮询进度。⚠️ **破坏性变更**：原同步接口返回分级汇总，现只返回任务状态；分级汇总改由 `GET /api/qc/score/batch/{id}` 获取。任务会覆盖既有分数（records.qc_results）并同步复核任务状态；范围超单次上限（qc.batch.max-records，默认 40000）或已有任务在排队/运行中时返回 400。"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QcBatchDTO'
       responses:
         '200':
-          description: 重算完成，返回分级分布
+          description: "已提交，data 为任务状态 {id, status, total}"
           content:
             application/json:
               schema:
@@ -2505,35 +2566,156 @@ paths:
                   code:
                     type: integer
                     example: 200
+                  msg:
+                    type: string
                   data:
-                    type: object
-                    properties:
+                      id:
+                        type: string
+                      status:
+                        type: string
+                        description: QUEUED / RUNNING / COMPLETED / CANCELLED / INTERRUPTED / FAILED
                       total:
                         type: integer
-                      qualified:
-                        type: integer
-                      pendingReview:
-                        type: integer
-                      invalid:
-                        type: integer
-                      failed:
-                        type: integer
-                        description: 失败条数
-                      failureSamples:
-                        type: array
-                        maxItems: 50
-                        description: 失败明细示例（前 50 条），完整失败清单不入库
-                        items:
-                          type: object
-                          properties:
-                            recordId:
-                              type: integer
-                            reason:
-                              type: string
+                        description: 计划处理条数
+        '400':
+          description: 超出单次上限，或已有重算任务在排队/运行中
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/qc/score/batch/{id}:
+    get:
+      tags:
+        - 质控
+      summary: 查询质控批量重算任务进度
+      description: "【权限：仅管理员】返回进度与分级汇总（qualified / pendingReview / invalid），含失败明细。前端 2s 轮询本接口直到 status 进入终态。"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 任务ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 任务进度与分级汇总
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                      id:
+                        type: string
+                      status:
+                        type: string
+                        description: QUEUED / RUNNING / COMPLETED / CANCELLED / INTERRUPTED / FAILED
+                      total:
+                        type: integer
+                        description: 计划处理条数
+                      done:
+                        type: integer
+                        description: 已处理条数
+                      success:
+                        type: integer
+                      failed:
+                        type: integer
+                      qualified:
+                        type: integer
+                        description: 合格数
+                      pendingReview:
+                        type: integer
+                        description: 待复核数
+                      invalid:
+                        type: integer
+                        description: 无效数
+                      current:
+                        type: string
+                        description: 当前处理的病历标识
+                      createdBy:
+                        type: string
+                      createTime:
+                        type: string
+                        format: date-time
+                      startedAt:
+                        type: string
+                        format: date-time
+                      finishedAt:
+                        type: string
+                        format: date-time
+                      failureTruncated:
+                        type: boolean
+                        description: 失败清单是否被截断（仅存前 500 条）
+                      failures:
+                        type: array
+                        description: 失败明细；列表接口不带，详情接口带
+                        items:
+                          type: object
+                          properties:
+                            recordId:
+                              type: string
+                            reason:
+                              type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+  /api/qc/score/batch/{id}/cancel:
+    post:
+      tags:
+        - 质控
+      summary: 取消质控批量重算任务
+      description: "【权限：仅管理员】排队中的任务直接置为已取消；运行中的置取消位，由 worker 在分页边界退出并落库。"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 任务ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 取消后的任务状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                      id:
+                        type: string
+                      status:
+                        type: string
+                        description: QUEUED / RUNNING / COMPLETED / CANCELLED / INTERRUPTED / FAILED
+                      total:
+                        type: integer
+                        description: 计划处理条数
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
   /api/qc/rules:
     get:
       tags:

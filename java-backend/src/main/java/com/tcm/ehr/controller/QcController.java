@@ -10,13 +10,16 @@ import com.tcm.ehr.domain.dto.QcCheckDTO;
 import com.tcm.ehr.domain.dto.QcScoreDTO;
 import com.tcm.ehr.domain.vo.DeductionStatsVO;
 import com.tcm.ehr.domain.vo.LogicCheckVO;
-import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcCheckVO;
 import com.tcm.ehr.domain.vo.QcRulesVO;
+import com.tcm.ehr.domain.vo.QcTaskVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
+import com.tcm.ehr.service.IQcBatchService;
 import com.tcm.ehr.service.IQcService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,6 +39,7 @@ import java.util.List;
 public class QcController {
 
     private final IQcService qcService;
+    private final IQcBatchService qcBatchService;
 
     /**
      * 事前质控：要素缺失与格式校验。
@@ -80,17 +84,72 @@ public class QcController {
     }
 
     /**
-     * 按范围批量重算评分与分级（写库）。
+     * 提交批量重算任务（异步，§七 L5）。
      *
-     * <p>【权限：仅管理员】会覆盖既有分数并同步复核任务状态；超上限返回 400。</p>
+     * <p>【权限：仅管理员】提交后立即返回 taskId，不再同步跑到尾。
+     * 任务会覆盖既有分数并同步复核任务状态；超上限或已有任务在跑返回 400。</p>
+     *
+     * <p>⚠️ <b>破坏性变更</b>：原来返回分级汇总，现在只返回任务状态；
+     * 分级汇总改为轮询 {@code GET /api/qc/score/batch/{id}} 获取。</p>
      *
      * @param dto filters=范围条件，为空表示全库
-     * @return total/qualified/pendingReview/invalid/failed=分级汇总；failureSamples=失败样本
+     * @return id=任务ID；status=QUEUED；total=计划处理条数
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/score/batch")
-    public Result<QcBatchResultVO> scoreBatch(@RequestBody(required = false) QcBatchDTO dto) {
-        return Result.ok(qcService.scoreBatch(dto));
+    public Result<QcTaskVO> submitScoreBatch(@RequestBody(required = false) QcBatchDTO dto) {
+        return Result.ok("已提交，后台运行中", qcBatchService.submit(dto));
+    }
+
+    /**
+     * 查询批量重算任务进度（含分级汇总）。
+     *
+     * <p>【权限：仅管理员】</p>
+     *
+     * @param id 任务ID
+     * @return 进度与分级汇总；任务不存在时返回 404
+     */
+    @RequireRole(roles = {"管理员"})
+    @GetMapping("/api/qc/score/batch/{id}")
+    public ResponseEntity<Result<QcTaskVO>> scoreBatchStatus(@PathVariable String id) {
+        // 1. 进度在表里；任务不存在与「任务被清理」同一表现
+        QcTaskVO vo = qcBatchService.get(id);
+        if (vo == null) {
+            return ResponseEntity.status(404).body(Result.error(404, "任务不存在"));
+        }
+        return ResponseEntity.ok(Result.ok(vo));
+    }
+
+    /**
+     * 列出最近的批量重算任务（最多 50 条）。
+     *
+     * <p>【权限：仅管理员】不含失败明细（看明细请走详情接口）。</p>
+     *
+     * @return 按提交时间倒序的任务列表
+     */
+    @RequireRole(roles = {"管理员"})
+    @GetMapping("/api/qc/score/batch")
+    public Result<List<QcTaskVO>> listScoreBatch() {
+        return Result.ok(qcBatchService.list());
+    }
+
+    /**
+     * 取消批量重算任务。
+     *
+     * <p>【权限：仅管理员】排队中的直接落已取消；
+     * 运行中的置取消位，由 worker 在页边界退出并落库。</p>
+     *
+     * @param id 任务ID
+     * @return 取消后的任务状态；任务不存在时返回 404
+     */
+    @RequireRole(roles = {"管理员"})
+    @PostMapping("/api/qc/score/batch/{id}/cancel")
+    public ResponseEntity<Result<QcTaskVO>> cancelScoreBatch(@PathVariable String id) {
+        try {
+            return ResponseEntity.ok(Result.ok("已取消", qcBatchService.cancel(id)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(Result.error(404, e.getMessage()));
+        }
     }
 
     /**

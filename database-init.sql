@@ -106,6 +106,32 @@ CREATE TABLE IF NOT EXISTS nlp_task (
   INDEX idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='NLP批量解析任务表';
 
+-- 批量质控重算任务（§七 L5）。异步化后前端提交即拿 taskId、轮询进度，不再长时间占请求线程。
+-- role 列是**提交时的角色快照**：后台线程读不到 RequestContextHolder（会拿到 "unknown"），
+-- worker 必须用它重建 RecordFilter，否则 domainGrade 返回 null → 退化成「不过滤 = 全库」。
+CREATE TABLE IF NOT EXISTS qc_task (
+  id VARCHAR(36) PRIMARY KEY COMMENT '任务ID(UUID)',
+  status VARCHAR(20) NOT NULL COMMENT '状态：QUEUED/RUNNING/COMPLETED/CANCELLED/INTERRUPTED/FAILED',
+  total INT NOT NULL DEFAULT 0 COMMENT '计划处理条数',
+  done INT NOT NULL DEFAULT 0 COMMENT '已处理条数',
+  success INT NOT NULL DEFAULT 0 COMMENT '成功条数',
+  failed INT NOT NULL DEFAULT 0 COMMENT '失败条数',
+  qualified INT NOT NULL DEFAULT 0 COMMENT '合格数',
+  pending_review INT NOT NULL DEFAULT 0 COMMENT '待复核数',
+  invalid INT NOT NULL DEFAULT 0 COMMENT '无效数',
+  current_label VARCHAR(255) COMMENT '当前处理的病历标识',
+  filters_json TEXT COMMENT '筛选范围(JSON)',
+  created_by VARCHAR(50) COMMENT '提交人用户名',
+  role VARCHAR(20) COMMENT '提交时角色快照，供 worker 重建 RecordFilter',
+  failure_list JSON COMMENT '失败清单(仅存前500条)',
+  failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  started_at DATETIME COMMENT '开始时间',
+  finished_at DATETIME COMMENT '结束时间',
+  INDEX idx_status (status),
+  INDEX idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='质控批量重算任务表';
+
 -- 初始化账号（密码均为123456的BCrypt加密）
 -- admin/123456 = 管理员；auditor/123456 = 审核员
 INSERT INTO users (id, username, password, role) VALUES

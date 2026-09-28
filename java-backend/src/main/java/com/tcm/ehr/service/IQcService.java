@@ -3,20 +3,21 @@ package com.tcm.ehr.service;
 import com.baomidou.mybatisplus.spring.service.IService;
 import com.tcm.ehr.common.config.QcRuleSet;
 import com.tcm.ehr.domain.dto.LogicCheckDTO;
-import com.tcm.ehr.domain.dto.QcBatchDTO;
 import com.tcm.ehr.domain.dto.QcCheckDTO;
 import com.tcm.ehr.domain.dto.QcScoreDTO;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.DeductionStatsVO;
 import com.tcm.ehr.domain.vo.LogicCheckVO;
-import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcCheckVO;
 import com.tcm.ehr.domain.vo.QcRulesVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 
 /**
- * 质控服务：事前检查、逻辑一致性、评分、批量重算，以及评分规则的维护与扣分聚合。
+ * 质控服务：事前检查、逻辑一致性、单条评分，以及评分规则的维护与扣分聚合。
+ *
+ * <p>§七 L5：批量重算已从本接口移除（改为异步任务，见 {@code IQcBatchService}）。
+ * 本接口保留 {@code processOne} 所需的单条处理能力，供 worker 复用。</p>
  *
  * <p>评分口径由 {@link QcRuleSet} 决定，判定不经 LLM。</p>
  */
@@ -45,14 +46,6 @@ public interface IQcService extends IService<Record> {
      * @return score=得分；grade=分级；deductions=扣分明细
      */
     ScoreResultVO score(QcScoreDTO dto);
-
-    /**
-     * 按范围批量重算评分与分级（写库）。
-     *
-     * @param dto filters=范围条件，为空表示全库
-     * @return 分级汇总与失败样本
-     */
-    QcBatchResultVO scoreBatch(QcBatchDTO dto);
 
     /**
      * 读取当前生效规则。
