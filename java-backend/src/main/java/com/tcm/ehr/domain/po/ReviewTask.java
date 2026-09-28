@@ -36,4 +36,10 @@ public class ReviewTask {
     private LocalDateTime completedTime;
     /** 作废标记：病历重新评分后不再是待复核则置 1（查询/统计统一过滤 is_obsolete=0） */
     private Integer isObsolete;
+    /** 
+     * 任务所属组。
+     * <p>写入时打标而不是查询期 JOIN：MyBatis-Plus 的 {@code QueryWrapper} 不便于 JOIN，
+     * 而 {@code listTasks} 是高频路径。</p>
+     */
+    private String groupId;
 }

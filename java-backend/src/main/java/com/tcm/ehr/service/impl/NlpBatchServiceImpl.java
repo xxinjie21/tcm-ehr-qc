@@ -7,7 +7,9 @@ import com.tcm.ehr.common.exception.TermIndexUnavailableException;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.NlpTextComposer;
 import com.tcm.ehr.common.utils.PythonNlpClient;
+import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.NlpBatchDTO;
@@ -190,7 +192,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         int limit = dto == null || dto.getLimit() == null ? 0 : dto.getLimit();
 
         // 2. 统计计划条数：limit 大于 0 时以它封顶
-        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, filters);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), filters);
         long count = recordMapper.selectCount(wrapper);
         int total = limit > 0 ? (int) Math.min(count, limit) : (int) count;
 
@@ -204,6 +206,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setFailed(0);
         t.setFiltersJson(writeJsonStrict(objectMapper, filters));
         t.setCreatedBy(createdBy);
+        // 提交线程捕获组快照，供 worker 重建 RecordFilter（ a7 6.3 缺点 13）
+        t.setGroupId(RequestUtils.currentGroupId());
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
@@ -266,6 +270,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     @Override
     public NlpTaskVO get(String id) {
         NlpTask t = taskMapper.selectById(id);
+        // § 6.3 缺点 10：不能看别组任务进度。
+        // 不属于本组统一返回 null（按不存在处理）
+        if (t != null && !satisfiesGroup(t)) {
+            return null;
+        }
         return t == null ? null : toVO(t, true);
     }
 
@@ -285,6 +294,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         NlpTask t = taskMapper.selectById(id);
         if (t == null) {
             throw new IllegalArgumentException("任务不存在");
+        }
+        // § 6.3 缺点 10：不能取消别组任务（写操作，该报 Forbidden）
+        if (!satisfiesGroup(t)) {
+            throw new ForbiddenException("无权操作该任务");
         }
         // 2. 排队中：还没进 worker，直接落终态
         if (NlpTask.QUEUED.equals(t.getStatus())) {
@@ -307,8 +320,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     @Override
     public List<NlpTaskVO> list() {
-        // 1. 按创建时间倒序取最近 50 条
+        // 1. 按创建时间倒序取本组最近 50 条
+        //    § 6.3 缺点 9：不能看到别组的批量解析任务列表
         List<NlpTask> tasks = taskMapper.selectList(new QueryWrapper<NlpTask>()
+                .eq("group_id", RequestUtils.currentGroupId())
                 .orderByDesc("create_time").last("LIMIT 50"));
         // 2. 不带失败明细：列表页不需要，明细走 get(id)
         List<NlpTaskVO> out = new ArrayList<>();
@@ -360,7 +375,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                                 boolean[] truncated, int[] processed) {
         // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）
         int limit = t.getTotal() == null ? 0 : t.getTotal();
-        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, readFilters(t.getFiltersJson()));
+        QueryWrapper<Record> wrapper = RecordFilter.build(t.getGroupId(), readFilters(t.getFiltersJson()));
         int pageNo = 1;
         // 2. 分页循环取数：每页都先看取消位，避免停得慢
         while (true) {
@@ -394,6 +409,13 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 按记录ID集合分块处理（导入后自动解析用）；返回是否被取消 */
     private boolean runByIds(String id, List<String> ids, NlpTask t, List<NlpTaskVO.Failure> failures,
                              boolean[] truncated, int[] processed) {
+        // 0. § 6.3 缺点 11：导入时的 id 集合是本组的，但 task 里只有
+        //    本组快照。为保险再筛一次：重新按 group_id 限定，
+        //    避免任何路径把别组 id 混进来。
+        ids = recordMapper.selectList(new QueryWrapper<Record>()
+                .select("id").eq("group_id", t.getGroupId()).in("id", ids)
+                .last("LIMIT " + ids.size()))
+                .stream().map(Record::getId).toList();
         // 1. 按页大小切块：IN 过长会让 SQL 变慢
         for (int off = 0; off < ids.size(); off += PAGE_SIZE) {
             // 2. 每块开始前看取消位
@@ -466,6 +488,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private void markFailed(String id) {
         // 1. 不存在或已是终态就不用改（终态不能被回退）
         NlpTask t = taskMapper.selectById(id);
+        // 2. 不属于本组的任务不设法打失败（保护别组任务的真实进度）
+        if (t != null && !satisfiesGroup(t)) {
+            return;
+        }
         if (t == null || isTerminal(t.getStatus())) {
             return;
         }
@@ -579,6 +605,16 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** § 6.3 缺点 10：任务是否属于当前组（不含管理员特权：管理员也走组过滤，与病历访问同一口径） */
+    private boolean satisfiesGroup(NlpTask t) {
+        if (t == null) {
+            return false;
+        }
+        String g1 = t.getGroupId();
+        String g2 = RequestUtils.currentGroupId();
+        return g1 != null && g2 != null && !g2.isBlank() && g1.equals(g2);
     }
 
     /** 任务实体 → 视图；withFailures 为 false 时不带失败清单（列表接口用，省流量） */

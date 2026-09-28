@@ -278,8 +278,12 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 库内已存在哈希（按登记号预筛，避免全表扫描）
         Set<String> existingHash = new HashSet<>();
         if (!batchRegNos.isEmpty()) {
+            // § 6.3 缺点 12：查重必须限定本组。否则组 A 已有登记号 X，
+            // 组 B 导入同号会被判为重复，两个组无法使用相同登记号。
             List<Record> existing = baseMapper.selectList(
-                    new QueryWrapper<Record>().in("registration_no", batchRegNos));
+                    new QueryWrapper<Record>()
+                            .in("registration_no", batchRegNos)
+                            .eq("group_id", RequestUtils.currentGroupId()));
             for (Record r : existing) {
                 existingHash.add(RecordUtil.textHash(r));
             }
@@ -297,6 +301,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 continue;
             }
             r.setId(UUID.randomUUID().toString());
+            // 新建病历入组（诟入进本组，否则是无组病历，导入者导完自己也看不到）
+            r.setGroupId(RequestUtils.currentGroupId());
             toInsert.add(r);
         }
 
@@ -368,9 +374,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (isBlank(dto.getOutpatientNo())) {
             throw new IllegalArgumentException("门诊号不能为空");
         }
-        // 3. 组装病历实体：主键由服务端生成，21 个原始字段原样落库
+        // 3. 组装病历实体：主键由服务端生成，21 个原始字段原样落库；入本组
         Record r = new Record();
         r.setId(UUID.randomUUID().toString());
+        r.setGroupId(RequestUtils.currentGroupId());
         r.setRegistrationNo(dto.getRegistrationNo());
         r.setOutpatientNo(dto.getOutpatientNo());
         r.setGender(dto.getGender());
@@ -418,10 +425,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (r == null) {
             return null;
         }
-        // 数据域（行级权限）：审核员仅可见待复核病历
-        if (RecordFilter.ROLE_AUDITOR.equals(RequestUtils.currentRole())
-                && !"待复核".equals(r.getGrade())) {
-            throw new ForbiddenException("无权查看非待复核病历");
+        // § 6.3 缺点 4：查后校验组。无组 / 不属于当前组统一归“不存在”（404）：
+        // 遏免“存在但看不到”被用作情报（可探测别组病历 ID）
+        if (!RecordFilter.canAccess(r)) {
+            return null;
         }
         // 2. 组装视图：21 个原始字段 + 结构化数据 + 评分结果
         RawRecordVO vo = new RawRecordVO();
@@ -470,6 +477,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         Record r = baseMapper.selectById(recordId);
         if (r == null) {
             throw new IllegalArgumentException("病历不存在");
+        }
+        // § 6.3 缺点 5：不能改别组病历。用 ForbiddenException而不是 404：
+        // 这是写操作，攻击者看到的应是「不许」而不是「不存在」。
+        if (!RecordFilter.canAccess(r)) {
+            throw new ForbiddenException("无权修改该病历");
         }
         // 原始 21 字段只读：显式携带原始字段即拒绝（code=1007 语义）
         if (body != null) {
@@ -530,7 +542,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             throw new IllegalArgumentException("请至少设置一个筛选条件，避免误删全库");
         }
         // 2. 只取 id 列，不取整行数据
-        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN, filters);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), filters);
         List<Record> rows = baseMapper.selectList(wrapper.select("id"));
         List<String> ids = rows.stream().map(Record::getId).toList();
         // 3. 走同一段删除逻辑
@@ -588,7 +600,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         int page = dto != null && dto.getPage() != null && dto.getPage() > 0 ? dto.getPage() : 1;
         int size = dto != null && dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 20;
         // 数据域 → 用户筛选，取交集（统一走 RecordFilter，禁止手写 where）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), dto);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), dto);
         // 2. 分页查询（条件已含数据域与用户筛选）
         Page<Record> p = baseMapper.selectPage(new Page<>(page, size), wrapper);
         // 3. 组装返回：总数与当前页列表项

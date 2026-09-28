@@ -12,6 +12,7 @@ import com.tcm.ehr.domain.vo.ReviewTasksVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
 import com.tcm.ehr.service.impl.ReviewServiceImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -40,8 +41,24 @@ class ReviewServiceTest {
     private ReviewTaskMapper reviewTaskMapper;
     private ReviewServiceImpl service;
 
+    /** 组绑定的请求上下文：阶段 2 起所有数据读取都需要它 */
+    private static final String GROUP = "grp-review";
+
+    private void loginAsGroup() {
+        org.springframework.mock.web.MockHttpServletRequest req =
+                new org.springframework.mock.web.MockHttpServletRequest();
+        req.setAttribute("currentUserId", "u-1");
+        req.setAttribute("currentUsername", "reviewer");
+        req.setAttribute("currentRole", "用户");
+        req.setAttribute("currentGroupId", GROUP);
+        req.setAttribute("currentGroupRole", "member");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(req));
+    }
+
     @BeforeEach
     void setUp() {
+        loginAsGroup();
         recordMapper = Mockito.mock(RecordMapper.class);
         reviewTaskMapper = Mockito.mock(ReviewTaskMapper.class);
         // QcRuleStore 的 init() 是 @PostConstruct，测试里不调用 → get() 返回 null
@@ -49,6 +66,11 @@ class ReviewServiceTest {
         service = new ReviewServiceImpl(recordMapper, new ObjectMapper(), new QcRuleStore(new ObjectMapper()));
         // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置
         ReflectionTestUtils.setField(service, "baseMapper", reviewTaskMapper);
+    }
+
+    @AfterEach
+    void tearDown() {
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
     }
 
     /**
@@ -88,6 +110,7 @@ class ReviewServiceTest {
         r.setTongue("舌淡");
         r.setPattern("脾肾阳虚");
         r.setPrescription(herbName + "10g");
+        r.setGroupId(GROUP);
         r.setStructuredData(structured(withFormula, herbName));
         return r;
     }
@@ -99,6 +122,7 @@ class ReviewServiceTest {
         t.setStatus("pending");
         t.setIssueType("缺失字段");
         t.setScore(85);
+        t.setGroupId(GROUP);
         t.setIsObsolete(0);
         t.setCreateTime(LocalDateTime.now().minusDays(1));
         return t;

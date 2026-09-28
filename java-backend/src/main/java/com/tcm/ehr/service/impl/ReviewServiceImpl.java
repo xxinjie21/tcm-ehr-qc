@@ -66,17 +66,16 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         int p = page != null && page > 0 ? page : 1;
         int s = pageSize != null && pageSize > 0 ? pageSize : 20;
 
-        // 2. 组装查询条件：只取未失效任务，按创建时间倒序
+        // 2. 组装查询条件：只取本组、未失效任务，按创建时间倒序
         QueryWrapper<ReviewTask> w = new QueryWrapper<>();
         w.eq("is_obsolete", 0);
-        // 3. 数据域：审核员强制只看待复核，其余角色按传入状态过滤
-        if (RecordFilter.ROLE_AUDITOR.equals(RequestUtils.currentRole())) {
-            w.eq("status", "pending");
-        } else {
-            String dbStatus = dbStatus(status);
-            if (dbStatus != null) {
-                w.eq("status", dbStatus);
-            }
+        // 3. § 6.3 缺点 7：不能看到别组的复核任务（与判杂志事实同级的数据）。
+        //    review_tasks 打组是写入时做的（upsertReviewTask），这里只需等值过滤。
+        w.eq("group_id", RequestUtils.currentGroupId());
+        // 4. 状态筛选：无组时上面的 group_id 等值已让结果为空，不再需要角色判断
+        String dbStatus = dbStatus(status);
+        if (dbStatus != null) {
+            w.eq("status", dbStatus);
         }
         w.orderByDesc("create_time");
 
@@ -117,9 +116,9 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         if (r == null) {
             throw new ResourceNotFoundException(1006, "病历不存在");
         }
-        if (RecordFilter.ROLE_AUDITOR.equals(RequestUtils.currentRole())
-                && !"待复核".equals(r.getGrade())) {
-            throw new ForbiddenException("无权复核非待复核病历");
+        // § 6.3 缺点 8：不能复核别组病历。写操作用 ForbiddenException
+        if (!RecordFilter.canAccess(r)) {
+            throw new ForbiddenException("无权复核该病历");
         }
 
         List<ReviewTask> tasks = baseMapper.selectList(new QueryWrapper<ReviewTask>()

@@ -9,8 +9,10 @@ import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.ExportDTO;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CleanResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -75,11 +77,17 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters) {
         List<Record> records;
         if (recordIds != null && !recordIds.isEmpty()) {
-            records = baseMapper.selectBatchIds(recordIds);
+            // § 6.3 缺点 2：按 ID 批量取不能用了 selectBatchIds 之后
+            // 不再校验——“把别组的 id 传进来清洗”会直接成立。
+            // 改成先按本组过滤后再取，取不到的忽略（不报错：
+            // 一个 id 是否属于本组属于授权问题，不属于业务错误）。
+            records = baseMapper.selectList(RecordFilter
+                    .build(RequestUtils.currentGroupId(), new FiltersDTO())
+                    .in("id", recordIds));
         } else {
             records = baseMapper.selectList(
                     com.tcm.ehr.common.utils.RecordFilter.build(
-                            com.tcm.ehr.common.utils.RequestUtils.currentRole(), filters));
+                            RequestUtils.currentGroupId(), filters));
         }
 
         CleanResultVO vo = new CleanResultVO();
@@ -352,7 +360,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public Map<String, Object> governanceStats() {
-        return baseMapper.selectGovernanceStats();
+        return baseMapper.selectGovernanceStats(RecordFilter.domainGroupId());
     }
 
     /**
@@ -362,7 +370,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
         // 1. 条件组装复用 RecordFilter（与其余读路径同一个函数）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.ROLE_ADMIN,
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(),
                 RecordFilter.fromMap(dto.getFilters()));
         // 2. 追加导出自己的硬约束：只导合格病历
         wrapper.eq("grade", "合格");

@@ -32,6 +32,12 @@ public class NlpTask {
     /** 筛选范围 JSON（FiltersDTO） */
     private String filtersJson;
     private String createdBy;
+    /** 
+     * 提交时所属组的快照。
+     * <p>不是冗余：worker 跑在后台线程，读不到 {@code RequestContextHolder}，必须用快照值重建
+     * {@code RecordFilter}；否则数据域过滤会退化成「不过滤 = 全库」。</p>
+     */
+    private String groupId;
     /** 失败清单 JSON 数组（仅存前 500 条） */
     private String failureList;
     private Boolean failureTruncated;

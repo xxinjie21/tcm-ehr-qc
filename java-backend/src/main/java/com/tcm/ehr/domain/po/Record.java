@@ -47,6 +47,8 @@ public class Record {
     private String grade;
     /** 状态：pending/reviewing/completed/invalid */
     private String status;
+    /** 归属课题组；空 = 无组，代码层降级为「无数据」（fail-closed） */
+    private String groupId;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

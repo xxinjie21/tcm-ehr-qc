@@ -15,24 +15,45 @@ import java.util.Map;
  * <p>所有病历读取（查询 / 原始查看 / 后续图谱等）统一走本工具，禁止在业务方法中手写 where，
  * 避免口径漂移与"筛选条件绕过数据域"的越权。</p>
  *
- * <ul>
- * <li>管理员 = 全库；</li>
- * <li>审核员 = 复核域（{@code grade='待复核'}），再叠加用户筛选。</li>
- * </ul>
+ * <p><b>数据域 = 课题组（阶段 2）</b>：原本用 {@code grade}（质控结论）当权限维度，现已改为
+ * {@code group_id = 当前用户的主组}。{@code grade} 从此只做业务筛选（供应商可选），
+ * 不再影响任何一个人能看到哪些数据。</p>
+ *
+ * <p>原设计的两个后果正是本次改造的动机：审核员复核通过一份病历后会
+ * <b>立刻失去访问它的权限</b>；一次批量重算会<b>批量翻转可见性</b>。</p>
+ *
+ * <p>⚠️ <b>fail-closed 是本类最关键的一行</b>：{@code groupId} 为空时必须生成<b>返回空集</b>的查询，
+ * 而不能不加条件 —— 不加条件 = 看到全库 = 最严重的越权。</p>
  */
 public final class RecordFilter {
 
     public static final String ROLE_ADMIN = "管理员";
     public static final String ROLE_AUDITOR = "审核员";
 
+    /**
+     * fail-closed 用的不可能值、与 {@code records.id} 的 UUID 不可能相等。
+     * 它不是"这个 id 不存在"的东西，而是一个<b>不可能被任何导入数据命中</b>的值。
+     */
+    private static final String NO_GROUP_SENTINEL = "\u0000__no_group__";
+
     private RecordFilter() {
     }
 
+    /**
+     * 按主组取数据域上下文（就是 {@link #currentGroupId()} 的别名）。
+     *
+     * <p>为什么不直接用 {@code RequestUtils.currentGroupId()}：这里需要能被单测直接接窗口
+     * 动态传入 groupId（{@code RecordIsolationTest} 就是这么做的），而不是固定读线程上下文。</p>
+     */
+    public static String currentGroupId() {
+        return RequestUtils.currentGroupId();
+    }
+
     /** 构建查询条件：先数据域、后用户筛选 */
-    public static QueryWrapper<Record> build(String role, SearchDTO dto) {
+    public static QueryWrapper<Record> build(String groupId, SearchDTO dto) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
         // 1. 数据域（行级权限）——必须先于用户筛选
-        operatorScope(wrapper, role);
+        operatorScope(wrapper, groupId);
         // 2. 用户筛选（与数据域取交集，各条件之间取并集）
         if (dto != null) {
             if (notBlank(dto.getRegistrationNo())) {
@@ -73,13 +94,40 @@ public final class RecordFilter {
         return wrapper;
     }
 
-    /** 数据域（行级权限）：审核员强制待复核域；管理员全库 */
-    private static void operatorScope(QueryWrapper<Record> wrapper, String role) {
-        // 1. 管理员不限（null 就什么条件都不加）；审核员锁死待复核
-        String scope = domainGrade(role);
-        if (scope != null) {
-            wrapper.eq("grade", scope);
+    /**
+     * 数据域（行级权限）：限当前主组；无组时<b>返回空集</b>。
+     *
+     * <p>⚠️ 这里不得写成"无组就不加条件"——那等于看到全库，
+     * 是本次改造中最严重的越权。它也是防止写退出一个不可能的 id：
+     * 以后若有人导入了它，无组用户就会看到那一条。</p>
+     */
+    private static void operatorScope(QueryWrapper<Record> wrapper, String groupId) {
+        if (groupId == null || groupId.isBlank()) {
+            wrapper.eq("id", NO_GROUP_SENTINEL);
+            return;
         }
+        wrapper.eq("group_id", groupId.trim());
+    }
+
+    /**
+     * 查询前的越权自检：当前用户是否能看这条病历。
+     *
+     * <p>用于 {@code selectById} 类“查后校验”的路径（它们不能用 wrapper）。</p>
+     *
+     * @return true = 可访问；false = 不可访问（调用方应返回 404，不泄露"存在但看不到"）
+     */
+    public static boolean canAccess(Record record) {
+        if (record == null) {
+            return false;
+        }
+        String groupId = currentGroupId();
+        // 无组 → 一条也看不到（与 operatorScope 同一口径）
+        if (groupId == null || groupId.isBlank()) {
+            return false;
+        }
+        // 记录本身就无组（迁移未执行）→ 也看不到
+        String rg = record.getGroupId();
+        return rg != null && groupId.equals(rg.trim());
     }
 
     /**
@@ -171,22 +219,36 @@ public final class RecordFilter {
     }
 
     /**
-     * 数据域落在「分级」列上的取值：审核员 = {@code 待复核}；管理员 = {@code null}（不限）。
+     * 数据域落在 {@code group_id} 列上的取值（即当前主组）。
      *
      * <p>给 QueryWrapper 表达不了的聚合 SQL 用 —— Mapper 里以
-     * {@code WHERE (#{grade} IS NULL OR grade = #{grade})} 落地。
-     * 存在的意义是让「审核员的数据域是哪个分级」这个口径仍然只有一处，
-     * 不在 Mapper 里再写一遍中文字面量。</p>
+     * {@code WHERE (#{groupId} IS NULL OR group_id = #{groupId})} 落地。
+     * 存在的意义是让「数据域是哪个组」这个口径仍然只有一处，
+     * 不在 Mapper 里再写一遍。</p>
+     *
+     * <p>为何取值不能简单地是去掉空值：无组用户必须看不到任何数据，
+     * 而 {@code WHERE #{groupId} IS NULL OR ...} 的语义是「无组 → 不限」——恰好相反。
+     * 故这里返回不可能值，让 SQL 自然落到空集。</p>
      */
-    public static String domainGrade(String role) {
-        return ROLE_AUDITOR.equals(role) ? "待复核" : null;
+    public static String domainGroupId() {
+        return groupIdForSql(currentGroupId());
+    }
+
+    /**
+     * 把 groupId 转成可以直接交给聚合 SQL 的值：无组 → 不可能值。
+     *
+     * @param groupId 当前主组，可为 null / 空串
+     * @return 非空的 groupId，或 {@link #NO_GROUP_SENTINEL}
+     */
+    public static String groupIdForSql(String groupId) {
+        return (groupId == null || groupId.isBlank()) ? NO_GROUP_SENTINEL : groupId.trim();
     }
 
     /** .1：按 filters{department,dateRange,pattern,grade} 构建（数据域→用户筛选） */
-    public static QueryWrapper<Record> build(String role, FiltersDTO f) {
+    public static QueryWrapper<Record> build(String groupId, FiltersDTO f) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
         // 1. 数据域先叠加（必须最先，用户筛选只能在其上收窄）
-        operatorScope(wrapper, role);
+        operatorScope(wrapper, groupId);
         // 2. 再拼用户筛选；f 为 null 表示不限
         if (f != null) {
             if (notBlank(f.getDepartment())) {

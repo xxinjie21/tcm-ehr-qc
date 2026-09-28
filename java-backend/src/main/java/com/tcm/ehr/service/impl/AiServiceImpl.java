@@ -527,9 +527,10 @@ public class AiServiceImpl implements IAiService {
         if (r == null) {
             return null;
         }
-        // 2. 数据域校验：审核员只能看待复核域
-        if (RecordFilter.ROLE_AUDITOR.equals(RequestUtils.currentRole()) && !"待复核".equals(r.getGrade())) {
-            throw new ForbiddenException("无权查看非待复核病历");
+        // § 6.3 缺点 1：对任意组病历做 AI 解读 = 越权读取品质与隐私。
+        // 不属于本组统一止 404（不控接 ForbiddenException说明存在）。
+        if (!RecordFilter.canAccess(r)) {
+            return null;
         }
         return r;
     }

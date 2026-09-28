@@ -20,10 +20,14 @@ public interface RecordMapper extends BaseMapper<Record> {
     /**
      * 指标卡聚合（按 grade 口径，与质控分级一致）。
      *
-     * <p>{@code grade} 是<b>数据域</b>参数（取值来自
-     * {@link com.tcm.ehr.common.utils.RecordFilter#domainGrade}）：审核员传「待复核」，
-     * 只在这个域内聚合；管理员传 {@code null}，条件失效即全库。
-     * 没有它，审核员调 {@code /api/stats/overview} 就能读到全库的分级分布。</p>
+     * <p>{@code groupId} 是<b>数据域</b>参数（取值来自
+     * {@link com.tcm.ehr.common.utils.RecordFilter#domainGroupId()}）。没有它，任何人调
+     * {@code /api/stats/overview} 都能读到全库的分级分布。</p>
+     *
+     * <p>⚠️ <b>不能写成 {@code (#{groupId} IS NULL OR group_id = #{groupId})}</b>：
+     * 那句话的语义是「无组 → 不限」，恰好与 fail-closed 相反。
+     * 所以 {@code RecordFilter.domainGroupId()} 在无组时返回一个<b>不可能值</b>，
+     * 而不是 null，由 SQL 自然落到空集。</p>
      */
     @Select("""
             SELECT
@@ -32,19 +36,25 @@ public interface RecordMapper extends BaseMapper<Record> {
                 COALESCE(SUM(CASE WHEN grade = '待复核' THEN 1 ELSE 0 END), 0) AS pendingReviewCount,
                 COALESCE(SUM(CASE WHEN grade = '无效' THEN 1 ELSE 0 END), 0) AS invalidCount
             FROM records
-            WHERE (#{grade} IS NULL OR grade = #{grade})
+            WHERE group_id = #{groupId}
             """)
-    Map<String, Object> selectOverview(@Param("grade") String grade);
+    Map<String, Object> selectOverview(@Param("groupId") String groupId);
 
-    /** 清洗状态统计：合格总数/已清洗/待清洗 */
+    /**
+     * 清洗状态统计：合格总数/已清洗/待清洗。
+     *
+     * <p>原版是无参全库聚合 —— 那不只是「看到别组数据」，
+     * 还会让清洗页的卡片数字与实际可清洗范围对不上。</p>
+     */
     @Select("""
             SELECT
                 COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualified,
                 COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 1 THEN 1 ELSE 0 END), 0) AS governedCount,
                 COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 0 THEN 1 ELSE 0 END), 0) AS pendingGovern
             FROM records
+            WHERE group_id = #{groupId}
             """)
-    Map<String, Object> selectGovernanceStats();
+    Map<String, Object> selectGovernanceStats(@Param("groupId") String groupId);
 
     /** 清洗后的字段修复（trim/空值清理/状态标记） */
     @Update("""
@@ -72,16 +82,17 @@ public interface RecordMapper extends BaseMapper<Record> {
     /**
      * 科室动态选项：distinct 非空科室。
      *
-     * <p>{@code grade} 同 {@link #selectOverview} 的数据域参数 ——
-     * 不传的话审核员能从下拉选项里看到自己域外的科室名。</p>
+     * <p>{@code groupId} 同 {@link #selectOverview} 的数据域参数 ——
+     * 不传的话任何人都能从下拉选项里看到别组的科室名
+     * （这是轻度信息泄漏：科室名不是事实但会推断出东西）。</p>
      */
     @Select("""
             SELECT DISTINCT department FROM records
             WHERE department IS NOT NULL AND department <> ''
-              AND (#{grade} IS NULL OR grade = #{grade})
+              AND group_id = #{groupId}
             ORDER BY department
             """)
-    List<String> selectDepartments(@Param("grade") String grade);
+    List<String> selectDepartments(@Param("groupId") String groupId);
 
     /** 质控评分结果回写：分数 / 分级 / 状态 / 预检单 */
     @Update("""

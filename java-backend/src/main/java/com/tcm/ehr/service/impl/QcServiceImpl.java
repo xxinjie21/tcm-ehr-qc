@@ -228,6 +228,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 // 3. 没有就新建，时限默认 7 个工作日
                 ReviewTask t = new ReviewTask();
                 t.setRecordId(r.getId());
+                // 阶段 2：复核任务打组——写入时打标，避免查询期 JOIN（QueryWrapper 不便于 JOIN）
+                t.setGroupId(r.getGroupId());
                 t.setStatus("pending");
                 t.setIssueType(issueType(vo));
                 t.setScore(vo.getScore());
@@ -354,7 +356,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     @Override
     public DeductionStatsVO deductionStats(FiltersDTO filters) {
         // 1. 构造数据域过滤条件（角色可见范围 + 用户筛选）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentRole(), filters);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), filters);
         // 2. 主扫描只取 3 列（见方法注释的「两段式扫描」）
         wrapper.select("id", "grade", "qc_results");
         // 3. 初始化聚合容器：按类型、按条目、等级分布
@@ -482,9 +484,18 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     // ------------------------------------------------------------------ 辅助
 
-    /** 按 ID 取病历；ID 为空返回 null（由上层转 400/404） */
+    /**
+     * 按 ID 取病历；ID 为空返回 null（由上层转 400/404）。
+     *
+     * <p>§ 6.3 缺点 6：取到后验证组，不属于本组返回 null
+     * （统一按不存在处理，不泄露“存在但看不到”）。</p>
+     */
     private Record loadRaw(String recordId) {
-        return recordId == null || recordId.isBlank() ? null : baseMapper.selectById(recordId);
+        if (recordId == null || recordId.isBlank()) {
+            return null;
+        }
+        Record r = baseMapper.selectById(recordId);
+        return RecordFilter.canAccess(r) ? r : null;
     }
 
     /** 结构化数据：优先用入参对象，否则解析 JSON；空/坏数据返回 null 交由评分按"未结构化"处理 */
