@@ -322,7 +322,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
                             + "，待复核 " + result.getPendingReview()
                             + "，无效 " + result.getInvalid()
                             + "，失败 " + result.getFailed(),
-                    t.getCreatedBy(), t.getRole());
+                    t.getCreatedBy(), t.getRole(), t.getGroupId());
             log.info("[批重算] 任务 {} 结束：{}，成功 {}，失败 {}",
                     id, t.getStatus(), t.getSuccess(), t.getFailed());
         }

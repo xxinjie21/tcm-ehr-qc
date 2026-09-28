@@ -1,4 +1,4 @@
-﻿openapi: 3.0.3
+﻿﻿openapi: 3.0.3
 info:
   title: 中医电子病历质控与标准化系统
   description: |
@@ -515,6 +515,9 @@ components:
         detail:
           type: string
           description: 操作明细
+        groupId:
+          type: string
+          description: 操作时所属组（§七 L7 三档过滤依据）
     QcTaskVO:
       type: object
       description: 质控批量重算任务（出参，qc_task 表字段 + 分级汇总）
@@ -1566,7 +1569,7 @@ paths:
       tags:
         - 日志
       summary: 操作日志分页查询
-      description: 【权限：仅管理员】读 operation_log 表分页筛选。§七 L1/L2 后该表是唯一数据源（不记 IP、不再落文件）；§七 L3 后日志只增不删
+      description: 【权限：登录即可】（§七 L7 三档）读 operation_log 表分页筛选。§七 L1/L2 后该表是唯一数据源（不记 IP、不再落文件）；§七 L3 后日志只增不删
       parameters:
         - name: action
           in: query
@@ -1620,7 +1623,7 @@ paths:
       tags:
         - 日志
       summary: 操作类型选项
-      description: 【权限：仅管理员】返回 operation_log 中实际出现过的 action 值，供前端筛选下拉动态渲染，避免前端写死清单与后端调用点漂移
+      description: 【权限：登录即可】（§七 L7 三档）返回 operation_log 中实际出现过的 action 值，供前端筛选下拉动态渲染，避免前端写死清单与后端调用点漂移
       responses:
         '200':
           description: 操作类型列表
@@ -1647,7 +1650,7 @@ paths:
       tags:
         - 日志
       summary: 操作日志导出
-      description: 【权限：仅管理员】按筛选条件读 operation_log 表并导出为 CSV（带 UTF-8 BOM）文件流，不套 Result 包装
+      description: 【权限：登录即可】（§七 L7 三档）按筛选条件读 operation_log 表并导出为 CSV（带 UTF-8 BOM）文件流，不套 Result 包装
       responses:
         '200':
           description: 日志文件流

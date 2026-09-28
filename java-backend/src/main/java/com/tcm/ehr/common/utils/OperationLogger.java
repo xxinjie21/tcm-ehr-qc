@@ -64,14 +64,40 @@ public class OperationLogger {
      * @param role     操作人角色
      */
     public void log(String action, String target, String detail, String operator, String role) {
+        // 同步任务（如导入 / 清洗）由本重载走请求线程，组从 RequestUtils 取；
+        // 异步任务（批量重算）用 6 参重载显式传组快照
+        groupLog(action, target, detail, operator, role, RequestUtils.currentGroupId());
+    }
+
+    /**
+     * 记录一条关键操作，<b>操作人 / 角色 / 组由调用方指定</b>。
+     *
+     * <p>异步任务的收尾日志必须用它：worker 线程既拿不到 operator / role，
+     * 也拿不到 groupId（{@code RequestContextHolder} 不在该线程上）。
+     * groupId 若在提交线程即时为空（待分配池用户提交），这里应传空串，
+     * 落库的 {@code group_id} 即为 NULL —— 该操作永远只对操作人本人可见。</p>
+     *
+     * @param action   操作类型
+     * @param target   操作对象，可为 null
+     * @param detail   操作明细，可为 null
+     * @param operator 操作人用户名
+     * @param role     操作人角色
+     * @param groupId  操作时所属组（可为空串，等价于无组）
+     */
+    public void log(String action, String target, String detail, String operator, String role, String groupId) {
+        groupLog(action, target, detail, operator, role, groupId);
+    }
+
+    private void groupLog(String action, String target, String detail, String operator, String role, String groupId) {
         // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，不截断会让同一操作在不同出口相差 1 秒
         LocalDateTime now = LocalDateTime.now().withNano(0);
-        insertDb(now, operator, role, action, target, detail);
+        insertDb(now, operator, role, action, target, detail,
+                groupId == null || groupId.isBlank() ? null : groupId.trim());
     }
 
     /** 入库（审计页唯一数据源）；失败仅告警，不阻塞业务 */
     private void insertDb(LocalDateTime now, String operator, String role,
-                          String action, String target, String detail) {
+                          String action, String target, String detail, String groupId) {
         try {
             // 1. 各字段按列宽截断：超长会撞库列长度限制
             OperationLog row = new OperationLog();
@@ -80,6 +106,7 @@ public class OperationLogger {
             row.setRole(cut(role, MAX_ROLE));
             row.setAction(cut(action, MAX_ACTION));
             row.setTarget(cut(target, MAX_TARGET));
+            row.setGroupId(groupId);
             // 2. 明细列不截断（TEXT 列），只去首尾空白
             row.setDetail(detail == null ? null : detail.trim());
             operationLogMapper.insert(row);

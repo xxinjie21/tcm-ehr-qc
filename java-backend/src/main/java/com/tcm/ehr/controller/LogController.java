@@ -1,6 +1,5 @@
 package com.tcm.ehr.controller;
 
-import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.service.ILogService;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +38,6 @@ public class LogController {
      * @param size    每页条数
      * @return total=总条数；list=当前页记录
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/logs")
     public Result<Map<String, Object>> logs(@RequestParam(required = false) String action,
                                             @RequestParam(required = false) String keyword,
@@ -51,11 +49,10 @@ public class LogController {
     /**
      * 查询操作类型选项。
      *
-     * <p>【权限：仅管理员】取库中出现过的值，前端据此渲染下拉，避免写死清单与调用点漂移。</p>
+     * <p>【权限：登录即可】取库中出现过的值（同三档），前端据此渲染下拉，避免写死清单与调用点漂移。</p>
      *
      * @return 去重后的操作类型列表
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/logs/actions")
     public Result<List<String>> actions() {
         return Result.ok(logService.actions());
@@ -64,13 +61,12 @@ public class LogController {
     /**
      * 导出操作日志为 CSV。
      *
-     * <p>【权限：仅管理员】文件流直出，不套 Result 包装。</p>
+     * <p>【权限：登录即可】文件流直出（同三档），不套 Result 包装。</p>
      *
      * @param action  操作类型，空表示导出全部
      * @param keyword 关键字
      * @return 带 UTF-8 BOM 的 CSV 字节流
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/logs/export")
     public ResponseEntity<byte[]> export(@RequestParam(required = false) String action,
                                          @RequestParam(required = false) String keyword) {

@@ -2,7 +2,9 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcm.ehr.domain.po.GroupMember;
 import com.tcm.ehr.domain.po.OperationLog;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.mapper.OperationLogMapper;
 import com.tcm.ehr.service.ILogService;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +59,18 @@ public class LogServiceImpl implements ILogService {
      */
     @Override
     public List<String> actions() {
-        return operationLogMapper.selectDistinctActions();
+        // §七 L7：组员不能从下拉看到别人的操作类型。
+        // operations 与按组三档见 buildWrapper；这里单独传给硬编码 SQL。
+        String groupId = RequestUtils.currentGroupId();
+        String operator = RequestUtils.currentUsername();
+        if (RequestUtils.isAdmin()) {
+            return operationLogMapper.selectDistinctActions(null, null);
+        }
+        if (groupId != null && !groupId.isBlank()
+                && RequestUtils.currentGroupRole().equals(GroupMember.ROLE_OWNER)) {
+            return operationLogMapper.selectDistinctActions(groupId, null);
+        }
+        return operationLogMapper.selectDistinctActions(groupId, operator);
     }
 
     /**
@@ -128,19 +141,36 @@ public class LogServiceImpl implements ILogService {
         return out;
     }
 
-    /** 组装筛选条件：操作类型精确匹配，关键字模糊匹配操作人 / 操作对象 / 详情，统一时间倒序 */
+    /** 组装筛选条件：操作类型精确匹配 + 关键字模糊匹配 + §七 L7 的三档可见性范围 */
     private QueryWrapper<OperationLog> buildWrapper(String action, String keyword) {
         QueryWrapper<OperationLog> w = new QueryWrapper<>();
-        // 1. 操作类型精确匹配
+        // 1. §七 L7 四档范围：管理员全部 / 组长本组 /
+        //    组员本组自己 / 无组自己（一次覆盖 page、listForExport、exportCsv）
+        String groupId = RequestUtils.currentGroupId();
+        String operator = RequestUtils.currentUsername();
+        if (RequestUtils.isAdmin()) {
+            // 管理员：无条件（看全部）
+        } else if (groupId != null && !groupId.isBlank()) {
+            w.eq("group_id", groupId);
+            if (GroupMember.ROLE_MEMBER.equals(RequestUtils.currentGroupRole())) {
+                // 组员：只看自己在本组内的操作
+                w.eq("operator", operator);
+            }
+            // 组长：本组全员操作
+        } else {
+            // 无组（待分配池 / 审批中）：只能看自己
+            w.eq("operator", operator);
+        }
+        // 2. 操作类型精确匹配
         if (action != null && !action.isBlank()) {
             w.eq("action", action.trim());
         }
-        // 2. 关键字三列任一命中
+        // 3. 关键字三列任一命中
         if (keyword != null && !keyword.isBlank()) {
             String k = keyword.trim();
             w.and(q -> q.like("operator", k).or().like("target", k).or().like("detail", k));
         }
-        // 3. 时间倒序
+        // 4. 时间倒序
         w.orderByDesc("log_time");
         return w;
     }
