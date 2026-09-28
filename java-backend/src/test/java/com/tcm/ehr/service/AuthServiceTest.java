@@ -2,6 +2,8 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.common.exception.BadCredentialsException;
 import com.tcm.ehr.common.utils.JwtUtil;
+import com.tcm.ehr.domain.po.GroupMember;
+import com.tcm.ehr.domain.po.ResearchGroup;
 import com.tcm.ehr.domain.po.User;
 import com.tcm.ehr.domain.vo.LoginVO;
 import com.tcm.ehr.mapper.GroupMemberMapper;
@@ -178,5 +180,56 @@ class AuthServiceTest {
         assertEquals("用户名已存在", ex.getMessage());
         // 查重失败时不应插入任何数据
         Mockito.verify(userMapper, Mockito.never()).insert(Mockito.any(User.class));
+    }
+
+    /**
+     * 审批中的建组申请人必须能登录。
+     *
+     * <p>回归：旧实现把「有成员行但解析不到 active 组」等同于「组已停用」，
+     * 于是状态为 pending 的申请人被误报「所属课题组已被停用」而无法登录。
+     * 正确语义：只有组状态为 stopped 才拒登。</p>
+     */
+    @Test
+    void pendingGroupApplicantCanStillLogin() {
+        User xxj = user("u-xxj", "XXJ", "用户");
+        xxj.setHasPendingGroup(1);
+        when(userMapper.findByUsername("XXJ")).thenReturn(xxj);
+        // 组为 pending → 解析不到 active 组
+        resolvesToNoGroup();
+        GroupMember m = new GroupMember();
+        m.setGroupId("grp-xxj");
+        m.setUserId("u-xxj");
+        m.setRole(GroupMember.ROLE_OWNER);
+        when(groupMemberMapper.selectList(Mockito.any())).thenReturn(List.of(m));
+        ResearchGroup g = new ResearchGroup();
+        g.setId("grp-xxj");
+        g.setStatus(ResearchGroup.PENDING);
+        when(groupMapper.selectById("grp-xxj")).thenReturn(g);
+
+        LoginVO vo = authService.login("XXJ", "123456");
+
+        assertNotNull(vo.getToken(), "审批中的申请人应能登录");
+        assertEquals(List.of(), vo.getMenus(), "审批中走空菜单（前端引导页）");
+        assertTrue(vo.isPendingGroup());
+    }
+
+    /** 组确实被停用（status=stopped）时才拒登 */
+    @Test
+    void stoppedGroupRejectsLogin() {
+        when(userMapper.findByUsername("zhangsan")).thenReturn(user("u-zs", "zhangsan", "用户"));
+        resolvesToNoGroup();
+        GroupMember m = new GroupMember();
+        m.setGroupId("grp-stopped");
+        m.setUserId("u-zs");
+        m.setRole(GroupMember.ROLE_MEMBER);
+        when(groupMemberMapper.selectList(Mockito.any())).thenReturn(List.of(m));
+        ResearchGroup g = new ResearchGroup();
+        g.setId("grp-stopped");
+        g.setStatus(ResearchGroup.STOPPED);
+        when(groupMapper.selectById("grp-stopped")).thenReturn(g);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> authService.login("zhangsan", "123456"));
+        assertTrue(ex.getMessage().contains("停用"), ex.getMessage());
     }
 }

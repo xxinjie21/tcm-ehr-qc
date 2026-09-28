@@ -180,12 +180,29 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         return GroupMember.ROLE_OWNER.equals(g.getGroupRole()) ? OWNER_MENUS : MEMBER_MENUS;
     }
 
-    /** 该用户是否有成员行但所属组非 active（= 组被停用） */
+    /**
+     * 该用户是否属于一个<b>已停用</b>的课题组（组状态为 {@code stopped}）。
+     *
+     * <p>⚠️ 不能简化成「有成员行但解析不到 active 组」——那会把
+     * <b>审批中的建组申请人</b>（组状态 {@code pending}）误判成「组已停用」而拒绝登录。
+     * 申请人本就该能登录（进引导页看审批进度）。故这里显式只看
+     * {@code research_groups.status = 'stopped'}。</p>
+     */
     private boolean isGroupStopped(String userId) {
         if (userId == null || userId.isBlank()) {
             return false;
         }
-        return groupMemberMapper.selectCount(new QueryWrapper<GroupMember>()
-                .eq("user_id", userId)) > 0;
+        List<GroupMember> members = groupMemberMapper.selectList(
+                new QueryWrapper<GroupMember>().eq("user_id", userId));
+        for (GroupMember m : members) {
+            if (m.getGroupId() == null || m.getGroupId().isBlank()) {
+                continue;
+            }
+            ResearchGroup grp = groupMapper.selectById(m.getGroupId());
+            if (grp != null && ResearchGroup.STOPPED.equals(grp.getStatus())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
