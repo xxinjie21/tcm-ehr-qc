@@ -731,7 +731,7 @@ onMounted(handleSearch)
   margin: 0;
 }
 .uploader :deep(.el-upload-dragger) {
-  padding: 26px 10px;
+  padding: 24px 10px;
   border: 1px dashed var(--line);
   background: var(--paper);
 }
@@ -740,7 +740,7 @@ onMounted(handleSearch)
 .up-title em { color: var(--ink-mid); font-style: normal; font-weight: bold; }
 .up-sub { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
-.result { margin-top: 18px; border-top: 1px dashed #ece8dc; padding-top: 14px; }
+.result { margin-top: 16px; border-top: 1px dashed #ece8dc; padding-top: 14px; }
 .import-failed {
   margin-top: 14px;
   padding: 8px 12px;
@@ -773,7 +773,7 @@ onMounted(handleSearch)
 }
 .result-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 12px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
-.stat-item { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; text-align: center; }
+.stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; text-align: center; }
 .stat-item .num { font-size: 22px; font-weight: bold; color: var(--ink); }
 .stat-item .lbl { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 .stat-item.green .num { color: var(--ink-mid); }
@@ -804,7 +804,7 @@ onMounted(handleSearch)
 }
 .group-hd {
   position: relative;
-  padding: 3px 0 4px 9px;
+  padding: 3px 0 4px 8px;
   margin-bottom: 6px;
   font-size: 12px;
   font-weight: bold;
@@ -824,7 +824,7 @@ onMounted(handleSearch)
 .create-actions {
   position: sticky;
   bottom: 0;
-  background: #fff;
+  background: var(--surface);
   padding: 8px 0;
   border-top: 1px solid var(--line);
   z-index: 1;
@@ -836,10 +836,10 @@ onMounted(handleSearch)
 /* 栅格降级：
    1500px 以下如果取消 span 2，21 字段从 11 行降到 8 行，比降到 2 列更省高度；
    1200px 以下 3 列每列已不足 320px，标签左置后控件过窄，才收 2 列 */
-@media (max-width: 1559px) {
+@media (max-width: 1560px) {
   .form-grid .wide { grid-column: span 1; }
 }
-@media (max-width: 1199px) {
+@media (max-width: 1200px) {
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {

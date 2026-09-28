@@ -168,7 +168,7 @@ watch(() => props.recordId, () => {
 /* 骨架屏：纯色 + opacity 呼吸（项目硬规则禁渐变）；行宽由模板按序号递减，模拟段落长短不一 */
 .aii-skeleton .sk-line {
   height: 12px;
-  border-radius: 3px;
+  border-radius: 2px;
   margin-bottom: 8px;
   background: #e8e4da;
   animation: sk 1.2s ease-in-out infinite;
@@ -197,7 +197,7 @@ watch(() => props.recordId, () => {
   margin-bottom: 12px;
 }
 .sum-item {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 8px 10px;
@@ -220,7 +220,7 @@ watch(() => props.recordId, () => {
   font-size: 13px;
   line-height: 1.8;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 10px 12px;
@@ -233,7 +233,7 @@ watch(() => props.recordId, () => {
   gap: 10px;
 }
 .aii-block {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 10px 12px;
@@ -258,7 +258,7 @@ watch(() => props.recordId, () => {
 .chip {
   font-size: 11.5px;
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: 2px;
   border: 1px solid var(--line);
   background: var(--paper);
   color: var(--ink);

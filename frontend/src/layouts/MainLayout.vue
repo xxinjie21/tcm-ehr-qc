@@ -138,7 +138,7 @@ const handleLogout = () => {
   z-index: 2000;
   padding: 8px 14px;
   background: var(--ink);
-  color: #fff;
+  color: var(--surface);
   text-decoration: none;
   border-radius: 0 0 4px 0;
 }
@@ -153,7 +153,7 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   padding: 0 20px;
-  color: #fff;
+  color: var(--surface);
 }
 .brand {
   font-size: 16px;
@@ -179,7 +179,7 @@ const handleLogout = () => {
   font-size: 13px;
 }
 .llm-entry:hover {
-  color: #fff;
+  color: var(--surface);
 }
 .topbar .avatar {
   width: 28px;
@@ -194,7 +194,7 @@ const handleLogout = () => {
   color: #d8dfd9;
 }
 .logout:hover {
-  color: #fff;
+  color: var(--surface);
 }
 
 /* ===== 布局（原型 layout） ===== */
@@ -218,7 +218,7 @@ aside {
 }
 .menu a {
   display: block;
-  padding: 11px 18px;
+  padding: 12px 16px;
   color: #55534c;
   text-decoration: none;
   font-size: 13.5px;
@@ -235,7 +235,7 @@ aside {
   font-weight: bold;
 }
 .menu .sec {
-  padding: 14px 18px 4px;
+  padding: 14px 16px 4px;
   font-size: 12px;
   color: var(--text-sub);
 }

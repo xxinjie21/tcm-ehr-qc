@@ -354,7 +354,7 @@ onBeforeUnmount(() => {
   max-height: 76vh;
   background: #fbfaf6;
   border: 1px solid var(--line, #e4dfd2);
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow: 0 8px 28px rgba(47, 70, 57, 0.18);
   display: flex;
   flex-direction: column;
@@ -392,7 +392,7 @@ onBeforeUnmount(() => {
 }
 .aii-clear { margin-left: auto; font-size: 12px; }
 .aii-close { font-size: 18px; }
-.aii-clear:hover, .aii-close:hover { color: #fff; }
+.aii-clear:hover, .aii-close:hover { color: var(--surface); }
 
 /* 可查范围提示条：浅色底与上方标题栏区分 */
 .aii-scope {
@@ -414,9 +414,9 @@ onBeforeUnmount(() => {
 .cmd {
   font-size: 11.5px;
   color: var(--ink, #2f4639);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line, #e4dfd2);
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 3px 10px;
   cursor: pointer;
 }
@@ -440,7 +440,7 @@ onBeforeUnmount(() => {
   margin-left: 40px;
 }
 .msg.ai {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line, #e4dfd2);
   color: var(--ink, #2f4639);
 }
@@ -461,7 +461,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid #ece8dc;
-  background: #fff;
+  background: var(--surface);
 }
 
 /* 展开/收起过渡：淡入 + 上移 8px */

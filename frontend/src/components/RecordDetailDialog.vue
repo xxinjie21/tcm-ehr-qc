@@ -67,7 +67,7 @@ const FIELDS = fieldsWithWide([
 .detail-2col {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
+  gap: 16px;
   align-items: start;
   max-height: calc(86vh - 140px);
   overflow: auto;

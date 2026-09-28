@@ -447,7 +447,7 @@ onMounted(() => {
 <style scoped>
 /* ===== 清洗状态行（顶部） ===== */
 .gov-stats {
-  background: #fff;
+  background: var(--surface);
   display: flex;
   flex-wrap: wrap;
   border: 1px solid var(--line);
@@ -455,7 +455,7 @@ onMounted(() => {
   padding: 14px 24px;
   margin-bottom: 20px;
   display: flex;
-  gap: 48px;
+  gap: 24px;
 }
 .gs {
   font-size: 13px;
@@ -475,7 +475,7 @@ onMounted(() => {
 
 /* 当前范围条*/
 .scope-bar {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 14px 24px;
@@ -539,7 +539,7 @@ onMounted(() => {
   height: 30px;
   border-radius: 50%;
   background: var(--ink-mid);
-  color: #fff;
+  color: var(--surface);
   font-size: 14px;
   font-weight: bold;
   line-height: 30px;
@@ -601,7 +601,7 @@ onMounted(() => {
   gap: 12px;
 }
 .stat-item {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 14px 16px;
@@ -625,13 +625,13 @@ onMounted(() => {
 .level-dist {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   margin-top: 12px;
   font-size: 13px;
   color: var(--ink);
 }
 .level-dist .ld-lbl { color: var(--text-sub); font-size: 12.5px; }
-.level-dist .ld { padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.level-dist .ld { padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .level-dist .ld.exact { color: var(--ink-mid); }
 .level-dist .ld.contain { color: var(--ochre); }
 .level-dist .ld.fuzzy { color: var(--danger); }

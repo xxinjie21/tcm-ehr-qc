@@ -220,8 +220,8 @@ const levelDesc = (level, raw, name) => {
   font-size: 10.5px;
   margin-left: 6px;
   padding: 0 4px;
-  border-radius: 3px;
-  color: #fff;
+  border-radius: 2px;
+  color: var(--surface);
   background: var(--ink-mid);
 }
 .sd-item .tag.rule { background: var(--ochre); }

@@ -42,14 +42,14 @@ defineEmits(['search', 'reset'])
 <style scoped>
 /* 卡片式筛选条：与下方统计面板同底色同圆角，构成一组视觉单元 */
 .filter {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 16px;
   margin-bottom: 14px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 18px;
+  gap: 10px 16px;
   align-items: flex-end;
 }
 .filter .cap {

@@ -1001,7 +1001,7 @@ onMounted(() => {
   font-size: 12.5px;
   padding: 3px 10px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
   color: var(--ink);
 }
 
@@ -1046,7 +1046,7 @@ onMounted(() => {
 .wf-grade {
   font-size: 12px;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 6px;
 }
 .wf-grade.is-ok {
   background: var(--ink-light);
@@ -1107,7 +1107,7 @@ onMounted(() => {
   padding: 0 8px;
   font-size: 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--ink-light);
   color: var(--ink);
 }
@@ -1129,7 +1129,7 @@ onMounted(() => {
   gap: 6px;
   padding: 4px 12px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 6px;
   font-size: 12.5px;
   color: var(--text-sub);
 }

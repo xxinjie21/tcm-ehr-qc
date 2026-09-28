@@ -44,10 +44,10 @@ const display = computed(() =>
 <style scoped>
 .stat {
   flex: 1;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px 18px;
+  padding: 14px 16px;
 }
 .stat .num {
   font-size: 24px;

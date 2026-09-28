@@ -19,7 +19,7 @@ defineProps({
 
 <style scoped>
 .panel {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   margin-bottom: 14px;

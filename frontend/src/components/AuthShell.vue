@@ -29,7 +29,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 30px 20px 26px;
+  padding: 30px 20px 24px;
   /* 宣纸底 + 极淡墨点纹理（内联 SVG，非 CSS 渐变） */
   background-color: var(--paper);
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='0.9' fill='%232f4639' fill-opacity='0.05'/></svg>");
@@ -112,7 +112,7 @@
 .auth-form .hint {
   font-size: 12px;
   color: var(--text-sub);
-  margin: 7px 0 24px;
+  margin: 8px 0 24px;
 }
 
 /* 表单控件对齐原型（覆盖 Element Plus 默认间距） */
@@ -132,7 +132,7 @@
   margin-top: 6px;
 }
 .auth-switch {
-  margin-top: 18px;
+  margin-top: 16px;
   font-size: 12px;
   color: var(--text-sub);
 }
@@ -166,14 +166,14 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--ochre);
   background: var(--ochre-light);
-  padding: 9px 12px;
+  padding: 8px 12px;
   font-size: 12px;
   color: #6b5a44;
   margin: 0 0 16px;
 }
 
 .copyright {
-  margin-top: 22px;
+  margin-top: 24px;
   text-align: center;
   font-size: 11px;
   color: var(--text-sub);
@@ -197,7 +197,7 @@
     padding: 24px 4px;
   }
   .auth-demo {
-    margin-top: 22px;
+    margin-top: 24px;
   }
 }
 </style>

@@ -653,7 +653,7 @@ onMounted(() => {
 /* 转换预览：左候选表（flex:2）、右失败明细与操作（flex:1） */
 .convert-body {
   display: flex;
-  gap: 22px;
+  gap: 24px;
   align-items: flex-start;
 }
 .convert-main {
@@ -665,7 +665,7 @@ onMounted(() => {
   flex: 1;
   min-width: 250px;
   border-left: 1px solid var(--line);
-  padding-left: 22px;
+  padding-left: 24px;
 }
 /* 右栏小标题 */
 .col-hd {

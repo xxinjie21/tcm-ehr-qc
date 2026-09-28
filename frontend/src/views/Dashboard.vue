@@ -305,10 +305,10 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 }
 .todo {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 9px 18px;
+  padding: 8px 16px;
   cursor: pointer;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
   /* button 元素重置：保持原卡片观感*/

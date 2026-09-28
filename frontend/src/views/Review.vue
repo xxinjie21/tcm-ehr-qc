@@ -582,11 +582,11 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-left: 4px solid var(--ochre);
   border-radius: 6px;
-  padding: 12px 18px;
+  padding: 12px 16px;
   margin-bottom: 14px;
 }
 .task-id {
@@ -627,7 +627,7 @@ onMounted(() => {
 
 /* ===== ③ 原文折叠 ===== */
 .raw-panel {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   margin-bottom: 14px;
@@ -664,7 +664,7 @@ onMounted(() => {
 }
 .raw-item {
   display: flex;
-  padding: 7px 0;
+  padding: 8px 0;
   border-bottom: 1px dashed #ece8dc;
   font-size: 13px;
 }
@@ -693,7 +693,7 @@ onMounted(() => {
   margin-bottom: 0;
   /* 补齐面板外框：本页自写 .panel / .panel-hd / .panel-bd，
      原先漏了 .panel 的外框，左右对比区看起来没有边界，与病历数据页不一致 */
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   overflow: hidden;
@@ -776,7 +776,7 @@ onMounted(() => {
 .ded-hd {
   font-size: 12.5px;
   color: var(--text-sub);
-  margin: 13px 0 8px;
+  margin: 12px 0 8px;
 }
 .ded-item {
   display: flex;
@@ -825,7 +825,7 @@ onMounted(() => {
   background: var(--ink-light);
   border: 1px solid #cddcd2;
   border-radius: 2px;
-  padding: 9px 14px;
+  padding: 8px 14px;
   font-size: 13px;
   color: var(--ink-mid);
   display: flex;
@@ -838,7 +838,7 @@ onMounted(() => {
 }
 .tag-ok {
   color: var(--ink-mid);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--ink-mid);
   border-radius: 2px;
   padding: 1px 8px;
@@ -854,11 +854,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-left: 4px solid var(--ink-mid);
   border-radius: 6px;
-  padding: 12px 18px;
+  padding: 12px 16px;
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
@@ -891,10 +891,10 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 13px 20px;
+  padding: 12px 20px;
   flex-wrap: wrap;
   /* 吸底：对照区很长，关闭 / 提交入口始终可见，不必滚到底 */
   position: sticky;

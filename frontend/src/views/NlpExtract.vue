@@ -910,7 +910,7 @@ onBeforeUnmount(stopPoll)
   background: var(--ink-light);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 9px 14px;
+  padding: 8px 14px;
   font-size: 12.5px;
   color: var(--text-sub);
   margin-bottom: 14px;
@@ -934,7 +934,7 @@ onBeforeUnmount(stopPoll)
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 18px;
+  gap: 16px;
   align-items: start;
 }
 .pane { min-width: 0; }
@@ -947,7 +947,7 @@ onBeforeUnmount(stopPoll)
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 7px 11px;
+  padding: 8px 12px;
   margin-bottom: 10px;
   line-height: 1.7;
 }
@@ -964,7 +964,7 @@ onBeforeUnmount(stopPoll)
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px 11px;
+  padding: 8px 12px;
   margin-bottom: 10px;
   line-height: 1.8;
 }
@@ -973,8 +973,8 @@ onBeforeUnmount(stopPoll)
 .norm-stat b.bad { color: var(--danger); }
 .ns-line + .ns-line { margin-top: 2px; }
 .ns-legend {
-  margin-top: 7px;
-  padding-top: 7px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px dashed #ece8dc;
   display: flex;
   flex-direction: column;
@@ -998,7 +998,7 @@ onBeforeUnmount(stopPoll)
   border: 1px solid #e3c3bb;
   border-left: 3px solid var(--danger);
   border-radius: 6px;
-  padding: 9px 13px;
+  padding: 8px 12px;
   margin-bottom: 12px;
   font-size: 12.5px;
   line-height: 1.8;
@@ -1021,8 +1021,8 @@ onBeforeUnmount(stopPoll)
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 9px;
-  padding-top: 9px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px dashed #ece8dc;
   font-size: 12.5px;
 }
@@ -1041,7 +1041,7 @@ onBeforeUnmount(stopPoll)
 .form-group { margin-bottom: 4px; }
 .group-hd {
   position: relative;
-  padding: 3px 0 4px 9px;
+  padding: 3px 0 4px 8px;
   margin-bottom: 6px;
   font-size: 12px;
   font-weight: bold;
@@ -1070,7 +1070,7 @@ onBeforeUnmount(stopPoll)
 .composed-hd {
   cursor: pointer;
   list-style: none;
-  padding: 9px 0;
+  padding: 8px 0;
   font-size: 12.5px;
   color: var(--ink-mid);
 }
@@ -1082,7 +1082,7 @@ onBeforeUnmount(stopPoll)
 .pane-actions {
   position: sticky;
   bottom: 0;
-  background: #fff;
+  background: var(--surface);
   padding: 8px 0;
   border-top: 1px solid var(--line);
   z-index: 1;
@@ -1126,7 +1126,7 @@ onBeforeUnmount(stopPoll)
 .batch-list { margin-top: 16px; border-top: 1px dashed #ece8dc; padding-top: 12px; }
 .bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: 8px; }
 
-@media (max-width: 1400px) {
+@media (max-width: 1560px) {
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 1200px) {
