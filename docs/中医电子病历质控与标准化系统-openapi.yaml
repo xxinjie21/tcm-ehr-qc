@@ -1030,6 +1030,9 @@ components:
       properties:
         total:
           type: integer
+        skippedMissing:
+          type: integer
+          description: 因关联病历已删除而跳过的任务数（P5.2）
         tasks:
           type: array
           items:

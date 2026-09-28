@@ -48,6 +48,11 @@
         </template>
       </el-table>
 
+      <!-- P5.2：关联病历已删的任务会被跳过，条数与总数对不上时给出解释 -->
+      <div v-if="skippedMissing > 0" class="skip-hint">
+        另有 {{ skippedMissing }} 条任务因关联病历已删除而无法展示
+      </div>
+
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
@@ -250,6 +255,8 @@ const fmt = (t) => (t ? fmtDateTime(t,'minute') : '—')
 const status = ref('待复核')
 const rows = ref([])
 const total = ref(0)
+// P5.2：因关联病历已删而跳过的任务数
+const skippedMissing = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const loading = ref(false)
@@ -271,6 +278,7 @@ const load = async (p) => {
     if (mine !== listSeq) return
     rows.value = res.data?.tasks || []
     total.value = res.data?.total || 0
+    skippedMissing.value = res.data?.skippedMissing || 0
   } catch {
     if (mine !== listSeq) return
     // 拦截器已提示
@@ -910,4 +918,6 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 }
+/* P5.2：跳过已删病历的提示 */
+.skip-hint { margin-top: 8px; font-size: 12.5px; color: var(--text-sub); }
 </style>

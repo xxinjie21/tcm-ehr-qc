@@ -343,7 +343,7 @@
 
           <!-- 最近任务 -->
           <div v-if="batchTasks.length" class="batch-list">
-            <div class="bf-hd">最近任务</div>
+            <div class="bf-hd">最近任务（最多显示最近 50 条）</div>
             <el-table :data="batchTasks" border size="small" max-height="260">
               <el-table-column label="提交时间" width="170">
                 <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>

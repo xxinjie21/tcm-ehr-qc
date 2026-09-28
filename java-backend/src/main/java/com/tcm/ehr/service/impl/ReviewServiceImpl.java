@@ -84,9 +84,12 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         // 5. 组装返回：总数与任务列表项（关联病历缺失的跳过，不占位）
         ReviewTasksVO vo = new ReviewTasksVO();
         vo.setTotal(pg.getTotal());
+        // P5.2：关联病历已删（selectById 返回 null）的任务会跳过，计数后告知前端
+        int skippedMissing = 0;
         for (ReviewTask t : pg.getRecords()) {
             Record r = recordMapper.selectById(t.getRecordId());
             if (r == null) {
+                skippedMissing++;
                 continue;
             }
             ReviewTaskVO rv = new ReviewTaskVO();
@@ -101,6 +104,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             rv.setStructuredData(parse(r.getStructuredData()));
             vo.getTasks().add(rv);
         }
+        vo.setSkippedMissing(skippedMissing);
         return vo;
     }
 
