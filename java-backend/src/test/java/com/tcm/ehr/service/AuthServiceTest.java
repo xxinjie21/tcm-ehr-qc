@@ -4,6 +4,8 @@ import com.tcm.ehr.common.exception.BadCredentialsException;
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.domain.po.User;
 import com.tcm.ehr.domain.vo.LoginVO;
+import com.tcm.ehr.mapper.GroupMemberMapper;
+import com.tcm.ehr.mapper.ResearchGroupMapper;
 import com.tcm.ehr.mapper.UserMapper;
 import com.tcm.ehr.service.impl.AuthServiceImpl;
 import io.jsonwebtoken.Claims;
@@ -35,19 +37,28 @@ class AuthServiceTest {
             "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi";
 
     private UserMapper userMapper;
+    private ResearchGroupMapper groupMapper;
+    private GroupMemberMapper groupMemberMapper;
+    private IGroupService groupService;
     private JwtUtil jwtUtil;
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
         userMapper = Mockito.mock(UserMapper.class);
+        groupMapper = Mockito.mock(ResearchGroupMapper.class);
+        groupMemberMapper = Mockito.mock(GroupMemberMapper.class);
+        groupService = Mockito.mock(IGroupService.class);
         jwtUtil = new JwtUtil();
         ReflectionTestUtils.setField(jwtUtil, "secret",
                 "tcm-ehr-qc-jwt-secret-key-2026-course-design");
         ReflectionTestUtils.setField(jwtUtil, "expireHours", 24L);
-        authService = new AuthServiceImpl(jwtUtil);
+        authService = new AuthServiceImpl(jwtUtil, groupMapper, groupMemberMapper, groupService);
         // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置
         ReflectionTestUtils.setField(authService, "baseMapper", userMapper);
+        // 默认解析为无组（待分配池）；需要有组的用例再显式覆盖
+        resolvesToNoGroup();
+        Mockito.when(groupMemberMapper.selectCount(Mockito.any())).thenReturn(0L);
     }
 
     private User user(String id, String username, String role) {
@@ -56,21 +67,41 @@ class AuthServiceTest {
         u.setUsername(username);
         u.setPassword(HASH_123456);
         u.setRole(role);
+        // 阶段 2：默认给「有生效组」，否则否免注册用例会被当成待分配池
+        u.setStatus(User.STATUS_ACTIVE);
+        u.setHasPendingGroup(0);
         return u;
+    }
+
+    /** 把当前测试的“解析结果”设为无组（默认） */
+    private void resolvesToNoGroup() {
+        Mockito.when(groupService.resolvePrimaryGroup(Mockito.anyString()))
+                .thenReturn(GroupResolution.NONE);
+    }
+
+    /** 设为已属于某组（owner / member） */
+    private void resolvesToGroup(String groupId, String groupRole) {
+        Mockito.when(groupService.resolvePrimaryGroup(Mockito.anyString()))
+                .thenReturn(new GroupResolution(groupId, groupRole));
     }
 
     @Test
     void adminLoginOkAndTokenValid() {
         when(userMapper.findByUsername("admin"))
                 .thenReturn(user("admin-0001", "admin", "管理员"));
+        resolvesToGroup("grp-default-2026", "member");
 
         LoginVO vo = authService.login("admin", "123456");
 
         assertNotNull(vo.getToken());
         assertEquals("管理员", vo.getRole());
-        // 管理员菜单：文档第五章/登录响应示例共 8 项，名称已由旧名“数据清洗”改为“清洗与导出”
+        // 阶段2：管理员菜单 = 原 8 项 + 「课题组管理」= 9 项
+        // （注：计划 §八 的侧栏图同时列了「课题组管理」与「我的课题组」，但那条写的是
+        //  管理员 8 项 → 9 项；管理员从「我的课题组」页看的就是自己的组信息，
+        //  与 Groups.vue 的组列表是同一诉求，故只加 1 项以对上计划的数量）
         List<String> menus = vo.getMenus();
-        assertEquals(8, menus.size());
+        assertEquals(9, menus.size());
+        assertTrue(menus.contains("课题组管理"));
         assertTrue(menus.contains("人工复核"));
         assertTrue(menus.contains("清洗与导出"));
         assertFalse(menus.contains("数据清洗"));
@@ -89,7 +120,9 @@ class AuthServiceTest {
         LoginVO vo = authService.login("auditor", "123456");
 
         assertEquals("审核员", vo.getRole());
-        assertEquals(List.of("首页看板", "人工复核"), vo.getMenus());
+        // 审核员在阶段 2 中已不再是独立角色：会认定为「用户」，
+        // 菜单取决于组内角色（此处无组 → 空菜单）
+        assertEquals(List.of(), vo.getMenus());
         assertNotNull(vo.getToken());
     }
 
@@ -121,12 +154,15 @@ class AuthServiceTest {
             return 1;
         }).when(userMapper).insert(Mockito.any(User.class));
 
-        authService.register("newuser", "123456");
+        authService.register("newuser", "123456", null);
 
         User saved = savedRef.get();
         assertNotNull(saved);
         assertEquals("newuser", saved.getUsername());
-        assertEquals("审核员", saved.getRole());
+        // 阶段 2：注册角色固定为「用户」，无组时进待分配池
+        assertEquals("用户", saved.getRole());
+        assertEquals(User.STATUS_PENDING, saved.getStatus());
+        assertEquals(0, saved.getHasPendingGroup());
         // 密码必须 BCrypt 加密存储，且与明文匹配
         assertFalse(saved.getPassword().equals("123456"));
         assertTrue(new BCryptPasswordEncoder().matches("123456", saved.getPassword()));
@@ -138,7 +174,7 @@ class AuthServiceTest {
                 .thenReturn(user("admin-0001", "admin", "管理员"));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.register("admin", "123456"));
+                () -> authService.register("admin", "123456", null));
         assertEquals("用户名已存在", ex.getMessage());
         // 查重失败时不应插入任何数据
         Mockito.verify(userMapper, Mockito.never()).insert(Mockito.any(User.class));

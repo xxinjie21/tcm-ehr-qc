@@ -119,6 +119,13 @@ llm:
 # 操作日志：§七 L2 起只入库（operation_log 表），不再落文件，故无 log.* 配置项。
 # ⚠️ 下面的 logging: 是 Spring 应用日志（另一回事），不要一起删。
 
+# 认证（阶段2 §4.4）
+auth:
+  # 管理员能否看到各组数据。false = 把管理员的 groupId 置空，复用 RecordFilter 的
+  # fail-closed → 管理员在任何数据页面都看不到内容。这是设计意图（“数据主权在组”），
+  # 收紧时只需改这一行；数据层 / SQL / 前端 / openapi 零改动。
+  admin-can-view-data: true
+
 logging:
   level:
     # 排查问题时才改 debug；长期开会让日志迅速变大（且 debug 里可能带业务数据）
