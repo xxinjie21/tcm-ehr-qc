@@ -670,8 +670,7 @@ const handleSizeChange = () => {
   loadPrecheck()
 }
 
-/** 范围查询是整页口径：刷新时各块必须一起走 */
-// 两块数据任意一块在加载，查询按钮就处于 loading
+/** 查询按钮 loading：两块数据任意一块在加载就转（范围查询是整页口径，刷新时各块必须一起走） */
 const queryLoading = computed(() => precheckLoading.value || dedLoading.value)
 // 应用筛选：两块一起刷新（整页口径）
 const applyFilters = () => {

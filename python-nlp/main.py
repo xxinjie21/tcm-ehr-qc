@@ -205,7 +205,7 @@ def _rules(text: str) -> Dict[str, List[Entity]]:
     # 1. 舌象 / 脉象 / 治法走正则
     tongue = [ent(m.group(0)) for m in RULE_TONGUE.finditer(text)]
     pulse = [ent(m.group(0)) for m in RULE_PULSE.finditer(text)]
-    # 2. 病因走词表包含匹配，dict.fromkeys 去重并保序，避免同一病因重复出现
+    # 2. 病因走词表包含匹配；dict.fromkeys 的去重作用对此处是冗余的（RULE_CAUSE_WORDS 本身无重复项），只保证顺序与控制去重即可
     cause = [ent(w) for w in dict.fromkeys(RULE_CAUSE_WORDS) if w in text]
     treatment = [ent(m.group(0)) for m in RULE_TREATMENT.finditer(text)]
     return {"tongueList": tongue, "pulseList": pulse, "causeList": cause, "treatmentList": treatment}

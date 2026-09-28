@@ -76,6 +76,9 @@ public class AiServiceImpl implements IAiService {
      * 解读：规则先出结论（完整性/核心缺项/归一命中/关键提示），LLM 只做叙述增强。
      *
      * <p>LLM 不可用或返回非 JSON 时保留规则模板叙述，结论始终可用。</p>
+     *
+     * @param dto 含 recordId 的解读请求；病历不属于当前组时返回 {@code null}
+     * @return 解读结果，由 Controller 转 止 404
      */
     @Override
     public AiReplyVO interpret(AiQueryDTO dto) {
@@ -298,6 +301,9 @@ public class AiServiceImpl implements IAiService {
      * 问答：命中技术实现类关键词直接兜底拒答；否则拼业务上下文交给 LLM，失败降级为规则答案。
      *
      * <p>支持追问：{@code history} 为上文对话，一并进 prompt。</p>
+     *
+     * @param dto 含 question（必填）与可选 history / recordId
+     * @return 回答与来源（rule / llm）
      */
     @Override
     public AiReplyVO chat(AiQueryDTO dto) {
@@ -450,6 +456,9 @@ public class AiServiceImpl implements IAiService {
      * 复核预检：结论来自规则重算（与 records.qc_results 同源），LLM 只补建议。
      *
      * <p>LLM 不可用时直接回规则预检单，保证"有结论可看"。</p>
+     *
+     * @param dto 含 recordId 的预检请求；无权时返回 {@code null}
+     * @return 预检单，由 Controller 转 止 404
      */
     @Override
     public AiReplyVO review(AiQueryDTO dto) {

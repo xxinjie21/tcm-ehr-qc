@@ -125,12 +125,12 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
-/* 低于该宽度侧栏与主区会互相挤压，改为横向滚动*/
+/* 低于该宽度侧栏与主区会互相挤压，改为横向滚动 */
 .app-shell {
   min-width: 1024px;
 }
 
-/* 跳转链接：默认视觉隐藏，键盘聚焦时显现*/
+/* 跳转链接：默认视觉隐藏，键盘聚焦时显现 */
 .skip-link {
   position: absolute;
   left: -9999px;
@@ -199,7 +199,7 @@ const handleLogout = () => {
 
 /* ===== 布局（原型 layout） ===== */
 /* 固定视口：顶栏 + 布局占满整屏高，长页只在 main 内部滚动 —— 文档层不再出现上下滚动条，
-   页面不会被挤窄/左移*/
+   页面不会被挤窄/左移 */
 .layout {
   display: flex;
   height: calc(100vh - 52px);
@@ -247,7 +247,7 @@ main {
      文档层不出现滚动条 → 通栏且切页不偏移 */
   overflow-y: auto;
   padding: 16px 20px 84px;
-  /* 给右下角 AI 助手悬浮球留出安全间距，避免遮挡表格底部内容*/
+  /* 给右下角 AI 助手悬浮球留出安全间距，避免遮挡表格底部内容 */
 }
 /* 内层内容仍限宽居中，但滚动容器保持通宽 */
 main > * {
