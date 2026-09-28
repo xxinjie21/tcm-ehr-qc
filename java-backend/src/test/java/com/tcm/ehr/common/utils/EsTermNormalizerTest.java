@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -176,5 +177,52 @@ class EsTermNormalizerTest {
         assertEquals("   ", r.standardTerm());
         assertEquals("", r.source());
         Mockito.verify(es, Mockito.never()).search(anyString(), anyString(), anyInt());
+    }
+
+    // ---------------------------------------------------------------- scan（§九 ③）
+
+    /**
+     * {@code scan} 收集<b>全部</b>命中，不做「取最短」。
+     *
+     * <p>这是它与 {@code normalize} 的唯一区别，也是存在的理由：二级包含在
+     * {@code normalize} 里「多命中取最短」，"天麻10g，菊花10g" 会被压成一条；
+     * 而批量解析链路要的是「这段处方里有哪几个已收录的标准词」。</p>
+     */
+    @Test
+    void scan_shouldCollectAllHitsNotTheShortest() throws IOException {
+        esRecalls(List.of(entry("天麻", List.of(), "中药"), entry("菊花", List.of(), "中药")));
+
+        java.util.Set<String> hits = normalizer.scan("herb", "天麻10g，菊花10g");
+
+        assertEquals(2, hits.size(), "两个药名都应被收集，不能退化成 1 条最短：" + hits);
+        assertTrue(hits.contains("天麻"), hits.toString());
+        assertTrue(hits.contains("菊花"), hits.toString());
+    }
+
+    /** 同一份候选里既有长词又有它的子串时，两个都收（不去重成最短） */
+    @Test
+    void scan_shouldKeepBothLongAndShortEntries() throws IOException {
+        esRecalls(List.of(entry("茯苓", List.of(), "中药"), entry("茯苓皮", List.of(), "中药")));
+
+        java.util.Set<String> hits = normalizer.scan("herb", "茯苓皮15g，茯苓15g");
+
+        assertEquals(2, hits.size(), "长词与短词都在文本里，应各收一条：" + hits);
+    }
+
+    /** 空 / 空白文本：不检索，直接给空集 */
+    @Test
+    void scan_blankText_shouldReturnEmptyWithoutSearch() throws IOException {
+        assertTrue(normalizer.scan("herb", "   ").isEmpty());
+
+        Mockito.verify(es, Mockito.never()).search(anyString(), anyString(), anyInt());
+    }
+
+    /** ES 不可用：与 normalize 同口径抛 503，不静默返回空集（否则回补会被误判成「没漏」） */
+    @Test
+    void scan_esDown_shouldPropagateAsUnavailable() throws IOException {
+        when(es.search(anyString(), anyString(), anyInt())).thenThrow(new IOException("connection refused"));
+
+        assertThrows(TermIndexUnavailableException.class, () -> normalizer.scan("herb", "天麻10g"),
+                "scan 与 normalize 必须同样把 ES 故障显式抛出去");
     }
 }

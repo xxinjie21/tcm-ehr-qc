@@ -454,6 +454,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
         // 3. 归一到标准术语（ES 索引不可用时抛异常，由上层计失败）
         entityNormalizer.normalize(vo);
+        // 3.1 §九 ④：抽取器把长词切短（"天麻"→"天"）或整段漏掉（脉位）时，
+        //     用处方 / 中医诊断两列原文回补。异常触发，无未归一项就完全不触发。
+        entityNormalizer.backfillFromRaw(vo, r.getPrescription(), r.getTcmDiagnosis());
         // 4. 打上词典版本再写库：归一结果与当时词典版本必须成对，否则事后无法判断该不该重算
         String json = objectMapper.writeValueAsString(vo);
         json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());

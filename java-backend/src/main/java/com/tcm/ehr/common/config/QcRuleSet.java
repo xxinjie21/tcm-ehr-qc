@@ -172,6 +172,13 @@ public class QcRuleSet {
                 "formula", List.of("知柏地黄丸")));
 
         // 2. 术语标准化：覆盖全部 5 类词典类型，每处 1 分、封顶 5 分
+        // ⚠️ 此处用 `EntityTypes.dictKeys()`（5 类：disease/pattern/symptom/herb/formula，
+        // **含方剂、不含舌象／脉象**），与《开发指南与待办》中「核心要素 6 项（含舌象／
+        // 脉象、不含方剂）」的口径**相反** —— 两处说的是不同东西，此处如实登记，避免
+        // 后来人按文档去「修正」它。
+        // 为什么不能改成显式 6 项：舌象／脉象实体没有 normLevel（QcScorer 按未归一计），
+        // 纳入后每条病历会立刻扣满 5 分；而「脉象词典不该加」又把出口堵死 → 两件事互锁。
+        // 详见《AI执行计划》§九 9.1 / 9.2 第 ② 步（该步只加注释，不改行为）。
         r.standardization.setEnabled(true);
         r.standardization.setElementTypes(new ArrayList<>(EntityTypes.dictKeys()));
         r.standardization.setWeightEach(1);

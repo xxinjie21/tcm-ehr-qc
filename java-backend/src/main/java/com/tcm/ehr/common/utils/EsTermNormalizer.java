@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -105,6 +106,52 @@ public class EsTermNormalizer {
             throw new TermIndexUnavailableException(
                     "术语索引暂时不可用，无法完成术语归一，请稍后重试或联系管理员", e);
         }
+    }
+
+    /**
+     * 扫描一段文本里命中的<b>全部</b>标准词（§九 9.2 第 ③ 步）。
+     *
+     * <p>与 {@link #normalize} 的区别只在<b>二级·包含</b>这一层：{@code normalize} 多命中时
+     * <b>取最短</b>（"胃痛" 优先于 "胃脘痛"），那是给「单个术语找标准词」用的；
+     * 本方法要的是「这段文本里有哪几个已收录的标准词」，取最短会把
+     * {@code "天麻10g，菊花10g"} 压成一条。故这里把二级判定换成 contains 谓词、
+     * <b>收集全部命中</b>，不做「取最短」。</p>
+     *
+     * <p>用途：批量解析链路用它找出「抽取时被截断的残词」——
+     * 归一失败的 content 若正好是某个命中词的<b>真子串</b>（如 "天" ⊂ "天麻"），
+     * 说明抽取器把长词切短了，此时把完整词 append 回去。
+     * 注意判据必须是「真子串」而不是「长度为 1」这类启发式。</p>
+     *
+     * @param type 实体类型 key（见 {@link EntityTypes}），决定查哪本词典
+     * @param text 待扫描的文本（通常是处方或诊断整段）
+     * @return 命中的标准词集合（不含空串与原文自身）；ES 不可用时抛
+     *         {@link TermIndexUnavailableException}，与 {@link #normalize} 同口径
+     */
+    public Set<String> scan(String type, String text) {
+        Set<String> out = new LinkedHashSet<>();
+        if (text == null || text.isBlank()) {
+            return out;
+        }
+        String input = text.trim();
+        // 1. 复用同一套召回（同样不静默降级：ES 挂了就该报 503，不是「没命中」）
+        for (TermEntry e : recall(type, input)) {
+            String std = e.getStandardTerm();
+            if (std == null || std.isBlank() || std.equals(input)) {
+                // 与原文完全相同的不算「被截断的残词」，跳过
+                continue;
+            }
+            if (input.contains(std) || containsAnyAlias(e, input)) {
+                out.add(std);
+            }
+            if (e.getAliases() != null) {
+                for (String a : e.getAliases()) {
+                    if (a != null && !a.isBlank() && !a.equals(input) && input.contains(a)) {
+                        out.add(std);
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     /**

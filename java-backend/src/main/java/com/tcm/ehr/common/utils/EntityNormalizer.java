@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -219,6 +220,131 @@ public class EntityNormalizer {
         // 即 NormStat 描述的是做了多少次归一，去重只影响下发给前端的列表。
         return dedupByTerm(entities, NlpExtractVO.Entity::getContent,
                 NlpExtractVO.Entity::getSourceText, NlpExtractVO.Entity::getNormLevel);
+    }
+
+    /**
+     * 从原始字段回补抽取漏掉 / 截断的实体（§九 9.2 第 ④ 步）。
+     *
+     * <p><b>解决什么</b>：NER + 规则兜底会把长词切短（本数据集 500 条里 100 条的
+     * 「左尺无力」这类脉位被丢掉；处方里的中药名也常只出前一个字，如 "天"）。
+     * 这些残词既归不上标准词、又占着列表，用户看到的是「一堆没归一的碎片」。
+     * 处方与中医诊断这两列是<b>原文必然存在</b>的，实体却可能没被抽全 ——
+     * 拿它们当「事实来源」回补，比调模型可靠。</p>
+     *
+     * <p><b>处理顺序</b>：① 剔除截断项 → ② append 完整词 → ③ 再走一次
+     * {@link #normalize}（由它统一填 level / source / code 并按标准词去重）。
+     * 刻意<b>不</b>在本方法里自己判命中层级：那是 {@link EsTermNormalizer#judge} 的职责，
+     * 复制一份就会两处漂移。二次归一是幂等的（标准词本身是精确命中项）。</p>
+     *
+     * <p><b>截断项判据</b>：归一失败（无 normLevel）<b>且</b> content/name 是某个
+     * {@code scan} 命中词的<b>真子串</b>。刻意<b>不用</b>「长度为 1」这类启发式 ——
+     * 单字本身可能就是合法的标准词（如药名 "姜"），按长度砍会误删。</p>
+     *
+     * <p><b>异常触发</b>：只在该字段<b>确有未归一项</b>时才动手。全部已归一就完全不调
+     * {@code scan}，不给每次批量解析白加一次 ES 查询。</p>
+     *
+     * @param vo           归一后的抽取结果，就地修改
+     * @param prescription 原始处方列（可空）
+     * @param tcmDiagnosis 原始中医诊断列（可空）
+     */
+    public void backfillFromRaw(NlpExtractVO vo, String prescription, String tcmDiagnosis) {
+        if (vo == null) {
+            return;
+        }
+        boolean touched = backfillHerbs(vo, prescription);
+        touched |= backfillDiseases(vo, tcmDiagnosis);
+        // 1. 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
+        if (touched) {
+            normalize(vo);
+        }
+    }
+
+    /** 中药回补：目标字段是 {@code Herb.name}，原料是处方列 */
+    private boolean backfillHerbs(NlpExtractVO vo, String prescription) {
+        if (isBlank(prescription)) {
+            return false;
+        }
+        List<NlpExtractVO.Herb> herbs = vo.getHerbs();
+        // 1. 异常触发：全部已归一就不必回补
+        if (herbs != null && !herbs.isEmpty() && allNormalized(herbs, NlpExtractVO.Herb::getNormLevel)) {
+            return false;
+        }
+        Set<String> hits = termNormalizer.scan("herb", prescription);
+        if (hits.isEmpty()) {
+            return false;
+        }
+        // 2. 剔除截断项：未归一 + name 是某命中词的真子串
+        if (herbs != null) {
+            herbs.removeIf(h -> h != null
+                    && h.getNormLevel() == null
+                    && isProperSubstringOfAny(h.getName(), hits));
+        }
+        // 3. append 已命中的完整词（已存在的按标准词去重交给 normalize）
+        List<NlpExtractVO.Herb> target = herbs == null ? new ArrayList<>() : herbs;
+        for (String std : hits) {
+            NlpExtractVO.Herb h = new NlpExtractVO.Herb();
+            h.setName(std);
+            h.setSourceText(std);
+            target.add(h);
+        }
+        vo.setHerbs(target);
+        return true;
+    }
+
+    /** 疾病回补：目标字段是 {@code Entity.content}，原料是中医诊断列 */
+    private boolean backfillDiseases(NlpExtractVO vo, String tcmDiagnosis) {
+        if (isBlank(tcmDiagnosis)) {
+            return false;
+        }
+        List<NlpExtractVO.Entity> diseases = vo.getDiseases();
+        // 1. 异常触发
+        if (diseases != null && !diseases.isEmpty() && allNormalized(diseases, NlpExtractVO.Entity::getNormLevel)) {
+            return false;
+        }
+        Set<String> hits = termNormalizer.scan("disease", tcmDiagnosis);
+        if (hits.isEmpty()) {
+            return false;
+        }
+        // 2. 剔除截断项
+        if (diseases != null) {
+            diseases.removeIf(e -> e != null
+                    && e.getNormLevel() == null
+                    && isProperSubstringOfAny(e.getContent(), hits));
+        }
+        // 3. append
+        List<NlpExtractVO.Entity> target = diseases == null ? new ArrayList<>() : diseases;
+        for (String std : hits) {
+            NlpExtractVO.Entity e = new NlpExtractVO.Entity();
+            e.setContent(std);
+            e.setSourceText(std);
+            target.add(e);
+        }
+        vo.setDiseases(target);
+        return true;
+    }
+
+    /** 是否每一项都已归一（normLevel 非空且在 1~3） */
+    private <T> boolean allNormalized(List<T> items, Function<T, Integer> levelOf) {
+        for (T item : items) {
+            Integer lv = item == null ? null : levelOf.apply(item);
+            if (lv == null || lv < 1 || lv > 3) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** s 是否为 hits 中某个词的<b>真</b>子串（相等不算，那是完整词本身） */
+    private boolean isProperSubstringOfAny(String s, Set<String> hits) {
+        if (isBlank(s)) {
+            return false;
+        }
+        for (String hit : hits) {
+            if (hit.length() > s.length() && hit.contains(s)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 归一目标值：优先 content，缺失时退回 sourceText（两者在模型侧同源） */
