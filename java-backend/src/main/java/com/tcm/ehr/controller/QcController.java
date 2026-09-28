@@ -44,12 +44,11 @@ public class QcController {
     /**
      * 事前质控：要素缺失与格式校验。
      *
-     * <p>【权限：仅管理员】缺失按"结构化与原始列都为空"判定。</p>
+     * <p>【权限：登录即可】缺失按"结构化与原始列都为空"判定。</p>
      *
      * @param dto recordId=病历ID（必填）；structuredData=可选，缺省时读取库中结构化数据
      * @return missingFields=缺失的核心要素；formatErrors=年龄/性别格式问题
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/check")
     public Result<QcCheckVO> check(@RequestBody QcCheckDTO dto) {
         return Result.ok(qcService.check(dto));
@@ -58,12 +57,11 @@ public class QcController {
     /**
      * 诊疗逻辑一致性检查。
      *
-     * <p>【权限：仅管理员】按当前规则表判定，规则未覆盖的要素不判冲突。</p>
+     * <p>【权限：登录即可】按当前规则表判定，规则未覆盖的要素不判冲突。</p>
      *
      * @param dto patternList/treatmentList/formulaList 待判定的要素
      * @return conflicts=冲突描述；consistent=是否无冲突
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/check/logic")
     public Result<LogicCheckVO> checkLogic(@RequestBody LogicCheckDTO dto) {
         return Result.ok(qcService.checkLogic(dto));
@@ -72,12 +70,11 @@ public class QcController {
     /**
      * 单条病历评分（不落库）。
      *
-     * <p>【权限：仅管理员】</p>
+     * <p>【权限：登录即可】</p>
      *
      * @param dto recordId=病历ID；structuredData=可选，缺省时读取库中结构化数据
      * @return score=得分；grade=分级；deductions=扣分明细
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/score")
     public Result<ScoreResultVO> score(@RequestBody QcScoreDTO dto) {
         return Result.ok(qcService.score(dto));
@@ -86,7 +83,7 @@ public class QcController {
     /**
      * 提交批量重算任务（异步，§七 L5）。
      *
-     * <p>【权限：仅管理员】提交后立即返回 taskId，不再同步跑到尾。
+     * <p>【权限：登录即可】提交后立即返回 taskId，不再同步跑到尾。
      * 任务会覆盖既有分数并同步复核任务状态；超上限或已有任务在跑返回 400。</p>
      *
      * <p>⚠️ <b>破坏性变更</b>：原来返回分级汇总，现在只返回任务状态；
@@ -95,7 +92,6 @@ public class QcController {
      * @param dto filters=范围条件，为空表示全库
      * @return id=任务ID；status=QUEUED；total=计划处理条数
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/score/batch")
     public Result<QcTaskVO> submitScoreBatch(@RequestBody(required = false) QcBatchDTO dto) {
         return Result.ok("已提交，后台运行中", qcBatchService.submit(dto));
@@ -104,12 +100,11 @@ public class QcController {
     /**
      * 查询批量重算任务进度（含分级汇总）。
      *
-     * <p>【权限：仅管理员】</p>
+     * <p>【权限：登录即可】</p>
      *
      * @param id 任务ID
      * @return 进度与分级汇总；任务不存在时返回 404
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/qc/score/batch/{id}")
     public ResponseEntity<Result<QcTaskVO>> scoreBatchStatus(@PathVariable String id) {
         // 1. 进度在表里；任务不存在与「任务被清理」同一表现
@@ -123,11 +118,10 @@ public class QcController {
     /**
      * 列出最近的批量重算任务（最多 50 条）。
      *
-     * <p>【权限：仅管理员】不含失败明细（看明细请走详情接口）。</p>
+     * <p>【权限：登录即可】不含失败明细（看明细请走详情接口）。</p>
      *
      * @return 按提交时间倒序的任务列表
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/qc/score/batch")
     public Result<List<QcTaskVO>> listScoreBatch() {
         return Result.ok(qcBatchService.list());
@@ -136,13 +130,12 @@ public class QcController {
     /**
      * 取消批量重算任务。
      *
-     * <p>【权限：仅管理员】排队中的直接落已取消；
+     * <p>【权限：登录即可】排队中的直接落已取消；
      * 运行中的置取消位，由 worker 在页边界退出并落库。</p>
      *
      * @param id 任务ID
      * @return 取消后的任务状态；任务不存在时返回 404
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/score/batch/{id}/cancel")
     public ResponseEntity<Result<QcTaskVO>> cancelScoreBatch(@PathVariable String id) {
         try {
@@ -194,7 +187,7 @@ public class QcController {
     /**
      * 汇总范围内的扣分分布。
      *
-     * <p>【权限：仅管理员】优先读已落库的 qc_results，未算过的按当前规则现算。</p>
+     * <p>【权限：登录即可】优先读已落库的 qc_results，未算过的按当前规则现算。</p>
      *
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
@@ -203,7 +196,6 @@ public class QcController {
      * @param grade      分级
      * @return scanned=统计条数；byType/byItem=维度与明细扣分；gradeDist=分级分布
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/qc/deduction-stats")
     public Result<DeductionStatsVO> deductionStats(
             @RequestParam(required = false) String department,

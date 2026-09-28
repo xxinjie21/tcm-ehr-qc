@@ -63,14 +63,13 @@ public class DictionaryController {
     /**
      * 把国标 PDF 转换成候选术语供预览。
      *
-     * <p>【权限：仅管理员】预览不落库，确认后走 {@code /import} 入库。LLM 未开启或通道不可达时
+     * <p>【权限：登录即可】预览不落库，确认后走 {@code /import} 入库。LLM 未开启或通道不可达时
      * 返回 400 与可读提示，引导改用离线脚本或 JSON 直传。</p>
      *
      * @param file 国标 PDF 文件
      * @param type 术语类型
      * @return candidates=候选术语；failed=抽取失败明细
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/convert")
     public ResponseEntity<Result<ConvertPreviewVO>> convert(@RequestParam("file") MultipartFile file,
                                                            @RequestParam("type") String type) throws IOException {

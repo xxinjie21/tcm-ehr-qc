@@ -93,12 +93,11 @@ public class NlpController {
     /**
      * 提交批量解析任务。
      *
-     * <p>【权限：仅管理员】任务入队后立即返回，进度靠查询接口轮询。</p>
+     * <p>【权限：登录即可】任务入队后立即返回，进度靠查询接口轮询。</p>
      *
      * @param dto filters=范围条件；limit=处理条数上限，0 表示不限（字段级校验由 @Valid 触发）
      * @return 任务ID、状态与计划处理条数
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/nlp/extract/batch")
     public Result<NlpTaskVO> submitBatch(@Valid @RequestBody(required = false) NlpBatchDTO dto) {
         // 1. 提交即返回（异步任务）；dto 可空 = 全库范围
@@ -112,12 +111,11 @@ public class NlpController {
     /**
      * 查询批量解析任务进度。
      *
-     * <p>【权限：仅管理员】任务不存在返回 404。</p>
+     * <p>【权限：登录即可】任务不存在返回 404。</p>
      *
      * @param id 任务ID
      * @return 任务状态、进度、失败清单（截断存储）
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/nlp/extract/batch/{id}")
     public ResponseEntity<Result<NlpTaskVO>> batchStatus(@PathVariable String id) {
         // 1. 取任务；2. 不存在回 404（前端轮询时据此停止轮询）
@@ -131,12 +129,11 @@ public class NlpController {
     /**
      * 取消批量解析任务。
      *
-     * <p>【权限：仅管理员】排队中直接取消，运行中置取消位由工作线程在边界处退出。</p>
+     * <p>【权限：登录即可】排队中直接取消，运行中置取消位由工作线程在边界处退出。</p>
      *
      * @param id 任务ID
      * @return 取消后的任务状态
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/nlp/extract/batch/{id}/cancel")
     public Result<NlpTaskVO> cancelBatch(@PathVariable String id) {
         return Result.ok("已取消", nlpBatchService.cancel(id));
@@ -145,11 +142,10 @@ public class NlpController {
     /**
      * 查询最近的批量解析任务。
      *
-     * <p>【权限：仅管理员】固定返回最近 50 条，不含失败明细。</p>
+     * <p>【权限：登录即可】固定返回最近 50 条，不含失败明细。</p>
      *
      * @return 任务列表（按提交时间倒序）
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/nlp/extract/batch")
     public Result<List<NlpTaskVO>> batchList() {
         return Result.ok(nlpBatchService.list());

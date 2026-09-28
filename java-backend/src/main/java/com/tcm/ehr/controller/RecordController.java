@@ -44,13 +44,12 @@ public class RecordController {
     /**
      * 批量导入病历文件。
      *
-     * <p>【权限：仅管理员】单文件 ≤50MB、单次 ≤20 个；21 字段全一致的记录视为重复并跳过。</p>
+     * <p>【权限：登录即可】单文件 ≤50MB、单次 ≤20 个；21 字段全一致的记录视为重复并跳过。</p>
      *
      * @param files       病历文件（.xlsx/.xls）
      * @param autoExtract 是否在导入后自动投递结构化解析任务
      * @return taskId=导入任务ID；summary=本轮成功/失败条数与失败明细
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records/import")
     public Result<ImportTaskVO> importRecords(@RequestParam("files") MultipartFile[] files,
                                               @RequestParam(value = "autoExtract", defaultValue = "false") boolean autoExtract) {
@@ -65,12 +64,11 @@ public class RecordController {
     /**
      * 查询导入任务进度。
      *
-     * <p>【权限：仅管理员】进度存在内存中，服务重启后查询返回 404。</p>
+     * <p>【权限：登录即可】进度存在内存中，服务重启后查询返回 404。</p>
      *
      * @param taskId 导入任务ID
      * @return status=任务状态；processed/success/failed=处理进度
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/records/import/{taskId}/status")
     public ResponseEntity<Result<ImportStatusVO>> importStatus(@PathVariable String taskId) {
         // 1. 进度在内存里，任务不存在与"服务重启后丢失"是同一种表现
@@ -84,12 +82,11 @@ public class RecordController {
     /**
      * 单条新增病历。
      *
-     * <p>【权限：仅管理员】</p>
+     * <p>【权限：登录即可】</p>
      *
      * @param dto 21 字段原始记录，登记号必填；字段级校验由 @Valid 触发
      * @return id=新病历ID
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records")
     public Result<CreateRecordVO> createRecord(@Valid @RequestBody CreateRecordDTO dto) {
         return Result.ok("新增成功", recordService.createRecord(dto));
@@ -116,13 +113,12 @@ public class RecordController {
     /**
      * 修改病历的结构化数据。
      *
-     * <p>【权限：仅管理员】只允许改 structuredData，携带原始字段按只读冲突返回 1007。</p>
+     * <p>【权限：登录即可】只允许改 structuredData，携带原始字段按只读冲突返回 1007。</p>
      *
      * @param recordId 病历ID
      * @param body     仅接受 structuredData 键
      * @return 无数据体，仅成功标记
      */
-    @RequireRole(roles = {"管理员"})
     @PutMapping("/api/records/{recordId}")
     public Result<Void> updateRecord(@PathVariable String recordId, @RequestBody Map<String, Object> body) {
         // 1. 只改结构化数据；带原始字段的冲突由 service 抛 1007
@@ -135,12 +131,11 @@ public class RecordController {
     /**
      * 按 ID 批量删除病历。
      *
-     * <p>【权限：仅管理员】先清复核任务再删，避免外键约束失败。</p>
+     * <p>【权限：登录即可】先清复核任务再删，避免外键约束失败。</p>
      *
      * @param dto ids=待删除的病历ID集合
      * @return deletedCount=实际删除条数
      */
-    @RequireRole(roles = {"管理员"})
     @DeleteMapping("/api/records")
     public Result<DeleteRecordsVO> deleteRecords(@RequestBody DeleteRecordsDTO dto) {
         // 1. 删（service 内先清复核任务再删病历）2. 留痕
@@ -152,12 +147,11 @@ public class RecordController {
     /**
      * 按筛选范围批量删除病历。
      *
-     * <p>【权限：仅管理员】条件全空时拒绝，避免误删全库。</p>
+     * <p>【权限：登录即可】条件全空时拒绝，避免误删全库。</p>
      *
      * @param filters department/dateRange/pattern/grade，至少一项非空
      * @return deletedCount=实际删除条数
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records/delete-by-filter")
     public Result<DeleteRecordsVO> deleteByFilter(@RequestBody FiltersDTO filters) {
         // 1. 按范围删；条件全空会被 service 拒绝（防误删全库）2. 留痕

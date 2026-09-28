@@ -71,7 +71,6 @@ public class AiController {
      * @param dto recordId=病历ID（必填）
      * @return answer=预检建议；source=rule/llm；llmAvailable=LLM 是否可用
      */
-    @RequireRole(roles = {"管理员", "审核员"})
     @PostMapping("/review")
     public ResponseEntity<Result<AiReplyVO>> review(@RequestBody AiQueryDTO dto) {
         // 1. 必填校验 2. 病历不存在回 404

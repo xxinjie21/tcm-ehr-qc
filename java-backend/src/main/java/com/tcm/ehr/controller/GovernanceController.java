@@ -69,12 +69,11 @@ public class GovernanceController {
     /**
      * 对指定范围执行清洗。
      *
-     * <p>【权限：仅管理员】五步流水线：去重（只标记）→ 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。</p>
+     * <p>【权限：登录即可】五步流水线：去重（只标记）→ 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。</p>
      *
      * @param dto recordIds=限定病历集合；filters=范围条件，二选一
      * @return total/deduped/repaired/isolated/normalized=各步处理条数
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/governance/clean")
     public Result<CleanResultVO> clean(@RequestBody CleanDTO dto) {
         // 1. 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
@@ -87,12 +86,11 @@ public class GovernanceController {
     /**
      * 导出标准数据集。
      *
-     * <p>【权限：仅管理员】只导出质控合格且已清洗的病历；范围内无合格数据时返回 400 + code=2001。</p>
+     * <p>【权限：登录即可】只导出质控合格且已清洗的病历；范围内无合格数据时返回 400 + code=2001。</p>
      *
      * @param dto format=csv/json；filters=范围条件
      * @return 文件流（带 UTF-8 文件名的附件）
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/export/dataset")
     public ResponseEntity<byte[]> export(@RequestBody ExportDTO dto) throws IOException {
         // 1. 取导出件；null = 范围内无合格病历
@@ -119,12 +117,11 @@ public class GovernanceController {
     /**
      * 预览导出结果。
      *
-     * <p>【权限：仅管理员】只返回条数与样本，不生成文件。</p>
+     * <p>【权限：登录即可】只返回条数与样本，不生成文件。</p>
      *
      * @param dto format=csv/json；filters=范围条件
      * @return total=命中条数；sample=前 10 条样本
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/export/dataset/preview")
     public Result<Map<String, Object>> preview(@RequestBody ExportDTO dto) {
         return Result.ok(governanceService.previewDataset(dto));
@@ -133,11 +130,10 @@ public class GovernanceController {
     /**
      * 查询清洗状态统计。
      *
-     * <p>【权限：仅管理员】</p>
+     * <p>【权限：登录即可】</p>
      *
      * @return qualified=质控合格数；pendingGovern=待清洗数；governedCount=已清洗数
      */
-    @RequireRole(roles = {"管理员"})
     @GetMapping("/api/governance/stats")
     public Result<Map<String, Object>> governanceStats() {
         return Result.ok(governanceService.governanceStats());
