@@ -5,7 +5,7 @@
       <RangeFilter v-model="query" />
       <div class="actions">
         <el-button type="primary" :loading="listLoading" @click="search(1)">查 询</el-button>
-        <el-button :disabled="listLoading" @click="resetQuery">重置</el-button>
+        <el-button :disabled="listLoading" @click="resetFilters">重置</el-button>
         <span class="tip">共 {{ total }} 条，点击行即载入该病历原文</span>
       </div>
 
@@ -146,7 +146,7 @@
                 <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
                   <div class="group-hd">{{ g.title }}</div>
                   <div class="form-grid">
-                    <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :class="{ wide: f.wide }">
+                    <el-form-item v-for="f in groupFields(g)" :key="f.key" :label="f.label" :class="{ wide: f.wide }">
                       <el-input
                         v-model="fields[f.key]"
                         :type="f.multi ? 'textarea' : 'text'"
@@ -380,7 +380,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { extractNlp, submitNlpBatch, getNlpBatch, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
+import { extractNlp, submitNlpBatch, getNlpBatchProgress, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
 import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { useUserStore } from '@/stores/user'
@@ -437,7 +437,7 @@ const handleSizeChange = () => {
 }
 
 // 清空全部筛选条件并回到第 1 页重新查询
-const resetQuery = () => {
+const resetFilters = () => {
   query.department = ''
   query.dateRange = null
   query.pattern = ''
@@ -491,7 +491,7 @@ const FIELD_LABELS = {
 // 参与抽取的全部字段键，顺序即拼接顺序；由分组推导，新增字段只改 FIELD_GROUPS 即可
 const ALL_KEYS = FIELD_GROUPS.flatMap((g) => g.keys)
 // 把分组的 key 展开成带标签与形态的表单项，供模板遍历渲染
-const fieldsOf = (group) => group.keys.map((k) => ({ key: k, ...FIELD_LABELS[k] }))
+const groupFields = (group) => group.keys.map((k) => ({ key: k, ...FIELD_LABELS[k] }))
 
 // 生成一份全空字段对象；换病历 / 关闭详情时用它整体重置，避免残留上一位患者的原文
 const emptyFields = () => ALL_KEYS.reduce((o, k) => ({ ...o, [k]: '' }), {})
@@ -767,7 +767,7 @@ const poll = async () => {
   if (!id) return
   try {
     // 2. 取最新进度并回填当前任务
-    const res = await getNlpBatch(id)
+    const res = await getNlpBatchProgress(id)
     activeTask.value = res.data
     // 3. 任务已结束（非排队 / 进行中）则停止轮询
     if (!isActive(activeTask.value)) stopPoll()
@@ -875,7 +875,7 @@ const cancelBatch = async (id) => {
 const viewTask = async (id) => {
   try {
     // 1. 拉取该历史任务的详情
-    const res = await getNlpBatch(id)
+    const res = await getNlpBatchProgress(id)
     // 2. 设为当前任务，供任务卡与进度展示
     activeTask.value = res.data
     // 原来只赋值、不启动轮询，进度不会自刷新

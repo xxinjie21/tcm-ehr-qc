@@ -1,7 +1,7 @@
 <template>
   <!-- 首页看板：只留 4 块 —— 待办快捷条 + 4 张指标卡 + 质控趋势 + 评分分布/科室合格率 -->
   <div>
-    <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilter" />
+    <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilters" />
 
     <!-- 待办快捷条；无权限的卡片置灰并标注，避免点了才被 403 弹回
          用 button 而非 div：天然可聚焦、支持 Enter/Space-->
@@ -267,7 +267,7 @@ const loadAll = async () => {
 }
 
 // 重置筛选条件并重新拉取
-const resetFilter = () => {
+const resetFilters = () => {
   filter.department = ''
   filter.start = ''
   filter.end = ''

@@ -9,7 +9,7 @@
           <RangeFilter v-model="query" />
           <div class="actions">
             <el-button type="primary" :loading="searching" @click="handleSearch">查 询</el-button>
-            <el-button :disabled="searching" @click="handleReset">重置</el-button>
+            <el-button :disabled="searching" @click="resetFilters">重置</el-button>
             <el-button
               type="danger"
               plain
@@ -183,7 +183,7 @@
             <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
               <div class="group-hd">{{ g.title }}</div>
               <div class="form-grid">
-                <el-form-item v-for="f in fieldsOf(g)" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
+                <el-form-item v-for="f in groupFields(g)" :key="f.key" :label="f.label" :prop="f.key" :class="{ wide: f.wide }">
                   <!-- 性别改枚举下拉：自由文本会写进脏数据-->
                   <el-select
                     v-if="f.key === 'gender'"
@@ -293,7 +293,7 @@ const FIELD_GROUPS = [
 ]
 // 取某分区下的字段定义：按分区声明的 keys 顺序映射回 FIELDS，并过滤掉 FIELD_MAP 里
 // 不存在的 key —— 这样分组里写错 key 只会少渲染字段，不会冒出一个空表单项
-const fieldsOf = (group) => group.keys.map((k) => FIELD_MAP[k]).filter(Boolean)
+const groupFields = (group) => group.keys.map((k) => FIELD_MAP[k]).filter(Boolean)
 
 // ===== F·7.4 查询 =====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
@@ -346,7 +346,7 @@ const handleSizeChange = () => {
 }
 
 // 重置筛选：清空全部查询条件并回到第 1 页，随后再查一次让列表与筛选框同步回到初始态
-const handleReset = () => {
+const resetFilters = () => {
   // 1. 清空全部查询条件，四个筛选字段一起归零
   query.department = ''
   query.dateRange = null

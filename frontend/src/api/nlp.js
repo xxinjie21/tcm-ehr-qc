@@ -11,7 +11,7 @@ export function submitNlpBatch(data) {
 }
 
 // 批量任务进度
-export function getNlpBatch(id) {
+export function getNlpBatchProgress(id) {
   return request.get(`/nlp/extract/batch/${id}`)
 }
 
