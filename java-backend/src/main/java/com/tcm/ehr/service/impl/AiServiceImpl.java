@@ -346,84 +346,103 @@ public class AiServiceImpl implements IAiService {
 
     /** 规则检索：按问题关键词注入 stats / 当前病历 / 归一 / 知识；找不到就注入知识+提示 */
     private String buildContext(String question, String recordId) {
+        // 按 5 个语义块独立取，再按固定顺序拼接（与原实现的命中顺序逐字一致）；
+        // 全部未命中才回落到「功能与流程」，别让模型空答（P3.4 拆分）
+        String all = statsBlock(question)
+                + standardBlock(question, recordId)
+                + currentRecordBlock(question, recordId)
+                + knowledgeBlock(question)
+                + myLogsBlock(question);
+        if (all.isEmpty()) {
+            return "【知识】" + KNOWLEDGE_FUNCTION + "\n" + KNOWLEDGE_FLOW + "\n";
+        }
+        return all;
+    }
+
+    /** 块 1：统计类问题 → 看板指标；未命中返回 "" */
+    private String statsBlock(String question) {
+        if (!containsAny(question, "合格率", "合格", "待复核", "无效", "记录数", "病历数", "总数", "统计", "构成")) {
+            return "";
+        }
+        var ov = statsService.overview();
+        return new StringBuilder()
+                .append("【看板统计】全库病历 ").append(ov.getTotalRecords()).append(" 条：合格 ")
+                .append(ov.getQualifiedCount()).append("（").append(ov.getQualifiedRate()).append("%）、待复核 ")
+                .append(ov.getPendingReviewCount()).append("、无效 ").append(ov.getInvalidCount()).append("。\n")
+                .toString();
+    }
+
+    /** 块 2：归一/标准类问题 → 标准依据 + 当前病历命中分布；未命中返回 "" */
+    private String standardBlock(String question, String recordId) {
+        if (!containsAny(question, "归一", "命中", "标准化", "标准依据", "术语")) {
+            return "";
+        }
         StringBuilder sb = new StringBuilder();
-        boolean hit = false;
-
-        // 1. 统计类问题 → 看板指标
-        if (containsAny(question, "合格率", "合格", "待复核", "无效", "记录数", "病历数", "总数", "统计", "构成")) {
-            var ov = statsService.overview();
-            sb.append("【看板统计】全库病历 ").append(ov.getTotalRecords()).append(" 条：合格 ")
-                    .append(ov.getQualifiedCount()).append("（").append(ov.getQualifiedRate()).append("%）、待复核 ")
-                    .append(ov.getPendingReviewCount()).append("、无效 ").append(ov.getInvalidCount()).append("。\n");
-            hit = true;
-        }
-
-        // 2. 归一/标准类问题 → 标准依据 + 当前病历命中分布
-        if (containsAny(question, "归一", "命中", "标准化", "标准依据", "术语")) {
-            sb.append("【归一/标准】").append(KNOWLEDGE_STANDARD).append('\n');
-            if (recordId != null && !recordId.isBlank()) {
-                Record r = load(recordId);
-                if (r != null) {
-                    AiReplyVO.NormHits n = normHits(structured(r));
-                    sb.append("当前病历归一命中 ").append(n.getTotal()).append(" 处（精确 ")
-                            .append(n.getExact()).append(" / 包含 ").append(n.getContain())
-                            .append(" / 模糊 ").append(n.getFuzzy()).append("）。\n");
-                }
-            }
-            hit = true;
-        }
-
-        // 3. 指向具体病历的问题 → 当前病历上下文（没打开病历时明确说）
-        if (containsAny(question, "这份病历", "当前病历", "该病历", "这个病历", "本病例", "这条病历")) {
+        sb.append("【归一/标准】").append(KNOWLEDGE_STANDARD).append('\n');
+        if (recordId != null && !recordId.isBlank()) {
             Record r = load(recordId);
-            if (r == null) {
-                sb.append("【当前病历】未在详情中打开病历，无法回答“这份病历”类问题。\n");
-            } else {
-                sb.append("【当前病历】中医诊断：").append(nz(r.getTcmDiagnosis()))
-                        .append("；辨证：").append(nz(r.getPattern()))
-                        .append("；评分：").append(r.getScore() == null ? "未评分" : r.getScore())
-                        .append("（").append(nz(r.getGrade())).append("）。");
-                Map<String, Object> data = structured(r);
-                QcScorer.Missing core = coreMissing(data, r);
-                sb.append("核心字段缺失：").append(core.full().isEmpty() ? "无" : join(core.full())).append("；");
-                sb.append("未抽取到（原始病历有记录）：")
-                        .append(core.partial().isEmpty() ? "无" : join(core.partial())).append("。\n");
+            if (r != null) {
+                AiReplyVO.NormHits n = normHits(structured(r));
+                sb.append("当前病历归一命中 ").append(n.getTotal()).append(" 处（精确 ")
+                        .append(n.getExact()).append(" / 包含 ").append(n.getContain())
+                        .append(" / 模糊 ").append(n.getFuzzy()).append("）。\n");
             }
-            hit = true;
         }
+        return sb.toString();
+    }
 
-        // 4. 用法/流程类问题 → 功能与流程说明
-        if (containsAny(question, "功能", "怎么用", "如何使用", "流程", "标准依据", "接下来", "下一步")) {
-            sb.append("【功能】").append(KNOWLEDGE_FUNCTION).append('\n');
-            sb.append("【流程】").append(KNOWLEDGE_FLOW).append('\n');
-            hit = true;
+    /** 块 3：指向具体病历的问题 → 当前病历上下文；未命中返回 "" */
+    private String currentRecordBlock(String question, String recordId) {
+        if (!containsAny(question, "这份病历", "当前病历", "该病历", "这个病历", "本病例", "这条病历")) {
+            return "";
         }
+        StringBuilder sb = new StringBuilder();
+        Record r = load(recordId);
+        if (r == null) {
+            sb.append("【当前病历】未在详情中打开病历，无法回答“这份病历”类问题。\n");
+        } else {
+            sb.append("【当前病历】中医诊断：").append(nz(r.getTcmDiagnosis()))
+                    .append("；辨证：").append(nz(r.getPattern()))
+                    .append("；评分：").append(r.getScore() == null ? "未评分" : r.getScore())
+                    .append("（").append(nz(r.getGrade())).append("）。");
+            Map<String, Object> data = structured(r);
+            QcScorer.Missing core = coreMissing(data, r);
+            sb.append("核心字段缺失：").append(core.full().isEmpty() ? "无" : join(core.full())).append("；");
+            sb.append("未抽取到（原始病历有记录）：")
+                    .append(core.partial().isEmpty() ? "无" : join(core.partial())).append("。\n");
+        }
+        return sb.toString();
+    }
 
-        // 5. 问"我做了什么" → 本人最近操作（脱敏：动作/对象/时间，不含 IP）
-        if (containsAny(question, "操作", "日志", "我做了", "做了什么", "审计", "提交了", "操作记录")) {
-            sb.append("【我的最近操作】");
-            List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 50);
-            if (recent.isEmpty()) {
-                sb.append("没有查到操作记录。\n");
-            } else {
-                for (OperationLog l : recent) {
-                    sb.append(nz(l.getAction()));
-                    if (l.getTarget() != null && !l.getTarget().isBlank()) {
-                        sb.append('：').append(l.getTarget().trim());
-                    }
-                    if (l.getLogTime() != null) {
-                        sb.append("（").append(l.getLogTime().format(LOG_TS)).append("）");
-                    }
-                    sb.append('；');
+    /** 块 4：用法/流程类问题 → 功能与流程说明；未命中返回 "" */
+    private String knowledgeBlock(String question) {
+        if (!containsAny(question, "功能", "怎么用", "如何使用", "流程", "标准依据", "接下来", "下一步")) {
+            return "";
+        }
+        return "【功能】" + KNOWLEDGE_FUNCTION + "\n" + "【流程】" + KNOWLEDGE_FLOW + "\n";
+    }
+
+    /** 块 5：问「我做了什么」→ 本人最近操作（脱敏：动作/对象/时间，不含 IP）；未命中返回 "" */
+    private String myLogsBlock(String question) {
+        if (!containsAny(question, "操作", "日志", "我做了", "做了什么", "审计", "提交了", "操作记录")) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder("【我的最近操作】");
+        List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 50);
+        if (recent.isEmpty()) {
+            sb.append("没有查到操作记录。\n");
+        } else {
+            for (OperationLog l : recent) {
+                sb.append(nz(l.getAction()));
+                if (l.getTarget() != null && !l.getTarget().isBlank()) {
+                    sb.append('：').append(l.getTarget().trim());
                 }
-                sb.append('\n');
+                if (l.getLogTime() != null) {
+                    sb.append("（").append(l.getLogTime().format(LOG_TS)).append("）");
+                }
+                sb.append('；');
             }
-            hit = true;
-        }
-
-        // 6. 一条都没命中 → 至少给功能与流程，别让模型空答
-        if (!hit) {
-            sb.append("【知识】").append(KNOWLEDGE_FUNCTION).append('\n').append(KNOWLEDGE_FLOW).append('\n');
+            sb.append('\n');
         }
         return sb.toString();
     }

@@ -180,74 +180,85 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
                     new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
-            // 1. 逐类归一：content 换成标准词，sourceText 保留原文
-            for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
-                    "causeList", "treatmentList", "formulaList")) {
-                if (!(data.get(key) instanceof List<?> list)) continue;
-                String type = mapEntityType(key);
-                // 2. 有词典的才做词形归一；舌/脉/病因/治法这 4 类无词典，但仍要走去重
-                if (type != null) {
-                    for (Object item : list) {
-                        if (!(item instanceof Map)) continue;
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> entity = (Map<String, Object>) item;
-                        Object content = entity.get("content");
-                        if (content == null || String.valueOf(content).isBlank()) continue;
-                        var result = termNormalizer.normalize(type, String.valueOf(content));
-                        // 3. 只在"命中词典且词形确实变了"时才改写并记统计，
-                        //    否则会把未命中的实体也标成已归一
-                        if (result.source() != null && !result.source().isBlank()
-                                && !result.standardTerm().equals(String.valueOf(content))) {
-                            entity.put("content", result.standardTerm());
-                            entity.put("normLevel", result.level());
-                            entity.put("normSource", result.source());
-                            if (result.code() != null) {
-                                entity.put("normCode", result.code());
-                            }
-                            stat[0]++;
-                            if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
-                        }
-                    }
-                }
-                // 4. 同标准词去重：口径与解析链路共用 EntityNormalizer.dedupByTerm
-                data.put(key, dedupStructuredList(list, "content"));
-            }
-            // 5. 中药走另一套：name 归一 + 剂量单位小写（数值不动，改数值会失真）
-            if (data.get("herbs") instanceof List<?> list) {
-                for (Object item : list) {
-                    if (!(item instanceof Map)) continue;
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> herb = (Map<String, Object>) item;
-                    Object name = herb.get("name");
-                    if (name == null || String.valueOf(name).isBlank()) continue;
-                    var result = termNormalizer.normalize("herb", String.valueOf(name));
-                    if (result.source() != null && !result.source().isBlank()
-                            && !result.standardTerm().equals(String.valueOf(name))) {
-                        herb.put("name", result.standardTerm());
-                        herb.put("normLevel", result.level());
-                        herb.put("normSource", result.source());
-                        if (result.code() != null) {
-                            herb.put("normCode", result.code());
-                        }
-                        stat[0]++;
-                        if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
-                    }
-                    if (herb.get("dosage") != null) {
-                        String d = String.valueOf(herb.get("dosage")).trim().toLowerCase();
-                        if (!d.equals(String.valueOf(herb.get("dosage")))) herb.put("dosage", d);
-                    }
-                }
-                data.put("herbs", dedupStructuredList(list, "name"));
-            }
-            // 6. 打上词典版本再写库：归一结果与当时词典版本必须成对
+            // 1. 8 类 entity 逐类归一 + 同标准词去重（P3.4 拆出）
+            normalizeEntityList(data, stat);
+            // 2. 中药走另一套：name 归一 + 剂量单位小写（P3.4 拆出）
+            normalizeHerbs(data, stat);
+            // 3. 打上词典版本再写库：归一结果与当时词典版本必须成对
             String json = StructuredDataMeta.stamp(objectMapper, objectMapper.writeValueAsString(data),
                     dictionaryFileService.currentVersion());
             baseMapper.updateStructuredData(r.getId(), json);
         } catch (JacksonException e) {
-            // 7. 单条解析失败只记警告：一条脏数据不该中断整批清洗
+            // 单条解析失败只记警告：一条脏数据不该中断整批清洗
             log.warn("[清洗] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
         }
         return stat;
+    }
+
+    /** 8 类 entity（content）逐类归一并做同标准词去重；stat 就地累加 */
+    @SuppressWarnings("unchecked")
+    private void normalizeEntityList(Map<String, Object> data, int[] stat) {
+        for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
+                "causeList", "treatmentList", "formulaList")) {
+            if (!(data.get(key) instanceof List<?> list)) continue;
+            String type = mapEntityType(key);
+            // 有词典的才做词形归一；舌/脉/病因/治法这 4 类无词典，但仍要走去重
+            if (type != null) {
+                for (Object item : list) {
+                    if (!(item instanceof Map)) continue;
+                    Map<String, Object> entity = (Map<String, Object>) item;
+                    Object content = entity.get("content");
+                    if (content == null || String.valueOf(content).isBlank()) continue;
+                    var result = termNormalizer.normalize(type, String.valueOf(content));
+                    // 只在「命中词典且词形确实变了」时才改写并记统计，
+                    // 否则会把未命中的实体也标成已归一
+                    if (result.source() != null && !result.source().isBlank()
+                            && !result.standardTerm().equals(String.valueOf(content))) {
+                        entity.put("content", result.standardTerm());
+                        entity.put("normLevel", result.level());
+                        entity.put("normSource", result.source());
+                        if (result.code() != null) {
+                            entity.put("normCode", result.code());
+                        }
+                        stat[0]++;
+                        if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
+                    }
+                }
+            }
+            // 同标准词去重：口径与解析链路共用 EntityNormalizer.dedupByTerm
+            data.put(key, dedupStructuredList(list, "content"));
+        }
+    }
+
+    /** 中药（name）归一 + 剂量单位小写（数值不动，改数值会失真）+ 同药名去重；stat 就地累加 */
+    @SuppressWarnings("unchecked")
+    private void normalizeHerbs(Map<String, Object> data, int[] stat) {
+        if (!(data.get("herbs") instanceof List<?> list)) {
+            return;
+        }
+        for (Object item : list) {
+            if (!(item instanceof Map)) continue;
+            Map<String, Object> herb = (Map<String, Object>) item;
+            Object name = herb.get("name");
+            if (name == null || String.valueOf(name).isBlank()) continue;
+            var result = termNormalizer.normalize("herb", String.valueOf(name));
+            if (result.source() != null && !result.source().isBlank()
+                    && !result.standardTerm().equals(String.valueOf(name))) {
+                herb.put("name", result.standardTerm());
+                herb.put("normLevel", result.level());
+                herb.put("normSource", result.source());
+                if (result.code() != null) {
+                    herb.put("normCode", result.code());
+                }
+                stat[0]++;
+                if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
+            }
+            if (herb.get("dosage") != null) {
+                String d = String.valueOf(herb.get("dosage")).trim().toLowerCase();
+                if (!d.equals(String.valueOf(herb.get("dosage")))) herb.put("dosage", d);
+            }
+        }
+        data.put("herbs", dedupStructuredList(list, "name"));
     }
 
     /**

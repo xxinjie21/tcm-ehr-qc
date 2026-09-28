@@ -551,42 +551,10 @@ const saveRules = async () => {
   savingRules.value = true
   try {
     // 2. 组装完整性要素：按目录补齐来源与兜底别名，权重取表单统一值
-    const elements = form.elementNames.map((name) => {
-      const preset = catalogElements.value.find((e) => e.name === name) || {}
-      return {
-        name,
-        source: preset.source || name,
-        fallback: preset.fallback || [],
-        weightFull: form.fullWeight,
-        weightPartial: form.partialWeight
-      }
-    })
-    // 3. 组装一致性规则：起止值没填全的整条丢弃，不提交半成品
-    const consistency = form.consistency
-      .filter((c) => (c.triggerValues || []).length && (c.expectValues || []).length)
-      .map((c) => ({
-        name: c.name || '自定义规则',
-        triggerType: c.triggerType,
-        triggerValues: c.triggerValues,
-        expectType: c.expectType,
-        expectValues: c.expectValues,
-        weight: c.weight
-      }))
-    // 4. 组装完整规则对象（完整性 / 格式 / 一致性 / 标准化 / 重复 / 阈值）
-    //    format 里的 uid 只是前端渲染主键，提交前剥离，不进后端契约
-    const payload = {
-      completeness: { elements },
-      format: form.format.map(({ uid, ...f }) => f),
-      consistency,
-      standardization: clone(form.rules.standardization),
-      duplicateWeight: form.rules.duplicateWeight,
-      thresholds: clone(form.rules.thresholds)
-    }
+    const payload = buildRulesPayload()
     // 5. 提交后端，成功后就地刷新标准与说明，无需重进页面
     const res = await updateQcRules(payload)
-    rules.value = res.data?.rules || rules.value
-    descriptions.value = res.data?.descriptions || descriptions.value
-    ruleWarnings.value = res.data?.warnings || []
+    applyRules(res)
     // 6. 提示并收起弹窗
     ElMessage.success('规则已保存并生效')
     rulesVisible.value = false
@@ -596,6 +564,45 @@ const saveRules = async () => {
     // 无论成败都复位保存态，否则按钮会一直转圈
     savingRules.value = false
   }
+}
+
+// 组装保存用的规则 payload（P3.4 从 saveRules 抽出）
+const buildRulesPayload = () => {
+  const elements = form.elementNames.map((name) => {
+    const preset = catalogElements.value.find((e) => e.name === name) || {}
+    return {
+      name,
+      source: preset.source || name,
+      fallback: preset.fallback || [],
+      weightFull: form.fullWeight,
+      weightPartial: form.partialWeight
+    }
+  })
+  const consistency = form.consistency
+    .filter((c) => (c.triggerValues || []).length && (c.expectValues || []).length)
+    .map((c) => ({
+      name: c.name || '自定义规则',
+      triggerType: c.triggerType,
+      triggerValues: c.triggerValues,
+      expectType: c.expectType,
+      expectValues: c.expectValues,
+      weight: c.weight
+    }))
+  return {
+    completeness: { elements },
+    format: form.format.map(({ uid, ...f }) => f),
+    consistency,
+    standardization: clone(form.rules.standardization),
+    duplicateWeight: form.rules.duplicateWeight,
+    thresholds: clone(form.rules.thresholds)
+  }
+}
+
+/** 保存成功后就地刷新标准与说明（P3.4 从 saveRules 抽出） */
+const applyRules = (res) => {
+  rules.value = res.data?.rules || rules.value
+  descriptions.value = res.data?.descriptions || descriptions.value
+  ruleWarnings.value = res.data?.warnings || []
 }
 
 // 恢复默认规则：二次确认后调后端重置

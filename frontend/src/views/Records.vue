@@ -563,15 +563,8 @@ const handleImport = async () => {
   if (!files.length) return
   // 2. 发起即复位上一次结果、失败态与逐文件进度
   // 发起即清空上一次结果并复位失败态，避免把旧结果误读成本次结果
-  summary.value = null
-  importFailed.value = false
-  cancelled.value = false
-  progress.done = 0
-  progress.total = files.length
-  progress.current = ''
-  progress.success = 0
-  progress.failed = 0
-  importing.value = true
+  // 2. 发起即复位上一次结果、失败态与逐文件进度（P3.4 抽出）
+  resetImportState(files.length)
   // 3. 标记本次是否提交了后台结构化解析，供完成文案区分
   let autoTaskSubmitted = false
   // 4. 逐文件串行上传：后端是同步接口，进度只能按「文件」粒度推进
@@ -582,17 +575,12 @@ const handleImport = async () => {
       if (cancelled.value) break
       progress.current = files[i].name
       // 6. 单文件打包：文件本体 + 是否自动结构化解析
-      const fd = new FormData()
-      fd.append('files', files[i])
-      fd.append('autoExtract', autoExtract.value ? 'true' : 'false')
-      // 7. 提交该文件并累计成功 / 失败数与失败明细
-      const res = await importRecords(fd)
-      const s = res.data.summary || {}
-      if (res.data.autoExtractTaskId) autoTaskSubmitted = true
-      progress.success += s.success || 0
-      progress.failed += s.failed || 0
-      if (s.failures && s.failures.length) failures.push(...s.failures)
-      progress.done = i + 1
+      // 6. 单文件上传（P3.4 抽出 uploadOneFile）
+      const one = await uploadOneFile(files[i], i)
+      if (one.autoTaskId) autoTaskSubmitted = true
+      progress.success += one.success
+      progress.failed += one.failed
+      if (one.failures.length) failures.push(...one.failures)
     }
     // 8. 汇总本次统计，供结果区展示
     summary.value = {
@@ -619,6 +607,43 @@ const handleImport = async () => {
 }
 
 /** 取消：当前文件完成后不再提交后续文件，已入库的不回滚 */
+/**
+ * 复位导入态：清空上次结果与失败态、把逐文件进度归零（P3.4 从 handleImport 抽出）
+ */
+const resetImportState = (fileCount) => {
+  summary.value = null
+  importFailed.value = false
+  cancelled.value = false
+  progress.done = 0
+  progress.total = fileCount
+  progress.current = ''
+  progress.success = 0
+  progress.failed = 0
+  importing.value = true
+}
+
+/**
+ * 上传单个文件并返回本文件的统计（P3.4 从 handleImport 抽出）。
+ * 请求时序不变：调用方仍是串行 await，取消仍以 cancelImport 位控制。
+ *
+ * @returns {{success:number, failed:number, failures:Array, autoTaskId:any}}
+ */
+const uploadOneFile = async (file, index) => {
+  progress.current = file.name
+  const fd = new FormData()
+  fd.append('files', file)
+  fd.append('autoExtract', autoExtract.value ? 'true' : 'false')
+  const res = await importRecords(fd)
+  const s = res.data.summary || {}
+  progress.done = index + 1
+  return {
+    success: s.success || 0,
+    failed: s.failed || 0,
+    failures: s.failures || [],
+    autoTaskId: res.data.autoExtractTaskId || null
+  }
+}
+
 const cancelImport = () => {
   cancelled.value = true
   ElMessage.info('已取消，正在处理中的文件完成后停止')

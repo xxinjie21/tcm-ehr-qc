@@ -181,7 +181,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 3. 初始化导入摘要与批内去重容器
         ImportSummaryVO summary = new ImportSummaryVO();
         List<Record> toInsert = new ArrayList<>();
-        Set<String> seenHash = new HashSet<>();
         Map<String, String> regNoSource = new HashMap<>();
 
         // 预取本批登记号对应的库内病历哈希，用于跨批去重（不必全表扫描）
@@ -191,89 +190,20 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
         // 「接诊时间」有原值却解析不出来的行数与前若干条样例。
         // 这类行照旧入库（见 parseDateTime 的取舍），但必须留痕 —— 见文件循环之后的 warn
-        int visitTimeWarnCount = 0;
+        int[] visitTimeWarn = {0};
         List<String> visitTimeWarnSamples = new ArrayList<>();
 
-        // 4. 逐文件处理：先校验文件本身，再解析表头与数据行
+        // 4. 逐文件处理（P3.4：单文件解析抽到 parseFile）
         for (MultipartFile file : files) {
-            String filename = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
-            if (file.isEmpty()) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "文件为空"));
-                continue;
-            }
-            if (file.getSize() > MAX_FILE_BYTES) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "单文件超过 50MB"));
-                continue;
-            }
-            String lower = filename.toLowerCase();
-            if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls")) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "仅支持 .xlsx / .xls"));
-                continue;
-            }
-            try (InputStream in = file.getInputStream(); Workbook wb = WorkbookFactory.create(in)) {
-                Sheet sheet = wb.getSheetAt(0);
-                Row header = sheet.getRow(sheet.getFirstRowNum());
-                if (header == null) {
-                    summary.setFailed(summary.getFailed() + 1);
-                    summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少表头"));
-                    continue;
-                }
-                Map<String, Integer> colIndex = buildHeaderIndex(header);
-                if (!colIndex.containsKey("registrationNo")) {
-                    summary.setFailed(summary.getFailed() + 1);
-                    summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「登记号」"));
-                    continue;
-                }
-                if (!colIndex.containsKey("visitTime")) {
-                    summary.setFailed(summary.getFailed() + 1);
-                    summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「接诊时间」"));
-                    continue;
-                }
-                // 5. 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
-                for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
-                    Row row = sheet.getRow(i);
-                    if (row == null || TextUtil.isBlank(cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
-                        continue;
-                    }
-                    summary.setTotal(summary.getTotal() + 1);
-                    try {
-                        Record r = mapRow(row, colIndex);
-                        if (TextUtil.isBlank(r.getOutpatientNo())) {
-                            throw new IllegalArgumentException("门诊号为空");
-                        }
-                        batchRegNos.add(r.getRegistrationNo());
-                        parsedRows.add(new Object[]{r, filename});
-                        // 5. 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕。
-                        // 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、
-                        // 日期范围筛选、去重哈希同时悄悄退化（2026-09-28 的实际故障）
-                        String rawVisit = cellText(row.getCell(colIndex.get("visitTime")));
-                        if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
-                            visitTimeWarnCount++;
-                            if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
-                                visitTimeWarnSamples.add("第 " + (i + 1) + " 行「" + rawVisit + "」");
-                            }
-                        }
-                    } catch (Exception e) {
-                        summary.setFailed(summary.getFailed() + 1);
-                        summary.getFailures().add(new ImportSummaryVO.Failure(filename,
-                                "第 " + (i + 1) + " 行：" + e.getMessage()));
-                    }
-                }
-            } catch (Exception e) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "解析失败：" + e.getMessage()));
-            }
+            parseFile(file, summary, parsedRows, batchRegNos, visitTimeWarn, visitTimeWarnSamples);
         }
 
         // 「接诊时间」解析失败不阻断导入，但必须留痕：只写日志、不改接口与摘要，
         // 因为「有值却认不出」既不是失败也不是跳过，塞进 failures 会让「失败/跳过」计数自相矛盾
-        if (visitTimeWarnCount > 0) {
+        if (visitTimeWarn[0] > 0) {
             log.warn("[导入] {} 行的「接诊时间」格式无法识别，已按空值入库 —— 这些病历不会进就诊趋势、"
                             + "按接诊时间筛选也筛不出来，请核对导入源。示例：{}",
-                    visitTimeWarnCount, String.join("、", visitTimeWarnSamples));
+                    visitTimeWarn[0], String.join("、", visitTimeWarnSamples));
         }
 
         // 库内已存在哈希（按登记号预筛，避免全表扫描）
@@ -290,22 +220,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             }
         }
 
-        // 6. 逐行去重：库内哈希与本批哈希双查，命中按重复记失败
-        for (Object[] item : parsedRows) {
-            Record r = (Record) item[0];
-            String filename = (String) item[1];
-            String hash = RecordUtil.textHash(r);
-            if (existingHash.contains(hash) || !seenHash.add(hash)) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename,
-                        "重复病历（21 字段完全一致）：登记号 " + r.getRegistrationNo()));
-                continue;
-            }
-            r.setId(UUID.randomUUID().toString());
-            // 新建病历入组（诟入进本组，否则是无组病历，导入者导完自己也看不到）
-            r.setGroupId(RequestUtils.currentGroupId());
-            toInsert.add(r);
-        }
+        // 6. 逐行去重并收进待插入列表（P3.4 拆出 dedupeAndCollect）
+        dedupeAndCollect(parsedRows, existingHash, summary, toInsert);
 
         // 7. 批量落库并回填成功数
         if (!toInsert.isEmpty()) {
@@ -343,7 +259,110 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     }
 
     /**
-     * 查询导入任务进度，只读。
+     * 解析单个上传文件（P3.4 从 importRecords 抽出）：文件级校验 → 表头校验 → 逐行映射。
+     *
+     * <p>文件级问题（空 / 超限 / 后缀不符 / 缺表头 / 缺必需列）记失败并返回；
+     * 行级问题记失败明细；成功的行列进 {@code parsedRows} 并累积待查重登记号。
+     * 「接诊时间」有值却解析不出的行照旧入库，仅计数留痕（见调用侧 warn）。</p>
+     *
+     * @param visitTimeWarn 长度 1 的计数容器（跨文件累加）
+     */
+    private void parseFile(MultipartFile file, ImportSummaryVO summary, List<Object[]> parsedRows,
+                           Set<String> batchRegNos, int[] visitTimeWarn, List<String> visitTimeWarnSamples) {
+        String filename = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
+        if (file.isEmpty()) {
+            summary.setFailed(summary.getFailed() + 1);
+            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "文件为空"));
+            return;
+        }
+        if (file.getSize() > MAX_FILE_BYTES) {
+            summary.setFailed(summary.getFailed() + 1);
+            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "单文件超过 50MB"));
+            return;
+        }
+        String lower = filename.toLowerCase();
+        if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls")) {
+            summary.setFailed(summary.getFailed() + 1);
+            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "仅支持 .xlsx / .xls"));
+            return;
+        }
+        try (InputStream in = file.getInputStream(); Workbook wb = WorkbookFactory.create(in)) {
+            Sheet sheet = wb.getSheetAt(0);
+            Row header = sheet.getRow(sheet.getFirstRowNum());
+            if (header == null) {
+                summary.setFailed(summary.getFailed() + 1);
+                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少表头"));
+                return;
+            }
+            Map<String, Integer> colIndex = buildHeaderIndex(header);
+            if (!colIndex.containsKey("registrationNo")) {
+                summary.setFailed(summary.getFailed() + 1);
+                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「登记号」"));
+                return;
+            }
+            if (!colIndex.containsKey("visitTime")) {
+                summary.setFailed(summary.getFailed() + 1);
+                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「接诊时间」"));
+                return;
+            }
+            // 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
+            for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null || TextUtil.isBlank(cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
+                    continue;
+                }
+                summary.setTotal(summary.getTotal() + 1);
+                try {
+                    Record r = mapRow(row, colIndex);
+                    if (TextUtil.isBlank(r.getOutpatientNo())) {
+                        throw new IllegalArgumentException("门诊号为空");
+                    }
+                    batchRegNos.add(r.getRegistrationNo());
+                    parsedRows.add(new Object[]{r, filename});
+                    // 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕。
+                    // 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、
+                    // 日期范围筛选、去重哈希同时悄悄退化（2026-09-28 的实际故障）
+                    String rawVisit = cellText(row.getCell(colIndex.get("visitTime")));
+                    if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
+                        visitTimeWarn[0]++;
+                        if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
+                            visitTimeWarnSamples.add("第 " + (i + 1) + " 行「" + rawVisit + "」");
+                        }
+                    }
+                } catch (Exception e) {
+                    summary.setFailed(summary.getFailed() + 1);
+                    summary.getFailures().add(new ImportSummaryVO.Failure(filename,
+                            "第 " + (i + 1) + " 行：" + e.getMessage()));
+                }
+            }
+        } catch (Exception e) {
+            summary.setFailed(summary.getFailed() + 1);
+            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "解析失败：" + e.getMessage()));
+        }
+    }
+
+    /** 逐行去重（库内哈希 + 批内哈希双查）后收进待插入列表；重复记失败明细（P3.4 从 importRecords 抽出） */
+    private void dedupeAndCollect(List<Object[]> parsedRows, Set<String> existingHash,
+                                  ImportSummaryVO summary, List<Record> toInsert) {
+        Set<String> seenHash = new HashSet<>();
+        for (Object[] item : parsedRows) {
+            Record r = (Record) item[0];
+            String filename = (String) item[1];
+            String hash = RecordUtil.textHash(r);
+            if (existingHash.contains(hash) || !seenHash.add(hash)) {
+                summary.setFailed(summary.getFailed() + 1);
+                summary.getFailures().add(new ImportSummaryVO.Failure(filename,
+                        "重复病历（21 字段完全一致）：登记号 " + r.getRegistrationNo()));
+                continue;
+            }
+            r.setId(UUID.randomUUID().toString());
+            // 新建病历入组（否则是无组病历，导入者导完自己也看不到）
+            r.setGroupId(RequestUtils.currentGroupId());
+            toInsert.add(r);
+        }
+    }
+
+    /**
      *
      * <p>读取内存任务表；任务不存在（含服务重启后丢失）时返回 null，由上层转成 404。</p>
      *
