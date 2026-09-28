@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordFilter;
@@ -129,8 +130,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     .stream().filter(v -> v != null && !v.isEmpty() && v.trim().isEmpty()).count());
 
             // 4. 脏数据隔离（收紧：仅"无法修复"）——核心文本全空 或 structuredData存在但无法解析
-            boolean unrecoverable = (isBlank(r.getChiefComplaint()) && isBlank(r.getTcmDiagnosis())
-                    && isBlank(r.getPresentIllness()) && isBlank(r.getSelfReport()))
+            boolean unrecoverable = (TextUtil.isBlank(r.getChiefComplaint()) && TextUtil.isBlank(r.getTcmDiagnosis())
+                    && TextUtil.isBlank(r.getPresentIllness()) && TextUtil.isBlank(r.getSelfReport()))
                     || (r.getStructuredData() != null && !r.getStructuredData().isBlank()
                         && !isValidJson(r.getStructuredData()));
             if (unrecoverable && !"invalid".equals(status)) {
@@ -154,10 +155,6 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         log.info("[清洗] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
                 vo.getTotal(), vo.getDeduped(), vo.getRepaired(), vo.getIsolated(), vo.getNormalized());
         return vo;
-    }
-
-    private boolean isBlank(String s) {
-        return s == null || s.isBlank();
     }
 
     /** 判断是否为可解析的 JSON（隔离脏数据用；不可解析即视为"无法修复"） */

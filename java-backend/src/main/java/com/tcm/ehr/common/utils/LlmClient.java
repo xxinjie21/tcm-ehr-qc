@@ -3,6 +3,7 @@ package com.tcm.ehr.common.utils;
 import com.openai.client.OpenAIClientAsyncImpl;
 import com.openai.client.OpenAIClientImpl;
 import com.openai.core.ClientOptions;
+import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
 import io.micrometer.observation.ObservationRegistry;
@@ -237,7 +238,7 @@ public class LlmClient {
                 try {
                     chatClient = ChatClient.builder(buildModel(cfg)).build();
                     log.info("[LLM] 已启用：provider={}，model={}", cfg.provider(),
-                            isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
+                            TextUtil.isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
                 } catch (Exception e) {
                     // 装配失败保留 null，本次配置下都降级
                     log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
@@ -267,7 +268,7 @@ public class LlmClient {
     /** 本机通道：无需 api-key；Ollama 未启动时在调用期失败并降级 */
     private ChatModel buildOllama(LlmConfig cfg) {
         // 1. 没配 base-url 就用本机默认
-        String baseUrl = isBlank(cfg.baseUrl()) ? DEFAULT_OLLAMA_BASE_URL : cfg.baseUrl().trim();
+        String baseUrl = TextUtil.isBlank(cfg.baseUrl()) ? DEFAULT_OLLAMA_BASE_URL : cfg.baseUrl().trim();
 
         // OllamaApi 默认不设超时，连不上时会一直挂着；必须显式给连接与读取超时
         // 2. 显式设连接/读取超时
@@ -283,7 +284,7 @@ public class LlmClient {
 
         // 3. 模型名与温度只在配了才设：留空即用通道默认值
         OllamaChatOptions.Builder options = OllamaChatOptions.builder();
-        if (!isBlank(cfg.model())) {
+        if (!TextUtil.isBlank(cfg.model())) {
             options.model(cfg.model().trim());
         }
         if (cfg.temperature() != null) {
@@ -301,7 +302,7 @@ public class LlmClient {
     /** OpenAI 兼容通道：只认 OpenAI 协议，base-url 指向三方网关即可复用 */
     private ChatModel buildOpenAi(LlmConfig cfg) {
         // 1. 缺密钥直接抛：没有凭据的请求注定 401，不如早失败
-        if (isBlank(cfg.apiKey())) {
+        if (TextUtil.isBlank(cfg.apiKey())) {
             throw new IllegalStateException("provider=openai 但 api-key 为空");
         }
         SpringAiOpenAiHttpClient.Builder http = SpringAiOpenAiHttpClient.builder();
@@ -314,14 +315,14 @@ public class LlmClient {
                 .apiKey(cfg.apiKey().trim())
                 .maxRetries(0)          // 与 Ollama 通道同口径：快速失败，不做退避重试
                 .httpClient(http.build());
-        if (!isBlank(cfg.baseUrl())) {
+        if (!TextUtil.isBlank(cfg.baseUrl())) {
             clientOptions.baseUrl(cfg.baseUrl().trim());
         }
         ClientOptions options = clientOptions.build();
 
         // 3. 模型名与温度可选，留空用通道默认
         OpenAiChatOptions.Builder chatOptions = OpenAiChatOptions.builder();
-        if (!isBlank(cfg.model())) {
+        if (!TextUtil.isBlank(cfg.model())) {
             chatOptions.model(cfg.model().trim());
         }
         if (cfg.temperature() != null) {
@@ -339,7 +340,4 @@ public class LlmClient {
                 .build();
     }
 
-    private static boolean isBlank(String s) {
-        return s == null || s.isBlank();
-    }
 }

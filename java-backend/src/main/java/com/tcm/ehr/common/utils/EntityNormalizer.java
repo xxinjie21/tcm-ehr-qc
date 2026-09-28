@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -164,7 +165,7 @@ public class EntityNormalizer {
             // 中药以 name 为归一目标，sourceText 保留原文（模型侧 name 与 sourceText 同源）
             String raw = rawOf(herb.getName(), herb.getSourceText());
             if (raw.isEmpty()) continue;
-            if (isBlank(herb.getSourceText())) {
+            if (TextUtil.isBlank(herb.getSourceText())) {
                 herb.setSourceText(raw);
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", raw);
@@ -198,7 +199,7 @@ public class EntityNormalizer {
             if (e == null) continue;
             String raw = rawOf(e.getContent(), e.getSourceText());
             if (raw.isEmpty()) continue;
-            if (isBlank(e.getSourceText())) {
+            if (TextUtil.isBlank(e.getSourceText())) {
                 e.setSourceText(raw);
             }
             if (type == null) {
@@ -261,7 +262,7 @@ public class EntityNormalizer {
 
     /** 中药回补：目标字段是 {@code Herb.name}，原料是处方列 */
     private boolean backfillHerbs(NlpExtractVO vo, String prescription) {
-        if (isBlank(prescription)) {
+        if (TextUtil.isBlank(prescription)) {
             return false;
         }
         List<NlpExtractVO.Herb> herbs = vo.getHerbs();
@@ -293,7 +294,7 @@ public class EntityNormalizer {
 
     /** 疾病回补：目标字段是 {@code Entity.content}，原料是中医诊断列 */
     private boolean backfillDiseases(NlpExtractVO vo, String tcmDiagnosis) {
-        if (isBlank(tcmDiagnosis)) {
+        if (TextUtil.isBlank(tcmDiagnosis)) {
             return false;
         }
         List<NlpExtractVO.Entity> diseases = vo.getDiseases();
@@ -336,7 +337,7 @@ public class EntityNormalizer {
 
     /** s 是否为 hits 中某个词的<b>真</b>子串（相等不算，那是完整词本身） */
     private boolean isProperSubstringOfAny(String s, Set<String> hits) {
-        if (isBlank(s)) {
+        if (TextUtil.isBlank(s)) {
             return false;
         }
         for (String hit : hits) {
@@ -350,13 +351,9 @@ public class EntityNormalizer {
     /** 归一目标值：优先 content，缺失时退回 sourceText（两者在模型侧同源） */
     private String rawOf(String primary, String fallback) {
         // 1. 主值可用就用主值
-        if (!isBlank(primary)) return primary.trim();
+        if (!TextUtil.isBlank(primary)) return primary.trim();
         // 2. 否则退回原文；两边都空给空串
-        if (!isBlank(fallback)) return fallback.trim();
+        if (!TextUtil.isBlank(fallback)) return fallback.trim();
         return "";
-    }
-
-    private boolean isBlank(String s) {
-        return s == null || s.isBlank();
     }
 }

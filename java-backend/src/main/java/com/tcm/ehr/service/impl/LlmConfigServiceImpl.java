@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.common.exception.LlmProbeException;
@@ -55,7 +56,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         // 1. 与当前配置合并：只提交改过的字段，其余沿用当前值
         LlmConfig next = merge(dto, store.get());
         // 2. 参数校验：开启 openai 通道必须填 API Key
-        if (next.enabled() && LlmConfig.PROVIDER_OPENAI.equals(next.provider()) && isBlank(next.apiKey())) {
+        if (next.enabled() && LlmConfig.PROVIDER_OPENAI.equals(next.provider()) && TextUtil.isBlank(next.apiKey())) {
             throw new IllegalArgumentException("选择 openai 通道时必须填写 API Key");
         }
         // 3. 写入 Store（触发 ChatClient 重建），回掩码视图
@@ -77,7 +78,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         // 1. 与当前配置合并（不落盘、不改当前配置）
         LlmConfig cfg = merge(dto, store.get());
         // 2. 参数校验：openai 通道必须填 API Key
-        if (LlmConfig.PROVIDER_OPENAI.equals(cfg.provider()) && isBlank(cfg.apiKey())) {
+        if (LlmConfig.PROVIDER_OPENAI.equals(cfg.provider()) && TextUtil.isBlank(cfg.apiKey())) {
             throw new IllegalArgumentException("选择 openai 通道时必须填写 API Key");
         }
         // 探测固定为「启用」：用户点测试连接就是要验证这套参数能不能用
@@ -98,7 +99,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         // 4. 回填通道、模型名、耗时与截断到 200 字的回复
         LlmTestVO vo = new LlmTestVO();
         vo.setProvider(probeCfg.provider());
-        vo.setModel(isBlank(probeCfg.model()) ? "(通道默认)" : probeCfg.model());
+        vo.setModel(TextUtil.isBlank(probeCfg.model()) ? "(通道默认)" : probeCfg.model());
         vo.setLatencyMs(System.currentTimeMillis() - start);
         vo.setReply(reply.length() > 200 ? reply.substring(0, 200) + "…" : reply);
         return vo;
@@ -115,7 +116,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         // 2. 逐字段「DTO 给了就用新值，否则沿用当前值」——部分提交是页面常态
         boolean enabled = dto.getEnabled() == null ? cur.enabled() : dto.getEnabled();
 
-        String provider = isBlank(dto.getProvider()) ? cur.provider() : dto.getProvider();
+        String provider = TextUtil.isBlank(dto.getProvider()) ? cur.provider() : dto.getProvider();
         String normProvider = LlmConfig.normalizeProvider(provider);
         if (normProvider == null) {
             throw new IllegalArgumentException("通道只能选 ollama 或 openai");
@@ -143,7 +144,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
     /** 空串 / 回传的掩码 = 不修改，其余视为新密钥 */
     private String resolveApiKey(String incoming, String existing) {
         // 1. 空串 = 没改密钥
-        if (isBlank(incoming)) {
+        if (TextUtil.isBlank(incoming)) {
             return existing;
         }
         // 2. 回传值等于当前密钥的掩码 = 页面没动它，也算没改
@@ -157,7 +158,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         vo.setEnabled(cfg.enabled());
         vo.setProvider(cfg.provider());
         vo.setBaseUrl(cfg.baseUrl());
-        vo.setApiKeySet(!isBlank(cfg.apiKey()));
+        vo.setApiKeySet(!TextUtil.isBlank(cfg.apiKey()));
         vo.setApiKeyMask(mask(cfg.apiKey()));
         vo.setModel(cfg.model());
         vo.setTemperature(cfg.temperature());
@@ -169,7 +170,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
     /** 掩码：保留通道前缀（如 sk-）与末 4 位，形如 {@code sk-****abcd} */
     private String mask(String key) {
         // 1. 没设密钥就给空串
-        if (isBlank(key)) {
+        if (TextUtil.isBlank(key)) {
             return "";
         }
         String k = key.trim();
@@ -190,14 +191,10 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         }
         String out = message;
         // 2. 把消息里出现的密钥明文换成掩码
-        if (!isBlank(apiKey)) {
+        if (!TextUtil.isBlank(apiKey)) {
             out = out.replace(apiKey.trim(), mask(apiKey));
         }
         // 3. 截到 300 字：SDK 错误常带整段请求体
         return out.length() > 300 ? out.substring(0, 300) + "…" : out;
-    }
-
-    private boolean isBlank(String s) {
-        return s == null || s.isBlank();
     }
 }

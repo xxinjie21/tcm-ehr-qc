@@ -265,7 +265,7 @@
       <el-pagination
         v-model:current-page="precheckPage"
         v-model:page-size="precheckSize"
-        :page-sizes="[10, 20, 50]"
+        :page-sizes="PAGE_SIZES"
         :total="precheckTotal"
         layout="total, sizes, prev, pager, next"
         style="margin-top: 12px; justify-content: flex-end"

@@ -4,6 +4,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
@@ -120,7 +121,7 @@ public class AiServiceImpl implements IAiService {
     private void applyLlmInterpret(AiReplyVO vo, String raw, String fallback) {
         try {
             // 1. 模型回的是 JSON 文本，可能带 ``` 围栏，先剥掉
-            String json = stripCodeFence(raw);
+            String json = TextUtil.stripCodeFence(raw);
             Map<String, Object> parsed = objectMapper.readValue(json,
                     new TypeReference<Map<String, Object>>() {
                     });
@@ -617,17 +618,4 @@ public class AiServiceImpl implements IAiService {
         return s == null || s.isBlank();
     }
 
-    /** 去掉模型可能加上的 ``` 围栏，只留 JSON 本体 */
-    private String stripCodeFence(String s) {
-        String t = s == null ? "" : s.trim();
-        // 1. 不是围栏开头就原样返回
-        if (t.startsWith("```")) {
-            // 2. 去掉首行 ```lang，再去掉末尾 ```
-            int nl = t.indexOf('\n');
-            if (nl > 0) t = t.substring(nl + 1);
-            int end = t.lastIndexOf("```");
-            if (end >= 0) t = t.substring(0, end);
-        }
-        return t.trim();
-    }
 }

@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ConvertPreviewVO;
@@ -411,7 +412,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     /** 从模型返回里解析候选词条；解析失败的行进失败明细，不影响其余候选 */
     private void parseCandidates(String raw, ConvertPreviewVO vo) {
-        String json = stripCodeFence(raw);
+        String json = TextUtil.stripCodeFence(raw);
         List<ConvertPreviewVO.Candidate> list;
         // 1. 整体按数组解析；解析不了就把原文记进失败明细，不静默丢弃
         try {
@@ -436,19 +437,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
         }
     }
 
-    /** 模型常把 JSON 包在 markdown 代码块里，解析前剥掉 */
-    private String stripCodeFence(String s) {
-        String t = s == null ? "" : s.trim();
-        // 1. 不是围栏开头就原样返回
-        if (t.startsWith("```")) {
-            // 2. 去掉首行 ```lang，再去掉末尾 ```
-            int nl = t.indexOf('\n');
-            if (nl > 0) t = t.substring(nl + 1);
-            int end = t.lastIndexOf("```");
-            if (end >= 0) t = t.substring(0, end);
-        }
-        return t.trim();
-    }
 
     /** 截断超长文本，避免单个字段把行撑爆 */
     private String truncate(String s, int max) {

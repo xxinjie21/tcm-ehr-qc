@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.databind.ObjectMapper;
+import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
@@ -234,13 +235,13 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 // 5. 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
                 for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
                     Row row = sheet.getRow(i);
-                    if (row == null || isBlank(cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
+                    if (row == null || TextUtil.isBlank(cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
                         continue;
                     }
                     summary.setTotal(summary.getTotal() + 1);
                     try {
                         Record r = mapRow(row, colIndex);
-                        if (isBlank(r.getOutpatientNo())) {
+                        if (TextUtil.isBlank(r.getOutpatientNo())) {
                             throw new IllegalArgumentException("门诊号为空");
                         }
                         batchRegNos.add(r.getRegistrationNo());
@@ -249,7 +250,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                         // 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、
                         // 日期范围筛选、去重哈希同时悄悄退化（2026-09-28 的实际故障）
                         String rawVisit = cellText(row.getCell(colIndex.get("visitTime")));
-                        if (r.getVisitTime() == null && !isBlank(rawVisit)) {
+                        if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
                             visitTimeWarnCount++;
                             if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
                                 visitTimeWarnSamples.add("第 " + (i + 1) + " 行「" + rawVisit + "」");
@@ -367,11 +368,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     @Override
     public CreateRecordVO createRecord(CreateRecordDTO dto) {
         // 1. 必填校验：登记号
-        if (dto == null || isBlank(dto.getRegistrationNo())) {
+        if (dto == null || TextUtil.isBlank(dto.getRegistrationNo())) {
             throw new IllegalArgumentException("登记号不能为空");
         }
         // 2. 必填校验：门诊号
-        if (isBlank(dto.getOutpatientNo())) {
+        if (TextUtil.isBlank(dto.getOutpatientNo())) {
             throw new IllegalArgumentException("门诊号不能为空");
         }
         // 3. 组装病历实体：主键由服务端生成，21 个原始字段原样落库；入本组
@@ -579,9 +580,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
         // 2. 时间区间要两端都有才算一个条件，缺一端会变成"从某时到最新"这种误删口径
         boolean range = f.getDateRange() != null && f.getDateRange().size() == 2
-                && !isBlank(f.getDateRange().get(0)) && !isBlank(f.getDateRange().get(1));
+                && !TextUtil.isBlank(f.getDateRange().get(0)) && !TextUtil.isBlank(f.getDateRange().get(1));
         // 3. 任一维度非空即算有筛选
-        return !isBlank(f.getDepartment()) || !isBlank(f.getPattern()) || !isBlank(f.getGrade()) || range;
+        return !TextUtil.isBlank(f.getDepartment()) || !TextUtil.isBlank(f.getPattern()) || !TextUtil.isBlank(f.getGrade()) || range;
     }
 
     /**
@@ -616,10 +617,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     private String summarize(Record r) {
         // 1. 主诉优先，缺了依次回退中医诊断、西医诊断
         String s = r.getChiefComplaint();
-        if (isBlank(s)) {
+        if (TextUtil.isBlank(s)) {
             s = r.getTcmDiagnosis();
         }
-        if (isBlank(s)) {
+        if (TextUtil.isBlank(s)) {
             s = r.getWesternDiagnosis();
         }
         if (s == null) {
@@ -638,7 +639,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 1. 逐列取表头文本，空列跳过
         for (Cell cell : header) {
             String text = cellText(cell);
-            if (isBlank(text)) {
+            if (TextUtil.isBlank(text)) {
                 continue;
             }
             String field = HEADER_FIELD.get(text.trim());
@@ -690,7 +691,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     private Integer parseInt(String s) {
         // 1. 空值直接给 null
-        if (isBlank(s)) {
+        if (TextUtil.isBlank(s)) {
             return null;
         }
         // 2. 按 double 解析：Excel 数值列读出来常带 ".0"；解析不了给 null，不让整行失败
@@ -713,7 +714,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
         // 3. 其余按文本处理
         String s = cellText(cell);
-        if (isBlank(s)) {
+        if (TextUtil.isBlank(s)) {
             return null;
         }
         try {
@@ -804,9 +805,5 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             case FORMULA -> cell.getCellFormula();
             default -> null;
         };
-    }
-
-    private boolean isBlank(String s) {
-        return s == null || s.isBlank();
     }
 }
