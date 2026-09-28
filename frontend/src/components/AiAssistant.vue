@@ -213,8 +213,12 @@ const scrollBottom = async () => {
 }
 
 // ===== 提问（含追问：带近期上文）=====
-// 取最近 6 条消息拼成上文，标注问/答，供后端做多轮理解
+// 取最近 6 条消息拼成上文，标注问/答，供后端做多轮理解。
+// ⚠️ 排除最后一条：ask() 已在发请求前把本轮问题 push 进 messages，
+// 若不排除，同一句话会以 question + history 末行两次发给后端。
+// 只改这里、不动 ask() 的 push 顺序 —— 那样才能保住「界面立刻有反馈」
 const historyText = () => messages.value
+  .slice(0, -1)
   .slice(-6)
   .map((m) => (m.role === 'user' ? '问：' : '答：') + m.text)
   .join('\n')

@@ -142,24 +142,31 @@ const available = ref(true)
 const tagType = (action) => TAG_TYPES[action] || 'primary'
 
 // 拉取日志列表：成功后刷新总数；失败则清空并标记不可用（供空态与按钮禁用判断）
+// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点查询/翻页时慢的旧响应
+// 不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
+let listSeq = 0
 const loadLogs = async () => {
+  // 0. 取本次请求的号
+  const mine = ++listSeq
   // 1. 置加载态：表格进入 loading
   loading.value = true
   try {
     // 2. 按当前查询条件（类型 / 关键字 / 分页）拉取日志
     const res = await getLogs(query)
+    if (mine !== listSeq) return
     // 3. 回填列表与总数，并标记日志可用（导出 / 清理按钮据此解禁）
     logs.value = res.data?.list || []
     total.value = res.data?.total || 0
     available.value = true
   } catch {
+    if (mine !== listSeq) return
     logs.value = []
     total.value = 0
     // 失败即清空并标记不可用：不退化成展示编造的日志，空态给出重试入口
     available.value = false
   } finally {
-    // 无论成败都复位加载态
-    loading.value = false
+    // 只有最新一次请求才复位加载态
+    if (mine === listSeq) loading.value = false
   }
 }
 

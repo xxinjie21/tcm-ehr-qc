@@ -283,21 +283,28 @@ const pageSize = ref(10)
 const loading = ref(false)
 
 // 查询复核任务列表：传数字即跳到该页；失败由拦截器提示，不清空已有行
+// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页时慢的旧响应
+// 不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
+let listSeq = 0
 const load = async (p) => {
   // 1. 传数字即跳到该页（翻页与重试共用同一入口）
   if (typeof p === 'number') page.value = p
+  // 1.5 取本次请求的号
+  const mine = ++listSeq
   // 2. 进入加载态
   loading.value = true
   try {
     // 3. 拉取任务列表，回填行与总数
     const res = await listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value })
+    if (mine !== listSeq) return
     rows.value = res.data?.tasks || []
     total.value = res.data?.total || 0
   } catch {
+    if (mine !== listSeq) return
     // 拦截器已提示
   } finally {
-    // 4. 无论成败都收掉加载态
-    loading.value = false
+    // 4. 只有最新一次请求才收掉加载态
+    if (mine === listSeq) loading.value = false
   }
 }
 

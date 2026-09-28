@@ -195,6 +195,11 @@
                 <b>本次抽取没有完成</b> —— {{ extractError }}
                 抽取与术语归一依赖 ES 术语索引，索引不可用时不会退化成「全部未收录」，请处理后再重试。
               </div>
+              <!-- 文本超长被 NER 截断：尾部实体可能静默丢失，必须显式告知（否则用户以为抽全了） -->
+              <div v-if="result?.truncated" class="norm-note warn">
+                文本超长已截断，<b>尾部实体可能丢失</b> —— 模型侧只看得到前若干 token（规则兜底仍用全文）。
+                可分段抽取后合并。
+              </div>
               <!-- 归一状态行：明说「归一跑没跑、跑出了什么」 -->
               <div v-if="result" class="norm-note" :class="{ warn: !!emptyReason }">
                 <template v-if="emptyReason">
@@ -397,24 +402,31 @@ const listLoading = ref(false)
 const listFailed = ref(false)
 
 // 查询病历列表（分页 / 筛选 / 重试共用）：传数字即跳到该页；失败置 listFailed 与「确实没有匹配」区分，toast 由拦截器出
+// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页时慢的旧响应不覆盖新结果，
+// 也不提前收掉 loading（范式同 components/TermInput.vue）
+let listSeq = 0
 const search = async (p) => {
   // 1. 传数字即跳到该页（翻页与重试共用同一入口）
   if (typeof p === 'number') page.value = p
+  // 1.5 取本次请求的号
+  const mine = ++listSeq
   // 2. 进入加载态，并清掉上一次的失败标记
   listLoading.value = true
   listFailed.value = false
   try {
     // 3. 拉取列表数据，回填行与总数
     const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
+    if (mine !== listSeq) return
     rows.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch {
+    if (mine !== listSeq) return
     // 4. 请求失败置失败标记，与「确实没有匹配」区分开
     listFailed.value = true
     // 拦截器已提示
   } finally {
-    // 5. 无论成败都收掉加载态
-    listLoading.value = false
+    // 5. 只有最新一次请求才收掉加载态
+    if (mine === listSeq) listLoading.value = false
   }
 }
 

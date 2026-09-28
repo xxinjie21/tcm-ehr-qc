@@ -209,6 +209,8 @@
                     :type="f.multi ? 'textarea' : 'text'"
                     :rows="1"
                     :autosize="f.multi ? { minRows: 1, maxRows: 2 } : false"
+                    :maxlength="f.max"
+                    :show-word-limit="!!f.max"
                     clearable
                   />
                 </el-form-item>
@@ -251,16 +253,18 @@ const activeTab = ref('query')
  * 之前 wide 有 11 个，span 2 在 3 列栅格里排不紧，纵向白白多出 4 行，
  * 这也是用户反复说「填写框还是太大」的直接原因。</p>
  */
+// max = 该列在 database-init.sql 里的 VARCHAR 宽度（前端限长与 DB 列宽对齐，
+// 免得超长内容在表单里输得下、落库时被截断或报错）。TEXT 列不设限。
 const FIELDS = [
-  { key: 'registrationNo', label: '登记号' },
-  { key: 'outpatientNo', label: '门诊号' },
+  { key: 'registrationNo', label: '登记号', max: 50 },
+  { key: 'outpatientNo', label: '门诊号', max: 50 },
   { key: 'gender', label: '性别' },
-  { key: 'age', label: '年龄' },
+  { key: 'age', label: '年龄', max: 20 },
   { key: 'visitCount', label: '就诊次数' },
   { key: 'westernDiagnosis', label: '西医诊断', multi: true },
   { key: 'tcmDiagnosis', label: '中医诊断', multi: true },
   { key: 'chiefComplaint', label: '主诉', multi: true, wide: true },
-  { key: 'selfReport', label: '自诉', multi: true, wide: true },
+  { key: 'selfReport', label: '自述', multi: true, wide: true },
   { key: 'presentIllness', label: '现病史', multi: true, wide: true },
   { key: 'inspection', label: '望诊', multi: true },
   { key: 'pulse', label: '脉诊', multi: true },
@@ -270,8 +274,8 @@ const FIELDS = [
   { key: 'prescription', label: '草药', multi: true, wide: true },
   { key: 'followUp', label: '随访', multi: true },
   { key: 'treatmentEffect', label: '治疗效果', multi: true },
-  { key: 'department', label: '开单科室' },
-  { key: 'doctorId', label: '医生工号' },
+  { key: 'department', label: '开单科室', max: 50 },
+  { key: 'doctorId', label: '医生工号', max: 50 },
   { key: 'visitTime', label: '接诊时间' }
 ]
 
@@ -309,22 +313,29 @@ const listFailed = ref(false)
 
 // 查询列表：按当前筛选条件 + 分页参数请求，成功后覆盖表格数据与总数；
 // 失败时置 listFailed，使空态能区分「加载失败」与「确实无数据」（错误提示由拦截器统一给出）
+// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页/改筛选时，
+// 慢的旧响应不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
+let listSeq = 0
 const handleSearch = async () => {
+  // 0. 取本次请求的号
+  const mine = ++listSeq
   // 1. 置加载态并清空上次失败态，重试时能重新给出 loading
   searching.value = true
   listFailed.value = false
   try {
     // 2. 按当前筛选条件 + 分页参数请求列表，成功后覆盖表格数据与总数
     const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
+    if (mine !== listSeq) return
     rows.value = res.data?.records || []
     total.value = res.data?.total || 0
   } catch {
+    if (mine !== listSeq) return
     // 3. 标记失败态，让空态能区分「加载失败」与「确实无数据」
     listFailed.value = true
     // 拦截器已提示
   } finally {
-    // 4. 无论成败都要关掉 loading
-    searching.value = false
+    // 4. 只有最新一次请求才关 loading，否则会把还在飞的请求的 loading 提前收掉
+    if (mine === listSeq) searching.value = false
   }
 }
 

@@ -101,7 +101,7 @@
             </template>
           </div>
         </div>
-        <div v-for="(f, i) in customFormats" :key="i" class="rc-line">
+        <div v-for="(f, i) in customFormats" :key="f.uid" class="rc-line">
           【{{ f.label || f.field }}】不合规扣
           <el-input-number v-model="f.weight" size="small" :min="0" :controls="false" />
           分
@@ -109,7 +109,7 @@
         </div>
 
         <div class="rc-hd">③ 一致性规则（触发类型 → 期望类型，期望值取自词典）</div>
-        <div v-for="(c, i) in form.consistency" :key="i" class="rc-block">
+        <div v-for="(c, i) in form.consistency" :key="c.uid" class="rc-block">
           <div class="rc-line">
             若
             <el-select v-model="c.triggerType" size="small" style="width: 120px">
@@ -429,6 +429,11 @@ const form = reactive({
 })
 // 深拷贝：避免编辑时直接改动 rules（取消后 rules 必须保持原样）
 const clone = (o) => JSON.parse(JSON.stringify(o))
+// 可编辑行的稳定主键：v-for 不用下标做 key，删中间行后其余行的 DOM / 输入框不会错位。
+// 只在本弹窗内唯一即可，用自增序号而非 randomUUID —— 非安全上下文（如局域网 http）下
+// crypto.randomUUID 可能不存在
+let uidSeq = 0
+const nextUid = () => 'u' + ++uidSeq
 // 取某词典类型的下拉选项（el-select-v2 的 {label,value} 结构）；未加载时返回空数组
 const termsOf = (type) => dictTerms.value[type] || []
 
@@ -469,11 +474,12 @@ const openRules = async () => {
   form.partialWeight = els[0]?.weightPartial ?? 6
   // 4. 回填格式规则，补齐字段默认值以便直接编辑
   form.format = (r.format || []).map((f) => ({
-    field: f.field, type: f.type || 'regex', expr: f.expr || '', values: f.values || [],
+    uid: nextUid(), field: f.field, type: f.type || 'regex', expr: f.expr || '', values: f.values || [],
     label: f.label, weight: f.weight ?? 5, reason: f.reason
   }))
   // 5. 回填一致性规则，同样补齐默认值
   form.consistency = (r.consistency || []).map((c) => ({
+    uid: nextUid(),
     name: c.name,
     triggerType: c.triggerType || 'pattern',
     triggerValues: c.triggerValues || [],
@@ -502,6 +508,7 @@ const toggleFormat = (t, on) => {
   if (on) {
     if (!fmtOf(t.field)) {
       form.format.push({
+        uid: nextUid(),
         field: t.field, type: t.type || 'regex', expr: t.expr || '', values: clone(t.values || []),
         label: t.label, weight: t.weight ?? 5, reason: t.reason
       })
@@ -525,6 +532,7 @@ const removeCustomFormat = (i) => {
 // 新增一条空白的一致性规则
 const addConsistency = () => {
   form.consistency.push({
+    uid: nextUid(),
     name: '自定义规则', triggerType: 'pattern', triggerValues: [],
     expectType: 'herb', expectValues: [], weight: 10
   })
@@ -558,9 +566,10 @@ const saveRules = async () => {
         weight: c.weight
       }))
     // 4. 组装完整规则对象（完整性 / 格式 / 一致性 / 标准化 / 重复 / 阈值）
+    //    format 里的 uid 只是前端渲染主键，提交前剥离，不进后端契约
     const payload = {
       completeness: { elements },
-      format: clone(form.format),
+      format: form.format.map(({ uid, ...f }) => f),
       consistency,
       standardization: clone(form.rules.standardization),
       duplicateWeight: form.rules.duplicateWeight,
@@ -619,25 +628,32 @@ const precheckLoading = ref(false)
 const precheckFailed = ref(false)
 
 // 加载预检列表；传数字即跳到该页
+// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页时慢的旧响应
+// 不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
+let precheckSeq = 0
 const loadPrecheck = async (p) => {
   // 1. 入参是页码数字时先跳页（分页组件切换时会带上页码）
   if (typeof p === 'number') precheckPage.value = p
+  // 1.5 取本次请求的号
+  const mine = ++precheckSeq
   // 2. 置加载态，并清掉上一次的失败标记
   precheckLoading.value = true
   precheckFailed.value = false
   try {
     // 3. 按当前范围 + 分页参数拉取预检列表
     const res = await searchRecords({ ...filters, page: precheckPage.value, pageSize: precheckSize.value })
+    if (mine !== precheckSeq) return
     // 4. 回填列表与总数
     precheckRows.value = res.data?.records || []
     precheckTotal.value = res.data?.total || 0
   } catch {
+    if (mine !== precheckSeq) return
     // 失败态与「范围内确实没有病历」区分开，空态据此给重试入口
     precheckFailed.value = true
     // 拦截器已提示
   } finally {
-    // 无论成败都复位加载态
-    precheckLoading.value = false
+    // 只有最新一次请求才复位加载态
+    if (mine === precheckSeq) precheckLoading.value = false
   }
 }
 

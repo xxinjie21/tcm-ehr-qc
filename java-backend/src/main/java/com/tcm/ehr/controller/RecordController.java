@@ -86,12 +86,12 @@ public class RecordController {
      *
      * <p>【权限：仅管理员】</p>
      *
-     * @param dto 21 字段原始记录，登记号必填
+     * @param dto 21 字段原始记录，登记号必填；字段级校验由 @Valid 触发
      * @return id=新病历ID
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/records")
-    public Result<CreateRecordVO> createRecord(@RequestBody CreateRecordDTO dto) {
+    public Result<CreateRecordVO> createRecord(@Valid @RequestBody CreateRecordDTO dto) {
         return Result.ok("新增成功", recordService.createRecord(dto));
     }
 

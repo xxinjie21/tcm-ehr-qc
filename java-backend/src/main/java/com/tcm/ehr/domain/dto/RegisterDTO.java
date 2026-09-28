@@ -2,6 +2,7 @@ package com.tcm.ehr.domain.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -28,5 +29,12 @@ public class RegisterDTO {
     private String username;
 
     @NotBlank(message = "密码不能为空")
+    /**
+     * 密码最短 6 位 —— 与前端 {@code Register.vue} 的 min=6 对齐。
+     * 此前只有前端拦得住，直调 {@code POST /api/auth/register} 可传 1 位密码建号。
+     * 上限取 {@code users.password VARCHAR(255)} 的一半再留余量（BCrypt 散列固定 60 字符，
+     * 这里的 72 是防超长输入拖慢 BCrypt，而非列宽约束）。
+     */
+    @Size(min = 6, max = 72, message = "密码须为 6~72 位")
     private String password;
 }

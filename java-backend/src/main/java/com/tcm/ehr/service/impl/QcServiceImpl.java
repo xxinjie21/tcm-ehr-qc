@@ -135,10 +135,12 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 一致性（逻辑冲突）检查，只读。
      *
-     * <p>把请求中的证型 / 治法 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
+     * <p>把请求中的证型 / 治法 / 中药 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
      * {@code dto} 为 null 时按空数据检查，结果视为无冲突。</p>
+     * <p>⚠️ 中药的 map key 必须是 {@code herbs}（= {@code EntityTypes} 里 herb 的 structuredKey），
+     * 写成 {@code herbList}（DTO 的属性名）会让「证候 → 中药」规则永远取不到值。</p>
      *
-     * @param dto 含 patternList / treatmentList / formulaList 的检查请求，可为 null
+     * @param dto 含 patternList / treatmentList / formulaList / herbList 的检查请求，可为 null
      * @return 冲突清单及「是否一致」标志（冲突为空即一致）
      */
     @Override
@@ -149,6 +151,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             data.put("patternList", dto.getPatternList());
             data.put("treatmentList", dto.getTreatmentList());
             data.put("formulaList", dto.getFormulaList());
+            data.put("herbs", dto.getHerbList());
         }
         // 2. 按当前一致性规则求冲突项
         List<String> conflicts = LogicChecker.check(data, ruleStore.get().getConsistency());

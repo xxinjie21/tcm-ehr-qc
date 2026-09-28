@@ -18,6 +18,22 @@ import java.util.List;
 @Data
 public class QcRuleSet {
 
+    /**
+     * 性别枚举白名单 —— <b>唯一权威</b>。
+     *
+     * <p>此前同一份「男 / 女」在三处各写一遍：默认规则（{@link #defaults()}）、
+     * 前端下拉目录（{@code QcRuleDescriber.catalogFormats()}）、前端表单校验
+     * （{@code Records.vue}）。改一处忘另两处就会出现「界面能选、提交被判不合规」这类偏差。
+     * 现统一取这里；前端两份由 {@code GET /api/qc/rules} 的 catalog 下发，不各自硬编码。</p>
+     */
+    public static final List<String> GENDER_VALUES = List.of("男", "女");
+
+    /**
+     * 性别校验正则（供 DTO 的 {@code @Pattern} 用；长度上限对齐 {@code records.gender VARCHAR(10)}）。
+     * 放行 null / 空串（由 {@code @NotBlank} 或业务层决定「是否必填」），此处只管「填了就得合法」。
+     */
+    public static final String GENDER_PATTERN = "^(男|女)$";
+
     private Completeness completeness = new Completeness();
     private List<FormatRule> format = new ArrayList<>();
     private List<ConsistencyRule> consistency = new ArrayList<>();
@@ -121,7 +137,7 @@ public class QcRuleSet {
                 List.of(), "年龄", "年龄格式不正确");
         age.setHint("须为数字，可带 岁/个月/月/天 单位");
         r.format.add(age);
-        r.format.add(format("gender", "enum", null, List.of("男", "女"), "性别", "性别非 男/女"));
+        r.format.add(format("gender", "enum", null, GENDER_VALUES, "性别", "性别非 男/女"));
 
         // 一致性（证候 → 中药 / 方剂；值取自词典，当前数据无方剂则方剂规则不触发）
         // 证候 → 中药

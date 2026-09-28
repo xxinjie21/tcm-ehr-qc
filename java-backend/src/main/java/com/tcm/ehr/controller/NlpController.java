@@ -8,6 +8,7 @@ import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.NlpBatchDTO;
+import jakarta.validation.Valid;
 import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.NlpTaskVO;
@@ -94,12 +95,12 @@ public class NlpController {
      *
      * <p>【权限：仅管理员】任务入队后立即返回，进度靠查询接口轮询。</p>
      *
-     * @param dto filters=范围条件；limit=处理条数上限，0 表示不限
+     * @param dto filters=范围条件；limit=处理条数上限，0 表示不限（字段级校验由 @Valid 触发）
      * @return 任务ID、状态与计划处理条数
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/nlp/extract/batch")
-    public Result<NlpTaskVO> submitBatch(@RequestBody(required = false) NlpBatchDTO dto) {
+    public Result<NlpTaskVO> submitBatch(@Valid @RequestBody(required = false) NlpBatchDTO dto) {
         // 1. 提交即返回（异步任务）；dto 可空 = 全库范围
         NlpTaskVO vo = nlpBatchService.submit(dto, RequestUtils.currentUsername());
         // 2. 留痕：把操作范围写进日志，便于事后核对这次解析动了哪些病历
