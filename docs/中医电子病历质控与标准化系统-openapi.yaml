@@ -1670,7 +1670,7 @@ paths:
         - 病历管理
       summary: 病历批量导入
       description: |
-        【权限：仅管理员】
+        【权限：登录即可】
         批量上传病历Excel文件（.xlsx），校验格式并创建导入任务。
         约束：单文件最大50MB，单次最多20个文件。
         autoExtract=true 且后端已开启抽取时，导入完成后自动投递后台结构化解析任务（返回 autoExtractTaskId）。
@@ -1721,7 +1721,7 @@ paths:
       tags:
         - 病历管理
       summary: 导入进度查询
-      description: 【权限：仅管理员】查询批量导入任务处理进度。任务状态暂存服务内存，服务重启后丢失
+      description: 【权限：登录即可】查询批量导入任务处理进度。任务状态暂存服务内存，服务重启后丢失
       parameters:
         - name: taskId
           in: path
@@ -1756,7 +1756,7 @@ paths:
       tags:
         - 病历管理
       summary: 单条新增病历
-      description: 【权限：仅管理员】手动新增病历并绑定元数据，完成单条病历入库
+      description: 【权限：登录即可】手动新增病历并绑定元数据，完成单条病历入库
       requestBody:
         required: true
         content:
@@ -1815,7 +1815,7 @@ paths:
       tags:
         - 病历管理
       summary: 批量删除病历
-      description: 【权限：仅管理员】按病历ID列表批量删除
+      description: 【权限：登录即可】按病历ID列表批量删除（数据由组过滤兜底）
       requestBody:
         required: true
         content:
@@ -1859,7 +1859,7 @@ paths:
       tags:
         - 病历管理
       summary: 按范围批量删除病历
-      description: 【权限：仅管理员】按筛选范围（科室/时间区间/证候/分级）删除全部匹配病历；四个条件全空时拒绝（防误删全库）。删除前先清 review_tasks 外键依赖
+      description: 【权限：登录即可】按筛选范围（科室/时间区间/证候/分级）删除全部匹配病历；四个条件全空时拒绝（防误删全库）。删除前先清 review_tasks 外键依赖
       requestBody:
         required: true
         content:
@@ -1943,7 +1943,7 @@ paths:
       tags:
         - 病历管理
       summary: 病历修改（仅元数据）
-      description: 【权限：仅管理员】修改病历元数据（就诊时间、科室、标签、归档状态），原始文本不可修改
+      description: 【权限：登录即可】修改病历元数据（就诊时间、科室、标签、归档状态），原始文本不可修改
       parameters:
         - name: recordId
           in: path
@@ -2051,7 +2051,7 @@ paths:
       tags:
         - NLP抽取
       summary: 提交批量结构化解析任务
-      description: 【权限：仅管理员】按筛选范围提交后台批量解析任务，立即返回 taskId。任务由服务端固定并发（默认 2）的队列执行，进度与失败清单持久化在 nlp_task 表，可关闭页面后回来查看。每条处理：拼文本→抽取→ES 术语归一→打词典版本→写 structured_data
+      description: 【权限：登录即可】按筛选范围提交后台批量解析任务，立即返回 taskId。任务由服务端固定并发（默认 2）的队列执行，进度与失败清单持久化在 nlp_task 表，可关闭页面后回来查看。每条处理：拼文本→抽取→ES 术语归一→打词典版本→写 structured_data
       requestBody:
         required: true
         content:
@@ -2089,7 +2089,7 @@ paths:
       tags:
         - NLP抽取
       summary: 批量解析任务列表
-      description: 【权限：仅管理员】最近 50 条任务（按提交时间倒序）
+      description: 【权限：登录即可】最近 50 条任务（按提交时间倒序）
       responses:
         '200':
           description: 任务列表
@@ -2114,7 +2114,7 @@ paths:
       tags:
         - NLP抽取
       summary: 批量解析任务进度
-      description: 【权限：仅管理员】查询任务状态、进度与失败清单（失败清单仅保留前 500 条）
+      description: 【权限：登录即可】查询任务状态、进度与失败清单（失败清单仅保留前 500 条）
       parameters:
         - name: id
           in: path
@@ -2145,7 +2145,7 @@ paths:
       tags:
         - NLP抽取
       summary: 取消批量解析任务
-      description: 【权限：仅管理员】排队中（QUEUED）直接置为已取消；运行中（RUNNING）置取消位，工作线程在条/页边界退出，已处理的不回滚
+      description: 【权限：登录即可】排队中（QUEUED）直接置为已取消；运行中（RUNNING）置取消位，工作线程在条/页边界退出，已处理的不回滚
       parameters:
         - name: id
           in: path
@@ -2224,7 +2224,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 清洗状态统计
-      description: 【权限：仅管理员】返回质控合格病历数量、待清洗、已清洗统计（清洗与导出页顶部状态行）
+      description: 【权限：登录即可】返回质控合格病历数量、待清洗、已清洗统计（清洗与导出页顶部状态行）
       responses:
         '200':
           description: 清洗状态统计
@@ -2254,7 +2254,7 @@ paths:
       tags:
         - 质控
       summary: 质控检查（缺失/格式/查重）
-      description: 【权限：仅管理员】事前质控统一入口，一次返回缺失字段、格式错误、查重结果
+      description: 【权限：登录即可】事前质控统一入口，一次返回缺失字段、格式错误、查重结果
       requestBody:
         required: true
         content:
@@ -2289,7 +2289,7 @@ paths:
       tags:
         - 质控
       summary: 诊疗逻辑一致性检查
-      description: 【权限：仅管理员】事中质控，校验证候、治法、方剂、中药的诊疗逻辑一致性（入参为数组）
+      description: 【权限：登录即可】事中质控，校验证候、治法、方剂、中药的诊疗逻辑一致性（入参为数组）
       requestBody:
         required: true
         content:
@@ -2406,7 +2406,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 标准数据集导出
-      description: 【权限：仅管理员】按条件导出质控合格的标准化病历数据集，支持 CSV/JSON 格式。文件流下载，不套 Result 包装，导出自动脱敏
+      description: 【权限：登录即可】按条件导出质控合格的标准化病历数据集，支持 CSV/JSON 格式。文件流下载，不套 Result 包装，导出自动脱敏
       requestBody:
         required: true
         content:
@@ -2439,7 +2439,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 标准数据集预览
-      description: 【权限：仅管理员】按条件返回质控合格病历的总数与前 10 条样本（供导出前预览，不下载文件）
+      description: 【权限：登录即可】按条件返回质控合格病历的总数与前 10 条样本（供导出前预览，不下载文件）
       requestBody:
         required: true
         content:
@@ -2475,7 +2475,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 数据清洗规整
-      description: 【权限：仅管理员】批量清洗病历数据，完成去重、修复、规整、脏数据隔离【长耗时同步接口（3 万上限）；前端放宽超时、勿重复提交】
+      description: 【权限：登录即可】批量清洗病历数据，完成去重、修复、规整、脏数据隔离【长耗时同步接口（3 万上限）；前端放宽超时、勿重复提交】
       requestBody:
         required: true
         content:
@@ -2513,7 +2513,7 @@ paths:
       tags:
         - 质控
       summary: 终末质控评分
-      description: 【权限：仅管理员】自动对病历打分、扣分并完成质量分级（合格/待复核/无效）
+      description: 【权限：登录即可】自动对病历打分、扣分并完成质量分级（合格/待复核/无效）
       requestBody:
         required: true
         content:
@@ -2544,11 +2544,27 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
   /api/qc/score/batch:
+    get:
+      tags:
+        - 质控
+      summary: 批量重算任务列表
+      description: 【权限：登录即可】最近 50 条（按提交时间倒序，包含分级汇总与失败明细）
+      responses:
+        '200':
+          description: 任务列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QcTaskVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
     post:
       tags:
         - 质控
       summary: 提交质控批量重算任务（异步）
-      description: "【权限：仅管理员】§七 L5 起改为**异步**：提交后立即返回 taskId，由后台 worker（并发 1）执行，可关页面、靠 GET 轮询进度。⚠️ **破坏性变更**：原同步接口返回分级汇总，现只返回任务状态；分级汇总改由 `GET /api/qc/score/batch/{id}` 获取。任务会覆盖既有分数（records.qc_results）并同步复核任务状态；范围超单次上限（qc.batch.max-records，默认 40000）或已有任务在排队/运行中时返回 400。"
+      description: "【权限：登录即可】§七 L5 起改为**异步**：提交后立即返回 taskId，由后台 worker（并发 1）执行，可关页面、靠 GET 轮询进度。⚠️ **破坏性变更**：原同步接口返回分级汇总，现只返回任务状态；分级汇总改由 `GET /api/qc/score/batch/{id}` 获取。任务会覆盖既有分数（records.qc_results）并同步复核任务状态；范围超单次上限（qc.batch.max-records，默认 40000）或已有任务在排队/运行中时返回 400。"
       requestBody:
         required: false
         content:
@@ -2587,12 +2603,13 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+
   /api/qc/score/batch/{id}:
     get:
       tags:
         - 质控
       summary: 查询质控批量重算任务进度
-      description: "【权限：仅管理员】返回进度与分级汇总（qualified / pendingReview / invalid），含失败明细。前端 2s 轮询本接口直到 status 进入终态。"
+      description: "【权限：登录即可】返回进度与分级汇总（qualified / pendingReview / invalid），含失败明细。前端 2s 轮询本接口直到 status 进入终态。"
       parameters:
         - name: id
           in: path
@@ -2678,7 +2695,7 @@ paths:
       tags:
         - 质控
       summary: 取消质控批量重算任务
-      description: "【权限：仅管理员】排队中的任务直接置为已取消；运行中的置取消位，由 worker 在分页边界退出并落库。"
+      description: "【权限：登录即可】排队中的任务直接置为已取消；运行中的置取消位，由 worker 在分页边界退出并落库。"
       parameters:
         - name: id
           in: path
@@ -2828,7 +2845,7 @@ paths:
       tags:
         - 质控
       summary: 范围扣分维度聚合
-      description: 【权限：仅管理员】按范围（filters：department/start/end/pattern/grade）聚合各病历扣分明细：按维度（byType）与明细项（byItem）汇总次数/扣分，另附分级分布；优先读 records.qc_results，缺失则现算，扫描上限超出时 truncated=true
+      description: 【权限：登录即可】按范围（filters：department/start/end/pattern/grade）聚合各病历扣分明细：按维度（byType）与明细项（byItem）汇总次数/扣分，另附分级分布；优先读 records.qc_results，缺失则现算，扫描上限超出时 truncated=true
       parameters:
         - name: department
           in: query
@@ -2936,7 +2953,7 @@ paths:
       tags:
         - 词典管理
       summary: 术语库 PDF 智能转换（预览）
-      description: 【权限：仅管理员】上传国标 PDF，抽取文本后由 LLM 提取术语候选；不写入术语库，确认后再调 /api/dictionary/import 入库。AI 能力未开启（llm.enabled 关闭）或通道连不上时返回 400；提示文案不出现配置项名（llm.convert-enabled 自 2026-09-22 起默认开启）
+      description: 【权限：登录即可】上传国标 PDF，抽取文本后由 LLM 提取术语候选；不写入术语库，确认后再调 /api/dictionary/import 入库。AI 能力未开启（llm.enabled 关闭）或通道连不上时返回 400；提示文案不出现配置项名（llm.convert-enabled 自 2026-09-22 起默认开启）
       requestBody:
         required: true
         content:
@@ -3465,7 +3482,7 @@ paths:
         - AI助手
       summary: AI复核预检意见
       description: |
-        【权限：管理员 / 审核员】基于规则预检单（qc_results / 重算）与 structuredData 生成复核建议
+        【权限：登录即可】基于规则预检单（qc_results / 重算）与 structuredData 生成复核建议
         （疑缺脉象 / 证候-方剂冲突 / 建议复核重点）；判定仍为规则，LLM 仅叙述；
         LLM 关/挂 → 回退预检单原文。读取受数据域约束（审核员仅待复核域）。
       requestBody:
@@ -3512,7 +3529,7 @@ paths:
       tags:
         - LLM配置
       summary: 读取 LLM 配置
-      description: 【权限：仅管理员】读取当前生效的 LLM 配置。api-key 只回传掩码（如 sk-****abcd），明文密钥不出服务端
+      description: 【权限：登录即可】读取当前生效的 LLM 配置。api-key 只回传掩码（如 sk-****abcd），明文密钥不出服务端
       responses:
         '200':
           description: 当前生效配置
@@ -3584,7 +3601,7 @@ paths:
       tags:
         - LLM配置
       summary: LLM 连通性探测
-      description: 【权限：仅管理员】用请求体参数（省略则用当前生效配置）发一轮最小请求探测连通性，先试后存；不改变当前生效配置。探测超时上限 20 秒
+      description: 【权限：登录即可】用请求体参数（省略则用当前生效配置）发一轮最小请求探测连通性，先试后存；不改变当前生效配置。探测超时上限 20 秒
       requestBody:
         required: false
         content:
@@ -3620,5 +3637,287 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorVO'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/my-group:
+    get:
+      tags:
+        - 课题组
+      summary: 我的课题组
+      description: 【权限：登录即可】返回我的组 / 组内角色 / 审批中申请；无组时给引导
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups:
+    get:
+      tags:
+        - 课题组
+      summary: 课题组列表
+      description: 【权限：仅管理员】可带 status 筛选
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/pending-users:
+    get:
+      tags:
+        - 课题组
+      summary: 待分配池用户
+      description: 【权限：仅管理员】排除已申请建组的用户
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/approve:
+    post:
+      tags:
+        - 课题组
+      summary: 通过建组申请
+      description: 【权限：仅管理员】pending → active，申请人成为组长
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/reject:
+    post:
+      tags:
+        - 课题组
+      summary: 拒绝建组申请
+      description: 【权限：仅管理员】pending → rejected，编码改写释放
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: 拒绝理由（必填）
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}:
+    put:
+      tags:
+        - 课题组
+      summary: 更新组信息
+      description: 【权限：仅管理员】仅名称 / 用途可改
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/stop:
+    post:
+      tags:
+        - 课题组
+      summary: 停用课题组
+      description: 【权限：仅管理员】组员不能登录，数据保留
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/activate:
+    post:
+      tags:
+        - 课题组
+      summary: 恢复课题组
+      description: 【权限：仅管理员】stopped → active
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/members:
+    get:
+      tags:
+        - 课题组
+      summary: 本组成员列表
+      description: 【权限：组长（本组）】owner 在前；路径 id 必须等于当前组
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags:
+        - 课题组
+      summary: 从待分配池拉人
+      description: 【权限：组长（本组）】拉入后用户转 active
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: 待分配用户ID
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/groups/{id}/members/{userId}:
+    delete:
+      tags:
+        - 课题组
+      summary: 移除成员
+      description: 【权限：组长（本组）】不能移除组长
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          description: 用户ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/members/{userId}/transfer-owner:
+    put:
+      tags:
+        - 课题组
+      summary: 转让组长
+      description: 【权限：组长（本组）】原子改两行
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          description: 用户ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newOwnerUserId:
+                  type: string
+                  description: 新组长用户ID
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/leave:
+    post:
+      tags:
+        - 课题组
+      summary: 退出课题组
+      description: 【权限：组长（本组）】组长须先指定继任者
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 课题组ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
