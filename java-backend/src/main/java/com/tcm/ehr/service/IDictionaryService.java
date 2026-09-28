@@ -16,13 +16,18 @@ import java.util.Map;
 public interface IDictionaryService {
 
     /**
-     * 查询术语，供页面展示与输入联想。
+     * 查询术语，供术语词典页分页浏览、输入联想、质控规则「期望值」下拉三处使用。
      *
-     * @param type    术语类型
-     * @param keyword 关键字，为空表示不过滤
-     * @return 命中的术语列表
+     * <p>按标准词与别名做包含匹配；关键字为空表示不过滤。</p>
+     *
+     * @param type    词典类型
+     * @param keyword 搜索关键字，可为空
+     * @param page    页码，从 1 开始；{@code <= 0} 表示不分页、返回全部命中
+     * @param size    每页条数，仅 {@code page > 0} 时生效
+     * @return 视图含 {@code terms}（词条列表）与 {@code total}（命中总数）
+     * @throws IOException 词典文件读取失败
      */
-    List<Map<String, Object>> searchTerms(String type, String keyword) throws IOException;
+    Map<String, Object> searchTerms(String type, String keyword, int page, int size) throws IOException;
 
     /**
      * 导入词典文件并刷新内存与 ES 索引。

@@ -1126,8 +1126,13 @@ components:
       properties:
         terms:
           type: array
+          description: 命中词条；分页时为本页，不分页（page<=0）时为全部命中
           items:
             $ref: '#/components/schemas/DictionaryTermVO'
+        total:
+          type: integer
+          description: 命中总数（与 keyword 相关，不受分页影响）
+          example: 1357
     RollbackDTO:
       type: object
       description: 术语库回滚请求（入参）
@@ -2854,10 +2859,24 @@ paths:
           in: query
           schema:
             type: string
-          description: 名称或别名包含匹配
+          description: 名称或别名包含匹配，为空表示不过滤
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: 页码（从 1 开始）。不传或传 0 = 不分页、返回全部命中（供输入联想与规则下拉取完整候选）；传页码 = 分页（供术语词典页翻页）。页码超出总页数返回空列表而非报错
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+          description: 每页条数，仅 page>0 时生效
       responses:
         '200':
-          description: 术语列表
+          description: 术语列表（分页时为本页；不分页时为全部命中）
           content:
             application/json:
               schema:

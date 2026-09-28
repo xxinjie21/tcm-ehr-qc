@@ -26,12 +26,13 @@
           placeholder="输入术语或别名关键字，模糊匹配"
           clearable
           style="width: 320px"
-          @keyup.enter="loadTerms"
+          @keyup.enter="loadTerms()"
         />
-        <el-button type="primary" :loading="loadingTerms" @click="loadTerms">查 询</el-button>
-        <span class="tip">共 {{ terms.length }} 条</span>
+        <el-button type="primary" :loading="loadingTerms" @click="loadTerms()">查 询</el-button>
+        <span class="tip">共 {{ total }} 条</span>
       </div>
-      <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动，页面本身不出现滚动条 -->
+      <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动，页面本身不出现滚动条。
+           每页条数可调（20~200），故按可视行数固定高度，超出的行在表格内部滚动 -->
       <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360"
         :empty-text="termsFailed ? '加载失败，请点「查 询」重试' : '没有匹配的术语'">
         <el-table-column prop="standardTerm" label="标准术语" width="220" />
@@ -54,6 +55,18 @@
           />
         </template>
       </el-table>
+      <!-- 分页：词典已从演示的十几条涨到上千条（如疾病 1357、证候 2080），
+           一次全量渲染会卡且无法定位，故按页浏览 -->
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="size"
+        :page-sizes="[20, 50, 100, 200]"
+        :total="total"
+        layout="total, sizes, prev, pager, next"
+        style="margin-top: 12px; justify-content: flex-end"
+        @current-change="loadTerms(false)"
+        @size-change="handleSizeChange"
+      />
     </PanelCard>
 
     <!-- 术语库导入：非 PDF 直接覆盖入库（导入前自动备份）；PDF 先转换出候选、确认后才写入 -->
@@ -223,31 +236,53 @@ const activeTab = ref('disease')
 // 当前词典类型的中文名，用于面板标题、确认文案与导入提示
 const typeLabel = computed(() => TYPE_LABELS[activeTab.value])
 
-// 术语查询状态：keyword 为用户输入，terms 为查询结果
+// 术语查询状态：keyword 为用户输入，terms 为当前页结果
 const keyword = ref('')
 const terms = ref([])
 const loadingTerms = ref(false)
 /** 词条查询失败：与「确实没有匹配」区分开 */
 const termsFailed = ref(false)
+/** 分页：page 从 1 起，size 为每页条数，total 为命中总数（驱动 el-pagination 算总页数） */
+const page = ref(1)
+const size = ref(20)
+const total = ref(0)
 
 // 查询当前类型下的术语（关键字命中标准词或别名）
-const loadTerms = async () => {
-  // 1. 置加载态，并清掉上一次的失败标记
+// resetPage：切类型 / 搜索 / 导入后 / 回滚后都应回到第 1 页（数据集合已变），
+// 只有「翻页」「改每页条数」这两个纯翻页动作才传 false。
+const loadTerms = async (resetPage = true) => {
+  // 1. 置加载态，并清掉上一次的失败标记；需要重置时先回到第 1 页
+  if (resetPage) page.value = 1
   loadingTerms.value = true
   termsFailed.value = false
   try {
     // 2. 按当前词典类型 + 关键字查询（标准词与别名都参与匹配）
-    const res = await getTerms({ type: activeTab.value, keyword: keyword.value })
-    // 3. 回填查询结果
+    //    page 与 size 永远成对传：后端 page>0 时按 size 切片，漏传 size 会让
+    //    后端用默认值 100，与前端 el-pagination 显示的每页条数对不上。
+    const res = await getTerms({
+      type: activeTab.value,
+      keyword: keyword.value,
+      page: page.value,
+      size: size.value
+    })
+    // 3. 回填当前页结果与命中总数
     terms.value = res.data.terms || []
+    total.value = res.data.total ?? terms.value.length
   } catch {
     // 原来只有 try/finally：接口挂了列表还停在上一次的结果，用户会把旧数据当最新
     // 失败置失败态并清空列表，避免旧结果被当成最新
     termsFailed.value = true
     terms.value = []
+    total.value = 0
   } finally {
     loadingTerms.value = false
   }
+}
+
+/** 每页条数变化：回到第 1 页再查，否则会停在一个已越界的旧页码上 */
+const handleSizeChange = () => {
+  page.value = 1
+  loadTerms(false)
 }
 
 // 切换词典类型：先清掉上一次的查询与导入状态，再拉新类型的数据

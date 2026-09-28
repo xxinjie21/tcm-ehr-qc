@@ -63,36 +63,57 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 术语查询：读词典 JSON，按关键字对标准词与别名做包含匹配。
      *
-     * <p>关键字为空表示不过滤；每次调用都直接读文件 —— 词典体量小，且本方法只服务
-     * 术语词典页的列表 / 搜索。</p>
+     * <p>每次调用都直接读文件 —— 本方法只服务三处：术语词典页列表 / 输入联想 /
+     * 质控规则「期望值」下拉，都是低频请求，5 类词条合计三千余条、读文件代价可忽略。</p>
      *
-     * @param type 词典类型
-     * @param keyword 搜索关键字，可为空
-     * @return 命中词条（standardTerm / aliases），最多 100 条
+     * <p><b>两种返回模式</b>（由 {@code page} 决定）：</p>
+     * <ul>
+     *   <li>{@code page <= 0}（不分页）：返回<b>全部</b>命中词条。供质控规则下拉与
+     *       输入联想使用 —— 两者都需要完整候选集才能选到任意术语。</li>
+     *   <li>{@code page > 0}（分页）：只返回第 {@code page} 页（每页 {@code size} 条），
+     *       供术语词典页翻页浏览。分页切片对越界做了双向夹取，页码超出范围返回空列表
+     *       而非抛异常（{@code subList} 越界会抛 {@code IndexOutOfBounds}）。</li>
+     * </ul>
+     *
+     * @param type    词典类型
+     * @param keyword 搜索关键字，可为空（表示不过滤）
+     * @param page    页码，从 1 开始；{@code <= 0} 表示不分页、返回全部命中
+     * @param size    每页条数，仅 {@code page > 0} 时生效
+     * @return 命中词条视图：{@code terms}（standardTerm / aliases）+ {@code total}（命中总数）
      * @throws IOException 词典文件读取失败
      */
-    public List<Map<String, Object>> searchTerms(String type, String keyword) throws IOException {
-        // 词典列表直接读 JSON 文件（原先借 DictionaryStore 当文件缓存）。
-        // DictionaryStore 已随「归一不再内存兜底」删除；这里每次读一次文件 ——
-        // 全词典仅 131 条、文件十几 KB，且本方法只服务术语词典页的列表/搜索，代价可忽略。
+    public Map<String, Object> searchTerms(String type, String keyword, int page, int size)
+            throws IOException {
+        // 1. 词典列表直接读 JSON 文件（原先借 DictionaryStore 当文件缓存）。
+        //    DictionaryStore 已随「归一不再内存兜底」删除；这里每次读一次文件。
         List<TermEntry> entries = fileService.read(type);
-        List<Map<String, Object>> result = new ArrayList<>();
+        List<Map<String, Object>> hit = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
-        // 1. 逐条比对标准术语与别名，任一命中即算命中
+        // 2. 逐条比对标准术语与别名，任一命中即算命中（不过滤时 kw 为空，全量收）
         for (TermEntry e : entries) {
-            boolean hit = kw.isEmpty()
+            boolean matched = kw.isEmpty()
                     || e.getStandardTerm().contains(kw)
                     || (e.getAliases() != null && e.getAliases().stream().anyMatch(a -> a.contains(kw)));
-            if (hit) {
+            if (matched) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("standardTerm", e.getStandardTerm());
                 m.put("aliases", e.getAliases());
-                result.add(m);
-                // 2. 满 100 条就停：词典页一次只渲染前 100 条，全量返回没有意义
-                if (result.size() >= 100) break;
+                hit.add(m);
             }
         }
-        return result;
+        // 3. 分页切片：from/to 双向夹取，页码超出总页数时返回空列表而不是抛越界异常
+        List<Map<String, Object>> terms = hit;
+        if (page > 0) {
+            int step = Math.max(1, size);
+            int from = Math.min((page - 1) * step, hit.size());
+            int to = Math.min(from + step, hit.size());
+            terms = hit.subList(from, to);
+        }
+        // 4. total 一律是命中总数：分页时供词典页算总页数，不分页时一并返回供调用方判断
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("terms", terms);
+        out.put("total", hit.size());
+        return out;
     }
 
     // ---------------------------------------------------------------- 导入

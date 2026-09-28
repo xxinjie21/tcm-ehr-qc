@@ -116,9 +116,15 @@
               <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
             </el-select>
             含
-            <el-select v-model="c.triggerValues" multiple filterable allow-create collapse-tags size="small" style="min-width: 220px">
-              <el-option v-for="v in termsOf(c.triggerType)" :key="v" :label="v" :value="v" />
-            </el-select>
+            <!-- 用 el-select-v2（虚拟滚动）：证候词典已 2080 条，普通 el-select 一次挂载
+                 2000+ 个 el-option 会卡。allow-create 已移除 —— 候选表完整后从列表选即可，
+                 避免敲入词典外的错词导致一致性规则永不匹配 -->
+            <el-select-v2
+              v-model="c.triggerValues"
+              :options="termsOf(c.triggerType)"
+              multiple filterable collapse-tags size="small" style="min-width: 220px"
+              placeholder="从词典中选"
+            />
           </div>
           <div class="rc-line">
             则
@@ -126,9 +132,12 @@
               <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
             </el-select>
             应为
-            <el-select v-model="c.expectValues" multiple filterable collapse-tags size="small" style="min-width: 220px">
-              <el-option v-for="v in termsOf(c.expectType)" :key="v" :label="v" :value="v" />
-            </el-select>
+            <el-select-v2
+              v-model="c.expectValues"
+              :options="termsOf(c.expectType)"
+              multiple filterable collapse-tags size="small" style="min-width: 220px"
+              placeholder="从词典中选"
+            />
             冲突扣
             <el-input-number v-model="c.weight" size="small" :min="0" :controls="false" />
             分
@@ -420,10 +429,11 @@ const form = reactive({
 })
 // 深拷贝：避免编辑时直接改动 rules（取消后 rules 必须保持原样）
 const clone = (o) => JSON.parse(JSON.stringify(o))
-// 取某词典类型的标准词列表，供一致性规则的「期望值」下拉；未加载时返回空数组
+// 取某词典类型的下拉选项（el-select-v2 的 {label,value} 结构）；未加载时返回空数组
 const termsOf = (type) => dictTerms.value[type] || []
 
-// 拉取五类词典的标准词，供一致性规则的「期望值」下拉（已取过的不重复请求）
+// 拉取五类词典的标准词，供一致性规则的「触发值 / 期望值」下拉（已取过的不重复请求）
+// 不传 page → 后端返回全部命中（原本硬截断 100 条，会让证候 2080 条只能选到前 100）
 const loadDictTerms = async () => {
   // 1. 需要候选的词典类型固定五类
   const types = ['disease', 'pattern', 'symptom', 'herb', 'formula']
@@ -431,9 +441,12 @@ const loadDictTerms = async () => {
   await Promise.all(types.map(async (type) => {
     if (dictTerms.value[type]) return
     try {
-      // 3. 只留标准词，供一致性规则的「期望值」下拉
+      // 3. 只留标准词，并直接组装成 el-select-v2 需要的 {label, value} 选项结构
       const res = await getTerms({ type })
-      dictTerms.value[type] = (res.data?.terms || []).map((t) => t.standardTerm).filter(Boolean)
+      dictTerms.value[type] = (res.data?.terms || [])
+        .map((t) => t.standardTerm)
+        .filter(Boolean)
+        .map((s) => ({ label: s, value: s }))
     } catch {
       // 单类词典拉取失败 → 该类候选退化为空数组，不影响其余类型
       dictTerms.value[type] = []

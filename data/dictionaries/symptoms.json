@@ -107,5 +107,288 @@
   "standardTerm": "流清涕反复发作",
   "aliases": [],
   "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "发热",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "抽搐",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "谵语",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "郑声",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "错语",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "头痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "眩晕",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "晕厥",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "昏迷",
+  "aliases": [
+   "神昏"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "烦躁",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "健忘",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "嗜睡",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "目盲",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "耳鸣",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "耳聋",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "鼻衄",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "牙痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "齿衄",
+  "aliases": [
+   "牙衄"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "失音",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "咯血",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "咳嗽",
+  "aliases": [
+   "咳逆"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "气喘",
+  "aliases": [
+   "喘促"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "咳血",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "胸痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "心悸",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "心痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "呕吐",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "干呕",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "暴吐",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "呕血",
+  "aliases": [
+   "吐血"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "胃痛",
+  "aliases": [
+   "胃脘痛",
+   "脘痛"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "脘痞",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "嘈杂",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "胁痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "黄疸",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "吐酸",
+  "aliases": [
+   "吞酸",
+   "泛酸",
+   "噫酸"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "腹痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "腹胀",
+  "aliases": [
+   "腹满"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "腹泻",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "腹水",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "便秘",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "便血",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "腰痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "尿血",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "尿浊",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "水肿",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "关节痛",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "瘫痪",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "震颤",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "紫斑",
+  "aliases": [
+   "肌衄"
+  ],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "出疹",
+  "aliases": [],
+  "source": "中医临床诊疗术语 症状"
+ },
+ {
+  "standardTerm": "瘙痒",
+  "aliases": [
+   "皮肤瘙痒"
+  ],
+  "source": "中医临床诊疗术语 症状"
  }
 ]

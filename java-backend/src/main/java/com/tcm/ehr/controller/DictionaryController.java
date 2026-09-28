@@ -87,23 +87,30 @@ public class DictionaryController {
     }
 
     /**
-     * 查询术语（供页面展示与输入联想）。
+     * 查询术语（供词典页分页、输入联想、质控规则下拉）。
      *
      * <p>【权限：登录即可】按标准词与别名做模糊匹配。</p>
      *
+     * <p><b>两种模式</b>：不传 {@code page}（或传 {@code <=0}）→ 返回全部命中，
+     * 供输入联想与规则下拉取完整候选；传 {@code page} → 分页，供词典页翻页。</p>
+     *
      * @param type    术语类型
      * @param keyword 关键字，为空表示不过滤
-     * @return terms=命中的术语列表
+     * @param page    页码，从 1 开始；默认 0 = 不分页、返回全部
+     * @param size    每页条数，仅 page&gt;0 时生效
+     * @return terms=本页词条列表；total=命中总数
      */
     @GetMapping("/terms")
-    public ResponseEntity<Result<Map<String, Object>>> terms(@RequestParam("type") String type,
-                                                             @RequestParam(value = "keyword", required = false) String keyword)
-            throws IOException {
-        // 1. 类型校验（keyword 可空 = 不过滤，最多返回 100 条）
+    public ResponseEntity<Result<Map<String, Object>>> terms(
+            @RequestParam("type") String type,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "100") int size) throws IOException {
+        // 1. 类型校验（keyword 可空 = 不过滤；page<=0 = 不分页，返回全部命中）
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
-        return ResponseEntity.ok(Result.ok(Map.of("terms", dictionaryService.searchTerms(type, keyword))));
+        return ResponseEntity.ok(Result.ok(dictionaryService.searchTerms(type, keyword, page, size)));
     }
 
     /**
