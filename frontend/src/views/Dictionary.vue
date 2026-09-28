@@ -232,6 +232,7 @@ import StatCard from '@/components/StatCard.vue'
 import { getTerms, importDict, convertDict, rollback, getBackups } from '@/api/dictionary'
 import { saveBlob } from '@/utils/download'
 import { confirmBox } from '@/utils/confirm'
+import { PAGE_SIZES, PAGE_SIZES_LARGE } from '@/utils/constants'
 
 // 词典类型 → 界面文案；键名与后端 type 参数一致（disease / pattern / symptom / herb / formula）
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }

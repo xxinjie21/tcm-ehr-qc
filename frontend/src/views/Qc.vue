@@ -343,6 +343,7 @@ import { searchRecords } from '@/api/records'
 import { getTerms } from '@/api/dictionary'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
+import { PAGE_SIZES } from '@/utils/constants'
 
 // 仅管理员可改规则（与后端 @RequireRole 一致）
 const userStore = useUserStore()

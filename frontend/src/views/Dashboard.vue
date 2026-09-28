@@ -101,6 +101,7 @@ import StatCard from '@/components/StatCard.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
+import { getOverview, getExtraStats } from '@/api/stats'
 import { governanceStats } from '@/api/governance'
 import { useUserStore } from '@/stores/user'
 

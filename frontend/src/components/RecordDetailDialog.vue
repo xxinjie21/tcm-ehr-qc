@@ -38,6 +38,8 @@
 // 左栏为原始 21 字段只读，右栏为结构化数据 + AI 解读，左右同屏可比对。
 import StructuredDataCard from './StructuredDataCard.vue'
 import AiInterpretCard from './AiInterpretCard.vue'
+import { fieldOf } from '@/utils/format'
+import { fieldsWithWide } from '@/utils/recordFields'
 
 defineProps({
   /** 弹窗标题：病历数据页用「病历详情（原始字段只读）」，清洗页用「病历完整详情」 */

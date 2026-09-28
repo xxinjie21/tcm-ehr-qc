@@ -388,6 +388,7 @@ import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
 import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
 import { confirmBox } from '@/utils/confirm'
+import { PAGE_SIZES } from '@/utils/constants'
 
 const activeTab = ref('single')
 

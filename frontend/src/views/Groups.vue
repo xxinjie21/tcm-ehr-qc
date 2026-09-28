@@ -75,6 +75,7 @@ import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import { listGroups, approveGroup, rejectGroup, stopGroup, activateGroup, listPendingUsers } from '@/api/group'
+import { fmtDateTime } from '@/utils/format'
 
 const tab = ref('pending')
 const loading = ref(false)

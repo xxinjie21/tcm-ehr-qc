@@ -68,6 +68,8 @@ import { onMounted, reactive, ref } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
+import { fmtDateTime } from '@/utils/format'
+import { PAGE_SIZES } from '@/utils/constants'
 
 /** 图例配色；具体选项由后端返回，未匹配到的走默认色 */
 const TAG_TYPES = {

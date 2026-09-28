@@ -215,6 +215,9 @@ import { listReviewTasks, submitReview } from '@/api/review'
 import { getRawRecord } from '@/api/records'
 import { aiReview } from '@/api/ai'
 import { qcScore, getQcRules } from '@/api/qc'
+import { fmtDateTime, fieldOf } from '@/utils/format'
+import { fieldsWithWide } from '@/utils/recordFields'
+import { PAGE_SIZES } from '@/utils/constants'
 
 // 字段定义收敛到 @/utils/recordFields（P3.5）；复核列表的整行集合
 const FIELDS = fieldsWithWide([

@@ -236,8 +236,12 @@ import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import {
   importRecords, createRecord, searchRecords, getRawRecord, deleteRecords, deleteRecordsByFilter
 } from '@/api/records'
-import { fmtDateTime } from '@/utils/format'
+import { fmtDateTime, fieldOf } from '@/utils/format'
 import { useAiContextStore } from '@/stores/ai'
+import { fieldsWithWide } from '@/utils/recordFields'
+import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
+import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
+import { PAGE_SIZES } from '@/utils/constants'
 
 const aiStore = useAiContextStore()
 

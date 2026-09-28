@@ -423,20 +423,8 @@ const handleExport = async () => {
 }
 
 // 导出区科室选项取后端实际值，避免写死科室与库中数据对不上
-const departments = ref([])
-// 加载导出区的科室下拉项（取后端实际科室值，避免写死科室与库中数据对不上）；
-// 失败时降级为空列表，不阻塞页面其余功能
-const loadDepartments = async () => {
-  // 1. 取后端实际科室值，避免写死科室与库中数据对不上
-  try {
-    const res = await getDepartments()
-    // 2. 填充下拉选项
-    departments.value = res.data || []
-  // 3. 失败时降级为空列表，不阻塞页面其余功能
-  } catch {
-    departments.value = []
-  }
-}
+// 科室下拉：收敛到 useDepartments（Promise 单例缓存，与 Dashboard/RangeFilter 共用）
+const { departments, reload: loadDepartments } = useDepartments()
 
 onMounted(() => {
   loadStats()
