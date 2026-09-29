@@ -139,8 +139,8 @@ class QcBatchServiceImplTest {
                 new org.springframework.mock.web.MockHttpServletRequest();
         req.setAttribute("currentUsername", "admin");
         req.setAttribute("currentRole", "管理员");
-        req.setAttribute("currentGroupId", "grp-default-2026");
-        req.setAttribute("currentGroupRole", "member");
+        req.setAttribute("currentOrgId", "grp-default-2026");
+        req.setAttribute("currentOrgRole", "member");
         org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
                 new org.springframework.web.context.request.ServletRequestAttributes(req));
         try {
@@ -154,7 +154,7 @@ class QcBatchServiceImplTest {
         verify(taskMapper).insert(captor.capture());
         QcTask row = captor.getValue();
         assertEquals("管理员", row.getRole(), "角色必须快照进 qc_task.role（回填审计日志）");
-        assertEquals("grp-default-2026", row.getGroupId(),
+        assertEquals("grp-default-2026", row.getOrgId(),
                 "组必须快照进 qc_task.group_id（worker 重建 RecordFilter）");
         assertEquals("admin", row.getCreatedBy(), "操作人必须快照进 qc_task.created_by");
         assertEquals(5, row.getTotal());

@@ -2,7 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.tcm.ehr.domain.po.GroupMember;
+import com.tcm.ehr.domain.po.OrganizationMember;
 import com.tcm.ehr.domain.po.OperationLog;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.mapper.OperationLogMapper;
@@ -61,16 +61,16 @@ public class LogServiceImpl implements ILogService {
     public List<String> actions() {
         // §七 L7：组员不能从下拉看到别人的操作类型。
         // operations 与按组三档见 buildWrapper；这里单独传给硬编码 SQL。
-        String groupId = RequestUtils.currentGroupId();
+        String orgId = RequestUtils.currentOrgId();
         String operator = RequestUtils.currentUsername();
         if (RequestUtils.isAdmin()) {
             return operationLogMapper.selectDistinctActions(null, null);
         }
-        if (groupId != null && !groupId.isBlank()
-                && RequestUtils.currentGroupRole().equals(GroupMember.ROLE_OWNER)) {
-            return operationLogMapper.selectDistinctActions(groupId, null);
+        if (orgId != null && !orgId.isBlank()
+                && RequestUtils.currentOrgRole().equals(OrganizationMember.ROLE_OWNER)) {
+            return operationLogMapper.selectDistinctActions(orgId, null);
         }
-        return operationLogMapper.selectDistinctActions(groupId, operator);
+        return operationLogMapper.selectDistinctActions(orgId, operator);
     }
 
     /**
@@ -146,13 +146,13 @@ public class LogServiceImpl implements ILogService {
         QueryWrapper<OperationLog> w = new QueryWrapper<>();
         // 1. §七 L7 四档范围：管理员全部 / 组长本组 /
         //    组员本组自己 / 无组自己（一次覆盖 page、listForExport、exportCsv）
-        String groupId = RequestUtils.currentGroupId();
+        String orgId = RequestUtils.currentOrgId();
         String operator = RequestUtils.currentUsername();
         if (RequestUtils.isAdmin()) {
             // 管理员：无条件（看全部）
-        } else if (groupId != null && !groupId.isBlank()) {
-            w.eq("group_id", groupId);
-            if (GroupMember.ROLE_MEMBER.equals(RequestUtils.currentGroupRole())) {
+        } else if (orgId != null && !orgId.isBlank()) {
+            w.eq("group_id", orgId);
+            if (OrganizationMember.ROLE_MEMBER.equals(RequestUtils.currentOrgRole())) {
                 // 组员：只看自己在本组内的操作
                 w.eq("operator", operator);
             }

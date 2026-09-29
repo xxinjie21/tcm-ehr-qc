@@ -16,14 +16,14 @@ import java.time.LocalDateTime;
  * 会让同一用户在不同请求看到不同数据。</p>
  */
 @Data
-@TableName("group_members")
-public class GroupMember {
+@TableName("organization_members")
+public class OrganizationMember {
 
     public static final String ROLE_OWNER = "owner";
     public static final String ROLE_MEMBER = "member";
 
     private String id;
-    private String groupId;
+    private String orgId;
     private String userId;
     /** owner=组长 / member=组员 */
     private String role;

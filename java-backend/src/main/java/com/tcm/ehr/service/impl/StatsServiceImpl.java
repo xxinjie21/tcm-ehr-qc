@@ -55,7 +55,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public List<String> departments() {
-        return baseMapper.selectDepartments(domainGroupId());
+        return baseMapper.selectDepartments(domainOrgId());
     }
 
     /**
@@ -69,7 +69,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     @Override
     public OverviewVO overview() {
         // 1. 指标在库里聚合，只按数据域过滤（总览不受页面筛选影响）
-        Map<String, Object> row = baseMapper.selectOverview(domainGroupId());
+        Map<String, Object> row = baseMapper.selectOverview(domainOrgId());
         OverviewVO vo = new OverviewVO();
         vo.setTotalRecords(num(row.get("totalRecords")));
         vo.setQualifiedCount(num(row.get("qualifiedCount")));
@@ -88,17 +88,17 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public StatsVO stats(StatsDTO dto) {
-        String groupId = RequestUtils.currentGroupId();
+        String orgId = RequestUtils.currentOrgId();
         QueryWrapper<Record> wrapper;
         // 1. 三种圈定方式：病历ID → 筛选条件 → 全域（都不给时就是数据域内全部）
         if (dto.getRecordIds() != null && !dto.getRecordIds().isEmpty()) {
             // 优先：按病历ID圈定；ID 由调用方给，数据域必须先叠加
-            wrapper = RecordFilter.build(groupId, new FiltersDTO()).in("id", dto.getRecordIds());
+            wrapper = RecordFilter.build(orgId, new FiltersDTO()).in("id", dto.getRecordIds());
         } else if (dto.getFilters() != null && !dto.getFilters().isEmpty()) {
             // 次选：按筛选条件圈定
-            wrapper = RecordFilter.build(groupId, toFilters(dto.getFilters()));
+            wrapper = RecordFilter.build(orgId, toFilters(dto.getFilters()));
         } else {
-            wrapper = RecordFilter.build(groupId, new FiltersDTO());
+            wrapper = RecordFilter.build(orgId, new FiltersDTO());
         }
         return statsFor(baseMapper.selectList(wrapper), dto.getType());
     }
@@ -233,7 +233,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /** 按数据域 + 用户筛选取病历（看板扩展口径） */
     private List<Record> recordsFor(FiltersDTO filters) {
         // 条件组装统一走 RecordFilter：数据域与用户筛选的交集口径只有那一处
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), filters);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
         return baseMapper.selectList(wrapper);
     }
 
@@ -283,8 +283,8 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     /** 本请求的组织数据域：管理员 = null（不限），其余身份 = 当前组织 ID */
-    private String domainGroupId() {
-        return RecordFilter.domainGroupId();
+    private String domainOrgId() {
+        return RecordFilter.domainOrgId();
     }
 
     /** stats 契约的 filters 是无类型 Map —— 翻译交给 RecordFilter（口径只有那一处） */

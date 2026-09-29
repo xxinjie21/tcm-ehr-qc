@@ -74,7 +74,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
-import { listGroups, approveGroup, rejectGroup, stopGroup, activateGroup, listPendingUsers } from '@/api/group'
+import { listOrgs, approveGroup, rejectGroup, stopGroup, activateGroup, listPendingUsers } from '@/api/org'
 import { fmtDateTime } from '@/utils/format'
 
 const tab = ref('pending')
@@ -91,7 +91,7 @@ const statusText = (s) => ({ active: '生效', stopped: '已停用', rejected: '
 const load = async () => {
   loading.value = true
   try {
-    const [g, pool] = await Promise.all([listGroups(), listPendingUsers()])
+    const [g, pool] = await Promise.all([listOrgs(), listPendingUsers()])
     groups.value = g.data || []
     pendingGroups.value = (g.data || []).filter((x) => x.status === 'pending')
     poolUsers.value = pool.data || []

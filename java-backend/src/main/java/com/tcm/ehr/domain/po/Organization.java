@@ -11,12 +11,12 @@ import java.time.LocalDateTime;
  * <p>状态机：{@code pending}（已申请待审批）→ {@code active}（生效）/ {@code rejected}（被拒），
  * {@code active} ↔ {@code stopped}（管理员停用，只挡登录、数据保留）。</p>
  *
- * <p>{@code code} 有 UNIQUE 约束，被拒时改写为 {@code rej_<groupId>_<原code>} 释放编码，
+ * <p>{@code code} 有 UNIQUE 约束，被拒时改写为 {@code rej_<orgId>_<原code>} 释放编码，
  * 否则一次拒绝会让该编码被永久占死。</p>
  */
 @Data
-@TableName("research_groups")
-public class ResearchGroup {
+@TableName("organizations")
+public class Organization {
 
     public static final String PENDING = "pending";
     public static final String ACTIVE = "active";

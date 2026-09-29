@@ -205,8 +205,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
         // 1. 在提交线程取操作人与角色（worker 拿不到，必须现在捕获）
         String operator = RequestUtils.currentUsername();
         String role = RequestUtils.currentRole();
-        // 数据域快照：阶段 2 后 RecordFilter 取的是 groupId 而不是 role
-        String groupId = RequestUtils.currentGroupId();
+        // 数据域快照：阶段 2 后 RecordFilter 取的是 orgId 而不是 role
+        String orgId = RequestUtils.currentOrgId();
 
         // 2. 防重：查表判「是否已有 QUEUED/RUNNING」，不用 Redis 全局锁
         //    （原 tcm:task:batch 是全局单键，任意管理员提交会让别人排队，TTL 固定还会中途过期）
@@ -217,7 +217,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         }
 
         // 3. 用提交线程的角色构造数据域过滤，统计计划条数
-        long count = recordMapper.selectCount(RecordFilter.build(groupId, filters));
+        long count = recordMapper.selectCount(RecordFilter.build(orgId, filters));
         if (count > maxRecords) {
             throw new IllegalArgumentException("本次范围 " + count + " 条，超过单次上限 " + maxRecords
                     + " 条。请按科室或就诊时间分批重算。");
@@ -238,7 +238,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         t.setFiltersJson(writeJsonStrict(filters));
         t.setCreatedBy(operator);
         t.setRole(role);
-        t.setGroupId(groupId);
+        t.setOrgId(orgId);
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
@@ -335,7 +335,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
                             + "，待复核 " + result.getPendingReview()
                             + "，无效 " + result.getInvalid()
                             + "，失败 " + result.getFailed(),
-                    t.getCreatedBy(), t.getRole(), t.getGroupId());
+                    t.getCreatedBy(), t.getRole(), t.getOrgId());
             log.info("[批重算] 任务 {} 结束：{}，成功 {}，失败 {}",
                     id, t.getStatus(), t.getSuccess(), t.getFailed());
         }
@@ -344,13 +344,13 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 按筛选范围分页处理；返回是否被取消。
      *
-     * <p>⚠️ 用 {@code t.getGroupId()}（提交时快照）而不是 {@code RequestUtils.currentGroupId()}：
+     * <p>⚠️ 用 {@code t.getOrgId()}（提交时快照）而不是 {@code RequestUtils.currentOrgId()}：
      * worker 是后台线程，后者会拿到空串 → fail-closed → 一条也处理不了（静默失败）。</p>
      */
     private boolean run(String id, QcTask t, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules,
                         List<QcTaskVO.Failure> failures, boolean[] truncated, int[] processed) {
         // 1. 还原落库时的筛选条件（提交时冻结，不随数据变化）
-        QueryWrapper<Record> wrapper = RecordFilter.build(t.getGroupId(), readFilters(t.getFiltersJson()));
+        QueryWrapper<Record> wrapper = RecordFilter.build(t.getOrgId(), readFilters(t.getFiltersJson()));
         int pageNo = 1;
         // 2. 分页循环取数：每页都先看取消位，避免停不下来
         while (true) {

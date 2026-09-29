@@ -62,7 +62,7 @@ public class AuthController {
      * <p>菜单四套：管理员 / 组长 / 组员 / 待分配池（空菜单 + 前端引导页）。</p>
      *
      * @param dto 用户名与密码
-     * @return token=JWT；role=系统级角色；menus=可见菜单；groupId/groupRole/status=当前组上下文
+     * @return token=JWT；role=系统级角色；menus=可见菜单；orgId/groupRole/status=当前组上下文
      */
     @PostMapping("/login")
     public Result<LoginVO> login(@Valid @RequestBody LoginDTO dto) {

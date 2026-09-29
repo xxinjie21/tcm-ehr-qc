@@ -4,15 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.common.utils.RequestUtils;
-import com.tcm.ehr.domain.po.GroupMember;
-import com.tcm.ehr.domain.po.ResearchGroup;
+import com.tcm.ehr.domain.po.OrganizationMember;
+import com.tcm.ehr.domain.po.Organization;
 import com.tcm.ehr.domain.po.User;
-import com.tcm.ehr.domain.dto.GroupDTOs;
-import com.tcm.ehr.domain.vo.GroupVOs;
-import com.tcm.ehr.mapper.GroupMemberMapper;
-import com.tcm.ehr.mapper.ResearchGroupMapper;
-import com.tcm.ehr.service.GroupResolution;
-import com.tcm.ehr.service.IGroupService;
+import com.tcm.ehr.domain.dto.OrgDTOs;
+import com.tcm.ehr.domain.vo.OrgVOs;
+import com.tcm.ehr.mapper.OrgMemberMapper;
+import com.tcm.ehr.mapper.OrgMapper;
+import com.tcm.ehr.service.OrgResolution;
+import com.tcm.ehr.service.IOrgService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -27,7 +27,7 @@ import java.util.UUID;
 /**
  * 课题组服务实现（阶段2）。
  *
- * <p>成员管理接口（R5）全部要求组长且有 {@code @RequireGroupRole("owner")} 拦截器兜底，
+ * <p>成员管理接口（R5）全部要求组长且有 {@code @RequireOrgRole("owner")} 拦截器兜底，
  * 本类内再校验一次「操作者是本组长、目标行存在」的交错关系，双保险防越权。</p>
  *
  * <p>一人一组的应用层约束：一个 {@code user_id} 只允许出现在一个<b>非 rejected</b> 组的
@@ -36,57 +36,57 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchGroup>
-        implements IGroupService {
+public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
+        implements IOrgService {
 
     private static final String DEFAULT_GROUP_ID = "grp-default-2026";
 
-    private final GroupMemberMapper memberMapper;
+    private final OrgMemberMapper memberMapper;
 
     /** 普通用户的 Mapper（查用户名等）
-     * 组表通过 ServiceImpl.baseMapper 拿（extends ServiceImpl<ResearchGroupMapper, ResearchGroup>） */
+     * 组表通过 ServiceImpl.baseMapper 拿（extends ServiceImpl<OrgMapper, Organization>） */
     private final com.tcm.ehr.mapper.UserMapper userMapper;
 
     // ---------------------------------------------------------- R2 身份解析
 
     @Override
-    public GroupResolution resolvePrimaryGroup(String userId) {
+    public OrgResolution resolvePrimaryOrg(String userId) {
         if (userId == null || userId.isBlank() || "unknown".equals(userId)) {
-            return GroupResolution.NONE;
+            return OrgResolution.NONE;
         }
-        GroupMember m;
+        OrganizationMember m;
         try {
             m = memberMapper.findPrimaryActive(userId);
         } catch (Exception e) {
             log.error("[课题组] 解析 user={} 的组失败，降级为无组: {}", userId, e.getMessage());
-            return GroupResolution.NONE;
+            return OrgResolution.NONE;
         }
-        if (m == null || m.getGroupId() == null || m.getGroupId().isBlank()) {
-            return GroupResolution.NONE;
+        if (m == null || m.getOrgId() == null || m.getOrgId().isBlank()) {
+            return OrgResolution.NONE;
         }
-        return new GroupResolution(m.getGroupId(), m.getRole());
+        return new OrgResolution(m.getOrgId(), m.getRole());
     }
 
     // ---------------------------------------------------------- R5 我的组
 
     @Override
-    public GroupVOs.MyGroupVO myGroup() {
-        GroupVOs.MyGroupVO vo = new GroupVOs.MyGroupVO();
-        GroupMember m = memberMapper.findPrimaryActive(RequestUtils.currentUserId());
+    public OrgVOs.MyOrgVO myOrg() {
+        OrgVOs.MyOrgVO vo = new OrgVOs.MyOrgVO();
+        OrganizationMember m = memberMapper.findPrimaryActive(RequestUtils.currentUserId());
         if (m != null) {
-            ResearchGroup g = baseMapper.selectById(m.getGroupId());
+            Organization g = baseMapper.selectById(m.getOrgId());
             if (g != null) {
-                vo.setGroup(toGroupInfo(g, false));
+                vo.setOrg(toOrgInfo(g, false));
                 vo.setMyRole(m.getRole());
             }
         } else {
             // 无生效组：可能是待分配池，也可能是「已提交建组申请待审批」
-            ResearchGroup pending = baseMapper.selectOne(new QueryWrapper<ResearchGroup>()
+            Organization pending = baseMapper.selectOne(new QueryWrapper<Organization>()
                     .eq("applied_by", RequestUtils.currentUserId())
-                    .eq("status", ResearchGroup.PENDING)
+                    .eq("status", Organization.PENDING)
                     .last("LIMIT 1"));
             if (pending != null) {
-                GroupVOs.PendingApplication pa = new GroupVOs.PendingApplication();
+                OrgVOs.PendingApplication pa = new OrgVOs.PendingApplication();
                 pa.setCode(pending.getCode());
                 pa.setName(pending.getName());
                 pa.setStatus(pending.getStatus());
@@ -100,15 +100,15 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
     // ---------------------------------------------------------- R5 管理员
 
     @Override
-    public List<GroupVOs.GroupInfo> listGroups(String status) {
-        QueryWrapper<ResearchGroup> w = new QueryWrapper<>();
+    public List<OrgVOs.OrgInfo> listOrgs(String status) {
+        QueryWrapper<Organization> w = new QueryWrapper<>();
         if (status != null && !status.isBlank()) {
             w.eq("status", status.trim());
         }
         w.orderByDesc("create_time");
-        List<GroupVOs.GroupInfo> out = new ArrayList<>();
-        for (ResearchGroup g : baseMapper.selectList(w)) {
-            out.add(toGroupInfo(g, status == null || "active".equals(status.trim())
+        List<OrgVOs.OrgInfo> out = new ArrayList<>();
+        for (Organization g : baseMapper.selectList(w)) {
+            out.add(toOrgInfo(g, status == null || "active".equals(status.trim())
                     || "pending".equals(status.trim())));
         }
         return out;
@@ -116,12 +116,12 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
 
     @Override
     @Transactional
-    public void approve(String groupId) {
-        ResearchGroup g = requireGroup(groupId);
-        if (!ResearchGroup.PENDING.equals(g.getStatus())) {
+    public void approve(String orgId) {
+        Organization g = requireOrg(orgId);
+        if (!Organization.PENDING.equals(g.getStatus())) {
             throw new IllegalArgumentException("只有待审批的组才能通过");
         }
-        g.setStatus(ResearchGroup.ACTIVE);
+        g.setStatus(Organization.ACTIVE);
         g.setReviewedBy(RequestUtils.currentUsername());
         g.setReviewedAt(LocalDateTime.now().withNano(0));
         baseMapper.updateById(g);
@@ -131,12 +131,12 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
 
     @Override
     @Transactional
-    public void reject(String groupId, String reason) {
-        ResearchGroup g = requireGroup(groupId);
-        if (!ResearchGroup.PENDING.equals(g.getStatus())) {
+    public void reject(String orgId, String reason) {
+        Organization g = requireOrg(orgId);
+        if (!Organization.PENDING.equals(g.getStatus())) {
             throw new IllegalArgumentException("只有待审批的组才能拒绝");
         }
-        g.setStatus(ResearchGroup.REJECTED);
+        g.setStatus(Organization.REJECTED);
         g.setReviewedBy(RequestUtils.currentUsername());
         g.setReviewedAt(LocalDateTime.now().withNano(0));
         g.setRejectReason(reason);
@@ -146,12 +146,12 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
         // 申请人回落待分配池，可立即重新申请
         updateUserStatus(g.getAppliedBy(), User.STATUS_PENDING, false);
         // 移除首任组长的成员行（组已拒绝，上一任 owner 身份作废）
-        memberMapper.delete(new QueryWrapper<GroupMember>().eq("group_id", g.getId()));
+        memberMapper.delete(new QueryWrapper<OrganizationMember>().eq("group_id", g.getId()));
     }
 
     @Override
-    public void updateGroup(String groupId, GroupDTOs.UpdateGroupRequest body) {
-        ResearchGroup g = requireGroup(groupId);
+    public void updateGroup(String orgId, OrgDTOs.UpdateGroupRequest body) {
+        Organization g = requireOrg(orgId);
         if (body == null) {
             return;
         }
@@ -163,41 +163,41 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
     }
 
     @Override
-    public void stop(String groupId) {
-        ResearchGroup g = requireGroup(groupId);
-        if (ResearchGroup.STOPPED.equals(g.getStatus())) {
+    public void stop(String orgId) {
+        Organization g = requireOrg(orgId);
+        if (Organization.STOPPED.equals(g.getStatus())) {
             return;
         }
-        g.setStatus(ResearchGroup.STOPPED);
+        g.setStatus(Organization.STOPPED);
         baseMapper.updateById(g);
         // 停用只挡登录（JwtInterceptor 的 findPrimaryActive 已过滤 status='active'），数据保留
     }
 
     @Override
-    public void activate(String groupId) {
-        ResearchGroup g = requireGroup(groupId);
-        if (!ResearchGroup.STOPPED.equals(g.getStatus())) {
+    public void activate(String orgId) {
+        Organization g = requireOrg(orgId);
+        if (!Organization.STOPPED.equals(g.getStatus())) {
             throw new IllegalArgumentException("只有已停用的组才能恢复");
         }
-        g.setStatus(ResearchGroup.ACTIVE);
+        g.setStatus(Organization.ACTIVE);
         baseMapper.updateById(g);
         // 组员状态恢复为 active（此前登录被挡就是因为查不到 active 组）
-        List<GroupMember> members = memberMapper.selectList(
-                new QueryWrapper<GroupMember>().eq("group_id", g.getId()));
-        for (GroupMember m : members) {
+        List<OrganizationMember> members = memberMapper.selectList(
+                new QueryWrapper<OrganizationMember>().eq("group_id", g.getId()));
+        for (OrganizationMember m : members) {
             updateUserStatus(m.getUserId(), User.STATUS_ACTIVE, false);
         }
     }
 
     @Override
-    public List<GroupVOs.PendingUserVO> pendingUsers() {
+    public List<OrgVOs.PendingUserVO> pendingUsers() {
         // 待分配池：status=pending 且 没有在审批中的建组申请（已申请的从池里隐藏）
-        List<GroupVOs.PendingUserVO> out = new ArrayList<>();
+        List<OrgVOs.PendingUserVO> out = new ArrayList<>();
         for (User u : userMapper.selectList(new QueryWrapper<User>()
                 .eq("status", User.STATUS_PENDING)
                 .eq("has_pending_group", 0)
                 .orderByAsc("create_time"))) {
-            GroupVOs.PendingUserVO vo = new GroupVOs.PendingUserVO();
+            OrgVOs.PendingUserVO vo = new OrgVOs.PendingUserVO();
             vo.setId(u.getId());
             vo.setUsername(u.getUsername());
             vo.setCreateTime(u.getCreateTime());
@@ -209,16 +209,16 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
     // ---------------------------------------------------------- R5 组长（本组）
 
     @Override
-    public List<GroupVOs.MemberInfo> members(String groupId) {
-        requireGroup(groupId);
-        List<GroupVOs.MemberInfo> out = new ArrayList<>();
+    public List<OrgVOs.MemberInfo> members(String orgId) {
+        requireOrg(orgId);
+        List<OrgVOs.MemberInfo> out = new ArrayList<>();
         // owner 排前，便于前端直接看出组长
-        List<GroupMember> rows = memberMapper.selectList(new QueryWrapper<GroupMember>()
-                .eq("group_id", groupId)
+        List<OrganizationMember> rows = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
+                .eq("group_id", orgId)
                 .orderByDesc("role").orderByAsc("create_time"));
-        for (GroupMember m : rows) {
+        for (OrganizationMember m : rows) {
             User u = userMapper.selectById(m.getUserId());
-            GroupVOs.MemberInfo mi = new GroupVOs.MemberInfo();
+            OrgVOs.MemberInfo mi = new OrgVOs.MemberInfo();
             mi.setUserId(m.getUserId());
             mi.setUsername(u == null ? "(已注销)" : u.getUsername());
             mi.setRole(m.getRole());
@@ -230,8 +230,8 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
 
     @Override
     @Transactional
-    public void addMember(String groupId, String userId) {
-        requireGroup(groupId);
+    public void addMember(String orgId, String userId) {
+        requireOrg(orgId);
         User u = userMapper.selectById(userId);
         if (u == null) {
             throw new ResourceNotFoundException(1006, "用户不存在");
@@ -241,11 +241,11 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
                 || (u.getHasPendingGroup() != null && u.getHasPendingGroup() == 1)) {
             throw new IllegalArgumentException("该用户已有归属或正在申请建组，无法拉入");
         }
-        GroupMember m = new GroupMember();
+        OrganizationMember m = new OrganizationMember();
         m.setId(UUID.randomUUID().toString());
-        m.setGroupId(groupId);
+        m.setOrgId(orgId);
         m.setUserId(userId);
-        m.setRole(GroupMember.ROLE_MEMBER);
+        m.setRole(OrganizationMember.ROLE_MEMBER);
         m.setIsPrimary(1);
         m.setCreateTime(LocalDateTime.now().withNano(0));
         // uk_group_user 唯一索引兜底并发拉人：上面的 status 检查与插入之间有窗口
@@ -261,10 +261,10 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
 
     @Override
     @Transactional
-    public void removeMember(String groupId, String userId) {
-        requireGroup(groupId);
-        GroupMember m = memberOf(groupId, userId);
-        if (GroupMember.ROLE_OWNER.equals(m.getRole())) {
+    public void removeMember(String orgId, String userId) {
+        requireOrg(orgId);
+        OrganizationMember m = memberOf(orgId, userId);
+        if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
             throw new IllegalArgumentException("不能直接移除组长，先转让组长");
         }
         memberMapper.deleteById(m.getId());
@@ -273,47 +273,47 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
 
     @Override
     @Transactional
-    public void transferOwner(String groupId, String newOwnerUserId) {
-        requireGroup(groupId);
-        GroupMember newOwner = memberOf(groupId, newOwnerUserId);
+    public void transferOwner(String orgId, String newOwnerUserId) {
+        requireOrg(orgId);
+        OrganizationMember newOwner = memberOf(orgId, newOwnerUserId);
         // 原组长降为组员：两行必须同生共死（加了 @Transactional）
-        List<GroupMember> owners = memberMapper.selectList(new QueryWrapper<GroupMember>()
-                .eq("group_id", groupId).eq("role", GroupMember.ROLE_OWNER));
+        List<OrganizationMember> owners = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
+                .eq("group_id", orgId).eq("role", OrganizationMember.ROLE_OWNER));
         if (owners.isEmpty()) {
             throw new IllegalStateException("本组没有组长，状态异常");
         }
-        GroupMember oldOwner = owners.get(0);
+        OrganizationMember oldOwner = owners.get(0);
         if (oldOwner.getUserId().equals(newOwnerUserId)) {
             return; // 已经是组长
         }
-        oldOwner.setRole(GroupMember.ROLE_MEMBER);
+        oldOwner.setRole(OrganizationMember.ROLE_MEMBER);
         memberMapper.updateById(oldOwner);
-        newOwner.setRole(GroupMember.ROLE_OWNER);
+        newOwner.setRole(OrganizationMember.ROLE_OWNER);
         memberMapper.updateById(newOwner);
     }
 
     @Override
     @Transactional
-    public void leave(String groupId) {
-        requireGroup(groupId);
+    public void leave(String orgId) {
+        requireOrg(orgId);
         String userId = RequestUtils.currentUserId();
-        GroupMember m = memberOf(groupId, userId);
-        if (GroupMember.ROLE_OWNER.equals(m.getRole())) {
+        OrganizationMember m = memberOf(orgId, userId);
+        if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
             // 组长不能直接退出：先数还有几个组员，没有继任者就拒绝（不产生孤儿组）
-            long others = memberMapper.selectCount(new QueryWrapper<GroupMember>()
-                    .eq("group_id", groupId)
+            long others = memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
+                    .eq("group_id", orgId)
                     .ne("user_id", userId));
             if (others == 0) {
                 throw new IllegalArgumentException("你是组长且组内无其他成员，无法退出");
             }
             // 有其他人：按「队长离职须指定继任者」处理 —— 直接从剩余成员里选最早的升组长
-            GroupMember successor = memberMapper.selectList(new QueryWrapper<GroupMember>()
-                            .eq("group_id", groupId)
+            OrganizationMember successor = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
+                            .eq("group_id", orgId)
                             .ne("user_id", userId)
                             .orderByAsc("create_time")
                             .last("LIMIT 1"))
                     .get(0);
-            successor.setRole(GroupMember.ROLE_OWNER);
+            successor.setRole(OrganizationMember.ROLE_OWNER);
             memberMapper.updateById(successor);
         }
         memberMapper.deleteById(m.getId());
@@ -322,17 +322,17 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
 
     // ---------------------------------------------------------- 辅助
 
-    private ResearchGroup requireGroup(String groupId) {
-        ResearchGroup g = baseMapper.selectById(groupId);
+    private Organization requireOrg(String orgId) {
+        Organization g = baseMapper.selectById(orgId);
         if (g == null) {
             throw new ResourceNotFoundException(1006, "课题组不存在");
         }
         return g;
     }
 
-    private GroupMember memberOf(String groupId, String userId) {
-        GroupMember m = memberMapper.selectOne(new QueryWrapper<GroupMember>()
-                .eq("group_id", groupId).eq("user_id", userId)
+    private OrganizationMember memberOf(String orgId, String userId) {
+        OrganizationMember m = memberMapper.selectOne(new QueryWrapper<OrganizationMember>()
+                .eq("group_id", orgId).eq("user_id", userId)
                 .last("LIMIT 1"));
         if (m == null) {
             throw new IllegalArgumentException("该用户不在此课题组");
@@ -341,8 +341,8 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
     }
 
     /** 组装组概要；withOwner=false 时跳过组长的二次查询（我的组只有一组，没必要） */
-    private GroupVOs.GroupInfo toGroupInfo(ResearchGroup g, boolean withOwner) {
-        GroupVOs.GroupInfo info = new GroupVOs.GroupInfo();
+    private OrgVOs.OrgInfo toOrgInfo(Organization g, boolean withOwner) {
+        OrgVOs.OrgInfo info = new OrgVOs.OrgInfo();
         info.setId(g.getId());
         info.setCode(g.getCode());
         info.setName(g.getName());
@@ -351,10 +351,10 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
         info.setCreateTime(g.getCreateTime());
         info.setRejectReason(g.getRejectReason());
         info.setMemberCount((int) (long) memberMapper.selectCount(
-                new QueryWrapper<GroupMember>().eq("group_id", g.getId())));
+                new QueryWrapper<OrganizationMember>().eq("group_id", g.getId())));
         if (withOwner) {
-            List<GroupMember> owners = memberMapper.selectList(new QueryWrapper<GroupMember>()
-                    .eq("group_id", g.getId()).eq("role", GroupMember.ROLE_OWNER)
+            List<OrganizationMember> owners = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
+                    .eq("group_id", g.getId()).eq("role", OrganizationMember.ROLE_OWNER)
                     .last("LIMIT 1"));
             if (!owners.isEmpty()) {
                 User owner = userMapper.selectById(owners.get(0).getUserId());

@@ -50,8 +50,8 @@ class ReviewServiceTest {
         req.setAttribute("currentUserId", "u-1");
         req.setAttribute("currentUsername", "reviewer");
         req.setAttribute("currentRole", "用户");
-        req.setAttribute("currentGroupId", GROUP);
-        req.setAttribute("currentGroupRole", "member");
+        req.setAttribute("currentOrgId", GROUP);
+        req.setAttribute("currentOrgRole", "member");
         org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
                 new org.springframework.web.context.request.ServletRequestAttributes(req));
     }
@@ -110,7 +110,7 @@ class ReviewServiceTest {
         r.setTongue("舌淡");
         r.setPattern("脾肾阳虚");
         r.setPrescription(herbName + "10g");
-        r.setGroupId(GROUP);
+        r.setOrgId(GROUP);
         r.setStructuredData(structured(withFormula, herbName));
         return r;
     }
@@ -122,7 +122,7 @@ class ReviewServiceTest {
         t.setStatus("pending");
         t.setIssueType("缺失字段");
         t.setScore(85);
-        t.setGroupId(GROUP);
+        t.setOrgId(GROUP);
         t.setIsObsolete(0);
         t.setCreateTime(LocalDateTime.now().minusDays(1));
         return t;

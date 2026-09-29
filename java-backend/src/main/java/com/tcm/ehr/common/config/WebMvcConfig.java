@@ -1,6 +1,6 @@
 package com.tcm.ehr.common.config;
 
-import com.tcm.ehr.common.interceptors.GroupRoleInterceptor;
+import com.tcm.ehr.common.interceptors.OrgRoleInterceptor;
 import com.tcm.ehr.common.interceptors.JwtInterceptor;
 import com.tcm.ehr.common.interceptors.RoleInterceptor;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final JwtInterceptor jwtInterceptor;
     private final RoleInterceptor roleInterceptor;
-    private final GroupRoleInterceptor groupRoleInterceptor;
+    private final OrgRoleInterceptor groupRoleInterceptor;
 
     @Override
     /**

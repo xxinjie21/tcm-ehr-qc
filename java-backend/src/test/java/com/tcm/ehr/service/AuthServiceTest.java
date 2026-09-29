@@ -4,12 +4,12 @@ import com.tcm.ehr.common.exception.BadCredentialsException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.exception.UnauthorizedException;
 import com.tcm.ehr.common.utils.JwtUtil;
-import com.tcm.ehr.domain.po.GroupMember;
-import com.tcm.ehr.domain.po.ResearchGroup;
+import com.tcm.ehr.domain.po.OrganizationMember;
+import com.tcm.ehr.domain.po.Organization;
 import com.tcm.ehr.domain.po.User;
 import com.tcm.ehr.domain.vo.LoginVO;
-import com.tcm.ehr.mapper.GroupMemberMapper;
-import com.tcm.ehr.mapper.ResearchGroupMapper;
+import com.tcm.ehr.mapper.OrgMemberMapper;
+import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.UserMapper;
 import com.tcm.ehr.service.impl.AuthServiceImpl;
 import io.jsonwebtoken.Claims;
@@ -41,18 +41,18 @@ class AuthServiceTest {
             "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi";
 
     private UserMapper userMapper;
-    private ResearchGroupMapper groupMapper;
-    private GroupMemberMapper groupMemberMapper;
-    private IGroupService groupService;
+    private OrgMapper groupMapper;
+    private OrgMemberMapper groupMemberMapper;
+    private IOrgService groupService;
     private JwtUtil jwtUtil;
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
         userMapper = Mockito.mock(UserMapper.class);
-        groupMapper = Mockito.mock(ResearchGroupMapper.class);
-        groupMemberMapper = Mockito.mock(GroupMemberMapper.class);
-        groupService = Mockito.mock(IGroupService.class);
+        groupMapper = Mockito.mock(OrgMapper.class);
+        groupMemberMapper = Mockito.mock(OrgMemberMapper.class);
+        groupService = Mockito.mock(IOrgService.class);
         jwtUtil = new JwtUtil();
         ReflectionTestUtils.setField(jwtUtil, "secret",
                 "tcm-ehr-qc-jwt-secret-key-2026-course-design");
@@ -84,14 +84,14 @@ class AuthServiceTest {
 
     /** 把当前测试的“解析结果”设为无组（默认） */
     private void resolvesToNoGroup() {
-        Mockito.when(groupService.resolvePrimaryGroup(Mockito.anyString()))
-                .thenReturn(GroupResolution.NONE);
+        Mockito.when(groupService.resolvePrimaryOrg(Mockito.anyString()))
+                .thenReturn(OrgResolution.NONE);
     }
 
     /** 设为已属于某组（owner / member） */
-    private void resolvesToGroup(String groupId, String groupRole) {
-        Mockito.when(groupService.resolvePrimaryGroup(Mockito.anyString()))
-                .thenReturn(new GroupResolution(groupId, groupRole));
+    private void resolvesToGroup(String orgId, String groupRole) {
+        Mockito.when(groupService.resolvePrimaryOrg(Mockito.anyString()))
+                .thenReturn(new OrgResolution(orgId, groupRole));
     }
 
     @Test
@@ -202,14 +202,14 @@ class AuthServiceTest {
         when(userMapper.findByUsername("XXJ")).thenReturn(xxj);
         // 组为 pending → 解析不到 active 组
         resolvesToNoGroup();
-        GroupMember m = new GroupMember();
-        m.setGroupId("grp-xxj");
+        OrganizationMember m = new OrganizationMember();
+        m.setOrgId("grp-xxj");
         m.setUserId("u-xxj");
-        m.setRole(GroupMember.ROLE_OWNER);
+        m.setRole(OrganizationMember.ROLE_OWNER);
         when(groupMemberMapper.selectList(Mockito.any())).thenReturn(List.of(m));
-        ResearchGroup g = new ResearchGroup();
+        Organization g = new Organization();
         g.setId("grp-xxj");
-        g.setStatus(ResearchGroup.PENDING);
+        g.setStatus(Organization.PENDING);
         when(groupMapper.selectById("grp-xxj")).thenReturn(g);
 
         LoginVO vo = authService.login("XXJ", "123456");
@@ -224,14 +224,14 @@ class AuthServiceTest {
     void stoppedGroupRejectsLogin() {
         when(userMapper.findByUsername("zhangsan")).thenReturn(user("u-zs", "zhangsan", "用户"));
         resolvesToNoGroup();
-        GroupMember m = new GroupMember();
-        m.setGroupId("grp-stopped");
+        OrganizationMember m = new OrganizationMember();
+        m.setOrgId("grp-stopped");
         m.setUserId("u-zs");
-        m.setRole(GroupMember.ROLE_MEMBER);
+        m.setRole(OrganizationMember.ROLE_MEMBER);
         when(groupMemberMapper.selectList(Mockito.any())).thenReturn(List.of(m));
-        ResearchGroup g = new ResearchGroup();
+        Organization g = new Organization();
         g.setId("grp-stopped");
-        g.setStatus(ResearchGroup.STOPPED);
+        g.setStatus(Organization.STOPPED);
         when(groupMapper.selectById("grp-stopped")).thenReturn(g);
 
         ForbiddenException ex = assertThrows(ForbiddenException.class,

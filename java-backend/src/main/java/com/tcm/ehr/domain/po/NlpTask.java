@@ -37,7 +37,7 @@ public class NlpTask {
      * <p>不是冗余：worker 跑在后台线程，读不到 {@code RequestContextHolder}，必须用快照值重建
      * {@code RecordFilter}；否则数据域过滤会退化成「不过滤 = 全库」。</p>
      */
-    private String groupId;
+    private String orgId;
     /** 失败清单 JSON 数组（仅存前 500 条） */
     private String failureList;
     private Boolean failureTruncated;

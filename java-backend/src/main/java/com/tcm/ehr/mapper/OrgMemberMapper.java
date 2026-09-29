@@ -1,14 +1,14 @@
 package com.tcm.ehr.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.tcm.ehr.domain.po.GroupMember;
+import com.tcm.ehr.domain.po.OrganizationMember;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 /** 课题组成员 Mapper */
 @Mapper
-public interface GroupMemberMapper extends BaseMapper<GroupMember> {
+public interface OrgMemberMapper extends BaseMapper<OrganizationMember> {
 
     /**
      * 取某用户的<b>主组</b>，且该组必须处于 {@code active} 状态。
@@ -19,7 +19,7 @@ public interface GroupMemberMapper extends BaseMapper<GroupMember> {
      *       <b>允许一人多组</b>；不指定主组时取到哪组取决于 SQL 返回顺序 →
      *       同一用户不同请求可能看到不同数据。</li>
      *   <li>漏 {@code g.status = 'active'}：停用组只挡了登录，
-     *       {@code group_members} 的行仍在 → 查组照常返回 groupId →
+     *       {@code group_members} 的行仍在 → 查组照常返回 orgId →
      *       <b>旧 token 在 24h 内照样能看数据</b>（停用形同虚设）。</li>
      * </ul>
      *
@@ -38,5 +38,5 @@ public interface GroupMemberMapper extends BaseMapper<GroupMember> {
                AND g.status = 'active'
              LIMIT 1
             """)
-    GroupMember findPrimaryActive(@Param("userId") String userId);
+    OrganizationMember findPrimaryActive(@Param("userId") String userId);
 }

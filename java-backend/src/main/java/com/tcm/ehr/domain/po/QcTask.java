@@ -51,10 +51,10 @@ public class QcTask {
     private String role;
     /** 
      * 提交时所属组的快照，供 worker 重建 {@code RecordFilter}。
-     * <p>与 {@link #role} 不同用途：{@code role} 只回填审计日志，{@code groupId} 才是数据域。
-     * 阶段 2 后 {@code RecordFilter.build} 取的是 groupId，所以快照必须是组而不是角色。</p>
+     * <p>与 {@link #role} 不同用途：{@code role} 只回填审计日志，{@code orgId} 才是数据域。
+     * 阶段 2 后 {@code RecordFilter.build} 取的是 orgId，所以快照必须是组而不是角色。</p>
      */
-    private String groupId;
+    private String orgId;
     /** 失败清单 JSON 数组（仅存前 500 条） */
     private String failureList;
     private Boolean failureTruncated;

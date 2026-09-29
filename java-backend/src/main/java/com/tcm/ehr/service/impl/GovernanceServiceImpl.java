@@ -83,12 +83,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             // 改成先按本组过滤后再取，取不到的忽略（不报错：
             // 一个 id 是否属于本组属于授权问题，不属于业务错误）。
             records = baseMapper.selectList(RecordFilter
-                    .build(RequestUtils.currentGroupId(), new FiltersDTO())
+                    .build(RequestUtils.currentOrgId(), new FiltersDTO())
                     .in("id", recordIds));
         } else {
             records = baseMapper.selectList(
                     com.tcm.ehr.common.utils.RecordFilter.build(
-                            RequestUtils.currentGroupId(), filters));
+                            RequestUtils.currentOrgId(), filters));
         }
 
         CleanResultVO vo = new CleanResultVO();
@@ -368,7 +368,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public Map<String, Object> governanceStats() {
-        return baseMapper.selectGovernanceStats(RecordFilter.domainGroupId());
+        return baseMapper.selectGovernanceStats(RecordFilter.domainOrgId());
     }
 
     /**
@@ -378,7 +378,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
         // 1. 条件组装复用 RecordFilter（与其余读路径同一个函数）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(),
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(),
                 RecordFilter.fromMap(dto.getFilters()));
         // 2. 追加导出自己的硬约束：只导合格病历
         wrapper.eq("grade", "合格");

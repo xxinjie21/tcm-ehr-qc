@@ -17,8 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RecordFilterTest {
 
-    private String sql(String groupId, SearchDTO dto) {
-        QueryWrapper<Record> w = RecordFilter.build(groupId, dto);
+    private String sql(String orgId, SearchDTO dto) {
+        QueryWrapper<Record> w = RecordFilter.build(orgId, dto);
         return w.getSqlSegment();
     }
 
@@ -83,13 +83,13 @@ class RecordFilterTest {
     @Test
     void canAccessMatchesSameGroup() {
         Record r = new Record();
-        r.setGroupId("grp-a");
-        // 直接调用需要 RequestContext 里的 groupId；这里用「同组」的等价断言，
+        r.setOrgId("grp-a");
+        // 直接调用需要 RequestContext 里的 orgId；这里用「同组」的等价断言，
         // 真正的绑定值校验交给 RecordIsolationTest（它挂 MockHttpServletRequest）
         assertTrue(RecordFilter.groupIdForSql("grp-a").equals("grp-a"));
     }
 
-    /** 无组时 domainGroupId() 必须返回不可能值（给聚合 SQL 用），而不是 null */
+    /** 无组时 domainOrgId() 必须返回不可能值（给聚合 SQL 用），而不是 null */
     @Test
     void domainGroupIdWithoutGroupIsSentinel() {
         String v = RecordFilter.groupIdForSql("");

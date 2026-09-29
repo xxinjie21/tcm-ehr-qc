@@ -2,10 +2,10 @@
   <div>
     <PanelCard title="我的组织">
       <!-- 按身份切三种视图：所有者（成员管理）/ 成员（组信息）/ 无组（引导） -->
-      <div v-if="loading" v-loading="loading" class="my-group-loading" />
+      <div v-if="loading" v-loading="loading" class="my-org-loading" />
 
       <!-- ⚠️ 无组织：待加入用户 / 审批中的引导页（路由守卫已拦截数据页，这里必须把话说清） -->
-      <div v-else-if="!data.group && !data.pendingApplication" class="my-group-empty">
+      <div v-else-if="!data.org && !data.pendingApplication" class="my-org-empty">
         <el-empty description="你还没有加入任何组织">
           <template #description>
             <p class="empty-hint">你的账号位于<b>待加入用户</b>，看不到任何病历数据。</p>
@@ -33,12 +33,12 @@
       <!-- 有组：所有者 / 成员共用 -->
       <div v-else>
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="组名称">{{ data.group.name }}</el-descriptions-item>
-          <el-descriptions-item label="组编码">{{ data.group.code }}</el-descriptions-item>
+          <el-descriptions-item label="组名称">{{ data.org.name }}</el-descriptions-item>
+          <el-descriptions-item label="组编码">{{ data.org.code }}</el-descriptions-item>
           <el-descriptions-item label="我的身份">
             {{ data.myRole === 'owner' ? '所有者' : '成员' }}
           </el-descriptions-item>
-          <el-descriptions-item label="成员数">{{ data.group.memberCount }}</el-descriptions-item>
+          <el-descriptions-item label="成员数">{{ data.org.memberCount }}</el-descriptions-item>
         </el-descriptions>
 
         <!-- 所有者操作区 -->
@@ -99,7 +99,7 @@ import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import PanelCard from '@/components/PanelCard.vue'
-import { getMyGroup, listMembers, addMember, removeMember, transferOwner, leaveGroup, listPendingUsers } from '@/api/group'
+import { getMyOrg, listMembers, addMember, removeMember, transferOwner, leaveGroup, listPendingUsers } from '@/api/org'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 
@@ -115,7 +115,7 @@ const poolUsers = ref([])
 
 const loadMyGroup = async () => {
   try {
-    const res = await getMyGroup()
+    const res = await getMyOrg()
     data.value = res.data || {}
   } catch {
     // 拦截器已提示
@@ -125,10 +125,10 @@ const loadMyGroup = async () => {
 }
 
 const loadMembers = async () => {
-  if (!data.value.group) return
+  if (!data.value.org) return
   membersLoading.value = true
   try {
-    const res = await listMembers(data.value.group.id)
+    const res = await listMembers(data.value.org.id)
     members.value = res.data || []
   } catch {
     // 拦截器已提示
@@ -149,7 +149,7 @@ const loadPool = async () => {
 const doAdd = async () => {
   if (!pickUserId.value) return
   try {
-    await addMember(data.value.group.id, pickUserId.value)
+    await addMember(data.value.org.id, pickUserId.value)
     ElMessage.success('已拉入本组织')
     addDialog.value = false
     pickUserId.value = ''
@@ -165,7 +165,7 @@ const doRemove = async (row) => {
     return
   }
   try {
-    await removeMember(data.value.group.id, row.userId)
+    await removeMember(data.value.org.id, row.userId)
     ElMessage.success('已移除')
     loadMembers()
     loadMyGroup()
@@ -179,7 +179,7 @@ const doTransfer = async (row) => {
     return
   }
   try {
-    await transferOwner(data.value.group.id, row.userId)
+    await transferOwner(data.value.org.id, row.userId)
     ElMessage.success('所有者已转让')
     loadMembers()
     loadMyGroup()
@@ -194,7 +194,7 @@ const doLeave = async () => {
   }
   leaving.value = true
   try {
-    await leaveGroup(data.value.group.id)
+    await leaveGroup(data.value.org.id)
     ElMessage.success('已退出')
     userStore.logout()
     location.href = '/login'
@@ -213,10 +213,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.my-group-loading {
+.my-org-loading {
   min-height: 160px;
 }
-.my-group-empty {
+.my-org-empty {
   padding: 24px 0;
 }
 .empty-hint {

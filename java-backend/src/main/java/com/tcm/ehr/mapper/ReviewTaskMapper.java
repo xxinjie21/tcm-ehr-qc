@@ -34,7 +34,7 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTask> {
               (id, record_id, group_id, score, issue_type, status, is_obsolete,
                create_time, deadline_time)
             VALUES
-              (REPLACE(UUID(), #{recordId}, #{groupId}, #{score}, #{issueType}, 'pending', 0,
+              (REPLACE(UUID(), #{recordId}, #{orgId}, #{score}, #{issueType}, 'pending', 0,
                #{now}, DATE_ADD(#{now}, INTERVAL 7 DAY))
             ON DUPLICATE KEY UPDATE
               score = VALUES(score),
@@ -43,7 +43,7 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTask> {
               deadline_time = VALUES(deadline_time)
             """)
     int upsertPending(@Param("recordId") String recordId,
-                      @Param("groupId") String groupId,
+                      @Param("orgId") String orgId,
                       @Param("score") Integer score,
                       @Param("issueType") String issueType,
                       @Param("now") java.time.LocalDateTime now);

@@ -237,7 +237,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         if ("待复核".equals(vo.getGrade())) {
             // 1. 原子 upsert：已有活跃行就刷新，没有就新建（时限默认 7 个工作日）
             //    复核任务打组织标记——写入时打标，避免查询期 JOIN（QueryWrapper 不便于 JOIN）
-            reviewTaskMapper.upsertPending(r.getId(), r.getGroupId(), vo.getScore(),
+            reviewTaskMapper.upsertPending(r.getId(), r.getOrgId(), vo.getScore(),
                     issueType(vo), now);
         } else {
             // 2. 已达标则把未作废任务作废而不是删除，历史复核轨迹要留
@@ -354,7 +354,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     @Override
     public DeductionStatsVO deductionStats(FiltersDTO filters) {
         // 1. 构造数据域过滤条件（角色可见范围 + 用户筛选）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), filters);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
         // 2. 主扫描只取 3 列（见方法注释的「两段式扫描」）
         wrapper.select("id", "grade", "qc_results");
         // 3. 初始化聚合容器：按类型、按条目、等级分布

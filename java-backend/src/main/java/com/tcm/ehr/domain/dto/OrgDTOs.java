@@ -6,9 +6,9 @@ import lombok.Data;
 /**
  * 课题组相关请求体（阶段2 R5）。
  */
-public final class GroupDTOs {
+public final class OrgDTOs {
 
-    private GroupDTOs() {
+    private OrgDTOs() {
     }
 
     /** 拒绝建组申请 */

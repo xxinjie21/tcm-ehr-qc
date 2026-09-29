@@ -7,29 +7,29 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 课题组相关视图（阶段2 R5）。
+ * 组织相关视图（批次 5 改名，出参字段同步 group -> org）。
  *
- * <p>把「我的组」「组列表」「成员列表」等的出参集中在这一处，
- * 避免 13 个接口各自拼 Map。成员函数返回嵌套视图对象。</p>
+ * <p>把「我的组织」「组织列表」「成员列表」等的出参集中在这一处，
+ * 避免十几个接口各自拼 Map。成员函数返回嵌套视图对象。</p>
  */
-public final class GroupVOs {
+public final class OrgVOs {
 
-    private GroupVOs() {
+    private OrgVOs() {
     }
 
-    /** GET /api/my-group：当前用户的组上下文 */
+    /** GET /api/my-org：当前用户的组织上下文 */
     @Data
-    public static class MyGroupVO {
-        private GroupInfo group;
-        /** owner=组长 / member=组员 / null=无组 */
+    public static class MyOrgVO {
+        private OrgInfo org;
+        /** owner=所有者 / member=成员 / null=无组织 */
         private String myRole;
         /** 申报中的建组申请；无则为 null */
         private PendingApplication pendingApplication;
     }
 
-    /** 组概要（列表 / 我的组共用） */
+    /** 组织概要（列表 / 我的组织共用） */
     @Data
-    public static class GroupInfo {
+    public static class OrgInfo {
         private String id;
         private String code;
         private String name;
@@ -41,7 +41,7 @@ public final class GroupVOs {
         private String rejectReason;
     }
 
-    /** 组的成员行 */
+    /** 组织的成员行 */
     @Data
     public static class MemberInfo {
         private String userId;
@@ -59,19 +59,19 @@ public final class GroupVOs {
         private String rejectReason;
     }
 
-    /** GET /api/groups 出参 */
+    /** GET /api/orgs 出参 */
     @Data
-    public static class GroupListVO {
-        private List<GroupInfo> groups = new ArrayList<>();
+    public static class OrgListVO {
+        private List<OrgInfo> orgs = new ArrayList<>();
     }
 
-    /** GET /api/groups/{id}/members 出参 */
+    /** GET /api/orgs/{id}/members 出参 */
     @Data
     public static class MemberListVO {
         private List<MemberInfo> members = new ArrayList<>();
     }
 
-    /** GET /api/groups/pending-users 出参 */
+    /** GET /api/orgs/pending-users 出参 */
     @Data
     public static class PendingUserVO {
         private String id;

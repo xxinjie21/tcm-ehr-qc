@@ -36,13 +36,13 @@ class RecordIsolationTest {
         RequestContextHolder.resetRequestAttributes();
     }
 
-    private void loginAs(String groupId) {
+    private void loginAs(String orgId) {
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setAttribute("currentUserId", "u-1");
         req.setAttribute("currentUsername", "user1");
         req.setAttribute("currentRole", "用户");
-        req.setAttribute("currentGroupId", groupId == null ? "" : groupId);
-        req.setAttribute("currentGroupRole", "member");
+        req.setAttribute("currentOrgId", orgId == null ? "" : orgId);
+        req.setAttribute("currentOrgRole", "member");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
     }
 
@@ -50,7 +50,7 @@ class RecordIsolationTest {
     @Test
     void groupADomainFiltersOnlyOwnGroup() {
         loginAs(GROUP_A);
-        QueryWrapper<Record> w = RecordFilter.build(RequestUtils.currentGroupId(), (FiltersDTO) null);
+        QueryWrapper<Record> w = RecordFilter.build(RequestUtils.currentOrgId(), (FiltersDTO) null);
         String sql = w.getSqlSegment();
         Object bound = w.getParamNameValuePairs().values().iterator().next();
 
@@ -63,7 +63,7 @@ class RecordIsolationTest {
     @Test
     void searchDtoVariantAlsoOwnGroupOnly() {
         loginAs(GROUP_B);
-        QueryWrapper<Record> w = RecordFilter.build(RequestUtils.currentGroupId(), new SearchDTO());
+        QueryWrapper<Record> w = RecordFilter.build(RequestUtils.currentOrgId(), new SearchDTO());
         String sql = w.getSqlSegment(); // 先渲染 where 段，参数表才会填充
         assertTrue(sql.contains("group_id"), sql);
         assertTrue(w.getParamNameValuePairs().containsValue("grp-b"), w.getParamNameValuePairs().toString());
@@ -74,7 +74,7 @@ class RecordIsolationTest {
     @Test
     void noGroupFailsClosed() {
         loginAs(null);
-        QueryWrapper<Record> w = RecordFilter.build(RequestUtils.currentGroupId(), (FiltersDTO) null);
+        QueryWrapper<Record> w = RecordFilter.build(RequestUtils.currentOrgId(), (FiltersDTO) null);
         String sql = w.getSqlSegment();
         // fail-closed：必须有一个不可能命中的条件，而不是空 where
         assertTrue(sql.toUpperCase().contains("ID"), "无组必须返回空集：" + sql);

@@ -1,6 +1,6 @@
 package com.tcm.ehr.common.interceptors;
 
-import com.tcm.ehr.common.annotation.RequireGroupRole;
+import com.tcm.ehr.common.annotation.RequireOrgRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.RequestUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,8 +17,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.Map;
 
 /**
- * 组内角色校验：{@link RequireGroupRole} 标注的方法只放组长（owner），
- * 且路径参数 {@code groupId} 必须等于当前组（组长只能管自己的组）。
+ * 组内角色校验：{@link RequireOrgRole} 标注的方法只放组长（owner），
+ * 且路径参数 {@code orgId} 必须等于当前组（组长只能管自己的组）。
  *
  * <p>为什么多此一举 —— {@link RequireRole} 只管系统级角色：
  * R5 的成员管理接口（拉人 / 移人 / 转让 / 退出）对「组长」开放，
@@ -28,7 +28,7 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class GroupRoleInterceptor implements HandlerInterceptor {
+public class OrgRoleInterceptor implements HandlerInterceptor {
 
     private final ObjectMapper objectMapper;
 
@@ -38,23 +38,23 @@ public class GroupRoleInterceptor implements HandlerInterceptor {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }
-        RequireGroupRole required = AnnotatedElementUtils.findMergedAnnotation(
-                handlerMethod.getMethod(), RequireGroupRole.class);
+        RequireOrgRole required = AnnotatedElementUtils.findMergedAnnotation(
+                handlerMethod.getMethod(), RequireOrgRole.class);
         if (required == null) {
             return true;
         }
         // 1. 组内角色校验
-        String groupRole = RequestUtils.currentGroupRole();
+        String groupRole = RequestUtils.currentOrgRole();
         if (!required.value().equals(groupRole)) {
             return reject(response, "需要" + roleLabel(required.value()) + "权限");
         }
-        // 2. 路径 groupId 必须等于当前组（防「拿别的组 id 调成员管理」）
+        // 2. 路径 orgId 必须等于当前组（防「拿别的组 id 调成员管理」）
         Map<String, String> vars = (Map<String, String>) request.getAttribute(
                 HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
-        String pathGroupId = vars == null ? null : vars.get("groupId");
-        String currentGroupId = RequestUtils.currentGroupId();
+        String pathGroupId = vars == null ? null : vars.get("orgId");
+        String currentOrgId = RequestUtils.currentOrgId();
         if (pathGroupId != null && !pathGroupId.isBlank()
-                && !pathGroupId.equals(currentGroupId)) {
+                && !pathGroupId.equals(currentOrgId)) {
             return reject(response, "无权操作其它课题组");
         }
         return true;

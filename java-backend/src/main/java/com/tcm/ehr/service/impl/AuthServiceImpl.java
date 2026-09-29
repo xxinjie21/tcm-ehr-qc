@@ -8,16 +8,16 @@ import com.tcm.ehr.common.exception.UnauthorizedException;
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.RegisterDTO;
-import com.tcm.ehr.domain.po.GroupMember;
-import com.tcm.ehr.domain.po.ResearchGroup;
+import com.tcm.ehr.domain.po.OrganizationMember;
+import com.tcm.ehr.domain.po.Organization;
 import com.tcm.ehr.domain.po.User;
 import com.tcm.ehr.domain.vo.LoginVO;
-import com.tcm.ehr.mapper.GroupMemberMapper;
-import com.tcm.ehr.mapper.ResearchGroupMapper;
+import com.tcm.ehr.mapper.OrgMemberMapper;
+import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.UserMapper;
-import com.tcm.ehr.service.GroupResolution;
+import com.tcm.ehr.service.OrgResolution;
 import com.tcm.ehr.service.IAuthService;
-import com.tcm.ehr.service.IGroupService;
+import com.tcm.ehr.service.IOrgService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -43,9 +43,9 @@ import java.util.UUID;
 public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IAuthService {
 
     private final JwtUtil jwtUtil;
-    private final ResearchGroupMapper groupMapper;
-    private final GroupMemberMapper groupMemberMapper;
-    private final IGroupService groupService;
+    private final OrgMapper groupMapper;
+    private final OrgMemberMapper groupMemberMapper;
+    private final IOrgService groupService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /**
@@ -111,21 +111,21 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         }
         // 5. 带建组申请：先校验编码唯一（排除 rejected —— 被拒时编码会被改写释放）
         String code = createGroup.getCode().trim();
-        Long taken = groupMapper.selectCount(new QueryWrapper<ResearchGroup>()
+        Long taken = groupMapper.selectCount(new QueryWrapper<Organization>()
                 .eq("code", code)
-                .ne("status", ResearchGroup.REJECTED));
+                .ne("status", Organization.REJECTED));
         if (taken != null && taken > 0) {
             throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
         }
         // 5.1 建 pending 组（待管理员审批）；编码唯一索引兜底并发竞态，
         //     否则异常直冒会变成 500（批次 2 的 409 只覆盖 DataIntegrityViolation，
         //     这里显式转成 400 的业务文案更贴近「换个编码」的引导）
-        ResearchGroup g = new ResearchGroup();
+        Organization g = new Organization();
         g.setId(UUID.randomUUID().toString());
         g.setCode(code);
         g.setName(createGroup.getName().trim());
         g.setPurpose(createGroup.getPurpose() == null ? null : createGroup.getPurpose().trim());
-        g.setStatus(ResearchGroup.PENDING);
+        g.setStatus(Organization.PENDING);
         g.setAppliedBy(user.getId());
         g.setCreateTime(LocalDateTime.now().withNano(0));
         try {
@@ -135,11 +135,11 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
         }
         // 5.2 申请人成为首任组长（待审批，但组内身份先立好，审批通过即可用）
-        GroupMember m = new GroupMember();
+        OrganizationMember m = new OrganizationMember();
         m.setId(UUID.randomUUID().toString());
-        m.setGroupId(g.getId());
+        m.setOrgId(g.getId());
         m.setUserId(user.getId());
-        m.setRole(GroupMember.ROLE_OWNER);
+        m.setRole(OrganizationMember.ROLE_OWNER);
         m.setIsPrimary(1);
         m.setCreateTime(LocalDateTime.now().withNano(0));
         groupMemberMapper.insert(m);
@@ -162,7 +162,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         }
 
         // 3. 解析当前组织（含 status='active' 过滤 —— 组织被停用则查不到）
-        GroupResolution g = groupService.resolvePrimaryGroup(user.getId());
+        OrgResolution g = groupService.resolvePrimaryOrg(user.getId());
         if (!g.hasGroup() && isOrgStopped(user.getId())) {
             // 3.1 查不到组织有三种可能：无组织（待加入用户，正常）/ 组织被停用（拒登）/
             //     DB 故障（降级为无组织，不该在这里误判）。停用的组织能从
@@ -175,7 +175,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole()));
         vo.setRole(user.getRole());
-        vo.setOrgId(g.hasGroup() ? g.getGroupId() : "");
+        vo.setOrgId(g.hasGroup() ? g.getOrgId() : "");
         vo.setOrgRole(g.hasGroup() ? g.getGroupRole() : null);
         vo.setStatus(user.getStatus());
         vo.setPendingGroup(user.getHasPendingGroup() != null && user.getHasPendingGroup() == 1);
@@ -194,14 +194,14 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * <b>不是</b>「能不能看数据」—— 后者由 {@code auth.admin-can-view-data} 控制
      * （数据层 fail-closed），不在菜单层体现。</p>
      */
-    private List<String> menusOf(User user, GroupResolution g) {
+    private List<String> menusOf(User user, OrgResolution g) {
         if (RequestUtils.ROLE_ADMIN.equals(user.getRole())) {
             return ADMIN_MENUS;
         }
         if (!g.hasGroup()) {
             return PENDING_MENUS;
         }
-        return GroupMember.ROLE_OWNER.equals(g.getGroupRole()) ? OWNER_MENUS : MEMBER_MENUS;
+        return OrganizationMember.ROLE_OWNER.equals(g.getGroupRole()) ? OWNER_MENUS : MEMBER_MENUS;
     }
 
     /**
@@ -216,14 +216,14 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         if (userId == null || userId.isBlank()) {
             return false;
         }
-        List<GroupMember> members = groupMemberMapper.selectList(
-                new QueryWrapper<GroupMember>().eq("user_id", userId));
-        for (GroupMember m : members) {
-            if (m.getGroupId() == null || m.getGroupId().isBlank()) {
+        List<OrganizationMember> members = groupMemberMapper.selectList(
+                new QueryWrapper<OrganizationMember>().eq("user_id", userId));
+        for (OrganizationMember m : members) {
+            if (m.getOrgId() == null || m.getOrgId().isBlank()) {
                 continue;
             }
-            ResearchGroup grp = groupMapper.selectById(m.getGroupId());
-            if (grp != null && ResearchGroup.STOPPED.equals(grp.getStatus())) {
+            Organization grp = groupMapper.selectById(m.getOrgId());
+            if (grp != null && Organization.STOPPED.equals(grp.getStatus())) {
                 return true;
             }
         }

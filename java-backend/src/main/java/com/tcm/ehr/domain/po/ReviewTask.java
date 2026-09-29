@@ -41,5 +41,5 @@ public class ReviewTask {
      * <p>写入时打标而不是查询期 JOIN：MyBatis-Plus 的 {@code QueryWrapper} 不便于 JOIN，
      * 而 {@code listTasks} 是高频路径。</p>
      */
-    private String groupId;
+    private String orgId;
 }

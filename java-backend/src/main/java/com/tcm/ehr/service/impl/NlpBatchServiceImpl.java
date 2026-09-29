@@ -212,7 +212,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         int limit = dto == null || dto.getLimit() == null ? 0 : dto.getLimit();
 
         // 2. 统计计划条数：limit 大于 0 时以它封顶
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), filters);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
         long count = recordMapper.selectCount(wrapper);
         int total = limit > 0 ? (int) Math.min(count, limit) : (int) count;
 
@@ -227,7 +227,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setFiltersJson(writeJsonStrict(objectMapper, filters));
         t.setCreatedBy(createdBy);
         // 提交线程捕获组快照，供 worker 重建 RecordFilter（ a7 6.3 缺点 13）
-        t.setGroupId(RequestUtils.currentGroupId());
+        t.setOrgId(RequestUtils.currentOrgId());
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
@@ -343,7 +343,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 按创建时间倒序取本组最近 50 条
         //    § 6.3 缺点 9：不能看到别组的批量解析任务列表
         List<NlpTask> tasks = taskMapper.selectList(new QueryWrapper<NlpTask>()
-                .eq("group_id", RequestUtils.currentGroupId())
+                .eq("group_id", RequestUtils.currentOrgId())
                 .orderByDesc("create_time").last("LIMIT 50"));
         // 2. 不带失败明细：列表页不需要，明细走 get(id)
         List<NlpTaskVO> out = new ArrayList<>();
@@ -395,7 +395,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                                 boolean[] truncated, int[] processed) {
         // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）
         int limit = t.getTotal() == null ? 0 : t.getTotal();
-        QueryWrapper<Record> wrapper = RecordFilter.build(t.getGroupId(), readFilters(t.getFiltersJson()));
+        QueryWrapper<Record> wrapper = RecordFilter.build(t.getOrgId(), readFilters(t.getFiltersJson()));
         int pageNo = 1;
         // 2. 分页循环取数：每页都先看取消位，避免停得慢
         while (true) {
@@ -433,7 +433,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         //    本组快照。为保险再筛一次：重新按 group_id 限定，
         //    避免任何路径把别组 id 混进来。
         ids = recordMapper.selectList(new QueryWrapper<Record>()
-                .select("id").eq("group_id", t.getGroupId()).in("id", ids)
+                .select("id").eq("group_id", t.getOrgId()).in("id", ids)
                 .last("LIMIT " + ids.size()))
                 .stream().map(Record::getId).toList();
         // 1. 按页大小切块：IN 过长会让 SQL 变慢
@@ -639,8 +639,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (t == null) {
             return false;
         }
-        String g1 = t.getGroupId();
-        String g2 = RequestUtils.currentGroupId();
+        String g1 = t.getOrgId();
+        String g2 = RequestUtils.currentOrgId();
         return g1 != null && g2 != null && !g2.isBlank() && g1.equals(g2);
     }
 

@@ -6,7 +6,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 /**
  * 当前请求上下文工具（鉴权与操作日志共用）：
  * JwtInterceptor 校验通过后把 currentUserId / currentUsername / currentRole /
- * currentGroupId / currentGroupRole 写入 request 属性，本类统一读取，
+ * currentOrgId / currentOrgRole 写入 request 属性，本类统一读取，
  * 替代各 Controller 各自复制的 operator() 方法。
  * 无请求上下文（如定时任务、单元测试）时统一返回 "unknown"，不抛异常。
  *
@@ -27,8 +27,8 @@ public final class RequestUtils {
     public static final String ATTR_USER_ID = "currentUserId";
     public static final String ATTR_USERNAME = "currentUsername";
     public static final String ATTR_ROLE = "currentRole";
-    public static final String ATTR_GROUP_ID = "currentGroupId";
-    public static final String ATTR_GROUP_ROLE = "currentGroupRole";
+    public static final String ATTR_ORG_ID = "currentOrgId";
+    public static final String ATTR_ORG_ROLE = "currentOrgRole";
 
     /** 系统级角色：管理员（唯一有跨组与配置写权限的身份） */
     public static final String ROLE_ADMIN = "管理员";
@@ -36,9 +36,9 @@ public final class RequestUtils {
     public static final String ROLE_USER = "用户";
 
     /** 组内角色：组长 */
-    public static final String GROUP_ROLE_OWNER = "owner";
+    public static final String ORG_ROLE_OWNER = "owner";
     /** 组内角色：组员 */
-    public static final String GROUP_ROLE_MEMBER = "member";
+    public static final String ORG_ROLE_MEMBER = "member";
 
     private static final String UNKNOWN = "unknown";
 
@@ -66,14 +66,14 @@ public final class RequestUtils {
      * <p><b>无组时返回空串而不是 null</b>：调用方（{@code RecordFilter}）会把它当
      * 「查不到数据」的判据，空串比 null 更不容易在下游被当成「未设置」而放过。</p>
      */
-    public static String currentGroupId() {
-        String v = attr(ATTR_GROUP_ID);
+    public static String currentOrgId() {
+        String v = attr(ATTR_ORG_ID);
         return UNKNOWN.equals(v) ? "" : v;
     }
 
     /** 当前操作人的组内角色（owner/member）；无组时为 {@code "unknown"} */
-    public static String currentGroupRole() {
-        return attr(ATTR_GROUP_ROLE);
+    public static String currentOrgRole() {
+        return attr(ATTR_ORG_ROLE);
     }
 
     /** 当前操作人是否是系统管理员 */
@@ -82,8 +82,8 @@ public final class RequestUtils {
     }
 
     /** 当前操作人是否是本组组长 */
-    public static boolean isGroupOwner() {
-        return GROUP_ROLE_OWNER.equals(currentGroupRole());
+    public static boolean isOrgOwner() {
+        return ORG_ROLE_OWNER.equals(currentOrgRole());
     }
 
     /** 取请求属性（鉴权拦截器写入的角色等）；无请求上下文或取不到时返回 unknown */

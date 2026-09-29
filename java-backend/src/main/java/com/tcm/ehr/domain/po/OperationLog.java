@@ -33,5 +33,5 @@ public class OperationLog {
     /** 操作明细 */
     private String detail;
     /** 操作时所属组快照（§七 L7：组员只见本组自己）；无组为 null */
-    private String groupId;
+    private String orgId;
 }

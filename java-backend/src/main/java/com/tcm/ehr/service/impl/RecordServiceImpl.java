@@ -185,7 +185,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             List<Record> existing = baseMapper.selectList(
                     new QueryWrapper<Record>()
                             .in("registration_no", batchRegNos)
-                            .eq("group_id", RequestUtils.currentGroupId()));
+                            .eq("group_id", RequestUtils.currentOrgId()));
             for (Record r : existing) {
                 existingHash.add(RecordUtil.textHash(r));
             }
@@ -321,7 +321,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             }
             r.setId(UUID.randomUUID().toString());
             // 新建病历入组织（否则是无组织病历，导入者导完自己也看不到）
-            r.setGroupId(RequestUtils.currentGroupId());
+            r.setOrgId(RequestUtils.currentOrgId());
             // 去重兜底：写 text_hash 让 DB 的 uk_records_org_text_hash 生效。
             // 不写的话该列恒 NULL，唯一键形同虚设（批次 4 随 DDL 一起补的代码路径）
             r.setTextHash(RecordUtil.textHash(r));
@@ -352,7 +352,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 3. 组装病历实体：主键由服务端生成，21 个原始字段原样落库；入本组
         Record r = new Record();
         r.setId(UUID.randomUUID().toString());
-        r.setGroupId(RequestUtils.currentGroupId());
+        r.setOrgId(RequestUtils.currentOrgId());
         r.setRegistrationNo(dto.getRegistrationNo());
         r.setOutpatientNo(dto.getOutpatientNo());
         r.setGender(dto.getGender());
@@ -519,7 +519,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             throw new IllegalArgumentException("请至少设置一个筛选条件，避免误删全库");
         }
         // 2. 只取 id 列，不取整行数据
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), filters);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
         List<Record> rows = baseMapper.selectList(wrapper.select("id"));
         List<String> ids = rows.stream().map(Record::getId).toList();
         // 3. 走同一段删除逻辑
@@ -577,7 +577,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         int page = dto != null && dto.getPage() != null && dto.getPage() > 0 ? dto.getPage() : 1;
         int size = dto != null && dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 20;
         // 数据域 → 用户筛选，取交集（统一走 RecordFilter，禁止手写 where）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentGroupId(), dto);
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), dto);
         // 2. 分页查询（条件已含数据域与用户筛选）
         Page<Record> p = baseMapper.selectPage(new Page<>(page, size), wrapper);
         // 3. 组装返回：总数与当前页列表项
