@@ -1,5 +1,7 @@
 package com.tcm.ehr.domain.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -18,8 +20,11 @@ public class AiQueryDTO {
     private String recordId;
 
     /** 使用者业务问题（chat 必填） */
+    @NotBlank(message = "问题不能为空")
+    @Size(max = 2000, message = "问题最长 2000 字")
     private String question;
 
     /** 追问上下文：本会话近期问答（可选，前端拼好后传入；仅用于 chat） */
+    @Size(max = 8000, message = "上文最长 8000 字")
     private String history;
 }

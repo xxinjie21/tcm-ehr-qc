@@ -3,6 +3,8 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.tcm.ehr.common.exception.BadCredentialsException;
+import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.exception.UnauthorizedException;
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.RegisterDTO;
@@ -142,19 +144,21 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
             throw new BadCredentialsException("用户名或密码错误");
         }
-        // 2. 账号停用：直接拒登。停用是管理动作，语义上不该给出「密码错误」以外的模糊提示
+        // 2. 账号停用：直接拒登（401，与「密码错误」同类但语义不同：
+        //    前端据此清登录态引导重新登录，而不是弹「权限不足」）。
+        //    停用是管理动作，不该给出「密码错误」那种模糊提示。
         if (User.STATUS_DISABLED.equals(user.getStatus())) {
-            throw new IllegalStateException("账号已被停用，请联系管理员");
+            throw new UnauthorizedException("账号已被停用，请联系管理员");
         }
 
-        // 3. 解析当前组（含 status='active' 过滤 —— 组被停用则查不到）
+        // 3. 解析当前组织（含 status='active' 过滤 —— 组织被停用则查不到）
         GroupResolution g = groupService.resolvePrimaryGroup(user.getId());
-        if (!g.hasGroup() && isGroupStopped(user.getId())) {
-            // 3.1 查不到组有三种可能：无组（待分配池，正常）/ 组已停用（拒登）/
-            //     DB 故障（降级为无组，不该在这里误判）。停用的组能从
-            //     group_members 查到行但 research_groups.status != 'active'，
+        if (!g.hasGroup() && isOrgStopped(user.getId())) {
+            // 3.1 查不到组织有三种可能：无组织（待加入用户，正常）/ 组织被停用（拒登）/
+            //     DB 故障（降级为无组织，不该在这里误判）。停用的组织能从
+            //     organization_members 查到行但 organizations.status != 'active'，
             //     故补一次不带 status 过滤的查询来区分。
-            throw new IllegalStateException("所属课题组已被停用，请联系管理员");
+            throw new ForbiddenException("所属组织已被停用，请联系管理员");
         }
 
         // 4. 签发 JWT（组织**不**进 token），并按身份下发菜单
@@ -191,14 +195,14 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     }
 
     /**
-     * 该用户是否属于一个<b>已停用</b>的课题组（组状态为 {@code stopped}）。
+     * 该用户是否属于一个<b>已停用</b>的组织（状态为 {@code stopped}）。
      *
      * <p>⚠️ 不能简化成「有成员行但解析不到 active 组」——那会把
-     * <b>审批中的建组申请人</b>（组状态 {@code pending}）误判成「组已停用」而拒绝登录。
+     * <b>审批中的建组申请人</b>（状态 {@code pending}）误判成「组织已停用」而拒绝登录。
      * 申请人本就该能登录（进引导页看审批进度）。故这里显式只看
-     * {@code research_groups.status = 'stopped'}。</p>
+     * {@code organizations.status = 'stopped'}。</p>
      */
-    private boolean isGroupStopped(String userId) {
+    private boolean isOrgStopped(String userId) {
         if (userId == null || userId.isBlank()) {
             return false;
         }

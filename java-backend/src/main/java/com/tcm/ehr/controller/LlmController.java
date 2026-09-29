@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -57,7 +58,7 @@ public class LlmController {
      */
     @RequireRole(roles = {"管理员"})
     @PutMapping("/config")
-    public ResponseEntity<Result<LlmConfigVO>> updateConfig(@RequestBody LlmConfigDTO dto) {
+    public ResponseEntity<Result<LlmConfigVO>> updateConfig(@Valid @RequestBody LlmConfigDTO dto) {
         return ResponseEntity.ok(Result.ok("配置已生效", llmConfigService.update(dto)));
     }
 
@@ -70,7 +71,7 @@ public class LlmController {
      * @return ok=是否连通；provider/model/latencyMs=探测结果
      */
     @PostMapping("/test")
-    public ResponseEntity<Result<LlmTestVO>> test(@RequestBody(required = false) LlmConfigDTO dto) {
+    public ResponseEntity<Result<LlmTestVO>> test(@Valid @RequestBody(required = false) LlmConfigDTO dto) {
         return ResponseEntity.ok(Result.ok("连接正常", llmConfigService.test(dto)));
     }
 }

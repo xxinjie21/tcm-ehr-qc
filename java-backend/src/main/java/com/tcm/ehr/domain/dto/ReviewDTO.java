@@ -2,6 +2,7 @@ package com.tcm.ehr.domain.dto;
 
 import lombok.Data;
 
+import jakarta.validation.constraints.Size;
 import java.util.Map;
 
 /**
@@ -22,5 +23,6 @@ public class ReviewDTO {
      * {@code detail} 落库（{@code operation_log.detail} 是 TEXT，容量不限）；
      * 空串与空白视为未填。</p>
      */
+    @Size(max = 500, message = "复核意见最长 500 字")
     private String comment;
 }

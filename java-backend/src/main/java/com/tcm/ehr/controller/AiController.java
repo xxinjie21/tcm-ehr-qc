@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -33,7 +34,7 @@ public class AiController {
      * @return answer=解读正文；source=结果来源（rule/llm）；llmAvailable=LLM 是否可用
      */
     @PostMapping("/interpret")
-    public ResponseEntity<Result<AiReplyVO>> interpret(@RequestBody AiQueryDTO dto) {
+    public ResponseEntity<Result<AiReplyVO>> interpret(@Valid @RequestBody AiQueryDTO dto) {
         // 1. 必填校验在前：缺参数是 400，不该走到 service 才失败
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
@@ -55,7 +56,7 @@ public class AiController {
      * @return answer=回答正文；source=rule/llm；llmAvailable=LLM 是否可用
      */
     @PostMapping("/chat")
-    public ResponseEntity<Result<AiReplyVO>> chat(@RequestBody AiQueryDTO dto) {
+    public ResponseEntity<Result<AiReplyVO>> chat(@Valid @RequestBody AiQueryDTO dto) {
         // 1. 问题必填；2. 问答永不返回 null，兜底答案也是结果
         if (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入问题"));
@@ -72,7 +73,7 @@ public class AiController {
      * @return answer=预检建议；source=rule/llm；llmAvailable=LLM 是否可用
      */
     @PostMapping("/review")
-    public ResponseEntity<Result<AiReplyVO>> review(@RequestBody AiQueryDTO dto) {
+    public ResponseEntity<Result<AiReplyVO>> review(@Valid @RequestBody AiQueryDTO dto) {
         // 1. 必填校验 2. 病历不存在回 404
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));

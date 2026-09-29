@@ -21,10 +21,10 @@ info:
     - **共享模型**（无后缀）：跨请求/响应复用的数据模型（如 StructuredData、Entity、Herb、RecordMetadata），见数据模型定义。
     ## 接口通用约定
     除标注「文件流下载」的接口外，所有接口统一返回 Result 包装 {"code":200,"msg":"string","data":any}。
-    - code: 200成功；400参数非法；401未登录/token失效；403权限不足；404资源不存在；500服务异常。
+    - code: 200成功；400参数非法；401未登录/token失效；403权限不足；404资源不存在；405方法不支持；409数据冲突（唯一键/外键）；415请求内容类型不支持；500服务异常。
     - 登录态：非登录接口需在请求头携带 Authorization: Bearer <token>。
     - 实体识别无结果统一返回空数组 []，禁止返回 null。
-    - 分页统一参数：page（从1开始）、pageSize。
+    - 分页统一参数：page（从1开始）、pageSize（单页上限 500，超出按 500 截断，避免一次拉全表）。
     - 错误响应统一结构见 ErrorVO（code/msg/data，非 200 时 data 为 null）。
   version: 1.0.0
 servers:

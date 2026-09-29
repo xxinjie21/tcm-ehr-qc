@@ -12,6 +12,7 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.QcBatchDTO;
 import com.tcm.ehr.domain.po.QcTask;
 import com.tcm.ehr.domain.po.Record;
+import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcTaskVO;
 import com.tcm.ehr.mapper.QcTaskMapper;
@@ -103,13 +104,22 @@ public class QcBatchServiceImpl implements IQcBatchService {
     @PostConstruct
     void init() {
         // 1. 重启兜底：上次没跑完的任务无法续跑，统一标为已中断（可重跑）
-        int n = taskMapper.update(null, new UpdateWrapper<QcTask>()
-                .in("status", List.of(QcTask.RUNNING, QcTask.QUEUED))
-                .set("status", QcTask.INTERRUPTED)
-                .set("current_label", null)
-                .set("finished_at", LocalDateTime.now().withNano(0)));
-        if (n > 0) {
-            log.warn("[批重算] 重启：{} 个未完成任务已标记为『已中断』", n);
+        //    ⚠️ 必须兜底：这一步直连 DB，而本方法由 @PostConstruct 触发，
+        //    异常会向上抛成 Bean 初始化失败 → 整个应用起不来。
+        //    与既有口径一致（ES / Redis 探活失败只告警不阻塞启动）：
+        //    查库失败只告警，任务留在原状态，下次提交/人工处理即可。
+        int n = 0;
+        try {
+            n = taskMapper.update(null, new UpdateWrapper<QcTask>()
+                    .in("status", List.of(QcTask.RUNNING, QcTask.QUEUED))
+                    .set("status", QcTask.INTERRUPTED)
+                    .set("current_label", null)
+                    .set("finished_at", LocalDateTime.now().withNano(0)));
+            if (n > 0) {
+                log.warn("[批重算] 重启：{} 个未完成任务已标记为『已中断』", n);
+            }
+        } catch (Exception e) {
+            log.error("[批重算] 重启兜底失败：未完成任务未能标记为『已中断』，（DB 可能不可用）。不影响服务启动，恢复后可在列表里手动重跑", e);
         }
         // 2. 起固定大小的守护线程池（重算写密集，并发固定为 1）
         int threads = Math.max(1, concurrency);
@@ -250,7 +260,9 @@ public class QcBatchServiceImpl implements IQcBatchService {
     public QcTaskVO cancel(String id) {
         QcTask t = taskMapper.selectById(id);
         if (t == null) {
-            throw new IllegalArgumentException("任务不存在");
+            // 抛 ResourceNotFoundException 而非 IllegalArgumentException：
+            // 「不存在」是 404，「参数非法」才是 400，两者语义不同
+            throw new ResourceNotFoundException(1008, "任务不存在");
         }
         if (QcTask.QUEUED.equals(t.getStatus())) {
             // 1. 排队中：还没进 worker，直接落终态

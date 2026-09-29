@@ -4,14 +4,22 @@ import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.controller.DictionaryController;
 import com.tcm.ehr.service.IDictionaryService;
+import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -66,5 +74,58 @@ class GlobalExceptionHandlerTest {
         assertEquals(400, resp.getStatusCode().value());
         assertEquals(400, resp.getBody().getCode());
         assertEquals("缺少文件参数：file", resp.getBody().getMsg());
+    }
+
+    // ------------------------------------------------ 批次 2 新增：客户端错误语义
+
+    /** 方法不支持 -> 405（原先落兜底 500） */
+    @Test
+    void methodNotSupported_shouldBe405() {
+        ResponseEntity<Result<Void>> resp = handler.handleMethodNotSupported(
+                new HttpRequestMethodNotSupportedException("POST"));
+
+        assertEquals(405, resp.getStatusCode().value());
+        assertEquals(405, resp.getBody().getCode());
+    }
+
+    /** 媒体类型不支持 -> 415 */
+    @Test
+    void mediaTypeNotSupported_shouldBe415() {
+        ResponseEntity<Result<Void>> resp = handler.handleMediaTypeNotSupported(
+                new HttpMediaTypeNotSupportedException(MediaType.TEXT_PLAIN,
+                        List.of(MediaType.APPLICATION_JSON)));
+
+        assertEquals(415, resp.getStatusCode().value());
+        assertEquals(415, resp.getBody().getCode());
+    }
+
+    /** 方法级参数校验失败 -> 400 */
+    @Test
+    void constraintViolation_shouldBe400() {
+        ResponseEntity<Result<Void>> resp = handler.handleConstraintViolation(
+                new ConstraintViolationException("pageSize 必须大于 0", Set.of()));
+
+        assertEquals(400, resp.getStatusCode().value());
+        assertEquals("pageSize 必须大于 0", resp.getBody().getMsg());
+    }
+
+    /** 唯一键冲突 -> 409（不是 500）：并发撞索引最常见的出口 */
+    @Test
+    void dataIntegrityViolation_shouldBe409() {
+        ResponseEntity<Result<Void>> resp = handler.handleDataIntegrity(
+                new DataIntegrityViolationException("Duplicate entry 'admin' for key 'uk_username'"));
+
+        assertEquals(409, resp.getStatusCode().value());
+        assertEquals(409, resp.getBody().getCode());
+    }
+
+    /** 账号停用 -> 401（不是行级越权的 403） */
+    @Test
+    void unauthorized_shouldBe401() {
+        ResponseEntity<Result<Void>> resp = handler.handleUnauthorized(
+                new UnauthorizedException("账号已被停用，请联系管理员"));
+
+        assertEquals(401, resp.getStatusCode().value());
+        assertEquals(401, resp.getBody().getCode());
     }
 }

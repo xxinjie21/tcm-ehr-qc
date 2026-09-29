@@ -70,7 +70,7 @@ public class GroupController {
 
     @RequireRole(roles = {"管理员"})
     @PutMapping("/api/groups/{id}")
-    public Result<Void> updateGroup(@PathVariable String id, @RequestBody GroupDTOs.UpdateGroupRequest body) {
+    public Result<Void> updateGroup(@PathVariable String id, @Valid @RequestBody GroupDTOs.UpdateGroupRequest body) {
         groupService.updateGroup(id, body);
         return Result.ok("已更新", null);
     }

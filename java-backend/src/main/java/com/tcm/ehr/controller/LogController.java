@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import com.tcm.ehr.common.utils.PageSizeGuard;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.service.ILogService;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,7 @@ public class LogController {
      * @param action  操作类型，空表示不限
      * @param keyword 关键字，匹配操作人/对象/详情
      * @param page    页码，从 1 开始
-     * @param pageSize 每页条数
+     * @param pageSize 每页条数，上限 {@value PageSizeGuard#MAX_PAGE_SIZE}（超出按上限截断，避免 pageSize=999999 一次拉全表）
      * @return total=总条数；list=当前页记录
      */
     @GetMapping("/api/logs")

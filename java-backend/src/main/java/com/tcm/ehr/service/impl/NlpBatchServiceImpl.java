@@ -94,13 +94,22 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     @PostConstruct
     void init() {
         // 1. 重启兜底：上次没跑完的任务无法续跑，统一标为已中断（可重跑）
-        int n = taskMapper.update(null, new UpdateWrapper<NlpTask>()
-                .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED))
-                .set("status", NlpTask.INTERRUPTED)
-                .set("current_label", null)
-                .set("finished_at", LocalDateTime.now().withNano(0)));
-        if (n > 0) {
-            log.warn("[批解析] 重启：{} 个未完成任务已标记为『已中断』", n);
+        //    ⚠️ 必须兜底：这一步直连 DB，而本方法由 @PostConstruct 触发，
+        //    异常会向上抛成 Bean 初始化失败 → 整个应用起不来。
+        //    与既有口径一致（ES / Redis 探活失败只告警不阻塞启动）：
+        //    查库失败只告警，任务留在原状态，下次提交/人工处理即可。
+        int n = 0;
+        try {
+            n = taskMapper.update(null, new UpdateWrapper<NlpTask>()
+                    .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED))
+                    .set("status", NlpTask.INTERRUPTED)
+                    .set("current_label", null)
+                    .set("finished_at", LocalDateTime.now().withNano(0)));
+            if (n > 0) {
+                log.warn("[批解析] 重启：{} 个未完成任务已标记为『已中断』", n);
+            }
+        } catch (Exception e) {
+            log.error("[批解析] 重启兜底失败：未完成任务未能标记为『已中断』，（DB 可能不可用）。不影响服务启动，恢复后可在列表里手动重跑", e);
         }
         // 2. 起固定大小的守护线程池：并发固定，Python 服务不会被多个任务同时压垮
         int threads = Math.max(1, concurrency);

@@ -1,6 +1,8 @@
 package com.tcm.ehr.service;
 
 import com.tcm.ehr.common.exception.BadCredentialsException;
+import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.exception.UnauthorizedException;
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.domain.po.GroupMember;
 import com.tcm.ehr.domain.po.ResearchGroup;
@@ -64,13 +66,18 @@ class AuthServiceTest {
     }
 
     private User user(String id, String username, String role) {
+        return user(id, username, role, User.STATUS_ACTIVE);
+    }
+
+    /** 可指定账号状态：停用用例需要 status=disabled 走到 401 分支 */
+    private User user(String id, String username, String role, String status) {
         User u = new User();
         u.setId(id);
         u.setUsername(username);
         u.setPassword(HASH_123456);
         u.setRole(role);
         // 阶段 2：默认给「有生效组」，否则否免注册用例会被当成待分配池
-        u.setStatus(User.STATUS_ACTIVE);
+        u.setStatus(status);
         u.setHasPendingGroup(0);
         return u;
     }
@@ -212,7 +219,7 @@ class AuthServiceTest {
         assertTrue(vo.isPendingGroup());
     }
 
-    /** 组确实被停用（status=stopped）时才拒登 */
+    /** 组织确实被停用（status=stopped）时才拒登；语义是「无权限」→ 403 而非 401 */
     @Test
     void stoppedGroupRejectsLogin() {
         when(userMapper.findByUsername("zhangsan")).thenReturn(user("u-zs", "zhangsan", "用户"));
@@ -227,9 +234,20 @@ class AuthServiceTest {
         g.setStatus(ResearchGroup.STOPPED);
         when(groupMapper.selectById("grp-stopped")).thenReturn(g);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        ForbiddenException ex = assertThrows(ForbiddenException.class,
                 () -> authService.login("zhangsan", "123456"));
         assertTrue(ex.getMessage().contains("停用"), ex.getMessage());
+    }
+
+    /** 账号被停用：凭证不可用 → 401（与「组织停用」的 403 区分开） */
+    @Test
+    void disabledAccountRejectsLoginWith401() {
+        when(userMapper.findByUsername("zhangsan"))
+                .thenReturn(user("u-zs", "zhangsan", "用户", User.STATUS_DISABLED));
+
+        UnauthorizedException ex = assertThrows(UnauthorizedException.class,
+                () -> authService.login("zhangsan", "123456"));
+        assertTrue(ex.getMessage().contains("账号已被停用"), ex.getMessage());
     }
 
     /** 所有者菜单：本组数据 + 术语词典/日志审计 + 我的组织 */

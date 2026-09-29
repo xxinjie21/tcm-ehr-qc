@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import jakarta.validation.Valid;
 import java.util.Map;
 
 /**
@@ -45,7 +46,7 @@ public class GovernanceController {
      * @return standardTerm=标准词（未命中时为原文）；source=词典来源；level=命中层级；code=国标代码
      */
     @PostMapping("/api/governance/normalize")
-    public ResponseEntity<Result<Map<String, Object>>> normalize(@RequestBody NormalizeDTO dto) {
+    public ResponseEntity<Result<Map<String, Object>>> normalize(@Valid @RequestBody NormalizeDTO dto) {
         // 1. 术语必填（错误体下沉：抛 BusinessException 由 GlobalExceptionHandler 统一出口）
         if (dto.getTerm() == null || dto.getTerm().isBlank()) {
             throw new com.tcm.ehr.common.exception.BusinessException(400, "请输入术语");
@@ -73,7 +74,7 @@ public class GovernanceController {
      * @return total/deduped/repaired/isolated/normalized=各步处理条数
      */
     @PostMapping("/api/governance/clean")
-    public Result<CleanResultVO> clean(@RequestBody CleanDTO dto) {
+    public Result<CleanResultVO> clean(@Valid @RequestBody CleanDTO dto) {
         // 1. 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
         CleanResultVO result = governanceService.clean(dto.getRecordIds(), dto.getFilters());
         operationLogger.log("数据清洗", RecordFilter.describe(dto == null ? null : dto.getFilters()), "共" + result.getTotal() + "条，去重" + result.getDeduped()
@@ -90,7 +91,7 @@ public class GovernanceController {
      * @return 文件流（带 UTF-8 文件名的附件）
      */
     @PostMapping("/api/export/dataset")
-    public ResponseEntity<byte[]> export(@RequestBody ExportDTO dto) throws IOException {
+    public ResponseEntity<byte[]> export(@Valid @RequestBody ExportDTO dto) throws IOException {
         // 1. 取导出件；null = 范围内无合格病历
         IGovernanceService.ExportedFile file = governanceService.export(dto);
         if (file == null) {
@@ -120,7 +121,7 @@ public class GovernanceController {
      * @return total=命中条数；sample=前 10 条样本
      */
     @PostMapping("/api/export/dataset/preview")
-    public Result<Map<String, Object>> preview(@RequestBody ExportDTO dto) {
+    public Result<Map<String, Object>> preview(@Valid @RequestBody ExportDTO dto) {
         return Result.ok(governanceService.previewDataset(dto));
     }
 

@@ -57,7 +57,7 @@ public class NlpController {
      * @return 9 类实体（含归一结果与原文）；降级时为空结构 + unavailableReason
      */
     @PostMapping("/api/nlp/extract")
-    public ResponseEntity<Result<NlpExtractVO>> extract(@RequestBody NlpExtractDTO dto) {
+    public ResponseEntity<Result<NlpExtractVO>> extract(@Valid @RequestBody NlpExtractDTO dto) {
         // 1. 取待抽取文本，为空回 400（其余情况一律降级）
         String text = dto == null ? null : dto.getText();
         if (text == null || text.isBlank()) {

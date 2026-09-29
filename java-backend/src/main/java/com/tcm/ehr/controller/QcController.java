@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import jakarta.validation.Valid;
 import java.util.List;
 
 /**
@@ -50,7 +51,7 @@ public class QcController {
      * @return missingFields=缺失的核心要素；formatErrors=年龄/性别格式问题
      */
     @PostMapping("/api/qc/check")
-    public Result<QcCheckVO> check(@RequestBody QcCheckDTO dto) {
+    public Result<QcCheckVO> check(@Valid @RequestBody QcCheckDTO dto) {
         return Result.ok(qcService.check(dto));
     }
 
@@ -63,7 +64,7 @@ public class QcController {
      * @return conflicts=冲突描述；consistent=是否无冲突
      */
     @PostMapping("/api/qc/check/logic")
-    public Result<LogicCheckVO> checkLogic(@RequestBody LogicCheckDTO dto) {
+    public Result<LogicCheckVO> checkLogic(@Valid @RequestBody LogicCheckDTO dto) {
         return Result.ok(qcService.checkLogic(dto));
     }
 
@@ -76,7 +77,7 @@ public class QcController {
      * @return score=得分；grade=分级；deductions=扣分明细
      */
     @PostMapping("/api/qc/score")
-    public Result<ScoreResultVO> score(@RequestBody QcScoreDTO dto) {
+    public Result<ScoreResultVO> score(@Valid @RequestBody QcScoreDTO dto) {
         return Result.ok(qcService.score(dto));
     }
 
@@ -93,7 +94,7 @@ public class QcController {
      * @return id=任务ID；status=QUEUED；total=计划处理条数
      */
     @PostMapping("/api/qc/score/batch")
-    public Result<QcTaskVO> submitScoreBatch(@RequestBody(required = false) QcBatchDTO dto) {
+    public Result<QcTaskVO> submitScoreBatch(@Valid @RequestBody(required = false) QcBatchDTO dto) {
         return Result.ok("已提交，后台运行中", qcBatchService.submit(dto));
     }
 
@@ -137,12 +138,10 @@ public class QcController {
      * @return 取消后的任务状态；任务不存在时返回 404
      */
     @PostMapping("/api/qc/score/batch/{id}/cancel")
-    public ResponseEntity<Result<QcTaskVO>> cancelScoreBatch(@PathVariable String id) {
-        try {
-            return ResponseEntity.ok(Result.ok("已取消", qcBatchService.cancel(id)));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(404).body(Result.error(404, e.getMessage()));
-        }
+    public Result<QcTaskVO> cancelScoreBatch(@PathVariable String id) {
+        // 不在 Controller 内 catch 拼错误体：任务不存在由 service 抛 ResourceNotFoundException，
+        // 统一交给 GlobalExceptionHandler 转 404（全仓唯一错误体出口）
+        return Result.ok("已取消", qcBatchService.cancel(id));
     }
 
     /**
@@ -167,7 +166,7 @@ public class QcController {
      */
     @RequireRole(roles = {"管理员"})
     @PutMapping("/api/qc/rules")
-    public Result<QcRulesVO> updateRules(@RequestBody QcRuleSet rules) {
+    public Result<QcRulesVO> updateRules(@Valid @RequestBody QcRuleSet rules) {
         return Result.ok("规则已保存并生效", qcService.updateRules(rules));
     }
 

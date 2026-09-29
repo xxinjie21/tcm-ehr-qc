@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import jakarta.validation.Valid;
 import java.util.List;
 
 /**
@@ -107,7 +108,7 @@ public class StatsController {
      * @return 该类型的词频或分布结果
      */
     @PostMapping
-    public Result<StatsVO> stats(@RequestBody StatsDTO dto) {
+    public Result<StatsVO> stats(@Valid @RequestBody StatsDTO dto) {
         return Result.ok(statsService.stats(dto));
     }
 

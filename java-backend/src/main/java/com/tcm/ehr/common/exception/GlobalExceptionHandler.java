@@ -2,10 +2,15 @@ package com.tcm.ehr.common.exception;
 
 import com.tcm.ehr.common.domain.Result;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.BindException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +43,17 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Result<Void>> handleBadCredentials(BadCredentialsException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.error(401, e.getMessage()));
+    }
+
+    /**
+     * 凭证不可用（账号被停用等）。
+     *
+     * @param e 携带可展示的提示文案
+     * @return HTTP 401 + code=401
+     */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Result<Void>> handleUnauthorized(UnauthorizedException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.error(401, e.getMessage()));
     }
 
@@ -233,6 +249,80 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(404, "接口不存在"));
+    }
+
+    /**
+     * 请求方法不支持（如对只读端点发 POST）。
+     *
+     * <p>落兜底分支会被说成"系统异常"，前端也无法区分"接口不存在"与"方法用错"。</p>
+     *
+     * @param e 方法不支持异常
+     * @return HTTP 405 + code=405
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Result<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(Result.error(405, "请求方法不支持：" + e.getMethod()));
+    }
+
+    /**
+     * 请求媒体类型不支持（如往只收 JSON 的端点发 form）。
+     *
+     * @param e 媒体类型异常
+     * @return HTTP 415 + code=415
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Result<Void>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(Result.error(415, "请求内容类型不支持，请使用 application/json"));
+    }
+
+    /**
+     * 方法级参数校验失败（{@code @RequestParam} 上的约束，如 {@code @Min} 分页下限）。
+     *
+     * <p>与 {@link MethodArgumentNotValidException}（请求体 Bean Validation）分开处理：
+     * 后者取 {@code BindingResult} 的字段错误，本类只能从异常里取路径。</p>
+     *
+     * @param e 约束校验异常
+     * @return HTTP 400 + code=400
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Result<Void>> handleConstraintViolation(ConstraintViolationException e) {
+        return ResponseEntity.badRequest().body(Result.error(400, e.getMessage()));
+    }
+
+    /**
+     * 表单/查询参数绑定失败（类型转换不合法等）。
+     *
+     * <p>与 {@link MethodArgumentNotValidException} 同源但不同类：前者带 {@code BindingResult}，
+     * 本类只带一条消息。</p>
+     *
+     * @param e 绑定异常
+     * @return HTTP 400 + code=400
+     */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<Result<Void>> handleBind(BindException e) {
+        String msg = e.getFieldErrors().stream()
+                .map(fe -> fe.getField() + " " + fe.getDefaultMessage())
+                .collect(Collectors.joining("；"));
+        return ResponseEntity.badRequest()
+                .body(Result.error(400, msg.isEmpty() ? "参数格式错误" : msg));
+    }
+
+    /**
+     * 数据完整性约束冲突（唯一键 / 外键 / 非空）。
+     *
+     * <p>典型触发：并发撞唯一索引。直接落 500 会把"数据重复"说成"系统故障"，
+     * 故落 409 并在日志里保留根因。</p>
+     *
+     * @param e 完整性异常
+     * @return HTTP 409 + code=409
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Result<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
+        log.warn("[全局异常] 数据完整性约束冲突: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Result.error(409, "数据冲突：该记录已存在或仍被其他数据引用"));
     }
 
     /**

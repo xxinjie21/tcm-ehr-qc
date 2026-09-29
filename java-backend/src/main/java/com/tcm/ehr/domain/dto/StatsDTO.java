@@ -3,12 +3,15 @@ package com.tcm.ehr.domain.dto;
 import lombok.Data;
 
 import java.util.List;
+import jakarta.validation.constraints.Pattern;
 import java.util.Map;
 
 @Data
 public class StatsDTO {
 
     /** disease（疾病频次）/ pattern（证候分布）/ prescription（方剂+中药频次） */
+    @Pattern(regexp = "^(disease|pattern|symptom|prescription)?$",
+            message = "统计类型只能是 disease/pattern/symptom/prescription")
     private String type;
 
     /** 统计范围（圈定的病历ID），空=按filters/全量 */

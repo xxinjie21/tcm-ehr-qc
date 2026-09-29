@@ -96,15 +96,25 @@ public class RecordController {
      *
      * <p>【权限：登录即可】只允许改 structuredData，携带原始字段按只读冲突返回 1007。</p>
      *
+     * <p>入参是「部分更新」语义的有序 Map（带原始字段要报冲突，不能收窄成 DTO），
+     * 所以无法用 Bean Validation，改在入口做守卫：空体与不带 structuredData 一律 400。</p>
+     *
      * @param recordId 病历ID
      * @param body     仅接受 structuredData 键
      * @return 无数据体，仅成功标记
      */
     @PutMapping("/api/records/{recordId}")
     public Result<Void> updateRecord(@PathVariable String recordId, @RequestBody Map<String, Object> body) {
-        // 1. 只改结构化数据；带原始字段的冲突由 service 抛 1007
+        // 1. 入口守卫：空体 / 不带 structuredData 直接拒，避免空更新被当成成功
+        if (body == null || body.isEmpty()) {
+            throw new IllegalArgumentException("请提交要修改的内容（structuredData）");
+        }
+        if (!body.containsKey("structuredData")) {
+            throw new IllegalArgumentException("只允许修改结构化数据（structuredData）");
+        }
+        // 2. 只改结构化数据；带原始字段的冲突由 service 抛 1007
         recordService.updateRecord(recordId, body);
-        // 2. 留痕：改了什么病历必须可查
+        // 3. 留痕：改了什么病历必须可查
         operationLogger.log("病历修改", recordId, "更新结构化数据");
         return Result.ok("修改成功", null);
     }
@@ -118,7 +128,7 @@ public class RecordController {
      * @return deletedCount=实际删除条数
      */
     @DeleteMapping("/api/records")
-    public Result<DeleteRecordsVO> deleteRecords(@RequestBody DeleteRecordsDTO dto) {
+    public Result<DeleteRecordsVO> deleteRecords(@Valid @RequestBody DeleteRecordsDTO dto) {
         // 1. 删（service 内先清复核任务再删病历）2. 留痕
         DeleteRecordsVO vo = recordService.deleteRecords(dto);
         operationLogger.log("病历删除", "共" + vo.getDeletedCount() + "条", null);
@@ -134,7 +144,7 @@ public class RecordController {
      * @return deletedCount=实际删除条数
      */
     @PostMapping("/api/records/delete-by-filter")
-    public Result<DeleteRecordsVO> deleteByFilter(@RequestBody FiltersDTO filters) {
+    public Result<DeleteRecordsVO> deleteByFilter(@Valid @RequestBody FiltersDTO filters) {
         // 1. 按范围删；条件全空会被 service 拒绝（防误删全库）2. 留痕
         DeleteRecordsVO vo = recordService.deleteByFilter(filters);
         operationLogger.log("病历删除", "按范围", "共" + vo.getDeletedCount() + "条");

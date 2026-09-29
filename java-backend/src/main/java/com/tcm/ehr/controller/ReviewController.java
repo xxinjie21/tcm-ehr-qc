@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import com.tcm.ehr.common.utils.PageSizeGuard;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.ReviewDTO;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,7 +34,7 @@ public class ReviewController {
      * <p>【权限：登录即可】已作废的任务不返回。</p>
      *
      * @param page     页码，从 1 开始
-     * @param pageSize 每页条数
+     * @param pageSize 每页条数，上限 {@value PageSizeGuard#MAX_PAGE_SIZE}（超出按上限截断）
      * @param status   任务状态，为空表示不限
      * @return total=总条数；tasks=任务列表
      */
@@ -40,7 +42,7 @@ public class ReviewController {
     public Result<ReviewTasksVO> tasks(@RequestParam(defaultValue = "1") Integer page,
                                        @RequestParam(defaultValue = "20") Integer pageSize,
                                        @RequestParam(required = false) String status) {
-        return Result.ok(reviewService.listTasks(page, pageSize, status));
+        return Result.ok(reviewService.listTasks(page, PageSizeGuard.clamp(pageSize), status));
     }
 
     /**
@@ -54,7 +56,7 @@ public class ReviewController {
      */
     @PostMapping("/api/records/{recordId}/review")
     public Result<ReviewResultVO> review(@PathVariable String recordId,
-                                         @RequestBody(required = false) ReviewDTO dto) {
+                                         @Valid @RequestBody(required = false) ReviewDTO dto) {
         // 1. 复核（dto 可空 = 不做人工修正，只重算）
         // 病历不存在与"复核记录不存在/已完结"共用 1006，由 GlobalExceptionHandler 统一转 404
         ReviewResultVO vo = reviewService.review(recordId, dto);

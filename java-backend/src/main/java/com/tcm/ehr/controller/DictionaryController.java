@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import com.tcm.ehr.common.utils.PageSizeGuard;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.TermTypes;
@@ -83,7 +84,8 @@ public class DictionaryController {
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
-        return ResponseEntity.ok(Result.ok(dictionaryService.searchTerms(type, keyword, page, size)));
+        return ResponseEntity.ok(Result.ok(
+                dictionaryService.searchTerms(type, keyword, page, PageSizeGuard.clamp(size))));
     }
 
     /**
@@ -97,17 +99,24 @@ public class DictionaryController {
     @RequireRole(roles = {"管理员"})
     @PostMapping("/rollback")
     public ResponseEntity<Result<Void>> rollback(@RequestBody Map<String, String> body) throws IOException {
-        String type = body.get("type");
-        String backupFilename = body.get("backupFilename");
-        // 1. 类型校验
+        String type = body == null ? null : body.get("type");
+        String backupFilename = body == null ? null : body.get("backupFilename");
+        // 1. 类型与文件名先判空：null 与空串都要拦，否则会走到文件层报「不存在」而掩盖真实入参问题
+        if (type == null || type.isBlank()) {
+            return ResponseEntity.badRequest().body(Result.error("缺少术语类型（type）"));
+        }
+        if (backupFilename == null || backupFilename.isBlank()) {
+            return ResponseEntity.badRequest().body(Result.error("缺少备份文件名（backupFilename）"));
+        }
+        // 2. 类型校验
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
-        // 2. 先确认备份存在（含路径穿越前缀校验），再执行覆盖
-        if (backupFilename == null || !dictionaryService.backupExists(type, backupFilename)) {
+        // 3. 先确认备份存在（含路径穿越前缀校验），再执行覆盖
+        if (!dictionaryService.backupExists(type, backupFilename)) {
             return ResponseEntity.badRequest().body(Result.error("备份文件不存在"));
         }
-        // 3. 回滚并重建索引
+        // 4. 回滚并重建索引
         dictionaryService.rollback(type, backupFilename);
         operationLogger.log("词典回滚", type, "恢复备份 " + backupFilename);
         return ResponseEntity.ok(Result.ok(null));
