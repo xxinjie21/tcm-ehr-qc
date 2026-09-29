@@ -49,6 +49,16 @@ public class Record {
     private String status;
     /** 归属课题组；空 = 无组，代码层降级为「无数据」（fail-closed） */
     private String groupId;
+
+    /**
+     * 21 字段文本哈希（见 {@code RecordUtil.textHash}），去重的 DB 层兜底。
+     *
+     * <p>与 {@code groupId} 组成联合唯一键 {@code uk_records_org_text_hash}：
+     * 同一份病历在同一组织内只能存一份，跨组织各存一份互不冲突。
+     * <b>存量行为 NULL</b>（不为老数据回填，见 migration-03 注）——
+     * MySQL 唯一索引视多个 NULL 互不相等，故存量行不受此键约束。</p>
+     */
+    private String textHash;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -223,39 +223,25 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * 复核任务幂等 upsert：待复核则新增/更新，否则把该病历未作废的任务置为作废。
      *
      * <p>作废而不是删除：历史复核轨迹要留，查询侧按 {@code is_obsolete=0} 过滤。</p>
+     *
+     * <p><b>为什么走 SQL 语义 upsert 而不再「先查后写」</b>（批次 4）：DB 侧已加
+     * {@code uk_record_active}（生成列，约束「一个病历至多一条活跃任务」）。
+     * 原来的 {@code selectList → update / insert} 是 check-then-act，并发两个线程
+     * 都能查到空、都去 insert，其中一个撞唯一键 → 从「静默重复」变成「整批 500」。
+     * {@code INSERT ... ON DUPLICATE KEY UPDATE} 由唯一索引直接仲裁，没有这个窗口。</p>
+     *
+     * <p>作废路径不需要唯一键仲裁（更新不产生新行），仍用一条 UPDATE。</p>
      */
     private void upsertReviewTask(Record r, ScoreResultVO vo) {
-        // 1. 先取该病历还没作废的任务（作废的保留历史轨迹，不参与幂等）
-        List<ReviewTask> existing = reviewTaskMapper.selectList(new QueryWrapper<ReviewTask>()
-                .eq("record_id", r.getId()).eq("is_obsolete", 0));
+        LocalDateTime now = LocalDateTime.now().withNano(0);
         if ("待复核".equals(vo.getGrade())) {
-            // 2. 已有未作废任务就原地更新：重复提交不会堆出第二条待办
-            if (!existing.isEmpty()) {
-                ReviewTask t = existing.get(0);
-                t.setScore(vo.getScore());
-                t.setIssueType(issueType(vo));
-                t.setStatus("pending");
-                reviewTaskMapper.updateById(t);
-            } else {
-                // 3. 没有就新建，时限默认 7 个工作日
-                ReviewTask t = new ReviewTask();
-                t.setRecordId(r.getId());
-                // 阶段 2：复核任务打组——写入时打标，避免查询期 JOIN（QueryWrapper 不便于 JOIN）
-                t.setGroupId(r.getGroupId());
-                t.setStatus("pending");
-                t.setIssueType(issueType(vo));
-                t.setScore(vo.getScore());
-                t.setCreateTime(LocalDateTime.now().withNano(0));
-                t.setDeadlineTime(addWorkdays(LocalDateTime.now(), 7));
-                t.setIsObsolete(0);
-                reviewTaskMapper.insert(t);
-            }
+            // 1. 原子 upsert：已有活跃行就刷新，没有就新建（时限默认 7 个工作日）
+            //    复核任务打组织标记——写入时打标，避免查询期 JOIN（QueryWrapper 不便于 JOIN）
+            reviewTaskMapper.upsertPending(r.getId(), r.getGroupId(), vo.getScore(),
+                    issueType(vo), now);
         } else {
-            // 4. 已达标则把未作废任务作废而不是删除，历史复核轨迹要留
-            for (ReviewTask t : existing) {
-                t.setIsObsolete(1);
-                reviewTaskMapper.updateById(t);
-            }
+            // 2. 已达标则把未作废任务作废而不是删除，历史复核轨迹要留
+            reviewTaskMapper.obsoleteActive(r.getId(), now);
         }
     }
 

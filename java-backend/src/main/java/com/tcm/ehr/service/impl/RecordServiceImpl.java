@@ -320,8 +320,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 continue;
             }
             r.setId(UUID.randomUUID().toString());
-            // 新建病历入组（否则是无组病历，导入者导完自己也看不到）
+            // 新建病历入组织（否则是无组织病历，导入者导完自己也看不到）
             r.setGroupId(RequestUtils.currentGroupId());
+            // 去重兜底：写 text_hash 让 DB 的 uk_records_org_text_hash 生效。
+            // 不写的话该列恒 NULL，唯一键形同虚设（批次 4 随 DDL 一起补的代码路径）
+            r.setTextHash(RecordUtil.textHash(r));
             toInsert.add(r);
         }
     }
@@ -371,7 +374,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         r.setDepartment(dto.getDepartment());
         r.setDoctorId(dto.getDoctorId());
         r.setVisitTime(dto.getVisitTime());
-        // 4. 落库
+        // 4. 去重兜底：与导入同口径算 text_hash，让唯一键能拦住重复单条新增
+        r.setTextHash(RecordUtil.textHash(r));
+        // 5. 落库
         baseMapper.insert(r);
 
         // 5. 只回传新病历 ID
