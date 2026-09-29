@@ -80,7 +80,10 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private static final List<String> PENDING_MENUS = List.of();
 
     @Override
-    @Transactional
+    // rollbackFor 必写：本方法连写 users + research_groups + group_members 三张表，
+    // 默认只回滚 RuntimeException，任何受检异常都会留下「用户已建、组织没建」的半成品。
+    // 口径与 RecordServiceImpl / ReviewServiceImpl / QcServiceImpl.processOne 一致。
+    @Transactional(rollbackFor = Exception.class)
     public boolean register(String username, String password, RegisterDTO.CreateGroup createGroup) {
         // 1. 用户名重复直接拒绝
         if (baseMapper.findByUsername(username) != null) {
@@ -102,7 +105,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             throw new IllegalArgumentException("用户名已存在");
         }
 
-        // 4. 不带建组申请 → 只注册，账号留在待分配池等组长拉
+        // 4. 不带建组申请 → 只注册，账号留在待加入用户（等所有者拉入或自行创建组织）
         if (createGroup == null) {
             return false;
         }
@@ -112,9 +115,11 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
                 .eq("code", code)
                 .ne("status", ResearchGroup.REJECTED));
         if (taken != null && taken > 0) {
-            throw new IllegalArgumentException("课题组编码「" + code + "」已被占用，请换一个");
+            throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
         }
-        // 5.1 建 pending 组（待管理员审批）
+        // 5.1 建 pending 组（待管理员审批）；编码唯一索引兜底并发竞态，
+        //     否则异常直冒会变成 500（批次 2 的 409 只覆盖 DataIntegrityViolation，
+        //     这里显式转成 400 的业务文案更贴近「换个编码」的引导）
         ResearchGroup g = new ResearchGroup();
         g.setId(UUID.randomUUID().toString());
         g.setCode(code);
@@ -123,7 +128,12 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         g.setStatus(ResearchGroup.PENDING);
         g.setAppliedBy(user.getId());
         g.setCreateTime(LocalDateTime.now().withNano(0));
-        groupMapper.insert(g);
+        try {
+            groupMapper.insert(g);
+        } catch (DuplicateKeyException e) {
+            // 并发同编码注册：上面的 selectCount 检查与插入之间有窗口，由唯一索引兜底
+            throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
+        }
         // 5.2 申请人成为首任组长（待审批，但组内身份先立好，审批通过即可用）
         GroupMember m = new GroupMember();
         m.setId(UUID.randomUUID().toString());

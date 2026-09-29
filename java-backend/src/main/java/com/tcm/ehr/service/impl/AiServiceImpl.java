@@ -575,7 +575,11 @@ public class AiServiceImpl implements IAiService {
             return objectMapper.readValue(r.getStructuredData(), new TypeReference<Map<String, Object>>() {
             });
         } catch (JacksonException e) {
-            // 2. 坏 JSON 同样给空 map：AI 解读不该被一条脏数据卡住
+            // 2. 坏 JSON 同样给空 map：AI 解读不该被一条脏数据卡住。
+            //    但必须留痕：否则「这条病历没有结构化数据」与「JSON 坏了」
+            //    在解读结果里完全无法区分，脏数据会一直无人发现
+            log.warn("[AI] 病历 {} 的 structured_data 解析失败，按空数据解读：{}",
+                    r.getId(), e.getOriginalMessage());
             return Map.of();
         }
     }

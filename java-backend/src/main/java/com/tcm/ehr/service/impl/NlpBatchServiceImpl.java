@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -196,6 +197,16 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 前置校验：没开抽取就不要排任务，避免整批必然失败
         if (!nlpClient.isEnabled()) {
             throw new IllegalArgumentException("抽取服务未开启（nlp.enabled=false），无法执行批量解析");
+        }
+        // 1.1 防重：与质控侧同一口径（查表判 QUEUED/RUNNING）。
+        //     解析侧原先完全没有这道门，重复点击会起多个并发任务同时压 Python 服务，
+        //     且后提交的任务会让先提交的进度互相覆写。
+        //     ⚠️ 本步仍是 check-then-act（与 QcBatchServiceImpl.submit 同样），
+        //     彻底原子化在批次 9 统一处理，本批只补上缺失的门。
+        Long active = taskMapper.selectCount(new QueryWrapper<NlpTask>()
+                .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED)));
+        if (active != null && active > 0) {
+            throw new IllegalArgumentException("已有解析任务在排队或运行中，请等它结束或先取消");
         }
         FiltersDTO filters = dto == null ? null : dto.getFilters();
         int limit = dto == null || dto.getLimit() == null ? 0 : dto.getLimit();
@@ -602,17 +613,24 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
-    /** 还原任务落库时冻结的筛选条件；解析不了按"不限"处理 */
+    /**
+     * 还原任务落库时冻结的筛选条件。
+     *
+     * <p>⚠️ <b>解析失败必须抛，不能退化成 null</b>：{@code null} 在下游表示「不限范围」，
+     * 解析失败若也返回 null，<b>指定范围的任务会静默变成全库解析</b>。
+     * 提交侧已用 writeJsonStrict 保证写入合法，此处是「历史脏数据」的兜底。</p>
+     */
     private FiltersDTO readFilters(String json) {
-        // 1. null / 空 / 字面 "null" 都表示「不限范围」
+        // 1. null / 空 / 字面 "null" 都表示「提交时未限定范围」
         if (json == null || json.isBlank() || "null".equals(json)) {
             return null;
         }
-        // 2. 解析不了也按「不限」兜底，但这条路径只在历史脏数据上出现
+        // 2. 解析不了：让任务失败，不默默扩大成全库
         try {
             return objectMapper.readValue(json, FiltersDTO.class);
         } catch (Exception e) {
-            return null;
+            log.error("[批解析] 筛选条件解析失败，任务将终止（不回退成全库范围）：{}", json, e);
+            throw new BusinessException(4003, "任务筛选条件损坏，无法执行。请重新提交一次");
         }
     }
 

@@ -15,6 +15,7 @@ import com.tcm.ehr.service.GroupResolution;
 import com.tcm.ehr.service.IGroupService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -247,7 +248,14 @@ public class GroupServiceImpl extends ServiceImpl<ResearchGroupMapper, ResearchG
         m.setRole(GroupMember.ROLE_MEMBER);
         m.setIsPrimary(1);
         m.setCreateTime(LocalDateTime.now().withNano(0));
-        memberMapper.insert(m);
+        // uk_group_user 唯一索引兜底并发拉人：上面的 status 检查与插入之间有窗口
+        // （两个所有者同时拉同一人都会看到「无归属」）。不捕获的话异常直冒成 500，
+        // 用户只会看到「系统异常」而不知道「该用户已被拉走」。
+        try {
+            memberMapper.insert(m);
+        } catch (DuplicateKeyException e) {
+            throw new IllegalArgumentException("该用户已在其他组织中，请刷新后重试");
+        }
         updateUserStatus(userId, User.STATUS_ACTIVE, false);
     }
 

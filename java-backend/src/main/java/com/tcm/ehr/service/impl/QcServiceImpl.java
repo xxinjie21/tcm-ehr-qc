@@ -27,6 +27,7 @@ import com.tcm.ehr.domain.vo.ScoreResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -175,10 +176,21 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 处理单条：现算评分 → 回写 records → 幂等 upsert 复核任务 → 计入分级统计。
      *
-     * <p>§七 L5：改为<b>包级可见</b>——异步 worker（{@code QcBatchServiceImpl}）复用本方法处理单条，
+     * <p>§七 L5：供异步 worker（{@code QcBatchServiceImpl}）复用本方法处理单条，
      * 避免在两个类里实现两份「现算 + 回写 + 复核任务」逻辑（两者口径一旦分岔就会让重算结果对不上）。</p>
+     *
+     * <p><b>为什么是 public</b>：Spring 基于代理的 {@code @Transactional} <b>只对 public 方法生效</b>。
+     * 本方法原为包级可见，注解加在上面等于没加（编译通过、运行期静默不开事务）；
+     * 调用方是<b>另一个 Bean</b>（{@code QcBatchServiceImpl}），走的是代理，改 public 后才真正生效。</p>
+     *
+     * <p><b>事务边界</b>：本方法先写 {@code records} 再 upsert {@code review_tasks}，
+     * 中途异常会留下「分数已写、复核任务未建」的脏状态，故整段包在一个事务里。
+     * {@code rollbackFor = Exception.class} 必写：默认只回滚 RuntimeException，
+     * 而本方法 {@code throws Exception}，漏了会静默不回滚。
+     * 逐条一个事务是<b>刻意的</b>：调用方按条 catch，一条失败不该把整批已成功的回滚掉。</p>
      */
-    void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception {
+    @Transactional(rollbackFor = Exception.class)
+    public void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception {
         // 1. 批内按 21 字段文本哈希判重（与导入去重、清洗去重同口径）
         String hash = RecordUtil.textHash(r);
         boolean duplicate = !seenHash.add(hash);
@@ -463,8 +475,10 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
         try {
             return objectMapper.readValue(r.getQcResults(), ScoreResultVO.class);
-        } catch (Exception ignored) {
-            // 落库格式异常则退回现算（走慢路径）
+        } catch (Exception e) {
+            // 落库格式异常则退回现算（走慢路径）；不抛是因为单条脏数据不该中断整批重算，
+            // 但必须留痕：否则「脏数据有多少」在日志里完全不可见
+            log.warn("[质控] 病历 {} 的 qc_results 解析失败，退回现算：{}", r.getId(), e.getMessage());
             return null;
         }
     }
@@ -480,6 +494,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         try {
             return QcScorer.score(asMap(null, r.getStructuredData()), r, false, ruleStore.get());
         } catch (Exception e) {
+            // 现算失败：调用侧把该条当「算不出来」跳过。不抛，但必须留痕 ——
+            // 静默 return null 会让「评分缺失」与「确实算不出」在上层完全无法区分
+            log.warn("[质控] 病历 {} 现算评分失败，该条将不计分：{}", r.getId(), e.getMessage());
             return null;
         }
     }
@@ -516,7 +533,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             return objectMapper.convertValue(src, new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
-            // 3. 解析失败返回 null，由评分按「未结构化」处理，不算病历本身有错
+            // 3. 解析失败返回 null，由评分按「未结构化」处理（会扣分），必须留痕：
+            //    否则「病历没结构化」与「JSON 坏了」两种原因在结果里看不出区别
+            log.warn("[质控] 结构化数据解析失败，按「未结构化」计分：{}", e.getMessage());
             return null;
         }
     }

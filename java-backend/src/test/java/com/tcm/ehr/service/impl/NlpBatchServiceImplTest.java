@@ -10,6 +10,7 @@ import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IDictionaryFileService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
@@ -106,6 +107,32 @@ class NlpBatchServiceImplTest {
     @Test
     void endStatus_shutdownWithCancelledStaysCancelled() {
         assertEquals(NlpTask.CANCELLED, NlpBatchServiceImpl.endStatus(false, true, 10, 500));
+    }
+
+    // ------------------------------------------------- 批次 3：提交防重
+
+    /**
+     * 解析侧原先<b>完全没有</b>防重（质控侧有）：重复点击会起多个并发任务同时压 Python 服务，
+     * 且后提交的任务进度会互相覆写。锁住「已有活跃任务时拒绝提交」。
+     */
+    @Test
+    void submitRejectsWhenAnotherTaskIsActive() {
+        NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
+        // selectCount 返回已有活跃任务（防重命中，insert 不该被调用）
+        when(taskMapper.selectCount(any())).thenReturn(1L);
+        // nlp.enabled 是更前置的门（不开抽取连排任务都不该允许），先让它通过才能走到防重那一步
+        PythonNlpClient nlpClient = mock(PythonNlpClient.class);
+        when(nlpClient.isEnabled()).thenReturn(true);
+
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
+                mock(RecordMapper.class), nlpClient, mock(EntityNormalizer.class),
+                mock(IDictionaryFileService.class), new ObjectMapper());
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> svc.submit(new com.tcm.ehr.domain.dto.NlpBatchDTO(), "tester"));
+        assertTrue(e.getMessage().contains("已有解析任务"), e.getMessage());
+        // 防重命中时应就地拒绝：除防重那次查表外，不该再有任何写库动作
+        verify(taskMapper, Mockito.never()).insert(Mockito.any(NlpTask.class));
     }
 
     /**

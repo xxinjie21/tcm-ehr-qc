@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -483,7 +484,17 @@ public class QcBatchServiceImpl implements IQcBatchService {
         }
     }
 
-    /** 还原任务落库时冻结的筛选条件；解析不了按「不限」处理 */
+    /**
+     * 还原任务落库时冻结的筛选条件。
+     *
+     * <p>⚠️ <b>解析失败必须抛，不能退化成 null</b>：{@code null} 在下游表示「不限范围」，
+     * 解析失败若也返回 null，<b>指定范围的任务会静默变成全库重算</b>——
+     * 这是本组后果最重的一处（会改写全库评分）。提交侧已用 writeJsonStrict 保证写入合法，
+     * 这里抛异常是「历史脏数据」的兜底：宁可任务失败可查，也不能默默扩大范围。</p>
+     *
+     * @param json 任务行上的 filters_json
+     * @return 筛选条件；{@code null}/空/字面 {@code "null"} 表示「提交时未限定范围」
+     */
     private FiltersDTO readFilters(String json) {
         if (json == null || json.isBlank() || "null".equals(json)) {
             return null;
@@ -491,7 +502,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
         try {
             return objectMapper.readValue(json, FiltersDTO.class);
         } catch (Exception e) {
-            return null;
+            log.error("[批重算] 筛选条件解析失败，任务将终止（不回退成全库范围）：{}", json, e);
+            throw new BusinessException(4003, "任务筛选条件损坏，无法执行。请重新提交一次");
         }
     }
 

@@ -218,11 +218,14 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         if (json == null || json.isBlank()) {
             return null;
         }
-        // 2. 坏 JSON 也给 null：复核要能继续走完，不能因为一条脏数据卡住复核员
+        // 2. 坏 JSON 也给 null：复核要能继续走完，不能因为一条脏数据卡住复核员。
+        //    但必须留痕：null 在下游表示「没有结构化数据」，
+        //    与「数据坏了」混淆会让脏数据一直不被发现
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
         } catch (JacksonException e) {
+            log.warn("[复核] structured_data 解析失败，按「无结构化数据」处理：{}", e.getOriginalMessage());
             return null;
         }
     }
