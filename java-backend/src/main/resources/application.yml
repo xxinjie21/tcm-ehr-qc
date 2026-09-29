@@ -106,8 +106,6 @@ nlp:
 # 默认关闭；关闭或调用失败时回退规则兜底，不阻塞主流程（模型装配见上方 spring.ai.model）
 llm:
   enabled: false              # 总控。此处只是启动基线，运行时被「导入 LLM」经 LlmConfigStore 覆盖
-  convert-enabled: true       # 词典 PDF 智能转换子开关，受 llm.enabled 总控约束（总控关闭时上传 PDF 回 400）。
-                              # 静态 @Value，改完要重启；默认开，使「导入 LLM = AI 功能都开」成立
   provider: ollama            # ollama | openai
   base-url: ""                # 留空用通道默认：ollama=http://localhost:11434，openai=https://api.openai.com/v1
   api-key: ""                 # provider=openai 时必填；留空则该通道降级（不影响启动）

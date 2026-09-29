@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
  * <p>用法：</p>
  * <pre>
  * &#64;RequireRole(roles = {"管理员"})                  // 仅管理员
- * &#64;RequireRole(roles = {"管理员", "审核员"})         // 复核双角色
+ * &#64;RequireRole(roles = {"管理员"})                    // 仅管理员
  * </pre>
  *
  * <p>角色取值以 openapi 的【权限：…】标注为准（契约权威），四档中的「公开」由

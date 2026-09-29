@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
 // 已登录用户的合法系统级角色（与后端一致：管理员 / 用户。
-// 组长、组员、待分配池在前端都归「用户」，组内区分看 groupRole）
+// 所有者、成员、待加入用户在前端都归「用户」，组织内区分看 orgRole）
 const KNOWN_ROLES = ['管理员', '用户']
 
 const routes = [
@@ -23,9 +23,12 @@ const routes = [
       { path: 'governance', name: 'Governance', component: () => import('@/views/Governance.vue'), meta: { title: '清洗与导出' } },
       { path: 'dictionary', name: 'Dictionary', component: () => import('@/views/Dictionary.vue'), meta: { title: '术语词典' } },
       { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '日志审计' } },
-      // 阶段2：课题组管理（仅管理员）与我的课题组（组长/组员/申请人）
-      { path: 'groups', name: 'Groups', component: () => import('@/views/Groups.vue'), meta: { title: '课题组管理', roles: ['管理员'] } },
-      { path: 'my-group', name: 'MyGroup', component: () => import('@/views/MyGroup.vue'), meta: { title: '我的课题组' } }
+      // 阶段2：组织管理（仅管理员）与我的组织（所有者/成员/申请人）
+      // 旧路径 /groups、/my-group 保留一个发布周期，批次 5 删
+      { path: 'orgs', name: 'Orgs', component: () => import('@/views/Groups.vue'), meta: { title: '组织管理', roles: ['管理员'] } },
+      { path: 'groups', redirect: '/orgs' },
+      { path: 'my-org', name: 'MyOrg', component: () => import('@/views/MyGroup.vue'), meta: { title: '我的组织' } },
+      { path: 'my-group', redirect: '/my-org' }
     ]
   }
 ]
@@ -55,12 +58,12 @@ router.beforeEach((to) => {
     ElMessage.error('无权限访问该页面')
     return '/dashboard'
   }
-  // 无组用户的落地页（阶段2 §7.2）：路由守卫把数据页全拦到「我的课题组」，
-  // 由 MyGroup.vue 按身份渲染「待分配池 / 审批中」引导文案。
+  // 无组织用户的落地页（阶段2 §7.2）：路由守卫把数据页全拦到「我的组织」，
+  // 由 MyGroup.vue 按身份渲染引导文案。
   // 哪些页面算「数据页」：7 个数据处理页 + 日志审计 + 术语词典（管理员不受影响）。
-  if (!userStore.hasGroup && userStore.role !== '管理员'
-      && to.path !== '/my-group' && to.name !== 'MyGroup') {
-    return '/my-group'
+  if (!userStore.hasOrg && userStore.role !== '管理员'
+      && to.path !== '/my-org' && to.path !== '/my-group') {
+    return '/my-org'
   }
   return true
 })

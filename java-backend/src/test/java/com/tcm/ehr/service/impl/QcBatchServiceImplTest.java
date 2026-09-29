@@ -115,7 +115,7 @@ class QcBatchServiceImplTest {
      * 提交时把「操作人 + 角色」冻结进 {@code qc_task}。
      *
      * <p>这是整条异步链路的地基：worker 若用 {@code "unknown"} 重建过滤器，
-     * 一次全库重算就会把审核员看不见的病历也重算并改写分数。</p>
+     * 一次全库重算就会把别的组织看不见的病历也重算并改写分数。</p>
      */
     @Test
     void submitFreezesOperatorAndRoleOntoTheTaskRow() {

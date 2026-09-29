@@ -38,7 +38,7 @@ class GlobalExceptionHandlerTest {
                 .setControllerAdvice(handler)
                 .build();
 
-        mockMvc.perform(multipart("/api/dictionary/convert").param("type", "symptom"))
+        mockMvc.perform(multipart("/api/dictionary/import").param("type", "symptom"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg").value("缺少文件参数：file"));

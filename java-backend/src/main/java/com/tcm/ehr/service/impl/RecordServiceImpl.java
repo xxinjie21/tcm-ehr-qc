@@ -383,12 +383,12 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 查询单条原始病历（含结构化数据与质控结果），只读。
      *
-     * <p>先按数据域校验：审核员仅可见「待复核」病历，其余角色不限；不满足即拒绝而非返回空。
+     * <p>先按组织数据域校验：不满足即拒绝而非返回空。
      * 病历不存在时返回 null。</p>
      *
      * @param recordId 病历 ID
      * @return 原始病历视图；不存在时为 null
-     * @throws ForbiddenException 审核员访问非待复核病历时抛出
+     * @throws ForbiddenException 访问非本组织病历时抛出
      */
     @Override
     public RawRecordVO getRawRecord(String recordId) {

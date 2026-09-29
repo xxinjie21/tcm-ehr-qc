@@ -144,7 +144,7 @@ public class RecordController {
     /**
      * 多条件分页查询病历。
      *
-     * <p>【权限：登录即可 + 数据域】审核员恒为待复核域。</p>
+     * <p>【权限：登录即可 + 数据域】按当前组织过滤。</p>
      *
      * @param dto 查询条件与分页参数
      * @return total=总条数；records=当前页摘要列表

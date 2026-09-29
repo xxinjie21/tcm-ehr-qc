@@ -1,8 +1,8 @@
 <template>
   <div>
-    <PanelCard title="课题组管理">
+    <PanelCard title="组织管理">
       <el-tabs v-model="tab" @tab-change="load">
-        <el-tab-pane label="待审批建组" name="pending">
+        <el-tab-pane label="待审批创建组织" name="pending">
           <el-table v-loading="loading" :data="pendingGroups" border stripe>
             <el-table-column prop="code" label="组编码" width="140" />
             <el-table-column prop="name" label="组名称" min-width="160" />
@@ -22,7 +22,7 @@
           <el-table v-loading="loading" :data="groups" border stripe>
             <el-table-column prop="code" label="组编码" width="130" />
             <el-table-column prop="name" label="组名称" min-width="140" />
-            <el-table-column label="组长" width="120">
+            <el-table-column label="所有者" width="120">
               <template #default="{ row }">{{ row.ownerName || '—' }}</template>
             </el-table-column>
             <el-table-column prop="memberCount" label="成员数" width="80" />
@@ -47,19 +47,19 @@
           </el-table>
         </el-tab-pane>
 
-        <el-tab-pane label="待分配池" name="pool">
+        <el-tab-pane label="待加入用户" name="pool">
           <el-table v-loading="loading" :data="poolUsers" border stripe>
             <el-table-column prop="username" label="用户名" min-width="160" />
             <el-table-column prop="createTime" label="注册时间" width="200">
               <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
             </el-table-column>
           </el-table>
-          <p class="pool-tip">待分配池用户只有组长「我的课题组」页里的拉人入口能接收。</p>
+          <p class="pool-tip">待加入的用户只有所有者「我的组织」页里的拉人入口能接收。</p>
         </el-tab-pane>
       </el-tabs>
 
       <!-- 拒绝弹窗：理由必填（拒绝后编码会被改写释放） -->
-      <el-dialog v-model="rejectVisible" title="拒绝建组申请" width="440px">
+      <el-dialog v-model="rejectVisible" title="拒绝创建组织申请" width="440px">
         <el-input v-model="rejectReason" type="textarea" :rows="3" placeholder="拒绝理由（必填，申请人可见）" />
         <template #footer>
           <el-button @click="rejectVisible = false">取消</el-button>
@@ -105,7 +105,7 @@ const load = async () => {
 const doApprove = async (row) => {
   try {
     await approveGroup(row.id)
-    ElMessage.success(`已通过「${row.name}」，${row.ownerName || '申请人'} 成为组长`)
+    ElMessage.success(`已通过「${row.name}」，${row.ownerName || '申请人'} 成为所有者`)
     load()
   } catch {
     // 拦截器已提示
@@ -129,7 +129,7 @@ const doReject = async () => {
 const doStop = async (row) => {
   try {
     await stopGroup(row.id)
-    ElMessage.warning(`「${row.name}」已停用：组员将无法登录，数据保留`)
+    ElMessage.warning(`「${row.name}」已停用：成员将无法登录，数据保留`)
     load()
   } catch {
     // 拦截器已提示

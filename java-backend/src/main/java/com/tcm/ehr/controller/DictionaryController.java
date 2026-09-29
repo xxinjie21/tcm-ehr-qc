@@ -5,7 +5,6 @@ import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.service.IDictionaryService;
 import com.tcm.ehr.common.utils.OperationLogger;
-import com.tcm.ehr.domain.vo.ConvertPreviewVO;
 import com.tcm.ehr.domain.vo.ImportResultVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +20,7 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * 术语词典：导入、PDF 转换预览、查询、版本回滚、备份列表。
+ * 术语词典：导入、查询、版本回滚、备份列表。
  *
  * <p>词典以 JSON 文件存放，每次导入自动备份。{@code type} 非法统一返回 400 + code=4001。</p>
  */
@@ -57,31 +56,6 @@ public class DictionaryController {
         // 3. 留痕：词典变更影响全库归一结果，必须可追溯
         operationLogger.log("词典导入", type, "成功" + vo.getImported()
                 + "条，失败" + vo.getFailed() + "条");
-        return ResponseEntity.ok(Result.ok(vo));
-    }
-
-    /**
-     * 把国标 PDF 转换成候选术语供预览。
-     *
-     * <p>【权限：登录即可】预览不落库，确认后走 {@code /import} 入库。LLM 未开启或通道不可达时
-     * 返回 400 与可读提示，引导改用离线脚本或 JSON 直传。</p>
-     *
-     * @param file 国标 PDF 文件
-     * @param type 术语类型
-     * @return candidates=候选术语；failed=抽取失败明细
-     */
-    @PostMapping("/convert")
-    public ResponseEntity<Result<ConvertPreviewVO>> convert(@RequestParam("file") MultipartFile file,
-                                                           @RequestParam("type") String type) throws IOException {
-        // 1. 类型校验
-        if (!TermTypes.ALL.contains(type)) {
-            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
-        }
-        // 2. 只出候选不落库；LLM 未开/不可达在 service 里抛 400
-        ConvertPreviewVO vo = dictionaryService.convertFromPdf(type, file);
-        // 3. 留痕并注明"待确认入库"
-        operationLogger.log("词典转换", type, "候选" + vo.getCandidates().size()
-                + "条，失败" + vo.getFailed().size() + "条（待确认入库）");
         return ResponseEntity.ok(Result.ok(vo));
     }
 

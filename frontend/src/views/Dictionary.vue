@@ -1,6 +1,6 @@
 <template>
   <!-- 词典管理页（管理员）：五个词典类型（疾病 / 证候 / 症状 / 中药 / 方剂）切换，
-       下面依次是术语查询、术语库导入、PDF 转换预览、版本回滚 -->
+       下面依次是术语查询、术语库导入、版本回滚 -->
   <div>
     <el-tabs v-model="activeTab" class="dict-tabs">
       <el-tab-pane label="疾病" name="disease" />
@@ -74,9 +74,9 @@
       />
     </PanelCard>
 
-    <!-- 术语库导入：非 PDF 直接覆盖入库（导入前自动备份）；PDF 先转换出候选、确认后才写入 -->
-    <!-- 写入入口仅管理员（后端 import/rollback/convert 仍 @RequireRole(管理员)）；后端要求保持一致 -->
-    <PanelCard v-if="isAdmin" title="术语库导入">
+    <!-- 术语库导入：Excel / CSV / JSON 覆盖入库（导入前自动备份） -->
+    <!-- 写入入口按 admin / owner / 授权成员 三档判定（与后端 import/rollback 的门禁一致） -->
+    <PanelCard v-if="canWrite" title="术语库导入">
       <div class="import-row">
         <el-upload
           ref="uploadRef"
@@ -87,17 +87,16 @@
           :on-change="onFileChange"
           :on-remove="onFileRemove"
           :on-exceed="onFileExceed"
-          accept=".xlsx,.xls,.csv,.json,.pdf"
+          accept=".xlsx,.xls,.csv,.json"
         >
           <div class="upload-tip">
             拖拽文件到此处，或 <em>点击选择</em>
-            <div class="sub">支持 Excel(.xlsx/.xls) / CSV / JSON；PDF 可智能转换为术语</div>
+            <div class="sub">支持 Excel(.xlsx/.xls) / CSV / JSON</div>
           </div>
         </el-upload>
         <div class="import-actions">
-          <!-- 按钮文案随文件类型切换：PDF 走「智能转换（预览）」，其余走「开始导入」 -->
-          <el-button type="primary" :loading="importing || converting" :disabled="!importFile" @click="handleImport">
-            {{ isPdfFile ? '智能转换（预览）' : '开始导入' }}
+          <el-button type="primary" :loading="importing" :disabled="!importFile" @click="handleImport">
+            开始导入
           </el-button>
           <div class="tip" style="margin-top: 8px">导入前会自动备份，可在下方「版本回滚」恢复。</div>
 
@@ -107,8 +106,7 @@
             <summary>查看格式说明</summary>
             <div class="fmt-body">
               · Excel / CSV：第 1 列「标准术语」、第 2 列「别名」（多个用 、或 ; 分隔），可选第 3 列「国标代码」<br />
-              · JSON：条目数组，每项含「标准术语」「别名」，可选「来源」「国标代码」<br />
-              · PDF：上传后先转换为候选术语，确认无误再入库
+              · JSON：条目数组，每项含「标准术语」「别名」，可选「来源」「国标代码」
             </div>
           </details>
         </div>
@@ -127,73 +125,8 @@
       </div>
     </PanelCard>
 
-    <!-- PDF 智能转换预览：预览阶段不落库，确认后才写入。
-         由弹窗改为同页展开——弹窗内嵌宽表格必然出现滚动条，
-         且用户看不到它属于「术语库导入」这一步的上下文。左＝候选，右＝失败明细与确认操作 -->
-    <PanelCard
-      v-if="isAdmin && convertVisible"
-      ref="convertRef"
-      title="PDF 转换预览"
-      class="convert-panel"
-    >
-      <template #header>
-        <span>PDF 转换预览（确认后才写入词典）</span>
-        <el-button link class="hd-close" @click="convertVisible = false">关闭预览</el-button>
-      </template>
-
-      <div class="convert-body">
-        <div class="convert-main">
-          <div class="convert-hd">
-            转换出候选 <b>{{ convert.candidates.length }}</b> 条，失败 <b>{{ convert.failed.length }}</b> 条；
-            确认后写入【{{ typeLabel }}】词典。
-          </div>
-          <el-table :data="convert.candidates" border size="small" max-height="400" style="margin-top: 10px">
-            <el-table-column type="index" label="#" width="50" />
-            <el-table-column prop="standardTerm" label="标准术语" width="170" />
-            <el-table-column label="别名" min-width="220">
-              <template #default="{ row }">
-                <el-tag
-                  v-for="a in row.aliases"
-                  :key="a"
-                  size="small"
-                  effect="plain"
-                  style="margin-right: 6px"
-                >{{ a }}</el-tag>
-                <span v-if="!row.aliases?.length" class="tip">无</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="source" label="来源" width="150" show-overflow-tooltip />
-            <el-table-column prop="code" label="国标代码" width="110" />
-            <template #empty>
-              <el-empty description="没有可入库的候选" :image-size="70" />
-            </template>
-          </el-table>
-        </div>
-
-        <div class="convert-side">
-          <div class="col-hd">失败明细（{{ convert.failed.length }} 条）</div>
-          <div v-if="convert.failed.length" class="fail-list">
-            <div v-for="(f, i) in convert.failed" :key="i" class="ded-item">
-              <span>{{ f.reason }}{{ f.text ? '：' + f.text : '' }}</span>
-            </div>
-          </div>
-          <div v-else class="tip">本次没有失败项。</div>
-
-          <div class="convert-actions">
-            <el-button :disabled="!convert.failed.length" @click="downloadFailed">下载失败明细</el-button>
-            <el-button
-              type="primary"
-              :loading="importing"
-              :disabled="!convert.candidates.length"
-              @click="confirmConvert"
-            >确认入库（{{ convert.candidates.length }} 条）</el-button>
-          </div>
-        </div>
-      </div>
-    </PanelCard>
-
     <!-- 版本回滚：每次导入前自动备份，选任一版本覆盖当前词典并立即生效 -->
-    <PanelCard v-if="isAdmin" title="版本回滚">
+    <PanelCard v-if="canWrite" title="版本回滚">
       <div class="rollback-row">
         <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
@@ -225,20 +158,20 @@
 
 <script setup>
 // 词典管理页：类型切换会同时刷新「术语查询」与「版本回滚」两块数据。
-// 导入有两条路径 —— 非 PDF 直接覆盖入库；PDF 先转换预览，确认后再把候选转成 JSON 复用同一入库接口。
-import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
+// 导入只有一条路径 —— Excel / CSV / JSON 覆盖入库（导入前自动备份）。
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
-import { getTerms, importDict, convertDict, rollback, getBackups } from '@/api/dictionary'
-import { saveBlob } from '@/utils/download'
+import { getTerms, importDict, rollback, getBackups } from '@/api/dictionary'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES, PAGE_SIZES_LARGE } from '@/utils/constants'
 
 const userStore = useUserStore()
-// 术语词典的写入入口（导入/转换/回滚）仅管理员；只读浏览对所有登录用户开放
-const isAdmin = computed(() => userStore.role === '管理员')
+// 术语词典写入入口（导入/回滚）：管理员 / 所有者 / 被授权成员三档；
+// 只读浏览对所有登录用户开放。后端按同一三档校验（批次 6 落地授权位），前端只负责不展示无效入口。
+const canWrite = computed(() => userStore.canWriteDictionaryEntry)
 
 // 词典类型 → 界面文案；键名与后端 type 参数一致（disease / pattern / symptom / herb / formula）
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
@@ -300,12 +233,9 @@ const handleSizeChange = () => {
 // 切换词典类型：先清掉上一次的查询与导入状态，再拉新类型的数据
 watch(activeTab, () => {
   keyword.value = ''
-  // 切换词典类型时清空上一次的导入/转换结果与已选文件，
+  // 切换词典类型时清空上一次的导入结果与已选文件，
   // 否则会把「上一类词典的结果」误读成本次的结果
   importResult.value = null
-  convert.candidates = []
-  convert.failed = []
-  convertVisible.value = false
   dictFileList.value = []
   importFile.value = null
   loadTerms()
@@ -319,11 +249,8 @@ const importFile = ref(null)
 const importing = ref(false)
 const importResult = ref(null)
 
-// 已选文件是否为 PDF：决定导入按钮走「智能转换（预览）」还是「开始导入」
-const isPdfFile = computed(() => (importFile.value?.name || '').toLowerCase().endsWith('.pdf'))
-
 const MAX_FILE_MB = 50
-const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.json', '.pdf']
+const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.json']
 
 /** 预校验扩展名与大小，不合格直接剔除并说明原因*/
 const rejectFile = (raw, reason) => {
@@ -371,92 +298,25 @@ const onFileExceed = (files) => {
   }
 }
 
-/** 统一入口：PDF 先走智能转换出预览，其余格式直接入库 */
+/** 统一入口：二次确认后覆盖式入库 */
 const handleImport = async () => {
   // 1. 没有待提交文件就直接返回
   if (!importFile.value) return
-  // 2. PDF 先走「智能转换」出候选预览，不在这里入库
-  if (isPdfFile.value) {
-    await handleConvert()
-    return
-  }
-  // 3. 其余格式覆盖式入库，先二次确认（取消则中止）
+  // 2. 覆盖式入库，先二次确认（取消则中止）
   if (!(await confirmBox(
     `确定用「${importFile.value.name}」覆盖【${typeLabel.value}】词典吗？`,
     '术语库导入',
     { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' }
   ))) return
-  // 4. 执行入库，成功后清空已选文件与上传列表
-  await doImport(importFile.value)
-  uploadRef.value?.clearFiles()
-  importFile.value = null
-}
-
-// PDF 转换预览状态：candidates 为待入库候选，failed 为失败明细（可下载）
-const convertVisible = ref(false)
-const convertRef = ref(null)
-const convert = reactive({ candidates: [], failed: [] })
-const converting = ref(false)
-
-/** 预览展开时滚到面板处，避免用户以为「点了没反应」 */
-watch(convertVisible, (v) => {
-  if (!v) return
-  nextTick(() => {
-    convertRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  })
-})
-
-/** PDF → LLM 转换 → 候选预览（此步不落库） */
-const handleConvert = async () => {
-  // 1. 置转换态：按钮 loading，避免重复提交
-  converting.value = true
-  try {
-    // 2. 组装上传表单：文件 + 当前词典类型
-    const fd = new FormData()
-    fd.append('file', importFile.value)
-    fd.append('type', activeTab.value)
-    // 3. 调后端转换（此步只出候选，不落库）
-    const res = await convertDict(fd)
-    // 4. 回填候选与失败明细
-    convert.candidates = res.data.candidates || []
-    convert.failed = res.data.failed || []
-    // 5. 一条候选都没有时提醒用户去看失败明细
-    if (!convert.candidates.length) {
-      ElMessage.warning('未转换出可入库的候选，请查看失败明细')
-    }
-    // 6. 展开预览面板，并清空已选文件（候选已进预览框）
-    convertVisible.value = true
-    // 转换成功、候选已进预览框，这时才清空已选文件
+  // 3. 执行入库，成功后清空已选文件与上传列表
+  const ok = await doImport(importFile.value)
+  if (ok) {
     uploadRef.value?.clearFiles()
     importFile.value = null
-  } catch {
-    // 拦截器已提示，含「转换未启用」的友好文案；失败时保留已选文件以便直接重试
-  } finally {
-    converting.value = false
   }
 }
 
-/** 预览确认 → 候选转成 JSON 文件，复用 JSON 直传入库路径 */
-const confirmConvert = async () => {
-  // 1. 候选映射成入库结构，剔掉预览用的多余字段
-  const payload = convert.candidates.map((c) => ({
-    standardTerm: c.standardTerm,
-    aliases: c.aliases || [],
-    source: c.source || '',
-    code: c.code || null
-  }))
-  // 2. 包成 JSON File，复用「JSON 直传入库」这条路径
-  const file = new File(
-    [JSON.stringify(payload, null, 2)],
-    `converted_${activeTab.value}.json`,
-    { type: 'application/json' }
-  )
-  // 3. 执行入库；成功才收起预览面板
-  const ok = await doImport(file)
-  if (ok) convertVisible.value = false
-}
-
-// 真正入库：非 PDF 与「PDF 转换确认」两条路径共用（后者把候选转成 JSON File 再走这里）
+/** 真正入库：Excel / CSV / JSON 直传覆盖写入 */
 const doImport = async (file) => {
   // 1. 置导入态：按钮 loading，避免重复提交
   importing.value = true
@@ -468,10 +328,11 @@ const doImport = async (file) => {
     // 3. 提交入库并回填结果（总数 / 成功 / 失败明细）
     const res = await importDict(fd)
     importResult.value = res.data
-    // 4. 提示成功并刷新术语列表
+    // 4. 提示成功并刷新术语列表与版本列表
     ElMessage.success(`导入完成：成功 ${res.data.imported} / 共 ${res.data.total}`)
     loadTerms()
-    // 5. 返回成功，供调用方决定是否收起预览
+    loadBackups()
+    // 5. 返回成功，供调用方决定是否清空已选文件
     return true
   } catch {
     // 拦截器已提示
@@ -480,15 +341,6 @@ const doImport = async (file) => {
     // 无论成败都复位导入态
     importing.value = false
   }
-}
-
-// 失败明细导出为制表符分隔的 txt；前置 BOM 以免 Excel 打开乱码
-const downloadFailed = () => {
-  const rows = convert.failed.map((f) => `${f.text || ''}\t${f.reason || ''}`).join('\n')
-  saveBlob(
-    new Blob(['\uFEFF原文\t原因\n' + rows], { type: 'text/plain;charset=utf-8' }),
-    `convert_failed_${Date.now()}.txt`
-  )
 }
 
 // 版本回滚数据
@@ -647,74 +499,5 @@ onMounted(() => {
   padding: 6px 12px;
   margin-bottom: 6px;
   font-size: 12.5px;
-}
-
-/* ===== PDF 转换预览：同页展开，左右两栏===== */
-.convert-panel {
-  margin-top: 14px;
-}
-/* 面板头部右侧的「关闭预览」 */
-.hd-close {
-  font-size: 12.5px;
-}
-/* 转换预览：左候选表（flex:2）、右失败明细与操作（flex:1） */
-.convert-body {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-}
-.convert-main {
-  flex: 2;
-  min-width: 0;
-}
-/* 右栏最小宽度 250px，保证失败文案不被挤成竖排 */
-.convert-side {
-  flex: 1;
-  min-width: 250px;
-  border-left: 1px solid var(--line);
-  padding-left: 24px;
-}
-/* 右栏小标题 */
-.col-hd {
-  font-size: 12.5px;
-  font-weight: bold;
-  color: var(--ink);
-  padding-bottom: 6px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-}
-/* 失败项可能上百条，给一个与候选表等高的滚动区；
-   页面本身不再出现滚动条 */
-.fail-list {
-  max-height: 400px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-/* 右栏底部操作按钮 */
-.convert-actions {
-  margin-top: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-/* 候选表上方的汇总说明 */
-.convert-hd {
-  font-size: 13px;
-  color: var(--text-sub);
-  line-height: 1.7;
-}
-.convert-hd b {
-  color: var(--ink);
-}
-@media (max-width: 900px) {
-  .convert-body {
-    flex-direction: column;
-  }
-  .convert-side {
-    border-left: 0;
-    padding-left: 0;
-    min-width: 0;
-    width: 100%;
-  }
 }
 </style>

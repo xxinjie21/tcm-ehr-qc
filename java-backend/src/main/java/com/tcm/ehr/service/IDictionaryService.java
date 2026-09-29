@@ -1,6 +1,5 @@
 package com.tcm.ehr.service;
 
-import com.tcm.ehr.domain.vo.ConvertPreviewVO;
 import com.tcm.ehr.domain.vo.ImportResultVO;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -9,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 术语库业务：查询、导入、PDF 转换预览、回滚、版本列表。
+ * 术语库业务：查询、导入、回滚、版本列表。
  *
  * <p>写入路径固定为 Excel/CSV/JSON → JSON → 内存 + ES 索引。</p>
  */
@@ -37,18 +36,6 @@ public interface IDictionaryService {
      * @return total/imported/failed=行数统计与失败明细
      */
     ImportResultVO importDictionary(String type, MultipartFile file) throws IOException;
-
-    /**
-     * 把国标 PDF 转为候选术语预览。
-     *
-     * <p>只预览不落库，确认后走 {@link #importDictionary} 入库；LLM 不可用时抛
-     * IllegalArgumentException，由上层转 400 与可读提示。</p>
-     *
-     * @param type 术语类型
-     * @param file PDF 文件
-     * @return candidates=候选术语；failed=抽取失败明细
-     */
-    ConvertPreviewVO convertFromPdf(String type, MultipartFile file) throws IOException;
 
     /**
      * 回滚到历史版本并刷新内存与 ES 索引。

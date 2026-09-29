@@ -24,7 +24,7 @@ public class OperationLog {
     private LocalDateTime logTime;
     /** 操作人用户名 */
     private String operator;
-    /** 操作人角色（管理员/审核员） */
+    /** 操作人角色（管理员/用户） */
     private String role;
     /** 操作类型（数据清洗/数据集导出/词典导入/词典回滚/人工复核/批量重算） */
     private String action;

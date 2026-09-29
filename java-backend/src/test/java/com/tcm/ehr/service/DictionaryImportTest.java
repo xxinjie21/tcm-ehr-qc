@@ -1,8 +1,5 @@
 package com.tcm.ehr.service;
 
-import com.tcm.ehr.common.config.LlmConfigStore;
-import com.tcm.ehr.common.config.LlmProperties;
-import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
 import com.tcm.ehr.service.impl.DictionaryServiceImpl;
@@ -16,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
@@ -55,33 +51,12 @@ class DictionaryImportTest {
         when(fileService.read(anyString())).thenReturn(List.of());
         when(fileService.backup(anyString())).thenReturn("symptoms.json.bak_test");
 
-        service = newService(false, false);
+        service = newService();
     }
 
-    /**
-     * 按开关状态构造服务（避免反射改 final 字段）。
-     *
-     * <p>两处刻意的构造参数，别删：</p>
-     * <ul>
-     *   <li>{@code configFile} 指到 {@code target/} 下的不存在路径 —— 默认的
-     *       {@code data/llm-config.json} 是开发机真实配置（enabled=true/provider=openai），
-     *       不隔离的话断言取决于本机文件；</li>
-     *   <li>{@code provider = "ollama"} —— {@code convertFromPdf} 先过
-     *       {@code isEnabled()} 再过 {@code isAvailable()}，最后才检查扩展名。
-     *       非 PDF 用例要走到扩展名那一关，前置的可用性判断就必须能通过（ollama 通道无需凭据、
-     *       装配不联网）。</li>
-     * </ul>
-     */
-    private DictionaryServiceImpl newService(boolean llmEnabled, boolean convertEnabled) {
-        LlmProperties props = new LlmProperties();
-        props.setEnabled(llmEnabled);
-        props.setProvider("ollama");
-        props.setConfigFile("target/nonexistent-llm-config.json");
-        LlmClient client = new LlmClient(new LlmConfigStore(props, new ObjectMapper()));
-        DictionaryServiceImpl s = new DictionaryServiceImpl(fileService, esIndex,
-                new ObjectMapper(), client);
-        ReflectionTestUtils.setField(s, "convertEnabled", convertEnabled);
-        return s;
+    /** 构造服务：只注入导入路径依赖的三个协作者 */
+    private DictionaryServiceImpl newService() {
+        return new DictionaryServiceImpl(fileService, esIndex, new ObjectMapper());
     }
 
     private static MockMultipartFile json(String name, String body) {
@@ -259,33 +234,5 @@ class DictionaryImportTest {
         Mockito.verify(esIndex).rebuild(Mockito.eq(TYPE), captor.capture(), Mockito.any());
         assertEquals(1, captor.getValue().size());
         assertEquals("喉痹", captor.getValue().get(0).getStandardTerm());
-    }
-
-    // ---------------------------------------------------------------- PDF 转换兜底
-
-    /** 开关关闭（llm.enabled 与 llm.convert-enabled 均 false）：回友好文案而非 500 */
-    @Test
-    void convertWhenDisabled_shouldGiveFriendlyMessage() {
-        MultipartFile pdf = new MockMultipartFile("file", "gb.pdf", "application/pdf",
-                "%PDF-1.4".getBytes(StandardCharsets.UTF_8));
-
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> service.convertFromPdf(TYPE, pdf));
-
-        assertTrue(e.getMessage().contains("PDF 智能转换未启用"), e.getMessage());
-        assertTrue(e.getMessage().contains("JSON 直传"), "文案应给出替代路径：" + e.getMessage());
-        assertTrue(e.getMessage().contains("convert-standard-pdf.py"), "文案应指向离线脚本");
-    }
-
-    /** 非 PDF 文件走 convert：明确拒绝，不误当作 PDF 解析 */
-    @Test
-    void convertWithNonPdf_shouldThrow() {
-        DictionaryServiceImpl enabled = newService(true, true);
-        MultipartFile xlsx = new MockMultipartFile("file", "terms.xlsx",
-                "application/octet-stream", new byte[]{1, 2, 3});
-
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> enabled.convertFromPdf(TYPE, xlsx));
-        assertTrue(e.getMessage().contains("仅支持 .pdf"), e.getMessage());
     }
 }

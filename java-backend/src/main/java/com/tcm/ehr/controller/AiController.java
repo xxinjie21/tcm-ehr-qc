@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * AI 消费端接口：质控解读、助手问答、复核预检。
  *
- * <p>读病历受数据域约束（审核员仅待复核域）；LLM 不可用时降级为规则输出，不阻塞也不外泄底层异常。</p>
+ * <p>读病历受组织数据域约束；LLM 不可用时降级为规则输出，不阻塞也不外泄底层异常。</p>
  */
 @RestController
 @RequestMapping("/api/ai")
@@ -66,7 +66,7 @@ public class AiController {
     /**
      * 生成复核预检意见。
      *
-     * <p>【权限：管理员 / 审核员】基于规则重算的扣分明细给出建议，病历不存在返回 404。</p>
+     * <p>【权限：登录即可】基于规则重算的扣分明细给出建议，病历不存在返回 404。</p>
      *
      * @param dto recordId=病历ID（必填）
      * @return answer=预检建议；source=rule/llm；llmAvailable=LLM 是否可用

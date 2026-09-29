@@ -33,7 +33,7 @@ import java.util.TreeMap;
  * 统计服务实现：指标卡聚合 + 按type统计（500条内内存聚合）+ 看板扩展。
  *
  * <p>看板扩展的过滤统一走 {@link RecordFilter}（先数据域、后用户筛选），
- * 与病历读取同域；审核员只统计待复核域。</p>
+ * 与病历读取同域（按组织过滤）。</p>
  */
 @Slf4j
 @Service
@@ -49,7 +49,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 查询可选科室列表，只读。
      *
-     * <p>按当前请求的数据域取（审核员仅待复核域，管理员不限），供筛选下拉使用。</p>
+     * <p>按当前请求的组织数据域取，供筛选下拉使用。</p>
      *
      * @return 去重后的科室名列表
      */
@@ -84,7 +84,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 按类型统计：先按数据域收窄范围，再按调用方给的 ID 或筛选条件圈定。
      *
-     * <p>数据域必须在最前面叠加，否则登录即可的接口会让审核员读到全库词频。</p>
+     * <p>数据域必须在最前面叠加，否则登录即可的接口会读到跨组织词频。</p>
      */
     @Override
     public StatsVO stats(StatsDTO dto) {
@@ -282,7 +282,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return "60以下";
     }
 
-    /** 本请求的数据域分级：审核员 = 待复核，管理员 = null（不限） */
+    /** 本请求的组织数据域：管理员 = null（不限），其余身份 = 当前组织 ID */
     private String domainGroupId() {
         return RecordFilter.domainGroupId();
     }

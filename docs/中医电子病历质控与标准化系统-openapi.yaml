@@ -5,12 +5,13 @@ info:
     中医电子病历质控与标准化系统接口文档。
 
     ## 权限约定
-    接口分四档权限，各接口在 description 首部以【权限：…】标注：
-    - **仅管理员**：管理类操作（词典导入/回滚、数据清洗、数据集导出、日志审计、质控评分与重算）。
-    - **登录即可**：只读查询与业务计算（术语查询/归一、统计看板、NLP 抽取、原始病历查看）。
-    - **管理员 / 审核员**：复核相关接口（复核任务列表、提交复核）。
+    接口分五档权限，各接口在 description 首部以【权限：…】标注：
     - **公开**：用户登录、用户注册。
-    审核员另受**数据域（行级权限）**约束：仅可读取 grade='待复核' 的病历；管理员为全库。
+    - **登录即可**：只读查询与业务计算（术语查询/归一、统计看板、NLP 抽取、原始病历查看、复核、日志审计）。
+    - **本人**：只能读写自己的配置（LLM 通道与密钥）。
+    - **管理员 / 所有者 / 授权成员**：组织级配置的写入（词典导入/回滚、质控规则保存与重置）。
+    - **仅管理员**：组织治理（组织列表、停用/恢复/归档、改派所有者）。
+    数据可见范围按**组织**隔离：管理员看全部（受 auth.admin-can-view-data 开关控制），其余身份只看本组织。
     执行顺序固定为「先数据域、后用户筛选」取交集，用户筛选条件不得绕过数据域。
     权限不足统一返回 HTTP 403（code=403）。
     ## 实体分层命名约定
@@ -246,7 +247,7 @@ components:
           type: string
         role:
           type: string
-          description: 管理员 / 审核员
+          description: 管理员 / 授权成员
         menus:
           type: array
           items:
@@ -1083,7 +1084,7 @@ components:
         file:
           type: string
           format: binary
-          description: import 支持 Excel(.xlsx/.xls) / CSV / JSON；convert 支持 PDF
+          description: 仅支持 Excel(.xlsx/.xls) / CSV / JSON
     DictionaryImportVO:
       type: object
       description: 术语库导入结果（出参）
@@ -1103,37 +1104,6 @@ components:
             properties:
               row:
                 type: integer
-              reason:
-                type: string
-    DictionaryConvertVO:
-      type: object
-      description: 术语库 PDF 转换预览（出参）；预览不落库，确认后调 /api/dictionary/import 入库
-      properties:
-        type:
-          type: string
-        candidates:
-          type: array
-          items:
-            type: object
-            properties:
-              standardTerm:
-                type: string
-              aliases:
-                type: array
-                items:
-                  type: string
-              source:
-                type: string
-              code:
-                type: string
-                description: 可选国标代码（GB/T 15657 / GB/T 16751）
-        failed:
-          type: array
-          items:
-            type: object
-            properties:
-              text:
-                type: string
               reason:
                 type: string
     DictionaryTermVO:
@@ -1433,7 +1403,7 @@ paths:
       tags:
         - 认证
       summary: 用户注册
-      description: 【权限：公开】注册账号角色固定为「审核员」，不开放管理员注册（请求体传入的 role 会被忽略）；管理员账号由 database-init.sql 预置
+      description: 【权限：公开】注册账号角色固定为「用户」，不开放管理员注册（请求体传入的 role 会被忽略）；管理员账号由 database-init.sql 预置
       security: []
       requestBody:
         required: true
@@ -1454,7 +1424,7 @@ paths:
               password: '123456'
       responses:
         '200':
-          description: 注册成功（角色固定为审核员）
+          description: 注册成功（角色固定为「用户」）
           content:
             application/json:
               schema:
@@ -1473,7 +1443,7 @@ paths:
                         type: string
                       role:
                         type: string
-                        example: 审核员
+                        example: 用户
         '400':
           description: 参数非法或用户名已存在（code=400）
           content:
@@ -2859,7 +2829,7 @@ paths:
       tags:
         - 词典管理
       summary: 术语库导入
-      description: 【权限：仅管理员】上传术语文件（Excel .xlsx/.xls、CSV、JSON），解析校验后写入术语库文件，写入前自动备份旧文件；PDF 请先走 /api/dictionary/convert
+      description: 【权限：仅管理员】上传术语文件（Excel .xlsx/.xls、CSV、JSON），解析校验后写入术语库文件，写入前自动备份旧文件
       requestBody:
         required: true
         content:
@@ -2884,43 +2854,6 @@ paths:
                     $ref: '#/components/schemas/DictionaryImportVO'
         '400':
           description: 术语类型非法（code=4001）；行级转换失败在 data.failures 中返回（code=4003，整体仍返回 200）
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorVO'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-  /api/dictionary/convert:
-    post:
-      tags:
-        - 词典管理
-      summary: 术语库 PDF 智能转换（预览）
-      description: 【权限：登录即可】上传国标 PDF，抽取文本后由 LLM 提取术语候选；不写入术语库，确认后再调 /api/dictionary/import 入库。AI 能力未开启（llm.enabled 关闭）或通道连不上时返回 400；提示文案不出现配置项名（llm.convert-enabled 自 2026-09-22 起默认开启）
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/DictionaryImportDTO'
-      responses:
-        '200':
-          description: 转换完成（仅预览，不落库）
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 200
-                  msg:
-                    type: string
-                  data:
-                    $ref: '#/components/schemas/DictionaryConvertVO'
-        '400':
-          description: 术语类型非法（code=4001）；或转换未启用 / LLM 不可用 / PDF 未抽到文本（code=400，msg 给出替代路径）
           content:
             application/json:
               schema:
@@ -3341,7 +3274,7 @@ paths:
       tags:
         - AI助手
       summary: AI质控解读
-      description: 【权限：登录即可】对单条病历生成可解释质控解读：规则出结论（完整性/缺项重点/归一命中/关键提示），再由 LlmClient 生成叙述与要点摘要；LLM 不可用降级模板叙述。读取受数据域约束（审核员仅待复核域）
+      description: 【权限：登录即可】对单条病历生成可解释质控解读：规则出结论（完整性/缺项重点/归一命中/关键提示），再由 LlmClient 生成叙述与要点摘要；LLM 不可用降级模板叙述。读取受组织数据域约束
       requestBody:
         required: true
         content:
@@ -3428,7 +3361,7 @@ paths:
       description: |
         【权限：登录即可】基于规则预检单（qc_results / 重算）与 structuredData 生成复核建议
         （疑缺脉象 / 证候-方剂冲突 / 建议复核重点）；判定仍为规则，LLM 仅叙述；
-        LLM 关/挂 → 回退预检单原文。读取受数据域约束（审核员仅待复核域）。
+        LLM 关/挂 → 回退预检单原文。读取受组织数据域约束。
       requestBody:
         required: true
         content:

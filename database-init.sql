@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS operation_log (
   id VARCHAR(36) PRIMARY KEY COMMENT '主键UUID',
   log_time DATETIME NOT NULL COMMENT '操作时间',
   operator VARCHAR(50) COMMENT '操作人用户名',
-  role VARCHAR(20) COMMENT '操作人角色：管理员/审核员',
+  role VARCHAR(20) COMMENT '操作人角色：管理员/用户',
   action VARCHAR(50) COMMENT '操作类型：数据清洗/数据集导出/词典导入/词典回滚/人工复核/批量重算',
   target VARCHAR(255) COMMENT '操作对象：筛选范围/文件名/词典类型/病历ID',
   detail TEXT COMMENT '操作明细',

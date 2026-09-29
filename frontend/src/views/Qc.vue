@@ -1,5 +1,5 @@
 <template>
-  <!-- 质控页：范围查询（整页口径）+ 评分标准 + 规则配置（仅管理员）+ 扣分构成 + AI 预检列表 + 扣分明细弹窗 -->
+  <!-- 质控页：范围查询（整页口径）+ 评分标准 + 规则配置（三档授权）+ 扣分构成 + AI 预检列表 + 扣分明细弹窗 -->
   <div>
     <!-- 范围查询提升为整页生效：此前 RangeFilter 只喂图谱，
          而「AI 预检列表」另挂一个独立的分级下拉，同一页存在两个互不相干的范围口径 -->
@@ -26,7 +26,7 @@
     <PanelCard title="质控评分标准">
       <template #header>
         <span>质控评分标准</span>
-        <el-button v-if="isAdmin" link type="primary" class="hd-action" @click="openRules">规则配置</el-button>
+        <el-button v-if="canWriteRules" link type="primary" class="hd-action" @click="openRules">规则配置</el-button>
       </template>
       <!-- 标准摘要：把当前生效的规则用自然语言摊开，改规则即随之变化（与规则同源） -->
       <div v-if="rules" class="std-grid">
@@ -71,7 +71,7 @@
       <el-empty v-if="!rules" description="标准加载中…" :image-size="60" />
     </PanelCard>
 
-    <!-- 规则配置（仅管理员）：句子清单 + 就地编辑，保存即生效 -->
+    <!-- 规则配置（管理员 / 所有者 / 被授权成员）：句子清单 + 就地编辑，保存即生效 -->
     <el-dialog v-model="rulesVisible" title="规则配置（改完点保存即生效）" width="min(1000px, 96vw)" top="4vh">
       <!-- 句子式编辑器：每段就是一句可读的话，直接在句子里改数字 / 选项，不暴露 JSON -->
       <div v-if="form.rules" class="rc">
@@ -329,7 +329,7 @@
 
 <script setup>
 // 质控页：范围查询是整页口径 —— 一次「查询」同时刷新「扣分构成」与「AI 预检列表」两块。
-// 管理员另有「规则配置」弹窗，保存后规则立即生效，无需重启后端。
+// 有写权限者另有「规则配置」弹窗，保存后规则立即生效，无需重启后端。
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
@@ -345,10 +345,9 @@ import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { PAGE_SIZES } from '@/utils/constants'
 
-// 仅管理员可改规则（与后端 @RequireRole 一致）
+// 规则写入口按 admin / owner / 授权成员 三档判定（与后端 qc/rules 写接口一致）
 const userStore = useUserStore()
-// 规则配置入口与后端写接口都要求管理员，前端据此隐藏无效入口
-const isAdmin = computed(() => userStore.role === '管理员')
+const canWriteRules = computed(() => userStore.canWriteQcRulesEntry)
 
 // 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
@@ -423,7 +422,7 @@ const params = () => {
   }
 }
 
-// ===== 规则配置（管理员）：句子清单 + 就地编辑 =====
+// ===== 规则配置（有写权限者）：句子清单 + 就地编辑 =====
 // 规则配置弹窗状态
 const rulesVisible = ref(false)
 const savingRules = ref(false)

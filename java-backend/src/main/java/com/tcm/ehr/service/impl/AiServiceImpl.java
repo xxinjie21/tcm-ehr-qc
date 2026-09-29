@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter;
  * AI 消费端服务实现。
  *
  * <p>规则优先：解读结论、降级问答由规则产出；LLM 只做叙述增强，异常/不可用一律降级，
- * 绝不阻塞主流程（与 LlmClient 约定一致）。读取受数据域约束（审核员仅待复核域）。</p>
+ * 绝不阻塞主流程（与 LlmClient 约定一致）。读取受组织数据域约束。</p>
  */
 @Slf4j
 @Service

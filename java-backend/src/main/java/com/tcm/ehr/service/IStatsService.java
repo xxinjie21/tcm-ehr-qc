@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * 统计服务：首页指标卡、按类型统计、科室选项、看板一次拉取与扩展统计。
  *
- * <p>所有聚合都受数据域约束：管理员全库，审核员仅待复核域。</p>
+ * <p>所有聚合都受组织数据域约束：管理员看全部，其余身份只看本组织。</p>
  */
 public interface IStatsService extends IService<Record> {
 

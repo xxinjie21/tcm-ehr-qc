@@ -97,13 +97,13 @@ class AuthServiceTest {
 
         assertNotNull(vo.getToken());
         assertEquals("管理员", vo.getRole());
-        // 阶段2：管理员菜单 = 原 8 项 + 「课题组管理」= 9 项
-        // （注：计划 §八 的侧栏图同时列了「课题组管理」与「我的课题组」，但那条写的是
-        //  管理员 8 项 → 9 项；管理员从「我的课题组」页看的就是自己的组信息，
-        //  与 Groups.vue 的组列表是同一诉求，故只加 1 项以对上计划的数量）
+        // 阶段2：管理员菜单 = 原 8 项 + 「组织管理」= 9 项
+        // （注：计划 §八 的侧栏图同时列了「组织管理」与「我的组织」，但那条写的是
+        //  管理员 8 项 → 9 项；管理员从「我的组织」页看的就是自己的组织信息，
+        //  与 Orgs 页的组织列表是同一诉求，故只加 1 项以对上计划的数量）
         List<String> menus = vo.getMenus();
         assertEquals(9, menus.size());
-        assertTrue(menus.contains("课题组管理"));
+        assertTrue(menus.contains("组织管理"));
         assertTrue(menus.contains("人工复核"));
         assertTrue(menus.contains("清洗与导出"));
         assertFalse(menus.contains("数据清洗"));
@@ -115,15 +115,14 @@ class AuthServiceTest {
     }
 
     @Test
-    void auditorLoginOk() {
+    void legacyAuditorRoleLoginOk() {
         when(userMapper.findByUsername("auditor"))
                 .thenReturn(user("audit-0001", "auditor", "审核员"));
 
         LoginVO vo = authService.login("auditor", "123456");
 
-        assertEquals("审核员", vo.getRole());
-        // 审核员在阶段 2 中已不再是独立角色：会认定为「用户」，
-        // 菜单取决于组内角色（此处无组 → 空菜单）
+        // 存量「审核员」账号的 role 字段原样回显（不做数据迁移改名），
+        // 但它已不是独立权限维度：菜单按组织内角色给，此处无组织 → 空菜单
         assertEquals(List.of(), vo.getMenus());
         assertNotNull(vo.getToken());
     }
@@ -186,7 +185,7 @@ class AuthServiceTest {
      * 审批中的建组申请人必须能登录。
      *
      * <p>回归：旧实现把「有成员行但解析不到 active 组」等同于「组已停用」，
-     * 于是状态为 pending 的申请人被误报「所属课题组已被停用」而无法登录。
+     * 于是状态为 pending 的申请人被误报「所属组织已被停用」而无法登录。
      * 正确语义：只有组状态为 stopped 才拒登。</p>
      */
     @Test
@@ -233,7 +232,7 @@ class AuthServiceTest {
         assertTrue(ex.getMessage().contains("停用"), ex.getMessage());
     }
 
-    /** 组长菜单：本组数据 + 术语词典/日志审计 + 我的课题组 */
+    /** 所有者菜单：本组数据 + 术语词典/日志审计 + 我的组织 */
     @Test
     void ownerMenuIncludesSharedReadOnlyAndMyGroup() {
         when(userMapper.findByUsername("zu")).thenReturn(user("u-zu", "zu", "用户"));
@@ -243,10 +242,10 @@ class AuthServiceTest {
 
         assertTrue(vo.getMenus().contains("术语词典"), vo.getMenus().toString());
         assertTrue(vo.getMenus().contains("日志审计"), vo.getMenus().toString());
-        assertTrue(vo.getMenus().contains("我的课题组"), vo.getMenus().toString());
+        assertTrue(vo.getMenus().contains("我的组织"), vo.getMenus().toString());
     }
 
-    /** 组员菜单：同样可用术语词典/日志审计，但无成员管理页 */
+    /** 成员菜单：同样可用术语词典/日志审计，但无成员管理页 */
     @Test
     void memberMenuHasDictionaryAndLogsButNotMyGroup() {
         when(userMapper.findByUsername("yu")).thenReturn(user("u-yu", "yu", "用户"));
@@ -256,6 +255,6 @@ class AuthServiceTest {
 
         assertTrue(vo.getMenus().contains("术语词典"), vo.getMenus().toString());
         assertTrue(vo.getMenus().contains("日志审计"), vo.getMenus().toString());
-        assertFalse(vo.getMenus().contains("我的课题组"), vo.getMenus().toString());
+        assertFalse(vo.getMenus().contains("我的组织"), vo.getMenus().toString());
     }
 }

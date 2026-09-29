@@ -19,7 +19,7 @@ import java.util.Map;
  * {@code group_id = 当前用户的主组}。{@code grade} 从此只做业务筛选（供应商可选），
  * 不再影响任何一个人能看到哪些数据。</p>
  *
- * <p>原设计的两个后果正是本次改造的动机：审核员复核通过一份病历后会
+ * <p>原设计的两个后果正是本次改造的动机：复核通过一份病历后会
  * <b>立刻失去访问它的权限</b>；一次批量重算会<b>批量翻转可见性</b>。</p>
  *
  * <p>⚠️ <b>fail-closed 是本类最关键的一行</b>：{@code groupId} 为空时必须生成<b>返回空集</b>的查询，
@@ -28,7 +28,6 @@ import java.util.Map;
 public final class RecordFilter {
 
     public static final String ROLE_ADMIN = "管理员";
-    public static final String ROLE_AUDITOR = "审核员";
 
     /**
      * fail-closed 用的不可能值、与 {@code records.id} 的 UUID 不可能相等。

@@ -1,25 +1,18 @@
 package com.tcm.ehr.service.impl;
 
-import com.tcm.ehr.common.utils.TextUtil;
-import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.domain.po.TermEntry;
-import com.tcm.ehr.domain.vo.ConvertPreviewVO;
 import com.tcm.ehr.domain.vo.ImportResultVO;
 import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.IDictionaryService;
 import com.tcm.ehr.service.IEsTermIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.core.JacksonException;
@@ -36,29 +29,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 词典服务实现：导入（Excel/CSV/JSON -> JSON -> 内存+ES）、PDF 智能转换预览、查询、回滚、备份列表
+ * 词典服务实现：导入（Excel/CSV/JSON -> JSON -> 内存+ES）、查询、回滚、备份列表
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DictionaryServiceImpl implements IDictionaryService {
 
-    /** PDF 送 LLM 的文本上限（字符）：超长截断，避免超出模型上下文 */
-    private static final int MAX_TEXT_CHARS = 20000;
-
     private final IDictionaryFileService fileService;
     private final IEsTermIndexService esTermIndexService;
     private final ObjectMapper objectMapper;
-    private final LlmClient llmClient;
-
-    /**
-     * 词典 PDF 智能转换子开关；依赖 {@code llm.enabled}。
-     *
-     * <p>2026-09-22 从 {@code nlp.convert-enabled} 挪到 {@code llm.convert-enabled}：真正干活的是
-     * {@link LlmClient}（Spring AI），与 :8001 的 python-nlp 服务无关。</p>
-     */
-    @Value("${llm.convert-enabled:false}")
-    private boolean convertEnabled;
 
     @Override
     /**
@@ -327,122 +307,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
         String source = e.getSource() == null ? "" : e.getSource().trim();
         String code = e.getCode() == null || e.getCode().isBlank() ? null : e.getCode().trim();
         return new TermEntry(standard, aliases, source, code);
-    }
-
-    // ---------------------------------------------------------------- PDF 智能转换
-
-    @Override
-    /**
-     * PDF 智能转换预览：PDFBox 抽取文本 -> 送 LLM 提取术语候选，不落库。
-     *
-     * <p>需 llm.enabled 与 llm.convert-enabled 双开关同时开启且 LLM 可用；文本超
-     * {@value #MAX_TEXT_CHARS} 字时截断并在 failed 中提示，扫描件（无文本层）直接拒绝。
-     * 管理员确认候选后再走 {@link #importDictionary} 落盘。</p>
-     *
-     * @param type 词典类型
-     * @param file 上传的 PDF 文件
-     * @return 转换预览（候选词条 + 失败原因）
-     * @throws IOException 文件读取或 PDF 解析失败
-     * @throws IllegalArgumentException 功能未启用、LLM 不可用、非 PDF、无文本或未提取到术语
-     */
-    public ConvertPreviewVO convertFromPdf(String type, MultipartFile file) throws IOException {
-        ConvertPreviewVO vo = new ConvertPreviewVO();
-        vo.setType(type);
-
-        // 双开关：llm.enabled 总控 + llm.convert-enabled 子控，两个都在 llm 段下。
-        // 子控由 application.yml 显式置 true（随包即开）；代码里的兜底值是 false，
-        // 所以 yml 缺这个键时会静默变成「默认关」——改 yml 时别漏掉这一行。
-        // 关闭属「预期内不可用」，用 IllegalArgumentException 让 GlobalExceptionHandler 回 400 +
-        // 明确文案（而非 500 系统异常）。
-        // 文案一律说人话、不出现配置项名：用户看到 llm.enabled / llm.convert-enabled 只会
-        // 以为是配置文件的问题，而这两个开关在页面上本来就打不开，说了也解决不了。
-        // 1. 开关未开 → 预期内不可用，400 + 明确替代方案
-        if (!llmClient.isEnabled() || !convertEnabled) {
-            throw new IllegalArgumentException(
-                    "PDF 智能转换未启用 —— 需要先开启 AI 能力：请让系统管理员在「导入 LLM」里"
-                            + "填写通道与密钥并保存，之后即可直接上传 PDF。"
-                            + "也可以改用 JSON 直传，或用离线脚本 tools/convert-standard-pdf.py 转换后导入。");
-        }
-        // 2. 开关开了但服务连不上 → 同样 400，文案指向「联系管理员」而非配置项名
-        if (!llmClient.isAvailable()) {
-            throw new IllegalArgumentException(
-                    "AI 服务当前连不上，无法智能转换。请让系统管理员确认 AI 服务已启动、"
-                            + "配置填写正确后重试；也可以改用 JSON 直传 / 离线脚本。");
-        }
-
-        // 3. 抽文本并前置校验：扫描件（无文本层）直接拒绝，不浪费一次模型调用
-        String text = extractPdfText(file);
-        if (text.isBlank()) {
-            throw new IllegalArgumentException("PDF 未抽取到文本（可能是扫描件），请改用离线脚本或 JSON 直传");
-        }
-        // 4. 超长截断并把这件事写进 failed，让用户知道只转了前半部分
-        if (text.length() > MAX_TEXT_CHARS) {
-            text = text.substring(0, MAX_TEXT_CHARS);
-            vo.getFailed().add(new ConvertPreviewVO.Failed("（PDF 超出 " + MAX_TEXT_CHARS + " 字，已截断）",
-                    "文本过长，仅转换前 " + MAX_TEXT_CHARS + " 字；建议用离线脚本分批处理"));
-        }
-
-        // 5. 送模型抽术语；返回空按失败处理，不当成功
-        String raw = llmClient.chat(LlmClient.DICT_CONVERT_SYSTEM_PROMPT, text);
-        if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException("LLM 调用失败（已降级），请稍后重试或改用 JSON 直传 / 离线脚本");
-        }
-        // 6. 解析候选；一条都没提到且没有失败项，说明模型没给出可用内容
-        parseCandidates(raw, vo);
-        if (vo.getCandidates().isEmpty() && vo.getFailed().isEmpty()) {
-            throw new IllegalArgumentException("LLM 未从 PDF 中提取到术语条目，请确认 PDF 内容或改用离线脚本");
-        }
-        log.info("[词典] {} PDF 转换完成: 候选{}条, 失败{}条", type, vo.getCandidates().size(), vo.getFailed().size());
-        return vo;
-    }
-
-    /** 抽 PDF 全文（PDFBox）；无文本层时返回空串，由上层转成失败明细 */
-    private String extractPdfText(MultipartFile file) throws IOException {
-        // 1. 只收 PDF，其余格式走导入通道
-        if (!fileName(file).endsWith(".pdf")) {
-            throw new IllegalArgumentException("智能转换仅支持 .pdf；Excel/CSV/JSON 请直接走导入");
-        }
-        // 2. 按坐标排序抽文本，多栏排版才不会串行
-        try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            stripper.setSortByPosition(true);
-            return stripper.getText(doc);
-        }
-    }
-
-    /** 从模型返回里解析候选词条；解析失败的行进失败明细，不影响其余候选 */
-    private void parseCandidates(String raw, ConvertPreviewVO vo) {
-        String json = TextUtil.stripCodeFence(raw);
-        List<ConvertPreviewVO.Candidate> list;
-        // 1. 整体按数组解析；解析不了就把原文记进失败明细，不静默丢弃
-        try {
-            list = objectMapper.readValue(json, new TypeReference<List<ConvertPreviewVO.Candidate>>() {
-            });
-        } catch (JacksonException e) {
-            // 模型没按格式返回：把原文放进 failed，便于人工查看而不是静默丢弃
-            vo.getFailed().add(new ConvertPreviewVO.Failed(truncate(raw, 500), "LLM 返回不是合法 JSON 数组"));
-            return;
-        }
-        // 2. 逐个校验标准术语，坏的记失败、好的收进候选
-        int idx = 0;
-        for (ConvertPreviewVO.Candidate c : list) {
-            idx++;
-            if (c == null || c.getStandardTerm() == null || c.getStandardTerm().isBlank()) {
-                vo.getFailed().add(new ConvertPreviewVO.Failed("第 " + idx + " 个元素",
-                        "标准术语列为空"));
-                continue;
-            }
-            c.setStandardTerm(c.getStandardTerm().trim());
-            vo.getCandidates().add(c);
-        }
-    }
-
-
-    /** 截断超长文本，避免单个字段把行撑爆 */
-    private String truncate(String s, int max) {
-        // 1. 超长才截断并补省略号，短文本原样返回
-        if (s == null) return "";
-        return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
     // ---------------------------------------------------------------- 回滚 / 备份

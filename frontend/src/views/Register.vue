@@ -3,16 +3,16 @@
     <h3>注册新账号</h3>
     <p class="hint">注册后可直接登录系统</p>
 
-    <div class="auth-role-tip">注册账号为「用户」（组长/组员/待分配池），管理员账号由系统预置。</div>
+    <div class="auth-role-tip">注册账号为「用户」（所有者/成员/待加入用户），管理员账号由系统预置。</div>
 
-    <!-- 阶段 2：可选「同时创建课题组」（代码必填、名称必填） -->
+    <!-- 阶段 2：可选「同时创创建组织织」（代码必填、名称必填） -->
     <el-collapse v-model="form.groupOpen" class="group-collapse">
-      <el-collapse-item title="同时创建课题组（可选）" name="group">
-        <p class="hint">勾选后提交会注册并申请建组，等管理员审批=你成为组长。不选则入待分配池等组长拉入。</p>
-        <el-form-item v-if="form.groupOpen" label="课题组编码" prop="groupCode">
+      <el-collapse-item title="同时创创建组织织（可选）" name="group">
+        <p class="hint">勾选后提交会注册并申请创建组织，等管理员审批=你成为所有者。不选则入待加入用户等所有者拉入。</p>
+        <el-form-item v-if="form.groupOpen" label="组织编码" prop="groupCode">
           <el-input v-model="form.groupCode" placeholder="如 NEURO-2026（2~50 位字母数字短横线下划线）" size="large" />
         </el-form-item>
-        <el-form-item v-if="form.groupOpen" label="课题组名称" prop="groupName">
+        <el-form-item v-if="form.groupOpen" label="组织名称" prop="groupName">
           <el-input v-model="form.groupName" placeholder="组名可重复，最长 100 字" size="large" />
         </el-form-item>
         <el-form-item v-if="form.groupOpen" label="用途说明（可选）">
@@ -117,13 +117,13 @@ const rules = {
   ],
   confirmPassword: [{ required: true, validator: validateConfirm, trigger: 'blur' }],
   groupCode: [
-    { required: true, whitespace: true, message: '请输入课题组编码', trigger: 'blur' },
+    { required: true, whitespace: true, message: '请输加入组织织编码', trigger: 'blur' },
     { pattern: /^[A-Za-z0-9_-]{2,50}$/, message: '编码为 2~50 位字母、数字、短横线或下划线', trigger: 'blur' }
   ],
-  groupName: [{ required: true, whitespace: true, message: '请输入课题组名称', trigger: 'blur' }]
+  groupName: [{ required: true, whitespace: true, message: '请输加入组织织名称', trigger: 'blur' }]
 }
 
-// 提交注册：校验通过后只提交用户名与密码（角色由后端固定为审核员）；
+// 提交注册：校验通过后只提交用户名与密码（角色由后端固定为「用户」）；
 // 成功后带用户名跳回登录页回填，用户只需再输密码
 const handleRegister = async () => {
   // 1. 先做表单校验（含确认密码一致性）；失败直接中止
@@ -132,7 +132,7 @@ const handleRegister = async () => {
   // 2. 置加载态：按钮转圈，避免重复提交
   loading.value = true
   try {
-    // 构建请求体：同时建组时勾上 createGroup；角色由后端固定为「用户」
+    // 构建请求体：同时创建组织时勾上 createGroup；角色由后端固定为「用户」
     const payload = { username: form.username, password: form.password }
     if (form.groupOpen) {
       payload.createGroup = {
@@ -142,8 +142,8 @@ const handleRegister = async () => {
       }
     }
     await register(payload)
-    // 3. 提示成功：建组请求与单纯注册用不同的口径提示
-    ElMessage.success(form.groupOpen ? '课题组申请已提交，等待管理员审批' : '注册成功，请等待课题组接收')
+    // 3. 提示成功：创建组织请求与单纯注册用不同的口径提示
+    ElMessage.success(form.groupOpen ? '组织申请已提交，等待管理员审批' : '注册成功，请等待组织接收')
     router.push({ path: '/login', query: { username: form.username } })
   } catch {
     // 拦截器已提示（如用户名已存在）

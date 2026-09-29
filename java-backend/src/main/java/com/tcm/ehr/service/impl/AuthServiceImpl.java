@@ -47,24 +47,24 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /**
-     * 管理员菜单（9 项：原 8 项 + 课题组管理）。
+     * 管理员菜单（9 项：原 8 项 + 组织管理）。
      * 名称与前端路由 / 侧栏一致。
      */
     private static final List<String> ADMIN_MENUS = List.of(
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", "术语词典", "日志审计", "课题组管理");
+            "清洗与导出", "术语词典", "日志审计", "组织管理");
 
     /**
-     * 组长菜单：本组数据 + 本组成员管理 + 共用只读（术语词典/日志审计）。
+     * 所有者菜单：本组数据 + 本组成员管理 + 共用只读（术语词典/日志审计）。
      *
-     * <p>术语词典的读取与日志审计均为「登录即可」（后者按组三档可见，见 §七 L7），
-     * 故组长/组员也能用；写入类（词典导入/回滚/转换）仍仅管理员，前端据 isAdmin 隐藏入口。</p>
+     * <p>术语词典的读取与日志审计均为「登录即可」（后者按组织三档可见，见 §七 L7），
+     * 故所有者/成员也能用；写入类（词典导入/回滚）按 admin/owner/授权位三档判定，前端据 store getter 隐藏入口。</p>
      */
     private static final List<String> OWNER_MENUS = List.of(
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", "术语词典", "日志审计", "我的课题组");
+            "清洗与导出", "术语词典", "日志审计", "我的组织");
 
-    /** 组员菜单：本组数据 + 共用只读（术语词典/日志审计），无成员管理 */
+    /** 成员菜单：本组数据 + 共用只读（术语词典/日志审计），无成员管理 */
     private static final List<String> MEMBER_MENUS = List.of(
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
             "清洗与导出", "术语词典", "日志审计");
@@ -157,22 +157,26 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             throw new IllegalStateException("所属课题组已被停用，请联系管理员");
         }
 
-        // 4. 签发 JWT（组**不**进 token），并按身份下发菜单
+        // 4. 签发 JWT（组织**不**进 token），并按身份下发菜单
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole()));
         vo.setRole(user.getRole());
-        vo.setGroupId(g.hasGroup() ? g.getGroupId() : "");
-        vo.setGroupRole(g.hasGroup() ? g.getGroupRole() : null);
+        vo.setOrgId(g.hasGroup() ? g.getGroupId() : "");
+        vo.setOrgRole(g.hasGroup() ? g.getGroupRole() : null);
         vo.setStatus(user.getStatus());
         vo.setPendingGroup(user.getHasPendingGroup() != null && user.getHasPendingGroup() == 1);
+        // 词典 / 质控规则写授权位：授权列在批次 4 的 DDL 落地前恒 false，
+        // 此时只有管理员与所有者能写（前端 getter 已按三档判定）
+        vo.setCanWriteDictionary(false);
+        vo.setCanWriteQcRules(false);
         vo.setMenus(menusOf(user, g));
         return vo;
     }
 
     /**
-     * 菜单四套：管理员 / 组长 / 组员 / 待分配池（空）。
+     * 菜单四套：管理员 / 所有者 / 成员 / 待分配池（空）。
      *
-     * <p>管理员与其它身份的区别是「能不能管组、能不能写共用配置」，
+     * <p>管理员与其它身份的区别是「能不能管组织、能不能写配置」，
      * <b>不是</b>「能不能看数据」—— 后者由 {@code auth.admin-can-view-data} 控制
      * （数据层 fail-closed），不在菜单层体现。</p>
      */

@@ -1,25 +1,25 @@
 <template>
   <div>
-    <PanelCard title="我的课题组">
-      <!-- 按身份切三种视图：组长（成员管理）/ 组员（组信息）/ 无组（引导） -->
+    <PanelCard title="我的组织">
+      <!-- 按身份切三种视图：所有者（成员管理）/ 成员（组信息）/ 无组（引导） -->
       <div v-if="loading" v-loading="loading" class="my-group-loading" />
 
-      <!-- ⚠️ 无组：待分配池 / 审批中的引导页（路由守卫已拦截数据页，这里必须把话说清） -->
+      <!-- ⚠️ 无组织：待加入用户 / 审批中的引导页（路由守卫已拦截数据页，这里必须把话说清） -->
       <div v-else-if="!data.group && !data.pendingApplication" class="my-group-empty">
-        <el-empty description="你还没有加入任何课题组">
+        <el-empty description="你还没有加入任何组织">
           <template #description>
-            <p class="empty-hint">你的账号位于<b>待分配池</b>，看不到任何病历数据。</p>
-            <p class="empty-hint">等某个组长从池里把你拉入后即可看到本组数据。</p>
+            <p class="empty-hint">你的账号位于<b>待加入用户</b>，看不到任何病历数据。</p>
+            <p class="empty-hint">等某个所有者从池里把你拉入后即可看到本组织数据。</p>
           </template>
           <router-link to="/register">
-            <el-button type="primary" size="small">或自己去申请创建课题组</el-button>
+            <el-button type="primary" size="small">或自己去申请创创建组织织</el-button>
           </router-link>
         </el-empty>
       </div>
 
       <!-- 审批中：申请人视图 -->
       <div v-else-if="data.pendingApplication" class="pending-block">
-        <el-result icon="info" title="课题组申请已提交" sub-title="等管理员审批，通过后你就是该组组长">
+        <el-result icon="info" title="组织申请已提交" sub-title="等管理员审批，通过后你就是该组织所有者">
         </el-result>
         <el-descriptions :column="1" border class="pending-desc">
           <el-descriptions-item label="组编码">{{ data.pendingApplication.code }}</el-descriptions-item>
@@ -30,24 +30,24 @@
         </el-descriptions>
       </div>
 
-      <!-- 有组：组长 / 组员共用 -->
+      <!-- 有组：所有者 / 成员共用 -->
       <div v-else>
         <el-descriptions :column="2" border>
           <el-descriptions-item label="组名称">{{ data.group.name }}</el-descriptions-item>
           <el-descriptions-item label="组编码">{{ data.group.code }}</el-descriptions-item>
           <el-descriptions-item label="我的身份">
-            {{ data.myRole === 'owner' ? '组长' : '组员' }}
+            {{ data.myRole === 'owner' ? '所有者' : '成员' }}
           </el-descriptions-item>
           <el-descriptions-item label="成员数">{{ data.group.memberCount }}</el-descriptions-item>
         </el-descriptions>
 
-        <!-- 组长操作区 -->
+        <!-- 所有者操作区 -->
         <template v-if="data.myRole === 'owner'">
           <div class="owner-actions">
             <el-button type="primary" size="small" @click="loadMembers">刷新成员</el-button>
-            <el-button size="small" @click="addDialog = true">从待分配池拉人</el-button>
+            <el-button size="small" @click="addDialog = true">从待加入用户拉人</el-button>
             <el-button size="small" type="danger" plain @click="doLeave" :loading="leaving">
-              退出课题组
+              退出组织
             </el-button>
           </div>
           <el-table v-loading="membersLoading" :data="members" border stripe style="margin-top: 12px">
@@ -55,7 +55,7 @@
             <el-table-column label="角色" width="90">
               <template #default="{ row }">
                 <el-tag size="small" :type="row.role === 'owner' ? 'warning' : 'info'" effect="plain">
-                  {{ row.role === 'owner' ? '组长' : '组员' }}
+                  {{ row.role === 'owner' ? '所有者' : '成员' }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -65,7 +65,7 @@
             <el-table-column label="操作" width="150">
               <template #default="{ row }">
                 <template v-if="row.role !== 'owner'">
-                  <el-button link type="primary" size="small" @click="doTransfer(row)">转让组长</el-button>
+                  <el-button link type="primary" size="small" @click="doTransfer(row)">转让所有者</el-button>
                   <el-button link type="danger" size="small" @click="doRemove(row)">移除</el-button>
                 </template>
                 <span v-else class="is-owner">（我）</span>
@@ -74,20 +74,20 @@
           </el-table>
         </template>
 
-        <!-- 组员只给信息，不给任何操作入口 -->
+        <!-- 成员只给信息，不给任何操作入口 -->
         <template v-else>
-          <p class="member-note">组员在本组只有读权限；需要拉人 / 转让等操作请联系组长。</p>
+          <p class="member-note">成员在本组织只有读权限；需要拉人 / 转让等操作请联系所有者。</p>
         </template>
       </div>
 
       <!-- 拉人弹窗 -->
-      <el-dialog v-model="addDialog" title="从待分配池拉人" width="480px">
+      <el-dialog v-model="addDialog" title="从待加入用户拉人" width="480px">
         <el-select v-model="pickUserId" placeholder="选择待分配用户" style="width: 100%" filterable>
           <el-option v-for="u in poolUsers" :key="u.id" :label="u.username" :value="u.id" />
         </el-select>
         <template #footer>
           <el-button @click="addDialog = false">取消</el-button>
-          <el-button type="primary" :disabled="!pickUserId" @click="doAdd">拉入本组</el-button>
+          <el-button type="primary" :disabled="!pickUserId" @click="doAdd">拉入本组织</el-button>
         </template>
       </el-dialog>
     </PanelCard>
@@ -150,7 +150,7 @@ const doAdd = async () => {
   if (!pickUserId.value) return
   try {
     await addMember(data.value.group.id, pickUserId.value)
-    ElMessage.success('已拉入本组')
+    ElMessage.success('已拉入本组织')
     addDialog.value = false
     pickUserId.value = ''
     loadMembers()
@@ -161,7 +161,7 @@ const doAdd = async () => {
 }
 
 const doRemove = async (row) => {
-  if (!(await confirmBox(`确定将「${row.username}」移出本组？`, '移除成员', { type: 'warning' }))) {
+  if (!(await confirmBox(`确定将「${row.username}」移出本组织？`, '移除成员', { type: 'warning' }))) {
     return
   }
   try {
@@ -175,12 +175,12 @@ const doRemove = async (row) => {
 }
 
 const doTransfer = async (row) => {
-  if (!(await confirmBox(`把组长转让给「${row.username}」？转让后你自动降为组员。`, '转让组长', { type: 'warning' }))) {
+  if (!(await confirmBox(`把所有者转让给「${row.username}」？转让后你自动降为成员。`, '转让所有者', { type: 'warning' }))) {
     return
   }
   try {
     await transferOwner(data.value.group.id, row.userId)
-    ElMessage.success('组长已转让')
+    ElMessage.success('所有者已转让')
     loadMembers()
     loadMyGroup()
   } catch {
@@ -189,7 +189,7 @@ const doTransfer = async (row) => {
 }
 
 const doLeave = async () => {
-  if (!(await confirmBox('退出后你立即失去本组数据访问权限。确定退出？', '退出课题组', { type: 'warning' }))) {
+  if (!(await confirmBox('退出后你立即失去本组织数据访问权限。确定退出？', '退出组织', { type: 'warning' }))) {
     return
   }
   leaving.value = true
@@ -207,7 +207,7 @@ const doLeave = async () => {
 
 onMounted(() => {
   loadMyGroup()
-  // 拉人弹窗的候选需要待分配池，进入页面就预热
+  // 拉人弹窗的候选需要待加入用户，进入页面就预热
   loadPool()
 })
 </script>

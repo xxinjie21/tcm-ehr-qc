@@ -532,7 +532,7 @@ const submit = async (withCorrection) => {
   }
 }
 
-/** 取后端分级阈值（GET /api/qc/rules 是「登录即可」，审核员也能调）；取不到就沿用兜底值 */
+/** 取后端分级阈值（GET /api/qc/rules 是「登录即可」，所有登录用户都能调）；取不到就沿用兜底值 */
 const loadThresholds = async () => {
   try {
     // 1. 取后端分级规则

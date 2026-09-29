@@ -1,8 +1,8 @@
 import request from '@/utils/request'
 
-// ===== 课题组（阶段2 R5）=====
+// ===== 组织（阶段2 R5）=====
 
-// 我的组：组长/组员/申请人/待分配池 四个身份统一从这里拿自己的状态
+// 我的组：所有者/成员/申请人/待加入的用户 四个身份统一从这里拿自己的状态
 export function getMyGroup() {
   return request.get('/my-group')
 }
@@ -30,7 +30,7 @@ export function listPendingUsers() {
   return request.get('/groups/pending-users')
 }
 
-// ---- 组长（本组）----
+// ---- 所有者（本组织）----
 export function listMembers(groupId) {
   return request.get(`/groups/${groupId}/members`)
 }
