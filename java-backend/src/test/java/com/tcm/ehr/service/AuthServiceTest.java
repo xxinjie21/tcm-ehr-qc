@@ -167,9 +167,9 @@ class AuthServiceTest {
         User saved = savedRef.get();
         assertNotNull(saved);
         assertEquals("newuser", saved.getUsername());
-        // 阶段 2：注册角色固定为「用户」，无组时进待分配池
+        // 批次 6：注册角色固定为「用户」；取消审核后账号一律 active
         assertEquals("用户", saved.getRole());
-        assertEquals(User.STATUS_PENDING, saved.getStatus());
+        assertEquals(User.STATUS_ACTIVE, saved.getStatus());
         assertEquals(0, saved.getHasPendingGroup());
         // 密码必须 BCrypt 加密存储，且与明文匹配
         assertFalse(saved.getPassword().equals("123456"));
@@ -189,34 +189,32 @@ class AuthServiceTest {
     }
 
     /**
-     * 审批中的建组申请人必须能登录。
+     * 组织不是 active（归档 / 无生效组织）时仍能登录，落引导页。
      *
-     * <p>回归：旧实现把「有成员行但解析不到 active 组」等同于「组已停用」，
-     * 于是状态为 pending 的申请人被误报「所属组织已被停用」而无法登录。
-     * 正确语义：只有组状态为 stopped 才拒登。</p>
+     * <p>正确语义：只有组织状态为 {@code stopped} 才拒登（403）。
+     * 批次 6 去审核后不再有 pending 状态，本用例改用 archived 覆盖同一分支。</p>
      */
     @Test
-    void pendingGroupApplicantCanStillLogin() {
+    void nonActiveOrgStillAllowsLogin() {
         User xxj = user("u-xxj", "XXJ", "用户");
-        xxj.setHasPendingGroup(1);
         when(userMapper.findByUsername("XXJ")).thenReturn(xxj);
-        // 组为 pending → 解析不到 active 组
+        // 组织不是 active（这里用 archived）→ 解析不到生效组织
         resolvesToNoGroup();
         OrganizationMember m = new OrganizationMember();
         m.setOrgId("grp-xxj");
         m.setUserId("u-xxj");
-        m.setRole(OrganizationMember.ROLE_OWNER);
+        m.setRole(OrganizationMember.ROLE_MEMBER);
         when(groupMemberMapper.selectList(Mockito.any())).thenReturn(List.of(m));
         Organization g = new Organization();
         g.setId("grp-xxj");
-        g.setStatus(Organization.PENDING);
+        g.setStatus(Organization.ARCHIVED);
         when(groupMapper.selectById("grp-xxj")).thenReturn(g);
 
         LoginVO vo = authService.login("XXJ", "123456");
 
-        assertNotNull(vo.getToken(), "审批中的申请人应能登录");
-        assertEquals(List.of(), vo.getMenus(), "审批中走空菜单（前端引导页）");
-        assertTrue(vo.isPendingGroup());
+        // 只有 status=stopped 才拒登（403）；归档/无组织一律放行，落引导页
+        assertNotNull(vo.getToken(), "非 stopped 的组织成员应能登录");
+        assertEquals(List.of(), vo.getMenus(), "无生效组织 → 空菜单（前端引导页）");
     }
 
     /** 组织确实被停用（status=stopped）时才拒登；语义是「无权限」→ 403 而非 401 */

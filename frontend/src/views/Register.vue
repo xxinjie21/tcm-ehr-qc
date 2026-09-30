@@ -3,20 +3,20 @@
     <h3>注册新账号</h3>
     <p class="hint">注册后可直接登录系统</p>
 
-    <div class="auth-role-tip">注册账号为「用户」（所有者/成员/待加入用户），管理员账号由系统预置。</div>
+    <div class="auth-role-tip">注册账号为「用户」（在组织内可能是所有者或成员），管理员账号由系统预置。</div>
 
-    <!-- 阶段 2：可选「同时创创建组织织」（代码必填、名称必填） -->
+    <!-- 可选「同时创建组织」：提交后组织立即生效，创建者即所有者 -->
     <el-collapse v-model="form.groupOpen" class="group-collapse">
-      <el-collapse-item title="同时创创建组织织（可选）" name="group">
-        <p class="hint">勾选后提交会注册并申请创建组织，等管理员审批=你成为所有者。不选则入待加入用户等所有者拉入。</p>
+      <el-collapse-item title="同时创建组织（可选）" name="group">
+        <p class="hint">勾选后提交会注册并<b>立即创建组织</b>（无需审批），你成为该组织所有者。不勾选则登录后自行创建，或等待其他组织所有者邀请。</p>
         <el-form-item v-if="form.groupOpen" label="组织编码" prop="groupCode">
-          <el-input v-model="form.groupCode" placeholder="如 NEURO-2026（2~50 位字母数字短横线下划线）" size="large" />
+          <el-input v-model="form.groupCode" placeholder="可留空；大写字母/数字/连字符，2~50 位" size="large" />
         </el-form-item>
         <el-form-item v-if="form.groupOpen" label="组织名称" prop="groupName">
-          <el-input v-model="form.groupName" placeholder="组名可重复，最长 100 字" size="large" />
+          <el-input v-model="form.groupName" placeholder="名称最长 100 字" size="large" />
         </el-form-item>
         <el-form-item v-if="form.groupOpen" label="用途说明（可选）">
-          <el-input v-model="form.groupPurpose" type="textarea" :rows="2" placeholder="供管理员审批判断" />
+          <el-input v-model="form.groupPurpose" type="textarea" :rows="2" placeholder="可选" />
         </el-form-item>
       </el-collapse-item>
     </el-collapse>
@@ -143,7 +143,7 @@ const handleRegister = async () => {
     }
     await register(payload)
     // 3. 提示成功：创建组织请求与单纯注册用不同的口径提示
-    ElMessage.success(form.groupOpen ? '组织申请已提交，等待管理员审批' : '注册成功，请等待组织接收')
+    ElMessage.success(form.groupOpen ? '注册成功，组织已创建，你是该组织所有者' : '注册成功，请登录后创建或加入组织')
     router.push({ path: '/login', query: { username: form.username } })
   } catch {
     // 拦截器已提示（如用户名已存在）

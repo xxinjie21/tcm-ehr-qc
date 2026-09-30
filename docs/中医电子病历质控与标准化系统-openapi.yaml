@@ -3522,8 +3522,8 @@ paths:
   /api/my-org:
     get:
       tags:
-        - 课题组
-      summary: 我的课题组
+        - 组织
+      summary: 我的组织
       description: 【权限：登录即可】返回我的组 / 组内角色 / 审批中申请；无组时给引导
       responses:
         '200':
@@ -3535,42 +3535,19 @@ paths:
   /api/orgs:
     get:
       tags:
-        - 课题组
-      summary: 课题组列表
+        - 组织
+      summary: 组织列表
       description: 【权限：仅管理员】可带 status 筛选
-      responses:
-        '200':
-          description: OK
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-  /api/orgs/pending-users:
-    get:
-      tags:
-        - 课题组
-      summary: 待分配池用户
-      description: 【权限：仅管理员】排除已申请建组的用户
-      responses:
-        '200':
-          description: OK
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-  /api/orgs/{id}/approve:
-    post:
-      tags:
-        - 课题组
-      summary: 通过建组申请
-      description: 【权限：仅管理员】pending → active，申请人成为组长
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: 课题组ID
+        - name: status
+          in: query
+          required: false
           schema:
             type: string
+            enum:
+              - active
+              - stopped
+              - archived
       responses:
         '200':
           description: OK
@@ -3578,17 +3555,72 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
-  /api/orgs/{id}/reject:
     post:
       tags:
-        - 课题组
-      summary: 拒绝建组申请
-      description: 【权限：仅管理员】pending → rejected，编码改写释放
+        - 组织
+      summary: 自助创建组织
+      description: 【权限：登录即可】创建者自动成为该组织所有者；无审核。服务端有三道防滥用闸（每人最多 3 个未归档组织、编码白名单、名下名称去重）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  description: 组织名称
+                code:
+                  type: string
+                  description: 组织编码，可留空由服务端生成；大写字母/数字/连字符，2~50 位
+                purpose:
+                  type: string
+                  maxLength: 500
+                  description: 用途说明（可选）
+      responses:
+        '200':
+          description: 已创建，返回组织概要
+        '400':
+          description: 名称为空 / 编码非法 / 编码被占用 / 超出创建配额 / 名下已有同名组织
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/orgs/users:
+    get:
+      tags:
+        - 组织
+      summary: 按用户名搜索可拉入的用户
+      description: 【权限：登录即可】关键词至少 2 个字符，最多返回 20 条；只返回 id 与 username（不返回角色/状态/所属组织，防枚举）
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 用户名关键字，至少 2 个字符
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: 关键词不足 2 个字符
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/orgs/{id}/archive:
+    post:
+      tags:
+        - 组织
+      summary: 归档组织
+      description: 【权限：仅管理员】前提「成员数为 0」；不自动归档，避免误伤沉睡组织
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
           schema:
             type: string
       requestBody:
@@ -3597,28 +3629,68 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - reason
               properties:
                 reason:
                   type: string
-                  description: 拒绝理由（必填）
+                  description: 归档原因
       responses:
         '200':
-          description: OK
+          description: 已归档
+        '400':
+          description: 组织不存在 / 仍有成员 / 状态不允许归档
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/orgs/{id}/reassign-owner:
+    post:
+      tags:
+        - 组织
+      summary: 改派组织所有者
+      description: 【权限：仅管理员】所有者账号丢失时的兜底；原所有者降为成员，冗余列 owner_user_id 同事务同步
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newOwnerUserId
+              properties:
+                newOwnerUserId:
+                  type: string
+      responses:
+        '200':
+          description: 已改派
+        '400':
+          description: 用户不存在 / 已是该组织所有者 / 组织已归档
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/ServerError'
   /api/orgs/{id}:
     put:
       tags:
-        - 课题组
+        - 组织
       summary: 更新组信息
       description: 【权限：仅管理员】仅名称 / 用途可改
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3631,14 +3703,14 @@ paths:
   /api/orgs/{id}/stop:
     post:
       tags:
-        - 课题组
-      summary: 停用课题组
-      description: 【权限：仅管理员】组员不能登录，数据保留
+        - 组织
+      summary: 停用组织
+      description: 【权限：仅管理员】成员不能登录，数据保留
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3651,14 +3723,14 @@ paths:
   /api/orgs/{id}/activate:
     post:
       tags:
-        - 课题组
-      summary: 恢复课题组
+        - 组织
+      summary: 恢复组织
       description: 【权限：仅管理员】stopped → active
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3671,14 +3743,14 @@ paths:
   /api/orgs/{id}/members:
     get:
       tags:
-        - 课题组
+        - 组织
       summary: 本组成员列表
       description: 【权限：所有者（本组织）】owner 在前；路径 id 必须等于当前组
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3690,14 +3762,14 @@ paths:
           $ref: '#/components/responses/ServerError'
     post:
       tags:
-        - 课题组
-      summary: 从待分配池拉人
+        - 组织
+      summary: 按用户名拉人
       description: 【权限：所有者（本组织）】拉入后用户转 active
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       requestBody:
@@ -3709,7 +3781,7 @@ paths:
               properties:
                 userId:
                   type: string
-                  description: 待分配用户ID
+                  description: 用户ID
       responses:
         '200':
           description: OK
@@ -3721,14 +3793,14 @@ paths:
   /api/orgs/{id}/members/{userId}:
     delete:
       tags:
-        - 课题组
+        - 组织
       summary: 移除成员
-      description: 【权限：所有者（本组织）】不能移除组长
+      description: 【权限：所有者（本组织）】不能移除所有者
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
         - name: userId
@@ -3747,14 +3819,14 @@ paths:
   /api/orgs/{id}/members/{userId}/transfer-owner:
     put:
       tags:
-        - 课题组
-      summary: 转让组长
+        - 组织
+      summary: 转让所有者
       description: 【权限：所有者（本组织）】原子改两行
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
         - name: userId
@@ -3772,7 +3844,7 @@ paths:
               properties:
                 newOwnerUserId:
                   type: string
-                  description: 新组长用户ID
+                  description: 新所有者用户ID
       responses:
         '200':
           description: OK
@@ -3783,14 +3855,14 @@ paths:
   /api/orgs/{id}/leave:
     post:
       tags:
-        - 课题组
-      summary: 退出课题组
-      description: 【权限：所有者（本组织）】组长须先指定继任者
+        - 组织
+      summary: 退出组织
+      description: 【权限：所有者（本组织）】所有者须先指定继任者
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3804,8 +3876,8 @@ paths:
   /api/my-group:
     get:
       tags:
-        - 课题组
-      summary: 我的课题组
+        - 组织
+      summary: 我的组织
       description: 【权限：登录即可】返回我的组 / 组内角色 / 审批中申请；无组时给引导
       responses:
         '200':
@@ -3817,72 +3889,9 @@ paths:
   /api/groups:
     get:
       tags:
-        - 课题组
-      summary: 课题组列表
+        - 组织
+      summary: 组织列表
       description: 【权限：仅管理员】可带 status 筛选
-      responses:
-        '200':
-          description: OK
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-  /api/groups/pending-users:
-    get:
-      tags:
-        - 课题组
-      summary: 待分配池用户
-      description: 【权限：仅管理员】排除已申请建组的用户
-      responses:
-        '200':
-          description: OK
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-  /api/groups/{id}/approve:
-    post:
-      tags:
-        - 课题组
-      summary: 通过建组申请
-      description: 【权限：仅管理员】pending → active，申请人成为组长
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: 课题组ID
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
-  /api/groups/{id}/reject:
-    post:
-      tags:
-        - 课题组
-      summary: 拒绝建组申请
-      description: 【权限：仅管理员】pending → rejected，编码改写释放
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: 课题组ID
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                reason:
-                  type: string
-                  description: 拒绝理由（必填）
       responses:
         '200':
           description: OK
@@ -3893,14 +3902,14 @@ paths:
   /api/groups/{id}:
     put:
       tags:
-        - 课题组
+        - 组织
       summary: 更新组信息
       description: 【权限：仅管理员】仅名称 / 用途可改
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3913,14 +3922,14 @@ paths:
   /api/groups/{id}/stop:
     post:
       tags:
-        - 课题组
-      summary: 停用课题组
-      description: 【权限：仅管理员】组员不能登录，数据保留
+        - 组织
+      summary: 停用组织
+      description: 【权限：仅管理员】成员不能登录，数据保留
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3933,14 +3942,14 @@ paths:
   /api/groups/{id}/activate:
     post:
       tags:
-        - 课题组
-      summary: 恢复课题组
+        - 组织
+      summary: 恢复组织
       description: 【权限：仅管理员】stopped → active
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3953,14 +3962,14 @@ paths:
   /api/groups/{id}/members:
     get:
       tags:
-        - 课题组
+        - 组织
       summary: 本组成员列表
       description: 【权限：所有者（本组织）】owner 在前；路径 id 必须等于当前组
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:
@@ -3972,14 +3981,14 @@ paths:
           $ref: '#/components/responses/ServerError'
     post:
       tags:
-        - 课题组
-      summary: 从待分配池拉人
+        - 组织
+      summary: 按用户名拉人
       description: 【权限：所有者（本组织）】拉入后用户转 active
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       requestBody:
@@ -3991,7 +4000,7 @@ paths:
               properties:
                 userId:
                   type: string
-                  description: 待分配用户ID
+                  description: 用户ID
       responses:
         '200':
           description: OK
@@ -4003,14 +4012,14 @@ paths:
   /api/groups/{id}/members/{userId}:
     delete:
       tags:
-        - 课题组
+        - 组织
       summary: 移除成员
-      description: 【权限：所有者（本组织）】不能移除组长
+      description: 【权限：所有者（本组织）】不能移除所有者
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
         - name: userId
@@ -4029,14 +4038,14 @@ paths:
   /api/groups/{id}/members/{userId}/transfer-owner:
     put:
       tags:
-        - 课题组
-      summary: 转让组长
+        - 组织
+      summary: 转让所有者
       description: 【权限：所有者（本组织）】原子改两行
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
         - name: userId
@@ -4054,7 +4063,7 @@ paths:
               properties:
                 newOwnerUserId:
                   type: string
-                  description: 新组长用户ID
+                  description: 新所有者用户ID
       responses:
         '200':
           description: OK
@@ -4065,14 +4074,14 @@ paths:
   /api/groups/{id}/leave:
     post:
       tags:
-        - 课题组
-      summary: 退出课题组
-      description: 【权限：所有者（本组织）】组长须先指定继任者
+        - 组织
+      summary: 退出组织
+      description: 【权限：所有者（本组织）】所有者须先指定继任者
       parameters:
         - name: id
           in: path
           required: true
-          description: 课题组ID
+          description: 组织ID
           schema:
             type: string
       responses:

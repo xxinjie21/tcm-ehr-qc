@@ -108,12 +108,12 @@ const breadcrumb = computed(() => {
 
 /** LLM 配置入口仅管理员可见（后端接口同为【权限：仅管理员】，前端只是不展示无效入口） */
 const isAdmin = computed(() => userStore.role === '管理员')
-/** 身份下标：管理员 / 所有者 / 成员 / 待加入用户 / 审批中 */
+/** 身份下标：管理员 / 所有者 / 成员 / 未加入组织 */
 const roleLabel = computed(() => {
   if (userStore.role === '管理员') return '管理员'
   if (userStore.orgRole === 'owner') return '所有者'
   if (userStore.hasOrg) return '成员'
-  return userStore.pendingGroup ? '审批中' : '待加入用户'
+  return '未加入组织'
 })
 const llmVisible = ref(false)
 

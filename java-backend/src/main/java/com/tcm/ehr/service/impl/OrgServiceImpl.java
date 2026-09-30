@@ -197,6 +197,10 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         owner.setOrgId(g.getId());
         owner.setUserId(creatorUserId);
         owner.setRole(OrganizationMember.ROLE_OWNER);
+        // 两个授权位显式置 0：不写会因 null 被 MyBatis-Plus 跳过而依赖 DB 默认值，
+        // 「新建所有者的授权状态」在代码里就读不出来，且默认值一改就静默变化
+        owner.setCanWriteDictionary(0);
+        owner.setCanWriteQcRules(0);
         owner.setIsPrimary(1);
         owner.setCreateTime(LocalDateTime.now().withNano(0));
         memberMapper.insert(owner);
