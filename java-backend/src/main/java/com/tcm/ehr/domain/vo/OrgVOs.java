@@ -23,8 +23,6 @@ public final class OrgVOs {
         private OrgInfo org;
         /** owner=所有者 / member=成员 / null=无组织 */
         private String myRole;
-        /** 申报中的建组申请；无则为 null */
-        private PendingApplication pendingApplication;
     }
 
     /** 组织概要（列表 / 我的组织共用） */
@@ -36,9 +34,7 @@ public final class OrgVOs {
         private String status;
         private String ownerName;
         private int memberCount;
-        private String appliedBy;
         private LocalDateTime createTime;
-        private String rejectReason;
     }
 
     /** 组织的成员行 */
@@ -50,14 +46,6 @@ public final class OrgVOs {
         private LocalDateTime joinTime;
     }
 
-    /** 审批中的申请（申请人自见） */
-    @Data
-    public static class PendingApplication {
-        private String code;
-        private String name;
-        private String status;
-        private String rejectReason;
-    }
 
     /** GET /api/orgs 出参 */
     @Data
@@ -71,11 +59,15 @@ public final class OrgVOs {
         private List<MemberInfo> members = new ArrayList<>();
     }
 
-    /** GET /api/orgs/pending-users 出参 */
+    /**
+     * GET /api/orgs/users 出参：按用户名搜索到的候选人。
+     *
+     * <p><b>刻意只有 id 与 username</b>：再加角色 / 状态 / 所属组织，
+     * 这个接口就成了「全站用户名 + 组织归属」的枚举器。</p>
+     */
     @Data
-    public static class PendingUserVO {
+    public static class UserBriefVO {
         private String id;
         private String username;
-        private LocalDateTime createTime;
     }
 }

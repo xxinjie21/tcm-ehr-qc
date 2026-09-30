@@ -343,7 +343,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 按创建时间倒序取本组最近 50 条
         //    § 6.3 缺点 9：不能看到别组的批量解析任务列表
         List<NlpTask> tasks = taskMapper.selectList(new QueryWrapper<NlpTask>()
-                .eq("group_id", RequestUtils.currentOrgId())
+                .eq("org_id", RequestUtils.currentOrgId())
                 .orderByDesc("create_time").last("LIMIT 50"));
         // 2. 不带失败明细：列表页不需要，明细走 get(id)
         List<NlpTaskVO> out = new ArrayList<>();
@@ -430,10 +430,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private boolean runByIds(String id, List<String> ids, NlpTask t, List<NlpTaskVO.Failure> failures,
                              boolean[] truncated, int[] processed) {
         // 0. § 6.3 缺点 11：导入时的 id 集合是本组的，但 task 里只有
-        //    本组快照。为保险再筛一次：重新按 group_id 限定，
+        //    本组快照。为保险再筛一次：重新按 org_id 限定，
         //    避免任何路径把别组 id 混进来。
         ids = recordMapper.selectList(new QueryWrapper<Record>()
-                .select("id").eq("group_id", t.getOrgId()).in("id", ids)
+                .select("id").eq("org_id", t.getOrgId()).in("id", ids)
                 .last("LIMIT " + ids.size()))
                 .stream().map(Record::getId).toList();
         // 1. 按页大小切块：IN 过长会让 SQL 变慢

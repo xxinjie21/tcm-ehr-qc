@@ -155,7 +155,7 @@ class QcBatchServiceImplTest {
         QcTask row = captor.getValue();
         assertEquals("管理员", row.getRole(), "角色必须快照进 qc_task.role（回填审计日志）");
         assertEquals("grp-default-2026", row.getOrgId(),
-                "组必须快照进 qc_task.group_id（worker 重建 RecordFilter）");
+                "组必须快照进 qc_task.org_id（worker 重建 RecordFilter）");
         assertEquals("admin", row.getCreatedBy(), "操作人必须快照进 qc_task.created_by");
         assertEquals(5, row.getTotal());
     }

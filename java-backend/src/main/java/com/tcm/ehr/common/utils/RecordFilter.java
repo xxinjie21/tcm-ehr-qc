@@ -16,7 +16,7 @@ import java.util.Map;
  * 避免口径漂移与"筛选条件绕过数据域"的越权。</p>
  *
  * <p><b>数据域 = 课题组（阶段 2）</b>：原本用 {@code grade}（质控结论）当权限维度，现已改为
- * {@code group_id = 当前用户的主组}。{@code grade} 从此只做业务筛选（供应商可选），
+ * {@code org_id = 当前用户的主组}。{@code grade} 从此只做业务筛选（供应商可选），
  * 不再影响任何一个人能看到哪些数据。</p>
  *
  * <p>原设计的两个后果正是本次改造的动机：复核通过一份病历后会
@@ -48,11 +48,16 @@ public final class RecordFilter {
         return RequestUtils.currentOrgId();
     }
 
-    /** 构建查询条件：先数据域、后用户筛选 */
+    /**
+     * 构建查询条件：先数据域、后用户筛选。
+     *
+     * <p>管理员「看全部」（{@link RequestUtils#viewAllOrgs()}）时<b>不加组织条件</b>。</p>
+     */
     public static QueryWrapper<Record> build(String orgId, SearchDTO dto) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
         // 1. 数据域（行级权限）——必须先于用户筛选
         operatorScope(wrapper, orgId);
+
         // 2. 用户筛选（与数据域取交集，各条件之间取并集）
         if (dto != null) {
             if (notBlank(dto.getRegistrationNo())) {
@@ -101,11 +106,19 @@ public final class RecordFilter {
      * 以后若有人导入了它，无组用户就会看到那一条。</p>
      */
     private static void operatorScope(QueryWrapper<Record> wrapper, String orgId) {
+        // 0. 管理员看全部：明确「不加组织条件」。
+        //    ⚠️ 这里必须靠独立的 viewAllOrgs 标记判断，**不能**写成
+        //    「orgId 为空就不加条件」—— 批次 4 之后 orgId 为空是 fail-closed
+        //    （查不到任何数据），那样会让「看全部」变成「什么都看不到」，
+        //    是个方向相反、很难一眼看出的 bug。
+        if (RequestUtils.viewAllOrgs()) {
+            return;
+        }
         if (orgId == null || orgId.isBlank()) {
             wrapper.eq("id", NO_GROUP_SENTINEL);
             return;
         }
-        wrapper.eq("group_id", orgId.trim());
+        wrapper.eq("org_id", orgId.trim());
     }
 
     /**
@@ -218,10 +231,10 @@ public final class RecordFilter {
     }
 
     /**
-     * 数据域落在 {@code group_id} 列上的取值（即当前主组）。
+     * 数据域落在 {@code org_id} 列上的取值（即当前主组）。
      *
      * <p>给 QueryWrapper 表达不了的聚合 SQL 用 —— Mapper 里以
-     * {@code WHERE (#{orgId} IS NULL OR group_id = #{orgId})} 落地。
+     * {@code WHERE (#{orgId} IS NULL OR org_id = #{orgId})} 落地。
      * 存在的意义是让「数据域是哪个组」这个口径仍然只有一处，
      * 不在 Mapper 里再写一遍。</p>
      *

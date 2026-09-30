@@ -15,11 +15,11 @@ public interface OrgMemberMapper extends BaseMapper<OrganizationMember> {
      *
      * <p>两个条件缺一不可，漏掉任一条都会留下真实漏洞：</p>
      * <ul>
-     *   <li>漏 {@code is_primary = 1}：表上是 {@code UNIQUE(group_id,user_id)}，
+     *   <li>漏 {@code is_primary = 1}：表上是 {@code UNIQUE(org_id,user_id)}，
      *       <b>允许一人多组</b>；不指定主组时取到哪组取决于 SQL 返回顺序 →
      *       同一用户不同请求可能看到不同数据。</li>
      *   <li>漏 {@code g.status = 'active'}：停用组只挡了登录，
-     *       {@code group_members} 的行仍在 → 查组照常返回 orgId →
+     *       {@code organization_members} 的行仍在 → 查组照常返回 orgId →
      *       <b>旧 token 在 24h 内照样能看数据</b>（停用形同虚设）。</li>
      * </ul>
      *
@@ -30,9 +30,9 @@ public interface OrgMemberMapper extends BaseMapper<OrganizationMember> {
      * @return 主组成员行；无组 / 组已停用时返回 {@code null}
      */
     @Select("""
-            SELECT m.id, m.group_id, m.user_id, m.role, m.is_primary, m.create_time
-              FROM group_members m
-              JOIN research_groups g ON g.id = m.group_id
+            SELECT m.id, m.org_id, m.user_id, m.role, m.is_primary, m.create_time
+              FROM organization_members m
+              JOIN organizations g ON g.id = m.org_id
              WHERE m.user_id = #{userId}
                AND m.is_primary = 1
                AND g.status = 'active'

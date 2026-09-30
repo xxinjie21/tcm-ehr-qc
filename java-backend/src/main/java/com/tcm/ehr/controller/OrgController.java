@@ -2,6 +2,7 @@ package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.annotation.RequireOrgRole;
 import com.tcm.ehr.common.annotation.RequireRole;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.domain.dto.OrgDTOs;
 import com.tcm.ehr.domain.vo.OrgVOs;
@@ -39,7 +40,7 @@ public class OrgController {
 
     private final IOrgService orgService;
 
-    /** 我的组（组长 / 组员 / 申请人 / 待分配池统一入口） */
+    /** 我的组织（所有者 / 成员 / 未加入组织，统一入口） */
     @GetMapping({"/api/my-org", "/api/my-group"})
     public Result<OrgVOs.MyOrgVO> myOrg() {
         return Result.ok(orgService.myOrg());
@@ -54,25 +55,53 @@ public class OrgController {
         return Result.ok(orgService.listOrgs(status));
     }
 
-    @RequireRole(roles = {"管理员"})
-    @PostMapping({"/api/orgs/{id}/approve", "/api/groups/{id}/approve"})
-    public Result<Void> approve(@PathVariable String id) {
-        orgService.approve(id);
-        return Result.ok("已通过", null);
-    }
-
-    @RequireRole(roles = {"管理员"})
-    @PostMapping({"/api/orgs/{id}/reject", "/api/groups/{id}/reject"})
-    public Result<Void> reject(@PathVariable String id, @Valid @RequestBody OrgDTOs.RejectRequest body) {
-        orgService.reject(id, body.getReason());
-        return Result.ok("已拒绝", null);
+    /**
+     * 自助创建组织（批次 6）。
+     *
+     * <p>【权限：登录即可】创建者自动成为 owner。<b>只挂新路径</b>：这是新增能力，
+     * 旧路径下本来不存在「自助创建」，给两个名字只会让人以为旧路径也能调。</p>
+     */
+    @PostMapping("/api/orgs")
+    public Result<OrgVOs.OrgInfo> createOrg(@Valid @RequestBody OrgDTOs.CreateOrgRequest body) {
+        return Result.ok("已创建，你是该组织所有者", orgService.createOrg(body, RequestUtils.currentUserId()));
     }
 
     @RequireRole(roles = {"管理员"})
     @PutMapping({"/api/orgs/{id}", "/api/groups/{id}"})
-    public Result<Void> updateGroup(@PathVariable String id, @Valid @RequestBody OrgDTOs.UpdateGroupRequest body) {
-        orgService.updateGroup(id, body);
+    public Result<Void> updateOrg(@PathVariable String id, @Valid @RequestBody OrgDTOs.UpdateGroupRequest body) {
+        orgService.updateOrg(id, body);
         return Result.ok("已更新", null);
+    }
+
+    /** 归档（仅管理员，前提成员数为 0） */
+    @RequireRole(roles = {"管理员"})
+    @PostMapping("/api/orgs/{id}/archive")
+    public Result<Void> archive(@PathVariable String id, @Valid @RequestBody OrgDTOs.ArchiveOrgRequest body) {
+        orgService.archive(id, body.getReason());
+        return Result.ok("已归档", null);
+    }
+
+    /**
+     * 改派所有者（仅管理员）：owner 账号丢失时的兜底。
+     *
+     * <p>没有它，唯一能让组织脱离「无人可管」的方式是等原 owner 回来。</p>
+     */
+    @RequireRole(roles = {"管理员"})
+    @PostMapping("/api/orgs/{id}/reassign-owner")
+    public Result<Void> reassignOwner(@PathVariable String id,
+                                      @Valid @RequestBody OrgDTOs.TransferOwnerRequest body) {
+        orgService.reassignOwner(id, body.getNewOwnerUserId());
+        return Result.ok("已改派所有者", null);
+    }
+
+    /**
+     * 按用户名搜索可拉入的成员（登录即可）。
+     *
+     * <p>【权限：登录即可】关键词至少 2 字符、最多回 20 条，且只返回 id 与 username。</p>
+     */
+    @GetMapping("/api/orgs/users")
+    public Result<List<OrgVOs.UserBriefVO>> searchUsers(@RequestParam String keyword) {
+        return Result.ok(orgService.searchUsers(keyword));
     }
 
     @RequireRole(roles = {"管理员"})
@@ -89,13 +118,7 @@ public class OrgController {
         return Result.ok("已恢复", null);
     }
 
-    @RequireRole(roles = {"管理员"})
-    @GetMapping({"/api/orgs/pending-users", "/api/groups/pending-users"})
-    public Result<List<OrgVOs.PendingUserVO>> pendingUsers() {
-        return Result.ok(orgService.pendingUsers());
-    }
-
-    // ----------------------------------------------------------- 组长（本组）
+    // ----------------------------------------------------------- 所有者（本组织）
 
     @RequireOrgRole("owner")
     @GetMapping({"/api/orgs/{id}/members", "/api/groups/{id}/members"})
@@ -122,13 +145,27 @@ public class OrgController {
     public Result<Void> transferOwner(@PathVariable String id, @PathVariable String userId,
                                       @Valid @RequestBody OrgDTOs.TransferOwnerRequest body) {
         orgService.transferOwner(id, body.getNewOwnerUserId());
-        return Result.ok("组长已转让", null);
+        return Result.ok("所有者已转让", null);
+    }
+
+    /**
+     * 授予 / 回收成员的两个写开关（批次 6）。
+     *
+     * <p>【权限：所有者（本组织）】两个开关独立，null 表示「这一位不改」。</p>
+     */
+    @RequireOrgRole("owner")
+    @PutMapping({"/api/orgs/{id}/members/{userId}/permissions",
+                 "/api/groups/{id}/members/{userId}/permissions"})
+    public Result<Void> setPermissions(@PathVariable String id, @PathVariable String userId,
+                                      @Valid @RequestBody OrgDTOs.SetPermissionsRequest body) {
+        orgService.setPermissions(id, userId, body.getCanWriteDictionary(), body.getCanWriteQcRules());
+        return Result.ok("权限已更新", null);
     }
 
     @RequireOrgRole("owner")
     @PostMapping({"/api/orgs/{id}/leave", "/api/groups/{id}/leave"})
     public Result<Void> leave(@PathVariable String id) {
         orgService.leave(id);
-        return Result.ok("已退出", null);
+        return Result.ok("已退出组织", null);
     }
 }

@@ -27,7 +27,7 @@ public interface OperationLogMapper extends BaseMapper<OperationLog> {
             SELECT DISTINCT action FROM operation_log
             WHERE action IS NOT NULL
             <if test="orgId != null and orgId != ''">
-              AND group_id = #{orgId}
+              AND org_id = #{orgId}
             </if>
             <if test="operator != null and operator != ''">
               AND operator = #{operator}

@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p><b>组为什么不放进 JWT</b>：移出成员 / 转让组长 / 停用组必须<b>立即</b>生效，
  * 而 token 有效期是 24h。所以 {@code userId/username/role} 走 claim，
- * {@code orgId/groupRole} 每请求查 {@code group_members}
+ * {@code orgId/groupRole} 每请求查 {@code organization_members}
  * （走 {@code INDEX(user_id,is_primary)}，本项目规模下开销可忽略）。</p>
  *
  * <p><b>代价与可用性耦合（必须知道）</b>：本类从「纯解析 JWT、不碰 DB」变成<b>每请求查库</b>。
@@ -38,7 +38,7 @@ public class JwtInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
-    private final IOrgService groupService;
+    private final IOrgService orgService;
 
     /**
      * 管理员能否看到各组数据（阶段2 §4.4）。
@@ -83,15 +83,22 @@ public class JwtInterceptor implements HandlerInterceptor {
         request.setAttribute(RequestUtils.ATTR_USERNAME, username);
         request.setAttribute(RequestUtils.ATTR_ROLE, role);
 
-        // 4. 每请求解析当前组（不进 JWT，保证移人/停用立即生效）
-        OrgResolution g = groupService.resolvePrimaryOrg(userId);
+        // 4. 每请求解析当前组织（不进 JWT，保证移人/停用立即生效）
+        OrgResolution g = orgService.resolvePrimaryOrg(userId);
         String orgId = g.hasGroup() ? g.getOrgId() : null;
-        // 4.1 管理员开关：置 false 时把 orgId 清空，复用数据层的 fail-closed
+        // 4.1 管理员看全部（auth.admin-can-view-data=true，默认）
+        //     ⚠️ 这里置的不是「orgId = null」而是「viewAll = true」：
+        //     批次 4 之后 orgId 为空 = fail-closed（查不到数据），
+        //     拿它表示「不限组织」会让开关一开就**什么都看不到**（与语义正好相反）。
+        boolean adminSeesAll = RequestUtils.ROLE_ADMIN.equals(role) && adminCanViewData;
         if (RequestUtils.ROLE_ADMIN.equals(role) && !adminCanViewData) {
+            // 开关置 false：管理员收回可见范围，同样落回 fail-closed（什么都看不到）
             orgId = null;
         }
         request.setAttribute(RequestUtils.ATTR_ORG_ID, orgId == null ? "" : orgId);
         request.setAttribute(RequestUtils.ATTR_ORG_ROLE, g.hasGroup() ? g.getGroupRole() : null);
+        // 「不限组织」是独立标记，不能靠 orgId 空来表达（见 4.1）
+        request.setAttribute(RequestUtils.ATTR_VIEW_ALL_ORGS, adminSeesAll);
         return true;
     }
 

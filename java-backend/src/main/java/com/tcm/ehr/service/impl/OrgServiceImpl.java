@@ -25,13 +25,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 课题组服务实现（阶段2）。
+ * 组织服务实现（批次 6：自助创建、成员搜索、授权开关、归档 / 改派）。
  *
- * <p>成员管理接口（R5）全部要求组长且有 {@code @RequireOrgRole("owner")} 拦截器兜底，
- * 本类内再校验一次「操作者是本组长、目标行存在」的交错关系，双保险防越权。</p>
+ * <p>成员管理接口全部要求 owner 且有 {@code @RequireOrgRole("owner")} 拦截器兜底，
+ * 本类内再校验一次「操作者是本组织所有者、目标行存在」的交错关系，双保险防越权。</p>
  *
- * <p>一人一组的应用层约束：一个 {@code user_id} 只允许出现在一个<b>非 rejected</b> 组的
- * 成员表里（结构保留 {@code is_primary} 以便将来支持多组而无需改表）。</p>
+ * <p>一人一组织的应用层约束：一个 {@code user_id} 只允许出现在一个<b>未归档</b>组织的
+ * 成员表里（结构保留 {@code is_primary} 以便将来支持多组织而无需改表）。</p>
+ *
+ * <p><b>防滥用</b>（自助创建放开后必须自己兜住）：创建配额 + 编码白名单 + 名称去重，
+ * 见 {@link #createOrg}。</p>
  */
 @Slf4j
 @Service
@@ -39,7 +42,17 @@ import java.util.UUID;
 public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         implements IOrgService {
 
-    private static final String DEFAULT_GROUP_ID = "grp-default-2026";
+    private static final String DEFAULT_ORG_ID = "grp-default-2026";
+
+    /** 防滥用 1：每人同时最多持有的 owner 组织数（不自动归档，超了就必须先归档旧的） */
+    private static final int MAX_ACTIVE_ORGS_PER_USER = 3;
+
+    /** 防滥用 2：组织编码白名单（大写字母 / 数字 / 连字符，2~50） */
+    private static final java.util.regex.Pattern CODE_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Z0-9][A-Z0-9-]{1,49}$");
+
+    /** 防滥用 3：成员搜索单次返回上限（配合「关键词至少 2 字符」，避免变成扫描器） */
+    private static final int USER_SEARCH_LIMIT = 20;
 
     private final OrgMemberMapper memberMapper;
 
@@ -67,8 +80,14 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         return new OrgResolution(m.getOrgId(), m.getRole());
     }
 
-    // ---------------------------------------------------------- R5 我的组
+    // ---------------------------------------------------------- 我的组织
 
+    /**
+     * GET /api/my-org：当前用户的组织上下文。
+     *
+     * <p>批次 6 去审核后<b>没有「审批中」这个状态</b>：无组织就是无组织，
+     * 前端据此落到「我的组织」引导页（可自助创建 / 等所有者邀请）。</p>
+     */
     @Override
     public OrgVOs.MyOrgVO myOrg() {
         OrgVOs.MyOrgVO vo = new OrgVOs.MyOrgVO();
@@ -79,25 +98,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
                 vo.setOrg(toOrgInfo(g, false));
                 vo.setMyRole(m.getRole());
             }
-        } else {
-            // 无生效组：可能是待分配池，也可能是「已提交建组申请待审批」
-            Organization pending = baseMapper.selectOne(new QueryWrapper<Organization>()
-                    .eq("applied_by", RequestUtils.currentUserId())
-                    .eq("status", Organization.PENDING)
-                    .last("LIMIT 1"));
-            if (pending != null) {
-                OrgVOs.PendingApplication pa = new OrgVOs.PendingApplication();
-                pa.setCode(pending.getCode());
-                pa.setName(pending.getName());
-                pa.setStatus(pending.getStatus());
-                pa.setRejectReason(pending.getRejectReason());
-                vo.setPendingApplication(pa);
-            }
         }
         return vo;
     }
 
-    // ---------------------------------------------------------- R5 管理员
+    // ---------------------------------------------------------- 管理员
 
     @Override
     public List<OrgVOs.OrgInfo> listOrgs(String status) {
@@ -108,49 +113,101 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         w.orderByDesc("create_time");
         List<OrgVOs.OrgInfo> out = new ArrayList<>();
         for (Organization g : baseMapper.selectList(w)) {
-            out.add(toOrgInfo(g, status == null || "active".equals(status.trim())
-                    || "pending".equals(status.trim())));
+            out.add(toOrgInfo(g, true));
         }
         return out;
     }
 
+    /**
+     * 自助创建组织（批次 6）：任何登录用户可创建，创建者自动成为 owner，<b>无审核</b>。
+     *
+     * <p><b>放开自助创建后，这三道闸就是防滥用的全部手段</b>，少一道都可能被刷：</p>
+     * <ol>
+     *   <li><b>创建配额</b>：每人同时最多持有 {@value #MAX_ACTIVE_ORGS_PER_USER} 个未归档组织。
+     *       没有它，一个账号可以建几百个空组织，把组织列表冲垮（管理员页是全表查询）。</li>
+     *   <li><b>编码白名单</b>：{@code ^[A-Z0-9][A-Z0-9-]{1,49}$}（DTO 侧已校验，这里再兜一次）。
+     *       编码会进日志、导出文件名与接口路径，放任 {@code ../} 会污染这三处。</li>
+     *   <li><b>名称去重</b>：同名会让 owner 在列表里分不清自己的组织。</li>
+     * </ol>
+     *
+     * <p>code 留空时服务端生成 {@code ORG-<8位大写>}，避免并发抢同一个自增序列。</p>
+     */
     @Override
-    @Transactional
-    public void approve(String orgId) {
-        Organization g = requireOrg(orgId);
-        if (!Organization.PENDING.equals(g.getStatus())) {
-            throw new IllegalArgumentException("只有待审批的组才能通过");
+    @Transactional(rollbackFor = Exception.class)
+    public OrgVOs.OrgInfo createOrg(OrgDTOs.CreateOrgRequest body, String creatorUserId) {
+        String name = body == null || body.getName() == null ? "" : body.getName().trim();
+        if (name.isEmpty()) {
+            throw new IllegalArgumentException("组织名称不能为空");
         }
+        if (name.length() > 100) {
+            throw new IllegalArgumentException("组织名称最长 100 字");
+        }
+        String code = body == null || body.getCode() == null ? "" : body.getCode().trim().toUpperCase();
+        if (!code.isEmpty() && !CODE_PATTERN.matcher(code).matches()) {
+            throw new IllegalArgumentException("组织编码只能是大写字母、数字、连字符，长度 2~50");
+        }
+
+        // 1. 配额：同一创建者名下已有多少个未归档组织
+        Long owned = memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
+                .eq("user_id", creatorUserId)
+                .eq("role", OrganizationMember.ROLE_OWNER));
+        if (owned != null && owned >= MAX_ACTIVE_ORGS_PER_USER) {
+            throw new IllegalArgumentException("每人最多同时创建 "
+                    + MAX_ACTIVE_ORGS_PER_USER + " 个组织，请先归档不再使用的");
+        }
+        // 2. 名称去重（同一创建者名下）
+        if (owned != null && owned > 0) {
+            List<OrganizationMember> mine = memberMapper.selectList(
+                    new QueryWrapper<OrganizationMember>()
+                            .eq("user_id", creatorUserId)
+                            .eq("role", OrganizationMember.ROLE_OWNER));
+            for (OrganizationMember m : mine) {
+                Organization g = baseMapper.selectById(m.getOrgId());
+                if (g != null && name.equals(g.getName())) {
+                    throw new IllegalArgumentException("你名下已有同名组织「" + name + "」");
+                }
+            }
+        }
+        // 3. 编码唯一（交给唯一索引兜底并转友好文案）
+        if (code.isEmpty()) {
+            code = "ORG-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        } else if (baseMapper.selectCount(new QueryWrapper<Organization>().eq("code", code)) > 0) {
+            throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
+        }
+
+        // 4. 建组织 + 建 owner 成员行 + 建者的账号置 active —— 必须同一事务：
+        //    否则会出现「有组织但没有所有者」的孤儿组织
+        Organization g = new Organization();
+        g.setId(UUID.randomUUID().toString());
+        g.setCode(code);
+        g.setName(name);
+        g.setPurpose(body == null || body.getPurpose() == null ? null : body.getPurpose().trim());
         g.setStatus(Organization.ACTIVE);
-        g.setReviewedBy(RequestUtils.currentUsername());
-        g.setReviewedAt(LocalDateTime.now().withNano(0));
-        baseMapper.updateById(g);
-        // 申请人升为 active（首任 owner 在注册时已写入 group_members）
-        updateUserStatus(g.getAppliedBy(), User.STATUS_ACTIVE, false);
-    }
-
-    @Override
-    @Transactional
-    public void reject(String orgId, String reason) {
-        Organization g = requireOrg(orgId);
-        if (!Organization.PENDING.equals(g.getStatus())) {
-            throw new IllegalArgumentException("只有待审批的组才能拒绝");
+        g.setOwnerUserId(creatorUserId);
+        g.setCreateTime(LocalDateTime.now().withNano(0));
+        try {
+            baseMapper.insert(g);
+        } catch (DuplicateKeyException e) {
+            // 并发同编码：上面的存在性检查与插入之间有窗口，由 uk 兜底
+            throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
         }
-        g.setStatus(Organization.REJECTED);
-        g.setReviewedBy(RequestUtils.currentUsername());
-        g.setReviewedAt(LocalDateTime.now().withNano(0));
-        g.setRejectReason(reason);
-        // 释放编码：改写为 rej_<id>_<原code>（code 有 UNIQUE，不然一次拒绝就永久占死）
-        g.setCode("rej_" + g.getId() + "_" + g.getCode());
-        baseMapper.updateById(g);
-        // 申请人回落待分配池，可立即重新申请
-        updateUserStatus(g.getAppliedBy(), User.STATUS_PENDING, false);
-        // 移除首任组长的成员行（组已拒绝，上一任 owner 身份作废）
-        memberMapper.delete(new QueryWrapper<OrganizationMember>().eq("group_id", g.getId()));
+
+        OrganizationMember owner = new OrganizationMember();
+        owner.setId(UUID.randomUUID().toString());
+        owner.setOrgId(g.getId());
+        owner.setUserId(creatorUserId);
+        owner.setRole(OrganizationMember.ROLE_OWNER);
+        owner.setIsPrimary(1);
+        owner.setCreateTime(LocalDateTime.now().withNano(0));
+        memberMapper.insert(owner);
+
+        updateUserStatus(creatorUserId, User.STATUS_ACTIVE, false);
+        log.info("[组织] 用户 {} 创建组织 {}（code={}），自动成为所有者", creatorUserId, g.getId(), code);
+        return toOrgInfo(g, true);
     }
 
     @Override
-    public void updateGroup(String orgId, OrgDTOs.UpdateGroupRequest body) {
+    public void updateOrg(String orgId, OrgDTOs.UpdateGroupRequest body) {
         Organization g = requireOrg(orgId);
         if (body == null) {
             return;
@@ -168,53 +225,144 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         if (Organization.STOPPED.equals(g.getStatus())) {
             return;
         }
+        if (Organization.ARCHIVED.equals(g.getStatus())) {
+            throw new IllegalArgumentException("已归档的组织不能停用");
+        }
         g.setStatus(Organization.STOPPED);
         baseMapper.updateById(g);
-        // 停用只挡登录（JwtInterceptor 的 findPrimaryActive 已过滤 status='active'），数据保留
+        // 停用只挡登录（JwtInterceptor 的主组织解析已过滤 status='active'），数据保留
     }
 
     @Override
     public void activate(String orgId) {
         Organization g = requireOrg(orgId);
         if (!Organization.STOPPED.equals(g.getStatus())) {
-            throw new IllegalArgumentException("只有已停用的组才能恢复");
+            throw new IllegalArgumentException("只有已停用的组织才能恢复");
         }
         g.setStatus(Organization.ACTIVE);
         baseMapper.updateById(g);
-        // 组员状态恢复为 active（此前登录被挡就是因为查不到 active 组）
+        // 成员状态恢复为 active（此前登录被挡就是因为查不到 active 组织）
         List<OrganizationMember> members = memberMapper.selectList(
-                new QueryWrapper<OrganizationMember>().eq("group_id", g.getId()));
+                new QueryWrapper<OrganizationMember>().eq("org_id", g.getId()));
         for (OrganizationMember m : members) {
             updateUserStatus(m.getUserId(), User.STATUS_ACTIVE, false);
         }
     }
 
+    /**
+     * 归档（仅管理员）：前提「成员数为 0」。
+     *
+     * <p><b>为什么要求成员数为 0</b>：归档的语义是「这个组织已经没人用了」，
+     * 若带着成员归档，这些人的账号会因为「查不到 active 组织」而登录不了，
+     * 而组织列表里又看不到有未处理的人 —— 变成无声的账号丢失。</p>
+     *
+     * <p><b>不自动归档</b>：自动归档会误伤「沉睡但仍有效」的组织。</p>
+     */
     @Override
-    public List<OrgVOs.PendingUserVO> pendingUsers() {
-        // 待分配池：status=pending 且 没有在审批中的建组申请（已申请的从池里隐藏）
-        List<OrgVOs.PendingUserVO> out = new ArrayList<>();
+    @Transactional(rollbackFor = Exception.class)
+    public void archive(String orgId, String reason) {
+        Organization g = requireOrg(orgId);
+        if (Organization.ARCHIVED.equals(g.getStatus())) {
+            return;
+        }
+        if (Organization.STOPPED.equals(g.getStatus())) {
+            throw new IllegalArgumentException("已停用的组织请先恢复再归档，或直接保持停用");
+        }
+        Long members = memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
+                .eq("org_id", orgId));
+        if (members != null && members > 0) {
+            throw new IllegalArgumentException("组织还有 " + members
+                    + " 名成员，请先清空成员（或停用组织）再归档");
+        }
+        g.setStatus(Organization.ARCHIVED);
+        baseMapper.updateById(g);
+        log.info("[组织] 组织 {} 已归档：{}", orgId, reason);
+    }
+
+    /**
+     * 改派所有者（仅管理员）：owner 账号丢失 / 人离职时的兜底。
+     *
+     * <p>没有它，唯一能让组织脱离「无人可管」状态的方式是等原 owner 回来 ——
+     * 管理员只能停用。{@code applications.owner_user_id} 与成员行的 owner
+     * <b>必须同事务改两处</b>，否则两者会指向不同的人。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void reassignOwner(String orgId, String newOwnerUserId) {
+        Organization g = requireOrg(orgId);
+        if (Organization.ARCHIVED.equals(g.getStatus())) {
+            throw new IllegalArgumentException("已归档的组织不能改派所有者");
+        }
+        User target = userMapper.selectById(newOwnerUserId);
+        if (target == null) {
+            throw new ResourceNotFoundException(1006, "用户不存在");
+        }
+        if (newOwnerUserId.equals(g.getOwnerUserId())) {
+            throw new IllegalArgumentException("该用户已经是本组织所有者");
+        }
+        // 1. 原 owner 降为普通成员（保留在组织内，不移出）
+        OrganizationMember old = memberOf(orgId, g.getOwnerUserId());
+        if (old != null) {
+            old.setRole(OrganizationMember.ROLE_MEMBER);
+            memberMapper.updateById(old);
+        }
+        // 2. 新 owner：已在组织内则升权，不在则新建行
+        OrganizationMember neu = memberOf(orgId, newOwnerUserId);
+        if (neu == null) {
+            neu = new OrganizationMember();
+            neu.setId(UUID.randomUUID().toString());
+            neu.setOrgId(orgId);
+            neu.setUserId(newOwnerUserId);
+            neu.setIsPrimary(1);
+            neu.setCreateTime(LocalDateTime.now().withNano(0));
+            neu.setRole(OrganizationMember.ROLE_OWNER);
+            memberMapper.insert(neu);
+        } else {
+            neu.setRole(OrganizationMember.ROLE_OWNER);
+            memberMapper.updateById(neu);
+        }
+        // 3. 冗余列同步（权威仍是成员行的 role）
+        g.setOwnerUserId(newOwnerUserId);
+        baseMapper.updateById(g);
+        updateUserStatus(newOwnerUserId, User.STATUS_ACTIVE, false);
+        log.info("[组织] 组织 {} 的所有者改派为 {}", orgId, newOwnerUserId);
+    }
+
+    /**
+     * 按用户名搜索可拉入的候选人（登录即可）。
+     *
+     * <p>两道限制防止它变成枚举器 / 扫描器：关键词至少 2 个字符（单字符会撞上
+     * 全站绝大多数用户名）、{@value #USER_SEARCH_LIMIT} 条封顶。</p>
+     */
+    @Override
+    public List<OrgVOs.UserBriefVO> searchUsers(String keyword) {
+        String kw = keyword == null ? "" : keyword.trim();
+        if (kw.length() < 2) {
+            throw new IllegalArgumentException("搜索关键词至少 2 个字符");
+        }
+        List<OrgVOs.UserBriefVO> out = new ArrayList<>();
+        // 只回 id + username：返回角色 / 状态 / 所属组织等于开了一个「全站用户名 + 组织归属」查询
         for (User u : userMapper.selectList(new QueryWrapper<User>()
-                .eq("status", User.STATUS_PENDING)
-                .eq("has_pending_group", 0)
-                .orderByAsc("create_time"))) {
-            OrgVOs.PendingUserVO vo = new OrgVOs.PendingUserVO();
+                .like("username", kw)
+                .orderByAsc("username")
+                .last("LIMIT " + USER_SEARCH_LIMIT))) {
+            OrgVOs.UserBriefVO vo = new OrgVOs.UserBriefVO();
             vo.setId(u.getId());
             vo.setUsername(u.getUsername());
-            vo.setCreateTime(u.getCreateTime());
             out.add(vo);
         }
         return out;
     }
 
-    // ---------------------------------------------------------- R5 组长（本组）
+    // ---------------------------------------------------------- 所有者（本组织）
 
     @Override
     public List<OrgVOs.MemberInfo> members(String orgId) {
         requireOrg(orgId);
         List<OrgVOs.MemberInfo> out = new ArrayList<>();
-        // owner 排前，便于前端直接看出组长
+        // owner 排前，便于前端直接看出所有者
         List<OrganizationMember> rows = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
-                .eq("group_id", orgId)
+                .eq("org_id", orgId)
                 .orderByDesc("role").orderByAsc("create_time"));
         for (OrganizationMember m : rows) {
             User u = userMapper.selectById(m.getUserId());
@@ -229,17 +377,21 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void addMember(String orgId, String userId) {
         requireOrg(orgId);
         User u = userMapper.selectById(userId);
         if (u == null) {
             throw new ResourceNotFoundException(1006, "用户不存在");
         }
-        // 已被别的组接走 / 已在审批中建组 → 不能拉
-        if (User.STATUS_ACTIVE.equals(u.getStatus())
-                || (u.getHasPendingGroup() != null && u.getHasPendingGroup() == 1)) {
-            throw new IllegalArgumentException("该用户已有归属或正在申请建组，无法拉入");
+        // 已有归属 → 不能拉（一人一组织）。已停用账号也不拉入：拉进来也登不了，
+        // 只会让 owner 以为自己多了个人。
+        if (memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
+                .eq("user_id", userId)) > 0) {
+            throw new IllegalArgumentException("该用户已属于其他组织，无法重复拉入");
+        }
+        if (User.STATUS_DISABLED.equals(u.getStatus())) {
+            throw new IllegalArgumentException("该账号已被停用，无法拉入");
         }
         OrganizationMember m = new OrganizationMember();
         m.setId(UUID.randomUUID().toString());
@@ -248,7 +400,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         m.setRole(OrganizationMember.ROLE_MEMBER);
         m.setIsPrimary(1);
         m.setCreateTime(LocalDateTime.now().withNano(0));
-        // uk_group_user 唯一索引兜底并发拉人：上面的 status 检查与插入之间有窗口
+        // uk_org_user 唯一索引兜底并发拉人：上面的存在性检查与插入之间有窗口
         // （两个所有者同时拉同一人都会看到「无归属」）。不捕获的话异常直冒成 500，
         // 用户只会看到「系统异常」而不知道「该用户已被拉走」。
         try {
@@ -260,27 +412,27 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void removeMember(String orgId, String userId) {
         requireOrg(orgId);
         OrganizationMember m = memberOf(orgId, userId);
         if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
-            throw new IllegalArgumentException("不能直接移除组长，先转让组长");
+            throw new IllegalArgumentException("不能直接移除所有者，请先转让所有者");
         }
         memberMapper.deleteById(m.getId());
         updateUserStatus(userId, User.STATUS_PENDING, false);
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void transferOwner(String orgId, String newOwnerUserId) {
         requireOrg(orgId);
         OrganizationMember newOwner = memberOf(orgId, newOwnerUserId);
         // 原组长降为组员：两行必须同生共死（加了 @Transactional）
         List<OrganizationMember> owners = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
-                .eq("group_id", orgId).eq("role", OrganizationMember.ROLE_OWNER));
+                .eq("org_id", orgId).eq("role", OrganizationMember.ROLE_OWNER));
         if (owners.isEmpty()) {
-            throw new IllegalStateException("本组没有组长，状态异常");
+            throw new IllegalStateException("本组织没有所有者，数据异常");
         }
         OrganizationMember oldOwner = owners.get(0);
         if (oldOwner.getUserId().equals(newOwnerUserId)) {
@@ -293,7 +445,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void leave(String orgId) {
         requireOrg(orgId);
         String userId = RequestUtils.currentUserId();
@@ -301,14 +453,14 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
             // 组长不能直接退出：先数还有几个组员，没有继任者就拒绝（不产生孤儿组）
             long others = memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
-                    .eq("group_id", orgId)
+                    .eq("org_id", orgId)
                     .ne("user_id", userId));
             if (others == 0) {
                 throw new IllegalArgumentException("你是组长且组内无其他成员，无法退出");
             }
             // 有其他人：按「队长离职须指定继任者」处理 —— 直接从剩余成员里选最早的升组长
             OrganizationMember successor = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
-                            .eq("group_id", orgId)
+                            .eq("org_id", orgId)
                             .ne("user_id", userId)
                             .orderByAsc("create_time")
                             .last("LIMIT 1"))
@@ -320,22 +472,53 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         updateUserStatus(userId, User.STATUS_PENDING, false);
     }
 
+    /**
+     * 授予 / 回收成员的两个写开关（批次 6）。
+     *
+     * <p><b>两个开关独立</b>：owner 可以只给「词典写」或只给「质控规则写」。
+     * 参数为 {@code Boolean} 且<b>可空</b> —— null 表示「这一位不改」，
+     * 否则前端只提交其中一个开关就会把另一个误清零。</p>
+     *
+     * <p>不能给 owner 自己授权：owner 本来就能写，授权位只对 member 有意义。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void setPermissions(String orgId, String userId,
+                              Boolean canWriteDictionary, Boolean canWriteQcRules) {
+        requireOrg(orgId);
+        OrganizationMember m = memberOf(orgId, userId);
+        if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
+            throw new IllegalArgumentException("所有者本就拥有全部写权限，无需单独授权");
+        }
+        // 两个都为空 = 什么都没改，直接返回，避免一次无意义的写库
+        if (canWriteDictionary == null && canWriteQcRules == null) {
+            throw new IllegalArgumentException("未指定要修改的权限");
+        }
+        if (canWriteDictionary != null) {
+            m.setCanWriteDictionary(canWriteDictionary ? 1 : 0);
+        }
+        if (canWriteQcRules != null) {
+            m.setCanWriteQcRules(canWriteQcRules ? 1 : 0);
+        }
+        memberMapper.updateById(m);
+    }
+
     // ---------------------------------------------------------- 辅助
 
     private Organization requireOrg(String orgId) {
         Organization g = baseMapper.selectById(orgId);
         if (g == null) {
-            throw new ResourceNotFoundException(1006, "课题组不存在");
+            throw new ResourceNotFoundException(1006, "组织不存在");
         }
         return g;
     }
 
     private OrganizationMember memberOf(String orgId, String userId) {
         OrganizationMember m = memberMapper.selectOne(new QueryWrapper<OrganizationMember>()
-                .eq("group_id", orgId).eq("user_id", userId)
+                .eq("org_id", orgId).eq("user_id", userId)
                 .last("LIMIT 1"));
         if (m == null) {
-            throw new IllegalArgumentException("该用户不在此课题组");
+            throw new IllegalArgumentException("该用户不在此组织");
         }
         return m;
     }
@@ -347,14 +530,12 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         info.setCode(g.getCode());
         info.setName(g.getName());
         info.setStatus(g.getStatus());
-        info.setAppliedBy(g.getAppliedBy());
         info.setCreateTime(g.getCreateTime());
-        info.setRejectReason(g.getRejectReason());
         info.setMemberCount((int) (long) memberMapper.selectCount(
-                new QueryWrapper<OrganizationMember>().eq("group_id", g.getId())));
+                new QueryWrapper<OrganizationMember>().eq("org_id", g.getId())));
         if (withOwner) {
             List<OrganizationMember> owners = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
-                    .eq("group_id", g.getId()).eq("role", OrganizationMember.ROLE_OWNER)
+                    .eq("org_id", g.getId()).eq("role", OrganizationMember.ROLE_OWNER)
                     .last("LIMIT 1"));
             if (!owners.isEmpty()) {
                 User owner = userMapper.selectById(owners.get(0).getUserId());

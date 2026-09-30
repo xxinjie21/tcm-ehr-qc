@@ -7,6 +7,7 @@ import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.exception.UnauthorizedException;
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.domain.dto.OrgDTOs;
 import com.tcm.ehr.domain.dto.RegisterDTO;
 import com.tcm.ehr.domain.po.OrganizationMember;
 import com.tcm.ehr.domain.po.Organization;
@@ -24,9 +25,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 登录 / 注册服务实现（阶段2：加入课题组维度）。
@@ -34,7 +33,7 @@ import java.util.UUID;
  * <p>角色分两层，作用域不同，<b>不塞进同一个枚举</b>：</p>
  * <pre>
  * users.role          {管理员, 用户}          ← 系统级
- * group_members.role  {owner(组长), member(组员)} ← 组内级
+ * organization_members.role  {owner(组长), member(组员)} ← 组内级
  * </pre>
  * 混在一起就会出现「是某组组长」这种无法在 users 表上表达的状态。
  */
@@ -45,7 +44,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private final JwtUtil jwtUtil;
     private final OrgMapper groupMapper;
     private final OrgMemberMapper groupMemberMapper;
-    private final IOrgService groupService;
+    private final IOrgService orgService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /**
@@ -80,7 +79,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private static final List<String> PENDING_MENUS = List.of();
 
     @Override
-    // rollbackFor 必写：本方法连写 users + research_groups + group_members 三张表，
+    // rollbackFor 必写：本方法连写 users + organizations + organization_members 三张表，
     // 默认只回滚 RuntimeException，任何受检异常都会留下「用户已建、组织没建」的半成品。
     // 口径与 RecordServiceImpl / ReviewServiceImpl / QcServiceImpl.processOne 一致。
     @Transactional(rollbackFor = Exception.class)
@@ -94,9 +93,11 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
         user.setRole(RequestUtils.ROLE_USER);
-        // 2.1 状态：带建组申请时先进 pending（审批通过才转 active）
-        user.setStatus(User.STATUS_PENDING);
-        user.setHasPendingGroup(createGroup != null ? 1 : 0);
+        // 2.1 状态：批次 6 取消审核后，账号一律 active。
+        //     「有组织才能登录」的旧口径依赖 pending 中间态，现在组织可自助创建、
+        //     无组织用户登录后落到「我的组织」引导页，所以不需要中间态。
+        user.setStatus(User.STATUS_ACTIVE);
+        user.setHasPendingGroup(0);
         // 3. 落库（唯一索引兜底并发注册竞态）
         try {
             baseMapper.insert(user);
@@ -105,44 +106,17 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             throw new IllegalArgumentException("用户名已存在");
         }
 
-        // 4. 不带建组申请 → 只注册，账号留在待加入用户（等所有者拉入或自行创建组织）
+        // 4. 勾了「同时创建组织」→ 直接建生效组织，创建者即所有者。
+        //    ⚠️ 刻意复用 orgService.createOrg 而不是在这里再写一遍：配额、编码白名单、
+        //    名称去重这三道防滥用闸只有一份实现，写两份必然漂移。
         if (createGroup == null) {
             return false;
         }
-        // 5. 带建组申请：先校验编码唯一（排除 rejected —— 被拒时编码会被改写释放）
-        String code = createGroup.getCode().trim();
-        Long taken = groupMapper.selectCount(new QueryWrapper<Organization>()
-                .eq("code", code)
-                .ne("status", Organization.REJECTED));
-        if (taken != null && taken > 0) {
-            throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
-        }
-        // 5.1 建 pending 组（待管理员审批）；编码唯一索引兜底并发竞态，
-        //     否则异常直冒会变成 500（批次 2 的 409 只覆盖 DataIntegrityViolation，
-        //     这里显式转成 400 的业务文案更贴近「换个编码」的引导）
-        Organization g = new Organization();
-        g.setId(UUID.randomUUID().toString());
-        g.setCode(code);
-        g.setName(createGroup.getName().trim());
-        g.setPurpose(createGroup.getPurpose() == null ? null : createGroup.getPurpose().trim());
-        g.setStatus(Organization.PENDING);
-        g.setAppliedBy(user.getId());
-        g.setCreateTime(LocalDateTime.now().withNano(0));
-        try {
-            groupMapper.insert(g);
-        } catch (DuplicateKeyException e) {
-            // 并发同编码注册：上面的 selectCount 检查与插入之间有窗口，由唯一索引兜底
-            throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
-        }
-        // 5.2 申请人成为首任组长（待审批，但组内身份先立好，审批通过即可用）
-        OrganizationMember m = new OrganizationMember();
-        m.setId(UUID.randomUUID().toString());
-        m.setOrgId(g.getId());
-        m.setUserId(user.getId());
-        m.setRole(OrganizationMember.ROLE_OWNER);
-        m.setIsPrimary(1);
-        m.setCreateTime(LocalDateTime.now().withNano(0));
-        groupMemberMapper.insert(m);
+        OrgDTOs.CreateOrgRequest req = new OrgDTOs.CreateOrgRequest();
+        req.setName(createGroup.getName());
+        req.setCode(createGroup.getCode());
+        req.setPurpose(createGroup.getPurpose());
+        orgService.createOrg(req, user.getId());
         return true;
     }
 
@@ -162,7 +136,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         }
 
         // 3. 解析当前组织（含 status='active' 过滤 —— 组织被停用则查不到）
-        OrgResolution g = groupService.resolvePrimaryOrg(user.getId());
+        OrgResolution g = orgService.resolvePrimaryOrg(user.getId());
         if (!g.hasGroup() && isOrgStopped(user.getId())) {
             // 3.1 查不到组织有三种可能：无组织（待加入用户，正常）/ 组织被停用（拒登）/
             //     DB 故障（降级为无组织，不该在这里误判）。停用的组织能从

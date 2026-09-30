@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code selectById} 的路径都要透传 {@code canAccess} 校验（R3 已逐处处理，
  * 见 §6.3 的 13 类 / 20 处）。本测试锁定两条铁律：</p>
  * <ul>
- *   <li>有组 → 只返回本组行（{@code group_id = 本组}）；</li>
+ *   <li>有组 → 只返回本组行（{@code org_id = 本组}）；</li>
  *   <li>无组 → 返回空集（fail-closed），而不是退化成全库。</li>
  * </ul>
  */
@@ -46,7 +46,7 @@ class RecordIsolationTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
     }
 
-    /** 组 A 的数据域过滤只含 group_id=grp-a，不含 grp-b */
+    /** 组 A 的数据域过滤只含 org_id=grp-a，不含 grp-b */
     @Test
     void groupADomainFiltersOnlyOwnGroup() {
         loginAs(GROUP_A);
@@ -54,7 +54,7 @@ class RecordIsolationTest {
         String sql = w.getSqlSegment();
         Object bound = w.getParamNameValuePairs().values().iterator().next();
 
-        assertTrue(sql.contains("group_id"), "必须按 group_id 过滤：" + sql);
+        assertTrue(sql.contains("org_id"), "必须按 org_id 过滤：" + sql);
         assertTrue(sql.contains("grp-a") || String.valueOf(bound).equals("grp-a"), "绑定值应是本组：" + bound);
         assertFalse("grp-b".equals(bound), "绝不能绑成别组：" + bound);
     }
@@ -65,7 +65,7 @@ class RecordIsolationTest {
         loginAs(GROUP_B);
         QueryWrapper<Record> w = RecordFilter.build(RequestUtils.currentOrgId(), new SearchDTO());
         String sql = w.getSqlSegment(); // 先渲染 where 段，参数表才会填充
-        assertTrue(sql.contains("group_id"), sql);
+        assertTrue(sql.contains("org_id"), sql);
         assertTrue(w.getParamNameValuePairs().containsValue("grp-b"), w.getParamNameValuePairs().toString());
         assertFalse(w.getParamNameValuePairs().containsValue("grp-a"));
     }

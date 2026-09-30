@@ -24,7 +24,7 @@ public interface RecordMapper extends BaseMapper<Record> {
      * {@link com.tcm.ehr.common.utils.RecordFilter#domainOrgId()}）。没有它，任何人调
      * {@code /api/stats/overview} 都能读到全库的分级分布。</p>
      *
-     * <p>⚠️ <b>不能写成 {@code (#{orgId} IS NULL OR group_id = #{orgId})}</b>：
+     * <p>⚠️ <b>不能写成 {@code (#{orgId} IS NULL OR org_id = #{orgId})}</b>：
      * 那句话的语义是「无组 → 不限」，恰好与 fail-closed 相反。
      * 所以 {@code RecordFilter.domainOrgId()} 在无组时返回一个<b>不可能值</b>，
      * 而不是 null，由 SQL 自然落到空集。</p>
@@ -36,7 +36,7 @@ public interface RecordMapper extends BaseMapper<Record> {
                 COALESCE(SUM(CASE WHEN grade = '待复核' THEN 1 ELSE 0 END), 0) AS pendingReviewCount,
                 COALESCE(SUM(CASE WHEN grade = '无效' THEN 1 ELSE 0 END), 0) AS invalidCount
             FROM records
-            WHERE group_id = #{orgId}
+            WHERE org_id = #{orgId}
             """)
     Map<String, Object> selectOverview(@Param("orgId") String orgId);
 
@@ -52,7 +52,7 @@ public interface RecordMapper extends BaseMapper<Record> {
                 COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 1 THEN 1 ELSE 0 END), 0) AS governedCount,
                 COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 0 THEN 1 ELSE 0 END), 0) AS pendingGovern
             FROM records
-            WHERE group_id = #{orgId}
+            WHERE org_id = #{orgId}
             """)
     Map<String, Object> selectGovernanceStats(@Param("orgId") String orgId);
 
@@ -89,7 +89,7 @@ public interface RecordMapper extends BaseMapper<Record> {
     @Select("""
             SELECT DISTINCT department FROM records
             WHERE department IS NOT NULL AND department <> ''
-              AND group_id = #{orgId}
+              AND org_id = #{orgId}
             ORDER BY department
             """)
     List<String> selectDepartments(@Param("orgId") String orgId);

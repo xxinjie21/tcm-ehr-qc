@@ -185,7 +185,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             List<Record> existing = baseMapper.selectList(
                     new QueryWrapper<Record>()
                             .in("registration_no", batchRegNos)
-                            .eq("group_id", RequestUtils.currentOrgId()));
+                            .eq("org_id", RequestUtils.currentOrgId()));
             for (Record r : existing) {
                 existingHash.add(RecordUtil.textHash(r));
             }

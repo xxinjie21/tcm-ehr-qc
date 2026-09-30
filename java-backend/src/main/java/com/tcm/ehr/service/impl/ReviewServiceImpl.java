@@ -71,8 +71,8 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         w.eq("is_obsolete", 0);
         // 3. § 6.3 缺点 7：不能看到别组的复核任务（与判杂志事实同级的数据）。
         //    review_tasks 打组是写入时做的（upsertReviewTask），这里只需等值过滤。
-        w.eq("group_id", RequestUtils.currentOrgId());
-        // 4. 状态筛选：无组时上面的 group_id 等值已让结果为空，不再需要角色判断
+        w.eq("org_id", RequestUtils.currentOrgId());
+        // 4. 状态筛选：无组时上面的 org_id 等值已让结果为空，不再需要角色判断
         String dbStatus = dbStatus(status);
         if (dbStatus != null) {
             w.eq("status", dbStatus);

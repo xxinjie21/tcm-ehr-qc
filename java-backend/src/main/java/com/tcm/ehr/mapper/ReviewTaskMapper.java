@@ -31,7 +31,7 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTask> {
      */
     @Update("""
             INSERT INTO review_tasks
-              (id, record_id, group_id, score, issue_type, status, is_obsolete,
+              (id, record_id, org_id, score, issue_type, status, is_obsolete,
                create_time, deadline_time)
             VALUES
               (REPLACE(UUID(), #{recordId}, #{orgId}, #{score}, #{issueType}, 'pending', 0,

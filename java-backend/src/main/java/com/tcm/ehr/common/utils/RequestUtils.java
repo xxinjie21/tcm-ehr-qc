@@ -15,7 +15,7 @@ import org.springframework.web.context.request.RequestContextHolder;
  *
  * <p><b>组信息刻意不进 JWT</b>（阶段2）：移人 / 转让组长 / 停用组必须<b>立即</b>生效，
  * 放进有效期 24h 的 token 里意味着最长要等一天才生效。故 {@code JwtInterceptor}
- * 每请求查一次 {@code group_members}（走 {@code INDEX(user_id,is_primary)}）。</p>
+ * 每请求查一次 {@code organization_members}（走 {@code INDEX(user_id,is_primary)}）。</p>
  *
  * <p>⚠️ <b>后台线程会拿到 "unknown" 而不是 null</b>：这些访问器读的是线程绑定的
  * {@code RequestContextHolder}。异步任务（批量重算 / 批量解析）必须在<b>提交线程</b>
@@ -29,6 +29,14 @@ public final class RequestUtils {
     public static final String ATTR_ROLE = "currentRole";
     public static final String ATTR_ORG_ID = "currentOrgId";
     public static final String ATTR_ORG_ROLE = "currentOrgRole";
+    /**
+     * 「不限组织」标记（批次 6）：管理员且 {@code auth.admin-can-view-data=true} 时为 true。
+     *
+     * <p><b>为什么不能复用 orgId 为空来表示</b>：批次 4 之后 orgId 为空走 fail-closed
+     * （查不到任何数据），拿它当「不限组织」会让开关一开就什么都看不到 ——
+     * 与「看全部」正好相反，是个很难一眼看出的反向 bug。</p>
+     */
+    public static final String ATTR_VIEW_ALL_ORGS = "viewAllOrgs";
 
     /** 系统级角色：管理员（唯一有跨组与配置写权限的身份） */
     public static final String ROLE_ADMIN = "管理员";
@@ -71,9 +79,14 @@ public final class RequestUtils {
         return UNKNOWN.equals(v) ? "" : v;
     }
 
-    /** 当前操作人的组内角色（owner/member）；无组时为 {@code "unknown"} */
+    /** 当前操作人的组织内角色（owner/member）；无组织时为 {@code "unknown"} */
     public static String currentOrgRole() {
         return attr(ATTR_ORG_ROLE);
+    }
+
+    /** 本请求是否「不限组织」（管理员看全部）；false 时按 orgId 过滤，空 orgId 走 fail-closed */
+    public static boolean viewAllOrgs() {
+        return Boolean.TRUE.equals(attr(ATTR_VIEW_ALL_ORGS));
     }
 
     /** 当前操作人是否是系统管理员 */
@@ -81,7 +94,7 @@ public final class RequestUtils {
         return ROLE_ADMIN.equals(currentRole());
     }
 
-    /** 当前操作人是否是本组组长 */
+    /** 当前操作人是否是本组织所有者 */
     public static boolean isOrgOwner() {
         return ORG_ROLE_OWNER.equals(currentOrgRole());
     }

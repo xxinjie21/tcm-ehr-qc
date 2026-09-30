@@ -151,7 +151,7 @@ public class LogServiceImpl implements ILogService {
         if (RequestUtils.isAdmin()) {
             // 管理员：无条件（看全部）
         } else if (orgId != null && !orgId.isBlank()) {
-            w.eq("group_id", orgId);
+            w.eq("org_id", orgId);
             if (OrganizationMember.ROLE_MEMBER.equals(RequestUtils.currentOrgRole())) {
                 // 组员：只看自己在本组内的操作
                 w.eq("operator", operator);
