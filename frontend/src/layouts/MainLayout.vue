@@ -9,7 +9,7 @@
       </div>
       <div class="user">
         <!-- 导入 LLM：仅管理员可见；配置含三方通道密钥，属系统级设置 -->
-        <el-button v-if="isAdmin" link class="llm-entry" @click="llmVisible = true">
+        <el-button link class="llm-entry" @click="llmVisible = true">
           导入 LLM
         </el-button>
         <span class="avatar" aria-hidden="true">{{ userStore.role?.charAt(0) || '用' }}</span>
@@ -106,7 +106,12 @@ const breadcrumb = computed(() => {
   return group ? [group, title] : [title]
 })
 
-/** LLM 配置入口仅管理员可见（后端接口同为【权限：仅管理员】，前端只是不展示无效入口） */
+/**
+ * 「我的 LLM」入口对所有登录用户开放。
+ *
+ * <p>配置已改为<b>每个用户一份</b>（后端写 user_llm_config 自己那一行），管理员也只改自己的 ——
+ * 所以这里不能再按管理员隐藏，否则普通用户没有入口去配自己的模型。</p>
+ */
 const isAdmin = computed(() => userStore.role === '管理员')
 /** 身份下标：管理员 / 所有者 / 成员 / 未加入组织 */
 const roleLabel = computed(() => {

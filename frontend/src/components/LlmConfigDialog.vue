@@ -1,11 +1,11 @@
 <template>
-  <!-- 导入 LLM 配置弹窗（管理员）：切换运行时模型通道并就地探测连通性。
+  <!-- 我的 LLM 配置弹窗（管理员）：切换运行时模型通道并就地探测连通性。
        每次打开都从服务端重读配置（@open）；禁止点遮罩关闭，避免填了一半误关。
        保存后立即生效，无需重启后端。 -->
   <el-dialog
     v-model="visible"
     class="llm-dialog"
-    title="导入 LLM"
+    title="我的 LLM"
     width="min(900px, 94vw)"
     top="6vh"
     :close-on-click-modal="false"

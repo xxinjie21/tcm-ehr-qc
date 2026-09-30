@@ -3409,7 +3409,7 @@ paths:
       tags:
         - LLM配置
       summary: 读取 LLM 配置
-      description: 【权限：登录即可】读取当前生效的 LLM 配置。api-key 只回传掩码（如 sk-****abcd），明文密钥不出服务端
+      description: 【权限：登录即可】读取**本人**当前生效的 LLM 配置（未配置则回落到系统基线）。api-key 只回传掩码（如 sk-****abcd），明文密钥不出服务端
       responses:
         '200':
           description: 当前生效配置
@@ -3434,9 +3434,9 @@ paths:
         - LLM配置
       summary: 覆盖 LLM 配置
       description: |
-        【权限：仅管理员】覆盖运行时生效的 LLM 配置，保存即生效、无需重启。
-        只作用于内存，不写回 application.yml，重启后回到配置文件基线；
-        需要长期生效请写入配置文件的 llm 段。apiKey 传空串或掩码表示不修改。
+        【权限：登录即可】保存**本人**的 LLM 配置（user_llm_config 中自己那一行），保存即生效、无需重启。
+        管理员也只改自己的 —— 配置含三方通道密钥，属个人设置而非系统级设置。
+        apiKey 传空串或掩码表示**不修改**（不会清空已存密钥）；密钥经 AES-256-GCM 加密落库，读取只回掩码。
       requestBody:
         required: true
         content:

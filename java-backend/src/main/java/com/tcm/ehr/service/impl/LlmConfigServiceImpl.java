@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.exception.LlmProbeException;
 import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.domain.dto.LlmConfigDTO;
@@ -41,7 +42,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
      */
     @Override
     public LlmConfigVO get() {
-        return toVO(store.get());
+        return toVO(store.getFor(RequestUtils.currentUserId()));
     }
 
     /**
@@ -54,13 +55,14 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
     @Override
     public LlmConfigVO update(LlmConfigDTO dto) {
         // 1. 与当前配置合并：只提交改过的字段，其余沿用当前值
-        LlmConfig next = merge(dto, store.get());
+        LlmConfig next = merge(dto, store.getFor(RequestUtils.currentUserId()));
         // 2. 参数校验：开启 openai 通道必须填 API Key
         if (next.enabled() && LlmConfig.PROVIDER_OPENAI.equals(next.provider()) && TextUtil.isBlank(next.apiKey())) {
             throw new IllegalArgumentException("选择 openai 通道时必须填写 API Key");
         }
-        // 3. 写入 Store（触发 ChatClient 重建），回掩码视图
-        return toVO(store.update(next));
+        // 3. 写入当前用户那一行（密钥加密落库；触发 ChatClient 重建），回掩码视图
+        store.saveFor(RequestUtils.currentUserId(), next);
+        return toVO(next);
     }
 
     /**
@@ -76,7 +78,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
     @Override
     public LlmTestVO test(LlmConfigDTO dto) {
         // 1. 与当前配置合并（不落盘、不改当前配置）
-        LlmConfig cfg = merge(dto, store.get());
+        LlmConfig cfg = merge(dto, store.getFor(RequestUtils.currentUserId()));
         // 2. 参数校验：openai 通道必须填 API Key
         if (LlmConfig.PROVIDER_OPENAI.equals(cfg.provider()) && TextUtil.isBlank(cfg.apiKey())) {
             throw new IllegalArgumentException("选择 openai 通道时必须填写 API Key");

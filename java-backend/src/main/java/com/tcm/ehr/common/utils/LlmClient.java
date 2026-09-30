@@ -24,6 +24,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * LLM 统一入口（Spring AI 2.0 承载）。
@@ -68,17 +72,31 @@ public class LlmClient {
 
     private final LlmConfigStore configStore;
 
-    /** 懒构造；volatile + 双重检查，保证并发首次调用只装配一次 */
-    private volatile ChatClient chatClient;
+    /**
+     * 已装配的客户端缓存：key = {@code userId|版本}。
+     *
+     * <p><b>为什么按用户缓存</b>：配置改成「每人一份」后，单个 {@code ChatClient}
+     * 复用就会让 A 的请求发到 B 的通道上 —— 配置与客户端必须成对。</p>
+     *
+     * <p><b>为什么设上限</b>：每个 {@code ChatClient} 内部持有 HTTP 客户端与连接池，
+     * 按用户无限增长等于把内存泄漏进来。</p>
+     */
+    private static final int CLIENT_CACHE_MAX = 20;
+    private final Map<String, ChatClient> clients = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, ChatClient> eldest) {
+            return size() > CLIENT_CACHE_MAX;
+        }
+    };
 
-    /** 已按哪个配置版本装配过（成功或失败都算）；与 {@link LlmConfigStore#version()} 不等则需重建 */
-    private volatile long builtVersion = -1;
+    /** 记录「已经试过但装配失败」的 key，避免坏配置被反复重试 */
+    private final Set<String> failedKeys = ConcurrentHashMap.newKeySet();
 
     // ------------------------------------------------------------------ 对外
 
-    /** 当前配置是否开启 LLM（{@code llm.enabled} 或运行时覆盖后的等效值） */
+    /** <b>当前用户</b>的配置是否开启 LLM（未配置则看系统基线） */
     public boolean isEnabled() {
-        return configStore.get().enabled();
+        return configStore.getFor(RequestUtils.currentUserId()).enabled();
     }
 
     /** 当前是否可用：配置已开启且装配成功 */
@@ -86,9 +104,9 @@ public class LlmClient {
         return resolve() != null;
     }
 
-    /** 当前通道名，供日志与诊断展示 */
+    /** <b>当前用户</b>生效的通道名，供日志与诊断展示 */
     public String provider() {
-        return configStore.get().provider();
+        return configStore.getFor(RequestUtils.currentUserId()).provider();
     }
 
     /**
@@ -102,7 +120,7 @@ public class LlmClient {
         // 1. 取客户端；不可用（未启用或配置非法）就降级，调用方据 null 走规则路径
         ChatClient client = resolve();
         if (client == null) {
-            LlmConfig cfg = configStore.get();
+            LlmConfig cfg = configStore.getFor(RequestUtils.currentUserId());
             log.debug("[LLM] 不可用（enabled={}，provider={}），降级", cfg.enabled(), cfg.provider());
             return null;
         }
@@ -202,32 +220,35 @@ public class LlmClient {
      * @return 可用客户端；未启用或装配失败返回 {@code null}
      */
     private ChatClient resolve() {
-        LlmConfig cfg = configStore.get();
-        // 1. 未启用直接给 null，调用方走降级
+        // 1. 按当前用户解析配置：配置改成每人一份，客户端必须与配置成对
+        String userId = RequestUtils.currentUserId();
+        LlmConfig cfg = configStore.getFor(userId);
+        // 2. 未启用直接给 null，调用方走降级
         if (!cfg.enabled()) {
             return null;
         }
-        long v = configStore.version();
-        // 2. 配置没变就复用已装配的（null 也算"试过了"，避免每次调用都重试装配）
-        if (v == builtVersion) {
-            return chatClient;
+        String key = userId + "|" + configStore.versionFor(userId);
+        // 3. 配置没变就复用已装配的
+        ChatClient hit = clients.get(key);
+        if (hit != null) {
+            return hit;
         }
-        // 3. 配置变了才重建；双检锁：并发的首次调用只装配一次
-        synchronized (this) {
-            if (v != builtVersion) {
-                chatClient = null;
-                try {
-                    chatClient = ChatClient.builder(buildModel(cfg)).build();
-                    log.info("[LLM] 已启用：provider={}，model={}", cfg.provider(),
-                            TextUtil.isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
-                } catch (Exception e) {
-                    // 装配失败保留 null，本次配置下都降级
-                    log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
-                }
-                // 4. 无论成败都记下版本，避免坏配置被反复重试
-                builtVersion = v;
-            }
-            return chatClient;
+        if (failedKeys.contains(key)) {
+            // 4. 这个配置试过且失败，不再重复装配（否则每次调用都打一次外部连接）
+            return null;
+        }
+        // 5. 装配：并发下可能重复装一次，代价是浪费一次连接，不会出错（幂等）
+        try {
+            ChatClient client = ChatClient.builder(buildModel(cfg)).build();
+            clients.put(key, client);
+            log.info("[LLM] 已启用：user={}，provider={}，model={}", userId, cfg.provider(),
+                    TextUtil.isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
+            return client;
+        } catch (Exception e) {
+            // 装配失败记下 key，本次配置下都降级（LLM 是增强项，不能带崩主流程）
+            failedKeys.add(key);
+            log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
+            return null;
         }
     }
 

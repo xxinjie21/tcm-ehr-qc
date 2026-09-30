@@ -1,5 +1,8 @@
 package com.tcm.ehr.common.config;
 
+import com.tcm.ehr.common.utils.LlmSecretCipher;
+import com.tcm.ehr.domain.po.UserLlmConfig;
+import com.tcm.ehr.mapper.UserLlmConfigMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
@@ -13,18 +16,18 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * LLM 运行时配置存储。
+ * LLM 配置存储：<b>系统基线</b> + <b>每人一份私有配置</b>。
  *
- * <p>启动时以 {@link LlmProperties}（{@code application.yml} 的 {@code llm} 段）为基线，
- * 再用 {@code data/llm-config.json}（若存在）覆盖其中的<b>非密钥字段</b>；
- * 之后可由 {@code PUT /api/llm/config} 覆盖。</p>
+ * <p><b>基线</b>：启动时以 {@link LlmProperties}（{@code application.yml} 的 {@code llm} 段）为准，
+ * 再用旧版遗留的 {@code data/llm-config.json}（若存在）覆盖非密钥字段 —— 只读，不再回写。</p>
  *
- * <p><b>持久化边界</b>：只落盘 enabled / provider / baseUrl / model / temperature / timeout，
- * <b>api-key 永不落盘</b>，故重启后 api-key 为空、需重新填写（界面会回显"已配置 sk-****abcd"
- * 仅限当前进程内设置过的密钥）。这样既解决"每次打开都显示未启用、配置为空"，又不把密钥写到磁盘。</p>
+ * <p><b>私有配置</b>：{@code user_llm_config} 每人一行，密钥经
+ * {@link LlmSecretCipher} 以 AES-256-GCM 加密落库；用户没配则回落到基线。</p>
  *
- * <p>{@link #version()} 用于让 {@link com.tcm.ehr.common.utils.LlmClient} 感知配置变更：
- * 版本号变化即丢弃已装配的 {@code ChatClient} 并按新参数重建，实现「保存即生效、无需重启」。</p>
+ * <p>⚠️ <b>保存个人配置绝不回写全局文件</b>：那等于把一个人的密钥变成所有人的默认值。</p>
+ *
+ * <p>版本机制：{@link #versionFor(String)} 供 {@code LlmClient} 判断是否需要重建客户端，
+ * 版本变化即丢弃已装配的 {@code ChatClient}，实现「保存即生效、无需重启」。</p>
  */
 @Slf4j
 @Component
@@ -32,15 +35,143 @@ public class LlmConfigStore {
 
     private final LlmProperties props;
     private final ObjectMapper mapper;
+    /** 用户私有配置（每人一行，含加密密钥） */
+    private final UserLlmConfigMapper userMapper;
+    /** 密钥加解密 */
+    private final LlmSecretCipher cipher;
 
     private volatile LlmConfig current;
 
+    /** 单用户解析结果的缓存上限：每次 LLM 调用都会解析，命中 DB 没必要，但也不能无限长 */
+    private static final int CACHE_MAX = 200;
+    private final Map<String, CacheEntry> perUser = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
+            return size() > CACHE_MAX;
+        }
+    };
+
+    /** 缓存项：配置 + 版本串 */
+    private record CacheEntry(LlmConfig config, String version) {
+    }
+
     private final AtomicLong version = new AtomicLong();
 
-    public LlmConfigStore(LlmProperties props, ObjectMapper mapper) {
+    public LlmConfigStore(LlmProperties props, ObjectMapper mapper,
+                          UserLlmConfigMapper userMapper, LlmSecretCipher cipher) {
         this.props = props;
         this.mapper = mapper;
+        this.userMapper = userMapper;
+        this.cipher = cipher;
         this.current = load(props);
+    }
+
+    /**
+     * 取<b>某个用户</b>生效的配置：用户行覆盖基线，用户没配则用基线。
+     *
+     * <p>没有用户上下文（后台线程 / 启动期）时返回基线 —— 那时无法判断「谁的配置」。</p>
+     */
+    public LlmConfig getFor(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return get();
+        }
+        UserLlmConfig row = userMapper.selectById(userId);
+        String v = versionOf(row);
+        CacheEntry hit = perUser.get(userId);
+        if (hit != null && hit.version().equals(v)) {
+            return hit.config();
+        }
+        LlmConfig merged = merge(row);
+        perUser.put(userId, new CacheEntry(merged, v));
+        return merged;
+    }
+
+    /**
+     * 保存<b>某个用户</b>的配置（密钥加密落库）。
+     *
+     * <p>⚠️ 这里<b>不写全局配置文件</b>：配置是「每个用户一份」，把某人的配置写进全局基线
+     * 等于让 A 的密钥变成所有人的默认值。</p>
+     *
+     * @param userId 用户 ID
+     * @param cfg    已合并好的完整配置
+     */
+    public void saveFor(String userId, LlmConfig cfg) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("缺少用户上下文，无法保存 LLM 配置");
+        }
+        UserLlmConfig row = new UserLlmConfig();
+        row.setUserId(userId);
+        row.setEnabled(cfg.enabled());
+        row.setProvider(cfg.provider());
+        row.setBaseUrl(cfg.baseUrl());
+        row.setModel(cfg.model());
+        row.setTemperature(cfg.temperature());
+        row.setTimeout(cfg.timeout());
+        boolean newKey = cfg.apiKey() != null && !cfg.apiKey().isBlank();
+        if (newKey) {
+            row.setApiKey(cipher.encrypt(cfg.apiKey()));
+        }
+        UserLlmConfig existing = userMapper.selectById(userId);
+        if (existing == null) {
+            userMapper.insert(row);
+        } else {
+            if (!newKey && existing.getApiKey() != null) {
+                // 显式回填原密文：apiKey 传空 = 「不修改」。
+                // 刻意不依赖 MyBatis-Plus 对 null 字段「跳过」的默认策略 —— 那是隐式契约，
+                // 一旦字段策略调整或换成别的写法，用户的密钥就会被静默清空。
+                row.setApiKey(existing.getApiKey());
+            }
+            userMapper.updateById(row);
+        }
+        perUser.remove(userId);
+        version.incrementAndGet();
+    }
+
+    /**
+     * 某个用户的配置版本串（基线版本 + 用户行指纹），供 LlmClient 判断是否重建客户端。
+     */
+    public String versionFor(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return String.valueOf(version.get());
+        }
+        return versionOf(userMapper.selectById(userId));
+    }
+
+    /**
+     * 用户行的版本指纹。
+     *
+     * <p><b>基线版本必须参与</b>：用户没有自有配置时生效的是基线，基线一变该用户的生效
+     * 配置就跟着变。若版本串里只有用户行、没有基线版本，无自有配置的用户会一直命中
+     * 旧缓存，表现为「改了却不生效」—— 且很难一眼看出。</p>
+     *
+     * <p>只用 {@code update_time} 也不够：它精度到秒，同一秒内改两次会漏判成「没变」。
+     * 故并入各字段值 + 密文长度兜底。</p>
+     */
+    private String versionOf(UserLlmConfig row) {
+        if (row == null) {
+            return version.get() + ":none";
+        }
+        return version.get() + ":"
+                + (row.getUpdateTime() == null ? "" : row.getUpdateTime().toString())
+                + "|" + row.getEnabled() + "|" + row.getProvider() + "|" + row.getBaseUrl()
+                + "|" + row.getModel() + "|" + row.getTemperature() + "|" + row.getTimeout()
+                + "|" + (row.getApiKey() == null ? 0 : row.getApiKey().length());
+    }
+
+    /** 用户行覆盖基线；用户没配就返回基线本身 */
+    private LlmConfig merge(UserLlmConfig row) {
+        if (row == null) {
+            return get();
+        }
+        LlmConfig base = get();
+        return new LlmConfig(
+                row.getEnabled() != null && row.getEnabled(),
+                row.getProvider() != null ? row.getProvider() : base.provider(),
+                row.getBaseUrl() != null ? row.getBaseUrl() : base.baseUrl(),
+                cipher.decrypt(row.getApiKey()),
+                row.getModel() != null ? row.getModel() : base.model(),
+                row.getTemperature() != null ? row.getTemperature() : base.temperature(),
+                row.getTimeout() != null ? row.getTimeout() : base.timeout());
     }
 
     /** 当前生效配置 */

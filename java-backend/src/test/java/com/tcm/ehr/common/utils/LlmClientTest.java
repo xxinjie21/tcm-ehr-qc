@@ -2,6 +2,7 @@ package com.tcm.ehr.common.utils;
 
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
+import com.tcm.ehr.mapper.UserLlmConfigMapper;
 import com.tcm.ehr.common.config.LlmProperties;
 import org.junit.jupiter.api.Test;
 
@@ -51,8 +52,37 @@ class LlmClientTest {
         return p;
     }
 
+    /** 测试用加密密钥：固定 32 字节 Base64，便于复现 */
+    private static final String TEST_KEY =
+            "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+
+    private static LlmSecretCipher cipher() {
+        return new LlmSecretCipher(TEST_KEY);
+    }
+
+    /** 存储层测试替身：按内存 Map 模拟 user_llm_config（不碰数据库） */
+    private static UserLlmConfigMapper emptyUserMapper() {
+        return org.mockito.Mockito.mock(UserLlmConfigMapper.class);
+    }
+
+    /**
+     * 清理本测试写出的配置文件。
+     *
+     * <p>{@code LlmConfigStore.update()} 会把配置写盘，而构造时又会读它 ——
+     * 不清理的话，第二次跑时基线已被上一次的结果污染，
+     * 「基线未开启 → 运行时覆盖为开启」这类用例会在重跑时失败。</p>
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void cleanConfigFile() {
+        java.io.File f = new java.io.File("target/no-such-llm-config-client-test.json");
+        if (f.exists() && !f.delete()) {
+            throw new IllegalStateException("清理残留的 LLM 配置文件失败");
+        }
+    }
+
     private static LlmClient clientOf(LlmProperties p) {
-        return new LlmClient(new LlmConfigStore(p, new ObjectMapper()));
+        return new LlmClient(new LlmConfigStore(p, new ObjectMapper(),
+                emptyUserMapper(), cipher()));
     }
 
     /** 关闭（默认态）：不装配、不可用，调用返回 null 且不抛 */
@@ -113,7 +143,7 @@ class LlmClientTest {
     /** 基线关闭 → 运行时覆盖为开启：立即生效，无需重启 */
     @Test
     void runtimeOverride_takesEffectWithoutRestart() {
-        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper());
+        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper(), emptyUserMapper(), cipher());
         LlmClient client = new LlmClient(store);
 
         assertFalse(client.isAvailable(), "覆盖前应为关闭态");
@@ -128,7 +158,7 @@ class LlmClientTest {
     /** 覆盖为非法参数：仍只降级，不得抛（否则保存动作会把接口打 500） */
     @Test
     void runtimeOverrideWithIllegalProvider_shouldDegradeInsteadOfThrowing() {
-        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper());
+        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper(), emptyUserMapper(), cipher());
         LlmClient client = new LlmClient(store);
 
         store.update(new LlmConfig(true, "not-a-provider", "", "", "", null, 0));
