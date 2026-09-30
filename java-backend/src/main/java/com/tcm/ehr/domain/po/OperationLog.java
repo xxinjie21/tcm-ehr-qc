@@ -2,6 +2,7 @@ package com.tcm.ehr.domain.po;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -32,6 +33,16 @@ public class OperationLog {
     private String target;
     /** 操作明细 */
     private String detail;
-    /** 操作时所属组快照（§七 L7：组员只见本组自己）；无组为 null */
+    /** 操作时所属组织快照（三档可见范围：成员只见本组织自己的）；无组织为 null */
     private String orgId;
+
+    /**
+     * 所属组织名称（<b>不落库</b>）：由 LogServiceImpl 按 orgId 批量解析后回填。
+     *
+     * <p>日志表只存 org_id。直接把这个 UUID 显示给用户没有意义，
+     * 而「这条日志该不该被我看」又正是三档可见范围要回答的问题，
+     * 所以列表里补一列组织名。</p>
+     */
+    @TableField(exist = false)
+    private String orgName;
 }

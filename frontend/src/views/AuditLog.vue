@@ -1,5 +1,5 @@
 <template>
-  <!-- 操作日志页（管理员）：筛选 + 分页表格 + 导出 CSV（§七 L3 起无日志删除入口） -->
+  <!-- 操作日志页：筛选 + 分页表格 + 导出 CSV（无日志删除入口） -->
   <div>
     <PanelCard title="操作日志">
       <div class="filter-row">
@@ -22,12 +22,19 @@
         <span class="tip">共 {{ total }} 条</span>
       </div>
 
+      <!-- 可见范围说明：三档口径不同，不写清楚用户会以为「日志少了」 -->
+      <p class="scope-tip">{{ scopeTip }}</p>
+
       <el-table v-loading="loading" :data="logs" border stripe max-height="520" style="margin-top: 12px">
         <el-table-column label="操作时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.logTime) }}</template>
         </el-table-column>
         <el-table-column prop="operator" label="操作人" width="100" />
         <el-table-column prop="role" label="角色" width="90" />
+        <!-- 所属组织：三档可见范围下，这一列是判断「这条日志该不该被我看」的唯一线索 -->
+        <el-table-column label="所属组织" width="150" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.orgName || '—' }}</template>
+        </el-table-column>
         <el-table-column label="操作类型" width="110">
           <template #default="{ row }">
             <el-tag size="small" :type="tagType(row.action)" effect="plain">{{ row.action }}</el-tag>
@@ -64,12 +71,13 @@
 // 操作日志页：管理员查看审计留痕。
 // 对外只提供两个入口 —— 查询/分页（只读）与导出 CSV。
 // 日志只增不删（§七 L3）：日志删除功能已删，清理只能由运维人工归档。
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 import { fmtDateTime } from '@/utils/format'
 import { PAGE_SIZES } from '@/utils/constants'
+import { useUserStore } from '@/stores/user'
 
 /** 图例配色；具体选项由后端返回，未匹配到的走默认色 */
 const TAG_TYPES = {
@@ -84,6 +92,19 @@ const TAG_TYPES = {
 }
 
 // 操作类型下拉候选：由后端返回，不在前端硬编码枚举
+const userStore = useUserStore()
+
+/**
+ * 可见范围说明：后端按三档过滤，前端把口径写出来，
+ * 否则用户看到日志「少了」会以为系统丢数据。
+ */
+const scopeTip = computed(() => {
+  if (userStore.isAdmin) return '可见范围：全部组织。'
+  if (userStore.isOrgOwner) return '可见范围：本组织的全部操作记录。'
+  if (userStore.hasOrg) return '可见范围：仅本组织内你本人的操作记录。'
+  return '可见范围：仅你本人的操作记录（你还没有加入任何组织）。'
+})
+
 const actionOptions = ref([])
 
 // 拉取操作类型候选；失败退化为空列表，仍可用关键字搜索
@@ -177,6 +198,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.scope-tip {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--text-sub);
+}
 /* 筛选行：单行排列，窄屏自动换行 */
 .filter-row {
   display: flex;

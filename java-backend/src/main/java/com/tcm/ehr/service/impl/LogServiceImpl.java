@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.ehr.domain.po.OrganizationMember;
 import com.tcm.ehr.domain.po.OperationLog;
 import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.OperationLogMapper;
 import com.tcm.ehr.service.ILogService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,7 @@ public class LogServiceImpl implements ILogService {
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final OperationLogMapper operationLogMapper;
+    private final OrgMapper orgMapper;
 
     /**
      * 分页查询操作日志。
@@ -48,6 +51,8 @@ public class LogServiceImpl implements ILogService {
         // 2. 固定顺序装 total / list，前端按 key 取
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", p.getTotal());
+        // 「所属组」列展示用：库里只有 org_id，这里解析成组织名
+        fillOrgNames(p.getRecords());
         result.put("list", p.getRecords());
         return result;
     }
@@ -59,8 +64,8 @@ public class LogServiceImpl implements ILogService {
      */
     @Override
     public List<String> actions() {
-        // §七 L7：组员不能从下拉看到别人的操作类型。
-        // operations 与按组三档见 buildWrapper；这里单独传给硬编码 SQL。
+        // 成员不能从下拉看到别人的操作类型。
+        // 三档可见范围见 buildWrapper；这里要单独传给硬编码 SQL（不能复用 wrapper）。
         String orgId = RequestUtils.currentOrgId();
         String operator = RequestUtils.currentUsername();
         if (RequestUtils.isAdmin()) {
@@ -82,7 +87,9 @@ public class LogServiceImpl implements ILogService {
      */
     @Override
     public List<OperationLog> listForExport(String action, String keyword) {
-        return operationLogMapper.selectList(buildWrapper(action, keyword));
+        List<OperationLog> rows = operationLogMapper.selectList(buildWrapper(action, keyword));
+        fillOrgNames(rows);
+        return rows;
     }
 
     /**
@@ -122,12 +129,13 @@ public class LogServiceImpl implements ILogService {
     private byte[] csvBytes(List<OperationLog> rows) {
         // 1. 写表头
         StringBuilder sb = new StringBuilder();
-        sb.append("操作时间,操作人,角色,操作类型,操作对象,详情\n");
+        sb.append("操作时间,操作人,角色,所属组织,操作类型,操作对象,详情\n");
         // 2. 逐条拼行（字段值按 CSV 规则转义）
         for (OperationLog l : rows) {
             sb.append(csv(l.getLogTime() == null ? "" : l.getLogTime().format(TS))).append(',')
                     .append(csv(l.getOperator())).append(',')
                     .append(csv(l.getRole())).append(',')
+                    .append(csv(l.getOrgName())).append(',')
                     .append(csv(l.getAction())).append(',')
                     .append(csv(l.getTarget())).append(',')
                     .append(csv(l.getDetail())).append('\n');
@@ -141,11 +149,50 @@ public class LogServiceImpl implements ILogService {
         return out;
     }
 
+    /**
+     * 批量把 {@code orgId} 解析成组织名回填到 {@code orgName}。
+     *
+     * <p><b>一次查询回填整页</b>：逐行查组织名会让「每页 20 条」变成 20 次查询，
+     * 日志页是高频访问路径。这里先去重再一次性 {@code IN} 查询。</p>
+     *
+     * <p>解析不到（组织已删 / 该行为历史数据无归属）时置「—」而不是留空：
+     * 空字符串会让人以为是「查到了但没值」。</p>
+     */
+    private void fillOrgNames(List<OperationLog> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        // 1. 去重收集本页出现过的组织 ID
+        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        for (OperationLog l : rows) {
+            if (l.getOrgId() != null && !l.getOrgId().isBlank()) {
+                ids.add(l.getOrgId());
+            }
+        }
+        if (ids.isEmpty()) {
+            for (OperationLog l : rows) {
+                l.setOrgName("—");
+            }
+            return;
+        }
+        // 2. 一次性取回 id -> 名称
+        Map<String, String> nameById = new HashMap<>();
+        for (com.tcm.ehr.domain.po.Organization o
+                : orgMapper.selectBatchIds(ids)) {
+            nameById.put(o.getId(), o.getName());
+        }
+        // 3. 回填；解析不到给「—」
+        for (OperationLog l : rows) {
+            String name = l.getOrgId() == null ? null : nameById.get(l.getOrgId());
+            l.setOrgName(name == null || name.isBlank() ? "—" : name);
+        }
+    }
+
     /** 组装筛选条件：操作类型精确匹配 + 关键字模糊匹配 + §七 L7 的三档可见性范围 */
     private QueryWrapper<OperationLog> buildWrapper(String action, String keyword) {
         QueryWrapper<OperationLog> w = new QueryWrapper<>();
         // 1. §七 L7 四档范围：管理员全部 / 组长本组 /
-        //    组员本组自己 / 无组自己（一次覆盖 page、listForExport、exportCsv）
+        //    成员本组织自己 / 无组织自己（一次覆盖 page、listForExport、exportCsv）
         String orgId = RequestUtils.currentOrgId();
         String operator = RequestUtils.currentUsername();
         if (RequestUtils.isAdmin()) {
@@ -153,12 +200,12 @@ public class LogServiceImpl implements ILogService {
         } else if (orgId != null && !orgId.isBlank()) {
             w.eq("org_id", orgId);
             if (OrganizationMember.ROLE_MEMBER.equals(RequestUtils.currentOrgRole())) {
-                // 组员：只看自己在本组内的操作
+                // 成员：只看自己在本组织内的操作
                 w.eq("operator", operator);
             }
-            // 组长：本组全员操作
+            // 所有者：本组织全员操作
         } else {
-            // 无组（待分配池 / 审批中）：只能看自己
+            // 无组织：只能看自己
             w.eq("operator", operator);
         }
         // 2. 操作类型精确匹配

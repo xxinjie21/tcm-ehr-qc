@@ -483,9 +483,12 @@ components:
         detail:
           type: string
           description: 操作明细
-        groupId:
+        orgId:
           type: string
-          description: 操作时所属组（§七 L7 三档过滤依据）
+          description: 操作时所属组织（出参，操作日志领域字段）
+        orgName:
+          type: string
+          description: 所属组织名称（列表/导出展示列，服务端按 orgId 解析回填）
     QcTaskVO:
       type: object
       description: 质控批量重算任务（出参，qc_task 表字段 + 分级汇总）
