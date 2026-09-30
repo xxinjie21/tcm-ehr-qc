@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
+import com.tcm.ehr.domain.po.QcRule;
+import com.tcm.ehr.mapper.QcRuleMapper;
 import tools.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
@@ -28,15 +30,21 @@ import java.util.Map;
 public class QcRuleStore {
 
     private final ObjectMapper mapper;
+    /** 组织级规则（每组织一行；无记录回退内置默认） */
+    private final QcRuleMapper ruleMapper;
 
     @Value("${qc.rules-file:data/qc-rules.json}")
     private String rulesFile;
 
     private volatile QcRuleSet current;
+
+    private final java.util.concurrent.atomic.AtomicLong version =
+            new java.util.concurrent.atomic.AtomicLong();
     private final List<String> warnings = new CopyOnWriteArrayList<>();
 
-    public QcRuleStore(ObjectMapper mapper) {
+    public QcRuleStore(ObjectMapper mapper, QcRuleMapper ruleMapper) {
         this.mapper = mapper;
+        this.ruleMapper = ruleMapper;
     }
 
     /** 字段注入完成后再加载（@Value 尚未生效时不能读 rulesFile） */
@@ -46,11 +54,98 @@ public class QcRuleStore {
     }
 
     /** 当前生效规则 */
+    /**
+     * 取<b>某个组织</b>生效的规则：该组织有行就用它的，没有则回退内置默认。
+     *
+     * <p>回退默认时<b>不落库</b>：给所有组织都写一份默认行没意义，
+     * 还会在默认规则升级时留下一堆过期的行。</p>
+     *
+     * @param orgId 组织 ID；空值表示无组织上下文，回退默认
+     */
+    public QcRuleSet getFor(String orgId) {
+        if (orgId == null || orgId.isBlank()) {
+            return baseline();
+        }
+        QcRule row = ruleMapper.selectById(orgId);
+        if (row == null || row.getRulesJson() == null || row.getRulesJson().isBlank()) {
+            return baseline();
+        }
+        try {
+            QcRuleSet parsed = mapper.readValue(row.getRulesJson(), QcRuleSet.class);
+            return normalize(parsed);
+        } catch (Exception e) {
+            // 存量坏数据不该让整个质检停摆：退回默认并留告警
+            log.warn("[质控规则] 组织 {} 的规则解析失败，回退内置默认：{}", orgId, e.getMessage());
+            return baseline();
+        }
+    }
+
+    /**
+     * 保存<b>某个组织</b>的规则。
+     *
+     * @param orgId  组织 ID
+     * @param next   规则集
+     * @return 保存后的规则集
+     */
+    public QcRuleSet updateFor(String orgId, QcRuleSet next) {
+        if (orgId == null || orgId.isBlank()) {
+            throw new IllegalArgumentException("缺少组织上下文，无法保存质控规则");
+        }
+        QcRuleSet normalized = normalize(next);
+        QcRule row = ruleMapper.selectById(orgId);
+        boolean isNew = row == null;
+        if (isNew) {
+            row = new QcRule();
+            row.setOrgId(orgId);
+        }
+        try {
+            row.setRulesJson(mapper.writeValueAsString(normalized));
+        } catch (Exception e) {
+            // 存不进去就不能当成保存成功：回 500 比「提示已保存、实际没存」好
+            throw new IllegalStateException("质控规则序列化失败，未保存", e);
+        }
+        row.setUpdateTime(java.time.LocalDateTime.now().withNano(0));
+        if (isNew) {
+            ruleMapper.insert(row);
+        } else {
+            ruleMapper.updateById(row);
+        }
+        bump();
+        return normalized;
+    }
+
+    /** 恢复某组织的内置默认规则（删掉该组织那一行） */
+    public QcRuleSet resetFor(String orgId) {
+        if (orgId == null || orgId.isBlank()) {
+            return reset();
+        }
+        ruleMapper.deleteById(orgId);
+        bump();
+        return baseline();
+    }
+
+    /**
+     * 系统基线规则。
+     *
+     * <p><b>不为 null 兜底</b>：{@code current} 只在 {@code init()}（{@code @PostConstruct}）里赋值，
+     * 容器尚未完成启动或单测直接 new 时它仍是 null。直接把 null 传下去，
+     * 会让归一/评分链路在「规则还没加载」时踩 NPE。</p>
+     */
+    private QcRuleSet baseline() {
+        QcRuleSet c = get();
+        return c != null ? c : QcRuleSet.defaults();
+    }
+
     public QcRuleSet get() {
         return current;
     }
 
     /** 最近一次加载/保存的告警（供前端提示） */
+    /** 规则版本自增：让 LlmClient 之类的「按版本判断是否重建」逻辑感知变化 */
+    private void bump() {
+        version.incrementAndGet();
+    }
+
     public List<String> warnings() {
         return new ArrayList<>(warnings);
     }

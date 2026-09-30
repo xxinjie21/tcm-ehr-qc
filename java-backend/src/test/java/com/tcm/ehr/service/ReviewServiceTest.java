@@ -9,6 +9,7 @@ import com.tcm.ehr.domain.po.ReviewTask;
 import com.tcm.ehr.domain.vo.ReviewResultVO;
 import com.tcm.ehr.domain.vo.ReviewTaskVO;
 import com.tcm.ehr.domain.vo.ReviewTasksVO;
+import com.tcm.ehr.mapper.QcRuleMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
 import com.tcm.ehr.service.impl.ReviewServiceImpl;
@@ -63,7 +64,7 @@ class ReviewServiceTest {
         reviewTaskMapper = Mockito.mock(ReviewTaskMapper.class);
         // QcRuleStore 的 init() 是 @PostConstruct，测试里不调用 → get() 返回 null
         // → QcScorer 落回内置默认规则（正是要测的口径）
-        service = new ReviewServiceImpl(recordMapper, new ObjectMapper(), new QcRuleStore(new ObjectMapper()));
+        service = new ReviewServiceImpl(recordMapper, new ObjectMapper(), new QcRuleStore(new ObjectMapper(), org.mockito.Mockito.mock(QcRuleMapper.class)));
         // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置
         ReflectionTestUtils.setField(service, "baseMapper", reviewTaskMapper);
     }

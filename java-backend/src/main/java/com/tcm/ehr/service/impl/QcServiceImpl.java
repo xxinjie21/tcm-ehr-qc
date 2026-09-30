@@ -91,7 +91,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         Map<String, Object> data = asMap(dto == null ? null : dto.getStructuredData(),
                 raw == null ? null : raw.getStructuredData());
         // 3. 取当前生效规则
-        QcRuleSet rules = ruleStore.get();
+        QcRuleSet rules = ruleStore.getFor(RequestUtils.currentOrgId());
 
         // 4. 完整性检查：结构化字段缺失且原始字段回退也为空，才记入缺失清单
         QcCheckVO vo = new QcCheckVO();
@@ -138,7 +138,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             data.put("herbs", dto.getHerbList());
         }
         // 2. 按当前一致性规则求冲突项
-        List<String> conflicts = LogicChecker.check(data, ruleStore.get().getConsistency());
+        List<String> conflicts = LogicChecker.check(data, ruleStore.getFor(RequestUtils.currentOrgId()).getConsistency());
         // 3. 冲突为空即视为一致
         LogicCheckVO vo = new LogicCheckVO();
         vo.setConflicts(conflicts);
@@ -170,7 +170,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
         // 4. 组装数据并评分（只读：不写回 records，也不生成复核任务）
         Map<String, Object> data = asMap(sd, raw == null ? null : raw.getStructuredData());
-        return QcScorer.score(data, raw, false, ruleStore.get());
+        return QcScorer.score(data, raw, false, ruleStore.getFor(RequestUtils.currentOrgId()));
     }
 
     /**
@@ -297,7 +297,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      */
     @Override
     public QcRulesVO updateRules(QcRuleSet rules) {
-        ruleStore.update(rules);
+        ruleStore.updateFor(RequestUtils.currentOrgId(), rules);
         return buildRulesVO();
     }
 
@@ -308,21 +308,21 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      */
     @Override
     public QcRulesVO resetRules() {
-        ruleStore.reset();
+        ruleStore.resetFor(RequestUtils.currentOrgId());
         return buildRulesVO();
     }
 
     /** 组装：规则 + 自然语言描述 + 目录 + 告警（单一来源） */
     private QcRulesVO buildRulesVO() {
         // 1. 规则本体与加载告警直接来自 store，保证前端看到的和评分用的是同一份
-        QcRulesVO vo = new QcRulesVO(ruleStore.get(), ruleStore.warnings());
+        QcRulesVO vo = new QcRulesVO(ruleStore.getFor(RequestUtils.currentOrgId()), ruleStore.warnings());
         // 2. 自然语言描述与字段目录同源生成，规则一改文案跟着改
-        vo.setDescriptions(com.tcm.ehr.common.config.QcRuleDescriber.describe(ruleStore.get()));
+        vo.setDescriptions(com.tcm.ehr.common.config.QcRuleDescriber.describe(ruleStore.getFor(RequestUtils.currentOrgId())));
         vo.setCatalogElements(com.tcm.ehr.common.config.QcRuleDescriber.catalogElements());
         vo.setCatalogFormats(com.tcm.ehr.common.config.QcRuleDescriber.catalogFormats());
         // 一致性那行的摘要由规则数据拼装下发 —— 前端写死过一次「（证候 → 中药 / 舌象 / 脉象）」，
         // 而规则里没有舌象/脉象，改规则也不改文案
-        vo.setConsistencySummary(com.tcm.ehr.common.config.QcRuleDescriber.consistencySummary(ruleStore.get()));
+        vo.setConsistencySummary(com.tcm.ehr.common.config.QcRuleDescriber.consistencySummary(ruleStore.getFor(RequestUtils.currentOrgId())));
         return vo;
     }
 
@@ -478,7 +478,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
         // 2. 没有存值就按当前规则现算；算不出来返回 null，由调用侧跳过这一条
         try {
-            return QcScorer.score(asMap(null, r.getStructuredData()), r, false, ruleStore.get());
+            return QcScorer.score(asMap(null, r.getStructuredData()), r, false, ruleStore.getFor(RequestUtils.currentOrgId()));
         } catch (Exception e) {
             // 现算失败：调用侧把该条当「算不出来」跳过。不抛，但必须留痕 ——
             // 静默 return null 会让「评分缺失」与「确实算不出」在上层完全无法区分

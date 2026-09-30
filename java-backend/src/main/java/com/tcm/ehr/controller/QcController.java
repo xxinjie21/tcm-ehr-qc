@@ -2,6 +2,9 @@ package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.config.QcRuleSet;
+import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.service.IOrgPermissionService;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.LogicCheckDTO;
@@ -40,6 +43,8 @@ import java.util.List;
 public class QcController {
 
     private final IQcService qcService;
+    /** 组织内写权限（管理员 / 所有者 / 被授权成员） */
+    private final IOrgPermissionService orgPermission;
     private final IQcBatchService qcBatchService;
 
     /**
@@ -147,7 +152,7 @@ public class QcController {
     /**
      * 读取当前生效的质控规则。
      *
-     * <p>【权限：登录即可】</p>
+     * <p>【权限：登录即可】返回<b>当前组织</b>生效的规则。</p>
      *
      * @return rules=规则集；descriptions=自然语言描述；warnings=加载告警
      */
@@ -159,14 +164,15 @@ public class QcController {
     /**
      * 保存质控规则并立即生效。
      *
-     * <p>【权限：仅管理员】落盘到 qc-rules.json，下次启动沿用；缺项按默认补齐。</p>
+     * <p>【权限：管理员 / 所有者 / 被授权成员】保存到<b>当前组织</b>（qc_rules 表），
+     * 其他组织不受影响；缺项按内置默认补齐。</p>
      *
      * @param rules 规则集
      * @return 保存后的规则集
      */
-    @RequireRole(roles = {"管理员"})
     @PutMapping("/api/qc/rules")
     public Result<QcRulesVO> updateRules(@Valid @RequestBody QcRuleSet rules) {
+        requireRuleWrite();
         return Result.ok("规则已保存并生效", qcService.updateRules(rules));
     }
 
@@ -177,9 +183,9 @@ public class QcController {
      *
      * @return 恢复后的规则集
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/api/qc/rules/reset")
     public Result<QcRulesVO> resetRules() {
+        requireRuleWrite();
         return Result.ok("已恢复默认规则", qcService.resetRules());
     }
 
@@ -220,5 +226,19 @@ public class QcController {
             f.setDateRange(range);
         }
         return f;
+    }
+
+    /**
+     * 质控规则写门槛：管理员 / 组织所有者 / 被授权成员。
+     *
+     * <p>不做成注解是因为它要查 DB 里的成员授权位（不是只看 JWT 里的 role），
+     * 与 {@code @RequireRole} 的能力不同。</p>
+     */
+    private void requireRuleWrite() {
+        String userId = RequestUtils.currentUserId();
+        if (RequestUtils.isAdmin() || orgPermission.canWriteQcRules(userId)) {
+            return;
+        }
+        throw new ForbiddenException("无权修改本组织的质控规则（需管理员、组织所有者或被授权成员）");
     }
 }
