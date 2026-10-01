@@ -68,6 +68,20 @@ public class EsTermNormalizer {
      * @throws TermIndexUnavailableException ES 索引不可用
      */
     public NormalizeResult normalize(String type, String term) {
+        return normalize(type, "", term);
+    }
+
+    /**
+     * 组织级归一：ES 召回候选时限定「基础层 + 当前组织」。
+     *
+     * <p>请求路径传 {@code RequestUtils.currentOrgId()}，批任务传任务行上的组织快照
+     * （worker 线程没有 RequestContext）。</p>
+     *
+     * @param type  实体类型 key
+     * @param orgId 组织号；空串 = 只查基础层
+     * @param term  待归一的原文
+     */
+    public NormalizeResult normalize(String type, String orgId, String term) {
         // 1. 归一原文（null 视作空串）
         String input = term == null ? "" : term.trim();
         if (input.isEmpty()) {
@@ -75,7 +89,7 @@ public class EsTermNormalizer {
         }
 
         // ES 召回 -> 判定（命中路径只需在候选集内比较）
-        List<TermEntry> recalled = recall(type, input);
+        List<TermEntry> recalled = recall(type, orgId, input);
         if (!recalled.isEmpty()) {
             NormalizeResult hit = judge(recalled, input);
             if (hit != null) {
@@ -97,10 +111,10 @@ public class EsTermNormalizer {
      * ConnectException），按声明类型只抓 IOException 会漏掉它，异常就绕到这里冒到兜底处理器
      * 变成 500「系统异常」—— 实测踩过。索引查不动（无论什么原因）在语义上都等于索引不可用。</p>
      */
-    private List<TermEntry> recall(String type, String input) {
+    private List<TermEntry> recall(String type, String orgId, String input) {
         // 1. 检索失败必须抛出：静默返回空列表等于把「索引挂了」伪装成「词典没这个词」
         try {
-            return esTermIndexService.search(type, input, RECALL_SIZE);
+            return esTermIndexService.search(type, orgId == null ? "" : orgId, input, RECALL_SIZE);
         } catch (Exception e) {
             log.error("[归一] {} ES 检索失败，归一不可用：{}", type, e.getMessage());
             throw new TermIndexUnavailableException(
@@ -128,13 +142,18 @@ public class EsTermNormalizer {
      *         {@link TermIndexUnavailableException}，与 {@link #normalize} 同口径
      */
     public Set<String> scan(String type, String text) {
+        return scan(type, "", text);
+    }
+
+    /** 组织级扫描：限定「基础层 + 当前组织」。见 {@link #normalize(String, String, String)}。 */
+    public Set<String> scan(String type, String orgId, String text) {
         Set<String> out = new LinkedHashSet<>();
         if (text == null || text.isBlank()) {
             return out;
         }
         String input = text.trim();
         // 1. 复用同一套召回（同样不静默降级：ES 挂了就该报 503，不是「没命中」）
-        for (TermEntry e : recall(type, input)) {
+        for (TermEntry e : recall(type, orgId, input)) {
             String std = e.getStandardTerm();
             if (std == null || std.isBlank() || std.equals(input)) {
                 // 与原文完全相同的不算「被截断的残词」，跳过

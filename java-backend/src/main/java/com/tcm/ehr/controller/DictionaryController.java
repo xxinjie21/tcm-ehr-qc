@@ -23,7 +23,8 @@ import java.util.Map;
 /**
  * 术语词典：导入、查询、版本回滚、备份列表。
  *
- * <p>词典以 JSON 文件存放，每次导入自动备份。{@code type} 非法统一返回 400 + code=4001。</p>
+ * <p>词典按组织存放于 {@code dictionary_terms}（当前组织无自有词条时回退基础层），
+ * 每次导入自动存档。{@code type} 非法统一返回 400 + code=4001。</p>
  */
 @RestController
 @RequestMapping("/api/dictionary")
@@ -138,5 +139,24 @@ public class DictionaryController {
         }
         // 2. 按时间倒序返回（含词条数与相对当前增减）
         return ResponseEntity.ok(Result.ok(Map.of("backups", dictionaryService.listBackups(type))));
+    }
+
+    /**
+     * 强制重建<b>当前组织</b>某一类词典的 ES 索引。
+     *
+     * <p><b>仅管理员</b>：它会清掉并重灌该组织的索引文档，重建空窗期归一返回 503，
+     * 属于影响全组织可用性的操作，不交给「能改词典就能触发」的人。</p>
+     *
+     * <p>只重建当前组织这一层，基础层不连带处理 —— 否则一次手动操作会让所有组织
+     * 同时进入重建空窗。</p>
+     */
+    @RequireRole(roles = {"管理员"})
+    @PostMapping("/reindex")
+    public ResponseEntity<Result<Map<String, Object>>> reindex(@RequestParam("type") String type)
+            throws IOException {
+        if (!TermTypes.ALL.contains(type)) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+        }
+        return ResponseEntity.ok(Result.ok(dictionaryService.reindex(type)));
     }
 }

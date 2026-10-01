@@ -53,7 +53,7 @@ class EsTermNormalizerTest {
 
     /** 桩：ES 召回返回给定候选 */
     private void esRecalls(List<TermEntry> candidates) throws IOException {
-        when(es.search(anyString(), anyString(), anyInt())).thenReturn(candidates);
+        when(es.search(anyString(), anyString(), anyString(), anyInt())).thenReturn(candidates);
     }
 
     /** ES 正常召回：别名精确命中，判定只比较候选集 */
@@ -106,7 +106,7 @@ class EsTermNormalizerTest {
      */
     @Test
     void esThrowing_shouldPropagateAsUnavailable() throws IOException {
-        when(es.search(anyString(), anyString(), anyInt()))
+        when(es.search(anyString(), anyString(), anyString(), anyInt()))
                 .thenThrow(new IOException("connection refused"));
 
         assertThrows(TermIndexUnavailableException.class,
@@ -124,7 +124,7 @@ class EsTermNormalizerTest {
      */
     @Test
     void esThrowingUnchecked_shouldAlsoPropagateAsUnavailable() throws IOException {
-        when(es.search(anyString(), anyString(), anyInt()))
+        when(es.search(anyString(), anyString(), anyString(), anyInt()))
                 .thenThrow(new IllegalStateException("ElasticsearchException: ConnectException: Connection refused"));
 
         assertThrows(TermIndexUnavailableException.class,
@@ -220,7 +220,7 @@ class EsTermNormalizerTest {
     /** ES 不可用：与 normalize 同口径抛 503，不静默返回空集（否则回补会被误判成「没漏」） */
     @Test
     void scan_esDown_shouldPropagateAsUnavailable() throws IOException {
-        when(es.search(anyString(), anyString(), anyInt())).thenThrow(new IOException("connection refused"));
+        when(es.search(anyString(), anyString(), anyString(), anyInt())).thenThrow(new IOException("connection refused"));
 
         assertThrows(TermIndexUnavailableException.class, () -> normalizer.scan("herb", "天麻10g"),
                 "scan 与 normalize 必须同样把 ES 故障显式抛出去");

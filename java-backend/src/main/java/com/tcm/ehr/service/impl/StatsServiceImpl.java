@@ -44,7 +44,8 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     private static final List<String> SCORE_BUCKETS = List.of("90+", "80-89", "70-79", "60-69", "60以下");
 
     private final ObjectMapper objectMapper;
-    private final IDictionaryFileService fileService;
+    // 词典真源（批次8b）：统计必须与归一读同一处，否则看板数字和实际生效词典对不上
+    private final com.tcm.ehr.service.DictionaryTermStore termStore;
 
     /**
      * 查询可选科室列表，只读。
@@ -132,7 +133,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      *
      * <p>病历范围经数据域 + 用户筛选圈定后，产出四块：质控趋势（按就诊月份升序、最多最近 12
      * 个月，含合格 / 待复核数与合格率）、科室合格率（按总数降序）、评分分布（固定分桶顺序）与
-     * 词典规模（疾病 / 症状 / 证型 / 中药 / 方剂，直接读词典文件，读取失败按 -1 上报）。</p>
+     * 词典规模（疾病 / 症状 / 证型 / 中药 / 方剂，直接读 dictionary_terms，读取失败按 -1 上报）。</p>
      *
      * @param filters 用户筛选条件，可为 null（表示不限）
      * @return 趋势、科室合格率、评分分布与词典规模
@@ -201,7 +202,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             vo.getScoreDistribution().add(b);
         });
 
-        // 4. 词典规模（5 类术语数量）：读词典文件，见 termCount
+        // 4. 词典规模（5 类术语数量）：读 dictionary_terms，见 termCount
         vo.getDictionary().put("disease", termCount("disease"));
         vo.getDictionary().put("symptom", termCount("symptom"));
         vo.getDictionary().put("pattern", termCount("pattern"));
@@ -211,20 +212,22 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     /**
-     * 某类术语条数：直接读词典 JSON 文件（原先读 {@code DictionaryStore} 的内存缓存）。
+     * 某类术语条数：读 {@code dictionary_terms}（当前组织生效口径）。
      *
-     * <p>DictionaryStore 已随「归一不再内存兜底」删除，这里改读同一个数据源 ——
-     * <b>JSON 文件才是词典的真源</b>，ES 只是它的检索副本。刻意<b>不</b>改成查 ES 的 _count：
-     * 那样看板会因 ES 不可用而连「词典规模」这种静态信息都拿不到，而改造前看板并不依赖 ES。</p>
+     * <p><b>必须与归一读同一处</b>（批次8b）：词典真源已从 JSON 文件改为按组织的表，
+     * 这里若还数文件，看板会显示「文件里的基础层条数」，与该组织实际生效的词典
+     * （含组织自有词条）对不上 —— 数字看起来正常，含义是错的。</p>
      *
-     * <p>读文件失败时返回 <b>-1</b> 而不是 0 —— 0 会被读成「词典是空的」，属于另一种误导。</p>
+     * <p>刻意<b>不</b>改成查 ES 的 _count：那样看板会因 ES 不可用而连「词典规模」这种
+     * 静态信息都拿不到，而改造前看板并不依赖 ES。</p>
+     *
+     * <p>读库失败时返回 <b>-1</b> 而不是 0 —— 0 会被读成「词典是空的」，属于另一种误导。</p>
      */
     private int termCount(String type) {
-        // 1. 直接读词典 JSON 文件数条数
         try {
-            return fileService.read(type).size();
-        } catch (IOException e) {
-            // 2. 读不到给 -1 而不是 0：0 会被当成"词典是空的"，-1 才能让页面显示"不可用"
+            return termStore.readEffective(RequestUtils.currentOrgId(), type).size();
+        } catch (Exception e) {
+            // 读不到给 -1 而不是 0：0 会被当成「词典是空的」，-1 才能让页面显示「不可用」
             log.warn("[统计] {} 词典读取失败，词条数按 -1 上报: {}", type, e.getMessage());
             return -1;
         }

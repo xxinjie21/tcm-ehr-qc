@@ -66,7 +66,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         if (!com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(type)) {
             throw new IllegalArgumentException("type必须为disease/pattern/symptom/herb/formula");
         }
-        return termNormalizer.normalize(type, term);
+        return termNormalizer.normalize(type, RequestUtils.currentOrgId(), term);
     }
 
     /**
@@ -209,7 +209,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     Map<String, Object> entity = (Map<String, Object>) item;
                     Object content = entity.get("content");
                     if (content == null || String.valueOf(content).isBlank()) continue;
-                    var result = termNormalizer.normalize(type, String.valueOf(content));
+                    var result = termNormalizer.normalize(type, RequestUtils.currentOrgId(), String.valueOf(content));
                     // 只在「命中词典且词形确实变了」时才改写并记统计，
                     // 否则会把未命中的实体也标成已归一
                     if (result.source() != null && !result.source().isBlank()
@@ -241,7 +241,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             Map<String, Object> herb = (Map<String, Object>) item;
             Object name = herb.get("name");
             if (name == null || String.valueOf(name).isBlank()) continue;
-            var result = termNormalizer.normalize("herb", String.valueOf(name));
+            var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), String.valueOf(name));
             if (result.source() != null && !result.source().isBlank()
                     && !result.standardTerm().equals(String.valueOf(name))) {
                 herb.put("name", result.standardTerm());

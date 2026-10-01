@@ -1,0 +1,825 @@
+{
+  "_meta": {
+    "title": "医学术语词典资源清单（疾病 / 证候 / 症状 / 中药）",
+    "purpose": "为「中医电子病历质控与标准化系统」的术语标准化与归一化模块选型与集成提供权威来源清单",
+    "调研日期": "2026-09-29",
+    "面向版本": "当前系统 data/dictionaries 采用 TermEntry{standardTerm, aliases[], source?, code?} 结构",
+    "覆盖术语类别": ["疾病 disease", "证候 pattern/syndrome（中医证型）", "症状 symptom/sign", "中药 herb/Chinese Materia Medica"],
+    "严重度说明": "本清单按「权威优先」排序，每项均标注是否为官方正式发布版本；第三方聚合站点单列并标注为非权威参考",
+    "字段说明": {
+      "id": "资源唯一标识（本项目内部编号）",
+      "officialName": "官方名称（zh 中文 / en 英文）",
+      "publisher": "发布机构",
+      "version": "最新版本号",
+      "releaseDate": "发布/实施日期",
+      "status": "标准状态（现行 / 即将实施 / 已废止）",
+      "categories": "四类术语各自的覆盖情况与词条量；covered=false 表示不覆盖",
+      "scale": "整体词条量级",
+      "access": "获取方式（官方链接 / 接口）",
+      "license": "许可与商用限制",
+      "availability": "可直接下载 / 需注册申请 / 需购买 / 免费在线",
+      "formats": "可下载或可获取的数据格式",
+      "machineReadable": "是否提供官方机读数据（JSON/CSV/RDF/数据库导出）",
+      "completeness": "中英文术语、同义词、唯一编码 ID、定义、层级结构的齐备情况",
+      "crossCategoryMapping": "四类术语之间及与外部体系的关联关系",
+      "integrationAdvice": "集成建议",
+      "verifyDate": "本条信息核实日期",
+      "sources": "核实来源链接"
+    }
+  },
+
+  "summary": {
+    "资源总数": 22,
+    "可直接机读下载": ["ICD-11（WHO，CC BY-ND 3.0 IGO，REST API 返回 JSON）", "MeSH 2026（NLM，XML/RDF 免费下载）", "SNOMED CT（RF2，需 Affiliate/UMLS 许可）", "UMLS Metathesaurus 2026AA（RRF，需 License+UTS 账号）"],
+    "免费在线查阅但无机读数据": ["《中国药典》2025年版 网络版（2026-07 上线，全社会免费开放）", "国家数字标准馆（GB/T 标准题录在线）", "TCMLS 中医药学语言系统（免费注册试用）", "中医国家标准应用服务平台（上海中医药大学）"],
+    "需购买或申请授权": [
+      "GB/T 16751 系列与 GB/T 15657 标准全文（中国标准出版社，需购买；术语可自行录入）",
+      "ISO 18668 系列 / ISO 20334 / ISO 23961 系列（ISO 官网付费）",
+      "SNOMED CT 国际版（非成员国商用需 SNOMED International 授权）",
+      "UMLS 商用用途（需逐源词表审查 Category 0–4 附加限制）"
+    ],
+    "关键结论": [
+      "疾病与证候：GB/T 15657-2021 是唯一同时提供术语与法定层级编码（A/B/C 轴）的国家标准，应作为主码表；GB/T 16751.1-2023（1369 疾病）与 GB/T 16751.2-2021（2060 证候）提供定义、英译名与「可选用词」（同义词），应作为术语正文。",
+      "症状：目前尚无独立的「中医症状术语」国家标准。症状术语散落于 GB/T 16751.2 证候定义、GB/T 47335.1-2026（舌象）、GB/T 47335.2-2026（脉象）、GB/T 42467-2023（各科临床名词）与 TCMLS。建议以 TCMLS + GB/T 47335 组合补齐，或明确声明症状域的权威依据与版本。",
+      "中药：《中国药典》2025年版一部（3069 种）是法定依据，2026-07 起网络版免费开放；若需国际编码可用 ISO 18668-3（中药材）/ -2（饮片）/ -4（配方颗粒）与 ISO 20334（方剂编码）。",
+      "跨类关联：GB/T 15657 采用「疾病码 + 证候码 + 治法码」组合表达病-证-治关系；ICD-11 要求第 1–25 章常规诊断码与第 26 章传统医学码双编码；TCMLS 提供 96 语义类型 / 58 语义关系的显式关联网络，是四类术语之间唯一成体系的中文关联来源。",
+      "国际映射枢纽：UMLS Metathesaurus（CUI）是跨 ICD-11 / SNOMED CT / MeSH 的映射枢纽，但对中医术语覆盖极弱；中医侧枢纽应使用 TCMLS 概念 ID，国标侧使用 GB/T 15657 码。建议采用「双 ID」设计：内部主用国标码，对外互操作映射到 ICD-11 TM1 / UMLS。"
+    ]
+  },
+
+  "resources": [
+    {
+      "id": "gb-t-15657-2021",
+      "officialName": { "zh": "中医病证分类与代码", "en": "Classification and codes of diseases and patterns of traditional Chinese medicine" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会（提出：国家中医药管理局；归口：全国中医标准化技术委员会 SAC/TC 478）",
+      "version": "GB/T 15657-2021（2021 年第一次修订，替代 GB/T 15657-1995）",
+      "releaseDate": "2021-11-26 发布并实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": 1369, "note": "含 113 个类目词与 53 个临时诊断用术语；较 1995 版新增 741 个" },
+        "pattern": { "covered": true, "termCount": 2060, "note": "含 406 个类目词；较 1995 版新增 974 个" },
+        "symptom": { "covered": false, "termCount": null, "note": "不覆盖症状术语；附录 A 提供治法名术语与分类代码" },
+        "herb": { "covered": false, "termCount": null, "note": "不覆盖" }
+      },
+      "scale": "疾病 1369 + 证候 2060 + 治法（附录 A）；与 GB/T 16751 系列合计约 4705 条",
+      "access": {
+        "type": "标准全文需购买；题录与在线检索免费",
+        "urls": [
+          "https://www.ndls.org.cn/（国家数字标准馆，标准题录）",
+          "https://std.samr.gov.cn/（全国标准信息公共服务平台）",
+          "https://data.pharnexcloud.com/6/table/259（第三方免费检索库，非权威发布方）"
+        ],
+        "api": "无官方 API"
+      },
+      "license": {
+        "type": "国家标准文本受版权保护（中国标准出版社出版）",
+        "commercialUse": "术语内容本身可作为业务数据使用；标准全文复制/再分发需授权",
+        "redistribution": "不可再分发标准全文"
+      },
+      "availability": "需购买标准文本（术语可自行结构化录入）",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": {
+        "zhTerm": true, "enTerm": false,
+        "synonyms": false, "note_synonyms": "本标准为分类与代码，不含同义词；同义词见 GB/T 16751 系列",
+        "uniqueId": true,
+        "idScheme": "层级字母数字码：A=疾病、B=证候、C=治法；以「.」表示分类层级，每层 2 位数字；代码末尾带「.」表示类目属性（一般不用于临床诊断）。示例：A01.01.02.03.01（中暑/暑竭）",
+        "definition": false,
+        "hierarchy": true
+      },
+      "crossCategoryMapping": "通过「疾病码 + 证候码 + 治法码」组合表达病-证-治关系，是本项目四类术语中疾病与证候的唯一法定 ID 来源；与 ICD-11 传统医学章节分类体系基本衔接（疾病术语相同 169 条、证候相同 196 条）",
+      "pros": ["唯一提供法定编码的国家标准", "中医病案首页/医保结算强制使用", "层级结构清晰，便于查询与统计"],
+      "cons": ["无机读数据，需人工或 OCR 结构化", "无英文与同义词", "症状与中药不覆盖"],
+      "integrationAdvice": "P0 主码表。为 TermEntry 增加 code 字段存放 A/B 轴编码，增加 category 字段区分 disease/pattern/treatment；类目词（末尾带「.」）标记 isCategory=true 并在归一化时排除或降权",
+      "verifyDate": "2026-09-29",
+      "sources": [
+        "https://www.ndls.org.cn/standard/detail/722b730d3090a793f288df5a7e458565",
+        "https://www.antpedia.com/standard/1985452690-9.html",
+        "https://shzyyzz.shzyyzz.com/zh/article/doi/10.16305/j.1007-1334.2022.2205031/"
+      ]
+    },
+
+    {
+      "id": "gb-t-16751-1-2023",
+      "officialName": { "zh": "中医临床诊疗术语 第1部分：疾病", "en": "Clinic terminology of traditional Chinese medical diagnosis and treatment — Part 1: Diseases" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会（提出：国家中医药管理局；归口：SAC/TC 478）",
+      "version": "GB/T 16751.1-2023（替代 GB/T 16751.1-1997）",
+      "releaseDate": "2023-03-17 发布并实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": 1369, "note": "含 111 个类目词与 53 个临时诊断用术语；另有文献记为 111 类目词" },
+        "pattern": { "covered": false, "termCount": null },
+        "symptom": { "covered": false, "termCount": null, "note": "1997 版疾病部分曾含 49 条症状性术语，2023 版以疾病术语为主体" },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "scale": "1369 条疾病术语",
+      "access": { "type": "标准全文需购买；部分平台提供在线浏览/预览", "urls": ["https://www.ndls.org.cn/", "https://main.spc.net.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "术语可作为业务数据使用", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": {
+        "zhTerm": true, "enTerm": true,
+        "synonyms": true, "note_synonyms": "新版体例新增「可选用词」项，兼顾不同地域使用习惯",
+        "uniqueId": false, "note_id": "本部分不含编码，编码对应 GB/T 15657-2021",
+        "definition": true,
+        "hierarchy": true
+      },
+      "crossCategoryMapping": "与 GB/T 15657-2021 疾病部分一一对应；分类体系衔接 ICD-11 传统医学章节",
+      "pros": ["含中文名、英译名、定义、可选用词", "现行最新版", "国家医保/病案口径"],
+      "cons": ["无机读数据", "不含编码"],
+      "integrationAdvice": "P0。作为 diseases.json 的标准术语正文来源，将其「可选用词」并入 aliases，并为每条补充 english 与 definition 字段",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://www.ndls.org.cn/standard/detail/c8887df39c0cdf72fa0382cbb822381f", "https://www.hnbzw.com/Standard/StdDetail.aspx?ekdHR4nH7qqOuPYwMeYweuxaU15IYDMg"]
+    },
+
+    {
+      "id": "gb-t-16751-2-2021",
+      "officialName": { "zh": "中医临床诊疗术语 第2部分：证候", "en": "Clinic terminology of traditional Chinese medical diagnosis and treatment — Part 2: Syndromes/patterns" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会（提出：国家中医药管理局；归口：SAC/TC 478）",
+      "version": "GB/T 16751.2-2021（替代 GB/T 16751.2-1997）",
+      "releaseDate": "2021-11-26 发布并实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": false, "termCount": null },
+        "pattern": { "covered": true, "termCount": 2060, "note": "含 406 个类目词；较 1997 版（815 条）新增 1245 条；分类由 14 大类调整为 10 大类（八纲/病因/气血阴阳精髓津液/脏腑官窍/经络/六经/三焦/卫气营血/其他/期度）" },
+        "symptom": { "covered": "间接", "termCount": null, "note": "证候定义中规范描述必然出现或可伴见的症状与体征，是抽取「证候—症状」关联的文本来源" },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "scale": "2060 条证候术语",
+      "access": { "type": "标准全文需购买；有公开 PDF 与英文译本流通", "urls": ["https://www.ndls.org.cn/standard/detail/722b730d3090a793f288df5a7e458565"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "术语可作为业务数据使用", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本（网络上有高校公开 PDF 可核对，但不宜作为正式数据源）",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": {
+        "zhTerm": true, "enTerm": true, "note_en": "2021 版新增证候术语英译名",
+        "synonyms": true, "note_synonyms": "新增「可选用词」项",
+        "uniqueId": false, "note_id": "编码对应 GB/T 15657-2021 的 B 轴",
+        "definition": true,
+        "hierarchy": true
+      },
+      "crossCategoryMapping": "定义格式统一，含「伴见…/或伴见…/可伴见…」「甚则…/甚或…」等规范表述，可从定义中结构化抽取证候—症状关联；与 ICD-11 传统医学章节证候分类体系衔接（相同术语 196 条）",
+      "pros": ["含英文、定义、可选用词", "证候分类体系与 ICD-11 衔接", "定义格式统一，便于规则化抽取"],
+      "cons": ["无机读数据", "类目词（406 条）一般不适用于临床诊断，需在归一化中区分"],
+      "integrationAdvice": "P0。作为 patterns.json 的标准术语正文来源；利用统一定义格式抽取症状组成，为「证候—症状」关联与诊疗逻辑校验提供规则依据",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://www.samr.gov.cn:83/bzjss/bzjd/art/2022/art_ae386988ba3a44f387bb5634b5f2aa08.html", "https://www.ndls.org.cn/standard/detail/722b730d3090a793f288df5a7e458565"]
+    },
+
+    {
+      "id": "gb-t-16751-3-2023",
+      "officialName": { "zh": "中医临床诊疗术语 第3部分：治法", "en": "Clinic terminology of traditional Chinese medical diagnosis and treatment — Part 3: Therapeutic methods" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会（归口：SAC/TC 478）",
+      "version": "GB/T 16751.3-2023（替代 GB/T 16751.3-1997）",
+      "releaseDate": "2023-03-17 发布并实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": false, "termCount": null },
+        "pattern": { "covered": false, "termCount": null },
+        "symptom": { "covered": false, "termCount": null },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "extraCategory": { "treatment": { "covered": true, "termCount": 1276, "note": "治则/治法/疗法术语；另见文献记为 1168 条（GB/T 15657-2021 附录 A 口径），建议以标准正文为准" } },
+      "scale": "1276 条治法术语",
+      "access": { "type": "标准全文需购买", "urls": ["https://www.ndls.org.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "术语可作为业务数据使用", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": true, "uniqueId": true, "idScheme": "C 轴编码（GB/T 15657-2021 附录 A）", "definition": true, "hierarchy": true },
+      "crossCategoryMapping": "治法承接受证候，是「证候—治法—方剂—中药」链条的中间环节，可与 ISO 20334 方剂编码、ISO 18668 中药编码串联",
+      "pros": ["补齐病-证-治三元组", "含编码"],
+      "cons": ["无机读数据", "非本次四类术语的直接目标，属补充域"],
+      "integrationAdvice": "P2 补充域。用于 LogicChecker 的「证候—治法/方剂」冲突校验规则扩展，可提升质控规则覆盖度",
+      "verifyDate": "2026-09-29",
+      "sources": ["http://saistcm.shutcm.edu.cn/2025/0721/c7633a168785/page.htm", "https://www.pharnexcloud.com/zixun/kp_7735"]
+    },
+
+    {
+      "id": "gb-t-47335-1-2026",
+      "officialName": { "zh": "中医药 诊断词汇 第1部分：舌象", "en": "Traditional Chinese medicine — Diagnostic vocabulary — Part 1: Tongue" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会（提出：国家中医药管理局；牵头：上海中医药大学）",
+      "version": "GB/T 47335.1-2026（修改采用 ISO 23961-1:2021）",
+      "releaseDate": "2026-03-31 发布；2026-07-01 实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": false, "termCount": null },
+        "pattern": { "covered": false, "termCount": null },
+        "symptom": { "covered": true, "termCount": null, "note": "覆盖舌质（神/色/形/态、舌下络脉）与舌苔（苔色/苔质）术语，属中医四诊客观体征域" },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "scale": "舌象术语体系（含典型舌象示意图，文字+图像释义）",
+      "access": { "type": "标准全文需购买", "urls": ["https://std.samr.gov.cn/", "https://www.ndls.org.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "术语可作为业务数据使用", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": false, "uniqueId": false, "definition": true, "hierarchy": true, "note": "所有术语均规范中文名称、英文名称及定义" },
+      "crossCategoryMapping": "舌象术语是「症状/体征」域与「证候」域的直接桥接要素；与 ISO 23961-1:2021 对齐，便于国际互操作",
+      "pros": ["2026 最新，与国际标准对齐", "症状/体征域目前最权威的国标依据", "含图示，便于人工核对"],
+      "cons": ["无机读数据", "仅覆盖舌象，不覆盖全身症状"],
+      "integrationAdvice": "P2。用于补齐 symptoms.json 的舌象子集，并为质控规则提供舌象规范化依据；建议在归一化中单独设 tongue 子域",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://std.samr.gov.cn/search/orgOthers?q=%E5%AE%89%E5%BE%BD%E4%B8%AD%E5%8C%BB%E8%8D%AF%E5%A4%A7%E5%AD%A6", "http://labzh.org.cn/StdNews/newsDetail.aspx?AppID=2027&NewType=8"]
+    },
+
+    {
+      "id": "gb-t-47335-2-2026",
+      "officialName": { "zh": "中医药 诊断词汇 第2部分：脉象", "en": "Traditional Chinese medicine — Diagnostic vocabulary — Part 2: Pulse" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会（牵头：上海中医药大学）",
+      "version": "GB/T 47335.2-2026（修改采用 ISO 23961-2:2021）",
+      "releaseDate": "2026-03-31 发布；2026-07-01 实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": false, "termCount": null },
+        "pattern": { "covered": false, "termCount": null },
+        "symptom": { "covered": true, "termCount": null, "note": "界定诊脉方法、部位及脉象要素术语" },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "scale": "脉象术语体系（含脉象示意图）",
+      "access": { "type": "标准全文需购买", "urls": ["https://std.samr.gov.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "术语可作为业务数据使用", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": false, "uniqueId": false, "definition": true, "hierarchy": true },
+      "crossCategoryMapping": "脉象与舌象共同构成辨证依据，可桥接症状域与证候域；与 ISO 23961-2:2021 对齐",
+      "pros": ["2026 最新，与国际标准对齐", "脉象要素界定清晰"],
+      "cons": ["无机读数据", "覆盖域窄"],
+      "integrationAdvice": "P2。与舌象标准共同补齐症状/体征域；NLP 抽取的脉象实体可优先归一到此标准",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://std.samr.gov.cn/search/orgOthers?q=%E5%BA%94%E6%80%A5%E6%80%BB%E5%8C%BB%E9%99%A2", "http://labzh.org.cn/StdNews/newsDetail.aspx?AppID=2027&NewType=8"]
+    },
+
+    {
+      "id": "gb-t-42467-2023",
+      "officialName": { "zh": "中医临床名词术语（第1部分：内科学 … 第9部分：耳鼻喉科学，共 9 个部分）", "en": "Clinical terminology of traditional Chinese medicine" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会",
+      "version": "GB/T 42467.1-2023 等 9 项",
+      "releaseDate": "2023-03-17 发布并实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": null, "note": "按临床各科（内科/外科/皮肤/肛肠/骨伤/妇/儿/眼/耳鼻喉）收录疾病与证候名词" },
+        "pattern": { "covered": true, "termCount": null },
+        "symptom": { "covered": true, "termCount": null, "note": "各科临床名词中含症状表述" },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "scale": "9 个部分（已纳入 TCMLS 2023 年度更新作为术语来源）",
+      "access": { "type": "标准全文需购买", "urls": ["https://std.samr.gov.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "术语可作为业务数据使用", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": false, "uniqueId": false, "definition": true, "hierarchy": false },
+      "crossCategoryMapping": "按临床科室组织，可作为科室维度（本项目 Records/Dashboard 的 department 筛选）的术语补充来源",
+      "pros": ["临床覆盖面广", "已被 TCMLS 收录，可通过 TCMLS 间接获取结构化版本"],
+      "cons": ["9 个部分需分别获取", "无机读数据"],
+      "integrationAdvice": "P2。建议通过 TCMLS 间接获取，而非直接从标准文本录入",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://std.samr.gov.cn/search/orgOthers?q=%E5%AE%89%E5%BE%BD%E4%B8%AD%E5%8C%BB%E8%8D%AF%E5%A4%A7%E5%AD%A6"]
+    },
+
+    {
+      "id": "gb-t-20348-2026",
+      "officialName": { "zh": "中医基础理论术语", "en": "Terminology of basic theory of traditional Chinese medicine" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会（提出并归口：国家中医药管理局）",
+      "version": "GB/T 20348-2026（替代 GB/T 20348-2006）",
+      "releaseDate": "2026-03-31 发布；2026-07-01 实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": false, "termCount": null },
+        "pattern": { "covered": "间接", "termCount": null, "note": "新增「病性」「病位」等术语，是证候构成的要素" },
+        "symptom": { "covered": "间接", "termCount": null, "note": "基础理论层面术语，非临床症状表" },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "scale": "较 2006 版新增 89 条（中医思维、病性、病位等），删除 17 条（如「理法方药」），修订「阴阳」等 200 余条定义",
+      "access": { "type": "标准全文需购买", "urls": ["https://std.samr.gov.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "术语可作为业务数据使用", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "note_en": "2026 版规范了术语英译表述", "synonyms": false, "uniqueId": false, "definition": true, "hierarchy": true },
+      "crossCategoryMapping": "病性/病位术语可作为「证候」的结构化拆解维度，有助于证候相似度计算与归一化",
+      "pros": ["2026 最新版", "英译规范，便于国际化"],
+      "cons": ["非临床症状/疾病主表", "无机读数据"],
+      "integrationAdvice": "P3。用于证候结构化拆解与同义归并的辅助依据",
+      "verifyDate": "2026-09-29",
+      "sources": ["http://labzh.org.cn/StdNews/newsDetail.aspx?AppID=2027&NewType=8"]
+    },
+
+    {
+      "id": "gb-t-46940-2025",
+      "officialName": { "zh": "中医药 中医临床术语系统分类框架", "en": "Traditional Chinese medicine — Classification framework of clinical terminology system" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会",
+      "version": "GB/T 46940-2025",
+      "releaseDate": "2025-12-31 发布；2026-04-01 实施",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": null },
+        "pattern": { "covered": true, "termCount": null },
+        "symptom": { "covered": true, "termCount": null },
+        "herb": { "covered": true, "termCount": null },
+        "note": "提供分类框架而非词条本身，适用于组织四类术语的顶层结构"
+      },
+      "scale": "分类框架标准（非词条表）",
+      "access": { "type": "标准全文需购买", "urls": ["https://std.samr.gov.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "框架可用于系统设计", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": false, "enTerm": false, "synonyms": false, "uniqueId": false, "definition": false, "hierarchy": true },
+      "crossCategoryMapping": "明确四类（及治法/方剂）术语在统一框架中的位置与关系，是设计本项目术语表结构（category/schema）的顶层参考",
+      "pros": ["顶层分类框架，直接指导表结构设计", "2026 年现行"],
+      "cons": ["不含具体词条", "需购买"],
+      "integrationAdvice": "P2。在设计 TermEntry 的 category 枚举与词典目录结构时参照此框架，保证与国标体系一致",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://std.samr.gov.cn/search/orgOthers?q=%E5%AE%89%E5%BE%BD%E4%B8%AD%E5%8C%BB%E8%8D%AF%E5%A4%A7%E5%AD%A6"]
+    },
+
+    {
+      "id": "gb-t-38324-2019",
+      "officialName": { "zh": "健康信息学 中医药学语言系统语义网络框架", "en": "Health informatics — Semantic network framework of traditional Chinese medicine language system" },
+      "publisher": "国家市场监督管理总局 / 国家标准化管理委员会",
+      "version": "GB/T 38324-2019",
+      "releaseDate": "2019 发布",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": null },
+        "pattern": { "covered": true, "termCount": null },
+        "symptom": { "covered": true, "termCount": null },
+        "herb": { "covered": true, "termCount": null },
+        "note": "语义网络框架标准，规定语义类型与语义关系，不直接提供词条"
+      },
+      "scale": "语义网络框架（对应 TCMLS 的 96 个语义类型 / 58 个语义关系；语义网络框架亦提交 ISO，见 ISO/TS 17938）",
+      "access": { "type": "标准全文需购买", "urls": ["https://std.samr.gov.cn/"], "api": "无" },
+      "license": { "type": "标准文本受版权保护", "commercialUse": "框架可用于系统设计", "redistribution": "不可再分发全文" },
+      "availability": "需购买标准文本",
+      "formats": ["PDF/纸质"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": false, "enTerm": false, "synonyms": false, "uniqueId": false, "definition": true, "hierarchy": true },
+      "crossCategoryMapping": "定义四类术语之间的语义关系类型（如「治疗」「影响」「与…相须」等），是构建「疾病-证候-症状-中药」关联关系（本项目质控图谱 graph）的规范依据",
+      "pros": ["中医语义关系的国家标准", "直接支撑图谱边类型定义"],
+      "cons": ["不含词条", "需购买"],
+      "integrationAdvice": "P2。Qc.vue 的图谱边（病历-实体 / 规则 / 冲突）定义可参考此框架扩展语义类型，使图例与实际数据一致",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://cmsj.cams.cn/zh/article/doi/10.24920/004151"]
+    },
+
+    {
+      "id": "chp-2025",
+      "officialName": { "zh": "中华人民共和国药典（2025年版，第十二版）一部", "en": "Pharmacopoeia of the People's Republic of China 2025 Edition, Volume I" },
+      "publisher": "国家药典委员会（国家药品监督管理局、国家卫生健康委员会 2025年第29号公告颁布）",
+      "version": "2025年版（第十二版）",
+      "releaseDate": "2025 年颁布；2025-10-01 起实施；网络版 2026-07 正式上线",
+      "status": "现行",
+      "categories": {
+        "disease": false, "pattern": false, "symptom": false,
+        "herb": { "covered": true, "termCount": 3069, "note": "一部中药收载品种 3069 种（新增 28、修订 420、不再收载 19）；含中药材、饮片、成方制剂与单味制剂" }
+      },
+      "scale": "一部中药 3069 种；全四部总计 6385 种（二部化学药 2776、三部生物制品 153、四部辅料 387）；通用技术要求 410 个、指导原则 72 个",
+      "access": {
+        "type": "网络版免费开放；纸质版需购买",
+        "urls": ["https://2025.chp.org.cn/", "https://www.chp.org.cn/（官网右下角「2025年版药典网络版」入口）"],
+        "api": "无官方 API（仅有网页检索）"
+      },
+      "license": {
+        "type": "国家药品标准，具法定效力；标准文本版权归国家药典委员会 / 中国医药科技出版社",
+        "commercialUse": "网络版面向全社会免费开放查询；批量抓取与商业再分发前需确认网站使用条款",
+        "redistribution": "不可再分发标准全文"
+      },
+      "availability": "免费在线查阅（2026-07 起）；无机读导出",
+      "formats": ["HTML（在线）", "PDF/纸质（购买）"],
+      "machineReadable": false,
+      "completeness": {
+        "zhTerm": true, "enTerm": "部分", "note_en": "药典含药材拉丁名/拼音，系统英文译名覆盖有限",
+        "synonyms": "部分", "note_synonyms": "含「曾用名」过渡用法（公告第七条：已修订通用名称的药品，原名称可作为曾用名过渡使用）",
+        "uniqueId": false, "note_id": "药典本身不提供持久编码；国际编码可用 ISO 18668 系列",
+        "definition": true, "hierarchy": true
+      },
+      "crossCategoryMapping": "药典品种正文含【性味与归经】【功能与主治】【用法与用量】，构成「中药—功效/主治」关联，可桥接中药与疾病/证候域",
+      "pros": ["法定权威，中药名称唯一依据", "2026-07 起免费在线", "覆盖中药材/饮片/成方制剂"],
+      "cons": ["无官方机读数据与 API", "无持久编码", "英文与同义词覆盖有限"],
+      "integrationAdvice": "P0 中药主表。以药典一部正文的药材与饮片名称为 herbs.json 的标准术语；若需批量获取，应优先采用人工录入或与药典委沟通授权，避免直接抓取",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://2025.chp.org.cn/#/item?bookId=3&entryId=5461", "https://www.gov.cn/zhengce/zhengceku/202503/content_7015673.htm", "https://yjj.hebei.gov.cn/hbpda/xwdt/ttgz/20260730170419132.html"]
+    },
+
+    {
+      "id": "iso-18668-series",
+      "officialName": {
+        "zh": "中医药 中药编码系统（第1部分：编码规则；第2部分：饮片代码；第3部分：中药材代码；第4部分：配方颗粒代码）",
+        "en": "ISO 18668-1:2016 / -2:2017 / -3:2017 / -4:2017 — Traditional Chinese medicine — Coding system for Chinese medicines"
+      },
+      "publisher": "ISO/TC 249（中医药技术委员会）/ SC 1",
+      "version": "ISO 18668-1:2016（2021 年复审确认）、-2:2017、-3:2017、-4:2017",
+      "releaseDate": "2016-04（-1）；2017（-2/-3/-4）",
+      "status": "现行（ISO 18668-1:2016 于 2021-12-02 确认继续有效）",
+      "categories": {
+        "disease": false, "pattern": false, "symptom": false,
+        "herb": { "covered": true, "termCount": null, "note": "为中药材（CMM）、饮片（decoction pieces）、配方颗粒（GFIMP）提供编码规则与代码；不含中成药（CPM）" }
+      },
+      "scale": "编码体系；覆盖中药材/饮片/配方颗粒（不含中成药）",
+      "access": { "type": "ISO 官网付费购买", "urls": ["https://www.iso.org/standard/63155.html"], "api": "无" },
+      "license": { "type": "ISO 标准版权", "commercialUse": "购买后可用于商业系统", "redistribution": "不可再分发标准文本" },
+      "availability": "需购买",
+      "formats": ["PDF"],
+      "machineReadable": false,
+      "completeness": {
+        "zhTerm": true, "enTerm": true, "synonyms": false,
+        "uniqueId": true,
+        "idScheme": "10 层分层编码：第1层大类（农林牧渔=0）、第2层中药产品码（=6）、第3层药用来源（1植物/2动物/3矿物/4真菌/5地衣/6藻类/7混合）、第4层 3 位科属与序号，依此至第10层，表达炮制与商品属性",
+        "definition": false, "hierarchy": true
+      },
+      "crossCategoryMapping": "与 ISO 20333:2017（供应链编码）、ISO 20334:2018（方剂编码）同属 ISO/TC 249 编码族，可串联「方剂—饮片—中药材」",
+      "pros": ["中药唯一国际编码体系", "分层结构表达来源与炮制属性", "可与药典名称配套作为 ID"],
+      "cons": ["标准与代码需购买", "无公开机读文件", "不含功效/主治等临床语义"],
+      "integrationAdvice": "P2。若系统需要中药持久 ID 或涉及供应链/国际贸易，为 herbs.json 增加 iso18668 编码字段；仅做院内质控可暂缓",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://www.iso.org/standard/63155.html", "https://committee.iso.org/ru/ics/11.120.10/x/"]
+    },
+
+    {
+      "id": "iso-20334-2018",
+      "officialName": { "zh": "中医药 方剂编码系统", "en": "ISO 20334:2018 — Traditional Chinese medicine — Coding system of formulae" },
+      "publisher": "ISO/TC 249 / SC 1",
+      "version": "ISO 20334:2018",
+      "releaseDate": "2018",
+      "status": "现行",
+      "categories": { "disease": false, "pattern": false, "symptom": false, "herb": false },
+      "extraCategory": { "formula": { "covered": true, "termCount": null, "note": "方剂编码；本项目 formulas.json 现仅 5 条，来源标注为《中医方剂大辞典》" } },
+      "scale": "方剂编码体系",
+      "access": { "type": "ISO 官网付费购买", "urls": ["https://committee.iso.org/ru/ics/11.120.10/x/"], "api": "无" },
+      "license": { "type": "ISO 标准版权", "commercialUse": "购买后可用", "redistribution": "不可再分发" },
+      "availability": "需购买",
+      "formats": ["PDF"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": false, "uniqueId": true, "idScheme": "ISO 20334 方剂码", "definition": false, "hierarchy": true },
+      "crossCategoryMapping": "方剂编码可串联 GB/T 16751.3 治法与 ISO 18668 中药编码，形成「证候—治法—方剂—中药」链条",
+      "pros": ["方剂唯一国际编码"],
+      "cons": ["需购买", "无机读数据"],
+      "integrationAdvice": "P3。formulas.json 目前仅 5 条且与药典/ISO 无对齐，建议先扩充词表再考虑编码",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://committee.iso.org/ru/ics/11.120.10/x/"]
+    },
+
+    {
+      "id": "icd-11-2026",
+      "officialName": { "zh": "国际疾病分类第十一次修订本（含第26章 传统医学病证 模块1）", "en": "ICD-11 (International Classification of Diseases, 11th Revision) — Chapter 26 Traditional medicine conditions, Module I" },
+      "publisher": "世界卫生组织（WHO）",
+      "version": "ICD-11 2026 Release；MMS linearization v2026-01；ICD API v2.6",
+      "releaseDate": "2026-02-16（2026 版发布）；2019-05 WHA 第72届大会通过；2022-01-01 生效",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": 250, "note": "第26章 传统医学疾病 TM1（SA00–SE5Z），6 大类：脏腑系统疾病、其他身体系统疾病、气血津液病、精神情志病、外感病、儿童与青少年期病类；早期文献记为 150 条" },
+        "pattern": { "covered": true, "termCount": 284, "note": "第26章 传统医学证候 TM1（SE70–SJ1Z），10 大类：八纲证、外感证、气血津液证、脏腑证、经络证、六经证、三焦证、卫气营血证、四体质证、其他；早期文献记为 196 条" },
+        "symptom": { "covered": true, "termCount": null, "note": "第21章「症状、体征或临床所见」覆盖症状域（非中医特有表述）" },
+        "herb": { "covered": false, "termCount": null }
+      },
+      "scale": "第26章约 534 条中医相关术语；ICD-11 全量约 17,000 个诊断类别、13 万余条临床术语（组合编码可达约 200 万条）；已有中文版",
+      "access": {
+        "type": "在线浏览 + REST API + 本地容器部署",
+        "urls": ["https://icd.who.int/en（ICD-11 Browser）", "https://icd.who.int/icdapi（ICD API 文档与密钥管理）"],
+        "api": "ICD API v2.6：HTTP REST，OAuth2 client credentials 换取 token；支持 JSON；可 Docker 本地部署（whoicd/icd-api，支持指定语言与版本，如 2026-01_en）；提供 Embedded Classification Tool 嵌入"
+      },
+      "license": {
+        "type": "CC BY-ND 3.0 IGO（Creative Commons 署名-禁止演绎 3.0 政府间组织）",
+        "commercialUse": "允许商业与研究使用，亦明确支持 AI 训练与临床决策支持场景（WHO 官方表述）",
+        "redistribution": "可再分发原始内容并须署名；禁止分发演绎/改编版本（ND）——本地部署需接受许可条款（acceptLicense=true）"
+      },
+      "availability": "可直接获取：在线浏览免费、API 需注册获取 client credentials（免费）、Docker 镜像可拉取",
+      "formats": ["JSON（API 返回）", "RDF/关联数据（WHO 提供内容模型）", "HTML（Browser）"],
+      "machineReadable": true,
+      "completeness": {
+        "zhTerm": true, "note_zh": "ICD-11 有官方中文版（含第26章中文术语）",
+        "enTerm": true,
+        "synonyms": true, "note_synonyms": "ICD-11 合并了分类与索引，含同义词与包含/排除术语；提供多语言（14 种以上）",
+        "uniqueId": true,
+        "idScheme": "ICD-11 码（如 SA00 胁痛、SE72 热证）+ 实体 URI（id.who.int/icd/entity/...）+ 可扩展的簇编码（cluster coding）与扩展码（X 章）",
+        "definition": true, "hierarchy": true
+      },
+      "crossCategoryMapping": "第26章为补充章节，规范要求与第 1–25 章常规诊断码并列双编码；疾病码与证候码可组合使用；与 GB/T 15657-2021 分类体系基本衔接（疾病相同 169 条、证候相同 196 条）",
+      "pros": ["唯一的国际权威且可机读的传统医学术语源", "CC 许可明确、允许商用与 AI 训练", "提供 REST API 与 Docker 本地部署，工程落地成本最低", "有中文版"],
+      "cons": ["中医术语量小（约 534 条），远少于国标 1369+2060", "ND 条款禁止分发演绎版本", "不覆盖中药"],
+      "integrationAdvice": "P1。作为国标体系的国际映射目标：为 TermEntry 增加 icd11 字段；质控评分与导出模块可输出 ICD-11 双编码以满足互操作要求；建议本地 Docker 部署以避免外网依赖",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://icd.who.int/icdapi", "https://www.who.int/standards/classifications/classification-of-diseases", "https://zh.wikisource.org/wiki/国际疾病分类第十一次修订本（ICD-11）中文版/第26章"]
+    },
+
+    {
+      "id": "snomed-ct",
+      "officialName": { "zh": "SNOMED CT（系统化临床医学术语集）国际版 / 美国版", "en": "SNOMED CT (Systematized Nomenclature of Medicine — Clinical Terms) International Edition / US Edition" },
+      "publisher": "SNOMED International（IHTSDO）；美国版由美国国家医学图书馆 NLM 维护发行",
+      "version": "国际版：月度发布（2026 年 7 月版为美国版 20260901 的基础）；美国版：20260901（2026-09-01 发布）",
+      "releaseDate": "国际版月度；美国版每年 3 月与 9 月（2026-09-01 为最新版）",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": null, "note": "临床发现（Clinical finding）、疾病等层级覆盖疾病域" },
+        "pattern": { "covered": false, "termCount": null, "note": "不含中医证候概念" },
+        "symptom": { "covered": true, "termCount": null, "note": "症状与体征覆盖完整，是西医侧症状域最细粒度来源" },
+        "herb": { "covered": false, "termCount": null, "note": "中药/草药基本不覆盖（物质层级以化药为主）" }
+      },
+      "scale": "国际版活跃概念 378,553；美国版活跃概念 386,110、活跃描述约 1,411,000、活跃关系约 1,356,762（2026-03 口径）",
+      "access": {
+        "type": "许可后下载 RF2 发布包；亦可通过 Snowstorm / FHIR 术语服务访问",
+        "urls": ["https://www.nlm.nih.gov/healthit/snomedct/us_edition.html", "https://uts.nlm.nih.gov"],
+        "api": "SNOMED International 提供 Snowstorm 开源术语服务器与 FHIR API；NLM 通过 UTS 分发"
+      },
+      "license": {
+        "type": "SNOMED CT Affiliate License（SNOMED International）；美国版另需 UMLS Metathesaurus License + UTS 账号",
+        "commercialUse": "成员国（Member）内使用含于会员费；非成员国/非附属机构的商业使用需向 SNOMED International 申请授权（可能收费）",
+        "redistribution": "不可再分发"
+      },
+      "availability": "需申请授权（Affiliate License / UMLS License）；下载 RF2 文件",
+      "formats": ["RF2（UTF-8 制表符分隔平面文件，可导入任意数据库）", "可转换为 JSON / RDF", "FHIR（通过术语服务器）"],
+      "machineReadable": true,
+      "completeness": {
+        "zhTerm": "有限", "note_zh": "有中文翻译计划与社区版本，但官方中文覆盖有限，非权威中文来源",
+        "enTerm": true,
+        "synonyms": true, "note_synonyms": "每条概念含 FSN（完全指定名）与多个同义描述",
+        "uniqueId": true, "idScheme": "SCTID（概念 ID / 描述 ID / 关系 ID）；美国版另附 SNOMED CT→ICD-10-CM 映射（逾 142,000 条源概念）",
+        "definition": true, "hierarchy": true
+      },
+      "crossCategoryMapping": "通过 UMLS CUI 与 ICD / MeSH / RxNorm 互通；通过 IS-A 与「finding site」等属性表达疾病-症状关系；不含中医证候，无法直接桥接证候域",
+      "pros": ["临床粒度最细", "关系模型完备（支持后组配）", "与 ICD-10-CM 有官方映射"],
+      "cons": ["许可门槛高，非成员国商用需付费授权", "中文覆盖弱", "不覆盖证候与中药"],
+      "integrationAdvice": "P3。仅在本系统需要对接西医诊断编码或做症状域细粒度归一（且已具备 SNOMED 授权）时引入；中医四类术语不应依赖 SNOMED",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://www.nlm.nih.gov/healthit/snomedct/us_edition.html", "https://www.nlm.nih.gov/pubs/techbull/so26/brief/so26_snomed_us.html", "https://snomed.atlassian.net/wiki/spaces/RMT/pages/131957405/SNOMED+CT+Managed+Service+-+US+Edition+package+license"]
+    },
+
+    {
+      "id": "mesh-2026",
+      "officialName": { "zh": "医学主题词表", "en": "MeSH (Medical Subject Headings) 2026" },
+      "publisher": "美国国家医学图书馆（NLM / NIH）",
+      "version": "2026 Production Year（MeSH DTD recordset_20260101）",
+      "releaseDate": "2026-01（XML/RDF 发布）；每年更新（Descriptor 与 Qualifier 年更，SCR 日更）",
+      "status": "现行",
+      "categories": {
+        "disease": { "covered": true, "termCount": null, "note": "C 类（疾病）覆盖疾病域" },
+        "pattern": { "covered": false, "termCount": null },
+        "symptom": { "covered": true, "termCount": null, "note": "C23（病理状态、体征与症状）覆盖症状体征域" },
+        "herb": { "covered": "部分", "termCount": null, "note": "D 类（化学物质与药物）含植物药/草药相关主题词，但非中国药典口径的中药名称体系" }
+      },
+      "scale": "约 30,766 条 Descriptor（2026 年 PubMed 基线口径）；另有大量 Supplementary Concept Records（化学品/药物，日更）",
+      "access": {
+        "type": "免费下载 + 开放 API",
+        "urls": ["https://www.nlm.nih.gov/databases/download/mesh.html", "https://id.nlm.nih.gov/mesh/（MeSH RDF / SPARQL）"],
+        "api": "MeSH RDF REST lookup API（返回 JSON）、SPARQL 1.1 endpoint、E-utilities"
+      },
+      "license": {
+        "type": "NLM Terms and Conditions；美国联邦政府作品，属公共领域（可自由使用与再分发，建议注明来源）",
+        "commercialUse": "允许商业使用",
+        "redistribution": "允许"
+      },
+      "availability": "可直接下载（无需申请授权）",
+      "formats": ["XML", "RDF (Turtle/N-Triples)", "MARC 21", "JSON（lookup API 返回）", "注：ASCII 格式已于 2026-01 停止发布，仅保留至 2025 年归档"],
+      "machineReadable": true,
+      "completeness": {
+        "zhTerm": "有限", "note_zh": "以英文为主，存在社区/机构中文译本但非 NLM 官方权威中文",
+        "enTerm": true,
+        "synonyms": true, "note_synonyms": "含 Entry Terms（入口词）作为同义词",
+        "uniqueId": true, "idScheme": "MeSH Unique ID（如 D000123）+ 树号（Tree Number）表达多层级归属",
+        "definition": true, "note_definition": "含 Scope Note",
+        "hierarchy": true, "note_hierarchy": "树号体系支持多父层级"
+      },
+      "crossCategoryMapping": "树号体系表达疾病-症状-药物的层级归属；通过 UMLS CUI 与 ICD / SNOMED 互通；不覆盖中医证候",
+      "pros": ["完全免费、可商用、可再分发", "XML/RDF 直接下载，工程接入成本低", "提供 SPARQL 与 REST API"],
+      "cons": ["以英文与西医为主", "不覆盖证候", "中药覆盖口径与中国药典不一致"],
+      "integrationAdvice": "P3。适合作为疾病/症状域的英文别名词表与文献检索增强；建议仅抽取 C 类与 D 类术语作为 aliases 的英文补充，不作为中文主表",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://www.nlm.nih.gov/databases/download/mesh.html", "https://mainweb.awsprod.nlm.nih.gov/pubs/techbull/jf26/brief/jf26_MeSH_RDF_2026_DSrelease.html"]
+    },
+
+    {
+      "id": "umls-2026aa",
+      "officialName": { "zh": "UMLS 元词表（统一医学语言系统）", "en": "UMLS Metathesaurus (Unified Medical Language System), 2026AA Release" },
+      "publisher": "美国国家医学图书馆（NLM）",
+      "version": "2026AA",
+      "releaseDate": "2026-05-04",
+      "status": "现行（每半年发布一次：AA 约 5 月、AB 约 11 月）",
+      "categories": {
+        "disease": { "covered": true, "termCount": null, "note": "聚合 ICD-11 / ICD-10-CM / SNOMED CT / MeSH 等来源的疾病概念" },
+        "pattern": { "covered": false, "termCount": null, "note": "不覆盖中医证候" },
+        "symptom": { "covered": true, "termCount": null },
+        "herb": { "covered": "部分", "termCount": null, "note": "含部分草药/植物药来源词表，但非中国药典口径" }
+      },
+      "scale": "3,530,466 个活跃概念、18,064,970 个概念名，来自 195 个源词表；语义网络 125 个语义类型 / 54 种语义关系；完整发布包约 5.3 GB（压缩）/ 40.1 GB（解压）",
+      "access": {
+        "type": "需签署 UMLS Metathesaurus License 并拥有 UTS 账号后下载",
+        "urls": ["https://www.nlm.nih.gov/research/umls/licensedcontent/umlsknowledgesources.html", "https://uts.nlm.nih.gov"],
+        "api": "UTS REST API（在请求中附加 apiKey），如 https://uts-ws.nlm.nih.gov/rest/content/current/CUI/{CUI}/atoms"
+      },
+      "license": {
+        "type": "UMLS Metathesaurus License Agreement（免费签署）；源词表按 Category 0–4 附加限制，SNOMED CT 另适用附录 2 条款",
+        "commercialUse": "研究与学术用途免费；生产/商业用途需逐源审查附加限制（Category 1–4 源可能需单独授权）",
+        "redistribution": "受限；需遵守各源词表条款"
+      },
+      "availability": "需申请授权（License + UTS 账号，申请免费但需审批与年度使用报告）",
+      "formats": ["RRF（Rich Release Format，可载入 MySQL / Oracle / MS Access）", "预计算子集（Full Subset 5.4GB / Level 0 Subset 1.9GB）", "MRCONSO.RRF（492MB 压缩）", "JSON（REST API 返回）"],
+      "machineReadable": true,
+      "completeness": {
+        "zhTerm": "有限", "note_zh": "含部分翻译源（49 个翻译源），中文覆盖不完整",
+        "enTerm": true,
+        "synonyms": true, "note_synonyms": "核心能力即为「同义术语聚合成概念」",
+        "uniqueId": true, "idScheme": "CUI（Concept Unique Identifier）+ 各源的 AUI / SCUI / CODE",
+        "definition": "部分", "hierarchy": true
+      },
+      "crossCategoryMapping": "核心价值即为跨词表映射枢纽：同一 CUI 下聚合 ICD-11 / ICD-10-CM / SNOMED CT / MeSH / RxNorm / LOINC 等编码，并提供 MRREL 关系表；是本项目「国标码 → 国际码」映射的实现基础",
+      "pros": ["跨词表映射能力最强", "提供语义类型与关系", "REST API 可用"],
+      "cons": ["需签署许可与年度使用报告", "商用需逐源审查（SNOMED CT 等）", "体积大（40GB）", "不覆盖中医证候"],
+      "integrationAdvice": "P3。若需要输出国际互操作编码（ICD-10-CM / SNOMED 等），可用 UMLS 作为映射引擎；否则直接用 ICD-11 API 更轻。中医四类术语本身不能依赖 UMLS",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://mainweb.awsprod.nlm.nih.gov/pubs/techbull/mj26/mj26_umls_aa_release_notes.html", "https://www.nlm.nih.gov/research/umls/licensedcontent/umlsknowledgesources.html", "https://www.nlm.nih.gov/pubs/techbull/so26/so26_umls_40.html"]
+    },
+
+    {
+      "id": "tcmls",
+      "officialName": { "zh": "中医药学语言系统（TCMLS）", "en": "Traditional Chinese Medicine Language System (TCMLS)" },
+      "publisher": "中国中医科学院中医药信息研究所（中医药知识组织与标准研究中心）",
+      "version": "2023 年度更新版（持续年度更新）",
+      "releaseDate": "2002 年启动；2023 年度更新（新增 GB/T 42467-2023 系列，并以 GB/T 15657-2021、GB/T 16751.2-2021 替代相应规范性文件）",
+      "status": "现行（在线平台持续维护）",
+      "categories": {
+        "disease": { "covered": true, "termCount": null, "note": "含 GB/T 15657、GB/T 16751.1、GB/T 42467 系列、中医药学名词等来源的疾病概念" },
+        "pattern": { "covered": true, "termCount": null, "note": "含 GB/T 16751.2-2021 证候术语" },
+        "symptom": { "covered": true, "termCount": null, "note": "含四诊（望闻问切）相关症状体征概念，是四类术语中症状域覆盖最完整的中文来源" },
+        "herb": { "covered": true, "termCount": null, "note": "含《中药材正名词典》《中国中医药学主题词表》等中药与方剂来源" }
+      },
+      "scale": "概念 10 万余条、术语 26 万余条（2023 年度口径；早期文献记约 12 万概念 / 30 万术语 / 127 万条语义关系）；整合 19 个权威术语标准规范；语义类型 96 种、语义关系 58 种",
+      "access": {
+        "type": "免费注册申请试用（在线平台）；批量数据需联系发布方",
+        "urls": ["http://tcmls.cintcm.com/", "http://tcmls.ac.cn/"],
+        "api": "未见公开 API；平台提供概念树 / 语义类型树 / 语义关系树浏览",
+        "contact": "中国中医科学院中医药信息研究所，电话 010-64089623 / 010-64089605，邮箱 xxstcmls@163.com"
+      },
+      "license": {
+        "type": "需注册申请试用；未公开标准化商用许可条款",
+        "commercialUse": "商用前须与发布方另行确认授权范围",
+        "redistribution": "未明确，默认不可再分发"
+      },
+      "availability": "需注册申请（免费试用）",
+      "formats": ["在线平台（概念树 / 语义网络浏览）", "未见公开批量下载格式（JSON/CSV/RDF 均需与发布方协商）"],
+      "machineReadable": false,
+      "completeness": {
+        "zhTerm": true,
+        "enTerm": true, "note_en": "整合《中医基本名词术语中英对照国际标准》等来源，含英文对照",
+        "synonyms": true, "note_synonyms": "以概念为核心聚合多来源同义术语，是其核心能力",
+        "uniqueId": true, "idScheme": "TCMLS 概念 ID（内部编码）；同时保留各来源标准的原始编码",
+        "definition": "部分", "hierarchy": true, "note_hierarchy": "语义网络 96 类型 / 58 关系 + 概念树层级"
+      },
+      "crossCategoryMapping": "四类术语之间关联关系最完整的中文来源：语义关系涵盖「治疗」「影响」「与…相须」「使药」「开窍于」「相表里」等中医特有关系，可直接支撑「疾病-证候-症状-中药-方剂」图谱；其语义网络框架已形成 GB/T 38324-2019，并提交 ISO（ISO/TS 17938）",
+      "pros": ["四类术语全覆盖，中文最完整", "提供显式语义关联（解决本项目图谱边定义与图例脱节问题）", "已整合 19 个权威标准，可做交叉校验", "免费注册试用"],
+      "cons": ["无机读数据与 API，批量获取需协商", "商用授权不明确", "版本更新节奏与透明度低于国标"],
+      "integrationAdvice": "P1。优先用于补齐症状域与四类术语之间的关联关系；建议以「人工核对 + 申请批量数据」方式获取，并在系统中标注来源与版本；商用前务必与发布方书面确认授权",
+      "verifyDate": "2026-09-29",
+      "sources": ["http://tcmls.cintcm.com/", "https://cmsj.cams.cn/zh/article/doi/10.24920/004151"]
+    },
+
+    {
+      "id": "who-istt-2007",
+      "officialName": { "zh": "世界卫生组织西太平洋地区传统医学名词术语国际标准", "en": "WHO International Standard Terminologies on Traditional Medicine in the Western Pacific Region" },
+      "publisher": "世界卫生组织西太平洋区域办公室（WHO WPRO），与国家中医药管理局联合发布",
+      "version": "2007 年版（首版；计划每 3–5 年修订）",
+      "releaseDate": "2007-10-16（北京发布）",
+      "status": "现行（自 2007 年后未见新版发布）",
+      "categories": {
+        "disease": { "covered": true, "termCount": null, "note": "临床各科部分覆盖疾病" },
+        "pattern": { "covered": true, "termCount": null, "note": "基础理论/诊断学部分含证候相关术语" },
+        "symptom": { "covered": true, "termCount": null, "note": "诊断学部分覆盖症状体征" },
+        "herb": { "covered": true, "termCount": null, "note": "药物治疗部分覆盖中药" }
+      },
+      "scale": "8 大类 3543 个词条（总类 / 基础理论 / 诊断学 / 临床各科 / 治疗学 / 针灸学 / 药物治疗 / 传统医学典籍）；另有文献记为 3259 条技术术语 + 153 部典籍名称",
+      "access": { "type": "书籍 / PDF；WHO 西太区官网", "urls": ["https://www.who.int/westernpacific"], "api": "无" },
+      "license": { "type": "WHO 出版物版权", "commercialUse": "需确认 WHO 出版物使用条款", "redistribution": "受限" },
+      "availability": "需获取出版物（部分内容可在线查阅）",
+      "formats": ["PDF / 纸质图书"],
+      "machineReadable": false,
+      "completeness": {
+        "zhTerm": true, "enTerm": true,
+        "synonyms": false,
+        "uniqueId": true, "idScheme": "百进制分类编号（如 0.0.1 / 1.1.0），按类目以百为单位预留扩展空间",
+        "definition": true, "hierarchy": true
+      },
+      "crossCategoryMapping": "8 大类结构天然串联基础理论-诊断-疾病-治疗-药物；ID 编码按类目分层，便于构建数据库",
+      "pros": ["四类术语全覆盖", "中英对照且含定义", "国际组织发布，便于对外交流"],
+      "cons": ["2007 年后未更新，与 2021/2023 新版国标存在口径差异", "无机读数据", "已被 ICD-11 第26章部分取代"],
+      "integrationAdvice": "P3。作为英译与历史数据兼容的参考来源；新建设据应优先采用 GB/T 16751 与 ICD-11 TM1",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://news.sciencenet.cn/sbhtmlnews/200710181453474191886.html", "https://pmc.ncbi.nlm.nih.gov/articles/PMC2887335/"]
+    },
+
+    {
+      "id": "cstt-2004",
+      "officialName": { "zh": "中医药学名词（2004）及内科学等（2010）、外科学等（2013）分册", "en": "Chinese Terminology of Traditional Chinese Medicine" },
+      "publisher": "全国科学技术名词审定委员会（中医药学名词审定委员会）",
+      "version": "2004 年版（18 个部分）；后续分册 2010（内科学等）、2013（外科学等）",
+      "releaseDate": "2004；2010；2013",
+      "status": "现行（部分内容已被新版国标替代）",
+      "categories": {
+        "disease": { "covered": true, "termCount": null },
+        "pattern": { "covered": true, "termCount": null },
+        "symptom": { "covered": true, "termCount": null, "note": "诊断学部分含症状术语" },
+        "herb": { "covered": true, "termCount": null, "note": "中药学、方剂学部分" }
+      },
+      "scale": "2004 版 18 部分共 5283 条（医史文献、中医基础理论、诊断学、治疗学、中药学、方剂学、针灸学、推拿学、养生学等）",
+      "access": { "type": "出版物 / 全国科学技术名词审定委员会官网（术语在线）", "urls": ["https://www.termonline.cn/"], "api": "术语在线提供查询" },
+      "license": { "type": "出版物版权", "commercialUse": "需确认", "redistribution": "受限" },
+      "availability": "需购买出版物 / 在线查询",
+      "formats": ["纸质 / PDF"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": false, "uniqueId": false, "definition": true, "hierarchy": true },
+      "crossCategoryMapping": "按学科分册组织，覆盖四类术语；与 GB/T 16751 / GB/T 15657 存在交叉，可用于同义词补充与历史数据兼容",
+      "pros": ["国家级审定术语", "覆盖中药学与方剂学", "可通过术语在线查询"],
+      "cons": ["2004 年版本较旧", "无机读数据", "部分已被 2021/2023 国标替代"],
+      "integrationAdvice": "P3。作为 aliases 的同义词补充来源，不作为主表",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://c3c.wiki/events/slides/bjug/S1_01_中医临床研究术语编码研究进展.pdf"]
+    },
+
+    {
+      "id": "tcm-standard-platform",
+      "officialName": { "zh": "中医国家标准应用服务平台（《中医病证分类与代码》等 4 项国标官方配套平台）", "en": "TCM National Standards Application Service Platform" },
+      "publisher": "上海中医药大学（4 项中医术语国家标准修订项目组）",
+      "version": "配套 GB/T 15657-2021 与 GB/T 16751.1/.2/.3",
+      "releaseDate": "随新版国标推广上线（2021 年起）",
+      "status": "现行",
+      "categories": { "disease": true, "pattern": true, "symptom": false, "herb": false },
+      "scale": "覆盖 4 项国标全部术语（约 4705 条）",
+      "access": { "type": "在线平台（含检索图谱、实训辅诊、病案评估三大模块）", "urls": ["http://saistcm.shutcm.edu.cn/（平台入口见该校中医方证信息研究中心发布页）"], "api": "未见公开 API" },
+      "license": { "type": "平台服务条款", "commercialUse": "需确认", "redistribution": "受限" },
+      "availability": "免费在线使用（无机读导出）",
+      "formats": ["HTML（在线）"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": true, "uniqueId": true, "idScheme": "沿用 A/B/C 轴国标码", "definition": true, "hierarchy": true },
+      "crossCategoryMapping": "提供「病证理法检索」与知识图谱，直接体现「病-证-理-法-方药」关联，可作为人工核对四类关系与校验本项目图谱规则的一致性参照",
+      "pros": ["国标官方配套，权威且免费", "提供知识图谱检索", "可用于人工核对与规则验证"],
+      "cons": ["无机读数据/API", "非标准发布方（属配套服务平台）"],
+      "integrationAdvice": "P1（作为核对工具）。用于人工校对本项目 diseases.json / patterns.json 的术语与编码，以及验证 LogicChecker 的证候-治法规则",
+      "verifyDate": "2026-09-29",
+      "sources": ["http://saistcm.shutcm.edu.cn/2025/0721/c7633a168785/page.htm"]
+    },
+
+    {
+      "id": "pharnexcloud-tcm-db",
+      "officialName": { "zh": "中医病证治分类与代码数据库（第三方聚合）", "en": "TCM disease-pattern-treatment classification and code database (third-party aggregator)" },
+      "publisher": "药融云（摩熵医药，第三方商业数据平台）",
+      "version": "收录《中医临床诊疗术语》全部术语 4705 条",
+      "releaseDate": "2024 年上线并持续更新",
+      "status": "第三方（非权威发布方）",
+      "categories": { "disease": true, "pattern": true, "symptom": false, "herb": false },
+      "scale": "4705 条（1369 疾病 + 2060 证候 + 1276 治法）",
+      "access": { "type": "免费在线检索（个人版）", "urls": ["https://data.pharnexcloud.com/6/table/259"], "api": "未见公开 API" },
+      "license": { "type": "第三方平台条款", "commercialUse": "需与平台确认", "redistribution": "受限" },
+      "availability": "免费在线检索（无机读导出）",
+      "formats": ["HTML（在线）"],
+      "machineReadable": false,
+      "completeness": { "zhTerm": true, "enTerm": true, "synonyms": false, "uniqueId": true, "idScheme": "沿用国标码", "definition": false, "hierarchy": true },
+      "crossCategoryMapping": "可按名称、英文名、代码检索，便于快速核对",
+      "pros": ["免费、检索方便", "覆盖 4705 条全量"],
+      "cons": ["非权威发布方，数据准确性需与标准正文核对", "无 API", "商用授权不明"],
+      "integrationAdvice": "仅作核对与快速取数参考，禁止作为系统的权威数据源；正式数据必须以国家标准正文为准",
+      "verifyDate": "2026-09-29",
+      "sources": ["https://www.pharnexcloud.com/zixun/kp_7735"]
+    }
+  ],
+
+  "categoryCoverageMatrix": [
+    { "category": "疾病 disease", "推荐主源": "GB/T 15657-2021（编码）+ GB/T 16751.1-2023（术语/定义/英译/可选用词）", "国际映射": "ICD-11 第26章 TM1 疾病（SA00–SE5Z，250 条）", "补充源": "GB/T 42467-2023、TCMLS、MeSH(C)、SNOMED CT、UMLS CUI", "现有系统状态": "data/dictionaries/diseases.json 1357 条，来源标注「中医临床诊疗术语 疾病」，缺 code / english / definition" },
+    { "category": "证候 pattern", "推荐主源": "GB/T 15657-2021（B 轴编码）+ GB/T 16751.2-2021（术语/定义/英译/可选用词，2060 条）", "国际映射": "ICD-11 第26章 TM1 证候（SE70–SJ1Z，284 条）", "补充源": "TCMLS、GB/T 20348-2026（病性/病位）、WHO ISTT 2007", "现有系统状态": "data/dictionaries/patterns.json 2080 条，来源标注「GB/T 15657-2021」，缺 code / english / definition；与标准 2060 条存在条数差异，需核对类目词处理口径" },
+    { "category": "症状 symptom", "推荐主源": "GB/T 47335.1-2026（舌象）+ GB/T 47335.2-2026（脉象）+ TCMLS（全身症状）", "国际映射": "ICD-11 第21章（症状、体征或临床所见）、MeSH C23、SNOMED CT Clinical finding", "补充源": "GB/T 42467-2023、GB/T 16751.2 定义中抽取的证候-症状关联、WHO ISTT 诊断学部分", "现有系统状态": "data/dictionaries/symptoms.json 仅 72 条，来源标注「中医临床诊疗术语 症状」，四类中最薄弱；无独立国家标准，需明确依据与版本" },
+    { "category": "中药 herb", "推荐主源": "《中国药典》2025年版一部（3069 种，网络版免费开放）", "国际映射": "ISO 18668-3（中药材）/ -2（饮片）/ -4（配方颗粒）编码", "补充源": "TCMLS（含中药材正名词典）、GB/T 46209-2025（中药资源信息描述规范）、ISO 20334（方剂编码）", "现有系统状态": "data/dictionaries/herbs.json 仅 66 条，来源标注「中国药典2025年版」，覆盖率远低于药典一部 3069 种" }
+  ],
+
+  "integrationPriority": [
+    { "priority": "P0", "ids": ["gb-t-15657-2021", "gb-t-16751-1-2023", "gb-t-16751-2-2021"], "rationale": "疾病与证候的法定术语 + 编码 + 定义 + 英译 + 同义词，是质控评分与病案/医保口径的唯一依据", "action": "为 TermEntry 增加 code / category / english / definition / isCategory 字段，并从标准正文补齐" },
+    { "priority": "P0", "ids": ["chp-2025"], "rationale": "中药名称的法定依据，2026-07 起网络版免费开放，可直接人工扩充 herbs.json", "action": "按药典一部的药材与饮片正名扩充 herbs.json，并标注曾用名作为 aliases" },
+    { "priority": "P1", "ids": ["tcmls"], "rationale": "唯一同时覆盖四类术语且提供显式语义关联的中文来源，可补齐症状域与四类之间的关联", "action": "申请试用并联系发布方确认批量数据与商用授权；商用前必须书面确认" },
+    { "priority": "P1", "ids": ["icd-11-2026"], "rationale": "唯一可机读（REST API + Docker）、CC BY-ND 3.0 IGO 明确允许商用的国际权威源，用于输出国际互操作编码", "action": "为 TermEntry 增加 icd11 字段；本地 Docker 部署 API 以避免外网依赖" },
+    { "priority": "P1", "ids": ["tcm-standard-platform"], "rationale": "国标官方配套平台，用于人工核对术语、编码与病-证-理-法关系", "action": "作为人工校对与规则验证工具，不接入运行时" },
+    { "priority": "P2", "ids": ["gb-t-47335-1-2026", "gb-t-47335-2-2026"], "rationale": "补齐症状/体征（舌象、脉象）域的国标依据，且与 ISO 23961 对齐", "action": "在 symptoms.json 中设 tongue / pulse 子域并标注来源版本" },
+    { "priority": "P2", "ids": ["gb-t-46940-2025", "gb-t-38324-2019"], "rationale": "分别提供四类术语的顶层分类框架与语义关系框架，指导表结构与图谱边类型设计", "action": "据此定义 category 枚举与图谱边语义类型，使图例与实际数据一致" },
+    { "priority": "P2", "ids": ["iso-18668-series"], "rationale": "为中药材/饮片/配方颗粒提供国际持久编码", "action": "仅在需要持久 ID 或供应链/国际贸易场景时引入" },
+    { "priority": "P3", "ids": ["gb-t-16751-3-2023", "iso-20334-2018"], "rationale": "治法与方剂属补充域，可提升 LogicChecker 的证候-治法规则覆盖", "action": "先扩充词表再考虑编码对齐" },
+    { "priority": "P3", "ids": ["mesh-2026", "umls-2026aa", "snomed-ct"], "rationale": "西医侧的英文别名与跨词表映射；许可门槛与中文覆盖是主要约束", "action": "MeSH 可直接下载作英文别名补充；UMLS/SNOMED 仅在已有授权或需输出国际编码时引入" },
+    { "priority": "P3", "ids": ["who-istt-2007", "cstt-2004"], "rationale": "英译与历史数据兼容参考，口径已被新版国标取代", "action": "仅作 aliases 补充与旧数据兼容" }
+  ],
+
+  "selectionAdvice": {
+    "一句话结论": "以 GB/T 15657-2021 + GB/T 16751.1/.2 做疾病与证候主表（法定编码 + 定义 + 英译 + 同义词），以《中国药典》2025年版一部做中药主表，以 TCMLS 补齐症状域与四类术语关联，以 ICD-11 第26章 TM1 做国际映射出口。",
+    "落地要点": [
+      "双 ID 设计：内部主 ID 用国标 A/B/C 轴码（法定、稳定），对外互操作 ID 用 ICD-11 码；TermEntry 至少扩展 code、category、english、definition、isCategory 五个字段。",
+      "同义词分层：将「可选用词」「曾用名」「别名」区分为不同 synonymType，归一化时对精确匹配与别名匹配分层打分（现有三级命中 exact/contain/fuzzy 可扩展为按 synonymType 加权）。",
+      "类目词隔离：GB/T 15657 中疾病 113 个、证候 406 个类目词不宜作为临床诊断结果，应在词典中标记并在归一化时排除，避免把类目词误判为标准诊断。",
+      "症状域需先定口径：目前无独立国标，建议明确「以 TCMLS 为主 + GB/T 47335 舌脉象为子域」，并在词典的 source 字段写入具体标准号与版本，保证可追溯（现有 symptoms.json 仅 72 条且来源标注不完整）。",
+      "中药覆盖率差距大：herbs.json 现 66 条 vs 药典一部 3069 种，建议按「常用中药 → 药典全量」分批扩充，并同步补充 ISO 18668 编码（如需）。",
+      "关联关系优先用 TCMLS：四类术语之间的关联（尤其证候-症状、证候-治法-方剂-中药）在国标中仅有隐式表述，TCMLS 的 58 种语义关系是唯一成体系的显式来源，可直接用于质控图谱的边定义。",
+      "授权前置：TCMLS（商用）、SNOMED CT（非成员国）、UMLS（生产用途）均需在使用前完成授权确认；GB/T 与 ISO 标准文本需购买，术语可作为业务数据录入但不可再分发全文；ICD-11 与 MeSH 可直接使用（前者 CC BY-ND 3.0 IGO 禁止分发演绎版本）。"
+    ],
+    "风险提示": [
+      "patterns.json 为 2080 条，与 GB/T 16751.2-2021 的 2060 条不一致，需核对是否混入类目词或旧版术语，避免归一化结果口径漂移。",
+      "pharnexcloud-tcm-db 等第三方聚合库仅可用于人工核对，不应作为系统数据源。",
+      "WHO ISTT（2007）与《中医药学名词》（2004）口径陈旧，与 2021/2023 新版国标存在冲突，作为别名补充时必须标注来源版本，避免污染主表。"
+    ]
+  }
+}

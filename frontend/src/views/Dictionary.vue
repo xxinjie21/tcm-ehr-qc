@@ -31,6 +31,12 @@
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms()">查 询</el-button>
         <span class="tip">共 {{ total }} 条</span>
       </div>
+      <!-- 作用域提示：词典已按组织隔离（批次8b）。这一条不是装饰 —— 组织 A 导入的词
+           只在 A 的归一里生效，管理员在此看到「基础层」时不能以为那就是全量生效词典 -->
+      <div class="scope-hint">
+        <el-tag size="small" :type="scopeTagType" effect="plain">{{ scopeLabel }}</el-tag>
+        <span class="tip">{{ scopeTip }}</span>
+      </div>
       <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动，页面本身不出现滚动条。
            每页条数可调（20~200），故按可视行数固定高度，超出的行在表格内部滚动 -->
 <el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
@@ -172,6 +178,18 @@ const userStore = useUserStore()
 // 术语词典写入入口（导入/回滚）：管理员 / 所有者 / 被授权成员三档；
 // 只读浏览对所有登录用户开放。后端按同一三档校验（批次 6 落地授权位），前端只负责不展示无效入口。
 const canWrite = computed(() => userStore.canWriteDictionaryEntry)
+
+// 词典作用域（批次8b）：后端按「本组织自有词条 → 无则回退基础层」返回，
+// 前端不额外判断层级，只把「看的是谁的词典」讲清楚，避免误以为改的是全局词典。
+const scopeLabel = computed(() =>
+  userStore.orgId ? `组织词典：${userStore.orgId}` : '基础层词典（全局共享）'
+)
+const scopeTagType = computed(() => (userStore.orgId ? 'primary' : 'info'))
+const scopeTip = computed(() =>
+  userStore.orgId
+    ? '本组织没有自有词条时自动回退基础层；你导入的词只在本组织的解析与归一中生效'
+    : '你当前不在任何组织中，看到并编辑的是全组织共享的基础层词典'
+)
 
 // 词典类型 → 界面文案；键名与后端 type 参数一致（disease / pattern / symptom / herb / formula）
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
@@ -423,6 +441,13 @@ onMounted(() => {
 .tip {
   font-size: 12.5px;
   color: var(--text-sub);
+}
+/* 词典作用域提示条：与查询区同一行基线，标签 + 说明一行排开 */
+.scope-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 /* 导入区：左上传拖拽框、右操作列 */
 .import-row {

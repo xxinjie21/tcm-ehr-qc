@@ -474,7 +474,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         processed[0]++;
         try {
             // 2. 成功则累加成功数
-            processOne(r);
+            processOne(r, t.getOrgId());
             t.setSuccess(t.getSuccess() + 1);
         } catch (Exception e) {
             // 3. 失败累加并记明细；明细只留前 MAX_FAILURES 条，超出置截断标记
@@ -494,7 +494,6 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
-    /** 单条：拼文本 → 抽取 → 归一 → 打词典版本 → 写库（与单条抽取口径一致） */
     /**
      * 读 DB 判「是否已请求取消」。
      *
@@ -511,7 +510,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
-    private void processOne(Record r) throws Exception {
+    /** 单条：拼文本 → 抽取 → 归一 → 打词典版本 → 写库（与单条抽取口径一致） */
+    private void processOne(Record r, String orgId) throws Exception {
         // 1. 拼可抽取文本；空文本直接判失败，不去调抽取服务
         String text = NlpTextComposer.compose(r);
         if (text.isBlank()) {
@@ -523,10 +523,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             throw new IllegalStateException("抽取服务连不上（:8001 未启动）");
         }
         // 3. 归一到标准术语（ES 索引不可用时抛异常，由上层计失败）
-        entityNormalizer.normalize(vo);
+        entityNormalizer.normalize(vo, orgId);
         // 3.1 §九 ④：抽取器把长词切短（"天麻"→"天"）或整段漏掉（脉位）时，
         //     用处方 / 中医诊断两列原文回补。异常触发，无未归一项就完全不触发。
-        entityNormalizer.backfillFromRaw(vo, r.getPrescription(), r.getTcmDiagnosis());
+        entityNormalizer.backfillFromRaw(vo, orgId, r.getPrescription(), r.getTcmDiagnosis());
         // 4. 打上词典版本再写库：归一结果与当时词典版本必须成对，否则事后无法判断该不该重算
         String json = objectMapper.writeValueAsString(vo);
         json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());

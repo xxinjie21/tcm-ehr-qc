@@ -143,6 +143,17 @@ public class EntityNormalizer {
 
     /** 就地归一抽取结果中的 8 类 Entity 与 herbs（共 9 路），返回命中统计 */
     public NormStat normalize(NlpExtractVO vo) {
+        return normalize(vo, com.tcm.ehr.common.utils.RequestUtils.currentOrgId());
+    }
+
+    /**
+     * 组织级归一：按 {@code orgId} 限定的词典范围（基础层 + 该组织）召回。
+     *
+     * <p><b>批任务必须传任务行上的 orgId 快照</b>，不能走无参版：worker 线程没有
+     * RequestContext，{@code currentOrgId()} 会拿到空串 → 静默只查基础层，
+     * 组织自定义词条对批任务完全失效，而且不报错。</p>
+     */
+    public NormStat normalize(NlpExtractVO vo, String orgId) {
         // 1. 没抽取出东西就不做归一
         if (vo == null) {
             return new NormStat(0, 0, 0, 0);
@@ -150,14 +161,14 @@ public class EntityNormalizer {
         int[] stat = {0, 0, 0, 0};
 
         // 2. 8 类 Entity 走同一字段→类型映射；无词典的 4 类只回填 sourceText（供前端展示原文）
-        vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat));
-        vo.setSymptoms(normEntities(vo.getSymptoms(), "symptoms", stat));
-        vo.setTongueList(normEntities(vo.getTongueList(), "tongueList", stat));
-        vo.setPulseList(normEntities(vo.getPulseList(), "pulseList", stat));
-        vo.setPatternList(normEntities(vo.getPatternList(), "patternList", stat));
-        vo.setCauseList(normEntities(vo.getCauseList(), "causeList", stat));
-        vo.setTreatmentList(normEntities(vo.getTreatmentList(), "treatmentList", stat));
-        vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat));
+        vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat, orgId));
+        vo.setSymptoms(normEntities(vo.getSymptoms(), "symptoms", stat, orgId));
+        vo.setTongueList(normEntities(vo.getTongueList(), "tongueList", stat, orgId));
+        vo.setPulseList(normEntities(vo.getPulseList(), "pulseList", stat, orgId));
+        vo.setPatternList(normEntities(vo.getPatternList(), "patternList", stat, orgId));
+        vo.setCauseList(normEntities(vo.getCauseList(), "causeList", stat, orgId));
+        vo.setTreatmentList(normEntities(vo.getTreatmentList(), "treatmentList", stat, orgId));
+        vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat, orgId));
 
         // 3. 中药单独处理：归一目标是 name 而不是 content
         for (NlpExtractVO.Herb herb : vo.getHerbs()) {
@@ -168,7 +179,7 @@ public class EntityNormalizer {
             if (TextUtil.isBlank(herb.getSourceText())) {
                 herb.setSourceText(raw);
             }
-            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", raw);
+            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", orgId, raw);
             // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
             if (r.source() == null || r.source().isBlank() || r.level() < 1 || r.level() > 3) {
                 continue;
@@ -187,7 +198,7 @@ public class EntityNormalizer {
         return NormStat.of(stat);
     }
 
-    private List<NlpExtractVO.Entity> normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat) {
+    private List<NlpExtractVO.Entity> normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat, String orgId) {
         // 1. 该字段没抽到东西就保持 null，别把 null 换成空列表
         if (entities == null) {
             return null;
@@ -205,7 +216,7 @@ public class EntityNormalizer {
             if (type == null) {
                 continue; // 该字段无独立词典，仅保留原文
             }
-            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, raw);
+            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
             // 4. 未命中词典就保持原样，不写 normLevel
             if (r.source() == null || r.source().isBlank() || r.level() < 1 || r.level() > 3) {
                 continue;
@@ -249,11 +260,16 @@ public class EntityNormalizer {
      * @param tcmDiagnosis 原始中医诊断列（可空）
      */
     public void backfillFromRaw(NlpExtractVO vo, String prescription, String tcmDiagnosis) {
+        backfillFromRaw(vo, com.tcm.ehr.common.utils.RequestUtils.currentOrgId(), prescription, tcmDiagnosis);
+    }
+
+    /** 组织级回填；批任务请传任务行上的 orgId 快照 */
+    public void backfillFromRaw(NlpExtractVO vo, String orgId, String prescription, String tcmDiagnosis) {
         if (vo == null) {
             return;
         }
-        boolean touched = backfillHerbs(vo, prescription);
-        touched |= backfillDiseases(vo, tcmDiagnosis);
+        boolean touched = backfillHerbs(vo, orgId, prescription);
+        touched |= backfillDiseases(vo, orgId, tcmDiagnosis);
         // 1. 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
         if (touched) {
             normalize(vo);
@@ -261,7 +277,7 @@ public class EntityNormalizer {
     }
 
     /** 中药回补：目标字段是 {@code Herb.name}，原料是处方列 */
-    private boolean backfillHerbs(NlpExtractVO vo, String prescription) {
+    private boolean backfillHerbs(NlpExtractVO vo, String orgId, String prescription) {
         if (TextUtil.isBlank(prescription)) {
             return false;
         }
@@ -270,7 +286,7 @@ public class EntityNormalizer {
         if (herbs != null && !herbs.isEmpty() && allNormalized(herbs, NlpExtractVO.Herb::getNormLevel)) {
             return false;
         }
-        Set<String> hits = termNormalizer.scan("herb", prescription);
+        Set<String> hits = termNormalizer.scan("herb", orgId, prescription);
         if (hits.isEmpty()) {
             return false;
         }
@@ -293,7 +309,7 @@ public class EntityNormalizer {
     }
 
     /** 疾病回补：目标字段是 {@code Entity.content}，原料是中医诊断列 */
-    private boolean backfillDiseases(NlpExtractVO vo, String tcmDiagnosis) {
+    private boolean backfillDiseases(NlpExtractVO vo, String orgId, String tcmDiagnosis) {
         if (TextUtil.isBlank(tcmDiagnosis)) {
             return false;
         }
@@ -302,7 +318,7 @@ public class EntityNormalizer {
         if (diseases != null && !diseases.isEmpty() && allNormalized(diseases, NlpExtractVO.Entity::getNormLevel)) {
             return false;
         }
-        Set<String> hits = termNormalizer.scan("disease", tcmDiagnosis);
+        Set<String> hits = termNormalizer.scan("disease", orgId, tcmDiagnosis);
         if (hits.isEmpty()) {
             return false;
         }

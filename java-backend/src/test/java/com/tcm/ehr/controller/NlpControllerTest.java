@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -69,9 +70,9 @@ class NlpControllerTest {
         when(client.extract(anyString())).thenReturn(vo);
 
         EsTermNormalizer termNormalizer = mock(EsTermNormalizer.class);
-        when(termNormalizer.normalize("symptom", "咽痛"))
+        when(termNormalizer.normalize(eq("symptom"), anyString(), eq("咽痛")))
                 .thenReturn(new EsTermNormalizer.NormalizeResult("咽喉痛", "中医症状词典", 3, null));
-        when(termNormalizer.normalize("herb", "双花"))
+        when(termNormalizer.normalize(eq("herb"), anyString(), eq("双花")))
                 .thenReturn(new EsTermNormalizer.NormalizeResult("金银花", "中药词典", 1, "GS-001"));
 
         ResponseEntity<Result<NlpExtractVO>> resp =

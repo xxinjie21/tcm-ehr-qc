@@ -2975,7 +2975,7 @@ paths:
       tags:
         - 词典管理
       summary: 词典历史版本列表
-      description: 【权限：登录即可】列出指定术语类型的历史版本（每次导入/转换自动留存），含可读时间、词条数、相对当前增减
+      description: 【权限：登录即可】列出<b>当前组织</b>指定术语类型的历史版本（每次导入自动留存），含可读时间、词条数；只能看到本组织的备份
       parameters:
         - name: type
           in: query
@@ -3029,6 +3029,53 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/dictionary/reindex:
+    post:
+      tags:
+        - 词典管理
+      summary: 重建当前组织的词典索引
+      description: 【权限：仅管理员】强制重建<b>当前组织</b>某一类词典的 ES 索引（不落库、不改词条）。用于「库里词条正确但索引落后」的自愈，不必重启服务。只重建当前组织这一层：基础层与其它组织不连带处理（那会让它们同时进入重建空窗、归一返回 503）
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - disease
+              - symptom
+              - pattern
+              - herb
+              - formula
+      responses:
+        '200':
+          description: 重建完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        example: herb
+                      orgId:
+                        type: string
+                        description: 所属组织（空串 = 基础层）
+                      entries:
+                        type: integer
+                        example: 120
+                      version:
+                        type: string
+                        example: 3f2a1c9d8b7e6051
+        '400':
+          description: 术语类型非法
+
   /api/stats:
     post:
       tags:

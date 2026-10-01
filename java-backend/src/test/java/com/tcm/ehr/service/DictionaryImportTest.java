@@ -2,6 +2,7 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
+import com.tcm.ehr.service.DictionaryTermStore;
 import com.tcm.ehr.service.impl.DictionaryServiceImpl;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Row;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -42,21 +44,28 @@ class DictionaryImportTest {
 
     private IDictionaryFileService fileService;
     private IEsTermIndexService esIndex;
+    private DictionaryTermStore termStore;
     private DictionaryServiceImpl service;
 
     @BeforeEach
     void setUp() throws IOException {
         fileService = Mockito.mock(IDictionaryFileService.class);
         esIndex = Mockito.mock(IEsTermIndexService.class);
-        when(fileService.read(anyString())).thenReturn(List.of());
-        when(fileService.backup(anyString())).thenReturn("symptoms.json.bak_test");
+        termStore = Mockito.mock(DictionaryTermStore.class);
+        // 本组织原有词条为空；备份 id 固定，便于回滚断言
+        when(termStore.read(anyString(), anyString())).thenReturn(List.of());
+        when(termStore.backup(anyString(), anyString(), any()))
+                .thenReturn("bak-test-id");
+        // replace 返回内容版本，代码会拿它当 rebuild/markIndexed 的入参
+        when(termStore.replace(anyString(), anyString(), anyList()))
+                .thenReturn("cv-test");
 
         service = newService();
     }
 
     /** 构造服务：只注入导入路径依赖的三个协作者 */
     private DictionaryServiceImpl newService() {
-        return new DictionaryServiceImpl(fileService, esIndex, new ObjectMapper());
+        return new DictionaryServiceImpl(fileService, esIndex, termStore, new ObjectMapper());
     }
 
     private static MockMultipartFile json(String name, String body) {
@@ -90,10 +99,11 @@ class DictionaryImportTest {
         }
     }
 
+    /** 导入真正落库的那一份词条（现在落在 termStore.replace 的第三个入参） */
     private List<TermEntry> capturedWritten() throws IOException {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<TermEntry>> captor = ArgumentCaptor.forClass(List.class);
-        Mockito.verify(fileService).write(Mockito.eq(TYPE), captor.capture());
+        Mockito.verify(termStore).replace(anyString(), Mockito.eq(TYPE), captor.capture());
         return captor.getValue();
     }
 
@@ -220,19 +230,28 @@ class DictionaryImportTest {
         assertTrue(e.getMessage().contains("文件格式不支持"), e.getMessage());
     }
 
-    /** 导入确实走完「备份 -> 写文件 -> 重建ES」三步 */
+    /**
+     * 导入走完「存档 -> 落库 -> 重建ES -> 记已同步」四步，且<b>顺序不能错</b>。
+     *
+     * <p>最后那步 {@code markIndexed} 是关键：它没被调用就意味着这次索引没被承认，
+     * 启动对账下次会无条件重建 —— 反过来若在 ES 灌之前就调用，ES 灌失败就会被
+     * 永久记成「已同步」，词典改了却永远不生效。</p>
+     */
     @Test
-    void import_shouldBackupWriteAndRebuild() throws IOException {
+    void import_shouldBackupWriteRebuildAndMarkIndexed() throws IOException {
         service.importDictionary(TYPE, json("d.json", "[{\"standardTerm\":\"喉痹\"}]"));
 
-        Mockito.verify(fileService).backup(TYPE);
-        Mockito.verify(fileService).write(Mockito.eq(TYPE), any());
+        // 1. 存档与落库都发生在本组织这一层
+        Mockito.verify(termStore).backup(anyString(), Mockito.eq(TYPE), any());
+        Mockito.verify(termStore).replace(anyString(), Mockito.eq(TYPE), anyList());
 
-        // 归一已改为只认 ES 索引，所以「导入的新词能不能归上」全看这一步：
-        // 断言灌进索引的就是刚导入的那条，而不是只断言 rebuild 被调用过
+        // 2. 灌进索引的就是刚导入的那条，而不是只断言 rebuild 被调用过
         ArgumentCaptor<List<TermEntry>> captor = ArgumentCaptor.forClass(List.class);
-        Mockito.verify(esIndex).rebuild(Mockito.eq(TYPE), captor.capture(), Mockito.any());
+        Mockito.verify(esIndex).rebuild(Mockito.eq(TYPE), anyString(), captor.capture(), Mockito.any());
         assertEquals(1, captor.getValue().size());
         assertEquals("喉痹", captor.getValue().get(0).getStandardTerm());
+
+        // 3. ES 灌完才承认已同步
+        Mockito.verify(termStore).markIndexed(anyString(), Mockito.eq(TYPE), Mockito.anyString());
     }
 }

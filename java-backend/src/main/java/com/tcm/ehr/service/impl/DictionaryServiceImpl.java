@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
 import com.tcm.ehr.service.IDictionaryFileService;
@@ -38,6 +39,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     private final IDictionaryFileService fileService;
     private final IEsTermIndexService esTermIndexService;
+    private final com.tcm.ehr.service.DictionaryTermStore termStore;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -65,9 +67,9 @@ public class DictionaryServiceImpl implements IDictionaryService {
      */
     public Map<String, Object> searchTerms(String type, String keyword, int page, int size)
             throws IOException {
-        // 1. 词典列表直接读 JSON 文件（原先借 DictionaryStore 当文件缓存）。
-        //    DictionaryStore 已随「归一不再内存兜底」删除；这里每次读一次文件。
-        List<TermEntry> entries = fileService.read(type);
+        // 1. 读「当前组织生效」的词条：有自有词条读自己的，否则回退基础层
+        String orgId = RequestUtils.currentOrgId();
+        List<TermEntry> entries = termStore.readEffective(orgId, type);
         List<Map<String, Object>> hit = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
         // 2. 逐条比对标准术语与别名，任一命中即算命中（不过滤时 kw 为空，全量收）
@@ -123,7 +125,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
                 : parseTabularEntries(type, file, failures);
 
         // 2. 合并：现有词典打底，新条目并入（同 standardTerm 合并别名，保留已有 source/code）
-        List<TermEntry> previous = fileService.read(type);
+        //    ⚠️ 合并基数是「当前组织这一层」而不是「基础层」：组织导入不该把基础层词条
+        //    复制成自己的私有词条 —— 那会让基础层以后的修订再也影响不到该组织。
+        String orgId = RequestUtils.currentOrgId();
+        List<TermEntry> previous = termStore.read(orgId, type);
         Map<String, TermEntry> merged = new LinkedHashMap<>();
         for (TermEntry e : previous) {
             merged.merge(e.getStandardTerm(), e, this::mergeEntries);
@@ -133,17 +138,19 @@ public class DictionaryServiceImpl implements IDictionaryService {
         }
 
         List<TermEntry> entries = new ArrayList<>(merged.values());
-        // 3. 先备份再覆盖写文件：回滚要靠这份备份
-        String backupName = fileService.backup(type);
-        fileService.write(type, entries);
-        // 4. 覆盖成功后重建索引；失败走补偿回滚
+        // 3. 先备份再落库：回滚要靠这份备份
+        String backupId = termStore.backup(orgId, type, RequestUtils.currentUsername());
+        // 4. 落库（同一事务里更新内容版本，避免「词条换了、版本没换」而跳过重建）
+        String contentVersion = termStore.replace(orgId, type, entries);
+        // 5. 只重建「本组织」在 ES 里的文档；失败则退回库内容，绝不谎报已同步
         try {
-            esTermIndexService.rebuild(type, entries, fileService.currentVersion());
+            esTermIndexService.rebuild(type, orgId, entries, contentVersion);
+            termStore.markIndexed(orgId, type, contentVersion);
         } catch (Exception e) {
-            // 文件已经覆盖而索引没建起来（rebuild 先 delete 再 create，失败时索引可能根本不存在）
-            // → 归一结果与词典页会长期不一致。回滚文件并尽力恢复索引，回到「同版本」状态。
-            log.error("[词典] {} ES 重建失败，回滚文件并尝试恢复索引: {}", type, e.getMessage());
-            compensateFailedRebuild(type, backupName, previous);
+            // DB 已改而 ES 没跟上 → 归一结果与词典页会长期不一致。退回库内容并尽力恢复索引。
+            log.error("[词典] {} (org={}) ES 重建失败，回退库内容并尝试恢复索引: {}",
+                    type, orgId, e.getMessage());
+            compensateFailedRebuild(type, orgId, backupId, previous, contentVersion);
             if (e instanceof IOException io) {
                 throw io;
             }
@@ -159,35 +166,45 @@ public class DictionaryServiceImpl implements IDictionaryService {
         vo.setFailures(failures);
         log.info("[词典] {} 导入完成: 新解析{}条(失败{}), 合并后共{}条, 备份{}",
                 type, incoming.size(), failures.size(), entries.size(),
-                backupName == null ? "无(首次)" : backupName);
+                backupId == null ? "无(首次)" : backupId);
         return vo;
     }
 
     /**
-     * ES 重建失败后的补偿：把文件退回导入前的版本，再尽力把索引也建回旧版本。
+     * ES 重建失败后的补偿：把库内容退回导入前的版本，再尽力把索引也建回旧版本。
      *
      * <p>两步都可能再失败 —— 那时只记日志，不掩盖最初的异常（调用方会把它抛出去）。
-     * 无备份（首次导入、原先没有文件）时用 {@code previous} 写回，通常是空列表。</p>
+     * 无备份（首次导入、本组织原先没有词条）时用 {@code previous} 写回，通常是空列表。</p>
+     *
+     * <p>关键：补偿路径<b>不会</b>把失败的那个版本记为已同步。记了就等于谎报，
+     * 启动对账会跳过重建，归一会永远停在这一版错误的数据上。</p>
      */
-    private void compensateFailedRebuild(String type, String backupName, List<TermEntry> previous) {
-        // 1. 先把文件退回导入前的版本（首次导入无备份时按原内容写回）
+    private void compensateFailedRebuild(String type, String orgId, String backupId,
+                                         List<TermEntry> previous, String failedVersion) {
+        // 1. 先把库内容退回导入前（有备份用备份，首次导入按原内容写回）
         try {
-            if (backupName != null) {
-                fileService.restore(type, backupName);
+            if (backupId != null) {
+                List<TermEntry> snap = termStore.readBackup(backupId);
+                termStore.replace(orgId, type, snap == null ? List.of() : snap);
             } else {
-                fileService.write(type, previous);
+                termStore.replace(orgId, type, previous);
             }
         } catch (Exception e) {
-            // 文件都退不回去就没必要再试索引，记日志交人工重新导入
-            log.error("[词典] {} 文件回滚失败，文件与索引可能不一致，需重新导入修复: {}", type, e.getMessage());
+            // 库都退不回去就没必要再试索引，记日志交人工重新导入
+            log.error("[词典] {} (org={}) 回退失败，库与索引可能不一致，需重新导入修复: {}",
+                    type, orgId, e.getMessage());
             return;
         }
-        // 2. 再尽力把索引建回旧版本；失败只记日志，不掩盖最初的异常
+        // 2. 再尽力把索引建回旧版本；失败只记日志，不掩盖最初的异常。
+        //    注意不要 markIndexed 那个失败版本 —— 那样启动对账会误判「已同步」。
         try {
-            esTermIndexService.rebuild(type, previous, fileService.currentVersion());
-            log.warn("[词典] {} 已回滚到导入前的词典并重建索引", type);
+            String oldVersion = termStore.contentVersion(previous);
+            esTermIndexService.rebuild(type, orgId, previous, oldVersion);
+            termStore.markIndexed(orgId, type, oldVersion);
+            log.warn("[词典] {} (org={}) 已回滚到导入前并重建索引", type, orgId);
         } catch (Exception e) {
-            log.error("[词典] {} 索引恢复失败（该类术语的归一不可用，请重新导入）: {}", type, e.getMessage());
+            log.error("[词典] {} (org={}) 索引恢复失败（该类术语的归一不可用，请重新导入；"
+                            + "失败版本 {} 未记为已同步）: {}", type, orgId, failedVersion, e.getMessage());
         }
     }
 
@@ -321,12 +338,21 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @throws IllegalArgumentException 备份文件不存在或与词典类型不匹配
      */
     public void rollback(String type, String backupFilename) throws IOException {
-        // 1. 先用备份覆盖词典文件
-        fileService.restore(type, backupFilename);
-        // 2. 再按恢复后的内容重建索引；文件与索引必须同版本，否则归一会拿到旧数据
-        List<TermEntry> entries = fileService.read(type);
-        esTermIndexService.rebuild(type, entries, fileService.currentVersion());
-        log.info("[词典] {} 回滚到 {}，现有{}条", type, backupFilename, entries.size());
+        // 0. 组织校验放在最前：拿别的组织的备份来覆盖本组织词典是越权，不能靠后续失败兜住
+        String orgId = RequestUtils.currentOrgId();
+        if (!termStore.backupMatches(backupFilename, orgId, type)) {
+            throw new IllegalArgumentException("备份不存在，或不属于当前组织 / 不匹配该词典类型");
+        }
+        // 1. 用备份快照覆盖本组织词条
+        List<TermEntry> entries = termStore.readBackup(backupFilename);
+        if (entries == null) {
+            throw new IllegalArgumentException("备份不存在或已损坏，无法回滚");
+        }
+        String contentVersion = termStore.replace(orgId, type, entries);
+        // 2. 再按恢复后的内容重建索引；库与索引必须同版本，否则归一会拿到旧数据
+        esTermIndexService.rebuild(type, orgId, entries, contentVersion);
+        termStore.markIndexed(orgId, type, contentVersion);
+        log.info("[词典] {} (org={}) 回滚到 {}，现有{}条", type, orgId, backupFilename, entries.size());
     }
 
     @Override
@@ -338,7 +364,22 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @throws IOException 遍历备份目录或读取当前词典失败
      */
     public List<Map<String, String>> listBackups(String type) throws IOException {
-        return fileService.listBackups(type);
+        String orgId = RequestUtils.currentOrgId();
+        List<Map<String, String>> out = new ArrayList<>();
+        for (com.tcm.ehr.domain.po.DictionaryBackup b : termStore.listBackups(orgId, type)) {
+            Map<String, String> m = new LinkedHashMap<>();
+            m.put("filename", b.getId());
+            m.put("time", b.getCreateTime() == null ? "" : b.getCreateTime().toString());
+            m.put("count", String.valueOf(countOf(b.getSnapshot())));
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** 快照里的词条数；解析不了就报 0，不为展示一个数字而抛异常 */
+    private int countOf(String snapshot) {
+        List<com.tcm.ehr.domain.po.TermEntry> list = termStore.readBackupBySnapshot(snapshot);
+        return list == null ? 0 : list.size();
     }
 
     @Override
@@ -350,10 +391,28 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @return 文件名合法且文件存在时为 {@code true}
      */
     public boolean backupExists(String type, String backupFilename) {
-        return fileService.backupExists(type, backupFilename);
+        // 同样要校验组织：否则能探测到别的组织的备份是否存在
+        return termStore.backupMatches(backupFilename, RequestUtils.currentOrgId(), type);
     }
 
     // ---------------------------------------------------------------- 内部工具
+
+    @Override
+    public Map<String, Object> reindex(String type) throws IOException {
+        // 只重建「当前组织这一层」：基础层与其它组织不在此动，避免让它们进入重建空窗
+        String orgId = RequestUtils.currentOrgId();
+        List<TermEntry> entries = termStore.read(orgId, type);
+        String version = termStore.contentVersion(entries);
+        esTermIndexService.rebuild(type, orgId, entries, version);
+        // 灌成功才记已同步：失败就让它保持落后，下次启动对账还会再试
+        termStore.markIndexed(orgId, type, version);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("type", type);
+        out.put("orgId", orgId);
+        out.put("entries", entries.size());
+        out.put("version", version);
+        return out;
+    }
 
     /** 合并同标准词的两条词条：别名取并集，其余字段以新条目为准 */
     private TermEntry mergeEntries(TermEntry oldE, TermEntry newE) {

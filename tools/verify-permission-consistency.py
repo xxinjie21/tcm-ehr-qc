@@ -70,6 +70,40 @@ def paths_of(line):
     return m.group(1).lower(), paths
 
 
+def perm_of_nearby_annotations(lines, i):
+    """取 @Mapping 附近的权限标注（上下两个方向都扫）。
+
+    ⚠️ 不能只看 lines[i-1]（紧邻的上一行）：方法上方有 javadoc、或是把
+    @RequireRole 写在 @Mapping 之下，都会读空，然后默认成「登录即���」而
+    **不报差异** —— 这种静默漏检比报错糟得多：批次 8b 加
+    POST /api/dictionary/reindex 时真实踩到，明明写了 @RequireRole，
+    校验却报「登录即可」，差点把管理员接口当登录即可提交。
+    做法：跨过空行、注释行、块注释与其它注解，上下各找一条权限标注。
+    """
+    for step in (-1, 1):
+        for d in range(1, 40):
+            j = i + step * d
+            if j < 0 or j >= len(lines):
+                break
+            t = lines[j].strip()
+            if not t or t.startswith("*") or t.startswith("/*") \
+                    or t.startswith("//") or t.startswith("*/"):
+                continue
+            if t.startswith("@"):
+                if "@RequireOrgRole" in t:
+                    return "所有者（本组织）"
+                if "@RequireRole" in t:
+                    m = re.search(r'roles\s*=\s*\{\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?\s*\}', t)
+                    if m:
+                        key = m.group(1) + (", " + m.group(2) if m.group(2) else "")
+                        return {"管理员": "仅管理员", "管理员, 审核员": "管理员 / 审核员"}.get(key, "未识别")
+                    return "未识别"
+                continue
+            # 遇到普通代码行：向上是上一段方法的尾巴、向下是本方法体，都说明标注不在这一段
+            break
+    return "登录即可"
+
+
 def collect_backend():
     out = {}
     for p in BACKEND.rglob("*.java"):
@@ -78,13 +112,7 @@ def collect_backend():
             method, raw_paths = paths_of(line)
             if not method or not raw_paths:
                 continue
-            perm = "登录即可"
-            if i >= 1 and "@RequireOrgRole" in lines[i - 1]:
-                perm = "所有者（本组织）"
-            elif i >= 1 and "@RequireRole" in lines[i - 1]:
-                roles = re.search(r'roles\s*=\s*\{\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?\s*\}', lines[i - 1])
-                key = roles.group(1) + (", " + roles.group(2) if roles.group(2) else "")
-                perm = {"管理员": "仅管理员", "管理员, 审核员": "管理员 / 审核员"}.get(key, "未识别")
+            perm = perm_of_nearby_annotations(lines, i)
             for raw in raw_paths:
                 path = raw
                 if not path.startswith("/api/"):
