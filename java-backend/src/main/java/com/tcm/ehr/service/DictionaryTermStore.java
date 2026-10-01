@@ -108,7 +108,7 @@ public class DictionaryTermStore {
             row.setStandardTerm(e.getStandardTerm());
             row.setCode(e.getCode());
             row.setSource(e.getSource());
-            row.setAliasesJson(writeJson(e.getAliases()));
+            row.setAliases(writeJson(e.getAliases()));
             termMapper.insert(row);
         }
         // 2. 内容版本：按标准词排序后取哈希 —— 与插入顺序无关，避免「同一份内容
@@ -286,7 +286,7 @@ public class DictionaryTermStore {
         e.setStandardTerm(r.getStandardTerm());
         e.setCode(r.getCode());
         e.setSource(r.getSource() == null ? "" : r.getSource());
-        e.setAliases(readAliases(r.getAliasesJson()));
+        e.setAliases(readAliases(r.getAliases()));
         return e;
     }
 

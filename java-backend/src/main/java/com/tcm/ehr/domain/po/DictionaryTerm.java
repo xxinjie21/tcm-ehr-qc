@@ -34,6 +34,15 @@ public class DictionaryTerm {
     /** 来源标准，可空 */
     private String source;
 
-    /** 别名列表（JSON 数组字符串） */
-    private String aliasesJson;
+    /**
+     * 别名列表（JSON 数组文本，如 {@code ["国老","国老草"]}）。
+     *
+     * <p><b>列名是 {@code aliases}，不是 {@code aliases_json}</b> —— 批次 4 建的表
+     * 用的就是 {@code aliases json}。写成 {@code aliasesJson} 会让 MyBatis-Plus
+     * 映射到不存在的 {@code aliases_json} 列，报
+     * {@code Unknown column 'aliases_json' in 'field list'}，
+     * 而服务仍能启动（启动器按类型逐个 catch），只是词典加载不了、归一全落空。
+     * 改列名前务必用脚本逐列比对实体与 {@code SHOW COLUMNS}，别照着印象写。</p>
+     */
+    private String aliases;
 }
