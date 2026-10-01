@@ -43,6 +43,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     private final IDictionaryFileService fileService;
     private final IEsTermIndexService esTermIndexService;
+    private final com.tcm.ehr.common.utils.DistLock distLock;
     private final com.tcm.ehr.service.DictionaryTermStore termStore;
     private final ObjectMapper objectMapper;
 
@@ -157,7 +158,18 @@ public class DictionaryServiceImpl implements IDictionaryService {
         String contentVersion = termStore.replace(orgId, type, entries);
         // 5. 只重建「本组织」在 ES 里的文档；失败则退回库内容，绝不谎报已同步
         try {
-            esTermIndexService.rebuild(type, orgId, entries, contentVersion);
+            // 跨实例互斥（批次16）：rebuild 是「删该组织文档 + bulk 灌入」两步，
+            // 两个实例同时做会交错成混合状态（一个删掉另一个刚灌的）。
+            // 锁按「类型+组织」划分，不做全局单键；拿不到锁直接拒绝，不放行。
+            distLock.runLocked(com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, orgId),
+                    () -> {
+                        try {
+                            esTermIndexService.rebuild(type, orgId, entries, contentVersion);
+                        } catch (IOException io) {
+                            throw new java.io.UncheckedIOException(io);
+                        }
+                        return null;
+                    });
             termStore.markIndexed(orgId, type, contentVersion);
         } catch (Exception e) {
             // DB 已改而 ES 没跟上 → 归一结果与词典页会长期不一致。退回库内容并尽力恢复索引。
@@ -416,7 +428,16 @@ public class DictionaryServiceImpl implements IDictionaryService {
         String orgId = RequestUtils.currentOrgId();
         List<TermEntry> entries = termStore.read(orgId, type);
         String version = termStore.contentVersion(entries);
-        esTermIndexService.rebuild(type, orgId, entries, version);
+        // 同样走跨实例互斥：与其它实例的导入 / 启动对账互斥
+        distLock.runLocked(com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, orgId),
+                () -> {
+                    try {
+                        esTermIndexService.rebuild(type, orgId, entries, version);
+                    } catch (IOException io) {
+                        throw new java.io.UncheckedIOException(io);
+                    }
+                    return null;
+                });
         // 灌成功才记已同步：失败就让它保持落后，下次启动对账还会再试
         termStore.markIndexed(orgId, type, version);
         Map<String, Object> out = new LinkedHashMap<>();

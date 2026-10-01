@@ -34,6 +34,7 @@ public class DataInitializationListener implements ApplicationRunner {
     private final IEsTermIndexService esTermIndexService;
     private final com.tcm.ehr.service.DictionaryTermStore termStore;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final com.tcm.ehr.common.utils.DistLock distLock;
     private final RestHighLevelClient esClient;
 
     /**
@@ -142,7 +143,24 @@ public class DataInitializationListener implements ApplicationRunner {
             return;
         }
         String version = termStore.contentVersion(entries);
-        esTermIndexService.rebuild(type, orgId, entries, version);
+        // 跨实例互斥（批次16）：多实例同时启动时，两个实例会同时判定「待重建」并
+        // 同时删/建同一索引，交错后索引内容可能是混合状态。
+        // 这里按「类型+组织」加 DB 命名锁；拿不到锁就让本次跳过（下一实例或下次
+        // 启动会补上）—— 启动期抢不到锁不是错误，不该让启动失败。
+        try {
+            distLock.runLocked(com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, orgId),
+                    () -> {
+                        try {
+                            esTermIndexService.rebuild(type, orgId, entries, version);
+                        } catch (java.io.IOException io) {
+                            throw new java.io.UncheckedIOException(io);
+                        }
+                        return null;
+                    });
+        } catch (IllegalStateException e) {
+            log.info("[词典] {} (org='{}') 重建被其它实例占用，本次跳过: {}", type, orgId, e.getMessage());
+            return;
+        }
         // 只有真灌成功才记已同步
         termStore.markIndexed(orgId, type, version);
         log.info("[词典] {} (org='{}') 重建索引，{} 条，版本 {}", type, orgId, entries.size(), version);

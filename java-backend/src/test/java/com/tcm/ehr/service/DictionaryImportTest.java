@@ -45,12 +45,18 @@ class DictionaryImportTest {
     private IDictionaryFileService fileService;
     private IEsTermIndexService esIndex;
     private DictionaryTermStore termStore;
+    private com.tcm.ehr.common.utils.DistLock distLock;
     private DictionaryServiceImpl service;
 
     @BeforeEach
     void setUp() throws IOException {
         fileService = Mockito.mock(IDictionaryFileService.class);
         esIndex = Mockito.mock(IEsTermIndexService.class);
+        // 跨实例互斥（批次16）：桩成「拿到锁并直接执行临界区」，
+        // 让本测试聚焦在导入逻辑本身，不受锁影响
+        com.tcm.ehr.mapper.DbLockMapper lockMapper = Mockito.mock(com.tcm.ehr.mapper.DbLockMapper.class);
+        Mockito.when(lockMapper.acquire(Mockito.anyString(), Mockito.anyInt())).thenReturn(1);
+        distLock = new com.tcm.ehr.common.utils.DistLock(lockMapper);
         termStore = Mockito.mock(DictionaryTermStore.class);
         // 本组织原有词条为空；备份 id 固定，便于回滚断言
         when(termStore.read(anyString(), anyString())).thenReturn(List.of());
@@ -65,7 +71,7 @@ class DictionaryImportTest {
 
     /** 构造服务：只注入导入路径依赖的三个协作者 */
     private DictionaryServiceImpl newService() {
-        return new DictionaryServiceImpl(fileService, esIndex, termStore, new ObjectMapper());
+        return new DictionaryServiceImpl(fileService, esIndex, distLock, termStore, new ObjectMapper());
     }
 
     private static MockMultipartFile json(String name, String body) {
