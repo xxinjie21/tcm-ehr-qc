@@ -174,9 +174,9 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
 
     private TermEntry toEntry(Map<String, Object> src) {
         TermEntry entry = new TermEntry();
-        entry.setStandardTerm(str(src.get("standard_term")));
+        entry.setStandardTerm(nullToEmpty(src.get("standard_term")));
         entry.setAliases(toStringList(src.get("aliases")));
-        entry.setSource(str(src.get("source")));
+        entry.setSource(nullToEmpty(src.get("source")));
         return entry;
     }
 
@@ -197,7 +197,14 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
         return s.isEmpty() ? new ArrayList<>() : new ArrayList<>(List.of(s.split("\\s+")));
     }
 
-    private String str(Object value) {
+    /**
+     * null 变空串，其余原样转字符串（<b>不 trim</b>）。
+     *
+     * <p>ES 文档字段不接受 null：缺字段时给空串，而不是让 Jackson 写出 {@code null}。
+     * 与 {@code AiServiceImpl.rawOrNull}（保持 null）语义相反，与
+     * {@code GovernanceServiceImpl.toTrimmedOrNull}（空串归 null）也不同。</p>
+     */
+    private String nullToEmpty(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 

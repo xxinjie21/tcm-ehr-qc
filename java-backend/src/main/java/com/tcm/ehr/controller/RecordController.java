@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import org.springframework.web.bind.annotation.RequestMapping;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import jakarta.validation.Valid;
@@ -35,6 +36,7 @@ import java.util.Map;
  */
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/records")
 public class RecordController {
 
     private final IRecordService recordService;
@@ -49,7 +51,7 @@ public class RecordController {
      * @param autoExtract 是否在导入后自动投递结构化解析任务
      * @return taskId=导入任务ID；summary=本轮成功/失败条数与失败明细
      */
-    @PostMapping("/api/records/import")
+    @PostMapping("/import")
     public Result<ImportTaskVO> importRecords(@RequestParam("files") MultipartFile[] files,
                                               @RequestParam(value = "autoExtract", defaultValue = "false") boolean autoExtract) {
         // 1. 导入并逐行给失败原因 2. 留痕（含是否已提交后台解析）
@@ -68,7 +70,7 @@ public class RecordController {
      * @param dto 21 字段原始记录，登记号必填；字段级校验由 @Valid 触发
      * @return id=新病历ID
      */
-    @PostMapping("/api/records")
+    @PostMapping("")
     public Result<CreateRecordVO> createRecord(@Valid @RequestBody CreateRecordDTO dto) {
         return Result.ok("新增成功", recordService.createRecord(dto));
     }
@@ -81,7 +83,7 @@ public class RecordController {
      * @param recordId 病历ID
      * @return 21 原始字段 + structuredData + score/grade
      */
-    @GetMapping("/api/records/raw/{recordId}")
+    @GetMapping("/raw/{recordId}")
     public ResponseEntity<Result<RawRecordVO>> rawRecord(@PathVariable String recordId) {
         // 1. 取原始数据；不存在与无权限都归为 404：数据域过滤在 service 内完成，不泄露"存在但看不到"
         RawRecordVO vo = recordService.getRawRecord(recordId);
@@ -103,7 +105,7 @@ public class RecordController {
      * @param body     仅接受 structuredData 键
      * @return 无数据体，仅成功标记
      */
-    @PutMapping("/api/records/{recordId}")
+    @PutMapping("/{recordId}")
     public Result<Void> updateRecord(@PathVariable String recordId, @RequestBody Map<String, Object> body) {
         // 1. 入口守卫：空体 / 不带 structuredData 直接拒，避免空更新被当成成功
         if (body == null || body.isEmpty()) {
@@ -127,7 +129,7 @@ public class RecordController {
      * @param dto ids=待删除的病历ID集合
      * @return deletedCount=实际删除条数
      */
-    @DeleteMapping("/api/records")
+    @DeleteMapping("")
     public Result<DeleteRecordsVO> deleteRecords(@Valid @RequestBody DeleteRecordsDTO dto) {
         // 1. 删（service 内先清复核任务再删病历）2. 留痕
         DeleteRecordsVO vo = recordService.deleteRecords(dto);
@@ -143,7 +145,7 @@ public class RecordController {
      * @param filters department/dateRange/pattern/grade，至少一项非空
      * @return deletedCount=实际删除条数
      */
-    @PostMapping("/api/records/delete-by-filter")
+    @PostMapping("/delete-by-filter")
     public Result<DeleteRecordsVO> deleteByFilter(@Valid @RequestBody FiltersDTO filters) {
         // 1. 按范围删；条件全空会被 service 拒绝（防误删全库）2. 留痕
         DeleteRecordsVO vo = recordService.deleteByFilter(filters);
@@ -159,7 +161,7 @@ public class RecordController {
      * @param dto 查询条件与分页参数
      * @return total=总条数；records=当前页摘要列表
      */
-    @PostMapping("/api/records/search")
+    @PostMapping("/search")
     public Result<SearchVO> search(@Valid @RequestBody SearchDTO dto) {
         return Result.ok(recordService.searchRecords(dto));
     }

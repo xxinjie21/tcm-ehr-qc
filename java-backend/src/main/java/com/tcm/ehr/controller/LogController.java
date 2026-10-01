@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import org.springframework.web.bind.annotation.RequestMapping;
 import com.tcm.ehr.common.utils.PageSizeGuard;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.service.ILogService;
@@ -24,6 +25,7 @@ import java.util.Map;
  */
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/logs")
 public class LogController {
 
     private final ILogService logService;
@@ -39,7 +41,7 @@ public class LogController {
      * @param pageSize 每页条数，上限 {@value PageSizeGuard#MAX_PAGE_SIZE}（超出按上限截断，避免 pageSize=999999 一次拉全表）
      * @return total=总条数；list=当前页记录
      */
-    @GetMapping("/api/logs")
+    @GetMapping("")
     public Result<Map<String, Object>> logs(@RequestParam(required = false) String action,
                                             @RequestParam(required = false) String keyword,
                                             @RequestParam(defaultValue = "1") int page,
@@ -54,7 +56,7 @@ public class LogController {
      *
      * @return 去重后的操作类型列表
      */
-    @GetMapping("/api/logs/actions")
+    @GetMapping("/actions")
     public Result<List<String>> actions() {
         return Result.ok(logService.actions());
     }
@@ -68,7 +70,7 @@ public class LogController {
      * @param keyword 关键字
      * @return 带 UTF-8 BOM 的 CSV 字节流
      */
-    @GetMapping("/api/logs/export")
+    @GetMapping("/export")
     public ResponseEntity<byte[]> export(@RequestParam(required = false) String action,
                                          @RequestParam(required = false) String keyword) {
         byte[] content = logService.exportCsv(action, keyword);

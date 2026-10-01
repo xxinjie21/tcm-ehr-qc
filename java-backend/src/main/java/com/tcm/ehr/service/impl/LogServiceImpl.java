@@ -31,7 +31,8 @@ public class LogServiceImpl implements ILogService {
     /** 页面展示用的时间格式 */
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final OperationLogMapper operationLogMapper;
+    /** 本实体的 Mapper，统一命名为 baseMapper（附录 A.1 #21） */
+    private final OperationLogMapper baseMapper;
     private final OrgMapper orgMapper;
 
     /**
@@ -46,7 +47,7 @@ public class LogServiceImpl implements ILogService {
     @Override
     public Map<String, Object> page(String action, String keyword, int page, int size) {
         // 1. 分页参数兜底为 1（非法分页会让 SQL 报错），条件走统一 wrapper
-        Page<OperationLog> p = operationLogMapper.selectPage(
+        Page<OperationLog> p = baseMapper.selectPage(
                 new Page<>(Math.max(page, 1), Math.max(size, 1)), buildWrapper(action, keyword));
         // 2. 固定顺序装 total / list，前端按 key 取
         Map<String, Object> result = new LinkedHashMap<>();
@@ -69,13 +70,13 @@ public class LogServiceImpl implements ILogService {
         String orgId = RequestUtils.currentOrgId();
         String operator = RequestUtils.currentUsername();
         if (RequestUtils.isAdmin()) {
-            return operationLogMapper.selectDistinctActions(null, null);
+            return baseMapper.selectDistinctActions(null, null);
         }
         if (orgId != null && !orgId.isBlank()
                 && RequestUtils.currentOrgRole().equals(OrganizationMember.ROLE_OWNER)) {
-            return operationLogMapper.selectDistinctActions(orgId, null);
+            return baseMapper.selectDistinctActions(orgId, null);
         }
-        return operationLogMapper.selectDistinctActions(orgId, operator);
+        return baseMapper.selectDistinctActions(orgId, operator);
     }
 
     /**
@@ -87,7 +88,7 @@ public class LogServiceImpl implements ILogService {
      */
     @Override
     public List<OperationLog> listForExport(String action, String keyword) {
-        List<OperationLog> rows = operationLogMapper.selectList(buildWrapper(action, keyword));
+        List<OperationLog> rows = baseMapper.selectList(buildWrapper(action, keyword));
         fillOrgNames(rows);
         return rows;
     }
@@ -122,7 +123,7 @@ public class LogServiceImpl implements ILogService {
                 .eq("operator", operator)
                 .orderByDesc("log_time")
                 .last("LIMIT " + limit);
-        return operationLogMapper.selectList(w);
+        return baseMapper.selectList(w);
     }
 
     /** 生成带 UTF-8 BOM 的 CSV 字节（Excel 正确识别中文） */

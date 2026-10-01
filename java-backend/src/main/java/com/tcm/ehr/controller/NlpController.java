@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import org.springframework.web.bind.annotation.RequestMapping;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.EntityNormalizer;
@@ -37,6 +38,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/nlp")
 public class NlpController {
 
     private final PythonNlpClient nlpClient;
@@ -56,7 +58,7 @@ public class NlpController {
      * @param dto text=待抽取文本
      * @return 9 类实体（含归一结果与原文）；降级时为空结构 + unavailableReason
      */
-    @PostMapping("/api/nlp/extract")
+    @PostMapping("/extract")
     public ResponseEntity<Result<NlpExtractVO>> extract(@Valid @RequestBody NlpExtractDTO dto) {
         // 1. 取待抽取文本，为空回 400（其余情况一律降级）
         String text = dto == null ? null : dto.getText();
@@ -98,7 +100,7 @@ public class NlpController {
      * @param dto filters=范围条件；limit=处理条数上限，0 表示不限（字段级校验由 @Valid 触发）
      * @return 任务ID、状态与计划处理条数
      */
-    @PostMapping("/api/nlp/extract/batch")
+    @PostMapping("/extract/batch")
     public Result<NlpTaskVO> submitBatch(@Valid @RequestBody(required = false) NlpBatchDTO dto) {
         // 1. 提交即返回（异步任务）；dto 可空 = 全库范围
         NlpTaskVO vo = nlpBatchService.submit(dto, RequestUtils.currentUsername());
@@ -116,7 +118,7 @@ public class NlpController {
      * @param id 任务ID
      * @return 任务状态、进度、失败清单（截断存储）
      */
-    @GetMapping("/api/nlp/extract/batch/{id}")
+    @GetMapping("/extract/batch/{id}")
     public ResponseEntity<Result<NlpTaskVO>> batchStatus(@PathVariable String id) {
         // 1. 取任务；2. 不存在回 404（前端轮询时据此停止轮询）
         NlpTaskVO vo = nlpBatchService.get(id);
@@ -134,7 +136,7 @@ public class NlpController {
      * @param id 任务ID
      * @return 取消后的任务状态
      */
-    @PostMapping("/api/nlp/extract/batch/{id}/cancel")
+    @PostMapping("/extract/batch/{id}/cancel")
     public Result<NlpTaskVO> cancelBatch(@PathVariable String id) {
         return Result.ok("已取消", nlpBatchService.cancel(id));
     }
@@ -146,7 +148,7 @@ public class NlpController {
      *
      * @return 任务列表（按提交时间倒序）
      */
-    @GetMapping("/api/nlp/extract/batch")
+    @GetMapping("/extract/batch")
     public Result<List<NlpTaskVO>> batchList() {
         return Result.ok(nlpBatchService.list());
     }

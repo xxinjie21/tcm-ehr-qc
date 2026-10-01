@@ -61,22 +61,22 @@ public final class QcScorer {
         List<String> conflicts = LogicChecker.check(data, rs.getConsistency());
         for (String c : conflicts) {
             String name = c.contains("：") ? c.substring(0, c.indexOf("：")) : c;
-            int w = weightOf(rs, name);
-            ded.add(new ScoreResultVO.Deduction("逻辑冲突", name, w, c));
+            int weight = weightOf(rs, name);
+            ded.add(new ScoreResultVO.Deduction("逻辑冲突", name, weight, c));
         }
         vo.setLogicConflicts(conflicts);
 
         // 3. 格式
         if (raw != null) {
-            for (com.tcm.ehr.common.config.QcRuleSet.FormatRule fr : rs.getFormat()) {
-                String v = rawValue(raw, fr.getField());
-                if (v == null) {
+            for (com.tcm.ehr.common.config.QcRuleSet.FormatRule formatRule : rs.getFormat()) {
+                String value = rawValue(raw, formatRule.getField());
+                if (value == null) {
                     continue;
                 }
-                if (!formatOk(fr, v)) {
-                    String label = fr.getLabel() == null ? fr.getField() : fr.getLabel();
-                    String reason = (fr.getReason() == null ? label + "格式不正确" : fr.getReason()) + "：" + v;
-                    ded.add(new ScoreResultVO.Deduction("格式错误", label, fr.getWeight(), reason));
+                if (!formatOk(formatRule, value)) {
+                    String label = formatRule.getLabel() == null ? formatRule.getField() : formatRule.getLabel();
+                    String reason = (formatRule.getReason() == null ? label + "格式不正确" : formatRule.getReason()) + "：" + value;
+                    ded.add(new ScoreResultVO.Deduction("格式错误", label, formatRule.getWeight(), reason));
                 }
             }
         }
@@ -202,9 +202,9 @@ public final class QcScorer {
             return false;
         }
         // 2. 任一字段有值即算原始写了
-        for (String f : fields) {
-            String v = rawValue(raw, f);
-            if (v != null) {
+        for (String field : fields) {
+            String value = rawValue(raw, field);
+            if (value != null) {
                 return true;
             }
         }
@@ -218,7 +218,7 @@ public final class QcScorer {
             return null;
         }
         // 2. 按属性名映射到列，未配置的字段给 null
-        String v = switch (field) {
+        String value = switch (field) {
             case "registrationNo" -> r.getRegistrationNo();
             case "outpatientNo" -> r.getOutpatientNo();
             case "gender" -> r.getGender();
@@ -241,7 +241,7 @@ public final class QcScorer {
             default -> null;
         };
         // 3. 空白视作无值，避免空格被当成内容
-        return v == null || v.isBlank() ? null : v.trim();
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /** 术语类型 → 结构化 key */
@@ -265,16 +265,16 @@ public final class QcScorer {
             return 0;
         }
         // 2. 逐个实体看有没有 normLevel：没有就是没命中词典
-        int n = 0;
+        int missCount = 0;
         for (Object item : list) {
-            if (item instanceof Map<?, ?> m) {
-                Object lv = m.get("normLevel");
-                if (lv == null) {
-                    n++;
+            if (item instanceof Map<?, ?> entity) {
+                Object normLevel = entity.get("normLevel");
+                if (normLevel == null) {
+                    missCount++;
                 }
             }
         }
-        return n;
+        return missCount;
     }
 
     private static String reasonFor(com.tcm.ehr.common.config.QcRuleSet.Element el, boolean rawHas) {

@@ -9,6 +9,7 @@ import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
 import com.tcm.ehr.domain.po.OperationLog;
 import com.tcm.ehr.domain.po.Record;
@@ -64,7 +65,8 @@ public class AiServiceImpl implements IAiService {
             + "症状用《中医临床诊疗术语 症状》、中药用《中国药典2025年版》、方剂用《中医方剂大辞典》；"
             + "归一命中分精确/包含/模糊三级。";
 
-    private final RecordMapper recordMapper;
+    /** 病历只读表：按统一口径命名为 baseMapper（附录 A.1 #21） */
+    private final RecordMapper baseMapper;
     private final IStatsService statsService;
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
@@ -126,7 +128,7 @@ public class AiServiceImpl implements IAiService {
                     new TypeReference<Map<String, Object>>() {
                     });
             // 2. 有叙述就覆盖模板叙述，没有就沿用模板
-            String narrative = str(parsed.get("narrative"));
+            String narrative = rawOrNull(parsed.get("narrative"));
             if (narrative != null && !narrative.isBlank()) {
                 vo.setAnswer(narrative.trim());
             } else {
@@ -135,10 +137,10 @@ public class AiServiceImpl implements IAiService {
             // 3. 摘要是可选字段，缺了不影响叙述
             if (parsed.get("summary") instanceof Map<?, ?> sm) {
                 AiReplyVO.Summary s = new AiReplyVO.Summary();
-                s.setChiefComplaint(str(sm.get("chiefComplaint")));
-                s.setDiagnosis(str(sm.get("diagnosis")));
-                s.setSyndrome(str(sm.get("syndrome")));
-                s.setPrescription(str(sm.get("prescription")));
+                s.setChiefComplaint(rawOrNull(sm.get("chiefComplaint")));
+                s.setDiagnosis(rawOrNull(sm.get("diagnosis")));
+                s.setSyndrome(rawOrNull(sm.get("syndrome")));
+                s.setPrescription(rawOrNull(sm.get("prescription")));
                 vo.setSummary(s);
             }
         } catch (JacksonException e) {
@@ -267,9 +269,11 @@ public class AiServiceImpl implements IAiService {
                 Object lv = m.get("normLevel");
                 if (lv == null) continue;
                 int level = parseInt(lv);
-                if (level == 1) n.setExact(n.getExact() + 1);
-                else if (level == 2) n.setContain(n.getContain() + 1);
-                else if (level == 3) n.setFuzzy(n.getFuzzy() + 1);
+                // 用具名常量而非裸字面量：层级语义由 EsTermNormalizer 定义，
+                // 判定顺序若调整，这里跟着改常量即可，写死数字会静默错位
+                if (level == EsTermNormalizer.LEVEL_EXACT) n.setExact(n.getExact() + 1);
+                else if (level == EsTermNormalizer.LEVEL_CONTAIN) n.setContain(n.getContain() + 1);
+                else if (level == EsTermNormalizer.LEVEL_FUZZY) n.setFuzzy(n.getFuzzy() + 1);
             }
         }
         // 2. 合计 = 精确 + 包含 + 模糊（按归一动作计，不按去重后条数）
@@ -552,7 +556,7 @@ public class AiServiceImpl implements IAiService {
         if (recordId == null || recordId.isBlank()) {
             return null;
         }
-        Record r = recordMapper.selectById(recordId);
+        Record r = baseMapper.selectById(recordId);
         if (r == null) {
             return null;
         }
@@ -596,10 +600,10 @@ public class AiServiceImpl implements IAiService {
         // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
         for (Object item : list) {
             if (item instanceof Map<?, ?> m) {
-                String c = str(m.get("content") != null ? m.get("content") : m.get("name"));
+                String c = rawOrNull(m.get("content") != null ? m.get("content") : m.get("name"));
                 if (c != null && !c.isBlank()) out.add(c.trim());
             } else if (item != null) {
-                String c = str(item);
+                String c = rawOrNull(item);
                 if (c != null && !c.isBlank()) out.add(c.trim());
             }
         }
@@ -629,7 +633,15 @@ public class AiServiceImpl implements IAiService {
         }
     }
 
-    private static String str(Object o) {
+    /**
+     * null 保持 null，其余按 {@code String.valueOf} 转字符串（<b>不 trim</b>）。
+     *
+     * <p>与 {@code GovernanceServiceImpl.toTrimmedOrNull}（会 trim、空串归 null）、
+     * {@code EsTermIndexServiceImpl.nullToEmpty}（null 变空串）是三种不同语义，
+     * 所以名字各不相同 —— 原来三处都叫 {@code str(Object)}，光看调用点无法判断
+     * 拿到的是 null 还是空串。</p>
+     */
+    private static String rawOrNull(Object o) {
         return o == null ? null : String.valueOf(o);
     }
 

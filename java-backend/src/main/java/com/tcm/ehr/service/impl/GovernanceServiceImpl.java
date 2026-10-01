@@ -221,7 +221,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                             entity.put("normCode", result.code());
                         }
                         stat[0]++;
-                        if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
+                        if (result.level() >= EsTermNormalizer.LEVEL_EXACT
+                && result.level() <= EsTermNormalizer.LEVEL_FUZZY) stat[result.level()]++;
                     }
                 }
             }
@@ -251,7 +252,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     herb.put("normCode", result.code());
                 }
                 stat[0]++;
-                if (result.level() >= 1 && result.level() <= 3) stat[result.level()]++;
+                if (result.level() >= EsTermNormalizer.LEVEL_EXACT
+                && result.level() <= EsTermNormalizer.LEVEL_FUZZY) stat[result.level()]++;
             }
             if (herb.get("dosage") != null) {
                 String d = String.valueOf(herb.get("dosage")).trim().toLowerCase();
@@ -387,7 +389,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     private String patternOf(ExportDTO dto) {
         Map<String, Object> filters = dto.getFilters() == null ? Map.of() : dto.getFilters();
-        return str(filters.get("pattern"));
+        return toTrimmedOrNull(filters.get("pattern"));
     }
 
     /** 取范围内合格病历；带证候筛选时额外做内存筛（证候在 JSON 里，SQL 筛不了） */
@@ -438,8 +440,16 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return mask(new String(csv, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
     }
 
-    private String str(Object o) {
-        // 1. 空值直接返回 2. 去空白，空串与字面 "null" 归成 null
+    /**
+     * trim 后为空（null / 空串 / 纯空白）一律归成 {@code null}，否则原样返回。
+     *
+     * <p>脱敏与清洗要的是「这个字段真的没有值」，不是「它是个空字符串」——
+     * 留着空串会让下游把它当成一个有内容的字段继续处理。</p>
+     *
+     * <p>与 {@code AiServiceImpl.rawOrNull}（不 trim、null 保持 null）语义不同，
+     * 与 {@code EsTermIndexServiceImpl.nullToEmpty}（null 变空串）也相反。</p>
+     */
+    private String toTrimmedOrNull(Object o) {
         if (o == null) return null;
         String s = String.valueOf(o).trim();
         return s.isEmpty() ? null : s;

@@ -56,17 +56,29 @@ def perm_of_openapi(path: str, method: str) -> str:
 #      却其实少看了一堆端点 —— 比报错更危险。
 #   2) 不能用 \{[^}]*\} 去切数组内容：路径变量 {id} 里的 } 会提前截断，
 #      含变量的端点会被整段丢掉。正确做法是抓「注解括号内的原文」再取所有引号串。
-ANY_MAPPING = re.compile(r'@(Get|Post|Put|Delete)Mapping\((.*)\)')
+# 括号可省略：`@PostMapping`（无参）也是合法写法，路径就是类级前缀本身。
+# 原正则强制要求 ( )，导致 StatsController.stats 这种无参映射被整条漏检。
+ANY_MAPPING = re.compile(r'@(Get|Post|Put|Delete|Patch)Mapping(?:\((.*)\))?')
 QUOTED = re.compile(r'"([^"]+)"')
 CLASS_MAPPING = re.compile(r'@RequestMapping\("([^"]+)"\)')
 
 
 def paths_of(line):
-    """一行注解里的全部路径（单值 / 数组都支持）。"""
+    """一行注解里的全部路径（单值 / 数组都支持）。
+
+    ⚠️ 空相对路径与无参注解都算「有一个路径 = 类级前缀本身」，必须返回 [""]：
+    批次 10 把 Controller 统一成「类级前缀 + 方法级相对路径」后，出现了
+    `@GetMapping("")`（= 前缀根，如 /api/logs）与无参 `@PostMapping`（= /api/stats）。
+    原实现对这两种返回空列表，调用方 `if not raw_paths: continue` 就把端点整个跳过 ——
+    校验照样报「0 差异」，而这几个端点从未被比对过。静默漏检比报错糟得多。
+    """
     m = ANY_MAPPING.search(line)
     if not m:
         return None, []
-    paths = QUOTED.findall(m.group(2))
+    paths = QUOTED.findall(m.group(2) or "")
+    if not paths:
+        # `@PostMapping`（无括号）或 `@GetMapping("")` —— 都表示类级前缀本身
+        return m.group(1).lower(), [""]
     return m.group(1).lower(), paths
 
 
@@ -137,10 +149,35 @@ def main():
             # openapi 缺失时 perm_of_openapi 返回 None —— 不能直接进 :<8 格式化，
             # 否则脚本报 TypeError 崩掉，把「有差异」变成「看不到差异」，比报错更糟
             diff.append(f"{method.upper():6} {path:<46} openapi={str(op):<8} backend={perm}")
+
+    # 反向：openapi 声明了、后端却没有的端点。
+    # 只做单向比对时，「后端端点被改名/写漏」这类问题永远看不见 ——
+    # 批次 10 改 Controller 路由风格时，端点计数从 74 掉到 71 就是这么藏住的。
+    missing = missing_in_backend(be)
+    for path, method in sorted(missing):
+        diff.append(f"{method.upper():6} {path:<46} openapi=已声明   backend=缺失")
+
     print(f"[校验] 后端 {method_count(be)} 个方法；差异 " + ("无" if not diff else f"{len(diff)} 处"))
     for d in diff:
         print("  ", d)
     return 1 if diff else 0
+
+
+def missing_in_backend(be):
+    """openapi 里有、后端没实现的 (path, method)。"""
+    text = io.open(OPENAPI, encoding="utf-8-sig").read()
+    body = text[text.find("\npaths:"):]
+    have = {(p, m.upper()) for (p, m) in be}
+    out = set()
+    for pm in re.finditer(r"^  (/\S*):\s*$", body, re.M):
+        blk = body[pm.end():]
+        nxt = blk.find("\n  /")
+        blk = blk[:nxt] if nxt != -1 else blk
+        for verb in re.findall(r"^    (get|post|put|delete|patch):", blk, re.M):
+            key = (pm.group(1), verb.upper())
+            if key not in have:
+                out.add(key)
+    return out
 
 
 def method_count(d):

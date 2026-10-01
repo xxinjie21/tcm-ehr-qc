@@ -138,8 +138,8 @@ public final class RecordFilter {
             return false;
         }
         // 记录本身就无组（迁移未执行）→ 也看不到
-        String rg = record.getOrgId();
-        return rg != null && orgId.equals(rg.trim());
+        String recordOrgId = record.getOrgId();
+        return recordOrgId != null && orgId.equals(recordOrgId.trim());
     }
 
     /**
@@ -193,11 +193,11 @@ public final class RecordFilter {
                 start = f.getDateRange().get(0);
                 end = f.getDateRange().get(1);
             }
-        } else if (filters instanceof Map<?, ?> m) {
-            department = text(m.get("department"));
-            grade = text(m.get("grade"));
-            pattern = text(m.get("pattern"));
-            if (m.get("dateRange") instanceof List<?> range && range.size() == 2) {
+        } else if (filters instanceof Map<?, ?> raw) {
+            department = text(raw.get("department"));
+            grade = text(raw.get("grade"));
+            pattern = text(raw.get("pattern"));
+            if (raw.get("dateRange") instanceof List<?> range && range.size() == 2) {
                 start = text(range.get(0));
                 end = text(range.get(1));
             }
@@ -226,8 +226,8 @@ public final class RecordFilter {
         if (o == null) {
             return null;
         }
-        String s = String.valueOf(o).trim();
-        return s.isEmpty() || "null".equals(s) ? null : s;
+        String trimmed = String.valueOf(o).trim();
+        return trimmed.isEmpty() || "null".equals(trimmed) ? null : trimmed;
     }
 
     /**
@@ -286,7 +286,7 @@ public final class RecordFilter {
         return wrapper;
     }
 
-    private static boolean notBlank(String s) {
-        return s != null && !s.isBlank();
+    private static boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 }

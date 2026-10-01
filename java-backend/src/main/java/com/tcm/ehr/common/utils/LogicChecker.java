@@ -52,7 +52,7 @@ public final class LogicChecker {
                 continue;
             }
             // 4. 触发条件满足、期望条件一条都不满足才算冲突
-            boolean ok = expects.stream().anyMatch(e -> anyContains(e, rule.getExpectValues()));
+            boolean ok = expects.stream().anyMatch(expected -> anyContains(expected, rule.getExpectValues()));
             if (!ok) {
                 String name = rule.getName() == null ? "一致性" : rule.getName();
                 conflicts.add(name + "：" + labelOf(rule.getExpectType()) + "与" + labelOf(rule.getTriggerType()) + "不符");
@@ -71,10 +71,11 @@ public final class LogicChecker {
         }
         // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
         for (Object item : list) {
-            if (item instanceof Map<?, ?> m) {
-                Object v = m.get("content") != null ? m.get("content") : m.get("name");
-                if (v != null && !String.valueOf(v).isBlank()) {
-                    out.add(String.valueOf(v).trim());
+            if (item instanceof Map<?, ?> entity) {
+                // 实体文本取 content，抽取器对中药用 name，两个都兜一下
+                Object text = entity.get("content") != null ? entity.get("content") : entity.get("name");
+                if (text != null && !String.valueOf(text).isBlank()) {
+                    out.add(String.valueOf(text).trim());
                 }
             } else if (item != null && !String.valueOf(item).isBlank()) {
                 out.add(String.valueOf(item).trim());

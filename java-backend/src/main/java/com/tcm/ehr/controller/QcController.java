@@ -1,5 +1,6 @@
 package com.tcm.ehr.controller;
 
+import org.springframework.web.bind.annotation.RequestMapping;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.config.QcRuleSet;
 import com.tcm.ehr.common.exception.ForbiddenException;
@@ -40,6 +41,7 @@ import java.util.List;
  */
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/qc")
 public class QcController {
 
     private final IQcService qcService;
@@ -55,7 +57,7 @@ public class QcController {
      * @param dto recordId=病历ID（必填）；structuredData=可选，缺省时读取库中结构化数据
      * @return missingFields=缺失的核心要素；formatErrors=年龄/性别格式问题
      */
-    @PostMapping("/api/qc/check")
+    @PostMapping("/check")
     public Result<QcCheckVO> check(@Valid @RequestBody QcCheckDTO dto) {
         return Result.ok(qcService.check(dto));
     }
@@ -68,7 +70,7 @@ public class QcController {
      * @param dto patternList/treatmentList/formulaList 待判定的要素
      * @return conflicts=冲突描述；consistent=是否无冲突
      */
-    @PostMapping("/api/qc/check/logic")
+    @PostMapping("/check/logic")
     public Result<LogicCheckVO> checkLogic(@Valid @RequestBody LogicCheckDTO dto) {
         return Result.ok(qcService.checkLogic(dto));
     }
@@ -81,7 +83,7 @@ public class QcController {
      * @param dto recordId=病历ID；structuredData=可选，缺省时读取库中结构化数据
      * @return score=得分；grade=分级；deductions=扣分明细
      */
-    @PostMapping("/api/qc/score")
+    @PostMapping("/score")
     public Result<ScoreResultVO> score(@Valid @RequestBody QcScoreDTO dto) {
         return Result.ok(qcService.score(dto));
     }
@@ -98,7 +100,7 @@ public class QcController {
      * @param dto filters=范围条件，为空表示全库
      * @return id=任务ID；status=QUEUED；total=计划处理条数
      */
-    @PostMapping("/api/qc/score/batch")
+    @PostMapping("/score/batch")
     public Result<QcTaskVO> submitScoreBatch(@Valid @RequestBody(required = false) QcBatchDTO dto) {
         return Result.ok("已提交，后台运行中", qcBatchService.submit(dto));
     }
@@ -111,7 +113,7 @@ public class QcController {
      * @param id 任务ID
      * @return 进度与分级汇总；任务不存在时返回 404
      */
-    @GetMapping("/api/qc/score/batch/{id}")
+    @GetMapping("/score/batch/{id}")
     public ResponseEntity<Result<QcTaskVO>> scoreBatchStatus(@PathVariable String id) {
         // 1. 进度在表里；任务不存在与「任务被清理」同一表现
         QcTaskVO vo = qcBatchService.get(id);
@@ -128,7 +130,7 @@ public class QcController {
      *
      * @return 按提交时间倒序的任务列表
      */
-    @GetMapping("/api/qc/score/batch")
+    @GetMapping("/score/batch")
     public Result<List<QcTaskVO>> listScoreBatch() {
         return Result.ok(qcBatchService.list());
     }
@@ -142,7 +144,7 @@ public class QcController {
      * @param id 任务ID
      * @return 取消后的任务状态；任务不存在时返回 404
      */
-    @PostMapping("/api/qc/score/batch/{id}/cancel")
+    @PostMapping("/score/batch/{id}/cancel")
     public Result<QcTaskVO> cancelScoreBatch(@PathVariable String id) {
         // 不在 Controller 内 catch 拼错误体：任务不存在由 service 抛 ResourceNotFoundException，
         // 统一交给 GlobalExceptionHandler 转 404（全仓唯一错误体出口）
@@ -156,7 +158,7 @@ public class QcController {
      *
      * @return rules=规则集；descriptions=自然语言描述；warnings=加载告警
      */
-    @GetMapping("/api/qc/rules")
+    @GetMapping("/rules")
     public Result<QcRulesVO> rules() {
         return Result.ok(qcService.rules());
     }
@@ -170,7 +172,7 @@ public class QcController {
      * @param rules 规则集
      * @return 保存后的规则集
      */
-    @PutMapping("/api/qc/rules")
+    @PutMapping("/rules")
     public Result<QcRulesVO> updateRules(@Valid @RequestBody QcRuleSet rules) {
         requireRuleWrite();
         return Result.ok("规则已保存并生效", qcService.updateRules(rules));
@@ -183,7 +185,7 @@ public class QcController {
      *
      * @return 恢复后的规则集
      */
-    @PostMapping("/api/qc/rules/reset")
+    @PostMapping("/rules/reset")
     public Result<QcRulesVO> resetRules() {
         requireRuleWrite();
         return Result.ok("已恢复默认规则", qcService.resetRules());
@@ -201,7 +203,7 @@ public class QcController {
      * @param grade      分级
      * @return scanned=统计条数；byType/byItem=维度与明细扣分；gradeDist=分级分布
      */
-    @GetMapping("/api/qc/deduction-stats")
+    @GetMapping("/deduction-stats")
     public Result<DeductionStatsVO> deductionStats(
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,

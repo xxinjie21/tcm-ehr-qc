@@ -181,7 +181,8 @@ public class EntityNormalizer {
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", orgId, raw);
             // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
-            if (r.source() == null || r.source().isBlank() || r.level() < 1 || r.level() > 3) {
+            if (r.source() == null || r.source().isBlank()
+                || r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
                 continue;
             }
             herb.setName(r.standardTerm());
@@ -218,7 +219,8 @@ public class EntityNormalizer {
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
             // 4. 未命中词典就保持原样，不写 normLevel
-            if (r.source() == null || r.source().isBlank() || r.level() < 1 || r.level() > 3) {
+            if (r.source() == null || r.source().isBlank()
+                || r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
                 continue;
             }
             e.setContent(r.standardTerm());

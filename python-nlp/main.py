@@ -118,7 +118,9 @@ def _load_model():
     logger.info("[nlp] 模型目录解析为: %s", os.path.abspath(MODEL_DIR))
     try:
         # 2. 加载权重与标签表
-        import torch
+        #    这里不 import torch：真正用到它的是 _ner()，那边自己 import。
+        #    删掉不影响降级路径 —— torch 缺失时下面这行 import 同样抛错，
+        #    由同一个 except 兜住置空、退回纯规则。
         from transformers import AutoModelForTokenClassification, AutoTokenizer
 
         _tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
@@ -126,7 +128,7 @@ def _load_model():
         _model.eval()
         _id2label = {int(k): v for k, v in _model.config.id2label.items()}
         logger.info("[nlp] 模型加载成功: %s, labels=%d", MODEL_DIR, len(_id2label))
-    except Exception as e:  # 模型缺失/异常 → 仅规则兜底
+    except Exception:  # 模型缺失/异常 → 仅规则兜底
         _tokenizer = None
         _model = None
         _id2label = {}
@@ -181,7 +183,8 @@ def _ner(text: str) -> Tuple[Dict[str, List[dict]], bool]:
     return out, truncated
 
 
-def _flush(out, field, text, start, end, confs):
+def _flush(out: Dict[str, List[Entity]], field: str, text: str,
+          start: Optional[int], end: Optional[int], confs: List[float]) -> None:
     """把当前累积的一段实体收进结果；herbs 额外向后抓剂量。"""
     if not field or start is None:
         return
