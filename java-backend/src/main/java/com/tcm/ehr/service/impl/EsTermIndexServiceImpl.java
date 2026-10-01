@@ -87,14 +87,30 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
         String index = indexName(type);
         String org = normalizeOrg(orgId);
 
+        // ⚠️ 不能只判「索引存在」就复用：从旧版本升级时，索引是旧代码建的 ——
+        //    它的 mapping 里没有 org_id（或 org_id 被动态映射成了 text）。
+        //    复用会导致两个后果，且都不报错：
+        //      1) delete_by_query(org_id) 删不掉任何东西（旧文档没这个字段）；
+        //      2) bulk 写入的 org_id 被 ES 动态映射成 text（分词），于是空串
+        //         ——也就是基础层的 org_id=""—— 根本不在倒排索引里，
+        //         termsQuery("org_id","") 永远查不到 → 全库归一「未收录」。
+        //    所以这里必须校验 mapping；不兼容就整索引重建（顺带清掉旧文档）。
+        boolean recreate = !exists(type) || !hasCompatibleMapping(type);
         if (!exists(type)) {
+            log.info("[ES] 索引 {} 不存在，创建", index);
+        } else if (recreate) {
+            log.warn("[ES] 索引 {} 的 mapping 不兼容（org_id 不是 keyword），删除重建", index);
+            client.indices().delete(new org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest(index),
+                    RequestOptions.DEFAULT);
+        }
+
+        if (recreate) {
             CreateIndexRequest create = new CreateIndexRequest(index);
             create.settings(Map.of("number_of_shards", 1, "number_of_replicas", 0));
             create.mapping(Map.of(
                     "_meta", Map.of("version", version == null ? "" : version),
                     "properties", mappingProperties()));
             client.indices().create(create, RequestOptions.DEFAULT);
-            log.info("[ES] 创建索引 {}（首次）", index);
         } else {
             // 先把该组织的旧文档删掉：不删整索引，避免误伤其它组织
             try {
@@ -141,6 +157,60 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
         }
         log.debug("[ES] {} 召回 {} 条候选（org_id='{}', input={}）", indexName(type), candidates.size(), org, input);
         return candidates;
+    }
+
+    @Override
+    public boolean schemaCompatible(String type) throws IOException {
+        return exists(type) && hasCompatibleMapping(type);
+    }
+
+    /**
+     * 索引的 mapping 是否与当前代码兼容。
+     *
+     * <p>判据只有一条：{@code org_id} 必须是 {@code keyword}。基础层的 org_id 是空串，
+     * 而空串在 {@code text}（分词）字段里<b>不进倒排索引</b>，{@code termsQuery} 查不到
+     * —— 表现就是全库归一「未收录」。从旧版本升级时，索引是旧代码建的（没有 org_id），
+     * 写入时被 ES 动态映射成 text，正好踩中这一条。</p>
+     *
+     * <p>读不到 mapping 时按<b>不兼容</b>处理：宁可重建（幂等，只是多花一次灌数据），
+     * 也不要把一个查不出东西的索引留着继续用。</p>
+     */
+    private boolean hasCompatibleMapping(String type) {
+        try {
+            GetMappingsResponse response = client.indices()
+                    .getMapping(new GetMappingsRequest().indices(indexName(type)), RequestOptions.DEFAULT);
+            MappingMetadata meta = response.mappings().get(indexName(type));
+            if (meta == null) {
+                return false;
+            }
+            return orgIdIsKeyword(meta.getSourceAsMap());
+        } catch (Exception e) {
+            log.warn("[ES] 读取 {} 的 mapping 失败，按不兼容处理（将重建）: {}",
+                    indexName(type), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * mapping 源里 {@code org_id} 是否为 {@code keyword}。
+     *
+     * <p>抽成纯函数是为了能脱离 ES 单测 —— 这条判据是「基础层能不能被查到」的开关，
+     * 值得有一个不走集群的回归测试兜住。</p>
+     *
+     * @param mappingSource mapping 的 source map（形如 {@code {"_meta":…, "properties":…}}）
+     * @return org_id 存在且类型为 keyword 时返回 true
+     */
+    static boolean orgIdIsKeyword(Map<String, Object> mappingSource) {
+        if (mappingSource == null) {
+            return false;
+        }
+        Object properties = mappingSource.get("properties");
+        if (!(properties instanceof Map<?, ?> props)) {
+            return false;
+        }
+        Object orgId = props.get("org_id");
+        return orgId instanceof Map<?, ?> field
+                && "keyword".equals(String.valueOf(field.get("type")));
     }
 
     private Map<String, Object> mappingProperties() {

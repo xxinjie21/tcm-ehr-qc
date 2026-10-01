@@ -129,9 +129,12 @@ public class DataInitializationListener implements ApplicationRunner {
         }
     }
 
-    /** 单层对账：已同步则跳过（rebuild 是先删后灌，期内归一会 503） */
+    /** 单层对账：已同步且索引结构兼容才跳过（rebuild 是先删后灌，期内归一会 503） */
     private void reconcileLayer(String type, String orgId) throws java.io.IOException {
-        if (termStore.isSynced(orgId, type)) {
+        // 内容版本同步 ≠ 索引结构正确：从旧版本升级时索引可能是旧 mapping
+        // （org_id 被动态映射成 text，空串基础层查不到 → 全库「未收录」）。
+        // 只信 dictionary_versions 会跳过重建，坏索引就永远修不好。
+        if (termStore.isSynced(orgId, type) && esTermIndexService.schemaCompatible(type)) {
             return;
         }
         List<TermEntry> entries = termStore.read(orgId, type);

@@ -33,6 +33,22 @@ public interface IEsTermIndexService {
     boolean exists(String type) throws IOException;
 
     /**
+     * 索引的映射是否与当前代码兼容。
+     *
+     * <p>判据：{@code org_id} 必须是 {@code keyword}。索引不存在、或 org_id 被动态映射成
+     * {@code text}（旧版本升级会这样）都返回 {@code false}。</p>
+     *
+     * <p><b>为什么启动对账要用它</b>：{@code dictionary_versions} 只记「内容版本对不对得上」，
+     * 记不了「索引结构对不对」。旧版本升级后内容版本可能已标为同步，但索引结构是坏的 ——
+     * 只信版本号会跳过重建，坏索引就永远修不好（实测：全库归一「未收录」）。</p>
+     *
+     * @param type 术语类型
+     * @return 兼容返回 true；索引不存在或不兼容返回 false
+     * @throws IOException ES 请求失败
+     */
+    boolean schemaCompatible(String type) throws IOException;
+
+    /**
      * 全量重建某组织（或基础层）的词条索引。
      *
      * <p>重建期间有检索空窗，调用方需容忍 {@code index_not_found}；归一接口据此回 503。
