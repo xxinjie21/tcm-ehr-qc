@@ -79,6 +79,11 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /** 任务列表最多返回条数 */
     private static final int LIST_LIMIT = 50;
 
+    /** 提交互斥锁名：跨实例只允许一个「查重 + 入队」同时进行 */
+    private static final String SUBMIT_LOCK = "tcm:qc_batch:submit";
+    /** 取锁等待秒数；拿不到就拒绝，不做无锁提交 */
+    private static final int SUBMIT_LOCK_WAIT_SECONDS = 3;
+
     private final QcTaskMapper taskMapper;
     private final RecordMapper recordMapper;
     private final QcServiceImpl qcService;
@@ -95,6 +100,13 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
     /** 运行中任务的取消位 */
+    /**
+     * 已请求取消的任务 ID。
+     *
+     * <p>存在内存里只为<b>当前进程内</b>判得快，但<b>不是权威</b>：多实例下另一个实例
+     * 看不到它。权威是 {@code qc_task.cancel_requested} 列（批次 4 加的），
+     * 见 {@link #isCancelRequested(String)}。</p>
+     */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
 
     private volatile boolean running;
@@ -208,14 +220,37 @@ public class QcBatchServiceImpl implements IQcBatchService {
         // 数据域快照：阶段 2 后 RecordFilter 取的是 orgId 而不是 role
         String orgId = RequestUtils.currentOrgId();
 
-        // 2. 防重：查表判「是否已有 QUEUED/RUNNING」，不用 Redis 全局锁
-        //    （原 tcm:task:batch 是全局单键，任意管理员提交会让别人排队，TTL 固定还会中途过期）
-        Long active = taskMapper.selectCount(new QueryWrapper<QcTask>()
-                .in("status", List.of(QcTask.QUEUED, QcTask.RUNNING)));
-        if (active != null && active > 0) {
-            throw new IllegalArgumentException("已有重算任务在排队或运行中，请等它结束或先取消");
+        // 2. 防重：「查有没有活跃任务」+「插队」必须原子，否则并发双提交会双双入库
+        //    （两个任务同时跑，进度互相覆写）。
+        //    ⚠️ 互斥用 DB 的 GET_LOCK 而不是 JVM 锁：synchronized 在多实例下静默失效 ——
+        //    不报错、只是不互斥，是最难查的一类 bug。拿不到锁就当并发冲突拒绝，
+        //    绝不「没锁也继续」—— 那正是原来 check-then-act 的老问题。
+        String lockName = SUBMIT_LOCK;
+        Integer locked = taskMapper.acquireLock(lockName, SUBMIT_LOCK_WAIT_SECONDS);
+        if (locked == null || locked != 1) {
+            throw new IllegalArgumentException("有另一个重算任务正在提交，请稍后重试");
         }
+        try {
+            Long active = taskMapper.selectCount(new QueryWrapper<QcTask>()
+                    .in("status", List.of(QcTask.QUEUED, QcTask.RUNNING)));
+            if (active != null && active > 0) {
+                throw new IllegalArgumentException("已有重算任务在排队或运行中，请等它结束或先取消");
+            }
+            return insertTask(dto, filters, orgId, operator, role);
+        } finally {
+            // 必须在 finally 释放：抛异常时锁不会自动释放，不释放会卡住后续所有提交
+            try {
+                taskMapper.releaseLock(lockName);
+            } catch (Exception e) {
+                // 释放失败只记录：连接归还时 MySQL 会自动释放本连接持有的命名锁
+                log.warn("[批重算] 释放提交锁失败: {}", e.getMessage());
+            }
+        }
+    }
 
+    /** 查重通过后真正落库的那一段（被提交互斥包住） */
+    private QcTaskVO insertTask(QcBatchDTO dto, FiltersDTO filters, String orgId,
+                               String operator, String role) {
         // 3. 用提交线程的角色构造数据域过滤，统计计划条数
         long count = recordMapper.selectCount(RecordFilter.build(orgId, filters));
         if (count > maxRecords) {
@@ -273,6 +308,10 @@ public class QcBatchServiceImpl implements IQcBatchService {
         } else if (QcTask.RUNNING.equals(t.getStatus())) {
             // 2. 运行中：不能直接改状态（worker 还会覆写），只置取消位让它自己收尾
             cancelFlags.add(id);
+            // 取消位落库：内存只有本进程看得见，worker 也可能不在同一实例
+            taskMapper.update(null, new UpdateWrapper<QcTask>()
+                    .eq("id", id)
+                    .set("cancel_requested", 1));
         }
         return toVO(t, false);
     }
@@ -354,7 +393,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         int pageNo = 1;
         // 2. 分页循环取数：每页都先看取消位，避免停不下来
         while (true) {
-            if (cancelFlags.contains(id)) {
+            if (cancelFlags.contains(id) || isCancelRequested(id)) {
                 return true;
             }
             Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE), wrapper);
@@ -364,7 +403,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
             }
             // 3. 逐条处理
             for (Record r : list) {
-                if (cancelFlags.contains(id)) {
+                if (cancelFlags.contains(id) || isCancelRequested(id)) {
                     return true;
                 }
                 step(id, r, t, result, seenHash, rules, failures, truncated, processed);
@@ -379,6 +418,24 @@ public class QcBatchServiceImpl implements IQcBatchService {
     }
 
     /** 处理单条并更新进度 */
+    /**
+     * 读 DB 判「是否已请求取消」。
+     *
+     * <p>为什么必须查库：内存 {@code cancelFlags} 只有本进程可见，多实例下
+     * 「A 实例点取消、B 实例在跑」会完全失效。</p>
+     *
+     * <p>查库失败按<b>未取消</b>处理：宁可多跑几条，也不要因为一次查询抖动就把长任务中断掉。</p>
+     */
+    private boolean isCancelRequested(String id) {
+        try {
+            QcTask t = taskMapper.selectById(id);
+            return t != null && t.getCancelRequested() != null && t.getCancelRequested() == 1;
+        } catch (Exception e) {
+            log.debug("[批重算] 读取消位失败，按未取消处理: {}", e.getMessage());
+            return false;
+        }
+    }
+
     private void step(String id, Record r, QcTask t, QcBatchResultVO result, Set<String> seenHash,
                       QcRuleSet rules, List<QcTaskVO.Failure> failures, boolean[] truncated, int[] processed) {
         // 1. 处理前先计数：done 以「已尝试」为准，失败也算一条

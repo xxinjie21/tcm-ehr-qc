@@ -55,6 +55,14 @@ public class QcTask {
      * 阶段 2 后 {@code RecordFilter.build} 取的是 orgId，所以快照必须是组而不是角色。</p>
      */
     private String orgId;
+
+    /**
+     * 是否已请求取消（1=是）。批次 4 加的列，批次 9 真正用起来。
+     *
+     * <p>取消位落库而不是只放内存：多实例下「A 点取消、B 在跑」时，
+     * 内存 Set B 看不见，必须以这一列为准。</p>
+     */
+    private Integer cancelRequested;
     /** 失败清单 JSON 数组（仅存前 500 条） */
     private String failureList;
     private Boolean failureTruncated;

@@ -51,14 +51,18 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * 病历数据服务实现：Excel 批量导入 + 单条新增 + 导入进度（内存）。
+ * 病历数据服务实现：Excel 批量导入 + 单条新增。
  *
  * <ul>
  * <li>解析：POI {@link WorkbookFactory}（兼容 .xlsx / .xls）；表头中文名 → 21 字段；</li>
- * <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；</li>
- * <li>进度：内存 Map（taskId → 状态），服务重启后丢失，查询返回 404（与 openapi 一致）；</li>
- * <li>导入同步执行：接口返回即本轮完成，status 直接为「已完成」。</li>
+ * <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；
+ *     并写入 {@code text_hash} 列，DB 侧 {@code uk_records_org_text_hash} 兜底并发重复；</li>
+ * <li>导入<b>同步执行</b>：接口返回即本轮完成，status 直接为「已完成」。</li>
  * </ul>
+ *
+ * <p><b>进度查询已删除</b>：原「内存 Map 记 taskId + 查进度」的那套状态存储与
+ * {@code GET /api/records/import/{taskId}/status} 端点已在 P5.11 移除（导入是同步的，
+ * 内存进度表没有任何读取方）。进度由前端按文件逐个统计，不再向服务端要状态。</p>
  */
 @Slf4j
 @Service
@@ -128,7 +132,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
      * <p>逐文件校验扩展名、大小（≤50MB）与必需列「登记号」「接诊时间」，逐行映射为 21 字段；
      * 缺列、解析失败、门诊号为空的行计入失败明细，不影响其余行。去重先按登记号预取库内病历哈希、
      * 再与本批内哈希比对（与数据清洗同口径的 21 字段文本哈希），命中的按重复记失败。落库走
-     * {@code saveBatch} 一次批量插入，结果同时写入内存任务表（供进度查询，重启即失）。开启
+     * {@code saveBatch} 一次批量插入。导入是同步的，
      * {@code autoExtract} 且有成功记录时，另行提交后台 NLP 批解析任务，导入本身不阻塞等待。</p>
      *
      * @param files 上传的 Excel 文件数组（最多 20 个）

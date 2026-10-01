@@ -7,6 +7,7 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.QcTask;
 import com.tcm.ehr.mapper.QcTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -17,10 +18,12 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +48,9 @@ class QcBatchServiceImplTest {
 
     private QcBatchServiceImpl newService(QcTaskMapper taskMapper, RecordMapper recordMapper,
                                           OperationLogger operationLogger) {
+        // 提交互斥：默认打桩「拿到锁」，否则 acquireLock 返回 null，submit 会被当成并发冲突拒掉
+        when(taskMapper.acquireLock(any(), anyInt())).thenReturn(1);
+        when(taskMapper.releaseLock(any())).thenReturn(1);
         return new QcBatchServiceImpl(taskMapper, recordMapper, mock(QcServiceImpl.class),
                 mock(QcRuleStore.class), operationLogger, new ObjectMapper());
     }
@@ -172,6 +178,40 @@ class QcBatchServiceImplTest {
                 IllegalArgumentException.class, () -> svc.submit(null));
         assertTrue(e.getMessage().contains("已有重算任务"), e.getMessage());
         // 拒绝路径不该写库
+        org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).insert(any(QcTask.class));
+    }
+
+    @Test
+    @DisplayName("拿不到提交锁：直接拒绝，且不做无锁提交（不能落库）")
+    void submitRejectedWhenSubmitLockNotAcquired() {
+        QcTaskMapper taskMapper = mock(QcTaskMapper.class);
+        QcBatchServiceImpl svc = newService(taskMapper, mock(RecordMapper.class), mock(OperationLogger.class));
+        // 必须在 newService 之后覆盖 —— 它默认把锁打桩成「拿到了」
+        // 桩改成「没拿到锁」—— 这正是多实例并发提交时的情形
+        when(taskMapper.acquireLock(any(), anyInt())).thenReturn(0);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> svc.submit(null));
+        assertTrue(ex.getMessage().contains("正在提交"));
+        // 关键：没拿到锁就绝不能继续插任务，否则又变回 check-then-act
+        org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).insert(any(QcTask.class));
+        // 也没拿到锁，自然不该去释放
+        org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).releaseLock(any());
+    }
+
+    @Test
+    @DisplayName("锁内查重被拒：也必须释放锁，否则后续提交全被卡死")
+    void submitReleasesLockWhenDuplicateRejected() {
+        QcTaskMapper taskMapper = mock(QcTaskMapper.class);
+        QcBatchServiceImpl svc = newService(taskMapper, mock(RecordMapper.class), mock(OperationLogger.class));
+        // 锁内查到已有活跃任务 → 抛异常
+        when(taskMapper.selectCount(any())).thenReturn(1L);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> svc.submit(null));
+        assertTrue(ex.getMessage().contains("排队或运行中"));
+        // finally 必须释放，否则这一次异常会把之后所有提交都堵死
+        verify(taskMapper).releaseLock(any());
         org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).insert(any(QcTask.class));
     }
 

@@ -80,10 +80,22 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
     /** 运行中任务的取消位 */
+    /**
+     * 已请求取消的任务 ID（<b>仅本进程可见，非权威</b>）。
+     *
+     * <p>权威是 {@code nlp_task.cancel_requested} 列，见 {@link #isCancelRequested(String)}。</p>
+     */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
     /**
      * 按记录ID集合执行的任务（导入后自动解析）：仅内存持有。
      * 重启后这些任务被 K-c 标记为 INTERRUPTED、不会续跑，故无需落库占存储。
+     */
+    /**
+     * 「导入后自动解析」的记录 ID 集合（按任务）。
+     *
+     * <p><b>单实例前提</b>：只在内存，重启即失（对应任务已被标 {@code INTERRUPTED}，可重跑）。
+     * 多实例部署时这里必须改为落库，否则 B 实例取不到 A 实例提交的任务范围。
+     * 见批次 16。</p>
      */
     private final Map<String, List<String>> idBatches = new ConcurrentHashMap<>();
 
@@ -399,7 +411,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         int pageNo = 1;
         // 2. 分页循环取数：每页都先看取消位，避免停得慢
         while (true) {
-            if (cancelFlags.contains(id)) {
+            if (cancelFlags.contains(id) || isCancelRequested(id)) {
                 return true;
             }
             Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE), wrapper);
@@ -409,7 +421,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             }
             // 3. 逐条处理
             for (Record r : list) {
-                if (cancelFlags.contains(id)) {
+                if (cancelFlags.contains(id) || isCancelRequested(id)) {
                     return true;
                 }
                 if (processed[0] >= limit) {
@@ -439,14 +451,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 按页大小切块：IN 过长会让 SQL 变慢
         for (int off = 0; off < ids.size(); off += PAGE_SIZE) {
             // 2. 每块开始前看取消位
-            if (cancelFlags.contains(id)) {
+            if (cancelFlags.contains(id) || isCancelRequested(id)) {
                 return true;
             }
             List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
             // 3. 一次批量取回该块，再逐条处理
             List<Record> list = recordMapper.selectBatchIds(chunk);
             for (Record r : list) {
-                if (cancelFlags.contains(id)) {
+                if (cancelFlags.contains(id) || isCancelRequested(id)) {
                     return true;
                 }
                 step(id, r, t, failures, truncated, processed);
@@ -483,6 +495,22 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /** 单条：拼文本 → 抽取 → 归一 → 打词典版本 → 写库（与单条抽取口径一致） */
+    /**
+     * 读 DB 判「是否已请求取消」。
+     *
+     * <p>内存 {@code cancelFlags} 只有本进程可见，多实例下会失效；这里以列为准。</p>
+     * <p>查库失败按<b>未取消</b>：宁可多跑几条，也不因一次抖动中断长任务。</p>
+     */
+    private boolean isCancelRequested(String id) {
+        try {
+            NlpTask t = taskMapper.selectById(id);
+            return t != null && t.getCancelRequested() != null && t.getCancelRequested() == 1;
+        } catch (Exception e) {
+            log.debug("[批解析] 读取消位失败，按未取消处理: {}", e.getMessage());
+            return false;
+        }
+    }
+
     private void processOne(Record r) throws Exception {
         // 1. 拼可抽取文本；空文本直接判失败，不去调抽取服务
         String text = NlpTextComposer.compose(r);
