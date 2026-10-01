@@ -3,7 +3,11 @@ package com.tcm.ehr.common.utils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.domain.dto.SearchDTO;
 import com.tcm.ehr.domain.po.Record;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -95,5 +99,39 @@ class RecordFilterTest {
         String v = RecordFilter.groupIdForSql("");
         assertFalse(v == null || v.isBlank(), "无组必须给哨兵值：" + v);
         assertTrue(v.contains("no_group"), "哨兵值可识别：" + v);
+    }
+
+    @AfterEach
+    void clearRequestContext() {
+        RequestContextHolder.resetRequestAttributes();
+    }
+
+    /** 打开「看全部」：SQL 里<b>不应</b>出现 org_id 条件 */
+    @Test
+    void viewAllAddsNoOrgCondition() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_VIEW_ALL_ORGS, Boolean.TRUE);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+
+        String s = sql("grp-a", new SearchDTO());
+        assertFalse(s.contains("org_id"),
+                "auth.admin-can-view-data=true 时不应按组织过滤：" + s);
+    }
+
+    /**
+     * 开关关掉：回到「按本组织过滤」。
+     *
+     * <p>这条与上一条成对：修复前 {@code viewAllOrgs()} 恒为 false，开关形同虚设，
+     * 管理员被永久锁在自己组织里（实测 1000 条只看得到 500 条）。</p>
+     */
+    @Test
+    void viewAllOffFallsBackToOrgScope() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_VIEW_ALL_ORGS, Boolean.FALSE);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+
+        String s = sql("grp-a", new SearchDTO());
+        assertTrue(s.contains("org_id"),
+                "开关为 false 时应按本组织过滤：" + s);
     }
 }

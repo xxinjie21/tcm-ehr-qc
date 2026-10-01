@@ -37,6 +37,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DictionaryServiceImpl implements IDictionaryService {
 
+    /** 单个词典文件大小上限（字节）。与 Spring multipart.max-file-size 同值（50MB） */
+    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
+
+
     private final IDictionaryFileService fileService;
     private final IEsTermIndexService esTermIndexService;
     private final com.tcm.ehr.service.DictionaryTermStore termStore;
@@ -119,6 +123,15 @@ public class DictionaryServiceImpl implements IDictionaryService {
      */
     public ImportResultVO importDictionary(String type, MultipartFile file) throws IOException {
         List<Map<String, Object>> failures = new ArrayList<>();
+        // 0. 大小防护：Excel 走 WorkbookFactory 全量载入，xlsx 解压后可达压缩体积的
+        //    数十倍，50MB 文件能把堆撑爆并**拖垮整个进程**（不只是这一个请求失败）。
+        //    病历导入侧早有同款上限（RecordServiceImpl.MAX_FILE_BYTES），词典侧此前只判
+        //    isEmpty()，是唯一没设防的 POI 入口 —— 这里补齐，两侧口径一致。
+        //    与 Spring 的 multipart.max-file-size 同为 50MB，不额外收紧既有行为。
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new IllegalArgumentException(
+                    "文件超过 50MB，请拆分后导入（Excel 解析需将整份文件载入内存）");
+        }
         // 1. 按扩展名分流解析：JSON 直传解析，Excel/CSV 走表格解析
         List<TermEntry> incoming = fileName(file).endsWith(".json")
                 ? parseJsonEntries(file, failures)
