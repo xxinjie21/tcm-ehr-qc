@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -53,11 +55,19 @@ class AuthServiceTest {
         groupMapper = Mockito.mock(OrgMapper.class);
         groupMemberMapper = Mockito.mock(OrgMemberMapper.class);
         groupService = Mockito.mock(IOrgService.class);
-        jwtUtil = new JwtUtil();
+        // JwtUtil / AuthServiceImpl 都要 Redis（令牌版本 + 登录失败计数，批次 15）
+        StringRedisTemplate redis = Mockito.mock(StringRedisTemplate.class);
+        ValueOperations<String, String> valueOps = Mockito.mock(ValueOperations.class);
+        Mockito.when(redis.opsForValue()).thenReturn(valueOps);
+        jwtUtil = new JwtUtil(redis);
         ReflectionTestUtils.setField(jwtUtil, "secret",
                 "tcm-ehr-qc-jwt-secret-key-2026-course-design");
         ReflectionTestUtils.setField(jwtUtil, "expireHours", 24L);
-        authService = new AuthServiceImpl(jwtUtil, groupMapper, groupMemberMapper, groupService);
+        authService = new AuthServiceImpl(jwtUtil, groupMapper, groupMemberMapper, groupService, redis);
+        // 登录失败计数读 Redis：默认「无记录」（未锁定）
+        Mockito.when(valueOps.get(Mockito.anyString())).thenReturn(null);
+        ReflectionTestUtils.setField(authService, "loginMaxFail", 5);
+        ReflectionTestUtils.setField(authService, "loginLockMinutes", 15);
         // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置
         ReflectionTestUtils.setField(authService, "baseMapper", userMapper);
         // 默认解析为无组（待分配池）；需要有组的用例再显式覆盖

@@ -68,4 +68,22 @@ public class AuthController {
     public Result<LoginVO> login(@Valid @RequestBody LoginDTO dto) {
         return Result.ok("登录成功", authService.login(dto.getUsername(), dto.getPassword()));
     }
+
+    /**
+     * 退出登录：作废当前用户全部已签发的令牌。
+     *
+     * <p>【权限：登录即可】需要有效 token —— 挂在 {@code /api/auth} 下但
+     * <b>不</b>加入拦截器白名单：白名单里的接口拿不到当前用户，只能凭参数操作，
+     * 登出必须以「你是谁」为前提。</p>
+     *
+     * <p>作废的是<b>该用户的所有</b>令牌（含其它设备上的）：令牌按用户签发，
+     * 做不到只废这一张，而这正是「退出登录」该有的效果。</p>
+     *
+     * @return 固定成功（令牌已失效后前端即可清本地登录态）
+     */
+    @PostMapping("/logout")
+    public Result<Void> logout() {
+        authService.logout(com.tcm.ehr.common.utils.RequestUtils.currentUserId());
+        return Result.ok("已退出登录", null);
+    }
 }

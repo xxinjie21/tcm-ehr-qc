@@ -31,4 +31,18 @@ public interface IAuthService extends IService<User> {
      * @throws IllegalStateException 账号被停用，或所属课题组被停用
      */
     LoginVO login(String username, String password);
+
+    /**
+     * 退出登录：作废该用户全部已签发的令牌。
+     *
+     * <p>JWT 无状态，只清前端 localStorage 的话，那张令牌在有效期内仍能继续用
+     * （复制到别的浏览器照样能调接口）。这里把令牌版本 +1，令牌里的 {@code ver}
+     * 对不上即失效。</p>
+     *
+     * <p>刻意作废<b>全部</b>而不是「仅当前这一张」：用户点退出登录的预期是
+     * 「这台设备别再是登录态」，而令牌是按用户签发的，做不到只废一张。</p>
+     *
+     * @param userId 当前用户 ID
+     */
+    void logout(String userId);
 }

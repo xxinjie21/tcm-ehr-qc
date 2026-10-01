@@ -60,6 +60,7 @@
 </template>
 
 <script setup>
+import { logout as logoutApi } from '@/api/auth'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -122,10 +123,18 @@ const roleLabel = computed(() => {
 })
 const llmVisible = ref(false)
 
-// 退出登录：清除本地登录状态后跳回登录页
-const handleLogout = () => {
-  userStore.logout()
-  router.push('/login')
+// 退出登录：先让服务端作废令牌，再清本地状态并跳回登录页
+// ⚠️ 顺序不能反：本地先清了就拿不到 token，服务端无法作废；
+// 而服务端不通知的话，那张 JWT 在 24h 内仍有效，复制到别的浏览器照样能调接口。
+const handleLogout = async () => {
+  try {
+    await logoutApi()
+  } catch {
+    // 登出接口失败不阻断登出：本地状态照清，否则用户会被困在已登录态
+  } finally {
+    userStore.logout()
+    router.push('/login')
+  }
 }
 </script>
 

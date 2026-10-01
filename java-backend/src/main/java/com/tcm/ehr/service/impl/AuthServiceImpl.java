@@ -20,6 +20,8 @@ import com.tcm.ehr.service.OrgResolution;
 import com.tcm.ehr.service.IAuthService;
 import com.tcm.ehr.service.IOrgService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ import java.util.List;
  * </pre>
  * 混在一起就会出现「是某组组长」这种无法在 users 表上表达的状态。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IAuthService {
@@ -46,6 +49,18 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private final OrgMemberMapper groupMemberMapper;
     private final IOrgService orgService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final org.springframework.data.redis.core.StringRedisTemplate redis;
+
+    /** 登录失败计数的 Redis key 前缀（批次 15） */
+    private static final String LOGIN_FAIL_KEY = "tcm:auth:fail:";
+
+    /** 连续失败达到该次数即锁定 */
+    @Value("${auth.login-max-fail:5}")
+    private int loginMaxFail;
+
+    /** 锁定时长（分钟） */
+    @Value("${auth.login-lock-minutes:15}")
+    private int loginLockMinutes;
 
     /**
      * 管理员菜单（9 项：原 8 项 + 组织管理）。
@@ -122,12 +137,22 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
 
     @Override
     public LoginVO login(String username, String password) {
+        // 0. 暴力破解锁定（批次 15）：达到阈值后直接拒，不去比对密码 —— 否则
+        //    锁定只是「提示变了」，爆破请求照样打到 BCrypt 上（BCrypt 故意慢，
+        //    这正是爆破的瓶颈，挡在这里才有意义）。
+        int locked = lockRemainingSeconds(username);
+        if (locked > 0) {
+            throw new BadCredentialsException("登录失败次数过多，账号已锁定，请 " + (locked / 60) + " 分钟后重试");
+        }
         // 1. 按用户名取用户
         User user = baseMapper.findByUsername(username);
         // 不区分用户不存在与密码错误，避免泄露账号是否存在
         if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
+            recordLoginFailure(username);
             throw new BadCredentialsException("用户名或密码错误");
         }
+        // 1.1 登录成功：清零失败计数
+        clearLoginFailure(username);
         // 2. 账号停用：直接拒登（401，与「密码错误」同类但语义不同：
         //    前端据此清登录态引导重新登录，而不是弹「权限不足」）。
         //    停用是管理动作，不该给出「密码错误」那种模糊提示。
@@ -202,5 +227,81 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             }
         }
         return false;
+    }
+
+    // ---------------------------------------------------------------- 登出
+
+    @Override
+    public void logout(String userId) {
+        // 令牌版本 +1：该用户此前签发的所有令牌立即失效（含其它设备上的）
+        jwtUtil.revokeAll(userId);
+    }
+
+    // ------------------------------------------------------- 登录失败锁定
+
+    /**
+     * 记录一次登录失败；达到阈值即进入锁定。
+     *
+     * <p>用 Redis INCR + 首次设置过期时间：进程内计数在多实例下会各算各的，
+     * 挡不住并发爆破；Redis 是共享的。</p>
+     */
+    private void recordLoginFailure(String username) {
+        if (username == null || username.isBlank()) {
+            return;
+        }
+        try {
+            String key = LOGIN_FAIL_KEY + username;
+            Long n = redis.opsForValue().increment(key);
+            if (n != null && n == 1L) {
+                // 首次失败才设过期：窗口从第一次失败开始滚，而不是每次失败都续命
+                redis.expire(key, loginLockMinutes, java.util.concurrent.TimeUnit.MINUTES);
+            }
+        } catch (Exception e) {
+            // Redis 不可用：不阻断登录。降级为「无锁定」，可用性优先。
+            log.warn("[Auth] 记录登录失败计数失败 username={}: {}", username, e.getMessage());
+        }
+    }
+
+    /** 登录成功：清零失败计数 */
+    private void clearLoginFailure(String username) {
+        if (username == null || username.isBlank()) {
+            return;
+        }
+        try {
+            redis.delete(LOGIN_FAIL_KEY + username);
+        } catch (Exception e) {
+            log.warn("[Auth] 清零登录失败计数失败 username={}: {}", username, e.getMessage());
+        }
+    }
+
+    /**
+     * 剩余锁定秒数；未锁定返回 0。
+     *
+     * <p>Redis 不可用返回 0（不锁定）：与全站其它降级一致 —— 宁可少一层防护，
+     * 也不能让一次 Redis 抖动把所有人挡在门外。</p>
+     */
+    private int lockRemainingSeconds(String username) {
+        if (username == null || username.isBlank()) {
+            return 0;
+        }
+        try {
+            String key = LOGIN_FAIL_KEY + username;
+            String v = redis.opsForValue().get(key);
+            if (v == null) {
+                return 0;
+            }
+            if (Integer.parseInt(v) < loginMaxFail) {
+                return 0;
+            }
+            Long ttl = redis.getExpire(key, java.util.concurrent.TimeUnit.SECONDS);
+            // getExpire 返回 -1=无过期、-2=key 不在；两种都按「锁到窗口结束」处理，
+            // 否则 Redis 里残留的计数会让账号被无限期锁死。
+            if (ttl == null || ttl < 0) {
+                return loginLockMinutes * 60;
+            }
+            return ttl.intValue();
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }

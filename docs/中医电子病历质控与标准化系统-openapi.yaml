@@ -1510,6 +1510,27 @@ paths:
                   data:
                     type: object
                     nullable: true
+  /api/auth/logout:
+    post:
+      tags:
+        - 认证
+      summary: 退出登录
+      description: 【权限：登录即可】作废<b>当前用户全部</b>已签发的 JWT（令牌版本 +1）。只清前端本地状态是不够的 —— 令牌在有效期内仍可被复制到别处继续调用接口。登出后该用户此前所有令牌立即失效，其它设备同时被登出
+      responses:
+        '200':
+          description: 已退出登录
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                    example: 已退出登录
+
   /api/logs:
     get:
       tags:
