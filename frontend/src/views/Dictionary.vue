@@ -71,7 +71,7 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="size"
-        :page-sizes="PAGE_SIZES_LARGE"
+        :page-sizes="PAGE_SIZES_WIDE"
         :total="total"
         layout="total, sizes, prev, pager, next"
         style="margin-top: var(--sp-3); justify-content: flex-end"
@@ -172,7 +172,7 @@ import StatCard from '@/components/StatCard.vue'
 import { getTerms, importDict, rollback, getBackups } from '@/api/dictionary'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
-import { PAGE_SIZES, PAGE_SIZES_LARGE } from '@/utils/constants'
+import { PAGE_SIZES_WIDE } from '@/utils/constants'
 
 const userStore = useUserStore()
 // 术语词典写入入口（导入/回滚）：管理员 / 所有者 / 被授权成员三档；
@@ -203,9 +203,9 @@ const typeLabel = computed(() => TYPE_LABELS[activeTab.value])
 const keyword = ref('')
 const terms = ref([])
 const loadingTerms = ref(false)
-/** 词条查询失败：与「确实没有匹配」区分开 */
+// 词条查询失败：与「确实没有匹配」区分开
 const termsFailed = ref(false)
-/** 分页：page 从 1 起，size 为每页条数，total 为命中总数（驱动 el-pagination 算总页数） */
+// 分页：page 从 1 起，size 为每页条数，total 为命中总数（驱动 el-pagination 算总页数）
 const page = ref(1)
 const size = ref(20)
 const total = ref(0)
@@ -242,7 +242,7 @@ const loadTerms = async (resetPage = true) => {
   }
 }
 
-/** 每页条数变化：回到第 1 页再查，否则会停在一个已越界的旧页码上 */
+// 每页条数变化：回到第 1 页再查，否则会停在一个已越界的旧页码上
 const handleSizeChange = () => {
   page.value = 1
   loadTerms(false)
@@ -270,7 +270,7 @@ const importResult = ref(null)
 const MAX_FILE_MB = 50
 const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.json']
 
-/** 预校验扩展名与大小，不合格直接剔除并说明原因*/
+// 预校验扩展名与大小，不合格直接剔除并说明原因
 const rejectFile = (raw, reason) => {
   ElMessage.error(`「${raw.name}」${reason}`)
   dictFileList.value = []
@@ -302,7 +302,7 @@ const onFileRemove = () => {
   importFile.value = null
 }
 
-/** limit=1 时再次选择会走这里；主动替换旧文件，避免「换了文件却没反应」*/
+// limit=1 时再次选择会走这里；主动替换旧文件，避免「换了文件却没反应」
 const onFileExceed = (files) => {
   // 1. 先清空旧文件：上传列表与待提交引用都要清，避免提交到上一个文件
   const file = files[0]
@@ -316,7 +316,7 @@ const onFileExceed = (files) => {
   }
 }
 
-/** 统一入口：二次确认后覆盖式入库 */
+// 统一入口：二次确认后覆盖式入库
 const handleImport = async () => {
   // 1. 没有待提交文件就直接返回
   if (!importFile.value) return
@@ -334,7 +334,7 @@ const handleImport = async () => {
   }
 }
 
-/** 真正入库：Excel / CSV / JSON 直传覆盖写入 */
+// 真正入库：Excel / CSV / JSON 直传覆盖写入
 const doImport = async (file) => {
   // 1. 置导入态：按钮 loading，避免重复提交
   importing.value = true
@@ -363,10 +363,10 @@ const doImport = async (file) => {
 
 // 版本回滚数据
 const backups = ref([])
-/** 历史版本读取失败：与「确实没有备份」区分开 */
+// 历史版本读取失败：与「确实没有备份」区分开
 const backupsFailed = ref(false)
 
-/** 较当前增减：正=备份比现在多，负=少，0=一致 */
+// 较当前增减：正=备份比现在多，负=少，0=一致
 const deltaText = (d) => {
   const n = Number(d)
   if (Number.isNaN(n)) return '—'

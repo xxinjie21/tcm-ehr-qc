@@ -59,7 +59,7 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
-        :page-sizes="PAGE_SIZES"
+        :page-sizes="PAGE_SIZES_STANDARD"
         :total="total"
         layout="total, sizes, prev, pager, next"
         style="margin-top: var(--sp-3); justify-content: flex-end"
@@ -357,7 +357,8 @@
                   <el-button v-if="isActive(row)" link type="danger" @click="cancelBatch(row.id)">取消</el-button>
                   <template v-else>
                     <el-button link type="primary" @click="viewTask(row.id)">查看</el-button>
-                    <el-button link type="primary" @click="rerun">按当前范围重新提交</el-button>
+                    <!-- 与「开始批量解析」同一条路径：按当前表单范围重新提交，不是重跑那一条任务 -->
+      <el-button link type="primary" @click="submitBatch">按当前范围重新提交</el-button>
                   </template>
                 </template>
               </el-table-column>
@@ -389,7 +390,7 @@ import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
 import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
 import { confirmBox } from '@/utils/confirm'
-import { PAGE_SIZES } from '@/utils/constants'
+import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 const activeTab = ref('single')
 
@@ -400,7 +401,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const listLoading = ref(false)
-/** 列表加载失败：与「确实没有匹配」区分开（三态统一） */
+// 列表加载失败：与「确实没有匹配」区分开（三态统一）
 const listFailed = ref(false)
 
 // 查询病历列表（分页 / 筛选 / 重试共用）：传数字即跳到该页；失败置 listFailed 与「确实没有匹配」区分，toast 由拦截器出
@@ -448,9 +449,9 @@ const resetFilters = () => {
 }
 
 const recordId = ref('')
-/** 已载入病历的展示标识（优先登记号），保存确认与成功提示都要回显它*/
+// 已载入病历的展示标识（优先登记号），保存确认与成功提示都要回显它
 const loadedLabel = ref('')
-/** 病历基本信息（只读）：给出上下文，但不参与抽取 */
+// 病历基本信息（只读）：给出上下文，但不参与抽取
 const loadedMeta = ref('')
 
 // 高亮当前已载入病历所在行，方便在列表里定位（样式见 .row-active）
@@ -499,7 +500,7 @@ const groupFields = (group) => group.keys.map((k) => ({ key: k, ...FIELD_LABELS[
 const emptyFields = () => ALL_KEYS.reduce((o, k) => ({ ...o, [k]: '' }), {})
 const fields = reactive(emptyFields())
 
-/** 抽取请求的文本：字段拼接，分隔符与后端既有口径一致（后端接口不变） */
+// 抽取请求的文本：字段拼接，分隔符与后端既有口径一致（后端接口不变）
 const composedText = computed(() => ALL_KEYS
   .map((k) => fields[k])
   .filter((s) => s && String(s).trim())
@@ -521,7 +522,7 @@ const extractError = ref('')
 // 可写回的前提：既载入了病历、又有抽取结果；两者缺一即禁用保存并给出对应提示
 const canSave = computed(() => !!recordId.value && !!result.value)
 
-/** 载入一份病历：换病历时必须清空上一次抽取结果，否则会把 A 的结果存进 B*/
+// 载入一份病历：换病历时必须清空上一次抽取结果，否则会把 A 的结果存进 B
 const loadRecord = async (row) => {
   // 1. 无有效行号直接返回，避免拿空 id 发请求
   if (!row?.id) return
@@ -556,7 +557,7 @@ const loadRecord = async (row) => {
   }
 }
 
-/** 关闭详情：清空当前病历与抽取结果，列表常驻可见 */
+// 关闭详情：清空当前病历与抽取结果，列表常驻可见
 const closeDetail = () => {
   recordId.value = ''
   loadedLabel.value = ''
@@ -629,7 +630,7 @@ const emptyReason = computed(() => {
   return r.modelAvailable ? 'NO_ENTITY' : 'UNKNOWN'
 })
 
-/** 结果来源标注：按原因各说一句，避免把「服务连不上」也说成「未开启」 */
+// 结果来源标注：按原因各说一句，避免把「服务连不上」也说成「未开启」
 const sourceNote = computed(() => {
   const r = result.value
   if (!r) return ''
@@ -649,7 +650,7 @@ const sourceNote = computed(() => {
 const normStat = computed(() => summarizeNorm(result.value))
 
 // ===== 术语归一试算=====
-/** 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射 */
+// 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射
 const NORM_TYPES = [
   { value: 'disease', label: '疾病' },
   { value: 'pattern', label: '证候' },
@@ -662,7 +663,7 @@ const normTerm = ref('')
 const normLoading = ref(false)
 const normResult = ref(null)
 
-/** 直接查词典归一（POST /api/governance/normalize），不经过 Python NLP 服务 */
+// 直接查词典归一（POST /api/governance/normalize），不经过 Python NLP 服务
 const runNormalize = async () => {
   // 1. 取词去空白，为空直接返回不发请求
   const term = normTerm.value.trim()
@@ -715,7 +716,7 @@ const userStore = useUserStore()
 const batchLimit = ref(40000)
 const batchMode = ref('all')
 const submitting = ref(false)
-/** 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选 */
+// 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选
 const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const activeTask = ref(null)
 const batchTasks = ref([])
@@ -725,7 +726,7 @@ const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
 // 任务是否仍在跑（排队 / 进行中）：决定是否显示取消按钮、是否继续轮询
 const isActive = (t) => !!t && ACTIVE_STATUS.includes(t.status)
 
-/** 状态文案：一句一个事实，精确到数字/原因 */
+// 状态文案：一句一个事实，精确到数字/原因
 const statusText = (t) => {
   if (!t) return ''
   switch (t.status) {
@@ -895,9 +896,6 @@ const viewTask = async (id) => {
     // 拦截器已提示
   }
 }
-
-// 与「开始批量解析」同一条路径：按**当前表单范围**重新提交，不是重跑那一条任务
-const rerun = () => submitBatch()
 
 onMounted(() => {
   search(1)

@@ -9,8 +9,12 @@ const request = axios.create({
 })
 
 request.interceptors.request.use((config) => {
-  // 1. 取本地登录 token
-  const token = localStorage.getItem('token')
+  // 1. token 统一从 user store 取，不直接读 localStorage ——
+  //    stores/user.js 是 token 的唯一写入方，这里再读一次 localStorage 就是第二份读源：
+  //    两者一旦不一致（store 已 logout、localStorage 还没清），请求会带着已注销的 token 发出，
+  //    表现为「明明退出登录了还报 401」。
+  //    依赖方向：request.js -> stores/user.js（user.js 不 import request.js，无环）。
+  const token = useUserStore().token
   // 2. 有 token 则注入 Authorization 请求头
   if (token) {
     config.headers.Authorization = `Bearer ${token}`

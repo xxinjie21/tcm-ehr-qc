@@ -101,9 +101,9 @@ const list = (key) => {
 // 9 类要素是否至少有一类非空 —— 决定渲染实体列表还是空态
 const hasAny = computed(() => sections.some((s) => list(s.key).length > 0))
 
-/** 词典版本元信息（落库时打点，见 StructuredDataMeta）；旧数据没有则为空、不展示 */
+// 词典版本元信息（落库时打点，见 StructuredDataMeta）；旧数据没有则为空、不展示
 const dictVersion = computed(() => parsed.value?._meta?.dictVersion || '')
-/** 词典采集时间（与 dictVersion 同一处 _meta 打点）；旧数据没有则空串、不展示 */
+// 词典采集时间（与 dictVersion 同一处 _meta 打点）；旧数据没有则空串、不展示
 const dictCapturedAt = computed(() => parsed.value?._meta?.dictCapturedAt || '')
 
 /**
@@ -113,20 +113,20 @@ const dictCapturedAt = computed(() => parsed.value?._meta?.dictCapturedAt || '')
  * 反之为「有数据但 9 类都空」，即抽取执行过、只是没识别出要素。</p>
  */
 const neverParsed = computed(() => parsed.value === null)
-/** 空态标题：按 neverParsed 区分「尚未抽取」与「已抽取但无要素」 */
+// 空态标题：按 neverParsed 区分「尚未抽取」与「已抽取但无要素」
 const emptyTitle = computed(() => (neverParsed.value ? '尚未抽取标准化数据' : '已抽取，但没有识别出要素'))
-/** 空态副文案：给出与标题对应的下一步动作（去执行抽取 / 无需处理） */
+// 空态副文案：给出与标题对应的下一步动作（去执行抽取 / 无需处理）
 const emptyHint = computed(() => (neverParsed.value
   ? '这份病历还没有跑过结构化抽取。可在「结构化解析」页载入该病历后点「执行抽取」，结果会写入这里。'
   : '抽取已经执行过，只是这段原文里没有可归一的要素（疾病 / 症状 / 证候 / 方剂 / 中药等）。'))
 
-/** 实体上的归一标签文案：命中方式；未命中说「未收录」 */
+// 实体上的归一标签文案：命中方式；未命中说「未收录」
 const lvText = (it) => (it.normLevel ? LEVEL_SHORT[it.normLevel] || it.normLevel : LEVEL_UNMATCHED)
 /** 描边颜色：命中按精确度分三级，未收录走中性灰 —— 灰的是「没查到」，
     红黄是「查到了但可能不准」，两者不该同色 */
 const lvClass = (it) => (it.normLevel ? `lv${it.normLevel}` : 'lv0')
 
-/** 悬停标题：「原文 → 标准词」，未命中/无词典时只说实体本身 */
+// 悬停标题：「原文 → 标准词」，未命中/无词典时只说实体本身
 const tpTitle = (sec, it) => {
   const name = entityName(sec, it)
   const raw = it.sourceText
@@ -167,14 +167,14 @@ const tpRows = (sec, it) => {
   return rows
 }
 
-/** 来源行：模型抽取带置信度；规则兜底是确定性匹配，没有置信度可言 */
+// 来源行：模型抽取带置信度；规则兜底是确定性匹配，没有置信度可言
 const sourceLine = (it) => {
   if (it.source === 'rule') return '规则兜底（确定性匹配，没有置信度）'
   const c = pct(it.confidence)
   return c ? `模型抽取 · 置信 ${c}` : '模型抽取'
 }
 
-/** 把「精确/包含/模糊」翻成「跟谁比、怎么比上的」 */
+// 把「精确/包含/模糊」翻成「跟谁比、怎么比上的」
 const levelDesc = (level, raw, name) => {
   const src = raw || name
   if (level === 1) return `原文「${src}」与词典里的标准词或别名完全一致`

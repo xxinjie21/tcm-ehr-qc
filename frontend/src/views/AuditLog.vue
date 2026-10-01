@@ -56,7 +56,7 @@
       <el-pagination
         v-model:current-page="query.page"
         v-model:page-size="query.pageSize"
-        :page-sizes="PAGE_SIZES"
+        :page-sizes="PAGE_SIZES_STANDARD"
         :total="total"
         layout="total, sizes, prev, pager, next"
         style="margin-top: var(--sp-3); justify-content: flex-end"
@@ -76,10 +76,10 @@ import PanelCard from '@/components/PanelCard.vue'
 import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 import { fmtDateTime } from '@/utils/format'
-import { PAGE_SIZES } from '@/utils/constants'
+import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 import { useUserStore } from '@/stores/user'
 
-/** 图例配色；具体选项由后端返回，未匹配到的走默认色 */
+// 图例配色；具体选项由后端返回，未匹配到的走默认色
 const TAG_TYPES = {
   数据清洗: 'warning',
   数据集导出: 'primary',
@@ -167,7 +167,7 @@ const loadLogs = async () => {
   }
 }
 
-/** 每页条数变化回到第 1 页*/
+// 每页条数变化回到第 1 页
 const handleSizeChange = () => {
   query.page = 1
   loadLogs()

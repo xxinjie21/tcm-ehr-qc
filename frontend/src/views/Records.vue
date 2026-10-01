@@ -74,7 +74,7 @@
           <el-pagination
             v-model:current-page="page"
             v-model:page-size="pageSize"
-            :page-sizes="PAGE_SIZES"
+            :page-sizes="PAGE_SIZES_STANDARD"
             :total="total"
             layout="total, sizes, prev, pager, next"
             style="margin-top: var(--sp-3); justify-content: flex-end"
@@ -242,7 +242,7 @@ import { useAiContextStore } from '@/stores/ai'
 import { fieldsWithWide } from '@/utils/recordFields'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
-import { PAGE_SIZES } from '@/utils/constants'
+import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 const aiStore = useAiContextStore()
 
@@ -285,7 +285,7 @@ const groupFields = (group) => GROUP_FIELDS.get(group) || []
 
 // ===== F·7.4 查询 =====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
-/** 范围删除要求至少一个筛选条件（与后端一致，防误删全库） */
+// 范围删除要求至少一个筛选条件（与后端一致，防误删全库）
 const hasFilter = computed(() => {
   const r = query.dateRange
   const range = Array.isArray(r) && r.length === 2 && r[0] && r[1]
@@ -296,7 +296,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const searching = ref(false)
-/** 列表加载失败：与「确实没有匹配」区分开（三态统一） */
+// 列表加载失败：与「确实没有匹配」区分开（三态统一）
 const listFailed = ref(false)
 
 // 查询列表：按当前筛选条件 + 分页参数请求，成功后覆盖表格数据与总数；
@@ -327,7 +327,7 @@ const handleSearch = async () => {
   }
 }
 
-/** 每页条数变化回到第 1 页*/
+// 每页条数变化回到第 1 页
 const handleSizeChange = () => {
   page.value = 1
   handleSearch()
@@ -351,7 +351,7 @@ const raw = ref(null)
 const detailVisible = ref(false)
 const activeId = ref('')
 
-/** 当前查看行高亮，便于在长表里对上号 */
+// 当前查看行高亮，便于在长表里对上号
 const rowClass = ({ row }) => (row.id === activeId.value ? 'row-active' : '')
 
 // 打开详情弹窗：按 id 回查原始病历（列表行只有摘要，完整字段不在列表数据里），
@@ -373,7 +373,7 @@ const openDetail = async (id) => {
   }
 }
 
-/** 只收起弹窗、保留 raw：否则关闭动画期间内容会闪空*/
+// 只收起弹窗、保留 raw：否则关闭动画期间内容会闪空
 const closeDetail = () => {
   detailVisible.value = false
 }
@@ -406,7 +406,7 @@ const handleDelete = async (id) => {
   }
 }
 
-/** 批量删除：表格多选 → 一次提交 ids */
+// 批量删除：表格多选 → 一次提交 ids
 const tableRef = ref(null)
 const selectedIds = ref([])
 // 表格多选变化：只收敛成 id 数组供批量删除提交；表格自身的选中态由 clearSelection 复位
@@ -446,7 +446,7 @@ const handleBatchDelete = async () => {
   }
 }
 
-/** 按当前筛选范围删除全部匹配病历（前端先取条数确认，后端再按要求删） */
+// 按当前筛选范围删除全部匹配病历（前端先取条数确认，后端再按要求删）
 const handleRangeDelete = async () => {
   // 1. 没有筛选条件不允许范围删除（防误删全库）
   if (!hasFilter.value) {
@@ -494,7 +494,7 @@ const handleRangeDelete = async () => {
 // ===== F·7.1 导入 =====
 const MAX_FILE_MB = 50
 const fileList = ref([])
-/** 导入后自动结构化解析（默认关；需抽取服务已开启） */
+// 导入后自动结构化解析（默认关；需抽取服务已开启）
 const autoExtract = ref(false)
 const importing = ref(false)
 const summary = ref(null)
@@ -508,7 +508,7 @@ const cancelled = ref(false)
 // 不显式提示用户会以为文件没被选中是卡住了
 const onExceed = () => ElMessage.warning('单次最多上传 20 个文件')
 
-/** 前端预校验：类型与大小不合法直接剔除，不用等服务端返回*/
+// 前端预校验：类型与大小不合法直接剔除，不用等服务端返回
 const onFileChange = (file, list) => {
   // 1. 取原始 File 对象，没有就跳过（如已有文件的回显）
   const raw = file.raw
@@ -583,7 +583,7 @@ const handleImport = async () => {
   }
 }
 
-/** 取消：当前文件完成后不再提交后续文件，已入库的不回滚 */
+// 取消：当前文件完成后不再提交后续文件，已入库的不回滚
 /**
  * 复位导入态：清空上次结果与失败态、把逐文件进度归零（P3.4 从 handleImport 抽出）
  */
@@ -632,7 +632,7 @@ const form = reactive(emptyForm())
 const creating = ref(false)
 const createFormRef = ref(null)
 
-/** 字段级校验：必填口径 + 数值范围 + 枚举 + 长度上限 */
+// 字段级校验：必填口径 + 数值范围 + 枚举 + 长度上限
 const FORM_RULES = {
   registrationNo: [
     { required: true, message: '登记号不能为空', trigger: 'blur' },

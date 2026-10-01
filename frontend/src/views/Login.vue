@@ -73,7 +73,7 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
-/** 只接受站内路径，避免 ?redirect= 被用作开放重定向*/
+// 只接受站内路径，避免 ?redirect= 被用作开放重定向
 const safeRedirect = () => {
   const target = route.query.redirect
   return typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')

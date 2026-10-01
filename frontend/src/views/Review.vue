@@ -57,7 +57,7 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
-        :page-sizes="PAGE_SIZES"
+        :page-sizes="PAGE_SIZES_STANDARD"
         :total="total"
         layout="total, sizes, prev, pager, next"
         style="margin-top: var(--sp-3); justify-content: flex-end"
@@ -218,7 +218,7 @@ import { aiReview } from '@/api/ai'
 import { qcScore, getQcRules } from '@/api/qc'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { fieldsWithWide } from '@/utils/recordFields'
-import { PAGE_SIZES } from '@/utils/constants'
+import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 // 字段定义收敛到 @/utils/recordFields（P3.5）；复核列表的整行集合
 const FIELDS = fieldsWithWide([
@@ -242,7 +242,7 @@ const COMPARE_FIELDS = [
   { key: 'causeList', label: '病因', termType: '' }
 ]
 
-/** 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算（核心 6 要素，取自规则集目录） */
+// 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算（核心 6 要素，取自规则集目录）
 const FIELD_BY_ITEM = {
   疾病: 'diseases',
   症状: 'symptoms',
@@ -401,7 +401,7 @@ const fillEditors = (sd) => {
   originalMap.value = map
 }
 
-/** 字段级表单 → structuredData；原存在的术语沿用原文溯源 sourceText */
+// 字段级表单 → structuredData；原存在的术语沿用原文溯源 sourceText
 const buildCorrected = () => {
   // 1. 结果对象从空开始，逐字段组装
   const out = {}
@@ -495,7 +495,7 @@ const openReview = async (row) => {
   }
 }
 
-/** 退出详情：收起任务卡 / 原文 / 对照区，保留提交反馈条 */
+// 退出详情：收起任务卡 / 原文 / 对照区，保留提交反馈条
 const exitDetail = () => {
   current.value = null
   record.value = null
@@ -507,7 +507,7 @@ const exitDetail = () => {
   originalMap.value = {}
 }
 
-/** 关闭详情：连提交反馈一起收起，回到纯任务列表*/
+// 关闭详情：连提交反馈一起收起，回到纯任务列表
 const closeReview = () => {
   exitDetail()
   result.value = null
@@ -542,7 +542,7 @@ const submit = async (withCorrection) => {
   }
 }
 
-/** 取后端分级阈值（GET /api/qc/rules 是「登录即可」，所有登录用户都能调）；取不到就沿用兜底值 */
+// 取后端分级阈值（GET /api/qc/rules 是「登录即可」，所有登录用户都能调）；取不到就沿用兜底值
 const loadThresholds = async () => {
   try {
     // 1. 取后端分级规则

@@ -39,27 +39,27 @@ export function leaveGroup(orgId) {
 
 // ---- 批次 6：自助创建 / 成员搜索 / 授权开关 / 归档 / 改派 ----
 
-/** 自助创建组织：创建者自动成为所有者，无审核 */
+// 自助创建组织：创建者自动成为所有者，无审核
 export function createOrg(body) {
   return request.post('/orgs', body)
 }
 
-/** 按用户名搜索可拉入的人（后端只回 id 与 username，关键词至少 2 字符） */
+// 按用户名搜索可拉入的人（后端只回 id 与 username，关键词至少 2 字符）
 export function searchUsers(keyword) {
   return request.get('/orgs/users', { params: { keyword } })
 }
 
-/** 授予 / 回收成员的两个写开关（null = 该位不改） */
+// 授予 / 回收成员的两个写开关（null = 该位不改）
 export function setPermissions(orgId, userId, body) {
   return request.put(`/orgs/${orgId}/members/${userId}/permissions`, body)
 }
 
-/** 归档组织（仅管理员，前提成员数为 0） */
+// 归档组织（仅管理员，前提成员数为 0）
 export function archiveOrg(id, reason) {
   return request.post(`/orgs/${id}/archive`, { reason })
 }
 
-/** 改派所有者（仅管理员，owner 账号丢失时的兜底） */
+// 改派所有者（仅管理员，owner 账号丢失时的兜底）
 export function reassignOwner(id, newOwnerUserId) {
   return request.post(`/orgs/${id}/reassign-owner`, { newOwnerUserId })
 }

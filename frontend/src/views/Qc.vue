@@ -265,7 +265,7 @@
       <el-pagination
         v-model:current-page="precheckPage"
         v-model:page-size="precheckSize"
-        :page-sizes="PAGE_SIZES"
+        :page-sizes="PAGE_SIZES_STANDARD"
         :total="precheckTotal"
         layout="total, sizes, prev, pager, next"
         style="margin-top: var(--sp-3); justify-content: flex-end"
@@ -343,7 +343,7 @@ import { searchRecords } from '@/api/records'
 import { getTerms } from '@/api/dictionary'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
-import { PAGE_SIZES } from '@/utils/constants'
+import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 // 规则写入口按 admin / owner / 授权成员 三档判定（与后端 qc/rules 写接口一致）
 const userStore = useUserStore()
@@ -381,7 +381,7 @@ const loadRules = async () => {
   }
 }
 
-/** 标准里的合格线（未加载时退回 90） */
+// 标准里的合格线（未加载时退回 90）
 const qualified = computed(() => rules.value?.thresholds?.qualified ?? 90)
 // 分级 → 样式类：合格 / 无效各一色，其余（待复核）走中性色
 const gradeClass = (g) => (g === '合格' ? 'is-ok' : g === '无效' ? 'is-bad' : 'is-mid')
@@ -408,7 +408,7 @@ const maxDeductPoints = computed(
   () => Math.max(1, ...(dedStats.value?.byType || []).map((t) => t.points))
 )
 
-/** 条形宽度：按最大扣分点数归一 */
+// 条形宽度：按最大扣分点数归一
 const barWidth = (points) => Math.round((points / maxDeductPoints.value) * 100) + '%' 
 
 // 组装接口参数：dateRange 是 [起, 止] 两元素数组，缺任一个都视为未选
@@ -429,7 +429,7 @@ const params = () => {
 // 规则配置弹窗状态
 const rulesVisible = ref(false)
 const savingRules = ref(false)
-/** 各词典类型的标准词（供一致性"期望值"下拉，仅从词典选） */
+// 各词典类型的标准词（供一致性"期望值"下拉，仅从词典选）
 const dictTerms = ref({})
 // 编辑用的表单副本：由 rules 克隆而来，保存时才组装回写服务端
 const form = reactive({
@@ -512,7 +512,7 @@ const openRules = async () => {
 }
 
 // 按 field 查一条格式规则
-/** 格式：模板勾选即用（无需写正则）；非模板项作为历史自定义规则展示 */
+// 格式：模板勾选即用（无需写正则）；非模板项作为历史自定义规则展示
 // 格式规则按 field 建索引：fmtOf 在模板里每行调 3 次，
 // 原来是每次都 Array.find 一遍 form.format，行数一多就是 N×3×M。
 const fmtMap = computed(() => {
@@ -611,7 +611,7 @@ const buildRulesPayload = () => {
   }
 }
 
-/** 保存成功后就地刷新标准与说明（P3.4 从 saveRules 抽出） */
+// 保存成功后就地刷新标准与说明（P3.4 从 saveRules 抽出）
 const applyRules = (res) => {
   rules.value = res.data?.rules || rules.value
   descriptions.value = res.data?.descriptions || descriptions.value
@@ -647,7 +647,7 @@ const precheckTotal = ref(0)
 const precheckPage = ref(1)
 const precheckSize = ref(10)
 const precheckLoading = ref(false)
-/** 预检列表加载失败：与「范围内确实没有病历」区分开（三态统一） */
+// 预检列表加载失败：与「范围内确实没有病历」区分开（三态统一）
 const precheckFailed = ref(false)
 
 // 加载预检列表；传数字即跳到该页
@@ -686,7 +686,7 @@ const handleSizeChange = () => {
   loadPrecheck()
 }
 
-/** 查询按钮 loading：两块数据任意一块在加载就转（范围查询是整页口径，刷新时各块必须一起走） */
+// 查询按钮 loading：两块数据任意一块在加载就转（范围查询是整页口径，刷新时各块必须一起走）
 const queryLoading = computed(() => precheckLoading.value || dedLoading.value)
 // 应用筛选：两块一起刷新（整页口径）
 const applyFilters = () => {
@@ -706,22 +706,22 @@ const resetFilters = () => {
 // 重算已从「同步等结果」改为「提交拿 taskId → 2s 轮询进度 → 终态提示分级汇总」。
 // 同步跑 40000 条会把请求挂到超时，用户关页面任务也还在跑；异步后可以离开再回来。
 const recomputing = ref(false)
-/** 当前任务进度：{ done, total, status, ... }，用于按钮上的进度文案 */
+// 当前任务进度：{ done, total, status, ... }，用于按钮上的进度文案
 const recomputeProgress = ref(null)
-/** 轮询句柄；null 表示当前没有在轮询 */
+// 轮询句柄；null 表示当前没有在轮询
 let pollTimer = null
 
-/** 终态判定：不再变化的状态 */
+// 终态判定：不再变化的状态
 const isActiveTask = (t) => !!t && (t.status === 'QUEUED' || t.status === 'RUNNING')
 
-/** 按钮文案：运行中显示进度，终态回到常态 */
+// 按钮文案：运行中显示进度，终态回到常态
 const recomputeButtonText = computed(() => {
   const t = recomputeProgress.value
   if (!isActiveTask(t)) return '质控评分计算'
   return t.status === 'QUEUED' ? '重算排队中…' : `重算中 ${t.done} / ${t.total}…`
 })
 
-/** 停掉轮询并清空句柄，防止重复启动或组件卸载后继续发请求 */
+// 停掉轮询并清空句柄，防止重复启动或组件卸载后继续发请求
 const stopPoll = () => {
   if (pollTimer) {
     clearTimeout(pollTimer)
@@ -729,7 +729,7 @@ const stopPoll = () => {
   }
 }
 
-/** 进度轮询：2s 一次（与 NlpExtract 的批量解析同频率），终态自动停 */
+// 进度轮询：2s 一次（与 NlpExtract 的批量解析同频率），终态自动停
 const pollTask = async (id) => {
   try {
     const res = await getQcBatch(id)
@@ -794,7 +794,7 @@ const detail = ref(null)
 const detailVisible = ref(false)
 
 // 扣分合计：弹窗里直接给出，省得用户在长表里自己加
-/** 扣分合计：两栏弹窗里直接给出，省得用户在长表里自己加*/
+// 扣分合计：两栏弹窗里直接给出，省得用户在长表里自己加
 const detailTotal = computed(() =>
   (detail.value?.deductions || []).reduce((s, d) => s + (d.points || 0), 0)
 )

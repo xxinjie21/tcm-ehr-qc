@@ -98,7 +98,7 @@ const ballRef = ref(null)
 const inputRef = ref(null)
 const bodyRef = ref(null)
 
-/** 多轮消息（本会话；刷新即清空） */
+// 多轮消息（本会话；刷新即清空）
 const messages = ref([])
 const draft = ref('')
 const loading = ref(false)

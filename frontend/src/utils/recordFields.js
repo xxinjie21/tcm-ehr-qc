@@ -11,7 +11,7 @@
  *   {@link fieldsWithWide} 声明自己要哪些字段占整行，不放进本表
  */
 
-/** 病历 21 原始字段（含表单属性 max / multi） */
+// 病历 21 原始字段（含表单属性 max / multi）
 export const RECORD_FIELDS = [
   { key: 'registrationNo', label: '登记号', max: 50 },
   { key: 'outpatientNo', label: '门诊号', max: 50 },

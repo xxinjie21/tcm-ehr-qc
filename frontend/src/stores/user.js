@@ -25,10 +25,10 @@ export const useUserStore = defineStore('user', {
     isAdmin: (s) => s.role === '管理员',
     hasOrg: (s) => !!s.orgId && s.orgId !== '',
     isOrgOwner: (s) => s.orgRole === 'owner',
-    /** 词典写入口：管理员 / 所有者 / 被授权成员 */
+    // 词典写入口：管理员 / 所有者 / 被授权成员
     canWriteDictionaryEntry: (s) =>
       s.role === '管理员' || s.orgRole === 'owner' || s.canWriteDictionary,
-    /** 质控规则写入口：管理员 / 所有者 / 被授权成员 */
+    // 质控规则写入口：管理员 / 所有者 / 被授权成员
     canWriteQcRulesEntry: (s) =>
       s.role === '管理员' || s.orgRole === 'owner' || s.canWriteQcRules
   },

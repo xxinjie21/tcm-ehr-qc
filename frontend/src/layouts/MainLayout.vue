@@ -98,7 +98,7 @@ const menuGroups = computed(() => {
     .filter((group) => group.items.length > 0)
 })
 
-/** 面包屑：所属分组 + 当前页标题；无 meta.title 的页面不渲染 */
+// 面包屑：所属分组 + 当前页标题；无 meta.title 的页面不渲染
 const breadcrumb = computed(() => {
   const title = route.meta?.title
   if (!title) return []
@@ -113,7 +113,7 @@ const breadcrumb = computed(() => {
  * 所以这里不能再按管理员隐藏，否则普通用户没有入口去配自己的模型。</p>
  */
 const isAdmin = computed(() => userStore.role === '管理员')
-/** 身份下标：管理员 / 所有者 / 成员 / 未加入组织 */
+// 身份下标：管理员 / 所有者 / 成员 / 未加入组织
 const roleLabel = computed(() => {
   if (userStore.role === '管理员') return '管理员'
   if (userStore.orgRole === 'owner') return '所有者'

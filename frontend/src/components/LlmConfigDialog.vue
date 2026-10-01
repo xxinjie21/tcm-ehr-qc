@@ -125,7 +125,7 @@ import { ElMessage } from 'element-plus'
 import { getLlmConfig, updateLlmConfig, testLlmConfig } from '@/api/llm'
 import { apiErrorMessage } from '@/utils/request'
 
-/** 常用模型（可选择或手输；避免用户不知道填什么） */
+// 常用模型（可选择或手输；避免用户不知道填什么）
 const MODEL_OPTIONS = {
   ollama: ['qwen2.5:7b', 'qwen2.5:14b', 'llama3.1', 'deepseek-r1:7b'],
   openai: ['deepseek-chat', 'deepseek-reasoner', 'gpt-4o-mini', 'qwen-plus', 'glm-4', 'moonshot-v1-8k']
@@ -138,7 +138,7 @@ const emit = defineEmits(['saved'])
 // loading 覆盖整个表单区（读配置时）；saving / testing 分别驱动对应按钮
 const loading = ref(false)
 const saving = ref(false)
-/** 读配置失败 / 保存失败 —— 都不该让表单停在上一次的值而不说明 */
+// 读配置失败 / 保存失败 —— 都不该让表单停在上一次的值而不说明
 const loadFailed = ref(false)
 const saveFailed = ref(false)
 // testing 驱动「测试连接」按钮的 loading；testResult 为 null 表示尚未探测
@@ -163,7 +163,7 @@ const form = reactive({
   timeout: 60000
 })
 
-/** 下拉候选：按当前通道给常用模型 */
+// 下拉候选：按当前通道给常用模型
 const modelOptions = computed(() => MODEL_OPTIONS[form.provider] || MODEL_OPTIONS.openai)
 
 // 每次打开弹窗都重读服务端配置，保证表单反映的是当前生效值
