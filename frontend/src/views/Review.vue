@@ -167,7 +167,7 @@
             </div>
 
             <div class="preview">
-              复核后预估评分：<b>{{ estimate.score }}</b> 分　预计分级：<span class="tag-ok">{{ estimate.grade }}</span>
+              复核后预估评分：<b>{{ estimate.score }}</b> 分　预计分级：<span v-if="estimate.grade" :class="['tag', gradeClass(estimate.grade)]">{{ estimate.grade }}</span><span v-else class="tag is-mid">{{ THRESHOLD_PLACEHOLDER }}</span><span v-if="estimate.hint" class="tip">（{{ estimate.hint }}）</span>
               <span class="est-note">（按已补齐的核心字段扣分回算，最终以服务端重算为准）</span>
             </div>
           </div>
@@ -219,6 +219,7 @@ import { qcScore, getQcRules } from '@/api/qc'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { fieldsWithWide } from '@/utils/recordFields'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
+import { gradeOf, gradeHint, gradeClass, THRESHOLD_PLACEHOLDER } from '@/utils/grade'
 
 // 字段定义收敛到 @/utils/recordFields（P3.5）；复核列表的整行集合
 const FIELDS = fieldsWithWide([
@@ -432,7 +433,10 @@ const buildCorrected = () => {
  * 原来的写法是把 90 / 60 直接写在判级那行，而注释还写着「不复制规则表」：
  * 管理员把合格线改成 85 后，这一栏的预估分级就与服务端重算结果对不上（审查报告 G8）。
  */
-const thresholds = ref({ qualified: 90, invalid: 60 })
+// 初值为 null：请求没回来 / 失败时<b>不给分级结论</b>，界面显示「—」。
+// 原来兜底成 90 / 60（后端出厂默认值的拷贝），于是规则还没到位的那几秒里
+// 界面就按 90 判级 —— 管理员把合格线改成 85 后，这段窗口里的结论是错的。
+const thresholds = ref(null)
 
 /**
  * 复核后预估评分（原型「复核后预估评分」区）。
@@ -448,9 +452,11 @@ const estimate = computed(() => {
     if (key && String(editValues[key] || '').trim()) gain += d.points || 0
   })
   const score = Math.max(0, Math.min(100, base + gain))
-  const { qualified, invalid } = thresholds.value
-  const grade = score >= qualified ? '合格 → 进入数据清洗' : score >= invalid ? '待复核' : '无效'
-  return { score, grade }
+  // 判定与名称都取 utils/grade.js 的唯一副本：原来这里写死
+  // '合格 → 进入数据清洗'，把处置动作混进分级名，于是同一条病历在质控页显示
+  // 「合格」、在复核页显示「合格 → 进入数据清洗」，两页结论字面不一致。
+  const grade = gradeOf(score, thresholds.value)
+  return { score, grade, hint: gradeHint(grade) }
 })
 
 // 进入复核：先清空上一次的详情与表单，再并行拉病历原文与质控评分，随后异步取 AI 预检

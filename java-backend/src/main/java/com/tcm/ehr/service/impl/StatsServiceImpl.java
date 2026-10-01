@@ -252,7 +252,8 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
                 vo.setFormulaStats(top(agg(records, "formulaList", "formula"), 10, "formula"));
                 vo.setHerbStats(top(agg(records, "herbs", "herb"), 10, "herb"));
             }
-            default -> throw new IllegalArgumentException("type必须为disease/pattern/symptom/prescription");
+            // 同理：原来把四个英文枚举值拼进报错，界面上直接显示给用户
+            default -> throw new IllegalArgumentException("统计类型不合法，请选择：疾病 / 证型 / 症状 / 处方");
         }
         return vo;
     }

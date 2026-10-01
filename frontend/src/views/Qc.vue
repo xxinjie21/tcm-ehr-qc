@@ -304,8 +304,8 @@
             </div>
           </div>
           <div class="wf-note">
-            合格线 {{ qualified }} 分
-            <template v-if="detail.score < qualified">，距合格线还差 {{ qualified - detail.score }} 分</template>
+            合格线 {{ qualifiedText }} 分
+            <template v-if="distanceToQualified != null">，距合格线还差 {{ distanceToQualified }} 分</template>
           </div>
 
           <div class="sd-title">扣分明细（合计 -{{ detailTotal }} 分）</div>
@@ -344,6 +344,7 @@ import { getTerms } from '@/api/dictionary'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
+import { gradeClass as gradeClassOf, THRESHOLD_PLACEHOLDER } from '@/utils/grade'
 
 // 规则写入口按 admin / owner / 授权成员 三档判定（与后端 qc/rules 写接口一致）
 const userStore = useUserStore()
@@ -381,10 +382,20 @@ const loadRules = async () => {
   }
 }
 
-// 标准里的合格线（未加载时退回 90）
-const qualified = computed(() => rules.value?.thresholds?.qualified ?? 90)
-// 分级 → 样式类：合格 / 无效各一色，其余（待复核）走中性色
-const gradeClass = (g) => (g === '合格' ? 'is-ok' : g === '无效' ? 'is-bad' : 'is-mid')
+// 标准里的合格线。规则未就绪时给 null（显示「—」），不再退回 90 ——
+// 那个 90 是后端出厂默认值的拷贝，管理员改过合格线后，等待期里界面会按 90
+// 算出「距合格线还差 N 分」，与服务端结论矛盾。
+const qualified = computed(() => rules.value?.thresholds?.qualified ?? null)
+// 分级 → 样式类：读 utils/grade.js 的唯一副本，不再在本页另写一份映射
+const gradeClass = gradeClassOf
+
+// 阈值未就绪时统一显示「—」，也算不出「距合格线还差多少」
+const qualifiedText = computed(() =>
+  qualified.value == null ? THRESHOLD_PLACEHOLDER : qualified.value
+)
+const distanceToQualified = computed(() =>
+  qualified.value == null ? null : Math.max(0, qualified.value - (detail.value?.score ?? 0))
+)
 
 // 拉取当前范围的扣分聚合（按类型、按项、分级分布）
 const loadDedStats = async () => {

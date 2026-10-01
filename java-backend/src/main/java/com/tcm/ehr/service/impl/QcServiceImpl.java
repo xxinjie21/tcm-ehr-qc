@@ -166,7 +166,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         Object sd = dto == null ? null : dto.getStructuredData();
         // 3. 两者都缺 → 参数错误，不落到空评分
         if (sd == null && raw == null) {
-            throw new IllegalArgumentException("structuredData 与 recordId 至少提供一个");
+            // 文案只说用户看得懂的事：原来直接抛字段名 structuredData / recordId，
+            // 这两个 key 只会出现在接口契约里，界面用户无从对应
+            throw new IllegalArgumentException("请提供病历标识，或直接提交已抽取的结构化数据（两者至少给一项）");
         }
         // 4. 组装数据并评分（只读：不写回 records，也不生成复核任务）
         Map<String, Object> data = asMap(sd, raw == null ? null : raw.getStructuredData());
