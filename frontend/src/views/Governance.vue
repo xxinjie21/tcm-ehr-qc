@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- 清洗状态行（顶部） -->
-    <section v-loading="statsLoading" class="gov-stats">
+    <section v-loading="statsLoading" element-loading-text="正在统计标准化情况…" class="gov-stats">
       <span class="gs" title="这三张卡只统计「质控合格」的病历；清洗范围若包含待复核/无效，条数会对不上">
         <b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
       <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
@@ -134,7 +134,7 @@
         <el-button @click="handlePreview" :loading="preview.loading">预览数据集</el-button>
         <el-button type="primary" :loading="exporting" @click="handleExport">导出下载</el-button>
       </div>
-      <div class="tip" style="margin-top: 8px">
+      <div class="tip" style="margin-top: var(--sp-2)">
         只导出质控合格的病历（<b>不随上方「分级」变化</b>，分级只作用于数据清洗）；
         导出的文件与上方预览里出现的手机号、身份证号都会自动打码。
       </div>
@@ -440,10 +440,10 @@ onMounted(() => {
   flex-wrap: wrap;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px 24px;
+  padding: 14px var(--sp-5);
   margin-bottom: 20px;
   display: flex;
-  gap: 24px;
+  gap: var(--sp-5);
 }
 .gs {
   font-size: 13px;
@@ -466,7 +466,7 @@ onMounted(() => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px 24px;
+  padding: 14px var(--sp-5);
   margin-bottom: 20px;
 }
 .scope-row {
@@ -488,7 +488,7 @@ onMounted(() => {
   font-size: 12.5px;
   color: var(--ink-mid);
   line-height: 1.7;
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-4);
 }
 .flow-tip b {
   color: var(--ink);
@@ -500,7 +500,7 @@ onMounted(() => {
   display: flex;
   align-items: stretch;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-3);
 }
 .flow-step {
   display: flex;
@@ -514,9 +514,9 @@ onMounted(() => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px 12px;
+  padding: 14px var(--sp-3);
   text-align: center;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .step-card:hover {
   transform: translateY(-2px);
@@ -531,7 +531,7 @@ onMounted(() => {
   font-size: 14px;
   font-weight: bold;
   line-height: 30px;
-  margin: 0 auto 8px;
+  margin: 0 auto var(--sp-2);
 }
 .step-title {
   font-size: 13px;
@@ -563,8 +563,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-bottom: 4px;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-1);
 }
 .tip {
   font-size: 12.5px;
@@ -573,9 +573,9 @@ onMounted(() => {
 
 /* ===== 清洗结果（中部） ===== */
 .clean-result {
-  margin-top: 24px;
+  margin-top: var(--sp-5);
   border-top: 1px dashed #ece8dc;
-  padding-top: 16px;
+  padding-top: var(--sp-4);
 }
 .result-hd {
   font-size: 13px;
@@ -586,13 +586,13 @@ onMounted(() => {
 .clean-stats {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
+  gap: var(--sp-3);
 }
 .stat-item {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px 16px;
+  padding: 14px var(--sp-4);
   text-align: center;
 }
 .stat-item .num {
@@ -603,7 +603,7 @@ onMounted(() => {
 .stat-item .lbl {
   font-size: 12px;
   color: var(--text-sub);
-  margin-top: 4px;
+  margin-top: var(--sp-1);
 }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.ochre .num { color: var(--ochre); }
@@ -613,8 +613,8 @@ onMounted(() => {
 .level-dist {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: 12px;
+  gap: var(--sp-4);
+  margin-top: var(--sp-3);
   font-size: 13px;
   color: var(--ink);
 }
@@ -627,7 +627,7 @@ onMounted(() => {
 /* ===== 导出区 ===== */
 .export-row {
   display: flex;
-  gap: 16px;
+  gap: var(--sp-4);
   align-items: flex-end;
   flex-wrap: wrap;
   padding-bottom: 6px;
@@ -641,19 +641,19 @@ label,
   margin-bottom: 3px;
 }
 .preview-box {
-  margin-top: 16px;
+  margin-top: var(--sp-4);
   border-top: 1px dashed #ece8dc;
-  padding-top: 12px;
+  padding-top: var(--sp-3);
 }
 .preview-hd {
   font-size: 13px;
   font-weight: bold;
   color: var(--ink);
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 /* 列显示选择器*/
 .col-picker :deep(.el-checkbox-group) {
@@ -669,9 +669,9 @@ label,
 .col-picker-actions {
   margin-top: 10px;
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
   border-top: 1px solid var(--line);
-  padding-top: 8px;
+  padding-top: var(--sp-2);
 }
 /* 预览行可点击下钻，给出指针提示*/
 .preview-box :deep(.el-table__body tr) {
@@ -683,7 +683,7 @@ label,
   .flow-wrapper {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: var(--sp-2);
   }
   .step-arrow {
     display: none;

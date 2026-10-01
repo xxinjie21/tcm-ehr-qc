@@ -25,7 +25,7 @@
       <!-- 可见范围说明：三档口径不同，不写清楚用户会以为「日志少了」 -->
       <p class="scope-tip">{{ scopeTip }}</p>
 
-      <el-table v-loading="loading" :data="logs" border stripe max-height="520" style="margin-top: 12px">
+      <el-table v-loading="loading" element-loading-text="正在读取操作日志…" :data="logs" border stripe max-height="520" style="margin-top: var(--sp-3)">
         <el-table-column label="操作时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.logTime) }}</template>
         </el-table-column>
@@ -59,7 +59,7 @@
         :page-sizes="PAGE_SIZES"
         :total="total"
         layout="total, sizes, prev, pager, next"
-        style="margin-top: 12px; justify-content: flex-end"
+        style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="loadLogs"
         @size-change="handleSizeChange"
       />
@@ -199,14 +199,14 @@ onMounted(() => {
 
 <style scoped>
 .scope-tip {
-  margin: 8px 0 0;
+  margin: var(--sp-2) 0 0;
   font-size: 12.5px;
   color: var(--text-sub);
 }
 /* 筛选行：单行排列，窄屏自动换行 */
 .filter-row {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: center;
   flex-wrap: wrap;
 }

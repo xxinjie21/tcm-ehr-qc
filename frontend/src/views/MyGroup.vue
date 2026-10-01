@@ -33,7 +33,7 @@
             <el-button size="small" @click="addDialog = true">按用户名拉人</el-button>
             <el-button size="small" type="danger" plain :loading="leaving" @click="doLeave">退出组织</el-button>
           </div>
-          <el-table v-loading="membersLoading" :data="members" border stripe style="margin-top: 12px">
+          <el-table v-loading="membersLoading" element-loading-text="正在读取成员…" :data="members" border stripe style="margin-top: var(--sp-3)">
             <el-table-column prop="username" label="用户名" min-width="120" />
             <el-table-column label="角色" width="90">
               <template #default="{ row }">
@@ -110,7 +110,7 @@
             <el-button :loading="searching" @click="doSearch">搜索</el-button>
           </template>
         </el-input>
-        <el-select v-model="pickUserId" placeholder="搜索结果" style="width: 100%; margin-top: 12px" filterable>
+        <el-select v-model="pickUserId" placeholder="搜索结果" style="width: 100%; margin-top: var(--sp-3)" filterable>
           <el-option v-for="u in candidates" :key="u.id" :label="u.username" :value="u.id" />
         </el-select>
         <template #footer>
@@ -300,20 +300,20 @@ onMounted(loadMyOrg)
   min-height: 160px;
 }
 .my-org-empty {
-  padding: 24px 0;
+  padding: var(--sp-5) 0;
 }
 .empty-hint {
-  margin: 0 0 4px;
+  margin: 0 0 var(--sp-1);
   color: var(--text-sub);
 }
 .owner-actions {
-  margin-top: 16px;
+  margin-top: var(--sp-4);
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: center;
 }
 .member-note {
-  margin-top: 16px;
+  margin-top: var(--sp-4);
   color: var(--text-sub);
 }
 .is-owner {

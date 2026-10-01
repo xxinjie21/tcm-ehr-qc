@@ -45,11 +45,11 @@ defineEmits(['search', 'reset'])
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 10px 16px;
+  padding: 10px var(--sp-4);
   margin-bottom: 14px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 16px;
+  gap: 10px var(--sp-4);
   align-items: flex-end;
 }
 .filter .cap {

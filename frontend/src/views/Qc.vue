@@ -186,7 +186,7 @@
 
     <!-- 本范围扣分构成：范围内各病历扣分明细聚合 -->
     <PanelCard title="本范围扣分构成">
-      <div v-loading="dedLoading">
+      <div v-loading="dedLoading" element-loading-text="正在统计扣分分布…">
         <template v-if="dedStats">
           <!-- 按扣分类型聚合：横条长度按最大扣分点数归一（见 barWidth） -->
           <div v-if="dedStats.byType.length" class="dist">
@@ -229,7 +229,7 @@
       </div>
 
       <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动 -->
-      <el-table v-loading="precheckLoading" :data="precheckRows" border size="small" max-height="360">
+      <el-table v-loading="precheckLoading" element-loading-text="正在预检待复核项…" :data="precheckRows" border size="small" max-height="360">
         <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
         <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
         <el-table-column prop="grade" label="分级" width="90" />
@@ -268,7 +268,7 @@
         :page-sizes="PAGE_SIZES"
         :total="precheckTotal"
         layout="total, sizes, prev, pager, next"
-        style="margin-top: 12px; justify-content: flex-end"
+        style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="loadPrecheck"
         @size-change="handleSizeChange"
       />
@@ -402,11 +402,14 @@ const loadDedStats = async () => {
   }
 }
 
+// 最大扣分点数：原先在 barWidth 里每次调用都 Math.max 一遍，
+// 而 barWidth 在模板里每行调一次 —— 渲染 N 行就是 N 次全量扫描。
+const maxDeductPoints = computed(
+  () => Math.max(1, ...(dedStats.value?.byType || []).map((t) => t.points))
+)
+
 /** 条形宽度：按最大扣分点数归一 */
-const barWidth = (points) => {
-  const max = Math.max(1, ...(dedStats.value?.byType || []).map((t) => t.points))
-  return Math.round((points / max) * 100) + '%'
-}
+const barWidth = (points) => Math.round((points / maxDeductPoints.value) * 100) + '%' 
 
 // 组装接口参数：dateRange 是 [起, 止] 两元素数组，缺任一个都视为未选
 const params = () => {
@@ -510,7 +513,14 @@ const openRules = async () => {
 
 // 按 field 查一条格式规则
 /** 格式：模板勾选即用（无需写正则）；非模板项作为历史自定义规则展示 */
-const fmtOf = (field) => form.format.find((f) => f.field === field)
+// 格式规则按 field 建索引：fmtOf 在模板里每行调 3 次，
+// 原来是每次都 Array.find 一遍 form.format，行数一多就是 N×3×M。
+const fmtMap = computed(() => {
+  const map = new Map()
+  for (const f of form.format) map.set(f.field, f)
+  return map
+})
+const fmtOf = (field) => fmtMap.value.get(field)
 // 非模板格式规则（历史遗留或手工添加）：不在 catalogFormats 目录里的项，单独列出供编辑
 const customFormats = computed(() => form.format.filter((f) => !catalogFormats.value.some((t) => t.field === f.field)))
 // 勾选 / 取消格式模板：勾选即按模板补一条规则，取消则移除
@@ -821,7 +831,7 @@ onMounted(() => {
 .filter-bar {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
 }
 /* 次级说明文字 */
@@ -831,13 +841,13 @@ onMounted(() => {
 }
 /* 截断 / 告警提示条：浅黄底，与错误红区分 */
 .trunc-hint {
-  background: #fdf6e8;
+  background: var(--ochre-surface);
   border: 1px solid #ecd9b0;
   color: #96714f;
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 6px var(--sp-3);
   font-size: 12.5px;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
 }
 /* 预检列表上方说明行 */
 .precheck-bar {
@@ -855,7 +865,7 @@ onMounted(() => {
   font-size: 13px;
   font-weight: bold;
   color: var(--ink);
-  margin: 14px 0 8px;
+  margin: 14px 0 var(--sp-2);
 }
 /* 扣分明细弹窗的内容列 */
 .ded-col {
@@ -866,18 +876,18 @@ onMounted(() => {
 }
 /* 「无扣分项」等正向文案 */
 .ok {
-  padding: 8px;
+  padding: var(--sp-2);
   color: var(--ink-mid);
   font-size: 12.5px;
 }
 /* 面板内二级标题（左竖线） */
 .sub-hd {
-  margin: 16px 0 8px;
+  margin: var(--sp-4) 0 var(--sp-2);
   font-size: 13px;
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
-  padding-left: 8px;
+  padding-left: var(--sp-2);
 }
 
 /* ===== 评分标准面板===== */
@@ -889,7 +899,7 @@ onMounted(() => {
   color: var(--ink);
 }
 .std-body {
-  padding-top: 4px;
+  padding-top: var(--sp-1);
 }
 .std-cols {
   display: flex;
@@ -937,7 +947,7 @@ onMounted(() => {
   color: #8a6a44;
 }
 .std-grade.bad {
-  background: #fdf3f1;
+  background: var(--danger-surface);
   color: #8a3d33;
 }
 .rule-card {
@@ -960,7 +970,7 @@ onMounted(() => {
 /* ===== 本范围扣分构成 ===== */
 /* 按类型的扣分分布 */
 .dist {
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
 }
 /* 单行：类型名 + 横条 + 数值 */
 .dist-row {
@@ -994,7 +1004,7 @@ onMounted(() => {
 /* 分级分布：胶囊标签 */
 .grade-chips {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 .grade-chips .gc {
@@ -1010,7 +1020,7 @@ onMounted(() => {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 6px 10px;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
   background: var(--paper);
 }
 /* 瀑布单行：标签 + 数值（扣分用 danger） */
@@ -1034,7 +1044,7 @@ onMounted(() => {
 }
 .wf-item.end {
   border-top: 1px solid var(--line);
-  margin-top: 4px;
+  margin-top: var(--sp-1);
   padding-top: 6px;
 }
 /* P4.11：最终得分要突出扫读，字号比扣分项（默认）放大一档加粗 */
@@ -1045,7 +1055,7 @@ onMounted(() => {
 /* 最终得分旁的分级胶囊 */
 .wf-grade {
   font-size: 12px;
-  padding: 1px 8px;
+  padding: 1px var(--sp-2);
   border-radius: 6px;
 }
 .wf-grade.is-ok {
@@ -1057,7 +1067,7 @@ onMounted(() => {
   color: #8a6a44;
 }
 .wf-grade.is-bad {
-  background: #fdf3f1;
+  background: var(--danger-surface);
   color: #8a3d33;
 }
 /* 合格线说明 */
@@ -1069,7 +1079,7 @@ onMounted(() => {
 
 /* ===== 规则配置弹窗 ===== */
 .hd-action {
-  margin-left: 12px;
+  margin-left: var(--sp-3);
 }
 /* 折叠区内的单条规则说明 */
 .std-desc {
@@ -1104,7 +1114,7 @@ onMounted(() => {
 .chip {
   display: inline-block;
   margin: 0 6px 2px 0;
-  padding: 0 8px;
+  padding: 0 var(--sp-2);
   font-size: 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -1113,7 +1123,7 @@ onMounted(() => {
 }
 /* 完整说明的折叠区 */
 .std-detail {
-  margin-top: 8px;
+  margin-top: var(--sp-2);
   border-top: 1px dashed var(--line);
 }
 /* 格式模板勾选 */
@@ -1127,7 +1137,7 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
+  padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 12.5px;
@@ -1156,9 +1166,9 @@ onMounted(() => {
 .rc-line {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
-  margin: 8px 0;
+  margin: var(--sp-2) 0;
   font-size: 12.5px;
   color: var(--ink);
   line-height: 2;
@@ -1167,18 +1177,18 @@ onMounted(() => {
 .rc-block {
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 6px 12px;
-  margin-bottom: 8px;
+  padding: 6px var(--sp-3);
+  margin-bottom: var(--sp-2);
   background: var(--paper);
 }
 /* ①②③④ 分段标题 */
 .rc-hd {
-  margin: 16px 0 8px;
+  margin: var(--sp-4) 0 var(--sp-2);
   font-size: 13px;
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
-  padding-left: 8px;
+  padding-left: var(--sp-2);
 }
 /* 预留的行式布局：当前模板用的是 .rc-line，本类暂无引用 */
 .rc-row {
@@ -1186,7 +1196,7 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
   font-size: 12.5px;
   color: var(--ink);
 }

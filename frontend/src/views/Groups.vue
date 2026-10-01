@@ -3,7 +3,7 @@
     <PanelCard title="组织管理">
       <!-- 组织列表（仅管理员）：批次 6 起组织由用户自助创建、无审核，
            管理员只做治理 —— 停用 / 恢复 / 归档 / 改派所有者 -->
-      <el-table v-loading="loading" :data="orgs" border stripe>
+      <el-table v-loading="loading" element-loading-text="正在读取组织列表…" :data="orgs" border stripe>
         <el-table-column prop="code" label="组织编码" width="130" />
         <el-table-column prop="name" label="组织名称" min-width="140" />
         <el-table-column label="所有者" width="120">
@@ -149,6 +149,6 @@ onMounted(load)
 .tip {
   color: var(--text-sub);
   font-size: 12.5px;
-  margin: 0 0 8px;
+  margin: 0 0 var(--sp-2);
 }
 </style>

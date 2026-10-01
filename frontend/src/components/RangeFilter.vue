@@ -75,7 +75,7 @@ onMounted(reload)
 
 <style scoped>
 /* 与 StatsFilter 同构的单行卡片布局；两者共用 styles/theme.css 的视觉令牌 */
-.range-filter { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.range-filter { display: flex; gap: var(--sp-4); align-items: flex-end; flex-wrap: wrap; }
 /* 标签压在各自控件上方（与 StatsFilter 一致） */
 .rf-item label { display: block; font-size: 12px; color: var(--text-sub); margin-bottom: 3px; }
 </style>

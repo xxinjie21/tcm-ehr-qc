@@ -141,7 +141,7 @@ watch(() => props.recordId, () => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px 16px;
+  padding: 14px var(--sp-4);
 }
 /* 标题行：标题 + 来源标签 + 右侧按钮 */
 .aii-hd {
@@ -155,13 +155,13 @@ watch(() => props.recordId, () => {
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
-  padding-left: 8px;
+  padding-left: var(--sp-2);
 }
 .aii-src {
   font-size: 11.5px;
   color: var(--text-sub);
 }
-/* margin-left:auto 把按钮推到标题行最右 */
+/* margin-left: auto 把按钮推到标题行最右 */
 .aii-btn {
   margin-left: auto;
 }
@@ -169,15 +169,15 @@ watch(() => props.recordId, () => {
 .aii-skeleton .sk-line {
   height: 12px;
   border-radius: 2px;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
   background: #e8e4da;
   animation: sk 1.2s ease-in-out infinite;
 }
 .aii-skeleton .sk-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
 }
 .aii-skeleton .sk-box {
   height: 40px;
@@ -193,16 +193,16 @@ watch(() => props.recordId, () => {
 .aii-summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
 }
 .sum-item {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 8px 10px;
+  padding: var(--sp-2) 10px;
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 /* flex-shrink:0 保证标签不被长文本挤窄 */
 .sum-item .sum-key {
@@ -223,8 +223,8 @@ watch(() => props.recordId, () => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  padding: 10px var(--sp-3);
+  margin-bottom: var(--sp-3);
 }
 /* 四块规则结论：两列网格 */
 .aii-blocks {
@@ -236,13 +236,13 @@ watch(() => props.recordId, () => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
 }
 .blk-title {
   font-size: 12.5px;
   font-weight: bold;
   color: var(--ink);
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
 }
 /* 「无缺项 / 无提示」时的正向文案，用次级色与警示标签区分 */
 .blk-ok {
@@ -257,7 +257,7 @@ watch(() => props.recordId, () => {
 /* 描边标签：用于归一命中分档；实心感留给「怎么来的」类标签 */
 .chip {
   font-size: 11.5px;
-  padding: 2px 8px;
+  padding: 2px var(--sp-2);
   border-radius: 2px;
   border: 1px solid var(--line);
   background: var(--paper);
@@ -270,19 +270,19 @@ watch(() => props.recordId, () => {
 .chip.fuzzy { color: var(--danger); }
 .hints {
   margin: 0;
-  padding-left: 16px;
+  padding-left: var(--sp-4);
   font-size: 12.5px;
   color: var(--ink);
   line-height: 1.8;
 }
 /* 免责声明：右上分隔线，与正文拉开距离 */
 .aii-disclaimer {
-  margin-top: 12px;
+  margin-top: var(--sp-3);
   font-size: 11.5px;
   color: var(--text-sub);
   text-align: right;
   border-top: 1px dashed #ece8dc;
-  padding-top: 8px;
+  padding-top: var(--sp-2);
 }
 .aii-tip {
   font-size: 12.5px;

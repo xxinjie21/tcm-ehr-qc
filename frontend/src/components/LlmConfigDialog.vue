@@ -29,7 +29,7 @@
     <!-- 左右两栏：原先 7 个表单项纵向堆叠，窗口一矮就要滚动才能
          填到最后一项、也看不到探测结果。改为左「通道与接入」/ 右「模型参数 + 探测结果」，
          一屏内可填完并即时看到连接是否可用 -->
-    <div v-loading="loading" class="llm-body">
+    <div v-loading="loading" element-loading-text="正在读取模型配置…" class="llm-body">
       <div class="llm-col">
         <div class="col-hd">通道与接入</div>
         <el-form label-position="top" class="llm-form">
@@ -249,7 +249,7 @@ async function handleSave() {
 /* 顶部提示条：左竖线 + 浅色底；提示用 ochre、告警用 danger，两者一眼可辨 */
 .llm-tip {
   margin: 0 0 14px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
   border-left: 3px solid var(--ochre);
   background: var(--ochre-light);
@@ -260,10 +260,10 @@ async function handleSave() {
 /* 读配置 / 保存失败时的告警条 */
 .llm-warn {
   margin: 0 0 10px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--danger);
   border-left: 3px solid var(--danger);
-  background: #f8ece9;
+  background: var(--danger-surface);
   font-size: 12px;
   line-height: 1.8;
   color: var(--danger);
@@ -278,7 +278,7 @@ async function handleSave() {
 /* 左右两栏：窄屏（<720px）自动收为单栏，不产生横向滚动 */
 .llm-body {
   display: flex;
-  gap: 24px;
+  gap: var(--sp-5);
   align-items: flex-start;
 }
 /* flex:1 + min-width:0：两栏等宽且可收缩，长模型名不会撑破一栏 */
@@ -289,7 +289,7 @@ async function handleSave() {
 /* 右栏左侧的分隔线（窄屏收单栏时在媒体查询里去掉） */
 .llm-col + .llm-col {
   border-left: 1px solid var(--line);
-  padding-left: 24px;
+  padding-left: var(--sp-5);
 }
 @media (max-width: 900px) {
   .llm-body {
@@ -329,7 +329,7 @@ async function handleSave() {
 /* 温度与超时并排一行 */
 .llm-row {
   display: flex;
-  gap: 16px;
+  gap: var(--sp-4);
 }
 .llm-row :deep(.el-form-item) {
   flex: 1;
@@ -338,7 +338,7 @@ async function handleSave() {
 /* 探测结果：正常 / 失败 / 未探测三态，靠左边框与底色区分 */
 .llm-result {
   margin-top: 2px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
   font-size: 12px;
   line-height: 1.8;
@@ -351,7 +351,7 @@ async function handleSave() {
 }
 .llm-result.is-bad {
   border-left: 3px solid var(--danger);
-  background: #fdf3f1;
+  background: var(--danger-surface);
   color: #8a3d33;
 }
 .llm-result.is-idle {

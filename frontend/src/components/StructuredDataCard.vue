@@ -194,32 +194,32 @@ const levelDesc = (level, raw, name) => {
   border-bottom: 1px dashed var(--line);
 }
 .sd-meta b { color: var(--ink-mid); font-weight: normal; }
-.sd-meta-t { margin-left: 4px; }
-.sd-sec { margin-bottom: 12px; }
+.sd-meta-t { margin-left: var(--sp-1); }
+.sd-sec { margin-bottom: var(--sp-3); }
 .sd-sec-title {
   font-size: 13px;
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
-  padding-left: 8px;
-  margin-bottom: 8px;
+  padding-left: var(--sp-2);
+  margin-bottom: var(--sp-2);
 }
-.sd-sec-hint { font-size: 11px; font-weight: normal; color: var(--text-sub); margin-left: 6px; }
-.sd-items { display: flex; flex-wrap: wrap; gap: 8px; }
+.sd-sec-hint { font-size: 11.5px; font-weight: normal; color: var(--text-sub); margin-left: 6px; }
+.sd-items { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .sd-item {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 4px 10px;
+  padding: var(--sp-1) 10px;
   color: var(--ink);
 }
 .sd-item .src { font-size: 11.5px; color: var(--text-sub); margin-left: 6px; }
-.sd-item .dosage { color: var(--ochre); margin-left: 4px; }
+.sd-item .dosage { color: var(--ochre); margin-left: var(--sp-1); }
 .sd-item .tag {
   font-style: normal;
-  font-size: 10.5px;
+  font-size: 11.5px;
   margin-left: 6px;
-  padding: 0 4px;
+  padding: 0 var(--sp-1);
   border-radius: 2px;
   color: var(--surface);
   background: var(--ink-mid);
@@ -234,7 +234,7 @@ const levelDesc = (level, raw, name) => {
 .sd-item .tag.lv1 { color: var(--ink-mid); }
 .sd-item .tag.lv2 { color: var(--ochre); }
 .sd-item .tag.lv3 { color: var(--danger); }
-.sd-item .conf { font-size: 10.5px; color: var(--text-sub); margin-left: 4px; }
+.sd-item .conf { font-size: 11.5px; color: var(--text-sub); margin-left: var(--sp-1); }
 /* 空态副文案：标题只说「哪一种空」，下一步动作放这里 */
 .empty-hint {
   max-width: 420px;
@@ -248,8 +248,8 @@ const levelDesc = (level, raw, name) => {
 <!-- 非 scoped：el-tooltip 的内容被 teleport 到 body，scoped 选择器命中不到，必须用全局块 -->
 <style>
 .el-popper .tp { max-width: 340px; font-size: 12px; line-height: 1.7; }
-.el-popper .tp-hd { font-weight: bold; margin-bottom: 4px; color: #2b2b2b; }
-.el-popper .tp-row { display: flex; gap: 8px; }
+.el-popper .tp-hd { font-weight: bold; margin-bottom: var(--sp-1); color: #2b2b2b; }
+.el-popper .tp-row { display: flex; gap: var(--sp-2); }
 .el-popper .tp-k { flex: 0 0 62px; color: #8a8578; }
 .el-popper .tp-v { flex: 1 1 auto; color: #2b2b2b; }
 </style>

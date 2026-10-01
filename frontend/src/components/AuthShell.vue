@@ -29,7 +29,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 30px 20px 24px;
+  padding: 30px 20px var(--sp-5);
   /* 宣纸底 + 极淡墨点纹理（内联 SVG，非 CSS 渐变） */
   background-color: var(--paper);
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='0.9' fill='%232f4639' fill-opacity='0.05'/></svg>");
@@ -82,7 +82,7 @@
 }
 .auth-brand .en {
   margin-top: 14px;
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.75;
   color: var(--ochre);
   letter-spacing: 1.2px;
@@ -90,7 +90,7 @@
 }
 .auth-brand .ver {
   margin-top: auto;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-sub);
   letter-spacing: 0.5px;
 }
@@ -112,18 +112,18 @@
 .auth-form .hint {
   font-size: 12px;
   color: var(--text-sub);
-  margin: 8px 0 24px;
+  margin: var(--sp-2) 0 var(--sp-5);
 }
 
 /* 表单控件对齐原型（覆盖 Element Plus 默认间距） */
 .auth-form .el-form-item {
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-4);
 }
 .auth-form .el-form-item__label {
   font-size: 12px;
   color: var(--text-sub);
   letter-spacing: 0.5px;
-  padding-bottom: 4px;
+  padding-bottom: var(--sp-1);
   line-height: 1.5;
 }
 .auth-submit {
@@ -132,7 +132,7 @@
   margin-top: 6px;
 }
 .auth-switch {
-  margin-top: 16px;
+  margin-top: var(--sp-4);
   font-size: 12px;
   color: var(--text-sub);
 }
@@ -166,16 +166,16 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--ochre);
   background: var(--ochre-light);
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   font-size: 12px;
   color: #6b5a44;
-  margin: 0 0 16px;
+  margin: 0 0 var(--sp-4);
 }
 
 .copyright {
-  margin-top: 24px;
+  margin-top: var(--sp-5);
   text-align: center;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-sub);
   letter-spacing: 0.5px;
 }
@@ -194,10 +194,10 @@
     background: transparent;
   }
   .auth-form {
-    padding: 24px 4px;
+    padding: var(--sp-5) var(--sp-1);
   }
   .auth-demo {
-    margin-top: 24px;
+    margin-top: var(--sp-5);
   }
 }
 </style>

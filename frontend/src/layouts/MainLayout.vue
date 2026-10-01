@@ -141,7 +141,7 @@ const handleLogout = () => {
   left: -9999px;
   top: 0;
   z-index: 2000;
-  padding: 8px 14px;
+  padding: var(--sp-2) 14px;
   background: var(--ink);
   color: var(--surface);
   text-decoration: none;
@@ -167,7 +167,7 @@ const handleLogout = () => {
 .brand em {
   font-style: normal;
   color: #c9b99a;
-  margin-left: 8px;
+  margin-left: var(--sp-2);
   font-size: 12px;
 }
 .topbar .user {
@@ -219,11 +219,11 @@ aside {
 }
 .menu {
   list-style: none;
-  padding-top: 8px;
+  padding-top: var(--sp-2);
 }
 .menu a {
   display: block;
-  padding: 12px 16px;
+  padding: var(--sp-3) var(--sp-4);
   color: #55534c;
   text-decoration: none;
   font-size: 13.5px;
@@ -240,7 +240,7 @@ aside {
   font-weight: bold;
 }
 .menu .sec {
-  padding: 14px 16px 4px;
+  padding: 14px var(--sp-4) var(--sp-1);
   font-size: 12px;
   color: var(--text-sub);
 }
@@ -251,7 +251,7 @@ main {
   /* 长页内部滚动：main 铺满整宽，滚动条贴窗最右（不再因内容居中而偏左）；
      文档层不出现滚动条 → 通栏且切页不偏移 */
   overflow-y: auto;
-  padding: 16px 20px 84px;
+  padding: var(--sp-4) 20px 84px;
   /* 给右下角 AI 助手悬浮球留出安全间距，避免遮挡表格底部内容 */
 }
 /* 内层内容仍限宽居中，但滚动容器保持通宽 */
@@ -265,7 +265,7 @@ main > * {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-3);
   font-size: 12.5px;
   color: var(--text-sub);
 }

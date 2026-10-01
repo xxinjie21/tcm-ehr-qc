@@ -31,10 +31,11 @@
           <el-table
             ref="tableRef"
             v-loading="searching"
+    element-loading-text="正在检索病历…"
             :data="rows"
             border
             size="small"
-            style="margin-top: 12px"
+            style="margin-top: var(--sp-3)"
             max-height="420"
             :row-class-name="rowClass"
             @selection-change="onSelectionChange"
@@ -76,7 +77,7 @@
             :page-sizes="PAGE_SIZES"
             :total="total"
             layout="total, sizes, prev, pager, next"
-            style="margin-top: 12px; justify-content: flex-end"
+            style="margin-top: var(--sp-3); justify-content: flex-end"
             @current-change="handleSearch"
             @size-change="handleSizeChange"
           />
@@ -275,7 +276,12 @@ const FIELD_GROUPS = [
 ]
 // 取某分区下的字段定义：按分区声明的 keys 顺序映射回 FIELDS，并过滤掉 FIELD_MAP 里
 // 不存在的 key —— 这样分组里写错 key 只会少渲染字段，不会冒出一个空表单项
-const groupFields = (group) => group.keys.map((k) => FIELD_MAP[k]).filter(Boolean)
+// FIELD_GROUPS 与 FIELD_MAP 都是模块常量、不含响应式依赖，
+// 所以预先建一次索引即可（不必用 computed —— 没有任何东西会变）。
+const GROUP_FIELDS = new Map(
+  FIELD_GROUPS.map((group) => [group, group.keys.map((k) => FIELD_MAP[k]).filter(Boolean)])
+)
+const groupFields = (group) => GROUP_FIELDS.get(group) || []
 
 // ===== F·7.4 查询 =====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
@@ -707,7 +713,7 @@ onMounted(handleSearch)
 <style scoped>
 /* 标签页：去掉底部分隔线，避免与面板边框叠成双线 */
 .records-tabs :deep(.el-tabs__header) {
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-3);
 }
 .records-tabs :deep(.el-tabs__nav-wrap::after) {
   display: none;
@@ -727,7 +733,7 @@ onMounted(handleSearch)
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-3);
   font-size: 12.5px;
   color: var(--ink);
 }
@@ -735,20 +741,20 @@ onMounted(handleSearch)
   margin: 0;
 }
 .uploader :deep(.el-upload-dragger) {
-  padding: 24px 10px;
+  padding: var(--sp-5) 10px;
   border: 1px dashed var(--line);
   background: var(--paper);
 }
 .up-inner { text-align: center; }
 .up-title { font-size: 13.5px; color: var(--ink); }
 .up-title em { color: var(--ink-mid); font-style: normal; font-weight: bold; }
-.up-sub { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+.up-sub { font-size: 12px; color: var(--text-sub); margin-top: var(--sp-1); }
 .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
-.result { margin-top: 16px; border-top: 1px dashed #ece8dc; padding-top: 14px; }
+.result { margin-top: var(--sp-4); border-top: 1px dashed #ece8dc; padding-top: 14px; }
 .import-failed {
   margin-top: 14px;
-  padding: 8px 12px;
-  background: #fdf6f4;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--danger-surface);
   border: 1px solid #e3c3bb;
   border-radius: 4px;
   font-size: 12.5px;
@@ -765,21 +771,21 @@ onMounted(handleSearch)
 .ip-hd {
   font-size: 12.5px;
   color: var(--text);
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
 }
 .ip-hd b {
   color: var(--ink);
 }
 .ip-sub {
-  margin-top: 8px;
+  margin-top: var(--sp-2);
   font-size: 12px;
   color: var(--text-sub);
 }
-.result-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 12px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
-.stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; text-align: center; }
+.result-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: var(--sp-3); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: var(--sp-3) var(--sp-4); text-align: center; }
 .stat-item .num { font-size: 22px; font-weight: bold; color: var(--ink); }
-.stat-item .lbl { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+.stat-item .lbl { font-size: 12px; color: var(--text-sub); margin-top: var(--sp-1); }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.red .num { color: var(--danger); }
 /* 多列栅格：3 列时 21 字段压到约 11 行，常规屏幕一屏可填完。
@@ -789,7 +795,7 @@ onMounted(handleSearch)
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 12px;
+  gap: 0 var(--sp-3);
 }
 .form-grid .wide {
   grid-column: span 2;
@@ -804,11 +810,11 @@ onMounted(handleSearch)
 }
 /* 分区常显：不再折叠，标题只作视觉分隔 */
 .form-group {
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-1);
 }
 .group-hd {
   position: relative;
-  padding: 3px 0 4px 8px;
+  padding: 3px 0 var(--sp-1) var(--sp-2);
   margin-bottom: 6px;
   font-size: 12px;
   font-weight: bold;
@@ -829,7 +835,7 @@ onMounted(handleSearch)
   position: sticky;
   bottom: 0;
   background: var(--surface);
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   border-top: 1px solid var(--line);
   z-index: 1;
 }

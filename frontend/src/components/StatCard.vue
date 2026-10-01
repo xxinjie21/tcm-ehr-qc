@@ -47,7 +47,7 @@ const display = computed(() =>
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px 16px;
+  padding: 14px var(--sp-4);
 }
 .stat .num {
   font-size: 24px;

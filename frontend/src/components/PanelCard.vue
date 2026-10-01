@@ -31,14 +31,14 @@ defineProps({
 }
 .panel-hd {
   margin: 0;
-  padding: 10px 16px;
+  padding: 10px var(--sp-4);
   border-bottom: 1px solid #eee9dd;
   font-size: 14px;
   font-weight: bold;
   color: var(--ink);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 /* 标题左侧的竖条装饰 */
 .panel-hd::before {
@@ -48,6 +48,6 @@ defineProps({
   background: var(--ink-mid);
 }
 .panel-bd {
-  padding: 16px;
+  padding: var(--sp-4);
 }
 </style>

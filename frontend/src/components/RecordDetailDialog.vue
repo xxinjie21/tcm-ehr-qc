@@ -69,7 +69,7 @@ const FIELDS = fieldsWithWide([
 .detail-2col {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--sp-4);
   align-items: start;
   max-height: calc(86vh - 140px);
   overflow: auto;
@@ -83,7 +83,7 @@ const FIELDS = fieldsWithWide([
 .col-hd {
   font-size: 12.5px;
   color: var(--text-sub);
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
 }
 /* 窄屏（<900px）两栏塌成单列，避免每栏过窄导致长文本逐字换行 */
 @media (max-width: 900px) {

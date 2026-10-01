@@ -11,7 +11,7 @@
     </el-tabs>
 
     <!-- 演示词典规模远小于真实词表（疾病仅 10 条、别名多为空），不说明会被当成系统缺陷 -->
-    <div class="tip" style="margin: 0 0 8px">
+    <div class="tip" style="margin: 0 0 var(--sp-2)">
       当前为演示词典：规模与真实词表差距较大，未命中属正常现象；导入正式词典后可提升归一命中率。
     </div>
 
@@ -39,7 +39,7 @@
       </div>
       <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动，页面本身不出现滚动条。
            每页条数可调（20~200），故按可视行数固定高度，超出的行在表格内部滚动 -->
-<el-table v-loading="loadingTerms" :data="terms" border stripe style="margin-top: 12px" max-height="360">
+<el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" max-height="360">
           <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
           <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
@@ -74,7 +74,7 @@
         :page-sizes="PAGE_SIZES_LARGE"
         :total="total"
         layout="total, sizes, prev, pager, next"
-        style="margin-top: 12px; justify-content: flex-end"
+        style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="loadTerms(false)"
         @size-change="handleSizeChange"
       />
@@ -104,7 +104,7 @@
           <el-button type="primary" :loading="importing" :disabled="!importFile" @click="handleImport">
             开始导入
           </el-button>
-          <div class="tip" style="margin-top: 8px">导入前会自动备份，可在下方「版本回滚」恢复。</div>
+          <div class="tip" style="margin-top: var(--sp-2)">导入前会自动备份，可在下方「版本回滚」恢复。</div>
 
           <!-- 格式说明移出 el-upload 拖拽区：原先嵌在拖拽热区里，
                点 <summary> 会冒泡触发原生文件选择框 -->
@@ -137,7 +137,7 @@
         <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
         <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
       </div>
-      <el-table :data="backups" border style="margin-top: 12px" max-height="260"
+      <el-table :data="backups" border style="margin-top: var(--sp-3)" max-height="260"
         :empty-text="backupsFailed ? '历史版本加载失败，请点「刷新历史版本」重试'
           : '暂无历史版本。导入词典时会自动备份，导入一次即可在这里回滚'">
         <el-table-column prop="time" label="导入时间" min-width="180" />
@@ -419,7 +419,7 @@ onMounted(() => {
 <style scoped>
 /* 类型 tab：激活态与下划线改用主题墨色，替换 Element Plus 默认蓝 */
 .dict-tabs {
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-1);
 }
 .dict-tabs :deep(.el-tabs__item.is-active) {
   color: var(--ink);
@@ -431,7 +431,7 @@ onMounted(() => {
 .search-row,
 .rollback-row {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: center;
 }
 /* 「较当前」的增减配色：多=ochre、少=danger、无变化=次级色 */
@@ -446,8 +446,8 @@ onMounted(() => {
 .scope-hint {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 /* 导入区：左上传拖拽框、右操作列 */
 .import-row {
@@ -463,7 +463,7 @@ onMounted(() => {
 .upload-tip .sub {
   font-size: 12px;
   color: var(--text-sub);
-  margin-top: 4px;
+  margin-top: var(--sp-1);
 }
 /* 详细格式收进折叠说明，避免一上来把数据结构摊给用户；
    位置在 import-actions 内，不再落在上传热区*/
@@ -489,7 +489,7 @@ onMounted(() => {
 }
 .fmt-body {
   margin-top: 6px;
-  padding: 8px 10px;
+  padding: var(--sp-2) 10px;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -503,7 +503,7 @@ onMounted(() => {
 /* 导入结果行：三张数字卡 + 失败明细并排 */
 .import-result {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   margin-top: 14px;
   align-items: flex-start;
 }
@@ -521,7 +521,7 @@ onMounted(() => {
 .ded-item {
   background: var(--ochre-light);
   border-radius: 2px;
-  padding: 6px 12px;
+  padding: 6px var(--sp-3);
   margin-bottom: 6px;
   font-size: 12.5px;
 }

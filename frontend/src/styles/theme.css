@@ -182,3 +182,20 @@ aside :focus-visible,
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* 动效退出开关（无障碍）
+ * 之前全项目没有这一条：面板悬浮、按钮位移、列表淡入都会照常播放，
+ * 前庭敏感 / 眩晕症用户没有任何退出途径（系统「减弱动态效果」设置也读不到）。
+ * 这里统一把动效压到 0.01ms 而不是 display:none —— 后者会让依赖
+ * transitionend / animationend 的逻辑收不到事件。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

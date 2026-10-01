@@ -16,6 +16,7 @@
 
       <el-table
         v-loading="loading"
+    element-loading-text="正在读取待复核任务…"
         :data="rows"
         border
         size="small"
@@ -59,13 +60,13 @@
         :page-sizes="PAGE_SIZES"
         :total="total"
         layout="total, sizes, prev, pager, next"
-        style="margin-top: 12px; justify-content: flex-end"
+        style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="load"
         @size-change="handleSizeChange"
       />
     </PanelCard>
 
-    <div v-loading="detailLoading">
+    <div v-loading="detailLoading" element-loading-text="正在读取复核详情…">
       <!-- ② 当前任务卡：详情区头部，右上角固定「关闭详情」出口。
            只把关闭入口放进底部吸底条，用户实测仍反馈「只有保存修改 / 复核通过」——
            进入复核后视线落在头部，出口必须在这里就出现，位置与弹窗右上角关闭同侧 -->
@@ -357,7 +358,16 @@ const remainText = computed(() => {
 // 归一实体的展示词：优先 content（多数实体），草药等只有 name，两者都没有则返回空串
 const textOf = (entry) => entry?.content || entry?.name || ''
 // 把某字段的原始实体列表拼成顿号分隔的只读文本，空项过滤掉
-const originalText = (key) => (originalMap.value[key] || []).map(textOf).filter(Boolean).join('、')
+// 原文按字段预先拼好：originalText 在模板里每行调 2 次，
+// 原来每次都重新 map/filter/join 出一串，逐行重复做同一件事。
+const originalTextMap = computed(() => {
+  const out = new Map()
+  for (const [key, values] of Object.entries(originalMap.value || {})) {
+    out.set(key, (values || []).map(textOf).filter(Boolean).join('、'))
+  }
+  return out
+})
+const originalText = (key) => originalTextMap.value.get(key) || ''
 // 判断人工修正框是否与原值不同，用于整行高亮「已改动」
 const isFixed = (key) => String(editValues[key] || '') !== originalText(key)
 
@@ -557,7 +567,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-3);
   flex-wrap: wrap;
 }
 .rv-bar > span:first-child {
@@ -576,20 +586,20 @@ onMounted(() => {
   margin-left: 6px;
 }
 :deep(.row-overdue) {
-  background: #fdf6f4;
+  background: var(--danger-surface);
 }
 
 /* ===== ② 当前任务卡 ===== */
 .task-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
   background: var(--surface);
   border: 1px solid var(--line);
   border-left: 4px solid var(--ochre);
   border-radius: 6px;
-  padding: 12px 16px;
+  padding: var(--sp-3) var(--sp-4);
   margin-bottom: 14px;
 }
 .task-id {
@@ -599,7 +609,7 @@ onMounted(() => {
 }
 .tag {
   display: inline-block;
-  padding: 1px 8px;
+  padding: 1px var(--sp-2);
   font-size: 12px;
   border-radius: 2px;
   line-height: 20px;
@@ -611,7 +621,7 @@ onMounted(() => {
 }
 .tag-issue {
   color: var(--danger);
-  background: #f6e9e6;
+  background: var(--danger-surface);
   border: 1px solid #e3c3bb;
 }
 .deadline {
@@ -636,7 +646,7 @@ onMounted(() => {
   margin-bottom: 14px;
 }
 .raw-panel summary {
-  padding: 10px 16px;
+  padding: 10px var(--sp-4);
   font-size: 14px;
   font-weight: bold;
   color: var(--ink);
@@ -657,7 +667,7 @@ onMounted(() => {
   background: #faf8f1;
 }
 .raw-bd {
-  padding: 4px 20px 16px;
+  padding: var(--sp-1) 20px var(--sp-4);
   border-top: 1px solid #eee9dd;
 }
 .raw-grid {
@@ -667,7 +677,7 @@ onMounted(() => {
 }
 .raw-item {
   display: flex;
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   border-bottom: 1px dashed #ece8dc;
   font-size: 13px;
 }
@@ -703,7 +713,7 @@ onMounted(() => {
 }
 .panel-hd {
   margin: 0;
-  padding: 10px 16px;
+  padding: 10px var(--sp-4);
   border-bottom: 1px solid #eee9dd;
   font-size: 14px;
   font-weight: bold;
@@ -731,13 +741,13 @@ onMounted(() => {
   line-height: 18px;
 }
 .panel-bd {
-  padding: 6px 16px 16px;
+  padding: 6px var(--sp-4) var(--sp-4);
 }
 .field-row {
   display: flex;
   align-items: flex-start;
   min-height: 40px;
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   border-bottom: 1px dashed #ece8dc;
 }
 .field-row:last-of-type {
@@ -747,8 +757,8 @@ onMounted(() => {
 .field-row.fixed {
   background: #f2f6f3;
   border-radius: 2px;
-  padding-left: 8px;
-  padding-right: 8px;
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
   margin: 0 -8px;
 }
 .flabel {
@@ -765,7 +775,7 @@ onMounted(() => {
 }
 .miss {
   color: var(--danger);
-  background: #f6e9e6;
+  background: var(--danger-surface);
   padding: 2px 10px;
   border-radius: 2px;
   font-size: 12.5px;
@@ -774,12 +784,12 @@ onMounted(() => {
 .term-note {
   font-size: 11.5px;
   color: var(--text-sub);
-  margin: 6px 0 8px 78px;
+  margin: 6px 0 var(--sp-2) 78px;
 }
 .ded-hd {
   font-size: 12.5px;
   color: var(--text-sub);
-  margin: 12px 0 8px;
+  margin: var(--sp-3) 0 var(--sp-2);
 }
 .ded-item {
   display: flex;
@@ -787,7 +797,7 @@ onMounted(() => {
   gap: 10px;
   background: var(--ochre-light);
   border-radius: 2px;
-  padding: 6px 12px;
+  padding: 6px var(--sp-3);
   margin-bottom: 6px;
   font-size: 12.5px;
 }
@@ -809,31 +819,31 @@ onMounted(() => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   font-size: 12.5px;
   line-height: 1.8;
   color: var(--ink);
 }
 .ai-box p {
-  margin: 0 0 4px;
+  margin: 0 0 var(--sp-1);
 }
 .ai-src {
   display: inline-block;
-  margin-top: 4px;
-  font-size: 11px;
+  margin-top: var(--sp-1);
+  font-size: 11.5px;
   color: var(--text-sub);
 }
 .preview {
-  margin-top: 12px;
+  margin-top: var(--sp-3);
   background: var(--ink-light);
   border: 1px solid #cddcd2;
   border-radius: 2px;
-  padding: 8px 14px;
+  padding: var(--sp-2) 14px;
   font-size: 13px;
   color: var(--ink-mid);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 .preview b {
@@ -844,7 +854,7 @@ onMounted(() => {
   background: var(--surface);
   border: 1px solid var(--ink-mid);
   border-radius: 2px;
-  padding: 1px 8px;
+  padding: 1px var(--sp-2);
   font-size: 12px;
 }
 .est-note {
@@ -861,7 +871,7 @@ onMounted(() => {
   border: 1px solid var(--line);
   border-left: 4px solid var(--ink-mid);
   border-radius: 6px;
-  padding: 12px 16px;
+  padding: var(--sp-3) var(--sp-4);
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
@@ -878,7 +888,7 @@ onMounted(() => {
 }
 
 /* ===== ⑥ 底部操作 ===== */
-/* 页面根为 flex 列 + min-height：内容不足一屏时 margin-top:auto 把底栏顶到底部，
+/* 页面根为 flex 列 + min-height：内容不足一屏时 margin-top: auto 把底栏顶到底部，
    不再浮在页面中部（data-v 作用域元素浮中部问题）；内容超长时 sticky 仍吸底可见。
    注意 min-height 必须减掉同层前面的面包屑与隐藏 h1（21 + 12 + 1 = 34px）——
    main 的 content box 高度里已经含了它们，不减就会恒多撑 34px，表现是
@@ -893,11 +903,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--sp-4);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 12px 20px;
+  padding: var(--sp-3) 20px;
   flex-wrap: wrap;
   /* 吸底：对照区很长，关闭 / 提交入口始终可见，不必滚到底 */
   position: sticky;
@@ -922,5 +932,5 @@ onMounted(() => {
   }
 }
 /* P5.2：跳过已删病历的提示 */
-.skip-hint { margin-top: 8px; font-size: 12.5px; color: var(--text-sub); }
+.skip-hint { margin-top: var(--sp-2); font-size: 12.5px; color: var(--text-sub); }
 </style>

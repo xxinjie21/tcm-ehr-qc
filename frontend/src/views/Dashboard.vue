@@ -302,14 +302,14 @@ onBeforeUnmount(() => {
 .todo-bar {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: var(--sp-3);
   margin-bottom: 10px;
 }
 .todo {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px 16px;
+  padding: var(--sp-2) var(--sp-4);
   cursor: pointer;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
   /* button 元素重置：保持原卡片观感*/
@@ -340,7 +340,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--line);
   border-radius: 2px;
   padding: 0 5px;
-  margin-left: 4px;
+  margin-left: var(--sp-1);
 }
 /* 待办数字：大号；有待办时（.warn）转 ochre */
 .todo-num {
@@ -360,14 +360,14 @@ onBeforeUnmount(() => {
 /* 指标卡一行等宽排列 */
 .stats {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   margin-bottom: 10px;
 }
 /* 下方两块面板并排（窄屏收单列） */
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 /* 面板自带下边距，网格内用间距代替，避免双重留白 */
 .grid-2 :deep(.panel) {
@@ -396,7 +396,7 @@ onBeforeUnmount(() => {
 .rate-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   font-size: 12.5px;
 }
 /* 科室名固定宽度右对齐，过长省略（完整名放 title） */
@@ -440,5 +440,5 @@ onBeforeUnmount(() => {
   }
 }
 /* P5.2：趋势截断提示 */
-.trend-trunc { margin: 8px 0 0; font-size: 12.5px; color: var(--text-sub); }
+.trend-trunc { margin: var(--sp-2) 0 0; font-size: 12.5px; color: var(--text-sub); }
 </style>

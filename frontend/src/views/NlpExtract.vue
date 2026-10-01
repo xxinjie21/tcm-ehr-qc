@@ -15,13 +15,14 @@
            改小这个值等于把滚动条加回来 -->
       <el-table
         v-loading="listLoading"
+      element-loading-text="正在读取任务列表…"
         :data="rows"
         border
         size="small"
         max-height="360"
         highlight-current-row
         :row-class-name="rowClass"
-        style="margin-top: 12px"
+        style="margin-top: var(--sp-3)"
         @row-click="loadRecord"
       >
         <!-- 列口径与「病历数据」的病历列表一致（病历ID 为 UUID，36 字符，需给足宽度）。
@@ -61,7 +62,7 @@
         :page-sizes="PAGE_SIZES"
         :total="total"
         layout="total, sizes, prev, pager, next"
-        style="margin-top: 12px; justify-content: flex-end"
+        style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="search"
         @size-change="handleSizeChange"
       />
@@ -374,7 +375,7 @@
 // 批量：仅管理员可见，走后端异步任务，提交后可关页面、靠轮询刷新进度。归一只认 ES 词典，索引不可用即整体失败。
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
-import { computed, reactive, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
@@ -786,6 +787,16 @@ const startPoll = () => {
   }, 10000)
 }
 
+// 切走「批量解析」页签就停轮询。
+// 原来只在 onBeforeUnmount 里停，于是「提交批量 → 切到单条解析」之后，
+// 定时器还在每 10 秒打一次进度与任务列表：单条页签根本不显示这些数据，
+// 白白发请求，还会让用户以为页面「在忙」。
+watch(activeTab, (tab) => {
+  if (tab !== 'batch') {
+    stopPoll()
+  }
+})
+
 /**
  * 当前批量范围的可读描述 + 条数。
  *
@@ -898,20 +909,20 @@ onBeforeUnmount(stopPoll)
 
 <style scoped>
 .tip { font-size: 12.5px; color: var(--text-sub); line-height: 1.7; }
-.actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.nlp-tabs :deep(.el-tabs__header) { margin-bottom: 12px; }
+.actions { margin-top: var(--sp-3); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.nlp-tabs :deep(.el-tabs__header) { margin-bottom: var(--sp-3); }
 .nlp-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
 /* 「换病历」入口：选择病历卡收起后挂在载入条右侧 */
 .picker-toggle { font-weight: normal; margin-left: auto; }
 .loaded-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
   background: var(--ink-light);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px 14px;
+  padding: var(--sp-2) 14px;
   font-size: 12.5px;
   color: var(--text-sub);
   margin-bottom: 14px;
@@ -935,12 +946,12 @@ onBeforeUnmount(stopPoll)
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--sp-4);
   align-items: start;
 }
 .pane { min-width: 0; }
-.pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: 8px; }
-.src-note { font-size: 11.5px; color: var(--ink-mid); font-weight: normal; margin-left: 8px; }
+.pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: var(--sp-2); }
+.src-note { font-size: 11.5px; color: var(--ink-mid); font-weight: normal; margin-left: var(--sp-2); }
 .src-note.warn { color: var(--danger); }
 .norm-note {
   font-size: 12px;
@@ -948,13 +959,13 @@ onBeforeUnmount(stopPoll)
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   margin-bottom: 10px;
   line-height: 1.7;
 }
 .norm-note b { color: var(--ink); font-weight: normal; }
 .norm-note.warn {
-  background: #fdf6f4;
+  background: var(--danger-surface);
   border-color: #e3c3bb;
   color: #8a3d33;
 }
@@ -965,7 +976,7 @@ onBeforeUnmount(stopPoll)
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   margin-bottom: 10px;
   line-height: 1.8;
 }
@@ -974,8 +985,8 @@ onBeforeUnmount(stopPoll)
 .norm-stat b.bad { color: var(--danger); }
 .ns-line + .ns-line { margin-top: 2px; }
 .ns-legend {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
   border-top: 1px dashed #ece8dc;
   display: flex;
   flex-direction: column;
@@ -995,12 +1006,12 @@ onBeforeUnmount(stopPoll)
 .dot.none { background: transparent; }
 /* 无产出提示：把「为什么没有结果」摆到填写区上方，不藏在空态里 */
 .nlp-off {
-  background: #fdf6f4;
+  background: var(--danger-surface);
   border: 1px solid #e3c3bb;
   border-left: 3px solid var(--danger);
   border-radius: 6px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-3);
   font-size: 12.5px;
   line-height: 1.8;
   color: #8a3d33;
@@ -1009,21 +1020,21 @@ onBeforeUnmount(stopPoll)
 
 /* 术语归一试算：词典直查，不依赖 NLP 服务 */
 .norm-tool {
-  margin-top: 12px;
-  padding: 10px 12px;
+  margin-top: var(--sp-3);
+  padding: 10px var(--sp-3);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.nt-hd { font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
-.nt-row { display: flex; gap: 8px; align-items: center; }
+.nt-hd { font-size: 12px; color: var(--text-sub); margin-bottom: var(--sp-2); }
+.nt-row { display: flex; gap: var(--sp-2); align-items: center; }
 .nt-result {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
   border-top: 1px dashed #ece8dc;
   font-size: 12.5px;
 }
@@ -1032,17 +1043,17 @@ onBeforeUnmount(stopPoll)
 .nt-out { color: var(--ink); font-weight: bold; }
 .nt-out.miss { color: var(--danger); font-weight: normal; }
 .nt-src { font-size: 11.5px; color: var(--text-sub); margin-left: auto; }
-.nt-hint { margin-top: 8px; font-size: 11.5px; color: var(--text-sub); line-height: 1.7; }
+.nt-hint { margin-top: var(--sp-2); font-size: 11.5px; color: var(--text-sub); line-height: 1.7; }
 
 /* 原文模块化字段；分区常显 + 3 列栅格：
    wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。
    再收紧行距与列间距，控件高度由 .compact-form 统一压到 small（24px） */
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
 .form-grid .wide { grid-column: span 2; }
-.form-group { margin-bottom: 4px; }
+.form-group { margin-bottom: var(--sp-1); }
 .group-hd {
   position: relative;
-  padding: 3px 0 4px 8px;
+  padding: 3px 0 var(--sp-1) var(--sp-2);
   margin-bottom: 6px;
   font-size: 12px;
   font-weight: bold;
@@ -1065,13 +1076,13 @@ onBeforeUnmount(stopPoll)
 .composed-panel {
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 0 12px;
+  padding: 0 var(--sp-3);
   margin-bottom: 10px;
 }
 .composed-hd {
   cursor: pointer;
   list-style: none;
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   font-size: 12.5px;
   color: var(--ink-mid);
 }
@@ -1084,7 +1095,7 @@ onBeforeUnmount(stopPoll)
   position: sticky;
   bottom: 0;
   background: var(--surface);
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   border-top: 1px solid var(--line);
   z-index: 1;
 }
@@ -1092,7 +1103,7 @@ onBeforeUnmount(stopPoll)
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   font-size: 12.5px;
   line-height: 1.9;
   color: var(--text);
@@ -1105,14 +1116,14 @@ onBeforeUnmount(stopPoll)
 
 /* 批量解析（页面内嵌） */
 .batch-filter {
-  margin: 14px 0 4px;
-  padding: 12px 14px;
+  margin: 14px 0 var(--sp-1);
+  padding: var(--sp-3) 14px;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.bf-title { font-size: 12.5px; color: var(--text-sub); margin-bottom: 8px; }
-.batch-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; }
+.bf-title { font-size: 12.5px; color: var(--text-sub); margin-bottom: var(--sp-2); }
+.batch-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 var(--sp-1); }
 .batch-progress {
   margin-top: 14px;
   padding: 10px 14px;
@@ -1120,12 +1131,12 @@ onBeforeUnmount(stopPoll)
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.bp-hd { font-size: 12.5px; color: var(--text); margin-bottom: 8px; }
+.bp-hd { font-size: 12.5px; color: var(--text); margin-bottom: var(--sp-2); }
 .bp-hd b { color: var(--ink); }
-.bp-sub { margin-top: 8px; font-size: 12px; color: var(--text-sub); }
-.batch-failures { margin-top: 14px; border-top: 1px dashed #ece8dc; padding-top: 12px; }
-.batch-list { margin-top: 16px; border-top: 1px dashed #ece8dc; padding-top: 12px; }
-.bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: 8px; }
+.bp-sub { margin-top: var(--sp-2); font-size: 12px; color: var(--text-sub); }
+.batch-failures { margin-top: 14px; border-top: 1px dashed #ece8dc; padding-top: var(--sp-3); }
+.batch-list { margin-top: var(--sp-4); border-top: 1px dashed #ece8dc; padding-top: var(--sp-3); }
+.bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: var(--sp-2); }
 
 @media (max-width: 1560px) {
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

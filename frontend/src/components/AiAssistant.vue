@@ -37,7 +37,7 @@
             <div v-for="(m, i) in messages" :key="i" class="msg" :class="m.role">
               <template v-if="m.role === 'user'">{{ m.text }}</template>
               <template v-else>
-                <p v-for="(line, j) in lines(m.text)" :key="j">{{ line }}</p>
+                <p v-for="(line, j) in messageLines[i] || []" :key="j">{{ line }}</p>
                 <!-- 来源标签：区分「规则回答」与「AI 回答」，不让规则输出看起来像模型产出 -->
                 <span v-if="m.source" class="msg-src">{{ m.source === 'rule' ? '规则回答（LLM 未启用）' : 'AI 回答' }}</span>
               </template>
@@ -113,7 +113,11 @@ const COMMANDS = [
 ]
 
 // 回答按空行拆段渲染，避免整块文字堆成一段
-const lines = (t) => (t || '').split('\n').filter((l) => l.trim() !== '')
+// 每条消息的行数组：原来在模板里 lines(m.text) 每次渲染都重新 split + filter。
+// 按下标对齐 messages，模板改用 messageLines[i]。
+const messageLines = computed(() =>
+  messages.value.map((m) => (m.text || '').split('\n').filter((l) => l.trim() !== ''))
+)
 
 // ===== 拖动（球与面板共用；位置存 localStorage）=====
 // 默认落在右下角（留 26px 边距，再减去球自身尺寸）
@@ -364,7 +368,7 @@ onBeforeUnmount(() => {
 .aii-hd {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   padding: 10px 14px;
   background: var(--ink, #2f4639);
   color: #f1ede0;
@@ -380,7 +384,7 @@ onBeforeUnmount(() => {
   background: #9bb7a4;
 }
 .aii-title { font-size: 13.5px; font-weight: bold; }
-.aii-sub { font-size: 11px; color: #c9b99a; margin-left: 2px; }
+.aii-sub { font-size: 11.5px; color: #c9b99a; margin-left: 2px; }
 /* 「清空」「收起」用无底透明按钮，避免在深色标题栏上抢视觉 */
 .aii-clear,
 .aii-close {
@@ -396,7 +400,7 @@ onBeforeUnmount(() => {
 
 /* 可查范围提示条：浅色底与上方标题栏区分 */
 .aii-scope {
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   font-size: 11.5px;
   color: var(--text-sub, #8a8578);
   background: var(--ink-light, #eef3ee);
@@ -408,7 +412,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   border-bottom: 1px solid #ece8dc;
 }
 .cmd {
@@ -427,12 +431,12 @@ onBeforeUnmount(() => {
 .aii-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--sp-3);
   font-size: 12.5px;
   line-height: 1.7;
 }
 .aii-empty { color: var(--text-sub, #8a8578); }
-.msg { border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; word-break: break-word; }
+.msg { border-radius: 6px; padding: var(--sp-2) 10px; margin-bottom: 10px; word-break: break-word; }
 /* 用户消息靠右留白，与 AI 消息一眼分开 */
 .msg.user {
   background: var(--ink-light, #eef3ee);
@@ -444,13 +448,13 @@ onBeforeUnmount(() => {
   border: 1px solid var(--line, #e4dfd2);
   color: var(--ink, #2f4639);
 }
-.msg.ai p { margin: 0 0 4px; }
+.msg.ai p { margin: 0 0 var(--sp-1); }
 .msg.ai p:last-child { margin-bottom: 0; }
 /* 回答来源标签 */
 .msg-src {
   display: inline-block;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-sub, #8a8578);
 }
 .msg.loading { color: var(--text-sub, #8a8578); }
@@ -458,8 +462,8 @@ onBeforeUnmount(() => {
 /* 输入区固定在面板底部 */
 .aii-input {
   display: flex;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--sp-2);
+  padding: 10px var(--sp-3);
   border-top: 1px solid #ece8dc;
   background: var(--surface);
 }
