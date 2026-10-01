@@ -260,18 +260,22 @@ public class EntityNormalizer {
      * @param vo           归一后的抽取结果，就地修改
      * @param prescription 原始处方列（可空）
      * @param tcmDiagnosis 原始中医诊断列（可空）
+     * @param pattern      原始辨证结论列（可空），用于证候回补
      */
-    public void backfillFromRaw(NlpExtractVO vo, String prescription, String tcmDiagnosis) {
-        backfillFromRaw(vo, com.tcm.ehr.common.utils.RequestUtils.currentOrgId(), prescription, tcmDiagnosis);
+    public void backfillFromRaw(NlpExtractVO vo, String prescription, String tcmDiagnosis, String pattern) {
+        backfillFromRaw(vo, com.tcm.ehr.common.utils.RequestUtils.currentOrgId(),
+                prescription, tcmDiagnosis, pattern);
     }
 
     /** 组织级回填；批任务请传任务行上的 orgId 快照 */
-    public void backfillFromRaw(NlpExtractVO vo, String orgId, String prescription, String tcmDiagnosis) {
+    public void backfillFromRaw(NlpExtractVO vo, String orgId, String prescription,
+                                String tcmDiagnosis, String pattern) {
         if (vo == null) {
             return;
         }
         boolean touched = backfillHerbs(vo, orgId, prescription);
         touched |= backfillDiseases(vo, orgId, tcmDiagnosis);
+        touched |= backfillPatterns(vo, orgId, pattern);
         // 1. 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
         if (touched) {
             normalize(vo);
@@ -339,6 +343,47 @@ public class EntityNormalizer {
             target.add(e);
         }
         vo.setDiseases(target);
+        return true;
+    }
+
+    /**
+     * 证候回补：目标字段是 {@code Entity.content}，原料是辨证结论列（{@code pattern}）。
+     *
+     * <p><b>为什么需要它</b>：证候只有模型一条来源（{@code python-nlp} 的规则兜底不含
+     * patternList），实测 1000 条里 200 条模型漏抽 —— 而词典里那些词都在。
+     * 中医诊断列有疾病回补、处方列有中药回补，辨证结论列同样该有。</p>
+     *
+     * <p>用 {@code scan} 而不是按顿号裸切分：切分不查词典，会把「经络不通」这类
+     * 非标准词原样塞进 patternList，反而制造未归一项（统计模块曾有一份这样的局部兜底）。</p>
+     */
+    private boolean backfillPatterns(NlpExtractVO vo, String orgId, String pattern) {
+        if (TextUtil.isBlank(pattern)) {
+            return false;
+        }
+        List<NlpExtractVO.Entity> patterns = vo.getPatternList();
+        // 1. 异常触发：全部已归一就不必回补
+        if (patterns != null && !patterns.isEmpty() && allNormalized(patterns, NlpExtractVO.Entity::getNormLevel)) {
+            return false;
+        }
+        Set<String> hits = termNormalizer.scan("pattern", orgId, pattern);
+        if (hits.isEmpty()) {
+            return false;
+        }
+        // 2. 剔除截断项：未归一 + content 是某命中词的真子串
+        if (patterns != null) {
+            patterns.removeIf(e -> e != null
+                    && e.getNormLevel() == null
+                    && isProperSubstringOfAny(e.getContent(), hits));
+        }
+        // 3. append 已命中的完整词
+        List<NlpExtractVO.Entity> target = patterns == null ? new ArrayList<>() : patterns;
+        for (String std : hits) {
+            NlpExtractVO.Entity e = new NlpExtractVO.Entity();
+            e.setContent(std);
+            e.setSourceText(std);
+            target.add(e);
+        }
+        vo.setPatternList(target);
         return true;
     }
 

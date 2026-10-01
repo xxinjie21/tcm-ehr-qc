@@ -29,6 +29,12 @@ public final class EntityTypes {
                              String fileName, List<String> fallback, int order) {
     }
 
+    // rawFields = 该类型的「专属原文来源列」。空列表不等于「抽不出来」：
+    // 模型是对 NlpTextComposer 拼出的**整段文本**做 NER，只要方剂/治法的字样出现在
+    // 任一已拼入的列里，模型的「方剂」标签仍会命中（python-nlp 的 LABEL_FIELD 有此标签）。
+    // 空列表只表示「没有哪一列是专门给它准备的」——所以下面这两个别当成坏配置去补源：
+    // 本数据集 prescription 列是纯中药清单（无方剂名）、也没有「治以…」文本，
+    // 方剂/治法恒空是数据如此，不是接线问题。
     private static final List<EntityType> ALL = List.of(
             new EntityType("disease", "疾病", "diseases", true, "diseases.json",
                     List.of("tcmDiagnosis", "westernDiagnosis"), 1),

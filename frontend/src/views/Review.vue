@@ -103,7 +103,7 @@
             原始结构化数据（NLP 抽取）<span class="mini-tag">只读锁定</span>
           </h2>
           <div class="panel-bd">
-            <div v-for="f in COMPARE_FIELDS" :key="f.key" class="field-row">
+            <div v-for="f in visibleCompareFields" :key="f.key" class="field-row">
               <div class="flabel">{{ f.label }}</div>
               <div class="fvalue">
                 <span v-if="originalText(f.key)">{{ originalText(f.key) }}</span>
@@ -135,7 +135,7 @@
           <h2 class="panel-hd hd-right">人工修正</h2>
           <div class="panel-bd">
             <div
-              v-for="f in COMPARE_FIELDS"
+              v-for="f in visibleCompareFields"
               :key="f.key"
               class="field-row"
               :class="{ fixed: isFixed(f.key) }"
@@ -227,6 +227,26 @@ const FIELDS = fieldsWithWide([
   'inspection', 'pulse', 'tongue', 'physicalExam', 'pattern', 'prescription', 'followUp'
 ])
 
+// 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算（核心 6 要素，取自规则集目录）
+const FIELD_BY_ITEM = {
+  疾病: 'diseases',
+  症状: 'symptoms',
+  证候: 'patternList',
+  舌象: 'tongueList',
+  脉象: 'pulseList',
+  中药: 'herbs'
+}
+
+/**
+ * 核心要素的 structuredData 键集合。
+ *
+ * <p>对照区据此区分两类字段：<b>核心要素</b>（参与「核心字段缺失」扣分）无论空不空都要显示，
+ * 因为「缺失（抽取为空）」正是提示复核员去补；<b>非核心</b>（治法 / 方剂 / 病因）只做展示，
+ * 空的时候渲染出来只会让人以为病历缺项，而那是补不了的假象 —— 例如本数据集里
+ * {@code prescription} 列是纯中药清单、没有方剂名，方剂永远抽不出来。</p>
+ */
+const CORE_KEYS = new Set(Object.values(FIELD_BY_ITEM))
+
 /**
  * 对照区的字段（功能设计附录A 的 9 类实体）。
  * termType 指向词典类型；治法/病因在现有词典里没有对应类别，故用普通输入框。
@@ -242,16 +262,6 @@ const COMPARE_FIELDS = [
   { key: 'symptoms', label: '症状', termType: 'symptom' },
   { key: 'causeList', label: '病因', termType: '' }
 ]
-
-// 扣分明细里「核心字段缺失」的 item 名 → structuredData 键，用于预估评分回算（核心 6 要素，取自规则集目录）
-const FIELD_BY_ITEM = {
-  疾病: 'diseases',
-  症状: 'symptoms',
-  证候: 'patternList',
-  舌象: 'tongueList',
-  脉象: 'pulseList',
-  中药: 'herbs'
-}
 
 // 时间格式化：去掉 T、截到分钟；空值返回「—」，避免列表里出现 Invalid Date
 const fmt = (t) => (t ? fmtDateTime(t,'minute') : '—')
@@ -369,6 +379,19 @@ const originalTextMap = computed(() => {
   return out
 })
 const originalText = (key) => originalTextMap.value.get(key) || ''
+
+/**
+ * 对照区实际渲染的字段。
+ *
+ * <p>核心要素一律显示（空就是「缺失（抽取为空）」，供复核员去补）；
+ * 非核心要素只在<b>原文有值或复核员改过</b>时显示 —— 否则会为每条病历都渲染一行
+ * 「缺失（抽取为空）」，而那是补不了的假象（见 {@link CORE_KEYS} 的说明）。</p>
+ */
+const visibleCompareFields = computed(() =>
+  COMPARE_FIELDS.filter(
+    (f) => CORE_KEYS.has(f.key) || !!originalText(f.key) || !!editValues[f.key]
+  )
+)
 // 判断人工修正框是否与原值不同，用于整行高亮「已改动」
 const isFixed = (key) => String(editValues[key] || '') !== originalText(key)
 

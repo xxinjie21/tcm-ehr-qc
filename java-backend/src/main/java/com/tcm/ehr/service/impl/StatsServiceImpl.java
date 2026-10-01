@@ -306,6 +306,11 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         for (Record r : records) {
             List<String> terms = extractFromStructured(r, jsonKey);
             // 2. 证候这一类特殊：结构化没抽到时回退原始辨证结论并切分多证组合串
+            //    ⚠️ 这是「未重解析的旧数据」的**过渡兜底**：裸切分不查词典，同义写法
+            //    （「肝阳上亢」vs「肝阳上亢证」）会各计一份，与归一口径不一致。
+            //    归一主链现已补上证候回补（EntityNormalizer.backfillPatterns），
+            //    病历重解析后 patternList 不再为空，本分支自然不再触发 ——
+            //    全部数据重解析后可删掉这一段。
             if ((terms == null || terms.isEmpty()) && "pattern".equals(fallbackField) && r.getPattern() != null) {
                 // 原始辨证结论是多证候组合串（顿号/逗号分隔），切分防整串污染统计
                 terms = Arrays.stream(r.getPattern().split("[、，,；;]"))

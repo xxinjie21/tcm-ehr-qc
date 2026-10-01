@@ -526,7 +526,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         entityNormalizer.normalize(vo, orgId);
         // 3.1 §九 ④：抽取器把长词切短（"天麻"→"天"）或整段漏掉（脉位）时，
         //     用处方 / 中医诊断两列原文回补。异常触发，无未归一项就完全不触发。
-        entityNormalizer.backfillFromRaw(vo, orgId, r.getPrescription(), r.getTcmDiagnosis());
+        entityNormalizer.backfillFromRaw(vo, orgId, r.getPrescription(), r.getTcmDiagnosis(), r.getPattern());
         // 4. 打上词典版本再写库：归一结果与当时词典版本必须成对，否则事后无法判断该不该重算
         String json = objectMapper.writeValueAsString(vo);
         json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());
