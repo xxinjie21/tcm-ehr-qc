@@ -86,7 +86,30 @@ public final class RequestUtils {
 
     /** 本请求是否「不限组织」（管理员看全部）；false 时按 orgId 过滤，空 orgId 走 fail-closed */
     public static boolean viewAllOrgs() {
-        return Boolean.TRUE.equals(attr(ATTR_VIEW_ALL_ORGS));
+        return Boolean.TRUE.equals(rawAttr(ATTR_VIEW_ALL_ORGS));
+    }
+
+    /**
+     * 取请求属性的<b>原始</b>值（不转字符串）。
+     *
+     * <p>⚠️ 不能用 {@link #attr}：它是给「角色 / 用户名」这类<b>文本</b>属性用的，
+     * 会把值 {@code String.valueOf} 成字符串并把空值兜成 {@code "unknown"}。
+     * 布尔标记那样取会得到 {@code "true"}/{@code "unknown"}，
+     * 再拿 {@code Boolean.TRUE.equals(...)} 比就<b>恒为 false</b> ——
+     * 于是 {@code auth.admin-can-view-data} 开关静默失效，管理员被永久限定在
+     * 自己所属组织里、看不到其它组织的数据（实测 1000 条只看得到 500 条）。</p>
+     *
+     * @param key 属性名
+     * @return 原始值；无请求上下文时返回 null
+     */
+    private static Object rawAttr(String key) {
+        try {
+            return RequestContextHolder.currentRequestAttributes()
+                    .getAttribute(key, RequestAttributes.SCOPE_REQUEST);
+        } catch (Exception e) {
+            // 无请求上下文（后台线程 / 单测）返回 null，由调用方按 false 处理
+            return null;
+        }
     }
 
     /** 当前操作人是否是系统管理员 */
