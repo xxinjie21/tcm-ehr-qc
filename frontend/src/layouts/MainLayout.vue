@@ -15,7 +15,6 @@
         <!-- 右上角显示「这是谁」：用户名为主、角色为辅。
              原来只有角色标签 —— 两个管理员在页面上长得一模一样，
              操作出了问题分不清是谁做的（roleLabel 现降级为徽标）。 -->
-        <span class="avatar" aria-hidden="true">{{ (displayName || '用').charAt(0) }}</span>
         <span class="user-name" :title="userStore.username || ''">{{ displayName }}</span>
         <span class="user-role">{{ roleLabel }}</span>
         <el-button link class="logout" @click="handleLogout">退出</el-button>
@@ -202,15 +201,6 @@ const handleLogout = async () => {
 }
 .llm-entry:hover {
   color: var(--surface);
-}
-.topbar .avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #4d6b58;
-  text-align: center;
-  line-height: 28px;
-  font-size: 12px;
 }
 /* 顶栏是深色底（.topbar background: var(--ink)），所以这里必须用浅色 ——
    之前按浅底习惯写了 color: var(--ink)，等于深绿字压深绿底，用户完全看不清。 */
