@@ -126,7 +126,8 @@ class NlpBatchServiceImplTest {
 
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), nlpClient, mock(EntityNormalizer.class),
-                mock(IDictionaryFileService.class), new ObjectMapper());
+                mock(IDictionaryFileService.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                new ObjectMapper());
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> svc.submit(new com.tcm.ehr.domain.dto.NlpBatchDTO(), "tester"));
@@ -146,7 +147,8 @@ class NlpBatchServiceImplTest {
 
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), mock(PythonNlpClient.class), mock(EntityNormalizer.class),
-                mock(IDictionaryFileService.class), new ObjectMapper());
+                mock(IDictionaryFileService.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                new ObjectMapper());
         // workers 为 null 时 shutdown() 会提前返回，所以得给一个真池子
         ReflectionTestUtils.setField(svc, "workers", Executors.newSingleThreadExecutor());
 

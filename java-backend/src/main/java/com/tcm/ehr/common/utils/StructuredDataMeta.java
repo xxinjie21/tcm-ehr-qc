@@ -33,25 +33,36 @@ public final class StructuredDataMeta {
      *
      * @param json 结构化数据 JSON（可能为空）
      * @param dictVersion 词典版本串；空则不打点
+     * @param dictTermCount 这次归一实际覆盖的词典词条数（可空）；用于在页面上把
+     *                      版本串翻译成「依据 N 条词条」，否则用户只看到一个无从解读的哈希
      * @return 打点后的 JSON；解析/序列化失败时原样返回，绝不因打点失败而丢数据
      */
-    public static String stamp(ObjectMapper mapper, String json, String dictVersion) {
+    public static String stamp(ObjectMapper mapper, String json, String dictVersion,
+                               Integer dictTermCount) {
         // 1. 没内容或没版本号就不打点，原样返回
         if (json == null || json.isBlank() || dictVersion == null || dictVersion.isBlank()) {
             return json;
         }
         try {
-            // 2. 解析后塞 _meta（版本 + 打点时刻），再序列化回去
+            // 2. 解析后塞 _meta（版本 + 打点时刻 + 词条数），再序列化回去
             Map<String, Object> data = mapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
             Map<String, Object> meta = new LinkedHashMap<>();
             meta.put("dictVersion", dictVersion);
             meta.put("dictCapturedAt", LocalDateTime.now().withNano(0).format(TS));
+            if (dictTermCount != null) {
+                meta.put("dictTermCount", dictTermCount);
+            }
             data.put(META_KEY, meta);
             return mapper.writeValueAsString(data);
         } catch (Exception e) {
             // 3. 打点失败原样返回：宁可没有版本信息，也不能弄丢结构化数据本身
             return json;
         }
+    }
+
+    /** 兼容旧调用点（不带词条数） */
+    public static String stamp(ObjectMapper mapper, String json, String dictVersion) {
+        return stamp(mapper, json, dictVersion, null);
     }
 }

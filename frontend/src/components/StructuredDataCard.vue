@@ -103,6 +103,10 @@ const hasAny = computed(() => sections.some((s) => list(s.key).length > 0))
 
 // 词典版本元信息（落库时打点，见 StructuredDataMeta）；旧数据没有则为空、不展示
 const dictVersion = computed(() => parsed.value?._meta?.dictVersion || '')
+// 短指纹：各词典类型的 contentVersion 前 8 位拼成（如 "herb:a1b2c3d4;pattern:…"）
+const dictVersionShort = computed(() => dictVersion.value.slice(0, 40))
+// 归一实际覆盖的词条数：新数据才有；旧数据为空则模板退回显示指纹
+const dictTermCount = computed(() => parsed.value?._meta?.dictTermCount || 0)
 // 词典采集时间（与 dictVersion 同一处 _meta 打点）；旧数据没有则空串、不展示
 const dictCapturedAt = computed(() => parsed.value?._meta?.dictCapturedAt || '')
 
@@ -195,6 +199,12 @@ const levelDesc = (level, raw, name) => {
 }
 .sd-meta b { color: var(--ink-mid); font-weight: normal; }
 .sd-meta-t { margin-left: var(--sp-1); }
+.sd-meta-fp {
+  margin-left: var(--sp-1);
+  color: var(--text-sub);
+  cursor: help;
+  border-bottom: 1px dotted var(--line);
+}
 .sd-sec { margin-bottom: var(--sp-3); }
 .sd-sec-title {
   font-size: 13px;

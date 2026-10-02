@@ -20,7 +20,7 @@ public class AiQueryDTO {
     private String recordId;
 
     /** 使用者业务问题（chat 必填） */
-    @NotBlank(message = "问题不能为空")
+    @NotBlank(message = "请输入你的问题")
     @Size(max = 2000, message = "问题最长 2000 字")
     private String question;
 

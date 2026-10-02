@@ -14,6 +14,13 @@ import java.util.List;
 public class LoginVO {
 
     private String token;
+    /**
+     * 用户名。
+     *
+     * <p>页面右上角要显示「这是谁」，而不是显示角色 —— 两个管理员在页面上长得一样，
+     * 出问题时分不清是谁操作的。角色只作次要徽标。</p>
+     */
+    private String username;
     private String role;
     private List<String> menus;
 

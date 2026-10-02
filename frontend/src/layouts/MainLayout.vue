@@ -12,8 +12,12 @@
         <el-button link class="llm-entry" @click="llmVisible = true">
           导入 LLM
         </el-button>
-        <span class="avatar" aria-hidden="true">{{ userStore.role?.charAt(0) || '用' }}</span>
-        <span>{{ roleLabel }}</span>
+        <!-- 右上角显示「这是谁」：用户名为主、角色为辅。
+             原来只有角色标签 —— 两个管理员在页面上长得一模一样，
+             操作出了问题分不清是谁做的（roleLabel 现降级为徽标）。 -->
+        <span class="avatar" aria-hidden="true">{{ (displayName || '用').charAt(0) }}</span>
+        <span class="user-name" :title="userStore.username || ''">{{ displayName }}</span>
+        <span class="user-role">{{ roleLabel }}</span>
         <el-button link class="logout" @click="handleLogout">退出</el-button>
       </div>
     </header>
@@ -114,7 +118,11 @@ const breadcrumb = computed(() => {
  * 所以这里不能再按管理员隐藏，否则普通用户没有入口去配自己的模型。</p>
  */
 const isAdmin = computed(() => userStore.role === '管理员')
-// 身份下标：管理员 / 所有者 / 成员 / 未加入组织
+// 右上角主标识：优先用户名；旧数据（未重登录、localStorage 里没有 username）
+// 回退到角色标签，避免出现空白 —— 直接改版上线时老会话不会崩。
+const displayName = computed(() => userStore.username || roleLabel.value)
+
+// 身份下标：管理员 / 所有者 / 成员 / 未加入组织（现降级为徽标）
 const roleLabel = computed(() => {
   if (userStore.role === '管理员') return '管理员'
   if (userStore.orgRole === 'owner') return '所有者'
@@ -203,6 +211,17 @@ const handleLogout = async () => {
   text-align: center;
   line-height: 28px;
   font-size: 12px;
+}
+.user-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+.user-role {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 12px;
+  color: var(--text-sub);
 }
 .logout {
   color: #d8dfd9;

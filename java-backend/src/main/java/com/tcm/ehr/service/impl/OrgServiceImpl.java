@@ -137,7 +137,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     public OrgVOs.OrgInfo createOrg(OrgDTOs.CreateOrgRequest body, String creatorUserId) {
         String name = body == null || body.getName() == null ? "" : body.getName().trim();
         if (name.isEmpty()) {
-            throw new IllegalArgumentException("组织名称不能为空");
+            throw new IllegalArgumentException("请填写组织名称");
         }
         if (name.length() > 100) {
             throw new IllegalArgumentException("组织名称最长 100 字");

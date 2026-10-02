@@ -63,7 +63,7 @@ public class NlpController {
         // 1. 取待抽取文本，为空回 400（其余情况一律降级）
         String text = dto == null ? null : dto.getText();
         if (text == null || text.isBlank()) {
-            return ResponseEntity.badRequest().body(Result.error(400, "待抽取文本不能为空"));
+            return ResponseEntity.badRequest().body(Result.error(400, "请输入待抽取文本"));
         }
         // 2. 转发 Python 抽取服务
         NlpExtractVO vo = nlpClient.extract(text);

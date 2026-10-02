@@ -152,6 +152,7 @@
             :rules="FORM_RULES"
             label-width="72px"
             size="small"
+            scroll-to-error
           >
             <!-- 语义分区 + 多列栅格：原先 21 字段平铺是 1000px+ 长表单，
                  改成折叠分组后用户仍要逐组展开、整页依旧要滚动。

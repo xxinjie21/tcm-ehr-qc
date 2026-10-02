@@ -34,11 +34,11 @@ public class RegisterDTO {
      */
     public static final String GROUP_CODE_PATTERN = "^\\s*$|^[A-Za-z0-9_-]{2,50}$";
 
-    @NotBlank(message = "用户名不能为空")
+    @NotBlank(message = "请输入用户名")
     @Pattern(regexp = USERNAME_PATTERN, message = "用户名须为 2~20 位字母、数字、下划线或中文")
     private String username;
 
-    @NotBlank(message = "密码不能为空")
+    @NotBlank(message = "请输入密码")
     /**
      * 密码最短 6 位 —— 与前端 {@code Register.vue} 的 min=6 对齐。
      * 上限 72 防超长输入拖慢 BCrypt（而非列宽约束；users.password 是 VARCHAR(255)，
@@ -61,11 +61,11 @@ public class RegisterDTO {
     @Data
     public static class CreateGroup {
 
-        @NotBlank(message = "课题组编码不能为空")
+        @NotBlank(message = "请填写课题组编码")
         @Pattern(regexp = GROUP_CODE_PATTERN, message = "课题组编码须为 2~50 位字母、数字、短横线或下划线")
         private String code;
 
-        @NotBlank(message = "课题组名称不能为空")
+        @NotBlank(message = "请填写课题组名称")
         @Size(max = 100, message = "课题组名称最长 100 字")
         private String name;
 

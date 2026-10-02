@@ -98,7 +98,7 @@ class AuthControllerTest {
                         .content(json("   ", "123456")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("用户名不能为空"));
+                .andExpect(jsonPath("$.msg").value("请输入用户名"));
     }
 
     @Test
@@ -108,7 +108,7 @@ class AuthControllerTest {
                         .content(json("admin", "")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("密码不能为空"));
+                .andExpect(jsonPath("$.msg").value("请输入密码"));
     }
 
     @Test
@@ -162,7 +162,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.msg").value("课题组编码不能为空"));
+                .andExpect(jsonPath("$.msg").value("请填写课题组编码"));
     }
 
     @Test
@@ -187,7 +187,7 @@ class AuthControllerTest {
                         .content(registerJson("   ", "123456")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("用户名不能为空"));
+                .andExpect(jsonPath("$.msg").value("请输入用户名"));
     }
 
     /**
@@ -201,7 +201,7 @@ class AuthControllerTest {
                         .content(registerJson("", "123456")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("用户名不能为空"));
+                .andExpect(jsonPath("$.msg").value("请输入用户名"));
     }
 
     /** 长度约束：2~20 字符（长度写在正则可避免与 @NotBlank 重复报错） */

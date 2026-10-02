@@ -10,6 +10,8 @@ import { defineStore } from 'pinia'
 export const useUserStore = defineStore('user', {
   state: () => ({
     token: localStorage.getItem('token') || '',
+    // 用户名：右上角显示「这是谁」。只显示 role 的话两个管理员长得一模一样。
+    username: localStorage.getItem('username') || '',
     role: localStorage.getItem('role') || '',
     menus: JSON.parse(localStorage.getItem('menus') || '[]'),
     orgId: localStorage.getItem('orgId') || '',
@@ -34,9 +36,10 @@ export const useUserStore = defineStore('user', {
   },
 
   actions: {
-    setLogin({ token, role, menus, orgId = '', orgRole = '', status = '', pendingGroup = false,
-      canWriteDictionary = false, canWriteQcRules = false }) {
+    setLogin({ token, username, role, menus, orgId = '', orgRole = '', status = '',
+      pendingGroup = false, canWriteDictionary = false, canWriteQcRules = false }) {
       this.token = token
+      this.username = username || ''
       this.role = role
       this.menus = menus || []
       this.orgId = orgId || ''
@@ -46,6 +49,7 @@ export const useUserStore = defineStore('user', {
       this.canWriteDictionary = !!canWriteDictionary
       this.canWriteQcRules = !!canWriteQcRules
       localStorage.setItem('token', this.token)
+      localStorage.setItem('username', this.username)
       localStorage.setItem('role', this.role)
       localStorage.setItem('menus', JSON.stringify(this.menus))
       localStorage.setItem('orgId', this.orgId)
@@ -57,6 +61,7 @@ export const useUserStore = defineStore('user', {
     },
     logout() {
       this.token = ''
+      this.username = ''
       this.role = ''
       this.menus = []
       this.orgId = ''
@@ -66,6 +71,7 @@ export const useUserStore = defineStore('user', {
       this.canWriteDictionary = false
       this.canWriteQcRules = false
       localStorage.removeItem('token')
+      localStorage.removeItem('username')
       localStorage.removeItem('role')
       localStorage.removeItem('menus')
       localStorage.removeItem('orgId')

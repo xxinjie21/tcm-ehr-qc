@@ -173,6 +173,9 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         // 4. 签发 JWT（组织**不**进 token），并按身份下发菜单
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole()));
+        // 用户名随登录下发：页面右上角要显示「这是谁」。只给 role 的话，
+        // 两个管理员在页面上长得一模一样，操作出问题分不清是谁做的。
+        vo.setUsername(user.getUsername());
         vo.setRole(user.getRole());
         vo.setOrgId(g.hasGroup() ? g.getOrgId() : "");
         vo.setOrgRole(g.hasGroup() ? g.getGroupRole() : null);

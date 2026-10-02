@@ -1,6 +1,7 @@
 package com.tcm.ehr.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.domain.po.DictionaryBackup;
 import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.DictionaryVersion;
@@ -20,6 +21,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
@@ -247,6 +250,81 @@ public class DictionaryTermStore {
             // SHA-256 不可用不该发生；退化成内容长度+首词，至少不抛异常中断启动
             return "len" + keys.size() + "_" + (keys.isEmpty() ? "" : keys.get(0));
         }
+    }
+
+    /**
+     * 该组织归一<b>实际用到</b>的词典状态摘要：5 类词典各自「本组织 → 基础层」的有效版本。
+     *
+     * <p><b>为什么不能用文件哈希</b>（原 {@code currentVersion()}）：词典源在批次 8b 已从文件
+     * 改成这张表，文件哈希从此<b>冻结不变</b> —— 库里 500 条记录的 {@code dictVersion}
+     * 全都是同一个值，既无法区分、也<b>不代表真正用的那版词典</b>。</p>
+     *
+     * <p>实现上只读 {@code dictionary_versions}（每 (org,type) 一行），
+     * 是两次轻查询；不重读词条 —— 词条量大（pattern 类两千多条）时重读会拖慢批量解析。</p>
+     *
+     * @param orgId 组织号；空串/null 视为基础层
+     * @return 5 类有效版本拼成的摘要串（未收录的类型跳过）
+     */
+    public String effectiveDictVersion(String orgId) {
+        String org = norm(orgId);
+        Map<String, String> base = versionsOf(BASE_ORG);
+        Map<String, String> own = org.isEmpty() ? Map.of() : versionsOf(org);
+        StringBuilder sb = new StringBuilder();
+        for (String type : TermTypes.ALL) {
+            // 本组织没配这一类就回退基础层 —— 与 readEffective 的回落口径保持一致
+            String v = own.getOrDefault(type, base.get(type));
+            if (v != null && !v.isBlank()) {
+                sb.append(type).append(':').append(v, 0, Math.min(8, v.length())).append(';');
+            }
+        }
+        return sb.isEmpty() ? null : sb.toString();
+    }
+
+    /** 某组织（或基础层）各类词典的内容版本 → 版本串 */
+    private Map<String, String> versionsOf(String org) {
+        Map<String, String> out = new HashMap<>();
+        for (DictionaryVersion v : versionMapper.selectList(
+                new QueryWrapper<DictionaryVersion>().eq("org_id", org))) {
+            if (v.getType() != null && v.getVersion() != null && !v.getVersion().isBlank()) {
+                out.put(v.getType(), v.getVersion());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 该组织归一实际覆盖的词典词条总数（5 类求和，按「本组织 → 基础层」取其一）。
+     *
+     * <p>用来把版本串翻译成「依据 N 条词条」——用户看到的是一个哈希时无从判断它代表什么，
+     * 看到「依据 3,589 条词条 · 采集于 2026-10-02」才知道用的是多大的词库。</p>
+     */
+    public int effectiveTermCount(String orgId) {
+        String org = norm(orgId);
+        Map<String, Integer> base = countsOf(BASE_ORG);
+        Map<String, Integer> own = org.isEmpty() ? Map.of() : countsOf(org);
+        int sum = 0;
+        for (String type : TermTypes.ALL) {
+            Integer n = own.containsKey(type) ? own.get(type) : base.get(type);
+            if (n != null) {
+                sum += n;
+            }
+        }
+        return sum;
+    }
+
+    /** 某组织（或基础层）各类词典的词条数 */
+    private Map<String, Integer> countsOf(String org) {
+        Map<String, Integer> out = new HashMap<>();
+        for (Map<String, Object> row : termMapper.selectMaps(
+                new QueryWrapper<DictionaryTerm>().eq("org_id", org).select("type", "COUNT(*) AS n")
+                        .groupBy("type"))) {
+            Object type = row.get("type");
+            Object n = row.get("n");
+            if (type != null && n instanceof Number num) {
+                out.put(String.valueOf(type), num.intValue());
+            }
+        }
+        return out;
     }
 
     // ---------------- 内部工具 ----------------

@@ -73,6 +73,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private final PythonNlpClient nlpClient;
     private final EntityNormalizer entityNormalizer;
     private final IDictionaryFileService dictionaryFileService;
+    /** 词典状态（版本 / 词条数）：归一打点要用「真正生效的那版词典」，不是词典还在文件时代留下的冻结哈希 */
+    private final com.tcm.ehr.service.DictionaryTermStore termStore;
     private final ObjectMapper objectMapper;
 
     @Value("${nlp.batch.concurrency:2}")
@@ -529,7 +531,13 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         entityNormalizer.backfillFromRaw(vo, orgId, r.getPrescription(), r.getTcmDiagnosis(), r.getPattern());
         // 4. 打上词典版本再写库：归一结果与当时词典版本必须成对，否则事后无法判断该不该重算
         String json = objectMapper.writeValueAsString(vo);
-        json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());
+        // ⚠️ 原先打的是 dictionaryFileService.currentVersion() —— 那是词典还在文件时代
+        //    的文件哈希。词典源在批次 8b 已入库，文件哈希从此冻结不变，库里 500 条记录
+        //    的 dictVersion 全是同一个值，既无法区分、也不是真正用的那版词典。
+        //    这里改用「本组织归一实际覆盖的 5 类词典」的有效版本 + 词条数。
+        json = StructuredDataMeta.stamp(objectMapper, json,
+                termStore.effectiveDictVersion(orgId),
+                termStore.effectiveTermCount(orgId));
         recordMapper.updateStructuredData(r.getId(), json);
     }
 

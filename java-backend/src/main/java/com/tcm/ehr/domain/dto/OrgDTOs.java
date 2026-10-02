@@ -36,7 +36,7 @@ public final class OrgDTOs {
     /** 拒绝建组申请 */
     @Data
     public static class RejectRequest {
-        @NotBlank(message = "拒绝理由不能为空")
+        @NotBlank(message = "请填写拒绝理由")
         private String reason;
     }
 
@@ -66,21 +66,21 @@ public final class OrgDTOs {
     /** owner 按用户名搜索后拉人 */
     @Data
     public static class AddMemberRequest {
-        @NotBlank(message = "用户 ID 不能为空")
+        @NotBlank(message = "请选择用户")
         private String userId;
     }
 
     /** owner 退出前必须指定继任者；管理员改派所有者同样用它 */
     @Data
     public static class TransferOwnerRequest {
-        @NotBlank(message = "新所有者用户 ID 不能为空")
+        @NotBlank(message = "新所有者请选择用户")
         private String newOwnerUserId;
     }
 
     /** 归档组织（仅管理员，前提成员数为 0） */
     @Data
     public static class ArchiveOrgRequest {
-        @NotBlank(message = "归档原因不能为空")
+        @NotBlank(message = "请填写归档原因")
         private String reason;
     }
 }

@@ -347,11 +347,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     public CreateRecordVO createRecord(CreateRecordDTO dto) {
         // 1. 必填校验：登记号
         if (dto == null || TextUtil.isBlank(dto.getRegistrationNo())) {
-            throw new IllegalArgumentException("登记号不能为空");
+            throw new IllegalArgumentException("请填写登记号");
         }
         // 2. 必填校验：门诊号
         if (TextUtil.isBlank(dto.getOutpatientNo())) {
-            throw new IllegalArgumentException("门诊号不能为空");
+            throw new IllegalArgumentException("请填写门诊号");
         }
         // 3. 组装病历实体：主键由服务端生成，21 个原始字段原样落库；入本组
         Record r = new Record();
