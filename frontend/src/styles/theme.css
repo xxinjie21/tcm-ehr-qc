@@ -116,30 +116,41 @@ body {
   border-radius: 2px;
 }
 
-/* ===== 紧凑表单 ===== */
-/* 填写区要求「不滚动就能填完」，统一三件事：① 控件走 small 尺寸（24px，由 el-form 的 size 下发）；
-   ② 标签左置，一个字段只占一行，不再「标签一行 + 控件一行」；
-   ③ 文本域单行起步、随输入自增。同样的字段数纵向约省四成高度。
-   校验红字改回占位（默认是浮层，行距收紧后会压住下一行）。 */
+/* ===== 紧凑表单 =====
+   目标从「一屏填完」调整为「录入不难受」：实测 24px 控件 + 1px 内边距太窄，
+   光标命中率低、误触相邻字段，21 个字段的手工录入代价被放大。
+   现在改为：
+   ① 控件高度 32px（等效 default 尺寸，仍比 large 小，比原 small 舒适）；
+   ② 标签仍左置、一字段一行、文本域随输入自增 —— 纵向密度基本没丢；
+   ③ 行间距从 6px 放到 10px，给红字留位置。
+   宽度仍靠 3 列栅格压缩，所以整体高度只比原来增加约 25%。 */
 .compact-form .el-form-item {
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 .compact-form .el-form-item__label {
   font-size: 12px;
   line-height: 1.5;
   padding-bottom: 0;
 }
+/* 32px：el-input__wrapper 的默认 padding 是 5px 11px，这里给 5px 8px 保持横向紧凑 */
 .compact-form .el-input__wrapper,
 .compact-form .el-select__wrapper {
-  padding: 1px 8px;
+  min-height: 32px;
+  padding: 5px 8px;
 }
 .compact-form .el-textarea__inner {
-  padding: 3px 8px;
-  line-height: 1.5;
+  padding: 6px 8px;
+  line-height: 1.6;
+  min-height: 56px;
 }
 .compact-form .el-form-item__error {
   position: static;
-  padding-top: 1px;
+  padding-top: 2px;
+}
+/* 聚焦时描边加粗一档：控件变大后更需要明确的焦点指示 */
+.compact-form .el-input__wrapper.is-focus,
+.compact-form .el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--ink-mid) inset;
 }
 
 /* ===== 视觉隐藏（给屏幕阅读器的文本，不占视觉空间） ===== */

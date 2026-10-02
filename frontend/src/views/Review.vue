@@ -1,6 +1,10 @@
 <template>
   <div class="review-page">
     <!-- ① 待复核任务列表 -->
+    <!-- 两个页签：「待复核任务」是复核主入口（原有内容一字未改）；
+         「全部病历」让复核员也能像在病历数据页那样浏览全部病历，并展开同一套对照面板。 -->
+    <el-tabs v-model="activeTab" class="rv-tabs">
+    <el-tab-pane label="待复核任务" name="tasks">
     <PanelCard title="待复核任务列表">
       <div class="rv-bar">
         <!-- 这里的视觉标签是普通 span（不是 <label for>），控件本身没有无障碍名称，
@@ -65,6 +69,48 @@
         @size-change="handleSizeChange"
       />
     </PanelCard>
+    </el-tab-pane>
+
+    <el-tab-pane label="全部病历" name="records">
+      <PanelCard title="全部病历（可浏览并展开对照）">
+        <div class="rv-bar">
+          <el-button size="small" @click="loadAllRecords()">刷新</el-button>
+          <span class="tip">
+            点任意一行即可在下方展开与复核完全相同的原文对照 / 人工修正面板。
+            该病历若没有待复核任务，则只可查看与修正、不能提交裁决（后端要求任务存在）。
+          </span>
+        </div>
+        <RecordTable
+          ref="allTableRef"
+          :rows="allRows"
+          :loading="allLoading"
+          loading-text="正在读取病历…"
+          highlight-current
+          :max-height="360"
+          :action-width="90"
+          @row-click="openReviewFromRecords"
+        >
+          <template #action="{ row }">
+            <el-button link type="primary" @click.stop="openReviewFromRecords(row)">查看</el-button>
+          </template>
+          <template #empty>
+            <EmptyState :failed="allFailed" :loading="allLoading" text="没有符合条件的病历"
+                        @retry="() => loadAllRecords()" />
+          </template>
+        </RecordTable>
+        <el-pagination
+          v-model:current-page="allPage"
+          v-model:page-size="allPageSize"
+          :page-sizes="PAGE_SIZES_STANDARD"
+          :total="allTotal"
+          layout="total, sizes, prev, pager, next"
+          style="margin-top: var(--sp-3); justify-content: flex-end"
+          @current-change="loadAllRecords"
+          @size-change="handleAllSizeChange"
+        />
+      </PanelCard>
+    </el-tab-pane>
+    </el-tabs>
 
     <div v-loading="detailLoading" element-loading-text="正在读取复核详情…">
       <!-- ② 当前任务卡：详情区头部，右上角固定「关闭详情」出口。
@@ -74,8 +120,13 @@
         <span class="task-id">{{ current.recordId }}</span>
         <span class="tag tag-score">当前评分：{{ current.score ?? '—' }} 分</span>
         <span v-for="t in issueTags" :key="t" class="tag tag-issue">{{ t }}</span>
-        <span class="deadline">
+        <!-- 截止时间与「还剩几天」只对**待复核任务**成立；从「全部病历」进入时没有任务，
+             这两个字段是空的，显示「—」只会让人误以为任务已过期 -->
+        <span v-if="current.taskId" class="deadline">
           复核截止：<b>{{ fmt(current.deadlineTime) }}</b>（{{ remainText }}）
+        </span>
+        <span v-else class="no-task-tip">
+          该病历没有待复核任务 —— 可查看与修正，提交裁决需从「待复核任务」进入
         </span>
         <el-button class="close-top" :disabled="submitting" @click="closeReview">关闭详情</el-button>
       </section>
@@ -196,8 +247,18 @@
           <!-- 补关闭入口：此前只有保存 / 通过两个出口，想只读退出无处可点。
                在任务卡右上角再加一处，底部这处保留 —— 读到最底也有出口 -->
           <el-button :disabled="submitting" @click="closeReview">关闭详情</el-button>
-          <el-button :loading="submitting" @click="submit(false)">保存修改</el-button>
-          <el-button type="primary" :loading="submitting" @click="submit(true)">复核通过</el-button>
+          <el-tooltip
+            :disabled="!!current?.taskId"
+            content="该病历没有待复核任务；后端要求任务存在才能提交裁决，请从「待复核任务」页签进入"
+            placement="top"
+          >
+            <span>
+              <el-button :loading="submitting" :disabled="!current?.taskId" @click="submit(false)">保存修改</el-button>
+              <el-button type="primary" :loading="submitting" :disabled="!current?.taskId" @click="submit(true)">
+                复核通过
+              </el-button>
+            </span>
+          </el-tooltip>
         </div>
       </section>
     </div>
@@ -208,7 +269,7 @@
 // 人工复核页：上方是待复核 / 已完成任务列表，点「进入复核」在下方展开该任务的病历原文对照、
 // NLP 原始结构化数据（只读）与人工修正表单，左右并排比对。
 // 关键取舍：修正提交前只做「已补齐核心字段把对应扣分加回」的本地预估，最终评分与分级以服务端重算为准。
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
@@ -219,6 +280,9 @@ import { qcScore, getQcRules } from '@/api/qc'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { fieldsWithWide } from '@/utils/recordFields'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
+import RecordTable from '@/components/RecordTable.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import { searchRecords } from '@/api/records'
 import { gradeOf, gradeHint, gradeClass, THRESHOLD_PLACEHOLDER } from '@/utils/grade'
 
 // 字段定义收敛到 @/utils/recordFields（P3.5）；复核列表的整行集合
@@ -274,6 +338,46 @@ const total = ref(0)
 const skippedMissing = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
+
+// ===== 页签 =====
+const activeTab = ref('tasks')
+
+// ===== 「全部病历」列表 =====
+const allRows = ref([])
+const allTotal = ref(0)
+const allPage = ref(1)
+const allPageSize = ref(10)
+const allLoading = ref(false)
+const allFailed = ref(false)
+const allTableRef = ref(null)
+
+/**
+ * 拉「全部病历」列表。
+ *
+ * <p>数据域仍由后端按登录者身份过滤（管理员看全部 / 其余看本组织），
+ * 这里不自己拼组织条件 —— 前端拼的条件改一次就得全页同步，漏一处就是越权。</p>
+ */
+const loadAllRecords = async (p) => {
+  if (p) allPage.value = p
+  allLoading.value = true
+  allFailed.value = false
+  try {
+    const res = await searchRecords({ page: allPage.value, pageSize: allPageSize.value })
+    allRows.value = res.data?.records || []
+    allTotal.value = res.data?.total || 0
+  } catch {
+    // 拦截器已提示；仍要标成失败，否则空态会误显示成「没有病历」
+    allFailed.value = true
+    allRows.value = []
+  } finally {
+    allLoading.value = false
+  }
+}
+
+const handleAllSizeChange = (sz) => {
+  allPageSize.value = sz
+  loadAllRecords(1)
+}
 const loading = ref(false)
 
 // 查询复核任务列表：传数字即跳到该页；失败由拦截器提示，不清空已有行
@@ -484,6 +588,18 @@ const estimate = computed(() => {
 
 // 进入复核：先清空上一次的详情与表单，再并行拉病历原文与质控评分，随后异步取 AI 预检
 // （AI 失败不影响复核，只提示改用扣分明细），最后滚动到任务卡提示已展开
+/**
+ * 从「全部病历」进入复核。
+ *
+ * <p>病历列表行的主键叫 {@code id}，复核任务行叫 {@code recordId}；
+ * 这里补齐成 openReview 期望的形状。<b>刻意不带 taskId</b> ——
+ * 后端 submitReview 要求该病历存在待复核任务，从「全部病历」进入的病历可能没有，
+ * 提交按钮据此禁用（见模板），而不是让用户填完表才被后端拒绝。</p>
+ */
+const openReviewFromRecords = (row) => {
+  openReview({ recordId: row.id, score: row.score, taskId: null, fromRecords: true })
+}
+
 const openReview = async (row) => {
   // 1. 先切到该任务并进入加载态
   current.value = row
@@ -585,6 +701,13 @@ const loadThresholds = async () => {
   }
 }
 
+// 切到「全部病历」时才加载：进页面就查会白付一次请求（大多数人先看任务）
+watch(activeTab, (tab) => {
+  if (tab === 'records' && allRows.value.length === 0) {
+    loadAllRecords()
+  }
+})
+
 onMounted(() => {
   load(1)
   loadThresholds()
@@ -592,6 +715,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.rv-tabs :deep(.el-tabs__header) {
+  margin-bottom: var(--sp-3);
+}
+.no-task-tip {
+  color: var(--text-sub);
+  font-size: 12px;
+}
 .rv-bar {
   display: flex;
   align-items: center;
