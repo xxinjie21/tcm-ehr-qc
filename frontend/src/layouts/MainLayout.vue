@@ -212,16 +212,22 @@ const handleLogout = async () => {
   line-height: 28px;
   font-size: 12px;
 }
+/* 顶栏是深色底（.topbar background: var(--ink)），所以这里必须用浅色 ——
+   之前按浅底习惯写了 color: var(--ink)，等于深绿字压深绿底，用户完全看不清。 */
 .user-name {
   font-weight: 600;
-  color: var(--ink);
+  color: #f2f6f3;          /* 近白：与 --ink 底对比度 ≈ 12:1 */
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .user-role {
   padding: 1px 6px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 2px;
   font-size: 12px;
-  color: var(--text-sub);
+  color: #dbe4de;          /* 徽标比用户名弱一档，与 --surface(#fff) 区分 */
 }
 .logout {
   color: #d8dfd9;

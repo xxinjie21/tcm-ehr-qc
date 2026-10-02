@@ -1,9 +1,20 @@
 <template>
   <div class="sd-card">
-    <!-- 可追溯：这份结构化数据是依据哪一版术语词典产生的（抽取/归一落库时打点） -->
-    <div v-if="dictVersion" class="sd-meta">
-      依据词典版本 <b>{{ dictVersion }}</b>
+    <!-- 可追溯：这份结构化数据是依据哪一版术语词典产生的（抽取/归一落库时打点）。
+         主行只给人能判断的信息（依据多少条词条 + 什么时候采集），
+         哈希串是技术标识，放 tooltip 里；直接把 81 字符的
+         "disease:c2dd2a1e;pattern:…;" 甩在页面上没有任何解读价值。 -->
+    <div v-if="dictVersion || dictCapturedAt" class="sd-meta">
+      依据词典<template v-if="dictTermCount"> <b>{{ dictTermCount }} 条词条</b></template>
       <span v-if="dictCapturedAt" class="sd-meta-t">· 采集于 {{ dictCapturedAt }}</span>
+      <el-tooltip v-if="dictVersion" placement="top">
+        <template #content>
+          词典内容指纹：{{ dictVersion }}<br>
+          同一份词典内容才会得到同一个指纹；词典改动后指纹随之变化，
+          据此可判断某份结构化数据是由「哪一版词库」归一出来的。
+        </template>
+        <span class="sd-meta-fp">查看版本指纹</span>
+      </el-tooltip>
     </div>
     <template v-if="hasAny">
       <div v-for="sec in sections" :key="sec.key" class="sd-section">
@@ -103,8 +114,6 @@ const hasAny = computed(() => sections.some((s) => list(s.key).length > 0))
 
 // 词典版本元信息（落库时打点，见 StructuredDataMeta）；旧数据没有则为空、不展示
 const dictVersion = computed(() => parsed.value?._meta?.dictVersion || '')
-// 短指纹：各词典类型的 contentVersion 前 8 位拼成（如 "herb:a1b2c3d4;pattern:…"）
-const dictVersionShort = computed(() => dictVersion.value.slice(0, 40))
 // 归一实际覆盖的词条数：新数据才有；旧数据为空则模板退回显示指纹
 const dictTermCount = computed(() => parsed.value?._meta?.dictTermCount || 0)
 // 词典采集时间（与 dictVersion 同一处 _meta 打点）；旧数据没有则空串、不展示
