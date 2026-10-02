@@ -229,38 +229,23 @@
       </div>
 
       <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动 -->
-      <el-table v-loading="precheckLoading" element-loading-text="正在预检待复核项…" :data="precheckRows" border size="small" max-height="360">
-        <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
-        <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
-        <el-table-column prop="grade" label="分级" width="90" />
-        <!-- 接诊时间：常态只到日，悬停给秒级原值。
-             只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
-             会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
-        <el-table-column label="接诊时间" width="110">
-          <template #default="{ row }">
-            <VisitTimeCell :visit-time="row.visitTime" />
-          </template>
-        </el-table-column>
-        <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
-             后端两字段是追加、向后兼容，回滚不需要动后端 -->
-        <el-table-column label="年龄/性别" width="110">
-          <template #default="{ row }">
-            <AgeGenderCell :age="row.age" :gender="row.gender" />
-          </template>
-        </el-table-column>
-        <!-- 操作列固定在右侧：表格横向滚动时始终可见 -->
-        <el-table-column label="操作" width="120" fixed="right">
-          <template #default="{ row }">
+      <RecordTable
+          ref="precheckTableRef"
+          :rows="precheckRows"
+          :loading="precheckLoading"
+          loading-text="正在预检待复核项…"
+          :max-height="360"
+          :action-width="120"
+        >
+          <template #action="{ row }">
             <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
           </template>
-        </el-table-column>
-        <template #empty>
-          <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一套 searchRecords 查询，
-               原先只写「无数据」，用户不知道是没查到、还是页面坏了 -->
-          <EmptyState :failed="precheckFailed" :loading="precheckLoading"
-            text="筛选范围内没有病历" @retry="() => loadPrecheck(1)" />
-        </template>
-      </el-table>
+          <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一份 searchRecords 查询 -->
+          <template #empty>
+            <EmptyState :failed="precheckFailed" :loading="precheckLoading"
+              text="筛选范围内没有病历" @retry="() => loadPrecheck(1)" />
+          </template>
+        </RecordTable>
       <!-- 分页：切换每页条数时回到第 1 页（见 handleSizeChange） -->
       <el-pagination
         v-model:current-page="precheckPage"
@@ -336,6 +321,7 @@ import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
+import RecordTable from '@/components/RecordTable.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { recomputeQc, getQcBatch, qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'

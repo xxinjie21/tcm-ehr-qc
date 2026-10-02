@@ -13,48 +13,21 @@
            一条内部滚动条。实测：写 320 时可视区只有 288px，差 32px 就冒滚动条；写 360 与人工复核、
            质控校验同口径，10 行正好铺满且不滚（>10 条时仍保留滚动，属预期）。
            改小这个值等于把滚动条加回来 -->
-      <el-table
-        v-loading="listLoading"
-      element-loading-text="正在读取任务列表…"
-        :data="rows"
-        border
-        size="small"
-        max-height="360"
-        highlight-current-row
+      <RecordTable
+        ref="tableRef"
+        :rows="rows"
+        :loading="listLoading"
+        loading-text="正在读取任务列表…"
+        highlight-current
         :row-class-name="rowClass"
-        style="margin-top: var(--sp-3)"
+        :max-height="360"
+        :action-width="90"
         @row-click="loadRecord"
       >
-        <!-- 列口径与「病历数据」的病历列表一致（病历ID 为 UUID，36 字符，需给足宽度）。
-             原「登记号」列已删：/records/search 返回的 SearchVO.Item 里没有该字段，恒为空 -->
-        <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
-        <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
-        <el-table-column prop="grade" label="分级" width="90" />
-        <!-- 接诊时间：常态只到日，悬停给秒级原值。
-             只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
-             会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
-        <el-table-column label="接诊时间" width="110">
-          <template #default="{ row }">
-            <VisitTimeCell :visit-time="row.visitTime" />
-          </template>
-        </el-table-column>
-        <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
-             后端两字段是追加、向后兼容，回滚不需要动后端 -->
-        <el-table-column label="年龄/性别" width="110">
-          <template #default="{ row }">
-            <AgeGenderCell :age="row.age" :gender="row.gender" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click.stop="loadRecord(row)">载入</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <EmptyState :failed="listFailed" :loading="listLoading"
-            text="无符合条件的病历" @retry="() => search(1)" />
+        <template #action="{ row }">
+          <el-button link type="primary" @click.stop="loadRecord(row)">载入</el-button>
         </template>
-      </el-table>
+      </RecordTable>
 
       <el-pagination
         v-model:current-page="page"
@@ -375,6 +348,7 @@
 // 单条：原文按字段模块化可逐项改，抽取后展示归一结果、可写回该病历结构化数据（覆盖原有）；
 // 批量：仅管理员可见，走后端异步任务，提交后可关页面、靠轮询刷新进度。归一只认 ES 词典，索引不可用即整体失败。
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
+import RecordTable from '@/components/RecordTable.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'

@@ -589,7 +589,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         vo.setTotal(p.getTotal());
         for (Record r : p.getRecords()) {
             vo.getRecords().add(new SearchVO.Item(r.getId(), summarize(r), r.getGrade(),
-                    r.getVisitTime(), r.getGender(), r.getAge()));
+                    r.getVisitTime(), r.getGender(), r.getAge(), r.getScore()));
         }
         return vo;
     }

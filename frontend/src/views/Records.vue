@@ -28,48 +28,26 @@
             <span class="tip-inline">共 {{ total }} 条</span>
           </div>
 
-          <el-table
+          <RecordTable
             ref="tableRef"
-            v-loading="searching"
-    element-loading-text="正在检索病历…"
-            :data="rows"
-            border
-            size="small"
-            style="margin-top: var(--sp-3)"
-            max-height="420"
+            :rows="rows"
+            :loading="searching"
+            loading-text="正在检索病历…"
+            selectable
             :row-class-name="rowClass"
+            :max-height="420"
+            :action-width="150"
             @selection-change="onSelectionChange"
           >
-            <el-table-column type="selection" width="46" />
-            <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
-            <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
-            <el-table-column prop="grade" label="分级" width="90" />
-            <!-- 接诊时间：常态只到日，悬停给秒级原值。
-                 只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
-                 会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上；hover 保留完整精度用于核对 -->
-            <el-table-column label="接诊时间" width="110">
-              <template #default="{ row }">
-                <VisitTimeCell :visit-time="row.visitTime" />
-              </template>
-            </el-table-column>
-            <!-- 年龄/性别：单块自包含，需回滚时整块删掉即可 ——
-                 后端两字段是追加、向后兼容，回滚不需要动后端 -->
-            <el-table-column label="年龄/性别" width="110">
-              <template #default="{ row }">
-                <AgeGenderCell :age="row.age" :gender="row.gender" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
-              <template #default="{ row }">
+            <template #action="{ row }">
                 <el-button link type="primary" @click="openDetail(row.id)">查看</el-button>
                 <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
-              </template>
-            </el-table-column>
+            </template>
             <template #empty>
               <EmptyState :failed="listFailed" :loading="searching"
                 text="无符合条件的病历" @retry="handleSearch" />
             </template>
-          </el-table>
+          </RecordTable>
 
           <el-pagination
             v-model:current-page="page"
@@ -231,6 +209,7 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
+import RecordTable from '@/components/RecordTable.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'

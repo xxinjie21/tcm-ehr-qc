@@ -35,18 +35,26 @@ public class SearchVO {
         private String gender;
         /** 年龄，与 gender 合成一列展示 */
         private String age;
+        /**
+         * 质控评分（0~100，未评分时为 null）。
+         *
+         * <p>与 {@code grade} 成对下发：分级是结论、评分是量值，两者分开算、分开看。
+         * 列表页要同时看到「多少分」与「算不算合格」—— 只给分级就看不出差几分。</p>
+         */
+        private Integer score;
 
         public Item() {
         }
 
         public Item(String id, String summary, String grade,
-                    LocalDateTime visitTime, String gender, String age) {
+                    LocalDateTime visitTime, String gender, String age, Integer score) {
             this.id = id;
             this.summary = summary;
             this.grade = grade;
             this.visitTime = visitTime;
             this.gender = gender;
             this.age = age;
+            this.score = score;
         }
     }
 }

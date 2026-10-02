@@ -612,6 +612,10 @@ components:
               age:
                 type: string
                 description: 年龄，与 gender 合成一列展示
+              score:
+                type: integer
+                nullable: true
+                description: 质控评分（0~100，未质评为 null）。与 grade 成对下发——分级是结论、评分是量值，只给分级看不出差几分
     # ========== NLP 抽取 DTO / VO ==========
     NlpExtractDTO:
       type: object
