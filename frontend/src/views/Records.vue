@@ -144,14 +144,14 @@
         <PanelCard title="单条新增病历">
           <!-- 紧凑口径：标签左置 + 控件 small + 文本域单行起步。
                只做了「分区常显 + 3 列栅格」，控件仍是 32px、标签各占一行，
-               用户实测仍要下拉；本轮直接压控件高度（.compact-form 见 theme.css） -->
+               用户实测仍要下拉；本轮改为 size="large"（控件 40px，见 theme.css .compact-form） -->
           <el-form
             ref="createFormRef"
             class="compact-form"
             :model="form"
             :rules="FORM_RULES"
             label-width="72px"
-            size="small"
+            size="large"
             scroll-to-error
           >
             <!-- 语义分区 + 多列栅格：原先 21 字段平铺是 1000px+ 长表单，

@@ -124,33 +124,41 @@ body {
    ② 标签仍左置、一字段一行、文本域随输入自增 —— 纵向密度基本没丢；
    ③ 行间距从 6px 放到 10px，给红字留位置。
    宽度仍靠 3 列栅格压缩，所以整体高度只比原来增加约 25%。 */
+/* ===== 录入表单 =====
+   ⚠️ 控件高度与字号**不再由本类控制**，改由 el-form 的 size="large" 统一决定
+   （Element 大号：控件 40px、字号 14px）。
+
+   此前这里写死 min-height:32px 却仍配 size="small"：只放大了高度、字号还是 12px，
+   实测仍然「太小」——手写病历时按空格键的误触率才是真问题，
+   光把框拉高而字不变等于没解决。
+
+   本类现在只负责**纵向密度与标签排布**：
+   ① 标签左置，一字段一行，不再「标签一行 + 控件一行」；
+   ② 文本域随输入自增，最小 3 行；
+   ③ 校验红字占位（默认是浮层，行距收紧后会压住下一行）。
+   横向宽度仍由各页的 3 列栅格压缩，整体高度比原始紧凑版增加约 35%。 */
 .compact-form .el-form-item {
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 .compact-form .el-form-item__label {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
-  padding-bottom: 0;
+  padding-bottom: 2px;
 }
-/* 32px：el-input__wrapper 的默认 padding 是 5px 11px，这里给 5px 8px 保持横向紧凑 */
-.compact-form .el-input__wrapper,
-.compact-form .el-select__wrapper {
-  min-height: 32px;
-  padding: 5px 8px;
-}
+/* 文本域：最小 3 行，方便一次看完整段现病史 */
 .compact-form .el-textarea__inner {
-  padding: 6px 8px;
+  min-height: 76px;
   line-height: 1.6;
-  min-height: 56px;
 }
 .compact-form .el-form-item__error {
   position: static;
-  padding-top: 2px;
+  padding-top: 3px;
+  font-size: 12px;
 }
-/* 聚焦时描边加粗一档：控件变大后更需要明确的焦点指示 */
+/* 聚焦描边加粗一档：控件变大后更需要明确的焦点指示 */
 .compact-form .el-input__wrapper.is-focus,
 .compact-form .el-select__wrapper.is-focused {
-  box-shadow: 0 0 0 1px var(--ink-mid) inset;
+  box-shadow: 0 0 0 2px var(--ink-mid) inset;
 }
 
 /* ===== 视觉隐藏（给屏幕阅读器的文本，不占视觉空间） ===== */

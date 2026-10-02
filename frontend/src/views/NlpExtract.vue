@@ -114,7 +114,8 @@
                 class="compact-form field-form"
                 label-width="68px"
                 @submit.prevent
-              >
+              
+                size="large">
                 <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
                   <div class="group-hd">{{ g.title }}</div>
                   <div class="form-grid">
@@ -1019,7 +1020,7 @@ onBeforeUnmount(stopPoll)
 
 /* 原文模块化字段；分区常显 + 3 列栅格：
    wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。
-   再收紧行距与列间距，控件高度由 .compact-form 统一压到 small（24px） */
+   再收紧行距与列间距，控件尺寸统一由 el-form 的 size="large" 决定（40px） */
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
 .form-grid .wide { grid-column: span 2; }
 .form-group { margin-bottom: var(--sp-1); }
