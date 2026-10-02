@@ -157,6 +157,11 @@ const loadMyOrg = async () => {
   try {
     const res = await getMyOrg()
     data.value = res.data || {}
+    // ⚠️ 原来只有「刷新成员」按钮会拉成员 —— onMounted 只调 loadMyOrg，
+    // 于是进页面成员表是空的，得手动点一次才出数据。这里跟着拉一次。
+    if (data.value.org) {
+      await loadMembers()
+    }
   } catch {
     // 拦截器已提示
   } finally {

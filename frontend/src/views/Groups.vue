@@ -33,7 +33,7 @@
               size="small"
               @click="archiveRow = row; archiveVisible = true"
             >归档</el-button>
-            <el-button link type="primary" size="small" @click="reassignRow = row; reassignVisible = true">改派所有者</el-button>
+            <el-button link type="primary" size="small" @click="openReassign(row)">改派所有者</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -51,11 +51,29 @@
 
     <!-- 改派所有者（owner 账号丢失时的兜底） -->
     <el-dialog v-model="reassignVisible" title="改派所有者" width="440px">
-      <p class="tip">把「{{ reassignRow?.name }}」的所有者改为指定用户；原所有者降为成员。</p>
-      <el-input v-model="newOwnerUserId" placeholder="新所有者的用户 ID" />
+      <p class="tip">把「{{ reassignRow?.name }}」的所有者改为下面选中的成员；原所有者降为成员。</p>
+      <!-- 继任者只能来自「当前组成员」：原先是裸的用户 ID 输入框，
+           既看不到用户名、又允许填组织外的人（后端会报「该用户不在此组织」）。 -->
+      <el-select
+        v-model="newOwnerUserId"
+        placeholder="选择本组织内的成员"
+        style="width: 100%"
+        filterable
+        :loading="reassignLoading"
+      >
+        <el-option
+          v-for="m in reassignCandidates"
+          :key="m.userId"
+          :label="m.username"
+          :value="m.userId"
+        />
+      </el-select>
+      <p v-if="!reassignLoading && !reassignCandidates.length" class="tip">
+        该组织没有可选成员（归档前提就是成员数为 0，故无法改派）
+      </p>
       <template #footer>
         <el-button @click="reassignVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!newOwnerUserId.trim()" @click="doReassign">确认改派</el-button>
+        <el-button type="primary" :disabled="!newOwnerUserId || !reassignCandidates.length" @click="doReassign">确认改派</el-button>
       </template>
     </el-dialog>
   </div>
@@ -67,7 +85,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
-import { listOrgs, stopGroup, activateGroup, archiveOrg, reassignOwner } from '@/api/org'
+import { listOrgs, stopGroup, activateGroup, archiveOrg, reassignOwner, listMembers } from '@/api/org'
 import { fmtDateTime } from '@/utils/format'
 
 const loading = ref(false)
@@ -79,6 +97,9 @@ const archiveRow = ref(null)
 const reassignVisible = ref(false)
 const reassignRow = ref(null)
 const newOwnerUserId = ref('')
+// 改派候选：该组织的当前成员（不提供全站用户搜索 —— 继任者必须本来就在组织里）
+const reassignCandidates = ref([])
+const reassignLoading = ref(false)
 
 const statusText = (s) => ({ active: '生效', stopped: '已停用', archived: '已归档' }[s] || s)
 
@@ -128,10 +149,27 @@ const doArchive = async () => {
   }
 }
 
-const doReassign = async () => {
-  if (!newOwnerUserId.value.trim() || !reassignRow.value) return
+/** 打开改派弹窗：先载入该组织成员作为候选人 */
+const openReassign = async (row) => {
+  reassignRow.value = row
+  newOwnerUserId.value = ''
+  reassignCandidates.value = []
+  reassignVisible.value = true
+  reassignLoading.value = true
   try {
-    await reassignOwner(reassignRow.value.id, newOwnerUserId.value.trim())
+    const res = await listMembers(row.id)
+    reassignCandidates.value = (res.data || []).filter((m) => m.role !== 'owner')
+  } catch {
+    // 拦截器已提示
+  } finally {
+    reassignLoading.value = false
+  }
+}
+
+const doReassign = async () => {
+  if (!newOwnerUserId.value || !reassignRow.value) return
+  try {
+    await reassignOwner(reassignRow.value.id, newOwnerUserId.value)
     ElMessage.success('已改派所有者')
     reassignVisible.value = false
     newOwnerUserId.value = ''
