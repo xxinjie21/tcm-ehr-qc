@@ -80,7 +80,7 @@
         <div class="rc-hd">① 病历应有这些要素（完整性）</div>
         <div class="rc-line">
           病历应有
-          <el-select v-model="form.elementNames" multiple collapse-tags size="small" style="min-width: 320px">
+          <el-select v-model="form.elementNames" multiple filterable collapse-tags size="small" style="min-width: 320px">
             <el-option v-for="e in catalogElements" :key="e.name" :label="e.name" :value="e.name" />
           </el-select>
           ；完全缺失每项扣
@@ -119,31 +119,41 @@
         <div v-for="(c, i) in form.consistency" :key="c.uid" class="rc-block">
           <div class="rc-line">
             若
-            <el-select v-model="c.triggerType" size="small" style="width: 120px">
+            <el-select v-model="c.triggerType" filterable size="small" style="width: 120px">
               <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
             </el-select>
             含
             <!-- 用 el-select-v2（虚拟滚动）：证候词典已 2080 条，普通 el-select 一次挂载
                  2000+ 个 el-option 会卡。allow-create 已移除 —— 候选表完整后从列表选即可，
-                 避免敲入词典外的错词导致一致性规则永不匹配 -->
+                 避免敲入词典外的错词导致一致性规则永不匹配。
+                 候选改为**远程检索**（remote + remote-method）：原先为喂一个下拉
+                 一次性把五类词典全量拉进内存（≈3589 个 option），现在展开才取前 50 条。 -->
             <el-select-v2
               v-model="c.triggerValues"
-              :options="termsOf(c.triggerType)"
-              multiple filterable collapse-tags size="small" style="min-width: 220px"
-              placeholder="从词典中选"
+              :options="termOptionsOf(c.triggerType).options.value"
+              :remote-method="termOptionsOf(c.triggerType).search"
+              :loading="termOptionsOf(c.triggerType).loading.value"
+              :visible-change="(v) => v && termOptionsOf(c.triggerType).preload()"
+              :remote-show-suffix="false"
+              multiple filterable remote collapse-tags size="small" style="min-width: 220px"
+              placeholder="从词典中选（可输入搜索）"
             />
           </div>
           <div class="rc-line">
             则
-            <el-select v-model="c.expectType" size="small" style="width: 120px">
+            <el-select v-model="c.expectType" filterable size="small" style="width: 120px">
               <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
             </el-select>
             应为
             <el-select-v2
               v-model="c.expectValues"
-              :options="termsOf(c.expectType)"
-              multiple filterable collapse-tags size="small" style="min-width: 220px"
-              placeholder="从词典中选"
+              :options="termOptionsOf(c.expectType).options.value"
+              :remote-method="termOptionsOf(c.expectType).search"
+              :loading="termOptionsOf(c.expectType).loading.value"
+              :visible-change="(v) => v && termOptionsOf(c.expectType).preload()"
+              :remote-show-suffix="false"
+              multiple filterable remote collapse-tags size="small" style="min-width: 220px"
+              placeholder="从词典中选（可输入搜索）"
             />
             冲突扣
             <el-input-number v-model="c.weight" size="small" :min="0" :controls="false" />
@@ -318,6 +328,7 @@
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useTermOptions } from '@/composables/useTermOptions'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
@@ -326,7 +337,6 @@ import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { recomputeQc, getQcBatch, qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
 import { searchRecords } from '@/api/records'
-import { getTerms } from '@/api/dictionary'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
@@ -427,7 +437,6 @@ const params = () => {
 const rulesVisible = ref(false)
 const savingRules = ref(false)
 // 各词典类型的标准词（供一致性"期望值"下拉，仅从词典选）
-const dictTerms = ref({})
 // 编辑用的表单副本：由 rules 克隆而来，保存时才组装回写服务端
 const form = reactive({
   rules: null,
@@ -445,28 +454,18 @@ const clone = (o) => JSON.parse(JSON.stringify(o))
 let uidSeq = 0
 const nextUid = () => 'u' + ++uidSeq
 // 取某词典类型的下拉选项（el-select-v2 的 {label,value} 结构）；未加载时返回空数组
-const termsOf = (type) => dictTerms.value[type] || []
+// 每类词典一个取数器（composable 内部有模块级缓存，同一类型的多个下拉共用一份，
+// 不会重复打同一接口）。模板里用 termOptionsOf(type) 取。
+const TERM_OPTION_HOLDERS = {}
 
-// 拉取五类词典的标准词，供一致性规则的「触发值 / 期望值」下拉（已取过的不重复请求）
-// 不传 page → 后端返回全部命中（原本硬截断 100 条，会让证候 2080 条只能选到前 100）
-const loadDictTerms = async () => {
-  // 1. 需要候选的词典类型固定五类
-  const types = ['disease', 'pattern', 'symptom', 'herb', 'formula']
-  // 2. 并发拉取；已取过的类型直接跳过，避免重复请求
-  await Promise.all(types.map(async (type) => {
-    if (dictTerms.value[type]) return
-    try {
-      // 3. 只留标准词，并直接组装成 el-select-v2 需要的 {label, value} 选项结构
-      const res = await getTerms({ type })
-      dictTerms.value[type] = (res.data?.terms || [])
-        .map((t) => t.standardTerm)
-        .filter(Boolean)
-        .map((s) => ({ label: s, value: s }))
-    } catch {
-      // 单类词典拉取失败 → 该类候选退化为空数组，不影响其余类型
-      dictTerms.value[type] = []
-    }
-  }))
+// 取某词典类型的候选取数器；type 为空时给一个「永不请求」的空壳，
+// 避免在下拉类型还没选时就去拉「未知类型」的词典
+const termOptionsOf = (type) => {
+  const key = type || '__none__'
+  if (!TERM_OPTION_HOLDERS[key]) {
+    TERM_OPTION_HOLDERS[key] = useTermOptions(() => type || 'disease')
+  }
+  return TERM_OPTION_HOLDERS[key]
 }
 
 // 打开规则配置：把当前规则克隆进表单，并确保词典候选已就绪
@@ -505,7 +504,7 @@ const openRules = async () => {
   }
   // 7. 打开弹窗，并预热词典候选（供「期望值」下拉）
   rulesVisible.value = true
-  loadDictTerms()
+  // 词典候选改为「展开下拉时按需预载」（见 useTermOptions），不再在此全量拉取
 }
 
 // 按 field 查一条格式规则

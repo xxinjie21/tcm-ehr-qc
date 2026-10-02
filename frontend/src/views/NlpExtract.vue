@@ -108,14 +108,15 @@
             <div class="pane">
               <div class="pane-hd">原文（按字段模块化，可单独修改）</div>
               <!-- 分区常显 + 多列栅格：原先 4 组折叠、默认只开 2 组，
-                   用户仍要逐组展开、整页依旧要滚动；与病历数据页  同一口径。
-                   再压控件高度（标签左置 + small + 文本域单行起步，见 theme.css） -->
+                   用户仍要逐组展开、整页依旧要滚动；与病历数据页同一口径。
+                   控件尺寸由 size="large" 决定（40px）；多行字段的高度由
+                   autosize 的 minRows 给 —— Element 的 autosize 会写行内
+                   style="height:…px"，CSS 里的 min-height 会被它压掉。 -->
               <el-form
                 class="compact-form field-form"
                 label-width="68px"
-                @submit.prevent
-              
-                size="large">
+                size="large"
+                @submit.prevent>
                 <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
                   <div class="group-hd">{{ g.title }}</div>
                   <div class="form-grid">
@@ -123,8 +124,8 @@
                       <el-input
                         v-model="fields[f.key]"
                         :type="f.multi ? 'textarea' : 'text'"
-                        :rows="1"
-                        :autosize="f.multi ? { minRows: 1, maxRows: 2 } : false"
+                        :rows="f.multi ? 3 : undefined"
+                        :autosize="f.multi ? { minRows: 3, maxRows: 6 } : false"
                         clearable
                       />
                     </el-form-item>

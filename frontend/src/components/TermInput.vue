@@ -1,20 +1,29 @@
 <template>
+  <!--
+    术语输入框（人工复核用）：绑定的是**自由文本**，一个字段可填「肝郁、脾虚」，
+    提交时由 buildCorrected 按分隔符拆开 —— 所以这里不能用 el-select，
+    否则会退化成「一个字段只能选一个词」。
+
+    候选取数见 composables/useTermOptions.js（与质控规则配置共用）。
+    与原版的差别：展开/聚焦会**预载一批候选**，点开不再是空的了
+    （原先 el-autocomplete 只有输入才出候选，用户不知道这里能搜国标术语）。
+  -->
   <el-autocomplete
     :model-value="modelValue"
-    :fetch-suggestions="querySearch"
+    :fetch-suggestions="fetchSuggestions"
     :placeholder="placeholder"
-    value-key="standardTerm"
+    :trigger-on-focus="false"
+    value-key="label"
     clearable
     style="width: 100%"
+    @focus="preload"
     @update:model-value="$emit('update:modelValue', $event)"
   />
 </template>
 
 <script setup>
-import { onBeforeUnmount } from 'vue'
-import { getTerms } from '@/api/dictionary'
+import { useTermOptions } from '@/composables/useTermOptions'
 
-// 术语输入框：按类型（疾病 / 证候 / 中药等）从词典联想，选中后回填标准词
 const props = defineProps({
   modelValue: { type: String, default: '' },
   type: { type: String, required: true },
@@ -23,41 +32,18 @@ const props = defineProps({
 
 defineEmits(['update:modelValue'])
 
-// 输入防抖间隔，避免逐字触发词典查询
-const DEBOUNCE_MS = 200
+const { options, searchWith, preload } = useTermOptions(props.type)
 
-let timer = null
-// latest-wins：每次真正发起请求时取号，回来时号不是最新就丢弃，
-// 避免慢的旧响应覆盖快的新结果
-let seq = 0
-
-// 联想查询：防抖后按类型拉词典候选，通过回调交给 el-autocomplete
-const querySearch = (keyword, cb) => {
-  // 1. 空关键字直接给空候选，不发请求
-  if (keyword === null || keyword === undefined || keyword === '') {
-    cb([])
+// el-autocomplete 的取候选回调（同步契约）：
+// 空输入 → 直接给预载的那批（点开就有内容）；有输入 → 防抖取回后再 cb，
+// 因为它拿到什么就渲染什么、不会等我们异步刷新。
+const fetchSuggestions = (keyword, cb) => {
+  const kw = String(keyword || '').trim()
+  if (!kw) {
+    cb(options.value)
     return
   }
-  // 2. 防抖：连续输入只保留最后一次
-  if (timer) clearTimeout(timer)
-  timer = setTimeout(async () => {
-    timer = null
-    const mine = ++seq
-    try {
-      // 3. 取候选；响应回来时若已不是最新一次输入则丢弃
-      const res = await getTerms({ type: props.type, keyword })
-      if (mine !== seq) return
-      cb(res.data.terms || [])
-    } catch {
-      // 词典接口异常 → 降级为无候选，不打断用户继续输入
-      if (mine !== seq) return
-      cb([])
-    }
-  }, DEBOUNCE_MS)
+  searchWith(kw, cb)
 }
 
-// 组件卸载时清掉尚未触发的防抖定时器
-onBeforeUnmount(() => {
-  if (timer) clearTimeout(timer)
-})
 </script>
