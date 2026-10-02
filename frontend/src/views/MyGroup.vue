@@ -74,7 +74,7 @@
             <el-table-column prop="joinTime" label="加入时间" width="180">
               <template #default="{ row }">{{ fmtDateTime(row.joinTime) }}</template>
             </el-table-column>
-            <el-table-column label="操作" width="150">
+            <el-table-column label="操作" width="190">
               <template #default="{ row }">
                 <template v-if="row.role !== 'owner'">
                   <el-button link type="primary" size="small" @click="doTransfer(row)">转让所有者</el-button>
@@ -98,7 +98,7 @@
       </div>
 
       <!-- 创建组织 -->
-      <el-dialog v-model="createDialog" title="创建组织" width="min(480px, 94vw)" top="10vh">
+      <el-dialog v-if="createDialog" v-model="createDialog" title="创建组织" width="min(480px, 94vw)" top="10vh">
         <el-form label-width="88px">
           <el-form-item label="组织名称">
             <el-input v-model="createForm.name" maxlength="100" placeholder="必填" />
@@ -119,7 +119,7 @@
       </el-dialog>
 
       <!-- 按用户名拉人 -->
-      <el-dialog v-model="addDialog" title="按用户名拉人" width="min(480px, 94vw)" top="10vh">
+      <el-dialog v-if="addDialog" v-model="addDialog" title="按用户名拉人" width="min(480px, 94vw)" top="10vh">
         <!-- ⚠️ 原来用的是 #append：Element Plus 的 append 插槽把内容渲染在输入框
              **外面**（两个相邻的盒子），不是框内的按钮；而且它带 :loading 的
              el-button 会在搜索时重排，导致输入框宽度/边框跳一下（看着像闪屏）。

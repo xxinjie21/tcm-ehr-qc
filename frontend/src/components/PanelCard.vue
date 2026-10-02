@@ -23,10 +23,15 @@ defineProps({
   border: 1px solid var(--line);
   border-radius: 6px;
   margin-bottom: 14px;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.15s ease;
 }
+/* hover 只给阴影，**不要** translateY：
+ * transform 会让 .panel 成为 position:fixed 后代的包含块 —— 面板内的
+ * el-dialog / el-tooltip / el-select 下拉（遮罩与弹层）会被限制在这个面板的
+ * 方框内（表现为「被方框截断」），且鼠标在面板内移动时 hover 反复求值，
+ * 包含块随之变化 → 弹层跳位 → 看起来就是闪屏。
+ * box-shadow 不参与布局，也不会创建包含块，纯绘制，安全。 */
 .panel:hover {
-  transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(47, 70, 57, 0.08);
 }
 .panel-hd {

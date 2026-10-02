@@ -47,7 +47,7 @@
     </PanelCard>
 
     <!-- 归档（前提成员数为 0） -->
-    <el-dialog v-model="archiveVisible" title="归档组织" width="min(440px, 94vw)" top="10vh">
+    <el-dialog v-if="archiveVisible" v-model="archiveVisible" title="归档组织" width="min(440px, 94vw)" top="10vh">
       <p class="tip">归档后该组织不再出现在生效列表；仅当成员数为 0 时允许。</p>
       <el-input v-model="archiveReason" type="textarea" :rows="3" placeholder="归档原因（必填）" />
       <template #footer>
@@ -57,7 +57,7 @@
     </el-dialog>
 
     <!-- 改派所有者（owner 账号丢失时的兜底） -->
-    <el-dialog v-model="reassignVisible" title="改派所有者" width="min(440px, 94vw)" top="10vh">
+    <el-dialog v-if="reassignVisible" v-model="reassignVisible" title="改派所有者" width="min(440px, 94vw)" top="10vh">
       <p class="tip">把「{{ reassignRow?.name }}」的所有者改为下面选中的成员；原所有者降为成员。</p>
       <!-- 继任者只能来自「当前组成员」：原先是裸的用户 ID 输入框，
            既看不到用户名、又允许填组织外的人（后端会报「该用户不在此组织」）。 -->
