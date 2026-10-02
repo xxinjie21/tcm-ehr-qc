@@ -2,10 +2,19 @@
   <div>
     <PanelCard title="我的组织">
       <!-- 按身份切三种视图：所有者（成员管理）/ 成员（组织信息）/ 未加入组织（引导） -->
-      <div v-if="loading" v-loading="loading" class="my-org-loading" />
+      <!-- 加载遮罩：容器常驻、遮罩只进出（与 Dashboard / Governance / Qc / Review 一致）。
+           原写法是 <div v-if="loading" v-loading="loading"> —— 用 v-if 承载 v-loading，
+           元素与遮罩同生同灭，遮罩移除与下一块内容挂载不同步，就会闪一下；
+           而且没给 element-loading-text，会显示 Element Plus 默认的英文 Loading...。
+           最小高度只在加载时给（.is-loading），避免不加载时一直占 160px。 -->
+      <div
+        v-loading="loading"
+        element-loading-text="正在读取我的组织…"
+        :class="['my-org-wrap', { 'is-loading': loading }]"
+      >
 
       <!-- 未加入组织：批次 6 起可自助创建；无「待加入池」也不再有「审批中」 -->
-      <div v-else-if="!data.org" class="my-org-empty">
+      <div v-if="!loading && !data.org" class="my-org-empty">
         <el-empty description="你还没有加入任何组织">
           <template #description>
             <p class="empty-hint">你可以自己创建一个组织（创建后你就是所有者），</p>
@@ -16,7 +25,7 @@
       </div>
 
       <!-- 有组织：所有者 / 成员共用 -->
-      <div v-else>
+      <div v-if="!loading && data.org">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="组织名称">{{ data.org.name }}</el-descriptions-item>
           <el-descriptions-item label="组织编码">{{ data.org.code }}</el-descriptions-item>
@@ -77,9 +86,10 @@
           <p class="member-note">成员在本组织只有读权限；需要拉人 / 转让等操作请联系所有者。</p>
         </template>
       </div>
+      </div>
 
       <!-- 创建组织 -->
-      <el-dialog v-model="createDialog" title="创建组织" width="480px">
+      <el-dialog v-model="createDialog" title="创建组织" width="min(480px, 94vw)" top="10vh">
         <el-form label-width="88px">
           <el-form-item label="组织名称">
             <el-input v-model="createForm.name" maxlength="100" placeholder="必填" />
@@ -100,17 +110,26 @@
       </el-dialog>
 
       <!-- 按用户名拉人 -->
-      <el-dialog v-model="addDialog" title="按用户名拉人" width="480px">
+      <el-dialog v-model="addDialog" title="按用户名拉人" width="min(480px, 94vw)" top="10vh">
+        <!-- ⚠️ 原来用的是 #append：Element Plus 的 append 插槽把内容渲染在输入框
+             **外面**（两个相邻的盒子），不是框内的按钮；而且它带 :loading 的
+             el-button 会在搜索时重排，导致输入框宽度/边框跳一下（看着像闪屏）。
+             改用 #suffix —— 框内右侧，和普通搜索框一致。 -->
         <el-input
           v-model="keyword"
           placeholder="输入用户名（至少 2 个字符）后点搜索"
           @keyup.enter="doSearch"
         >
-          <template #append>
-            <el-button :loading="searching" @click="doSearch">搜索</el-button>
+          <template #suffix>
+            <el-button link type="primary" :loading="searching" @click="doSearch">搜索</el-button>
           </template>
         </el-input>
-        <el-select v-model="pickUserId" placeholder="搜索结果" style="width: 100%; margin-top: var(--sp-3)" filterable>
+        <el-select
+          v-model="pickUserId"
+          placeholder="搜索结果（从上方结果中选择）"
+          style="width: 100%; margin-top: var(--sp-3)"
+          :disabled="!candidates.length"
+        >
           <el-option v-for="u in candidates" :key="u.id" :label="u.username" :value="u.id" />
         </el-select>
         <template #footer>
@@ -301,7 +320,8 @@ onMounted(loadMyOrg)
 </script>
 
 <style scoped>
-.my-org-loading {
+/* 遮罩容器：本身不占位；加载时才给最小高度，否则遮罩没有可覆盖的区域 */
+.my-org-wrap.is-loading {
   min-height: 160px;
 }
 .my-org-empty {
