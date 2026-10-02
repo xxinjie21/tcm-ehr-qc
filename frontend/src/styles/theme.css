@@ -145,9 +145,12 @@ body {
   line-height: 1.5;
   padding-bottom: 2px;
 }
-/* 文本域：最小 3 行，方便一次看完整段现病史 */
+/* 文本域只调行高；**高度不设 min-height** ——
+   Element Plus 的 autosize 会给 textarea 写行内 style="height:…px"，
+   行内样式优先于本文件任何 class 规则，写了 min-height 也是白写
+   （曾经就是这么白写了一次，用户反馈「输入框还是太小」）。
+   多行字段的高度由 autosize 的 minRows 给，见 Records.vue。 */
 .compact-form .el-textarea__inner {
-  min-height: 76px;
   line-height: 1.6;
 }
 .compact-form .el-form-item__error {

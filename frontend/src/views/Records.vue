@@ -142,9 +142,11 @@
       <!-- ============ 单条新增病历 ============ -->
       <el-tab-pane label="单条新增病历" name="create" lazy>
         <PanelCard title="单条新增病历">
-          <!-- 紧凑口径：标签左置 + 控件 small + 文本域单行起步。
-               只做了「分区常显 + 3 列栅格」，控件仍是 32px、标签各占一行，
-               用户实测仍要下拉；本轮改为 size="large"（控件 40px，见 theme.css .compact-form） -->
+          <!-- 控件尺寸由 el-form 的 size="large" 决定（40px / 14px）。
+               ⚠️ 文本域的高度**不由 CSS 决定**：Element Plus 的 autosize 会写行内
+               style="height:…px"，行内样式压过任何 class 规则 —— 之前 CSS 里写的
+               min-height 完全没起作用。现病史/主诉/中医诊断这类多行字段靠
+               autosize 的 minRows:3 给到 3 行。 -->
           <el-form
             ref="createFormRef"
             class="compact-form"
@@ -185,8 +187,8 @@
                     v-else
                     v-model="form[f.key]"
                     :type="f.multi ? 'textarea' : 'text'"
-                    :rows="1"
-                    :autosize="f.multi ? { minRows: 1, maxRows: 2 } : false"
+                    :rows="f.multi ? 3 : undefined"
+                    :autosize="f.multi ? { minRows: 3, maxRows: 6 } : false"
                     :maxlength="f.max"
                     :show-word-limit="!!f.max"
                     clearable
