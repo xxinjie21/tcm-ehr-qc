@@ -15,7 +15,12 @@
 
       <!-- 未加入组织：批次 6 起可自助创建；无「待加入池」也不再有「审批中」 -->
       <div v-if="!loading && !data.org" class="my-org-empty">
-        <el-empty description="你还没有加入任何组织">
+        <!-- 复用共享空态组件（Dashboard / Records / Qc / NlpExtract 都用它）：
+             原来这里是裸 el-empty，接口失败时与「真的没加入组织」显示成同一画面，
+             用户会以为自己没有组织。EmptyState 区分 failed 并给「重试」出口。 -->
+        <EmptyState v-if="orgFailed" failed :loading="loading"
+                    text="组织信息加载失败，请重试" @retry="loadMyOrg" />
+        <el-empty v-else description="你还没有加入任何组织">
           <template #description>
             <p class="empty-hint">你可以自己创建一个组织（创建后你就是所有者），</p>
             <p class="empty-hint">也可以等待某个组织的所有者按用户名把你拉入。</p>
@@ -78,6 +83,10 @@
                 <span v-else class="is-owner">（我）</span>
               </template>
             </el-table-column>
+            <template #empty>
+              <EmptyState :failed="membersFailed" :loading="membersLoading"
+                          text="该组织暂无成员" @retry="loadMembers" />
+            </template>
           </el-table>
         </template>
 
@@ -148,6 +157,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import PanelCard from '@/components/PanelCard.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import {
   getMyOrg, listMembers, addMember, removeMember, transferOwner, leaveGroup,
   createOrg, searchUsers, setPermissions
@@ -158,6 +168,10 @@ import { fmtDateTime } from '@/utils/format'
 const userStore = useUserStore()
 const loading = ref(true)
 const data = ref({ org: null, myRole: null })
+// 加载失败标志：把「接口失败」与「确实没有组织 / 没有成员」分开 ——
+// 共享 EmptyState 依赖它决定给不给「重试」入口
+const orgFailed = ref(false)
+const membersFailed = ref(false)
 const members = ref([])
 const membersLoading = ref(false)
 const leaving = ref(false)
@@ -173,6 +187,7 @@ const searching = ref(false)
 const candidates = ref([])
 
 const loadMyOrg = async () => {
+  orgFailed.value = false
   try {
     const res = await getMyOrg()
     data.value = res.data || {}
@@ -182,7 +197,8 @@ const loadMyOrg = async () => {
       await loadMembers()
     }
   } catch {
-    // 拦截器已提示
+    // 拦截器已提示；仍要标成「失败」，否则空态会误显示成「你没加入组织」
+    orgFailed.value = true
   } finally {
     loading.value = false
   }
@@ -191,11 +207,13 @@ const loadMyOrg = async () => {
 const loadMembers = async () => {
   if (!data.value.org) return
   membersLoading.value = true
+  membersFailed.value = false
   try {
     const res = await listMembers(data.value.org.id)
     members.value = res.data || []
   } catch {
     // 拦截器已提示
+    membersFailed.value = true
   } finally {
     membersLoading.value = false
   }

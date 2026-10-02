@@ -19,6 +19,13 @@
             >{{ statusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
+        <!-- 复用共享空态组件：区分「接口失败」与「确实还没有组织」。
+             原先这个表没有 #empty 插槽，失败时显示 Element 默认的「暂无数据」，
+             管理员会以为系统里真的一个组织都没有。 -->
+        <template #empty>
+          <EmptyState :failed="listFailed" :loading="loading"
+                      text="还没有任何组织" @retry="load" />
+        </template>
         <el-table-column label="创建时间" width="180">
           <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
         </el-table-column>
@@ -85,11 +92,14 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { listOrgs, stopGroup, activateGroup, archiveOrg, reassignOwner, listMembers } from '@/api/org'
 import { fmtDateTime } from '@/utils/format'
 
 const loading = ref(false)
 const orgs = ref([])
+// 加载失败标志：给 EmptyState 判断该显示「重试」还是「确实没有组织」
+const listFailed = ref(false)
 
 const archiveVisible = ref(false)
 const archiveReason = ref('')
@@ -105,11 +115,13 @@ const statusText = (s) => ({ active: '生效', stopped: '已停用', archived: '
 
 const load = async () => {
   loading.value = true
+  listFailed.value = false
   try {
     const res = await listOrgs()
     orgs.value = res.data || []
   } catch {
     // 拦截器已提示
+    listFailed.value = true
   } finally {
     loading.value = false
   }
