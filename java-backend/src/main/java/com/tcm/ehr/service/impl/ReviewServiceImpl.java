@@ -11,6 +11,7 @@ import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.common.utils.ReviewTaskUtil;
 import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.po.Record;
@@ -143,6 +144,11 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             } catch (JacksonException e) {
                 throw new IllegalArgumentException("修正数据格式错误");
             }
+            // 打「人工修改」标记（由后端写，前端传不进来 —— 否则这个标记可自报，就失去意义）。
+            // 原来这里直接写回、不打点：前端 buildCorrected 只组装 9 个实体键、不含 _meta，
+            // 于是旧 _meta 连同「依据哪一版词典」的溯源信息一起丢失。
+            json = StructuredDataMeta.stampManual(objectMapper, json,
+                    RequestUtils.currentUsername());
             recordMapper.updateStructuredData(recordId, json);
             r.setStructuredData(json);
         }

@@ -48,6 +48,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private final EsTermNormalizer termNormalizer;
     private final ObjectMapper objectMapper;
     private final IDictionaryFileService dictionaryFileService;
+    private final com.tcm.ehr.service.DictionaryTermStore termStore;
 
     /**
      * 单条术语归一（清洗页的「归一测试」入口）。
@@ -143,13 +144,20 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, status, grade);
 
             // 5. 术语归一（兜底）：仅对合格病历执行，归一后标记已清洗
+            //    ⚠️ 人工修改过的病历**跳过归一**（方案 A）：归一会重跑标准化，把人工改成
+            //    非标准词的术语又归一回标准词 —— 等于清洗一次就撤销一次人工修正。
+            //    人工成果优先，所以这里直接不碰它的 structured_data。
             if ("合格".equals(grade) && r.getStructuredData() != null && !r.getStructuredData().isBlank()) {
-                int[] norm = normalizeStructuredData(r);
-                vo.setNormalized(vo.getNormalized() + norm[0]);
-                vo.getNormByLevel().setExact(vo.getNormByLevel().getExact() + norm[1]);
-                vo.getNormByLevel().setContain(vo.getNormByLevel().getContain() + norm[2]);
-                vo.getNormByLevel().setFuzzy(vo.getNormByLevel().getFuzzy() + norm[3]);
-                baseMapper.markGoverned(r.getId());
+                if (StructuredDataMeta.isManuallyEdited(objectMapper, r.getStructuredData())) {
+                    vo.setManualSkipped(vo.getManualSkipped() + 1);
+                } else {
+                    int[] norm = normalizeStructuredData(r);
+                    vo.setNormalized(vo.getNormalized() + norm[0]);
+                    vo.getNormByLevel().setExact(vo.getNormByLevel().getExact() + norm[1]);
+                    vo.getNormByLevel().setContain(vo.getNormByLevel().getContain() + norm[2]);
+                    vo.getNormByLevel().setFuzzy(vo.getNormByLevel().getFuzzy() + norm[3]);
+                    baseMapper.markGoverned(r.getId());
+                }
             }
         }
         log.info("[清洗] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
@@ -185,8 +193,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             // 2. 中药走另一套：name 归一 + 剂量单位小写（P3.4 拆出）
             normalizeHerbs(data, stat);
             // 3. 打上词典版本再写库：归一结果与当时词典版本必须成对
+            //    ⚠️ 版本源换成 DictionaryTermStore：原先用
+            //    dictionaryFileService.currentVersion()（词典还在文件时代的文件哈希），
+            //    批次 8b 词典入库后它已冻结 —— 清洗一次就把正确的版本戳覆盖回那个死值。
             String json = StructuredDataMeta.stamp(objectMapper, objectMapper.writeValueAsString(data),
-                    dictionaryFileService.currentVersion());
+                    termStore.effectiveDictVersion(RequestUtils.currentOrgId()),
+                    termStore.effectiveTermCount(RequestUtils.currentOrgId()));
             baseMapper.updateStructuredData(r.getId(), json);
         } catch (JacksonException e) {
             // 单条解析失败只记警告：一条脏数据不该中断整批清洗

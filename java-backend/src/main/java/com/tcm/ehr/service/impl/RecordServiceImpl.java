@@ -484,8 +484,13 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         } catch (Exception e) {
             throw new IllegalArgumentException("structuredData 格式错误");
         }
-        // 4. 打上当前词典版本戳后落库
-        json = StructuredDataMeta.stamp(objectMapper, json, dictionaryFileService.currentVersion());
+        // 4. 打「人工修改」标记后落库
+        //    原来是 stamp(..., dictionaryFileService.currentVersion()) —— 那是词典还在
+        //    文件时代的文件哈希，批次 8b 词典入库后它已冻结不变，等于给每条人工修改的
+        //    病历盖上一个与实际词典无关的版本戳。这里改为标记人工修改：
+        //    人工改过就不该再声称「依据某一版词典归一出来的」。
+        json = StructuredDataMeta.stampManual(objectMapper, json,
+                RequestUtils.currentUsername());
         baseMapper.updateStructuredData(recordId, json);
     }
 
@@ -588,8 +593,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         SearchVO vo = new SearchVO();
         vo.setTotal(p.getTotal());
         for (Record r : p.getRecords()) {
+            // manuallyEdited 从 structured_data._meta 读：列表要能一眼看出「这条不是模型原样抽的」
+            boolean manual = StructuredDataMeta.isManuallyEdited(objectMapper, r.getStructuredData());
             vo.getRecords().add(new SearchVO.Item(r.getId(), summarize(r), r.getGrade(),
-                    r.getVisitTime(), r.getGender(), r.getAge(), r.getScore()));
+                    r.getVisitTime(), r.getGender(), r.getAge(), r.getScore(), manual));
         }
         return vo;
     }

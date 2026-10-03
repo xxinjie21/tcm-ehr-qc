@@ -35,6 +35,20 @@
       </template>
     </el-table-column>
     <el-table-column prop="grade" label="分级" width="90" />
+    <!-- 人工修改标记：该条结构化数据被人工改过（复核修正 / 手工改结构化数据），
+         不是模型原样抽的。标出来是为了评估模型准确率时能排除它。 -->
+    <el-table-column label="来源" width="86">
+      <template #default="{ row }">
+        <el-tooltip
+          v-if="row.manuallyEdited"
+          content="本条结构化数据含人工修改，清洗归一会跳过；统计模型准确率时请排除"
+          placement="top"
+        >
+          <el-tag size="small" type="warning" effect="plain">人工修改</el-tag>
+        </el-tooltip>
+        <span v-else class="tip">模型</span>
+      </template>
+    </el-table-column>
     <!-- 接诊时间：常态只到日，悬停给秒级原值。
          只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
          会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上 -->

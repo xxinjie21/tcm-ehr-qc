@@ -616,6 +616,9 @@ components:
                 type: integer
                 nullable: true
                 description: 质控评分（0~100，未质评为 null）。与 grade 成对下发——分级是结论、评分是量值，只给分级看不出差几分
+              manuallyEdited:
+                type: boolean
+                description: 该条结构化数据是否含人工修改（复核提交修正 / PUT 手工改结构化数据时由后端打标）。清洗归一这类自动流程不打，且遇到人工修改过的病历会跳过归一。统计模型抽取准确率时应排除此类数据
     # ========== NLP 抽取 DTO / VO ==========
     NlpExtractDTO:
       type: object

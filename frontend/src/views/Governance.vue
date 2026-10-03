@@ -80,6 +80,18 @@
             <div class="num">{{ clean.result.normalized }}</div>
             <div class="lbl">术语归一命中</div>
           </div>
+          <!-- 人工修改过的病历被跳过归一（方案 A：人工成果优先）。单列出来，
+               否则「归一命中数突然变少」看起来像清洗出错。 -->
+          <el-tooltip
+            v-if="clean.result.manualSkipped > 0"
+            content="这些病历的结构化数据被人工修改过，按「人工成果优先」跳过了归一，避免把人工修正撤销"
+            placement="top"
+          >
+            <div class="stat-item ochre">
+              <div class="num">{{ clean.result.manualSkipped }}</div>
+              <div class="lbl">含人工修改·已跳过</div>
+            </div>
+          </el-tooltip>
         </div>
         <div v-if="clean.result.normByLevel" class="level-dist">
           <span class="ld-lbl">三级命中分布</span>
@@ -283,8 +295,11 @@ const handleClean = async () => {
     // 5. 写入分步结果，并把三级命中分布同步给 AI 助手
     clean.result = res.data
     aiStore.setNormByLevel(res.data.normByLevel || { exact: 0, contain: 0, fuzzy: 0 })
-    // 6. 提示归一命中数
-    ElMessage.success(`清洗完成：归一命中 ${res.data.normalized} 处`)
+    // 6. 提示归一命中数；含人工修改被跳过时一并说明，避免「归一数变少」看起来像出错
+    const skipped = res.data.manualSkipped || 0
+    ElMessage.success(skipped > 0
+      ? `清洗完成：归一命中 ${res.data.normalized} 处，${skipped} 条含人工修改已跳过归一`
+      : `清洗完成：归一命中 ${res.data.normalized} 处`)
     // 7. 刷新顶部统计（待清洗 / 已清洗会变化）
     loadStats()
   // 8. 失败由响应拦截器统一提示

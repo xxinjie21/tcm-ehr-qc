@@ -42,12 +42,29 @@ public class SearchVO {
          * 列表页要同时看到「多少分」与「算不算合格」—— 只给分级就看不出差几分。</p>
          */
         private Integer score;
+        /**
+         * 该条结构化数据是否含人工修改。
+         *
+         * <p>来自 {@code structured_data._meta.manuallyEdited}，由后端在两个<b>人工</b>写入口
+         * （复核提交修正、{@code PUT /api/records/{id}}）打上。清洗归一这类自动流程不打，
+         * 且遇到人工修改过的病历会<b>跳过</b>归一（方案 A），所以这个标记能稳定成立。</p>
+         *
+         * <p>用途有二：列表上一眼看出「这条不是模型原样抽的」；以及评估模型准确率时
+         * 排除人工补过的数据。</p>
+         */
+        private Boolean manuallyEdited;
 
         public Item() {
         }
 
         public Item(String id, String summary, String grade,
                     LocalDateTime visitTime, String gender, String age, Integer score) {
+            this(id, summary, grade, visitTime, gender, age, score, null);
+        }
+
+        public Item(String id, String summary, String grade,
+                    LocalDateTime visitTime, String gender, String age, Integer score,
+                    Boolean manuallyEdited) {
             this.id = id;
             this.summary = summary;
             this.grade = grade;
@@ -55,6 +72,7 @@ public class SearchVO {
             this.gender = gender;
             this.age = age;
             this.score = score;
+            this.manuallyEdited = manuallyEdited;
         }
     }
 }

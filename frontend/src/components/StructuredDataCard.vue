@@ -16,6 +16,15 @@
         <span class="sd-meta-fp">查看版本指纹</span>
       </el-tooltip>
     </div>
+
+    <!-- 人工修改提示：这块数据被人工改过，清洗归一会跳过，
+         且不应计入「模型抽取准确率」。所以这里明确告诉用户，别把它当模型输出看。 -->
+    <div v-if="manuallyEdited" class="sd-manual">
+      <strong>人工修改数据</strong>
+      <span v-if="editedBy">由 {{ editedBy }}</span>
+      <span v-if="editedAt">· {{ editedAt }}</span>
+      <span class="sd-manual-t">该条结构化数据含人工修改，非模型原样抽取；清洗归一会跳过本条。</span>
+    </div>
     <template v-if="hasAny">
       <div v-for="sec in sections" :key="sec.key" class="sd-section">
         <div v-if="list(sec.key).length" class="sd-sec">
@@ -116,6 +125,10 @@ const hasAny = computed(() => sections.some((s) => list(s.key).length > 0))
 const dictVersion = computed(() => parsed.value?._meta?.dictVersion || '')
 // 归一实际覆盖的词条数：新数据才有；旧数据为空则模板退回显示指纹
 const dictTermCount = computed(() => parsed.value?._meta?.dictTermCount || 0)
+// 人工修改标记（后端在复核提交 / 手工改结构化数据时打；清洗归一这类自动流程不打）
+const manuallyEdited = computed(() => parsed.value?._meta?.manuallyEdited === true)
+const editedBy = computed(() => parsed.value?._meta?.editedBy || '')
+const editedAt = computed(() => parsed.value?._meta?.editedAt || '')
 // 词典采集时间（与 dictVersion 同一处 _meta 打点）；旧数据没有则空串、不展示
 const dictCapturedAt = computed(() => parsed.value?._meta?.dictCapturedAt || '')
 
@@ -208,6 +221,23 @@ const levelDesc = (level, raw, name) => {
 }
 .sd-meta b { color: var(--ink-mid); font-weight: normal; }
 .sd-meta-t { margin-left: var(--sp-1); }
+.sd-manual {
+  margin-top: var(--sp-2);
+  padding: 6px 10px;
+  border: 1px solid var(--ochre);
+  border-radius: 4px;
+  background: var(--ochre-surface, #f3ecdf);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.sd-manual strong {
+  margin-right: var(--sp-2);
+  color: var(--ochre);
+}
+.sd-manual-t {
+  margin-left: var(--sp-2);
+  color: var(--text-sub);
+}
 .sd-meta-fp {
   margin-left: var(--sp-1);
   color: var(--text-sub);
