@@ -123,6 +123,24 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @throws IllegalArgumentException 文件格式不支持，或 JSON 结构非法
      */
     public ImportResultVO importDictionary(String type, MultipartFile file) throws IOException {
+        return importDictionary(type, file, RequestUtils.currentOrgId());
+    }
+
+    @Override
+    public java.util.List<TermEntry> currentTerms(String orgId, String type) {
+        return termStore.read(orgId, type);
+    }
+
+    @Override
+    /**
+     * 导入到指定组织层（批次 17）。
+     *
+     * <p>原实现固定用 {@code currentOrgId()}，管理员无法写基础层；这里把落库目标
+     * 提为参数，{@code orgId=""} 即基础层。提案合并走的是 {@code termStore.replace}
+     * 而不是本方法 —— 本方法带「合并语义 + 自动归档」，那是管理员直写专用通道。</p>
+     */
+    public ImportResultVO importDictionary(String type, MultipartFile file, String orgId)
+            throws IOException {
         List<Map<String, Object>> failures = new ArrayList<>();
         // 0. 大小防护：Excel 走 WorkbookFactory 全量载入，xlsx 解压后可达压缩体积的
         //    数十倍，50MB 文件能把堆撑爆并**拖垮整个进程**（不只是这一个请求失败）。
@@ -141,7 +159,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
         // 2. 合并：现有词典打底，新条目并入（同 standardTerm 合并别名，保留已有 source/code）
         //    ⚠️ 合并基数是「当前组织这一层」而不是「基础层」：组织导入不该把基础层词条
         //    复制成自己的私有词条 —— 那会让基础层以后的修订再也影响不到该组织。
-        String orgId = RequestUtils.currentOrgId();
         List<TermEntry> previous = termStore.read(orgId, type);
         Map<String, TermEntry> merged = new LinkedHashMap<>();
         for (TermEntry e : previous) {

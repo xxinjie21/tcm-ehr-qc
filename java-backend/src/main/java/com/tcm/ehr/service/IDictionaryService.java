@@ -37,6 +37,27 @@ public interface IDictionaryService {
      */
     ImportResultVO importDictionary(String type, MultipartFile file) throws IOException;
 
+    /**
+     * 导入到<b>指定组织层</b>（批次 17）。
+     *
+     * <p>与 {@link #importDictionary(String, MultipartFile)} 的差别只在落库目标：
+     * 那个固定写当前组织，这个允许管理员显式写基础层（{@code orgId = ""}）。
+     * 刻意<b>不</b>开放任意 orgId 入参给普通用户 —— 提案流程才是成员改基线的唯一入口。</p>
+     *
+     * @param type   术语类型
+     * @param file   文件（.xlsx/.xls/.csv/.json）
+     * @param orgId  目标组织层；{@code ""} = 基础层
+     */
+    ImportResultVO importDictionary(String type, MultipartFile file, String orgId) throws IOException;
+
+    /**
+     * 读某一层当前的完整词条（不带回落，供归档快照取「合并后」的基线）。
+     *
+     * @param orgId 组织；{@code ""} = 基础层
+     * @param type  术语类型
+     */
+    java.util.List<com.tcm.ehr.domain.po.TermEntry> currentTerms(String orgId, String type);
+
     // 原 rollback / listBackups / backupExists 已随 dictionary_backups 表废弃（批次 17）：
     // 回滚改为「基于归档版本生成提案 → 组长审核合并」，历史版本改为 GET /api/dictionary/archives。
 

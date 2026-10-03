@@ -619,6 +619,57 @@ components:
               manuallyEdited:
                 type: boolean
                 description: 该条结构化数据是否含人工修改（复核提交修正 / PUT 手工改结构化数据时由后端打标）。清洗归一这类自动流程不打，且遇到人工修改过的病历会跳过归一。统计模型抽取准确率时应排除此类数据
+    # ========== 术语词典版本管理（批次 17） ==========
+    DictProposal:
+      type: object
+      properties:
+        id: { type: string }
+        orgId: { type: string, description: "''=基础层" }
+        type: { type: string }
+        submitUserId: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        auditUserId: { type: string, nullable: true }
+        auditComment: { type: string, nullable: true }
+        createTime: { type: string, format: date-time }
+        auditTime: { type: string, format: date-time, nullable: true }
+        purgeAfter: { type: string, format: date-time, nullable: true }
+        termCount: { type: integer, description: 快照词条数；快照已清理时为 0 }
+        snapshotPresent: { type: boolean, description: 快照是否还在 }
+
+    CreateDictProposal:
+      type: object
+      required: [type, terms]
+      properties:
+        type: { type: string, enum: [disease, symptom, pattern, herb, formula] }
+        terms:
+          type: array
+          description: 完整目标词典（非增量 diff）
+          items:
+            type: object
+            properties:
+              standardTerm: { type: string }
+              code: { type: string }
+              source: { type: string }
+              aliases:
+                type: array
+                items: { type: string }
+
+    DictProposalDiff:
+      type: object
+      properties:
+        added:
+          type: array
+          items: { type: object }
+        modified:
+          type: array
+          items: { type: object }
+          description: 含 before（旧值），便于前端显示「从 A 改成 B」
+        removed:
+          type: array
+          items: { type: string }
+        noDiff:
+          type: boolean
+          description: true 表示与基线完全一致
     # ========== NLP 抽取 DTO / VO ==========
     NlpExtractDTO:
       type: object
@@ -2942,7 +2993,276 @@ paths:
                     type: integer
                     example: 200
                   data:
-                    $ref: '#/components/schemas/DictionaryTermsVO'
+                    $ref: '#/component
+  /api/dictionary/baseline/export:
+    get:
+      tags:
+        - 词典管理
+      summary: 导出小组基线（全量）
+      description: 【权限：登录即可】导出当前组织该类型的完整基线词条，供前端存为本地个人词典。本地修改不会自动同步回小组基线，必须走提案流程
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [disease, symptom, pattern, herb, formula]
+      responses:
+        '200':
+          description: 基线词条数组
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        standardTerm:
+                          type: string
+                        code:
+                          type: string
+                        source:
+                          type: string
+                        aliases:
+                          type: array
+                          items:
+                            type: string
+  /api/dictionary/proposals:
+    get:
+      tags:
+        - 词典管理
+      summary: 提案列表
+      description: 【权限：登录即可】普通成员只看到自己提交的提案；组织所有者看到全组提案。查询时顺带惰性清理已驳回且过期的提案快照（提案主记录永久保留）
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        '200':
+          description: 提案列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DictProposal'
+    post:
+      tags:
+        - 词典管理
+      summary: 提交基线更新提案
+      description: 【权限：登录即可】提交一份完整的目标词典（不是增量 diff），生成待审提案。同一组织同一类型最多同时存在 5 条待审提案，超出直接拒绝
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDictProposal'
+      responses:
+        '200':
+          description: 已生成提案，等待组长审核
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/DictProposal'
+  /api/dictionary/proposals/{id}/diff:
+    get:
+      tags:
+        - 词典管理
+      summary: 提案与基线的差异
+      description: 【权限：登录即可】实时对比提案快照与当前基线，给出新增/修改/删除三组；差异不落表。仅提交者本人与组织所有者可查看
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 差异视图
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/DictProposalDiff'
+  /api/dictionary/proposals/{id}/terms:
+    put:
+      tags:
+        - 词典管理
+      summary: 在线编辑提案内容
+      description: 【权限：登录即可】修改仅作用于本次提案，不改动小组基线。服务端强制校验「操作人＝提交者本人」，且仅待审提案可编辑
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                terms:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: 提案内容已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+  /api/dictionary/proposals/{id}/audit:
+    post:
+      tags:
+        - 词典管理
+      summary: 审核提案
+      description: 【权限：所有者（本组织）】通过则整快照替换基线、重建该组织 ES 索引并生成归档版本；拒绝则填理由作废，快照 7 天后惰性清理（主记录永久保留）。已审核过的提案不能重复审核
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approve:
+                  type: boolean
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: 审核完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/DictProposal'
+  /api/dictionary/archives:
+    get:
+      tags:
+        - 词典管理
+      summary: 归档版本列表
+      description: 【权限：登录即可】每组织每类型最多保留最近 5 份归档快照；版本元信息永久保留。快照被清理的版本仍会列出（snapshotPresent=false）但不能再回滚
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [disease, symptom, pattern, herb, formula]
+      responses:
+        '200':
+          description: 归档版本列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        orgId:
+                          type: string
+                        type:
+                          type: string
+                        versionNo:
+                          type: integer
+                        proposalId:
+                          type: string
+                          nullable: true
+                        mergeTime:
+                          type: string
+                          format: date-time
+                        mergeUserId:
+                          type: string
+                        comment:
+                          type: string
+                        snapshotPresent:
+                          type: boolean
+                        termCount:
+                          type: integer
+  /api/dictionary/archives/{versionNo}/rollback:
+    post:
+      tags:
+        - 词典管理
+      summary: 基于归档版本生成回滚提案
+      description: 【权限：所有者（本组织）】读取该版本快照自动生成一份<b>新提案</b>，仍需走审核流程后才会合并（不直接还原基线，避免绕过审核）。回滚完成后同样生成新的归档版本并计入 5 份限额
+      parameters:
+        - name: versionNo
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [disease, symptom, pattern, herb, formula]
+      responses:
+        '200':
+          description: 已生成回滚提案
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/DictProposal'
+s/schemas/DictionaryTermsVO'
         '400':
           description: 术语类型非法（code=4001）
           content:
