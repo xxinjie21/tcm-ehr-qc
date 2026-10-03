@@ -2,11 +2,9 @@ package com.tcm.ehr.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.utils.TermTypes;
-import com.tcm.ehr.domain.po.DictionaryBackup;
 import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.DictionaryVersion;
 import com.tcm.ehr.domain.po.TermEntry;
-import com.tcm.ehr.mapper.DictionaryBackupMapper;
 import com.tcm.ehr.mapper.DictionaryTermMapper;
 import com.tcm.ehr.mapper.DictionaryVersionMapper;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +45,6 @@ public class DictionaryTermStore {
     public static final String BASE_ORG = "";
 
     private final DictionaryTermMapper termMapper;
-    private final DictionaryBackupMapper backupMapper;
     private final DictionaryVersionMapper versionMapper;
     private final ObjectMapper objectMapper;
 
@@ -174,58 +171,7 @@ public class DictionaryTermStore {
                 && base.getVersion().equals(base.getIndexedVersion());
     }
 
-    /**
-     * 导入前存档：把该层当前词条整份存进 {@code dictionary_backups}。
-     *
-     * @return 备份 id；该层本来就没有词条时返回 null（没东西可回滚）
-     */
-    public String backup(String orgId, String type, String operator) {
-        String org = norm(orgId);
-        List<TermEntry> entries = read(org, type);
-        if (entries.isEmpty()) {
-            return null;
-        }
-        DictionaryBackup b = new DictionaryBackup();
-        b.setId(UUID.randomUUID().toString());
-        b.setOrgId(org);
-        b.setType(type);
-        b.setSnapshot(writeJson(entries));
-        b.setCreatedBy(operator);
-        b.setCreateTime(LocalDateTime.now());
-        backupMapper.insert(b);
-        return b.getId();
-    }
-
-    /** 直接按快照文本解析词条（列表页要显示每个备份的词条数） */
-    public List<TermEntry> readBackupBySnapshot(String snapshot) {
-        return readSnapshot(snapshot);
-    }
-
-    /** 读某次备份的词条快照 */
-    public List<TermEntry> readBackup(String backupId) {
-        DictionaryBackup b = backupMapper.selectById(backupId);
-        if (b == null) {
-            return null;
-        }
-        return readSnapshot(b.getSnapshot());
-    }
-
-    /** 备份是否存在（并校验它属于该组织该类型，防止拿别的组织的备份来覆盖） */
-    public boolean backupMatches(String backupId, String orgId, String type) {
-        DictionaryBackup b = backupMapper.selectById(backupId);
-        return b != null && norm(orgId).equals(norm(b.getOrgId())) && type.equals(b.getType());
-    }
-
-    /** 列出某层的历史备份（新的在前） */
-    public List<DictionaryBackup> listBackups(String orgId, String type) {
-        String org = norm(orgId);
-        return backupMapper.selectList(new QueryWrapper<DictionaryBackup>()
-                .eq("org_id", org)
-                .eq("type", type)
-                .orderByDesc("create_time", "id"));
-    }
-
-    /**
+                        /**
      * 内容版本：标准词排序后取 SHA-256 前 32 位。
      *
      * <p>排序是必须的：不排序的话同一份词条换个导入顺序就换版本，

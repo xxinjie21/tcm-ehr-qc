@@ -152,9 +152,11 @@ public class DictionaryServiceImpl implements IDictionaryService {
         }
 
         List<TermEntry> entries = new ArrayList<>(merged.values());
-        // 3. 先备份再落库：回滚要靠这份备份
-        String backupId = termStore.backup(orgId, type, RequestUtils.currentUsername());
-        // 4. 落库（同一事务里更新内容版本，避免「词条换了、版本没换」而跳过重建）
+        // 3. 落库（同一事务里更新内容版本，避免「词条换了、版本没换」而跳过重建）
+        //    原先此处先写一份 dictionary_backups 全量备份；该表已随批次 17 废弃
+        //    （归档版本是「合并后」的快照而非「写前」备份），ES 重建失败的补偿
+        //    直接用内存里的 previous 回退。
+        // 3. 落库（同一事务里更新内容版本，避免「词条换了、版本没换」而跳过重建）
         String contentVersion = termStore.replace(orgId, type, entries);
         // 5. 只重建「本组织」在 ES 里的文档；失败则退回库内容，绝不谎报已同步
         try {
@@ -175,7 +177,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             // DB 已改而 ES 没跟上 → 归一结果与词典页会长期不一致。退回库内容并尽力恢复索引。
             log.error("[词典] {} (org={}) ES 重建失败，回退库内容并尝试恢复索引: {}",
                     type, orgId, e.getMessage());
-            compensateFailedRebuild(type, orgId, backupId, previous, contentVersion);
+            compensateFailedRebuild(type, orgId, previous, contentVersion);
             if (e instanceof IOException io) {
                 throw io;
             }
@@ -189,9 +191,8 @@ public class DictionaryServiceImpl implements IDictionaryService {
         vo.setImported(incoming.size());
         vo.setFailed(failures.size());
         vo.setFailures(failures);
-        log.info("[词典] {} 导入完成: 新解析{}条(失败{}), 合并后共{}条, 备份{}",
-                type, incoming.size(), failures.size(), entries.size(),
-                backupId == null ? "无(首次)" : backupId);
+        log.info("[词典] {} 导入完成: 新解析{}条(失败{}), 合并后共{}条",
+                type, incoming.size(), failures.size(), entries.size());
         return vo;
     }
 
@@ -204,16 +205,13 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * <p>关键：补偿路径<b>不会</b>把失败的那个版本记为已同步。记了就等于谎报，
      * 启动对账会跳过重建，归一会永远停在这一版错误的数据上。</p>
      */
-    private void compensateFailedRebuild(String type, String orgId, String backupId,
+    private void compensateFailedRebuild(String type, String orgId,
                                          List<TermEntry> previous, String failedVersion) {
-        // 1. 先把库内容退回导入前（有备份用备份，首次导入按原内容写回）
+        // 1. 先把库内容退回导入前（previous 即本次导入开始时读到的原内容；
+        //    dictionary_backups 已随批次 17 废弃 —— 归档版本是「合并后」的快照，
+        //    不是「写前」备份，补偿回退直接用内存里的 previous）
         try {
-            if (backupId != null) {
-                List<TermEntry> snap = termStore.readBackup(backupId);
-                termStore.replace(orgId, type, snap == null ? List.of() : snap);
-            } else {
-                termStore.replace(orgId, type, previous);
-            }
+            termStore.replace(orgId, type, previous);
         } catch (Exception e) {
             // 库都退不回去就没必要再试索引，记日志交人工重新导入
             log.error("[词典] {} (org={}) 回退失败，库与索引可能不一致，需重新导入修复: {}",
@@ -351,76 +349,11 @@ public class DictionaryServiceImpl implements IDictionaryService {
         return new TermEntry(standard, aliases, source, code);
     }
 
-    // ---------------------------------------------------------------- 回滚 / 备份
+    // ---------------------------------------------------------------- 索引重建
 
-    @Override
-    /**
-     * 回滚：用备份文件覆盖当前词典，并以恢复后的内容全量重建 ES 索引。
-     *
-     * @param type 词典类型
-     * @param backupFilename 备份文件名
-     * @throws IOException 文件恢复或索引重建失败
-     * @throws IllegalArgumentException 备份文件不存在或与词典类型不匹配
-     */
-    public void rollback(String type, String backupFilename) throws IOException {
-        // 0. 组织校验放在最前：拿别的组织的备份来覆盖本组织词典是越权，不能靠后续失败兜住
-        String orgId = RequestUtils.currentOrgId();
-        if (!termStore.backupMatches(backupFilename, orgId, type)) {
-            throw new IllegalArgumentException("备份不存在，或不属于当前组织 / 不匹配该词典类型");
-        }
-        // 1. 用备份快照覆盖本组织词条
-        List<TermEntry> entries = termStore.readBackup(backupFilename);
-        if (entries == null) {
-            throw new IllegalArgumentException("备份不存在或已损坏，无法回滚");
-        }
-        String contentVersion = termStore.replace(orgId, type, entries);
-        // 2. 再按恢复后的内容重建索引；库与索引必须同版本，否则归一会拿到旧数据
-        esTermIndexService.rebuild(type, orgId, entries, contentVersion);
-        termStore.markIndexed(orgId, type, contentVersion);
-        log.info("[词典] {} (org={}) 回滚到 {}，现有{}条", type, orgId, backupFilename, entries.size());
-    }
-
-    @Override
-    /**
-     * 备份版本列表，直接委托文件服务，按时间倒序。
-     *
-     * @param type 词典类型
-     * @return 备份条目列表
-     * @throws IOException 遍历备份目录或读取当前词典失败
-     */
-    public List<Map<String, String>> listBackups(String type) throws IOException {
-        String orgId = RequestUtils.currentOrgId();
-        List<Map<String, String>> out = new ArrayList<>();
-        for (com.tcm.ehr.domain.po.DictionaryBackup b : termStore.listBackups(orgId, type)) {
-            Map<String, String> m = new LinkedHashMap<>();
-            m.put("filename", b.getId());
-            m.put("time", b.getCreateTime() == null ? "" : b.getCreateTime().toString());
-            m.put("count", String.valueOf(countOf(b.getSnapshot())));
-            out.add(m);
-        }
-        return out;
-    }
-
-    /** 快照里的词条数；解析不了就报 0，不为展示一个数字而抛异常 */
-    private int countOf(String snapshot) {
-        List<com.tcm.ehr.domain.po.TermEntry> list = termStore.readBackupBySnapshot(snapshot);
-        return list == null ? 0 : list.size();
-    }
-
-    @Override
-    /**
-     * 备份文件是否存在，直接委托文件服务。
-     *
-     * @param type 词典类型
-     * @param backupFilename 备份文件名
-     * @return 文件名合法且文件存在时为 {@code true}
-     */
-    public boolean backupExists(String type, String backupFilename) {
-        // 同样要校验组织：否则能探测到别的组织的备份是否存在
-        return termStore.backupMatches(backupFilename, RequestUtils.currentOrgId(), type);
-    }
-
-    // ---------------------------------------------------------------- 内部工具
+    // 原 rollback() / listBackups() / backupExists() 三个方法已随 dictionary_backups
+    // 表一起废弃（批次 17）：回滚改为「基于归档版本生成提案 → 组长审核合并」，
+    // 历史版本列表改为 GET /api/dictionary/archives。
 
     @Override
     public Map<String, Object> reindex(String type) throws IOException {

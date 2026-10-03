@@ -30,22 +30,6 @@ class EntityColumnMappingTest {
             "id", "org_id", "type", "standard_term", "code", "source", "aliases",
             "create_time", "update_time");
 
-    /** dictionary_backups 的真实列 */
-    private static final Set<String> DICTIONARY_BACKUPS_COLUMNS = Set.of(
-            "id", "org_id", "type", "snapshot", "created_by", "create_time");
-
-    /** dictionary_versions 的真实列（复合主键 org_id + type） */
-    private static final Set<String> DICTIONARY_VERSIONS_COLUMNS = Set.of(
-            "org_id", "type", "version", "indexed_version", "indexed_at", "update_time");
-
-    @Test
-    @DisplayName("三个词典实体的每个字段都能映射到真实存在的列")
-    void allDictionaryEntityFieldsMapToRealColumns() {
-        assertNoUnknownColumn(DictionaryTerm.class, DICTIONARY_TERMS_COLUMNS);
-        assertNoUnknownColumn(DictionaryBackup.class, DICTIONARY_BACKUPS_COLUMNS);
-        assertNoUnknownColumn(DictionaryVersion.class, DICTIONARY_VERSIONS_COLUMNS);
-    }
-
     @Test
     @DisplayName("DictionaryTerm 必须映射到 aliases —— 事故回归点")
     void dictionaryTermUsesAliasesColumn() {

@@ -37,30 +37,8 @@ public interface IDictionaryService {
      */
     ImportResultVO importDictionary(String type, MultipartFile file) throws IOException;
 
-    /**
-     * 回滚当前组织到历史版本，并重建该组织的 ES 索引。
-     *
-     * @param type           术语类型
-     * @param backupFilename 备份文件名
-     */
-    void rollback(String type, String backupFilename) throws IOException;
-
-    /**
-     * 列出历史版本。
-     *
-     * @param type 术语类型
-     * @return 版本项：filename / time / count / delta
-     */
-    List<Map<String, String>> listBackups(String type) throws IOException;
-
-    /**
-     * 判断备份文件是否存在。
-     *
-     * @param type           术语类型
-     * @param backupFilename 备份文件名
-     * @return 存在返回 true
-     */
-    boolean backupExists(String type, String backupFilename);
+    // 原 rollback / listBackups / backupExists 已随 dictionary_backups 表废弃（批次 17）：
+    // 回滚改为「基于归档版本生成提案 → 组长审核合并」，历史版本改为 GET /api/dictionary/archives。
 
     /**
      * 强制重建当前组织某一类词典的 ES 索引（不落库、不改词条）。

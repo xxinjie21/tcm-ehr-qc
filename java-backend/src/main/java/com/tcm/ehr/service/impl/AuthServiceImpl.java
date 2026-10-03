@@ -18,6 +18,7 @@ import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.UserMapper;
 import com.tcm.ehr.service.OrgResolution;
 import com.tcm.ehr.service.IAuthService;
+import com.tcm.ehr.service.IOrgPermissionService;
 import com.tcm.ehr.service.IOrgService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private final OrgMapper groupMapper;
     private final OrgMemberMapper groupMemberMapper;
     private final IOrgService orgService;
+    private final IOrgPermissionService orgPermission;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
 
@@ -181,10 +183,14 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         vo.setOrgRole(g.hasGroup() ? g.getGroupRole() : null);
         vo.setStatus(user.getStatus());
         vo.setPendingGroup(user.getHasPendingGroup() != null && user.getHasPendingGroup() == 1);
-        // 词典 / 质控规则写授权位：授权列在批次 4 的 DDL 落地前恒 false，
-        // 此时只有管理员与所有者能写（前端 getter 已按三档判定）
-        vo.setCanWriteDictionary(false);
-        vo.setCanWriteQcRules(false);
+        // 词典 / 质控规则写授权位：**实时查库**，不用登录时的快照。
+        // 原来这里写死 false（注释说「批次 4 的 DDL 落地前恒 false」），但 DDL 早已落地、
+        // organization_members 上的两列也早已在用 —— 写死导致：
+        //   ① 前端 canWriteDictionaryEntry 永远退化成「管理员或所有者」，成员授权功能形同失效；
+        //   ② 与 QcController 的实时判定不一致：后端放行、前端却不显示入口。
+        // 与 QcController:241 走同一个 OrgPermissionService，口径只此一处。
+        vo.setCanWriteDictionary(orgPermission.canWriteDictionary(user.getId()));
+        vo.setCanWriteQcRules(orgPermission.canWriteQcRules(user.getId()));
         vo.setMenus(menusOf(user, g));
         return vo;
     }

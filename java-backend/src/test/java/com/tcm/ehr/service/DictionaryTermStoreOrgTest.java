@@ -1,7 +1,6 @@
 package com.tcm.ehr.service;
 
 import com.tcm.ehr.domain.po.TermEntry;
-import com.tcm.ehr.mapper.DictionaryBackupMapper;
 import com.tcm.ehr.mapper.DictionaryTermMapper;
 import com.tcm.ehr.mapper.DictionaryVersionMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +29,6 @@ class DictionaryTermStoreOrgTest {
     private static DictionaryTermStore newStore() {
         return new DictionaryTermStore(
                 mock(DictionaryTermMapper.class),
-                mock(DictionaryBackupMapper.class),
                 mock(DictionaryVersionMapper.class),
                 new ObjectMapper());
     }
@@ -68,7 +66,7 @@ class DictionaryTermStoreOrgTest {
         when(vm.selectOne(any())).thenReturn(null);
         DictionaryTermStore store = new DictionaryTermStore(
                 mock(DictionaryTermMapper.class),
-                mock(DictionaryBackupMapper.class), vm, new ObjectMapper());
+                vm, new ObjectMapper());
 
         assertTrue(!store.isSynced("org-A", "herb"),
                 "查不到版本行时必须判未同步；默认已同步会让首次启动跳过重建、索引里什么都没有");
@@ -86,7 +84,7 @@ class DictionaryTermStoreOrgTest {
         when(vm.selectOne(any())).thenReturn(row);
         DictionaryTermStore store = new DictionaryTermStore(
                 mock(DictionaryTermMapper.class),
-                mock(DictionaryBackupMapper.class), vm, new ObjectMapper());
+                vm, new ObjectMapper());
 
         assertTrue(!store.isSynced("", "herb"),
                 "indexed_version 落后于 version 时必须判未同步 —— 这正是「库已改、ES 没跟上」的信号");

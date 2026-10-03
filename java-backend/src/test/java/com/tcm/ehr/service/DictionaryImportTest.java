@@ -58,10 +58,8 @@ class DictionaryImportTest {
         Mockito.when(lockMapper.acquire(Mockito.anyString(), Mockito.anyInt())).thenReturn(1);
         distLock = new com.tcm.ehr.common.utils.DistLock(lockMapper);
         termStore = Mockito.mock(DictionaryTermStore.class);
-        // 本组织原有词条为空；备份 id 固定，便于回滚断言
+        // 本组织原有词条为空（备份机制已随 dictionary_backups 表废弃）
         when(termStore.read(anyString(), anyString())).thenReturn(List.of());
-        when(termStore.backup(anyString(), anyString(), any()))
-                .thenReturn("bak-test-id");
         // replace 返回内容版本，代码会拿它当 rebuild/markIndexed 的入参
         when(termStore.replace(anyString(), anyString(), anyList()))
                 .thenReturn("cv-test");
@@ -247,8 +245,8 @@ class DictionaryImportTest {
     void import_shouldBackupWriteRebuildAndMarkIndexed() throws IOException {
         service.importDictionary(TYPE, json("d.json", "[{\"standardTerm\":\"喉痹\"}]"));
 
-        // 1. 存档与落库都发生在本组织这一层
-        Mockito.verify(termStore).backup(anyString(), Mockito.eq(TYPE), any());
+        // 1. 落库发生在本组织这一层（存档机制已随 dictionary_backups 表废弃，
+        //    改由归档版本承担「合并后快照」）
         Mockito.verify(termStore).replace(anyString(), Mockito.eq(TYPE), anyList());
 
         // 2. 灌进索引的就是刚导入的那条，而不是只断言 rebuild 被调用过

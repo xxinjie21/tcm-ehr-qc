@@ -184,15 +184,52 @@ CREATE TABLE IF NOT EXISTS dictionary_terms (
   INDEX idx_org_type (org_id, type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='术语词典词条';
 
-CREATE TABLE IF NOT EXISTS dictionary_backups (
+CREATE TABLE IF NOT EXISTS dict_proposal (
   id VARCHAR(36) PRIMARY KEY,
   org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层",
   type VARCHAR(20) NOT NULL,
-  snapshot LONGTEXT NOT NULL,
-  created_by VARCHAR(36),
-  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_backup_org_type (org_id, type, create_time)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='词典回滚快照';
+  submit_user_id VARCHAR(36) NOT NULL COMMENT '提交人',
+  status VARCHAR(16) NOT NULL COMMENT 'pending/approved/rejected',
+  audit_user_id VARCHAR(36) COMMENT '审核人（组长）',
+  audit_comment VARCHAR(500),
+  create_time DATETIME NOT NULL,
+  audit_time DATETIME,
+  purge_after DATETIME COMMENT '仅 rejected：+7天后惰性清理快照；主记录永久保留',
+  INDEX idx_pending (org_id, type, status),
+  INDEX idx_purge (status, purge_after)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='词典基线更新提案';
+
+CREATE TABLE IF NOT EXISTS dict_proposal_term (
+  id VARCHAR(36) PRIMARY KEY,
+  proposal_id VARCHAR(36) NOT NULL,
+  standard_term VARCHAR(200) NOT NULL,
+  code VARCHAR(100),
+  source VARCHAR(100),
+  aliases JSON,
+  INDEX idx_proposal (proposal_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提案术语快照（提交时的完整目标基线）';
+
+CREATE TABLE IF NOT EXISTS dict_archive_version (
+  id VARCHAR(36) PRIMARY KEY,
+  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层，与组织层独立计数",
+  type VARCHAR(20) NOT NULL,
+  version_no INT NOT NULL COMMENT '组内递增版本号',
+  proposal_id VARCHAR(36) COMMENT '来源提案；管理员直写导入时为 NULL',
+  merge_time DATETIME NOT NULL,
+  merge_user_id VARCHAR(36) NOT NULL,
+  comment VARCHAR(300),
+  UNIQUE KEY uk_org_type_no (org_id, type, version_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='基线归档版本元信息（永久保留）';
+
+CREATE TABLE IF NOT EXISTS dict_archive_term (
+  id VARCHAR(36) PRIMARY KEY,
+  version_id VARCHAR(36) NOT NULL,
+  standard_term VARCHAR(200) NOT NULL,
+  code VARCHAR(100),
+  source VARCHAR(100),
+  aliases JSON,
+  INDEX idx_version (version_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='基线归档术语快照（每组每 type 仅留最近 5 份）';
 
 CREATE TABLE IF NOT EXISTS dictionary_versions (
   org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层",
