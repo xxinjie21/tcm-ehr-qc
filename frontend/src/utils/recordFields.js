@@ -11,6 +11,20 @@
  *   {@link fieldsWithWide} 声明自己要哪些字段占整行，不放进本表
  */
 
+/**
+ * 多行字段（现病史 / 主诉 / 中医诊断…）的自适应行高。
+ *
+ * <p>随内容增高、<b>宽度不变</b>：写病史时内容长度不可预知，固定几行会逼用户
+ * 在小框里横向拖动，或者反复展开折叠。</p>
+ *
+ * <p>{@code maxRows} 取 30 而不是不限：完全不限高度时，一个超长字段会把整个表单
+ * 撑到几千像素，后面字段全被推走，反而更难填。30 行约等于一整页病史的常见长度。</p>
+ *
+ * <p>注意高度只由这个值决定 —— Element Plus 的 autosize 会写<b>行内</b>
+ * {@code style="height:…px"}，所以在 CSS 里写 min-height 会被它压掉（此前白写过）。</p>
+ */
+export const MULTI_AUTOSIZE = { minRows: 3, maxRows: 30 }
+
 // 病历 21 原始字段（含表单属性 max / multi）
 export const RECORD_FIELDS = [
   { key: 'registrationNo', label: '登记号', max: 50 },

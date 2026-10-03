@@ -39,6 +39,8 @@ import java.util.function.Function;
 public class EntityNormalizer {
 
     private final EsTermNormalizer termNormalizer;
+    /** {@link #normalizeMap} 需要在 Map 与 VO 之间转换；显式注入而不是 new 出来 */
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     /**
      * 归一统计。
@@ -153,6 +155,59 @@ public class EntityNormalizer {
      * RequestContext，{@code currentOrgId()} 会拿到空串 → 静默只查基础层，
      * 组织自定义词条对批任务完全失效，而且不报错。</p>
      */
+    /**
+     * 组织级归一（就地改 {@code structured_data} 的 Map 形态）。
+     *
+     * <p><b>用途</b>：人工复核提交修正后写回前用。复核员<b>新输入</b>的词只带
+     * {@code content/name}，没有 {@code normLevel}；而 {@link QcScorer#countUnnormalized}
+     * 把「无 normLevel」算作未标准化 → <b>人工修正反而扣分</b>（weightEach=1、封顶 5）。
+     * 这里在写回前跑一遍与模型抽取完全相同的归一，口径统一。</p>
+     *
+     * <p><b>为什么不在 Map 与 VO 之间整体来回转换</b>：{@code NlpExtractVO} 里没有
+     * {@code _meta} / {@code modelAvailable} / {@code truncated}，整体转换会丢键，
+     * 也会给未赋值的属性写出 {@code null} 键（JSON 变胖）。所以这里只把 9 个实体列表
+     * 与 {@code herbs} 的归一结果<b>写回原 Map</b>，其余键原样保留。</p>
+     *
+     * @param data  structured_data 的 Map 形态（就地修改）
+     * @param orgId 组织号
+     * @return 命中统计
+     */
+    public NormStat normalizeMap(Map<String, Object> data, String orgId) {
+        if (data == null) {
+            return new NormStat(0, 0, 0, 0);
+        }
+        NlpExtractVO vo;
+        try {
+            vo = objectMapper.convertValue(data, NlpExtractVO.class);
+        } catch (IllegalArgumentException e) {
+            // 结构化数据形状异常就不归一：让复核继续走完，不因一条脏数据卡住复核员
+            log.warn("[归一] 结构化数据转 VO 失败，跳过归一: {}", e.getMessage());
+            return new NormStat(0, 0, 0, 0);
+        }
+        NormStat stat = normalize(vo, orgId);
+        // 回写成 Map 而不是直接塞 vo.getXxx()：后者会把 NlpExtractVO.Entity / Herb
+        // 这些**强类型对象**留在 Map 里，而方法约定是「键值仍与 structured_data 同构的 Map」。
+        // 一旦有调用方接着读这个 Map（比如按 Map 取实体去比对），就会 ClassCastException。
+        // 我的测试先踩了这个坑才定下来的。
+        writeBack(data, "diseases", vo.getDiseases());
+        writeBack(data, "symptoms", vo.getSymptoms());
+        writeBack(data, "tongueList", vo.getTongueList());
+        writeBack(data, "pulseList", vo.getPulseList());
+        writeBack(data, "patternList", vo.getPatternList());
+        writeBack(data, "causeList", vo.getCauseList());
+        writeBack(data, "treatmentList", vo.getTreatmentList());
+        writeBack(data, "formulaList", vo.getFormulaList());
+        writeBack(data, "herbs", vo.getHerbs());
+        return stat;
+    }
+
+    /** 把归一后的强类型列表转回 Map 列表再放进 data，保持 Map 的同构约定 */
+    private void writeBack(Map<String, Object> data, String key, List<?> typed) {
+        data.put(key, objectMapper.convertValue(typed,
+                new tools.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
+                }));
+    }
+
     public NormStat normalize(NlpExtractVO vo, String orgId) {
         // 1. 没抽取出东西就不做归一
         if (vo == null) {

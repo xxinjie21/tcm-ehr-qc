@@ -188,7 +188,7 @@
                     v-model="form[f.key]"
                     :type="f.multi ? 'textarea' : 'text'"
                     :rows="f.multi ? 3 : undefined"
-                    :autosize="f.multi ? { minRows: 3, maxRows: 6 } : false"
+                    :autosize="f.multi ? MULTI_AUTOSIZE : false"
                     :maxlength="f.max"
                     :show-word-limit="!!f.max"
                     clearable
@@ -221,7 +221,7 @@ import {
 } from '@/api/records'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { useAiContextStore } from '@/stores/ai'
-import { fieldsWithWide } from '@/utils/recordFields'
+import { fieldsWithWide, MULTI_AUTOSIZE } from '@/utils/recordFields'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'

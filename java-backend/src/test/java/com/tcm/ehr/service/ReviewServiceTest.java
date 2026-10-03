@@ -2,6 +2,8 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
+import com.tcm.ehr.common.utils.EntityNormalizer;
+import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.po.Record;
@@ -64,7 +66,18 @@ class ReviewServiceTest {
         reviewTaskMapper = Mockito.mock(ReviewTaskMapper.class);
         // QcRuleStore 的 init() 是 @PostConstruct，测试里不调用 → get() 返回 null
         // → QcScorer 落回内置默认规则（正是要测的口径）
-        service = new ReviewServiceImpl(recordMapper, new ObjectMapper(), new QcRuleStore(new ObjectMapper(), org.mockito.Mockito.mock(QcRuleMapper.class)));
+        // 复核提交修正前会跑一遍归一（否则人工新输入的词没有 normLevel，
+        // 会被 QcScorer 当成未标准化而扣分）。mock 的 EsTermNormalizer 必须
+        // 像真实实现一样返回非 null 的结果 —— 契约上它就不返回 null，
+        // 之前直接 mock 返回 null 导致 normEntities NPE。
+        EsTermNormalizer termNormalizer = org.mockito.Mockito.mock(EsTermNormalizer.class);
+        Mockito.when(termNormalizer.normalize(Mockito.anyString(), Mockito.anyString(),
+                        Mockito.anyString()))
+                .thenAnswer(inv -> new EsTermNormalizer.NormalizeResult(
+                        inv.getArgument(2), "测试词典", 1, null));
+        service = new ReviewServiceImpl(recordMapper, new ObjectMapper(),
+                new QcRuleStore(new ObjectMapper(), org.mockito.Mockito.mock(QcRuleMapper.class)),
+                new EntityNormalizer(termNormalizer, new ObjectMapper()));
         // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置
         ReflectionTestUtils.setField(service, "baseMapper", reviewTaskMapper);
     }
@@ -163,8 +176,12 @@ class ReviewServiceTest {
 
         assertNotNull(vo);
         assertEquals("已完成", vo.getStatus());
-        // 100 - 术语未标准化 4 = 96（方剂自批M 起不参与评分，故不再是 100）
-        assertEquals(96, vo.getScore());
+        // 100 —— 人工修正**不再反被扣分**。
+        // 原期望值是 96，注释写着「100 - 术语未标准化 4」：复核员新输入/改写的词只带
+        // content、没有 normLevel，QcScorer.countUnnormalized 就把它们算作未标准化。
+        // 也就是说「越认真修正、分数越低」。现在写回前统一跑一遍归一，口径与模型
+        // 抽取一致，所以这 4 分不再出现。旧期望值实际固化了这个缺陷。
+        assertEquals(100, vo.getScore());
         assertEquals("completed", t.getStatus());
         assertNotNull(t.getReviewedBy());
         assertNotNull(t.getCompletedTime());

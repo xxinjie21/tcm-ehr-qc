@@ -48,7 +48,7 @@ class EntityNormalizerPatternBackfillTest {
         when(normalizer.scan(eq("pattern"), eq(ORG), eq(PATTERN_TEXT)))
                 .thenReturn(new LinkedHashSet<>(List.of("肝阳上亢", "肝火上炎")));
 
-        EntityNormalizer svc = new EntityNormalizer(normalizer);
+        EntityNormalizer svc = new EntityNormalizer(normalizer, new tools.jackson.databind.ObjectMapper());
         NlpExtractVO vo = NlpExtractVO.empty();
         // 模型漏抽：patternList 为空，但 pattern 列有文本
         assertTrue(vo.getPatternList().isEmpty());
@@ -67,7 +67,7 @@ class EntityNormalizerPatternBackfillTest {
     @DisplayName("辨证结论列为空：完全不查词典（不给每次批量解析白加一次 ES 查询）")
     void blankPatternColumnSkipsScan() {
         EsTermNormalizer normalizer = mockNormalizer(mock(EsTermNormalizer.class));
-        EntityNormalizer svc = new EntityNormalizer(normalizer);
+        EntityNormalizer svc = new EntityNormalizer(normalizer, new tools.jackson.databind.ObjectMapper());
 
         svc.backfillFromRaw(NlpExtractVO.empty(), ORG, null, null, "   ");
 
@@ -78,7 +78,7 @@ class EntityNormalizerPatternBackfillTest {
     @DisplayName("证候已全部归一：不触发回补（避免重复 append）")
     void fullyNormalizedPatternsSkipBackfill() {
         EsTermNormalizer normalizer = mockNormalizer(mock(EsTermNormalizer.class));
-        EntityNormalizer svc = new EntityNormalizer(normalizer);
+        EntityNormalizer svc = new EntityNormalizer(normalizer, new tools.jackson.databind.ObjectMapper());
 
         NlpExtractVO vo = NlpExtractVO.empty();
         NlpExtractVO.Entity e = new NlpExtractVO.Entity();
@@ -98,7 +98,7 @@ class EntityNormalizerPatternBackfillTest {
         EsTermNormalizer normalizer = mockNormalizer(mock(EsTermNormalizer.class));
         when(normalizer.scan(anyString(), anyString(), anyString()))
                 .thenReturn(new LinkedHashSet<>(List.of("肝阳上亢")));
-        EntityNormalizer svc = new EntityNormalizer(normalizer);
+        EntityNormalizer svc = new EntityNormalizer(normalizer, new tools.jackson.databind.ObjectMapper());
 
         svc.backfillFromRaw(NlpExtractVO.empty(), ORG, null, null, PATTERN_TEXT);
 

@@ -125,7 +125,7 @@
                         v-model="fields[f.key]"
                         :type="f.multi ? 'textarea' : 'text'"
                         :rows="f.multi ? 3 : undefined"
-                        :autosize="f.multi ? { minRows: 3, maxRows: 6 } : false"
+                        :autosize="f.multi ? MULTI_AUTOSIZE : false"
                         clearable
                       />
                     </el-form-item>
@@ -364,6 +364,7 @@ import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/request'
+import { MULTI_AUTOSIZE } from '@/utils/recordFields'
 import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
 import { confirmBox } from '@/utils/confirm'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'

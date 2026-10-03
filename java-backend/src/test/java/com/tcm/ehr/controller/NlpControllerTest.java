@@ -35,7 +35,7 @@ class NlpControllerTest {
     private NlpController controller(PythonNlpClient client, EsTermNormalizer termNormalizer) {
         EsTermNormalizer normalizer = termNormalizer == null ? mock(EsTermNormalizer.class) : termNormalizer;
         // 批量解析依赖（批K 起构造器新增）：本测试不碰批量接口，用替身占位
-        return new NlpController(client, new EntityNormalizer(normalizer),
+        return new NlpController(client, new EntityNormalizer(normalizer, new tools.jackson.databind.ObjectMapper()),
                 mock(INlpBatchService.class), mock(OperationLogger.class));
     }
 
