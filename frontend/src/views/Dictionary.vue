@@ -131,30 +131,178 @@
       </div>
     </PanelCard>
 
-    <!-- 版本回滚：每次导入前自动备份，选任一版本覆盖当前词典并立即生效 -->
-    <PanelCard v-if="canWrite" title="版本回滚">
-      <div class="rollback-row">
-        <span class="tip">回滚会用该版本覆盖当前词典，立即生效。</span>
-        <el-button size="small" @click="loadBackups">刷新历史版本</el-button>
+    <!-- ============================================================ 批次17：提案 + 归档 -->
+    <!-- 原「版本回滚」面板已移除：dictionary_backups 表废弃，回滚改为
+         「基于归档版本生成提案 → 组长审核」，历史列表改为「归档版本」。 -->
+
+    <!-- 个人词典：拉取小组基线存本地，可在本地编辑后提交提案 -->
+    <PanelCard title="个人词典（本地）">
+      <div class="rv-row">
+        <el-button size="small" :loading="baselineLoading" @click="loadBaseline">
+          拉取小组基线
+        </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          :loading="submittingProposal"
+          :disabled="!localTerms.length"
+          @click="doSubmitProposal"
+        >提交更新提案</el-button>
+        <span class="tip">
+          本地词典只存在这台电脑上，<b>不会自动同步小组基线</b>；改动要生效必须走提案 → 组长审核。
+        </span>
       </div>
-      <el-table :data="backups" border style="margin-top: var(--sp-3)" max-height="260"
-        :empty-text="backupsFailed ? '历史版本加载失败，请点「刷新历史版本」重试'
-          : '暂无历史版本。导入词典时会自动备份，导入一次即可在这里回滚'">
-        <el-table-column prop="time" label="导入时间" min-width="180" />
-        <el-table-column prop="count" label="词条数" width="110" />
-        <el-table-column label="较当前" width="120">
+      <div v-if="localLoadedAt" class="rv-meta">
+        已拉取 {{ localTerms.length }} 条 · {{ localLoadedAt }} ·
+        <span v-if="baselineTouched" class="rv-dirty">本地有未提交的改动</span>
+        <span v-else>与基线一致</span>
+      </div>
+      <el-table :data="localPaged" border size="small" max-height="260" style="margin-top: var(--sp-3)"
+        :empty-text="localTerms.length ? '' : '先点「拉取小组基线」把当前组织的词典下载到本地'">
+        <el-table-column prop="standardTerm" label="标准词" min-width="160" />
+        <el-table-column label="别名" min-width="200">
+          <template #default="{ row }">{{ (row.aliases || []).join('、') }}</template>
+        </el-table-column>
+        <el-table-column prop="source" label="来源" min-width="120" />
+        <el-table-column label="操作" width="90">
           <template #default="{ row }">
-            <span :class="deltaClass(row.delta)">{{ deltaText(row.delta) }}</span>
+            <el-button link type="danger" size="small" @click="removeLocalTerm(row.standardTerm)">
+              删除
+            </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120">
+      </el-table>
+      <div v-if="localTerms.length > LOCAL_PAGE_SIZE" class="rv-pager">
+        <el-button size="small" :disabled="localPage <= 1" @click="localPage--">上一页</el-button>
+        <span class="tip">{{ localPage }} / {{ localPageCount }}</span>
+        <el-button size="small" :disabled="localPage >= localPageCount" @click="localPage++">
+          下一页
+        </el-button>
+      </div>
+      <div class="rv-add">
+        <el-input v-model="newTerm" placeholder="新增标准词" style="width: 160px" size="small" />
+        <el-button size="small" :disabled="!newTerm.trim()" @click="addLocalTerm">加入本地</el-button>
+        <span class="tip">加入本地后同样需要提交提案才会进入小组基线</span>
+      </div>
+    </PanelCard>
+
+    <!-- 提案列表 + 差异预览 + 审核 -->
+    <PanelCard title="基线更新提案">
+      <div class="rv-row">
+        <el-select v-model="proposalStatus" size="small" style="width: 120px"
+          aria-label="提案状态" @change="loadProposals">
+          <el-option label="待审核" value="pending" />
+          <el-option label="已通过" value="approved" />
+          <el-option label="已拒绝" value="rejected" />
+        </el-select>
+        <el-button size="small" @click="loadProposals">刷新</el-button>
+        <span class="tip">
+          普通成员只能看到自己提交的提案；组织所有者可审核并合并。
+        </span>
+      </div>
+      <el-table :data="proposals" border size="small" max-height="240" style="margin-top: var(--sp-3)"
+        :empty-text="'暂无提案。在上方「个人词典」里改完后点「提交更新提案」'">
+        <el-table-column prop="type" label="类型" width="90" />
+        <el-table-column label="提交人" width="110">
+          <template #default="{ row }">{{ row.submitUserId }}</template>
+        </el-table-column>
+        <el-table-column prop="termCount" label="词条数" width="90" />
+        <el-table-column prop="status" label="状态" width="90">
           <template #default="{ row }">
+            <el-tag size="small" :type="statusTagType(row.status)" effect="plain">
+              {{ statusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="auditComment" label="审核意见" min-width="140" show-overflow-tooltip />
+        <el-table-column label="操作" width="130" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openDiff(row)">看差异</el-button>
             <el-button
-              type="warning"
+              v-if="isOwner && row.status === 'pending'"
+              link type="warning"
               size="small"
-              plain
-              @click="handleRollback(row)"
-            >回滚到此版</el-button>
+              @click="doAudit(row, true)"
+            >通过</el-button>
+            <el-button
+              v-if="isOwner && row.status === 'pending'"
+              link type="danger"
+              size="small"
+              @click="doAudit(row, false)"
+            >拒绝</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PanelCard>
+
+    <!-- 差异详情 -->
+    <el-dialog v-model="diffVisible" title="提案差异" width="min(900px, 94vw)" top="6vh">
+      <div v-if="diff" class="rv-diff">
+        <div class="rv-diff-sec">
+          <div class="rv-diff-hd add">新增 {{ diff.added?.length || 0 }} 条</div>
+          <div v-for="(t, i) in diff.added" :key="'a' + i" class="rv-diff-row">
+            {{ t.standardTerm }}
+            <span class="rv-diff-al">别名：{{ (t.aliases || []).join('、') || '—' }}</span>
+          </div>
+          <el-empty v-if="!diff.added?.length" description="无新增" :image-size="48" />
+        </div>
+        <div class="rv-diff-sec">
+          <div class="rv-diff-hd mod">修改 {{ diff.modified?.length || 0 }} 条</div>
+          <div v-for="(t, i) in diff.modified" :key="'m' + i" class="rv-diff-row">
+            {{ t.before?.standardTerm }} → <b>{{ t.standardTerm }}</b>
+            <span class="rv-diff-al">
+              别名：{{ (t.before?.aliases || []).join('、') || '—' }}
+              → {{ (t.aliases || []).join('、') || '—' }}
+            </span>
+          </div>
+          <el-empty v-if="!diff.modified?.length" description="无修改" :image-size="48" />
+        </div>
+        <div class="rv-diff-sec">
+          <div class="rv-diff-hd del">删除 {{ diff.removed?.length || 0 }} 条</div>
+          <div v-for="(t, i) in diff.removed" :key="'d' + i" class="rv-diff-row">
+            {{ t }}
+          </div>
+          <el-empty v-if="!diff.removed?.length" description="无删除" :image-size="48" />
+        </div>
+        <el-alert v-if="diff && diff.noDiff" type="info" :closable="false" show-icon
+          title="与当前基线完全一致" description="提案内容与小组基线相同，合并后不会产生实际变化。" />
+      </div>
+      <template #footer>
+        <el-button @click="diffVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 归档版本 -->
+    <PanelCard title="归档版本">
+      <div class="rv-row">
+        <el-button size="small" :loading="archivesLoading" @click="loadArchives">刷新归档</el-button>
+        <span class="tip">
+          每次基线合并后自动留一份快照；每个类型最多保留最近 5 份快照，版本元信息永久保留。
+        </span>
+      </div>
+      <el-table :data="archives" border size="small" max-height="220" style="margin-top: var(--sp-3)"
+        empty-text="暂无归档版本。基线第一次变更后会自动生成">
+        <el-table-column prop="versionNo" label="版本" width="80" />
+        <el-table-column label="词条数" width="90">
+          <template #default="{ row }">{{ row.termCount ?? '—' }}</template>
+        </el-table-column>
+        <el-table-column label="合并时间" min-width="160">
+          <template #default="{ row }">{{ fmtTime(row.mergeTime) }}</template>
+        </el-table-column>
+        <el-table-column prop="mergeUserId" label="合并人" width="120" />
+        <el-table-column prop="comment" label="备注" min-width="140" show-overflow-tooltip />
+        <el-table-column label="快照" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.snapshotPresent" size="small" type="success" effect="plain">可用</el-tag>
+            <el-tooltip v-else content="快照已被 5 份限额清理，仅保留版本元信息，无法用于回滚">
+              <el-tag size="small" type="info" effect="plain">已清理</el-tag>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="isOwner" label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="warning" size="small" :disabled="!row.snapshotPresent"
+              @click="doRollback(row)">回滚</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -169,7 +317,10 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
-import { getTerms, importDict, rollback, getBackups } from '@/api/dictionary'
+import {
+  getTerms, importDict, exportBaseline, submitProposal, listProposals,
+  proposalDiff, auditProposal, listArchives, rollbackArchive
+} from '@/api/dictionary'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES_WIDE } from '@/utils/constants'
@@ -250,6 +401,11 @@ const handleSizeChange = () => {
 
 // 切换词典类型：先清掉上一次的查询与导入状态，再拉新类型的数据
 watch(activeTab, () => {
+  // 切术语类型：本地词典按类型分开存，切回来要恢复；提案/归档同理
+  restoreLocal()
+  localPage.value = 1
+  loadProposals()
+  loadArchives()
   keyword.value = ''
   // 切换词典类型时清空上一次的导入结果与已选文件，
   // 否则会把「上一类词典的结果」误读成本次的结果
@@ -257,7 +413,6 @@ watch(activeTab, () => {
   dictFileList.value = []
   importFile.value = null
   loadTerms()
-  loadBackups()
 })
 
 // 导入相关状态：dictFileList 供 el-upload 回显，importFile 才是真正待提交的文件
@@ -349,7 +504,6 @@ const doImport = async (file) => {
     // 4. 提示成功并刷新术语列表与版本列表
     ElMessage.success(`导入完成：成功 ${res.data.imported} / 共 ${res.data.total}`)
     loadTerms()
-    loadBackups()
     // 5. 返回成功，供调用方决定是否清空已选文件
     return true
   } catch {
@@ -359,60 +513,225 @@ const doImport = async (file) => {
     // 无论成败都复位导入态
     importing.value = false
   }
-}
+}// 读取历史版本列表（按当前词典类型）// 回滚到指定版本：二次确认 → 覆盖当前词典 → 刷新术语与版本列表// 进页面拉取当前类型的术语与历史版本
+// ================================================================ 批次17：个人词典 / 提案 / 归档
 
-// 版本回滚数据
-const backups = ref([])
-// 历史版本读取失败：与「确实没有备份」区分开
-const backupsFailed = ref(false)
+const isOwner = computed(() => userStore.orgRole === 'owner')
 
-// 较当前增减：正=备份比现在多，负=少，0=一致
-const deltaText = (d) => {
-  const n = Number(d)
-  if (Number.isNaN(n)) return '—'
-  if (n === 0) return '无变化'
-  return n > 0 ? `多 ${n} 条` : `少 ${-n} 条`
-}
-// 「较当前」的配色类名：非数字或持平走中性，多 / 少分别走 ochre / danger
-const deltaClass = (d) => {
-  const n = Number(d)
-  if (Number.isNaN(n) || n === 0) return 'dl-flat'
-  return n > 0 ? 'dl-up' : 'dl-down'
-}
+// ---- 个人词典（本地 localStorage，与小组基线解耦）----
+const LOCAL_KEY = (org, type) => `dict.local.${org || 'base'}.${type}`
+const LOCAL_PAGE_SIZE = 20
 
-// 读取历史版本列表（按当前词典类型）
-const loadBackups = async () => {
+const localTerms = ref([])
+const localLoadedAt = ref('')
+const baselineTouched = ref(false)
+const baselineLoading = ref(false)
+const submittingProposal = ref(false)
+const newTerm = ref('')
+const localPage = ref(1)
+
+const localPageCount = computed(() =>
+  Math.max(1, Math.ceil(localTerms.value.length / LOCAL_PAGE_SIZE)))
+const localPaged = computed(() => {
+  const from = (localPage.value - 1) * LOCAL_PAGE_SIZE
+  return localTerms.value.slice(from, from + LOCAL_PAGE_SIZE)
+})
+
+const localKey = computed(() => LOCAL_KEY(userStore.orgId, activeTab.value))
+
+function saveLocal() {
   try {
-    const res = await getBackups({ type: activeTab.value })
-    backups.value = res.data.backups || []
-    backupsFailed.value = false
-  } catch {
-    // 原来连 try 都没有；且失败后表头的「暂无历史版本」会让人以为真的没有备份
-    backupsFailed.value = true
-    backups.value = []
+    localStorage.setItem(localKey.value, JSON.stringify({
+      at: new Date().toLocaleString(),
+      terms: localTerms.value
+    }))
+  } catch (e) {
+    // localStorage 满 / 隐私模式：给出提示，不静默丢数据
+    ElMessage.warning('本地词典保存失败（浏览器存储不可用或已满），本次修改不会保留')
   }
 }
 
-// 回滚到指定版本：二次确认 → 覆盖当前词典 → 刷新术语与版本列表
-const handleRollback = async (row) => {
-  // 1. 二次确认：回滚会覆盖当前词典，取消即整体中止
-  if (!(await confirmBox(
-    `确定将「${TYPE_LABELS[activeTab.value]}」词典回滚到 ${row.time} 的版本吗？覆盖当前词典并立即生效。`,
-    '版本回滚'))) {
+/** 拉取小组基线到本地（覆盖本地已有内容） */
+const loadBaseline = async () => {
+  baselineLoading.value = true
+  try {
+    const res = await exportBaseline({ type: activeTab.value })
+    const raw = localStorage.getItem(localKey.value)
+    let at = ''
+    if (raw) {
+      try {
+        at = (JSON.parse(raw) || {}).at || ''
+      } catch (e) {
+        at = ''
+      }
+    }
+    localTerms.value = (res.data || []).map((t) => ({
+      standardTerm: t.standardTerm,
+      aliases: t.aliases || [],
+      source: t.source || ''
+    }))
+    localLoadedAt.value = at || new Date().toLocaleString()
+    baselineTouched.value = false
+    saveLocal()
+    ElMessage.success(`已拉取 ${localTerms.value.length} 条到本地个人词典`)
+  } catch {
+    // 拦截器已提示
+  } finally {
+    baselineLoading.value = false
+  }
+}
+
+/** 从本地存储恢复上次编辑（切页签回来时用），没有就空着 */
+function restoreLocal() {
+  const raw = localStorage.getItem(localKey.value)
+  if (!raw) {
+    localTerms.value = []
+    localLoadedAt.value = ''
+    baselineTouched.value = false
     return
   }
-  // 2. 调后端按备份文件覆盖当前词典
-  const res = await rollback({ type: activeTab.value, backupFilename: row.filename })
-  // 3. 提示结果，并刷新术语列表与历史版本
-  ElMessage.success(res.msg || '回滚成功')
-  loadTerms()
-  loadBackups()
+  try {
+    const obj = JSON.parse(raw) || {}
+    localTerms.value = Array.isArray(obj.terms) ? obj.terms : []
+    localLoadedAt.value = obj.at || ''
+  } catch (e) {
+    localTerms.value = []
+    localLoadedAt.value = ''
+  }
 }
 
-// 进页面拉取当前类型的术语与历史版本
+const addLocalTerm = () => {
+  const t = newTerm.value.trim()
+  if (!t) return
+  if (localTerms.value.some((x) => x.standardTerm === t)) {
+    ElMessage.warning('本地词典里已有该标准词')
+    return
+  }
+  localTerms.value.push({ standardTerm: t, aliases: [], source: '本地新增' })
+  baselineTouched.value = true
+  newTerm.value = ''
+  saveLocal()
+}
+
+const removeLocalTerm = (std) => {
+  localTerms.value = localTerms.value.filter((x) => x.standardTerm !== std)
+  baselineTouched.value = true
+  saveLocal()
+}
+
+/** 提交提案：带上完整目标词典 */
+const doSubmitProposal = async () => {
+  submittingProposal.value = true
+  try {
+    const res = await submitProposal({
+      type: activeTab.value,
+      terms: localTerms.value.map((t) => ({
+        standardTerm: t.standardTerm,
+        aliases: t.aliases || [],
+        source: t.source || ''
+      }))
+    })
+    ElMessage.success(res.msg || '提案已提交，等待组长审核')
+    baselineTouched.value = false
+    loadProposals()
+  } catch {
+    // 拦截器已提示（含「已有 5 条待审提案」这类业务提示）
+  } finally {
+    submittingProposal.value = false
+  }
+}
+
+// ---- 提案列表 ----
+const proposals = ref([])
+const proposalStatus = ref('pending')
+const loadProposals = async () => {
+  try {
+    const res = await listProposals({ status: proposalStatus.value || undefined })
+    proposals.value = res.data || []
+  } catch {
+    proposals.value = []
+  }
+}
+
+// ---- 差异 ----
+const diffVisible = ref(false)
+const diff = ref(null)
+const openDiff = async (row) => {
+  try {
+    const res = await proposalDiff(row.id)
+    diff.value = res.data || null
+    diffVisible.value = true
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+// ---- 审核 ----
+const doAudit = async (row, approve) => {
+  let comment = ''
+  if (!approve) {
+    comment = window.prompt('请填写拒绝理由（会一并记入提案，供提交人查看）')
+    if (comment === null) return
+    if (!comment.trim()) {
+      ElMessage.warning('拒绝时必须填写理由')
+      return
+    }
+  } else if (!(await confirmBox('通过后将整份提案内容替换当前基线，并生成一份归档版本。确定？',
+    '审核通过', { type: 'warning' }))) {
+    return
+  }
+  try {
+    await auditProposal(row.id, { approve, comment })
+    ElMessage.success(approve ? '已通过并合并入基线' : '已驳回')
+    loadProposals()
+    loadArchives()
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+// ---- 归档版本 ----
+const archives = ref([])
+const archivesLoading = ref(false)
+const loadArchives = async () => {
+  archivesLoading.value = true
+  try {
+    const res = await listArchives({ type: activeTab.value })
+    archives.value = res.data || []
+  } catch {
+    archives.value = []
+  } finally {
+    archivesLoading.value = false
+  }
+}
+
+/** 回滚：生成新提案，仍需审核后才会真正合并 */
+const doRollback = async (row) => {
+  if (!(await confirmBox(
+    `基于归档 v${row.versionNo} 生成一份回滚提案？回滚同样需要审核通过后才会生效，且会生成新的归档版本。`,
+    '版本回滚', { type: 'warning' }))) {
+    return
+  }
+  try {
+    const res = await rollbackArchive(row.versionNo, activeTab.value)
+    ElMessage.success(res.msg || '已生成回滚提案，请审核')
+    proposalStatus.value = 'pending'
+    loadProposals()
+  } catch {
+    // 拦截器已提示（含「快照已被清理，无法回滚」）
+  }
+}
+
+const statusText = (st) => ({ pending: '待审核', approved: '已通过', rejected: '已拒绝' }[st] || st)
+const statusTagType = (st) => ({ pending: 'warning', approved: 'success', rejected: 'info' }[st] || 'info')
+
+const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '—')
+
 onMounted(() => {
+  restoreLocal()
+  loadProposals()
+  loadArchives()
   loadTerms()
-  loadBackups()
 })
 </script>
 
@@ -429,11 +748,6 @@ onMounted(() => {
 }
 /* 查询行 / 回滚行：单行水平排布 */
 .search-row,
-.rollback-row {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: center;
-}
 /* 「较当前」的增减配色：多=ochre、少=danger、无变化=次级色 */
 .dl-up { color: var(--ochre); }
 .dl-down { color: var(--danger); }
@@ -524,5 +838,59 @@ onMounted(() => {
   padding: 6px var(--sp-3);
   margin-bottom: 6px;
   font-size: 12.5px;
+}
+
+/* ===== 批次17：个人词典 / 提案 / 归档 ===== */
+.rv-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.rv-meta {
+  margin-top: var(--sp-2);
+  font-size: 12.5px;
+  color: var(--text-sub);
+}
+.rv-dirty {
+  color: var(--ochre);
+  margin-left: var(--sp-2);
+}
+.rv-pager {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.rv-add {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  flex-wrap: wrap;
+}
+/* 差异三栏：新增/修改/删除用色块区分，颜色与 EmptyState 的语义色一致 */
+.rv-diff-sec {
+  margin-bottom: var(--sp-4);
+}
+.rv-diff-hd {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: var(--sp-2);
+  padding-left: var(--sp-2);
+  border-left: 3px solid var(--line);
+}
+.rv-diff-hd.add { border-left-color: var(--ink-mid); color: var(--ink-mid); }
+.rv-diff-hd.mod { border-left-color: var(--ochre); color: var(--ochre); }
+.rv-diff-hd.del { border-left-color: var(--danger); color: var(--danger); }
+.rv-diff-row {
+  padding: 3px var(--sp-2);
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+.rv-diff-al {
+  margin-left: var(--sp-2);
+  color: var(--text-sub);
+  font-size: 12px;
 }
 </style>
