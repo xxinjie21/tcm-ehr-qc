@@ -8,7 +8,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 词典文件读写：每类术语一个 JSON 文件，导入前自动备份到 backup 子目录。
+ * 词典文件**只读**：每类术语一个 JSON 文件，仅用于基础层首次播种。
+ *
+ * <p>批次 17 起本接口<b>只保留 read()</b>：词典真源已入库
+ * （{@code dictionary_terms}），备份/回滚/版本列表改由归档版本体系承担
+ * （{@code dict_archive_version} / {@code dict_archive_term}）。
+ * 保留 {@code read()} 是因为基础层 3580 条术语只此一份可重建的来源。</p>
  *
  * <p>只管文件，解析与校验在 {@link IDictionaryService}。</p>
  */
@@ -17,8 +22,6 @@ public interface IDictionaryFileService {
     /** @return 词典文件所在目录 */
     Path dir();
 
-    /** @return 备份文件所在目录 */
-    Path backupDir();
 
     /**
      * 取词典文件名。
@@ -44,38 +47,6 @@ public interface IDictionaryFileService {
      */
     void write(String type, List<TermEntry> entries) throws IOException;
 
-    /**
-     * 备份当前词典。
-     *
-     * @param type 术语类型
-     * @return 备份文件名；当前无文件返回 {@code null}
-     */
-    String backup(String type) throws IOException;
-
-    /**
-     * 用备份覆盖当前词典。
-     *
-     * @param type           术语类型
-     * @param backupFilename 备份文件名，类型不匹配时拒绝
-     */
-    void restore(String type, String backupFilename) throws IOException;
-
-    /**
-     * 列出历史版本。
-     *
-     * @param type 术语类型
-     * @return 版本项：filename=文件名；time=导入时间；count=词条数；delta=相对当前的增减
-     */
-    List<Map<String, String>> listBackups(String type) throws IOException;
-
-    /**
-     * 判断备份文件是否存在。
-     *
-     * @param type           术语类型
-     * @param backupFilename 备份文件名
-     * @return 文件存在返回 true
-     */
-    boolean backupExists(String type, String backupFilename);
 
     /**
      * 当前词典版本（各类型内容合成，内容不变则稳定）。

@@ -22,7 +22,17 @@ public class LoginVO {
      */
     private String username;
     private String role;
-    private List<String> menus;
+
+    /**
+     * 可见菜单（树形；批次 17 升级）。
+     *
+     * <p><b>为什么从平铺字符串列表升级为树</b>：「术语批量导入」是「术语词典」的子项，
+     * 平铺列表表达不了父子关系，前端只能靠字符串猜顺序与归属。</p>
+     *
+     * <p>父项与子项的可见性由 {@code AuthServiceImpl.menusOf} 决定：父项「术语词典」
+     * 对所有能访问词典的人可见，子项「术语批量导入」<b>仅管理员</b>。</p>
+     */
+    private List<MenuNode> menus;
 
     /** 当前所属组织 ID；无组织（待分配池 / 组织已停用）时为空串 */
     private String orgId;

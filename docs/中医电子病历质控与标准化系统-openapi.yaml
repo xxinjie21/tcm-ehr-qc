@@ -248,19 +248,30 @@ components:
         role:
           type: string
           description: 管理员 / 授权成员
+        username:
+          type: string
+          description: 用户名（页面右上角显示「这是谁」，而非只显示角色）
         menus:
           type: array
+          description: >-
+            可见菜单（树形）。批次17 起由平铺字符串列表升级为带 children 的结构 ——
+            「术语批量导入」是「术语词典」的子项，平铺列表表达不了父子关系。
           items:
-            type: string
-          example:
-            - 首页看板
-            - 病历数据
-            - 结构化解析
-            - 质控校验
-            - 人工复核
-            - 清洗与导出
-            - 术语词典
-            - 日志审计
+            $ref: '#/components/schemas/MenuNode'
+    MenuNode:
+      type: object
+      properties:
+        title:
+          type: string
+          description: 菜单显示名，与前端 MainLayout 的 ALL_MENUS[].title 对应
+        path:
+          type: string
+          description: 前端路由路径；父项也可点（如「术语词典」→ /dictionary）
+        children:
+          type: array
+          description: 子菜单；空数组表示叶子节点
+          items:
+            $ref: '#/components/schemas/MenuNode'
     # ========== 病历管理 DTO / VO ==========
     ImportSummaryVO:
       type: object

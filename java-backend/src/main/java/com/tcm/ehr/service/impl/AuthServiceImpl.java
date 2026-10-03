@@ -13,6 +13,7 @@ import com.tcm.ehr.domain.po.OrganizationMember;
 import com.tcm.ehr.domain.po.Organization;
 import com.tcm.ehr.domain.po.User;
 import com.tcm.ehr.domain.vo.LoginVO;
+import com.tcm.ehr.domain.vo.MenuNode;
 import com.tcm.ehr.mapper.OrgMemberMapper;
 import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.UserMapper;
@@ -28,6 +29,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -65,27 +67,71 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private int loginLockMinutes;
 
     /**
-     * 管理员菜单（9 项：原 8 项 + 组织管理）。
-     * 名称与前端路由 / 侧栏一致。
+     * 菜单树（批次 17 从平铺字符串列表升级为带 children 的结构）。
+     *
+     * <p><b>为什么升级</b>：「术语批量导入」是「术语词典」的子项，平铺列表表达不了父子关系。
+     * 名称与前端 MainLayout 的 ALL_MENUS[].title 对应。</p>
+     *
+     * <p>「术语词典」父项<b>所有人可见</b>（它是日常高频入口）；其子项
+     * 「术语批量导入」<b>仅管理员</b>可见 —— 后端 {@code POST /dictionary/import}
+     * 是 {@code @RequireRole("管理员")}，父项可点但不展开的语义也在这里一并确定。</p>
      */
-    private static final List<String> ADMIN_MENUS = List.of(
+    private static List<MenuNode> menus(boolean withDictImport, String... titles) {
+        List<MenuNode> out = new ArrayList<>();
+        for (String t : titles) {
+            if (DICT_TITLE.equals(t) && withDictImport) {
+                // 只有管理员能看到「术语批量导入」子项：后端 POST /dictionary/import
+                // 是 @RequireRole("管理员")，给组长露出入口只会让人点了撞 403。
+                out.add(new MenuNode(DICT_TITLE, "/dictionary",
+                        List.of(new MenuNode(DICT_IMPORT_TITLE, "/dictionary/import"))));
+            } else {
+                out.add(new MenuNode(t, pathOf(t)));
+            }
+        }
+        return out;
+    }
+
+    private static final String DICT_TITLE = "术语词典";
+    private static final String DICT_IMPORT_TITLE = "术语批量导入";
+
+    /** 菜单标题 → 前端路由路径；与 router/index.js 的 meta.title 一一对应 */
+    private static String pathOf(String title) {
+        return switch (title) {
+            case "首页看板" -> "/dashboard";
+            case "病历数据" -> "/records";
+            case "结构化解析" -> "/nlp-extract";
+            case "质控校验" -> "/qc-check";
+            case "人工复核" -> "/review";
+            case "清洗与导出" -> "/governance";
+            case "日志审计" -> "/audit-log";
+            case "组织管理" -> "/orgs";
+            case "我的组织" -> "/my-org";
+            default -> "/dashboard";
+        };
+    }
+
+    /**
+     * 管理员菜单（含「术语词典」及其子项「术语批量导入」）。
+     */
+    private static final List<MenuNode> ADMIN_MENUS = menus(true,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", "术语词典", "日志审计", "组织管理");
+            "清洗与导出", DICT_TITLE, "日志审计", "组织管理");
 
     /**
      * 所有者菜单：本组数据 + 本组成员管理 + 共用只读（术语词典/日志审计）。
      *
      * <p>术语词典的读取与日志审计均为「登录即可」（后者按组织三档可见，见 §七 L7），
-     * 故所有者/成员也能用；写入类（词典导入/回滚）按 admin/owner/授权位三档判定，前端据 store getter 隐藏入口。</p>
+     * 故所有者/成员也能用；<b>「术语批量导入」子项不在这里</b> —— 它是管理员特权，
+     * 后端 import 同样是 @RequireRole("管理员")，前端露出入口只会让组长点了撞 403。</p>
      */
-    private static final List<String> OWNER_MENUS = List.of(
+    private static final List<MenuNode> OWNER_MENUS = menus(false,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", "术语词典", "日志审计", "我的组织");
+            "清洗与导出", DICT_TITLE, "日志审计", "我的组织");
 
     /** 成员菜单：本组数据 + 共用只读（术语词典/日志审计），无成员管理 */
-    private static final List<String> MEMBER_MENUS = List.of(
+    private static final List<MenuNode> MEMBER_MENUS = menus(false,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", "术语词典", "日志审计");
+            "清洗与导出", DICT_TITLE, "日志审计");
 
     /**
      * 待分配池 / 审批中的菜单：<b>空列表</b>。
@@ -93,7 +139,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * <p>空菜单不是「没做完」，是刻意的：让前端落到引导页，说明「在等组长接收」或
      * 「申请已提交」，而不是给一个点进去全是空态的侧栏。</p>
      */
-    private static final List<String> PENDING_MENUS = List.of();
+    private static final List<MenuNode> PENDING_MENUS = List.of();
 
     @Override
     // rollbackFor 必写：本方法连写 users + organizations + organization_members 三张表，
@@ -202,7 +248,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * <b>不是</b>「能不能看数据」—— 后者由 {@code auth.admin-can-view-data} 控制
      * （数据层 fail-closed），不在菜单层体现。</p>
      */
-    private List<String> menusOf(User user, OrgResolution g) {
+    private List<MenuNode> menusOf(User user, OrgResolution g) {
         if (RequestUtils.ROLE_ADMIN.equals(user.getRole())) {
             return ADMIN_MENUS;
         }

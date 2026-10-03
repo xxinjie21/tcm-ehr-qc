@@ -8,6 +8,7 @@ import com.tcm.ehr.domain.po.OrganizationMember;
 import com.tcm.ehr.domain.po.Organization;
 import com.tcm.ehr.domain.po.User;
 import com.tcm.ehr.domain.vo.LoginVO;
+import com.tcm.ehr.domain.vo.MenuNode;
 import com.tcm.ehr.mapper.OrgMemberMapper;
 import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.UserMapper;
@@ -22,7 +23,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -122,12 +125,15 @@ class AuthServiceTest {
         // （注：计划 §八 的侧栏图同时列了「组织管理」与「我的组织」，但那条写的是
         //  管理员 8 项 → 9 项；管理员从「我的组织」页看的就是自己的组织信息，
         //  与 Orgs 页的组织列表是同一诉求，故只加 1 项以对上计划的数量）
-        List<String> menus = vo.getMenus();
-        assertEquals(9, menus.size());
-        assertTrue(menus.contains("组织管理"));
-        assertTrue(menus.contains("人工复核"));
-        assertTrue(menus.contains("清洗与导出"));
-        assertFalse(menus.contains("数据清洗"));
+        List<MenuNode> menus = vo.getMenus();
+        assertEquals(9, menus.size(), menus.toString());
+        assertTrue(titlesOf(menus).contains("组织管理"));
+        assertTrue(titlesOf(menus).contains("人工复核"));
+        assertTrue(titlesOf(menus).contains("清洗与导出"));
+        assertFalse(titlesOf(menus).contains("数据清洗"));
+        // 管理员额外能看到「术语词典」的子项「术语批量导入」
+        assertTrue(childTitlesOf(menus, "术语词典").contains("术语批量导入"),
+                menus.toString());
 
         Claims claims = jwtUtil.parseToken(vo.getToken());
         assertEquals("admin-0001", claims.getSubject());
@@ -270,9 +276,9 @@ class AuthServiceTest {
 
         LoginVO vo = authService.login("zu", "123456");
 
-        assertTrue(vo.getMenus().contains("术语词典"), vo.getMenus().toString());
-        assertTrue(vo.getMenus().contains("日志审计"), vo.getMenus().toString());
-        assertTrue(vo.getMenus().contains("我的组织"), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("术语词典"), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("日志审计"), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
     }
 
     /** 成员菜单：同样可用术语词典/日志审计，但无成员管理页 */
@@ -283,8 +289,36 @@ class AuthServiceTest {
 
         LoginVO vo = authService.login("yu", "123456");
 
-        assertTrue(vo.getMenus().contains("术语词典"), vo.getMenus().toString());
-        assertTrue(vo.getMenus().contains("日志审计"), vo.getMenus().toString());
-        assertFalse(vo.getMenus().contains("我的组织"), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("术语词典"), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("日志审计"), vo.getMenus().toString());
+        assertFalse(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
+        // ⚠️ 普通成员/组长拿不到「术语批量导入」子项 —— 它是管理员特权通道，
+        //    后端 POST /dictionary/import 也是 @RequireRole("管理员")，
+        //    前端露出入口只会让组长点了撞 403。
+        assertFalse(childTitlesOf(vo.getMenus(), "术语词典").contains("术语批量导入"),
+                "非管理员不应看到「术语批量导入」子项: " + vo.getMenus());
+    }
+
+    /** 取菜单树的顶层标题集合（批次17：menus 由平铺字符串列表升级为树） */
+    private static Set<String> titlesOf(List<MenuNode> menus) {
+        Set<String> out = new LinkedHashSet<>();
+        for (MenuNode m : menus) {
+            out.add(m.getTitle());
+        }
+        return out;
+    }
+
+    /** 取某个父菜单下的子项标题集合；父菜单不存在时返回空集 */
+    private static Set<String> childTitlesOf(List<MenuNode> menus, String parentTitle) {
+        for (MenuNode m : menus) {
+            if (parentTitle.equals(m.getTitle())) {
+                Set<String> out = new LinkedHashSet<>();
+                for (MenuNode c : m.getChildren()) {
+                    out.add(c.getTitle());
+                }
+                return out;
+            }
+        }
+        return Set.of();
     }
 }

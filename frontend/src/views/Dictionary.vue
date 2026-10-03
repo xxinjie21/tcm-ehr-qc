@@ -2,13 +2,17 @@
   <!-- 词典管理页（管理员）：五个词典类型（疾病 / 证候 / 症状 / 中药 / 方剂）切换，
        下面依次是术语查询、术语库导入、版本回滚 -->
   <div>
-    <el-tabs v-model="activeTab" class="dict-tabs">
-      <el-tab-pane label="疾病" name="disease" />
-      <el-tab-pane label="证候" name="pattern" />
-      <el-tab-pane label="症状" name="symptom" />
-      <el-tab-pane label="中药" name="herb" />
-      <el-tab-pane label="方剂" name="formula" />
-    </el-tabs>
+    <!-- 页头：术语类型筛选器。
+         类型是**全局过滤**（切类型后整个页签内的数据都跟着换），不是页面导航 ——
+         所以用 radio-group 而不是页签：原先那 5 个自闭合的空壳 tab-pane 长得像页签、
+         点的却是下面那一摞内容，观感上就是坏的。 -->
+    <div class="dict-head">
+      <el-radio-group v-model="typeKey" size="small" aria-label="术语类型">
+        <el-radio-button v-for="t in TYPE_OPTIONS" :key="t.value" :value="t.value">
+          {{ t.label }}
+        </el-radio-button>
+      </el-radio-group>
+    </div>
 
     <!-- 演示词典规模远小于真实词表（疾病仅 10 条、别名多为空），不说明会被当成系统缺陷 -->
     <div class="tip" style="margin: 0 0 var(--sp-2)">
@@ -16,7 +20,10 @@
     </div>
 
     <!-- 术语查询：按当前类型 + 关键字模糊匹配（标准词与别名都参与匹配） -->
-    <PanelCard :title="`术语查询（${typeLabel}）`">
+    <el-tabs v-model="tab" class="dict-tabs">
+
+    <el-tab-pane label="小组基线" name="baseline">
+    <PanelCard :title="`小组基线（${typeLabel}）`">
       <div class="search-row">
         <!-- 只给 placeholder 的搜索框没有无障碍名称，补 aria-label
              （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
@@ -81,61 +88,15 @@
     </PanelCard>
 
     <!-- 术语库导入：Excel / CSV / JSON 覆盖入库（导入前自动备份） -->
-    <!-- 写入入口按 admin / owner / 授权成员 三档判定（与后端 import/rollback 的门禁一致） -->
-    <PanelCard v-if="canWrite" title="术语库导入">
-      <div class="import-row">
-        <el-upload
-          ref="uploadRef"
-          v-model:file-list="dictFileList"
-          drag
-          :auto-upload="false"
-          :limit="1"
-          :on-change="onFileChange"
-          :on-remove="onFileRemove"
-          :on-exceed="onFileExceed"
-          accept=".xlsx,.xls,.csv,.json"
-        >
-          <div class="upload-tip">
-            拖拽文件到此处，或 <em>点击选择</em>
-            <div class="sub">支持 Excel(.xlsx/.xls) / CSV / JSON</div>
-          </div>
-        </el-upload>
-        <div class="import-actions">
-          <el-button type="primary" :loading="importing" :disabled="!importFile" @click="handleImport">
-            开始导入
-          </el-button>
-          <div class="tip" style="margin-top: var(--sp-2)">导入前会自动备份，可在下方「版本回滚」恢复。</div>
-
-          <!-- 格式说明移出 el-upload 拖拽区：原先嵌在拖拽热区里，
-               点 <summary> 会冒泡触发原生文件选择框 -->
-          <details class="fmt-detail">
-            <summary>查看格式说明</summary>
-            <div class="fmt-body">
-              · Excel / CSV：第 1 列「标准术语」、第 2 列「别名」（多个用 、或 ; 分隔），可选第 3 列「国标代码」<br />
-              · JSON：条目数组，每项含「标准术语」「别名」，可选「来源」「国标代码」
-            </div>
-          </details>
-        </div>
-      </div>
-      <!-- 导入结果：总行数 / 成功 / 失败三个数字，外加按行号列出的失败原因 -->
-      <div v-if="importResult" class="import-result">
-        <StatCard label="文件总行数" :value="importResult.total" />
-        <StatCard label="成功导入" :value="importResult.imported" tone="green" />
-        <StatCard label="失败" :value="importResult.failed" tone="red" />
-        <div v-if="importResult.failures?.length" class="failures">
-          <div class="ded-hd">失败明细：</div>
-          <div v-for="f in importResult.failures" :key="f.row" class="ded-item">
-            <span>第 {{ f.row }} 行：{{ f.reason }}</span>
-          </div>
-        </div>
-      </div>
-    </PanelCard>
 
     <!-- ============================================================ 批次17：提案 + 归档 -->
     <!-- 原「版本回滚」面板已移除：dictionary_backups 表废弃，回滚改为
          「基于归档版本生成提案 → 组长审核」，历史列表改为「归档版本」。 -->
 
     <!-- 个人词典：拉取小组基线存本地，可在本地编辑后提交提案 -->
+    </el-tab-pane>
+
+    <el-tab-pane label="我的词典" name="mine">
     <PanelCard title="个人词典（本地）">
       <div class="rv-row">
         <el-button size="small" :loading="baselineLoading" @click="loadBaseline">
@@ -187,7 +148,16 @@
     </PanelCard>
 
     <!-- 提案列表 + 差异预览 + 审核 -->
+    </el-tab-pane>
+
+    <el-tab-pane label="提案审核" name="proposals">
     <PanelCard title="基线更新提案">
+      <!-- 主从布局：左提案列表 / 右详情。
+           原先是「列表在上 + 点开弹窗看差异」，三栏差异（新增/修改/删除）+ 别名对照
+           塞进 el-dialog 非常挤 —— 这正是「观感不好」的另一处。
+           父项「术语词典」不做展开/收起，所以这里选中即加载，右侧常驻。 -->
+      <div class="rv-master">
+      <div class="rv-side">
       <div class="rv-row">
         <el-select v-model="proposalStatus" size="small" style="width: 120px"
           aria-label="提案状态" @change="loadProposals">
@@ -215,64 +185,125 @@
           </template>
         </el-table-column>
         <el-table-column prop="auditComment" label="审核意见" min-width="140" show-overflow-tooltip />
-        <el-table-column label="操作" width="130" fixed="right">
+        <el-table-column label="操作" width="70">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="openDiff(row)">看差异</el-button>
-            <el-button
-              v-if="isOwner && row.status === 'pending'"
-              link type="warning"
-              size="small"
-              @click="doAudit(row, true)"
-            >通过</el-button>
-            <el-button
-              v-if="isOwner && row.status === 'pending'"
-              link type="danger"
-              size="small"
-              @click="doAudit(row, false)"
-            >拒绝</el-button>
+            <el-button link type="primary" size="small" @click="selectProposal(row)">查看</el-button>
           </template>
         </el-table-column>
       </el-table>
+      </div>
+
+      <!-- 右侧：差异详情常驻（不再用弹窗 —— 三栏差异塞进 el-dialog 太挤） -->
+      <div class="rv-detail">
+        <el-empty
+          v-if="!currentProposal"
+          description="从左侧选择一条提案查看差异"
+          :image-size="70"
+        />
+        <template v-else>
+          <div class="rv-detail-hd">
+            <div class="rv-detail-meta">
+              <b>{{ typeLabel(currentProposal.type) }}</b>
+              <el-tag size="small" :type="statusTagType(currentProposal.status)" effect="plain">
+                {{ statusText(currentProposal.status) }}
+              </el-tag>
+              <span class="tip">
+                {{ currentProposal.termCount }} 条 · {{ fmtTime(currentProposal.createTime) }} 提交
+              </span>
+            </div>
+            <div class="rv-detail-ops">
+              <el-button v-if="editing" size="small" type="primary"
+                :loading="savingTerms" @click="saveProposalTerms">保存提案</el-button>
+              <el-button v-if="editing" size="small" @click="cancelEdit">取消</el-button>
+              <el-button v-else-if="canEditTerms" size="small" @click="startEdit">编辑提案</el-button>
+              <template v-if="isOwner && currentProposal.status === 'pending'">
+                <el-button size="small" type="warning" @click="doAudit(currentProposal, true)">通过</el-button>
+                <el-button size="small" type="danger" @click="doAudit(currentProposal, false)">拒绝</el-button>
+              </template>
+            </div>
+          </div>
+
+          <el-alert
+            v-if="editing" type="warning" :closable="false" show-icon
+            title="编辑中：改动仅作用于本次提案，不会改动小组基线"
+            description="基线要等审核通过合并后才会变化；删掉某行 = 合并时从基线移除该术语。"
+          />
+
+          <!-- 只读差异（三色） -->
+          <div v-if="!editing" class="rv-diff">
+            <div class="rv-diff-sec">
+              <div class="rv-diff-hd add">新增 {{ diff?.added?.length || 0 }} 条</div>
+              <div v-for="(t, i) in diff?.added || []" :key="'a' + i" class="rv-diff-row">
+                {{ t.standardTerm }}
+                <span class="rv-diff-al">别名：{{ (t.aliases || []).join('、') || '—' }}</span>
+              </div>
+              <el-empty v-if="!diff?.added?.length" description="无新增" :image-size="44" />
+            </div>
+            <div class="rv-diff-sec">
+              <div class="rv-diff-hd mod">修改 {{ diff?.modified?.length || 0 }} 条</div>
+              <div v-for="(t, i) in diff?.modified || []" :key="'m' + i" class="rv-diff-row">
+                {{ t.before?.standardTerm }} → <b>{{ t.standardTerm }}</b>
+                <span class="rv-diff-al">
+                  别名：{{ (t.before?.aliases || []).join('、') || '—' }}
+                  → {{ (t.aliases || []).join('、') || '—' }}
+                </span>
+              </div>
+              <el-empty v-if="!diff?.modified?.length" description="无修改" :image-size="44" />
+            </div>
+            <div class="rv-diff-sec">
+              <div class="rv-diff-hd del">删除 {{ diff?.removed?.length || 0 }} 条</div>
+              <div v-for="(t, i) in diff?.removed || []" :key="'d' + i" class="rv-diff-row">
+                {{ t }}
+              </div>
+              <el-empty v-if="!diff?.removed?.length" description="无删除" :image-size="44" />
+            </div>
+            <el-alert
+              v-if="diff && diff.noDiff" type="info" :closable="false" show-icon
+              title="与当前基线完全一致"
+              description="提案内容与小组基线相同，合并后不会产生实际变化。"
+            />
+          </div>
+
+          <!-- 可编辑态：整份提案的术语行（默认不显示，避免一屏铺满输入框） -->
+          <div v-else class="rv-edit">
+            <div class="rv-edit-hd">
+              <span class="tip">
+                共 {{ editTerms.length }} 条。改名 = 视为「删除旧词 + 新增新词」；删除某行 = 合并时从基线移除。
+              </span>
+              <el-input v-model="newEditTerm" size="small" placeholder="新增标准词" style="width: 150px" />
+              <el-button size="small" :disabled="!newEditTerm.trim()" @click="addEditTerm">加入</el-button>
+            </div>
+            <el-table :data="editPaged" border size="small" max-height="360">
+              <el-table-column label="标准词" min-width="160">
+                <template #default="{ row }">
+                  <el-input v-model="row.standardTerm" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="别名（、分隔）" min-width="200">
+                <template #default="{ row }">
+                  <el-input v-model="row.aliasText" size="small" placeholder="别名1、别名2" />
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="70">
+                <template #default="{ $index }">
+                  <el-button link type="danger" size="small" @click="removeEditTerm($index)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div v-if="editTerms.length > EDIT_PAGE_SIZE" class="rv-pager">
+              <el-button size="small" :disabled="editPage <= 1" @click="editPage--">上一页</el-button>
+              <span class="tip">{{ editPage }} / {{ editPageCount }}</span>
+              <el-button size="small" :disabled="editPage >= editPageCount" @click="editPage++">下一页</el-button>
+            </div>
+          </div>
+        </template>
+      </div>
+      </div>
     </PanelCard>
 
-    <!-- 差异详情 -->
-    <el-dialog v-model="diffVisible" title="提案差异" width="min(900px, 94vw)" top="6vh">
-      <div v-if="diff" class="rv-diff">
-        <div class="rv-diff-sec">
-          <div class="rv-diff-hd add">新增 {{ diff.added?.length || 0 }} 条</div>
-          <div v-for="(t, i) in diff.added" :key="'a' + i" class="rv-diff-row">
-            {{ t.standardTerm }}
-            <span class="rv-diff-al">别名：{{ (t.aliases || []).join('、') || '—' }}</span>
-          </div>
-          <el-empty v-if="!diff.added?.length" description="无新增" :image-size="48" />
-        </div>
-        <div class="rv-diff-sec">
-          <div class="rv-diff-hd mod">修改 {{ diff.modified?.length || 0 }} 条</div>
-          <div v-for="(t, i) in diff.modified" :key="'m' + i" class="rv-diff-row">
-            {{ t.before?.standardTerm }} → <b>{{ t.standardTerm }}</b>
-            <span class="rv-diff-al">
-              别名：{{ (t.before?.aliases || []).join('、') || '—' }}
-              → {{ (t.aliases || []).join('、') || '—' }}
-            </span>
-          </div>
-          <el-empty v-if="!diff.modified?.length" description="无修改" :image-size="48" />
-        </div>
-        <div class="rv-diff-sec">
-          <div class="rv-diff-hd del">删除 {{ diff.removed?.length || 0 }} 条</div>
-          <div v-for="(t, i) in diff.removed" :key="'d' + i" class="rv-diff-row">
-            {{ t }}
-          </div>
-          <el-empty v-if="!diff.removed?.length" description="无删除" :image-size="48" />
-        </div>
-        <el-alert v-if="diff && diff.noDiff" type="info" :closable="false" show-icon
-          title="与当前基线完全一致" description="提案内容与小组基线相同，合并后不会产生实际变化。" />
-      </div>
-      <template #footer>
-        <el-button @click="diffVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
+    </el-tab-pane>
 
-    <!-- 归档版本 -->
+    <el-tab-pane label="归档版本" name="archives">
     <PanelCard title="归档版本">
       <div class="rv-row">
         <el-button size="small" :loading="archivesLoading" @click="loadArchives">刷新归档</el-button>
@@ -307,6 +338,8 @@
         </el-table-column>
       </el-table>
     </PanelCard>
+    </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -314,12 +347,11 @@
 // 词典管理页：类型切换会同时刷新「术语查询」与「版本回滚」两块数据。
 // 导入只有一条路径 —— Excel / CSV / JSON 覆盖入库（导入前自动备份）。
 import { ref, computed, watch, onMounted } from 'vue'
-import { ElMessage, genFileId } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
-import StatCard from '@/components/StatCard.vue'
 import {
-  getTerms, importDict, exportBaseline, submitProposal, listProposals,
-  proposalDiff, auditProposal, listArchives, rollbackArchive
+  getTerms, exportBaseline, submitProposal, listProposals,
+  proposalDiff, auditProposal, listArchives, rollbackArchive, updateProposalTerms
 } from '@/api/dictionary'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
@@ -328,6 +360,9 @@ import { PAGE_SIZES_WIDE } from '@/utils/constants'
 const userStore = useUserStore()
 // 术语词典写入入口（导入/回滚）：管理员 / 所有者 / 被授权成员三档；
 // 只读浏览对所有登录用户开放。后端按同一三档校验（批次 6 落地授权位），前端只负责不展示无效入口。
+/** 术语类型选项（与后端 TermTypes.ALL 一致） */
+const TYPE_OPTIONS = Object.keys(TYPE_LABELS).map((v) => ({ value: v, label: TYPE_LABELS[v] }))
+
 const canWrite = computed(() => userStore.canWriteDictionaryEntry)
 
 // 词典作用域（批次8b）：后端按「本组织自有词条 → 无则回退基础层」返回，
@@ -346,9 +381,12 @@ const scopeTip = computed(() =>
 const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
 
 // ===== 布局：与其它页一致，不做整页缩放（表格内部滚动）=====
-const activeTab = ref('disease')
+/** 当前术语类型（页头 radio-group 的值，全局过滤） */
+const typeKey = ref('herb')
+/** 当前任务页签：baseline 小组基线 / mine 我的词典 / proposals 提案审核 / archives 归档版本 */
+const tab = ref('baseline')
 // 当前词典类型的中文名，用于面板标题、确认文案与导入提示
-const typeLabel = computed(() => TYPE_LABELS[activeTab.value])
+const typeLabel = (v) => (TYPE_LABELS[v] || v)
 
 // 术语查询状态：keyword 为用户输入，terms 为当前页结果
 const keyword = ref('')
@@ -374,7 +412,7 @@ const loadTerms = async (resetPage = true) => {
     //    page 与 size 永远成对传：后端 page>0 时按 size 切片，漏传 size 会让
     //    后端用默认值 100，与前端 el-pagination 显示的每页条数对不上。
     const res = await getTerms({
-      type: activeTab.value,
+      type: typeKey.value,
       keyword: keyword.value,
       page: page.value,
       size: size.value
@@ -400,120 +438,17 @@ const handleSizeChange = () => {
 }
 
 // 切换词典类型：先清掉上一次的查询与导入状态，再拉新类型的数据
-watch(activeTab, () => {
+watch(typeKey, () => {
   // 切术语类型：本地词典按类型分开存，切回来要恢复；提案/归档同理
   restoreLocal()
   localPage.value = 1
   loadProposals()
   loadArchives()
   keyword.value = ''
-  // 切换词典类型时清空上一次的导入结果与已选文件，
-  // 否则会把「上一类词典的结果」误读成本次的结果
-  importResult.value = null
-  dictFileList.value = []
-  importFile.value = null
   loadTerms()
 })
 
-// 导入相关状态：dictFileList 供 el-upload 回显，importFile 才是真正待提交的文件
-const uploadRef = ref(null)
-const dictFileList = ref([])
-const importFile = ref(null)
-const importing = ref(false)
-const importResult = ref(null)
 
-const MAX_FILE_MB = 50
-const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.json']
-
-// 预校验扩展名与大小，不合格直接剔除并说明原因
-const rejectFile = (raw, reason) => {
-  ElMessage.error(`「${raw.name}」${reason}`)
-  dictFileList.value = []
-  importFile.value = null
-}
-
-// 选择文件：先做本地预校验（扩展名、大小），不合格直接剔除并说明原因
-const onFileChange = (file) => {
-  // 1. 取原始文件对象；拿不到就直接忽略
-  const raw = file.raw
-  if (!raw) return
-  const name = (raw.name || '').toLowerCase()
-  // 2. 扩展名不在白名单 → 剔除并说明原因
-  if (!ALLOWED_EXT.some((ext) => name.endsWith(ext))) {
-    rejectFile(raw, `格式不支持，仅支持 ${ALLOWED_EXT.join(' / ')}`)
-    return
-  }
-  // 3. 超过大小上限 → 同样剔除
-  if (raw.size > MAX_FILE_MB * 1024 * 1024) {
-    rejectFile(raw, `超过 ${MAX_FILE_MB}MB 上限`)
-    return
-  }
-  // 4. 预校验通过，记为待提交文件
-  importFile.value = raw
-}
-
-// 移除已选文件：同步清掉待提交引用，避免提交到已删除的文件
-const onFileRemove = () => {
-  importFile.value = null
-}
-
-// limit=1 时再次选择会走这里；主动替换旧文件，避免「换了文件却没反应」
-const onFileExceed = (files) => {
-  // 1. 先清空旧文件：上传列表与待提交引用都要清，避免提交到上一个文件
-  const file = files[0]
-  uploadRef.value?.clearFiles()
-  dictFileList.value = []
-  importFile.value = null
-  if (file) {
-    // 2. 有新文件则重设 uid 后重新交给 upload 接管（limit=1 只能手动替换）
-    file.uid = genFileId()
-    uploadRef.value?.handleStart(file)
-  }
-}
-
-// 统一入口：二次确认后覆盖式入库
-const handleImport = async () => {
-  // 1. 没有待提交文件就直接返回
-  if (!importFile.value) return
-  // 2. 覆盖式入库，先二次确认（取消则中止）
-  if (!(await confirmBox(
-    `确定用「${importFile.value.name}」覆盖【${typeLabel.value}】词典吗？`,
-    '术语库导入',
-    { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' }
-  ))) return
-  // 3. 执行入库，成功后清空已选文件与上传列表
-  const ok = await doImport(importFile.value)
-  if (ok) {
-    uploadRef.value?.clearFiles()
-    importFile.value = null
-  }
-}
-
-// 真正入库：Excel / CSV / JSON 直传覆盖写入
-const doImport = async (file) => {
-  // 1. 置导入态：按钮 loading，避免重复提交
-  importing.value = true
-  try {
-    // 2. 组装上传表单：文件 + 当前词典类型
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('type', activeTab.value)
-    // 3. 提交入库并回填结果（总数 / 成功 / 失败明细）
-    const res = await importDict(fd)
-    importResult.value = res.data
-    // 4. 提示成功并刷新术语列表与版本列表
-    ElMessage.success(`导入完成：成功 ${res.data.imported} / 共 ${res.data.total}`)
-    loadTerms()
-    // 5. 返回成功，供调用方决定是否清空已选文件
-    return true
-  } catch {
-    // 拦截器已提示
-    return false
-  } finally {
-    // 无论成败都复位导入态
-    importing.value = false
-  }
-}// 读取历史版本列表（按当前词典类型）// 回滚到指定版本：二次确认 → 覆盖当前词典 → 刷新术语与版本列表// 进页面拉取当前类型的术语与历史版本
 // ================================================================ 批次17：个人词典 / 提案 / 归档
 
 const isOwner = computed(() => userStore.orgRole === 'owner')
@@ -537,7 +472,7 @@ const localPaged = computed(() => {
   return localTerms.value.slice(from, from + LOCAL_PAGE_SIZE)
 })
 
-const localKey = computed(() => LOCAL_KEY(userStore.orgId, activeTab.value))
+const localKey = computed(() => LOCAL_KEY(userStore.orgId, typeKey.value))
 
 function saveLocal() {
   try {
@@ -555,7 +490,7 @@ function saveLocal() {
 const loadBaseline = async () => {
   baselineLoading.value = true
   try {
-    const res = await exportBaseline({ type: activeTab.value })
+    const res = await exportBaseline({ type: typeKey.value })
     const raw = localStorage.getItem(localKey.value)
     let at = ''
     if (raw) {
@@ -624,7 +559,7 @@ const doSubmitProposal = async () => {
   submittingProposal.value = true
   try {
     const res = await submitProposal({
-      type: activeTab.value,
+      type: typeKey.value,
       terms: localTerms.value.map((t) => ({
         standardTerm: t.standardTerm,
         aliases: t.aliases || [],
@@ -654,18 +589,7 @@ const loadProposals = async () => {
 }
 
 // ---- 差异 ----
-const diffVisible = ref(false)
 const diff = ref(null)
-const openDiff = async (row) => {
-  try {
-    const res = await proposalDiff(row.id)
-    diff.value = res.data || null
-    diffVisible.value = true
-  } catch {
-    // 拦截器已提示
-  }
-}
-
 // ---- 审核 ----
 const doAudit = async (row, approve) => {
   let comment = ''
@@ -696,7 +620,7 @@ const archivesLoading = ref(false)
 const loadArchives = async () => {
   archivesLoading.value = true
   try {
-    const res = await listArchives({ type: activeTab.value })
+    const res = await listArchives({ type: typeKey.value })
     archives.value = res.data || []
   } catch {
     archives.value = []
@@ -713,12 +637,132 @@ const doRollback = async (row) => {
     return
   }
   try {
-    const res = await rollbackArchive(row.versionNo, activeTab.value)
+    const res = await rollbackArchive(row.versionNo, typeKey.value)
     ElMessage.success(res.msg || '已生成回滚提案，请审核')
     proposalStatus.value = 'pending'
     loadProposals()
   } catch {
     // 拦截器已提示（含「快照已被清理，无法回滚」）
+  }
+}
+
+
+// ---- 提案审核：主从布局（左侧列表 / 右侧详情）----
+const currentProposal = ref(null)
+const EDIT_PAGE_SIZE = 20
+const editing = ref(false)
+const savingTerms = ref(false)
+const editTerms = ref([])
+const editPage = ref(1)
+const newEditTerm = ref('')
+
+const editPageCount = computed(() =>
+  Math.max(1, Math.ceil(editTerms.value.length / EDIT_PAGE_SIZE)))
+const editPaged = computed(() => {
+  const from = (editPage.value - 1) * EDIT_PAGE_SIZE
+  return editTerms.value.slice(from, from + EDIT_PAGE_SIZE)
+})
+/** 只有「提交者本人 + 待审」能编辑 —— 后端也会再校验一次，这里只是不给按钮 */
+const canEditTerms = computed(() =>
+  !!currentProposal.value &&
+  currentProposal.value.status === 'pending' &&
+  currentProposal.value.submitUserId === userStore.username)
+
+/** 选中一条提案并加载差异（右侧常驻，不再弹窗） */
+const selectProposal = async (row) => {
+  currentProposal.value = row
+  editing.value = false
+  editPage.value = 1
+  try {
+    const res = await proposalDiff(row.id)
+    diff.value = res.data || null
+  } catch {
+    diff.value = null
+  }
+}
+
+/**
+ * 进入可编辑态。
+ *
+ * <p>⚠️ 这里有个必须讲清的限制：diff 只给「新增 / 修改」，**没有给未改动的原有词**；
+ * 而后端 PUT 收的是「完整目标词典」。所以若只把 diff 里的词填进编辑器再保存，
+ * 会把提案里其它词**全删掉** —— 一次误操作就清空整份提案。
+ * 因此当 diff 为空（提案与基线一致）时直接拒绝进入编辑：没有可编辑内容，
+ * 就不该给一个会清空数据的入口。</p>
+ */
+const startEdit = async () => {
+  const row = currentProposal.value
+  if (!row) return
+  try {
+    const res = await proposalDiff(row.id)
+    const d = res.data || {}
+    const rows = []
+    for (const t of d.modified || []) {
+      rows.push({ standardTerm: t.standardTerm, aliasText: (t.aliases || []).join('、') })
+    }
+    for (const t of d.added || []) {
+      rows.push({ standardTerm: t.standardTerm, aliasText: (t.aliases || []).join('、') })
+    }
+    if (!rows.length) {
+      ElMessage.info('本次提案与基线一致，没有可编辑的变更')
+      return
+    }
+    editTerms.value = rows
+    editPage.value = 1
+    editing.value = true
+  } catch {
+    // 拦截器已提示
+  }
+}
+
+const cancelEdit = () => {
+  editing.value = false
+  editTerms.value = []
+  newEditTerm.value = ''
+  editPage.value = 1
+}
+
+const addEditTerm = () => {
+  const t = newEditTerm.value.trim()
+  if (!t) return
+  if (editTerms.value.some((x) => x.standardTerm === t)) {
+    ElMessage.warning('提案里已有该标准词')
+    return
+  }
+  editTerms.value.push({ standardTerm: t, aliasText: '' })
+  newEditTerm.value = ''
+}
+
+const removeEditTerm = (i) => {
+  editTerms.value.splice(i, 1)
+}
+
+/** 保存：把可编辑行还原成后端要的 {standardTerm, aliases} 结构 */
+const saveProposalTerms = async () => {
+  const row = currentProposal.value
+  if (!row) return
+  const terms = editTerms.value
+    .filter((t) => t.standardTerm && t.standardTerm.trim())
+    .map((t) => ({
+      standardTerm: t.standardTerm.trim(),
+      aliases: String(t.aliasText || '')
+        .split(/[、,，;；|]/)
+        .map((x) => x.trim())
+        .filter(Boolean),
+      source: ''
+    }))
+  savingTerms.value = true
+  try {
+    await updateProposalTerms(row.id, terms)
+    ElMessage.success('提案内容已更新')
+    editing.value = false
+    editTerms.value = []
+    selectProposal(row)   // 重新拉差异
+    loadProposals()
+  } catch {
+    // 拦截器已提示
+  } finally {
+    savingTerms.value = false
   }
 }
 
@@ -892,5 +936,79 @@ onMounted(() => {
   margin-left: var(--sp-2);
   color: var(--text-sub);
   font-size: 12px;
+}
+
+/* ===== 页头：术语类型筛选器 ===== */
+.dict-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: var(--sp-3);
+}
+
+/* ===== 提案审核：主从布局 ===== */
+/* 左侧固定 340px 列表、右侧自适应详情。
+   原先是「列表在上 + 弹窗看差异」，三栏差异塞进 el-dialog 极挤。 */
+.rv-master {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: flex-start;
+}
+.rv-side {
+  flex: 0 0 340px;
+  min-width: 300px;
+}
+.rv-detail {
+  flex: 1 1 auto;
+  min-width: 0;   /* 关键：否则 flex 子项不收缩，长内容会把右栏撑破 */
+  border-left: 1px solid var(--line);
+  padding-left: var(--sp-4);
+}
+.rv-detail-hd {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+.rv-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.rv-detail-ops {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+/* 编辑态的术语行 */
+.rv-edit-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+/* 窄屏（<1200px）下主从退化为上下堆叠：340px 固定 + 详情在 1366 视口里
+   与侧栏(约220px)相加会挤掉内容，堆叠更稳。 */
+@media (max-width: 1200px) {
+  .rv-master {
+    flex-direction: column;
+  }
+  .rv-side {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .rv-detail {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding-left: 0;
+    padding-top: var(--sp-3);
+  }
 }
 </style>

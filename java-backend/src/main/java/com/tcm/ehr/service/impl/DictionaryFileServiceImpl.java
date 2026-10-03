@@ -47,7 +47,6 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     private volatile String cachedVersion;
     private volatile long cachedStamp = -1;
 
-    @Override
     /**
      * 词典数据目录（配置项 {@code dictionary.dir}，默认 {@code data/dictionaries}）。
      *
@@ -57,17 +56,6 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         return Paths.get(dictDir);
     }
 
-    @Override
-    /**
-     * 备份目录，即词典目录下的 {@code backup} 子目录；不校验其是否存在。
-     *
-     * @return 备份目录路径
-     */
-    public Path backupDir() {
-        return dir().resolve("backup");
-    }
-
-    @Override
     /**
      * 词典类型到 JSON 文件名的映射，文件名由 EntityTypes 统一登记。
      *
@@ -84,7 +72,6 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         return name;
     }
 
-    @Override
     /**
      * 读取某类词典的全部词条。
      *
@@ -105,7 +92,6 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
                 mapper.getTypeFactory().constructCollectionType(List.class, TermEntry.class));
     }
 
-    @Override
     /**
      * 全量覆盖写入某类词典文件（JSON 美化输出），目录不存在时自动创建。
      *
@@ -123,113 +109,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), entries);
     }
 
-    @Override
-    /**
-     * 备份当前词典文件到备份目录，备份名形如 {@code <文件名>.bak_yyyyMMdd_HHmmss_SSS}。
-     *
-     * @param type 词典类型
-     * @return 备份文件名；当前词典文件不存在（首次导入）时返回 {@code null}
-     * @throws IOException 备份目录创建或文件复制失败
-     */
-    public String backup(String type) throws IOException {
-        Path file = dir().resolve(fileNameOf(type));
-        // 1. 没有原文件就没得备份，返回 null 让调用方知道这次没有可回滚点
-        if (!Files.exists(file)) {
-            return null;
-        }
-        // 2. 备份名带毫秒时间戳；万一仍撞名（同一毫秒），追加 _2、_3 去重，保证不覆盖已有回滚点
-        Files.createDirectories(backupDir());
-        String base = fileNameOf(type) + ".bak_" + LocalDateTime.now().format(TS_MILLI);
-        String backupName = base;
-        for (int i = 2; Files.exists(backupDir().resolve(backupName)); i++) {
-            backupName = base + "_" + i;
-        }
-        // 刻意不加 REPLACE_EXISTING：宁可让并发下的撞名抛出来，也不要静默覆盖掉一份备份
-        Files.copy(file, backupDir().resolve(backupName));
-        return backupName;
-    }
-
-    @Override
-    /**
-     * 用备份文件覆盖当前词典文件，完成回滚。
-     *
-     * <p>备份文件名必须以该类型的 {@code <文件名>.bak_} 前缀开头，用以拦截路径穿越串，
-     * 防止借备份名指向备份目录之外的任意文件。</p>
-     *
-     * @param type 词典类型
-     * @param backupFilename 备份文件名（非全路径）
-     * @throws IOException 词典目录创建或文件复制失败
-     * @throws IllegalArgumentException 备份文件不存在，或文件名与该词典类型不匹配
-     */
-    public void restore(String type, String backupFilename) throws IOException {
-        Path src = backupDir().resolve(backupFilename);
-        // 1. 备份不存在直接报错
-        if (!Files.exists(src)) {
-            throw new IllegalArgumentException("备份文件不存在: " + backupFilename);
-        }
-        // 2. 前缀不符即拒绝：这是防路径穿越的关键一步，必须在 copy 之前
-        if (!backupFilename.startsWith(fileNameOf(type) + ".bak_")) {
-            throw new IllegalArgumentException("备份文件与词典类型不匹配");
-        }
-        // 3. 校验通过才覆盖当前词典
-        Files.createDirectories(dir());
-        Files.copy(src, dir().resolve(fileNameOf(type)), StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    @Override
-    /**
-     * 列出该类词典的全部备份，按时间倒序。
-     *
-     * <p>每项含 filename（文件名）、time（可读时间）、count（该备份词条数）、
-     * delta（相对当前词典的增减，形如 +3 / -2 / 0）。单个备份文件解析失败时词条数按 0 计，
-     * 不因坏文件拖垮整个列表。</p>
-     *
-     * @param type 词典类型
-     * @return 备份条目列表；备份目录不存在时为空列表
-     * @throws IOException 遍历备份目录或读取当前词典失败
-     */
-    public List<Map<String, String>> listBackups(String type) throws IOException {
-        List<Map<String, String>> result = new ArrayList<>();
-        Path backupDir = backupDir();
-        // 1. 备份目录都没有就当没备份过
-        if (!Files.exists(backupDir)) {
-            return result;
-        }
-        // 2. 先算当前词条数，delta 要拿它做基准
-        int currentCount = read(type).size();
-        String prefix = fileNameOf(type) + ".bak_";
-        // 3. 只扫本类型前缀的文件（不扫别的类型的备份）
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(backupDir, prefix + "*")) {
-            for (Path p : stream) {
-                String name = p.getFileName().toString();
-                String ts = name.substring(prefix.length());
-                // 逐个解析时间戳；认不出的坏名跳过，不让一个坏文件拖垮整个列表
-                var m = TS_IN_NAME.matcher(ts);
-                if (!m.find()) {
-                    log.warn("[词典] 备份文件名无法解析时间戳，已跳过: {}", name);
-                    continue;
-                }
-                String stamp = m.group(1);
-                LocalDateTime t = stamp.length() > 15
-                        ? LocalDateTime.parse(stamp, TS_MILLI)
-                        : LocalDateTime.parse(stamp, TS);
-                int count = countOf(p);
-                int delta = count - currentCount;
-                Map<String, String> row = new LinkedHashMap<>();
-                row.put("filename", name);
-                row.put("time", t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                row.put("count", String.valueOf(count));
-                // 正数带 + 号：页面上要能一眼看出是多了还是少了
-                row.put("delta", (delta > 0 ? "+" : "") + delta);
-                result.add(row);
-            }
-        }
-        // 4. 按时间倒序：最近的备份在最上面
-        result.sort((a, b) -> b.get("time").compareTo(a.get("time")));
-        return result;
-    }
-
-    /** 备份文件词条数；解析失败按 0 计（不因单个坏文件拖垮整个列表） */
+        /** 备份文件词条数；解析失败按 0 计（不因单个坏文件拖垮整个列表） */
     private int countOf(Path path) {
         // 1. 数词条数；坏文件给 0，只记警告，不让整个备份列表挂掉
         try {
@@ -242,27 +122,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         }
     }
 
-    @Override
-    /**
-     * 判断备份文件是否存在，同时兼作路径穿越防护。
-     *
-     * <p>先按与 {@link #restore} 相同的前缀规则过滤：文件名为 null 或前缀不符时直接返回
-     * {@code false}，避免用 {@code ../..} 之类的名字探测备份目录之外的路径。</p>
-     *
-     * @param type 词典类型
-     * @param backupFilename 备份文件名
-     * @return 前缀合法且文件存在时为 {@code true}
-     */
-    public boolean backupExists(String type, String backupFilename) {
-        // 1. 与 restore() 同一套前缀校验：否则 backupFilename 传 ../.. 之类可以探测任意路径是否存在
-        if (backupFilename == null || !backupFilename.startsWith(fileNameOf(type) + ".bak_")) {
-            return false;
-        }
-        // 2. 前缀合法才查存在性
-        return Files.exists(backupDir().resolve(backupFilename));
-    }
-
-    /**
+        /**
      * 词典内容版本（5 个文件内容拼接后的 MD5 前 12 位）。
      *
      * <p>先算「文件指纹」（修改时间 + 大小）判缓存，<b>命中就不再读文件</b>。
@@ -273,6 +133,14 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      * <p>指纹用「修改时间 + 大小」：本项目改词典只有两条路径（导入、回滚），
      * 都是整文件覆盖，两者都会变；不存在「内容变了而指纹没变」的情形。</p>
      */
+    /**
+     * @deprecated <b>不要用于给结构化数据打版本戳</b>。
+     * 词典真源已入库（批次 8b 起），这里算的是<b>文件</b>的指纹 —— 词典文件自播种后
+     * 就不再变化，这个值从此<b>冻结不变</b>。批次 17 清理时发现三处仍在用它打戳，
+     * 害得「清洗一次就把正确版本覆盖回死值」。正确做法用
+     * {@code DictionaryTermStore.effectiveDictVersion(orgId)} / {@code effectiveTermCount(orgId)}。
+     */
+    @Deprecated
     @Override
     public String currentVersion() {
         try {
@@ -313,7 +181,6 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
         }
     }
 
-    @Override
     /**
      * 以 UTF-8 读取文本文件的全部内容。
      *

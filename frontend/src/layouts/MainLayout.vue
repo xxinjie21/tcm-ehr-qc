@@ -27,14 +27,25 @@
           <ul class="menu">
             <template v-for="group in menuGroups" :key="group.title">
               <li class="sec">{{ group.title }}</li>
-              <li v-for="item in group.items" :key="item.path">
-                <!-- 用 router-link 而非 javascript: 伪链接，保留真实 href 与浏览器导航语义-->
-                <router-link
-                  :to="item.path"
-                  :class="{ on: $route.path === item.path }"
-                  :aria-current="$route.path === item.path ? 'page' : undefined"
-                >{{ item.title }}</router-link>
-              </li>
+              <template v-for="item in group.items" :key="item.path">
+                <li>
+                  <!-- 用 router-link 而非 javascript: 伪链接，保留真实 href 与浏览器导航语义-->
+                  <router-link
+                    :to="item.path"
+                    :class="{ on: isActive(item) }"
+                    :aria-current="isActive(item) ? 'page' : undefined"
+                  >{{ item.title }}</router-link>
+                </li>
+                <!-- 子项（如「术语词典 > 术语批量导入」）：父项本身也可点，
+                     故不做展开/收起，子项常驻显示 —— 省掉展开状态持久化这一摊复杂度。 -->
+                <li v-for="child in item.children" :key="child.path" class="sub">
+                  <router-link
+                    :to="child.path"
+                    :class="{ on: isActive(child) }"
+                    :aria-current="isActive(child) ? 'page' : undefined"
+                  >{{ child.title }}</router-link>
+                </li>
+              </template>
             </template>
           </ul>
         </nav>
@@ -76,6 +87,7 @@ const userStore = useUserStore()
 
 // 菜单项全量定义；实际渲染项由登录返回的 menus 过滤，
 // 未开发页面显示占位页
+// 「术语词典」带子项「术语批量导入」（仅管理员），故支持 children
 const ALL_MENUS = [
   { group: '数据处理', title: '首页看板', path: '/dashboard' },
   { group: '数据处理', title: '病历数据', path: '/records' },
@@ -83,7 +95,9 @@ const ALL_MENUS = [
   { group: '数据处理', title: '质控校验', path: '/qc-check' },
   { group: '数据处理', title: '人工复核', path: '/review' },
   { group: '数据处理', title: '清洗与导出', path: '/governance' },
-  { group: '系统配置', title: '术语词典', path: '/dictionary' },
+  { group: '系统配置', title: '术语词典', path: '/dictionary', children: [
+    { group: '系统配置', title: '术语批量导入', path: '/dictionary/import' }
+  ] },
   { group: '系统配置', title: '日志审计', path: '/audit-log' },
   { group: '系统配置', title: '组织管理', path: '/orgs' },
   { group: '系统配置', title: '我的组织', path: '/my-org' }
@@ -91,23 +105,49 @@ const ALL_MENUS = [
 
 const GROUP_ORDER = ['数据处理', '系统配置']
 
-// 菜单由登录响应的 menus 决定（与 AuthServiceImpl 一致）；空分组不渲染
+/** 侧栏高亮：精确匹配当前路径 */
+const isActive = (node) => route.path === node.path
+
+/**
+ * 菜单由登录响应的 menus 决定（与 AuthServiceImpl.menusOf 一致）；空分组不渲染。
+ *
+ * <p>批次 17 起 menus 是**树**（带 children）。过滤要分别看父项与子项：
+ * 后端给组长/成员的是「父项 + 空 children」，给管理员的是「父项 + 导入子项」，
+ * 这里按各自的 title 列表分别过滤，父项没被授权时其子项也不该出现。</p>
+ */
 const menuGroups = computed(() => {
   const allowed = userStore.menus || []
+  const titles = (list) => (Array.isArray(list) ? list : []).map((m) => (typeof m === 'string' ? m : m?.title))
+  const allowSet = new Set(titles(allowed))
   return GROUP_ORDER
     .map((title) => ({
       title,
-      items: ALL_MENUS.filter((m) => m.group === title && allowed.includes(m.title))
+      items: ALL_MENUS
+        .filter((m) => m.group === title && allowSet.has(m.title))
+        .map((m) => ({
+          title: m.title,
+          path: m.path,
+          // 子项也要在后端授权范围内：父项有、子项没有的（组长）就不显示子项
+          children: (m.children || []).filter((c) => allowSet.has(c.title))
+        }))
     }))
     .filter((group) => group.items.length > 0)
 })
 
-// 面包屑：所属分组 + 当前页标题；无 meta.title 的页面不渲染
+// 面包屑：所属分组 + 当前页标题；子项额外带上父项（「术语词典 / 术语批量导入」）
 const breadcrumb = computed(() => {
   const title = route.meta?.title
   if (!title) return []
-  const group = ALL_MENUS.find((m) => m.title === title)?.group
-  return group ? [group, title] : [title]
+  const all = ALL_MENUS.flatMap((m) => [m, ...(m.children || [])])
+  const hit = all.find((m) => m.title === title)
+  if (!hit) return [title]
+  // 命中的是子项：返回 [分组, 父项, 子项]
+  const isChild = ALL_MENUS.some((m) => (m.children || []).some((c) => c.title === title))
+  if (isChild) {
+    const parent = ALL_MENUS.find((m) => (m.children || []).some((c) => c.title === title))
+    return [hit.group, parent.title, title]
+  }
+  return [hit.group, title]
 })
 
 /**
@@ -267,6 +307,24 @@ aside {
   padding: 14px var(--sp-4) var(--sp-1);
   font-size: 12px;
   color: var(--text-sub);
+}
+
+/* 子菜单（如「术语批量导入」）：缩进一级 + 稍小字号，视觉上从属于父项。
+   父项本身也可点，故不做展开/收起，子项常驻。 */
+.menu .sub a {
+  padding-left: var(--sp-5);
+  font-size: 13px;
+  color: var(--text-sub);
+}
+.menu .sub a:hover {
+  background: var(--ink-light);
+  color: var(--ink);
+}
+.menu .sub a.on {
+  background: var(--ink-light);
+  color: var(--ink);
+  border-left-color: var(--ink-mid);
+  font-weight: bold;
 }
 
 main {

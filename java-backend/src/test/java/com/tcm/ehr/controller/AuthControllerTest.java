@@ -6,6 +6,7 @@ import com.tcm.ehr.common.exception.GlobalExceptionHandler;
 import com.tcm.ehr.domain.dto.LoginDTO;
 import com.tcm.ehr.domain.dto.RegisterDTO;
 import com.tcm.ehr.domain.vo.LoginVO;
+import com.tcm.ehr.domain.vo.MenuNode;
 import com.tcm.ehr.service.IAuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,8 @@ class AuthControllerTest {
         LoginVO vo = new LoginVO();
         vo.setToken("fake.jwt.token");
         vo.setRole("管理员");
-        vo.setMenus(List.of("首页看板", "清洗与导出"));
+        vo.setMenus(List.of(new MenuNode("首页看板", "/dashboard"),
+                new MenuNode("清洗与导出", "/governance")));
         return vo;
     }
 
@@ -75,7 +77,9 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.msg").value("登录成功"))
                 .andExpect(jsonPath("$.data.token").value("fake.jwt.token"))
                 .andExpect(jsonPath("$.data.role").value("管理员"))
-                .andExpect(jsonPath("$.data.menus[1]").value("清洗与导出"));
+                // 批次17：menus 由平铺字符串列表升级为带 children 的树，断言改读 .title
+                .andExpect(jsonPath("$.data.menus[1].title").value("清洗与导出"))
+                .andExpect(jsonPath("$.data.menus[0].path").value("/dashboard"));
     }
 
     @Test
