@@ -358,11 +358,23 @@ import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES_WIDE } from '@/utils/constants'
 
 const userStore = useUserStore()
-// 术语词典写入入口（导入/回滚）：管理员 / 所有者 / 被授权成员三档；
-// 只读浏览对所有登录用户开放。后端按同一三档校验（批次 6 落地授权位），前端只负责不展示无效入口。
-/** 术语类型选项（与后端 TermTypes.ALL 一致） */
-const TYPE_OPTIONS = Object.keys(TYPE_LABELS).map((v) => ({ value: v, label: TYPE_LABELS[v] }))
 
+/**
+ * 术语类型的中文标签（与后端 TermTypes.ALL 同源）。
+ *
+ * <p><b>必须声明在 TYPE_OPTIONS 之前</b>：<code>const</code> 是块级作用域且有 TDZ，
+ * 上层在初始化时读到下层的 const 会抛
+ * {@code ReferenceError: Cannot access 'X' before initialization}，
+ * 表现为整个组件 setup 失败、页面白屏 —— 而 {@code vite build} 不会报错。
+ * 这就是批次 12 工作项 8「TDZ 调序」要防的那类问题。</p>
+ */
+const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
+
+/** 术语类型选项（页头 radio-group 的数据源） */
+
+// 术语词典写入入口（导入）：管理员 / 所有者 / 被授权成员三档；
+// 只读浏览对所有登录用户开放。后端按同一三档校验（批次 6 落地授权位），前端只负责不展示无效入口。
+const TYPE_OPTIONS = Object.keys(TYPE_LABELS).map((v) => ({ value: v, label: TYPE_LABELS[v] }))
 const canWrite = computed(() => userStore.canWriteDictionaryEntry)
 
 // 词典作用域（批次8b）：后端按「本组织自有词条 → 无则回退基础层」返回，
@@ -378,7 +390,6 @@ const scopeTip = computed(() =>
 )
 
 // 词典类型 → 界面文案；键名与后端 type 参数一致（disease / pattern / symptom / herb / formula）
-const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
 
 // ===== 布局：与其它页一致，不做整页缩放（表格内部滚动）=====
 /** 当前术语类型（页头 radio-group 的值，全局过滤） */
