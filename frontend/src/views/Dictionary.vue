@@ -67,6 +67,14 @@
             <span v-if="!row.aliases?.length" class="tip">无</span>
           </template>
         </el-table-column>
+        <!-- 批次 22：显示国标编码。没有编码的词条显式写「—」而不是留空，
+             免得「空白」被误读成「这一列没加载出来」 -->
+        <el-table-column prop="code" label="国标编码" width="150">
+          <template #default="{ row }">
+            <span v-if="row.code" class="code-cell">{{ row.code }}</span>
+            <span v-else class="tip">—</span>
+          </template>
+        </el-table-column>
         <template #empty>
           <!-- P5.8：空态必须解释「为什么空 / 怎么才有内容」；加载失败与真为空分开 -->
           <el-empty
@@ -827,6 +835,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 批次 22：国标编码用等宽字体，便于逐字符核对（编码错一位就查不出来了） */
+.code-cell {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text-sub);
+}
 /* 类型 tab：激活态与下划线改用主题墨色，替换 Element Plus 默认蓝 */
 .dict-tabs {
   margin-bottom: var(--sp-1);

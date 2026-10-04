@@ -86,12 +86,16 @@ public class DictionaryServiceImpl implements IDictionaryService {
             boolean matched = kw.isEmpty()
                     || e.getStandardTerm().contains(kw)
                     || (e.getAliases() != null && e.getAliases().stream().anyMatch(a -> a.contains(kw)));
-            if (matched) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("standardTerm", e.getStandardTerm());
-                m.put("aliases", e.getAliases());
-                hit.add(m);
-            }
+if (matched) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("standardTerm", e.getStandardTerm());
+                    m.put("aliases", e.getAliases());
+                    // 批次 22：带上编码，词典页与导出才能显示国标码。
+                    // 空串归 null 与 normalize 同口径：区分「没有编码」与「编码是空串」。
+                    String code = e.getCode();
+                    m.put("code", code == null || code.isBlank() ? null : code);
+                    hit.add(m);
+                }
         }
         // 3. 分页切片：from/to 双向夹取，页码超出总页数时返回空列表而不是抛越界异常
         List<Map<String, Object>> terms = hit;

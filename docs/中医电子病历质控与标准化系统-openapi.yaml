@@ -903,7 +903,10 @@ components:
             - pattern
             - herb
             - formula
-          description: disease疾病 / pattern证候 / symptom症状 / herb中药 / formula方剂
+            - tongue
+            - pulse
+            - treatment
+          description: 术语类型；tongue舌象 / pulse脉象 / treatment治法 自批次 20 起纳入词典
         term:
           type: string
           description: 口语化/非标准术语
@@ -1153,6 +1156,9 @@ components:
             - pattern
             - herb
             - formula
+            - tongue
+            - pulse
+            - treatment
         file:
           type: string
           format: binary
@@ -1216,6 +1222,9 @@ components:
             - pattern
             - herb
             - formula
+            - tongue
+            - pulse
+            - treatment
         backupFilename:
           type: string
           description: 备份文件名，如 symptoms.json.bak_20260811_143000
@@ -2973,6 +2982,9 @@ paths:
               - pattern
               - herb
               - formula
+              - tongue
+              - pulse
+              - treatment
         - name: keyword
           in: query
           schema:
@@ -3370,6 +3382,9 @@ s/schemas/DictionaryTermsVO'
               - pattern
               - herb
               - formula
+              - tongue
+              - pulse
+              - treatment
       responses:
         '200':
           description: 重建完成
