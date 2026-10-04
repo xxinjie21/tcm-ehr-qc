@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -172,6 +173,52 @@ class DictProposalServiceTest {
         verify(proposalMapper, times(2)).selectList(cap.capture());
         List<QueryWrapper<DictProposal>> all = cap.getAllValues();
         return all.get(all.size() - 1);
+    }
+
+    // ------------------------------------------------------------ 规模下限（防误删基线）
+
+    @Test
+    @DisplayName("快照比基线小很多：拒绝提交（否则通过审核会清空基线）")
+    void rejectsProposalThatWouldShrinkBaseline() {
+        when(proposalMapper.selectCount(any())).thenReturn(0L);
+        // 基线 100 条，提案只有 10 条 —— 一通过就要删掉 90 条
+        when(termStore.read("org-A", "herb")).thenReturn(terms("a", "b", "c", "d", "e",
+                "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
+                "u", "v", "w", "x", "y", "z", "aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh",
+                "ii", "jj", "kk", "ll", "mm", "nn", "oo", "pp", "qq", "rr", "ss", "tt", "uu",
+                "vv", "ww", "xx", "yy", "zz", "aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg",
+                "hhh", "iii", "jjj", "kkk", "lll", "mmm", "nnn", "ooo", "ppp", "qqq", "rrr",
+                "sss", "ttt", "uuu", "vvv", "www", "xxx", "yyy", "zzz", "A1", "B2", "C3", "D4",
+                "E5", "F6", "G7", "H8", "I9", "J1", "K2"));
+
+        BusinessException e = assertThrows(BusinessException.class,
+                () -> svc.submit("org-A", "herb", terms("甘草"), "bob"));
+        // 提示必须说清「会删多少」和「先拉基线」，否则用户不知道下一步做什么
+        org.junit.jupiter.api.Assertions.assertTrue(e.getMessage().contains("拉取小组基线"),
+                "提示要给出可执行的下一步：" + e.getMessage());
+
+        verify(proposalMapper, never()).insert(any(DictProposal.class));
+    }
+
+    @Test
+    @DisplayName("快照略少于基线（在 80% 以上）：允许提交")
+    void allowsSlightShrink() {
+        when(proposalMapper.selectCount(any())).thenReturn(0L);
+        when(termStore.read("org-A", "herb")).thenReturn(terms("a", "b", "c", "d", "e"));
+        when(termMapper.selectCount(any())).thenReturn(0L);
+
+        // 基线 5 条、提案 4 条 = 80%，正好在允许范围内
+        assertDoesNotThrow(() -> svc.submit("org-A", "herb", terms("a", "b", "c", "d"), "bob"));
+    }
+
+    @Test
+    @DisplayName("基线为空：首次建库不受规模下限限制")
+    void allowsWhenBaselineEmpty() {
+        when(proposalMapper.selectCount(any())).thenReturn(0L);
+        when(termStore.read("org-A", "herb")).thenReturn(List.of());
+        when(termMapper.selectCount(any())).thenReturn(0L);
+
+        assertDoesNotThrow(() -> svc.submit("org-A", "herb", terms("甘草"), "bob"));
     }
 
     // ------------------------------------------------------------ 待审上限

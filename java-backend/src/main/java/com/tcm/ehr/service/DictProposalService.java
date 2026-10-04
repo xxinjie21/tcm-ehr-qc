@@ -76,20 +76,30 @@ public class DictProposalService {
         return termStore.read(orgId, type);
     }
 
-    // ---------------------------------------------------------------- 提交提案
+// ---------------------------------------------------------------- 提交提案
 
-    /**
-     * 提交提案（先校验待审上限）。
-     *
-     *
-     * 上限的作用是防止反复提交把 dict_proposal_term 撑爆：每个提案都带一份
-     *
-     * 全量快照（疾病类可上千条），无上限时刷 100 次就是十万行。
-     *
-     * @throws BusinessException 已有 5 条待审提案
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public DictProposalVO submit(String orgId, String type, List<TermEntry> terms, String submitUserId) {
+/**
+ * 提交提案时的规模下限比例：快照小于基线这个比例即拒绝。
+ *
+ * 提案携带的是**完整目标词典**，审核通过走整快照替换（见 audit）。
+ * 所以「快照比基线小很多」等于「一提交就会删掉基线里大量词条」——
+ * 典型触发路径：成员没点「拉取小组基线」，直接上传一个自己整理的小文件当提案，
+ * 组长没细看差异就点通过，该类型的基线就被清空了。
+ */
+static final int MIN_SHRINK_RATIO_PERCENT = 80;
+
+/**
+ * 提交提案（先校验待审上限，再校验规模下限）。
+ *
+ *
+ * 上限的作用是防止反复提交把 dict_proposal_term 撑爆：每个提案都带一份
+ *
+ * 全量快照（疾病类可上千条），无上限时刷 100 次就是十万行。
+ *
+ * @throws BusinessException 已有 5 条待审提案，或快照相对基线缩水过多
+ */
+@Transactional(rollbackFor = Exception.class)
+public DictProposalVO submit(String orgId, String type, List<TermEntry> terms, String submitUserId) {
         String org = norm(orgId);
         // 1. 先查上限再建快照 —— 顺序反了就是「先写完再发现有超限」
         Long pending = proposalMapper.selectCount(new QueryWrapper<DictProposal>()
@@ -97,6 +107,8 @@ public class DictProposalService {
         if (pending != null && pending >= MAX_PENDING) {
             throw new BusinessException(4003, "该组织该类型已有 " + MAX_PENDING + " 条待审提案，请等待组长处理后再提交");
         }
+        // 2. 规模下限：提案是整快照替换，快照明显缩水等于「一提交就要删基线」
+        checkNotShrunk(org, type, terms);
         purgeExpiredSnapshots();
 
         DictProposal p = new DictProposal();
@@ -477,6 +489,39 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
     /** 查询条件里 null 与空白一视同仁：都表示「这一维度不过滤」 */
     private static boolean notBlank(String v) {
         return v != null && !v.isBlank();
+    }
+
+    /**
+     * 规模下限校验：快照条数不得明显少于当前基线。
+     *
+     *
+     * 为什么必须在提交侧拦，而不是在审核侧提醒：审核通过是整快照替换，
+     *
+     * 到那一步基线已经被覆盖了，只能靠归档回滚补救；提交侧拦是唯一还来得及的时机。
+     *
+     *
+     * 为什么用比例而不是绝对条数：不同类型的基线规模差一个数量级
+     *
+     * （症状 72 条 vs 疾病 1364 条），写死条数会对小词典误报、对大词典漏报。
+     *
+     *
+     * 基线为空时一律放过：那正是「首次建库」场景，不该拦。
+     *
+     */
+    private void checkNotShrunk(String org, String type, List<TermEntry> terms) {
+        int incoming = terms == null ? 0 : terms.size();
+        int baseline = termStore.read(org, type).size();
+        if (baseline == 0) {
+            return;
+        }
+        int floor = baseline * MIN_SHRINK_RATIO_PERCENT / 100;
+        if (incoming < floor) {
+            throw new BusinessException(4003,
+                    "本次提案只有 " + incoming + " 条，而小组基线有 " + baseline
+                            + " 条；提案按整份词典替换，通过后会删除基线中的 "
+                            + (baseline - incoming) + " 条。"
+                            + "请先在「我的词典」点「拉取小组基线」，再把你的修改合并进去后提交。");
+        }
     }
 
     private String norm(String orgId) {
