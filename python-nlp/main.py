@@ -124,6 +124,48 @@ class ExtractResponse(BaseModel):
     truncated: bool = False
 
 
+def _log_model_fingerprint():
+    """启动时把模型指纹打进日志：抽取结果要能溯源到具体权重。
+
+    为什么要记：NER 结果直接进 structured_data 并参与质控评分。若本地权重被
+    换过而没人在意，同一份病历的抽取结果就会变，历史数据不可复现、批次之间
+    也不能比较。记录 revision 与权重 sha256，出问题时能立刻判断「是数据变了
+    还是模型变了」。
+
+    刻意**只告警不阻断**：指纹对不上时服务仍可用（降级或照常跑），但日志必须
+    留痕 —— 阻断会让「换模型」这种正常运维动作直接打不开服务。
+    """
+    try:
+        from download_model import WEIGHTS_SHA256, MODEL_REVISION
+    except Exception:
+        return
+    weights = os.path.join(MODEL_DIR, "pytorch_model.bin")
+    if not os.path.isfile(weights):
+        logger.info("[nlp] 未找到权重文件（modelAvailable=false），跳过指纹记录")
+        return
+    try:
+        import hashlib
+        h = hashlib.sha256()
+        with open(weights, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        actual = h.hexdigest()
+    except Exception as e:
+        logger.warning("[nlp] 计算权重指纹失败（不影响服务）: %s", e)
+        return
+    if actual == WEIGHTS_SHA256:
+        logger.info("[nlp] 模型指纹校验通过: %s@%s weights=%s",
+                    "Monor/hwtcmner", MODEL_REVISION[:12], actual)
+    else:
+        logger.warning(
+            "[nlp] 模型指纹与钉定版本不一致 —— 抽取结果可能与历史数据不可比！\n"
+            "        期望 revision=%s weights=%s\n"
+            "        实际 weights=%s\n"
+            "        若确实要换版本，请同步更新 download_model.py 的 MODEL_REVISION 与 "
+            "WEIGHTS_SHA256，并在《多批次实施计划》登记。",
+            MODEL_REVISION[:12], WEIGHTS_SHA256, actual)
+
+
 def _load_model():
     """加载本地 NER 模型与分词器；失败则置空，服务降级为纯规则兜底。"""
     global _tokenizer, _model, _id2label
@@ -141,6 +183,8 @@ def _load_model():
         _model.eval()
         _id2label = {int(k): v for k, v in _model.config.id2label.items()}
         logger.info("[nlp] 模型加载成功: %s, labels=%d", MODEL_DIR, len(_id2label))
+        # 3. 记录权重指纹（批次 23）：抽取结果要能溯源到具体权重
+        _log_model_fingerprint()
     except Exception:  # 模型缺失/异常 → 仅规则兜底
         _tokenizer = None
         _model = None
