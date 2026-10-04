@@ -187,6 +187,16 @@ def check_dict_quality(dicts):
         if not entries:
             print(f'[{field}] 词典为空  ← 需按标准术语集补建')
             continue
+
+        # 同一文件内标准术语重复：会撞 dictionary_terms 的 uk_org_type_term 唯一键，
+        # 播种整批失败且只在启动日志里报 SQLIntegrityConstraintViolation，
+        # 现场极难定位（2026-10-04 舌象词典就是这样整本没灌进去的）。
+        # 所以在质量体检里当硬缺陷报出来。
+        names = [e['standardTerm'] for e in entries]
+        dups = sorted({n for n in names if names.count(n) > 1})
+        if dups:
+            print(f'[{field}] ! 标准术语重复 {len(dups)} 个：{dups[:5]}')
+            print(f'        播种时会撞唯一键 uk_org_type_term，整类词典灌不进去')
         total = len(entries)
         with_code = sum(1 for e in entries if (e.get('code') or '').strip())
         with_alias = sum(1 for e in entries if e.get('aliases'))
