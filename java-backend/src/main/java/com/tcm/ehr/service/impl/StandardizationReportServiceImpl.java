@@ -13,9 +13,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -60,11 +63,25 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     @Override
     public StandardizationReportVO report() {
+        return report(null, null);
+    }
+
+    /**
+     * 按接诊时间区间出报告。
+     *
+     * @param start 起（yyyy-MM-dd），为空表示不限
+     * @param end   止（yyyy-MM-dd），为空表示不限；与 start 必须同时给或同时不给
+     */
+    @Override
+    public StandardizationReportVO report(String start, String end) {
         StandardizationReportVO vo = new StandardizationReportVO();
         vo.setDictQuality(dictQuality());
         vo.setCrossTypeDuplicates(crossTypeDuplicates());
         // 乙类：病历相关，必须先按数据域收窄，否则登录即可的接口会读到跨组织数据
-        List<Record> records = recordsInDomain();
+        List<Record> all = recordsInDomain();
+        List<Record> records = filterByVisitTime(all, start, end);
+        vo.setRange(rangeOf(all, records, start, end));
+        vo.setByMonth(byMonth(records));
         vo.setCoverage(coverage(records));
         vo.setUnmatched(unmatched(records, new HashSet<>(symptomTerms())));
         vo.setNormalizable(normalizableRate(records, new HashSet<>(symptomTerms())));
@@ -74,6 +91,132 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         return vo;
+    }
+
+    /**
+     * 按接诊时间过滤。
+     *
+     *
+     * 必须上下界同时给才生效，只给一端按「未给」处理 ——
+     *
+     * 与 StatsController 的区间口径一致。只给一端会被理解成「从某时到最新」，
+     * 那不是用户的意思；而如果只给一端就悄悄生效，用户看到记录数变少却找不到原因。
+     */
+    private List<Record> filterByVisitTime(List<Record> all, String start, String end) {
+        // 两个条件同时成立才过滤：早前写成「任一非空即过滤」，
+        // 结果只给 start 时返回 131 条（应为全部 500），与注释和既有口径都不符
+        if (!notBlankDate(start) || !notBlankDate(end)) {
+            return all;
+        }
+        LocalDate from = LocalDate.parse(start);
+        LocalDate to = LocalDate.parse(end).plusDays(1);
+        List<Record> out = new ArrayList<>();
+        for (Record r : all) {
+            LocalDateTime t = r.getVisitTime();
+            if (t == null) {
+                continue;
+            }
+            LocalDate d = t.toLocalDate();
+            if (d.isBefore(from) || !d.isBefore(to)) {
+                continue;
+            }
+            out.add(r);
+        }
+        return out;
+    }
+
+    private boolean notBlankDate(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    private StandardizationReportVO.TimeRange rangeOf(List<Record> all, List<Record> picked,
+                                                     String start, String end) {
+        StandardizationReportVO.TimeRange r = new StandardizationReportVO.TimeRange();
+        // 只有两端都给、过滤真正生效时才回显区间。
+        // 只给一端时过滤没生效，若还回显「2024-01-01 ~ 不限」，界面会显示成一个
+        // 实际并未应用的区间，而记录数其实是全部 —— 那是自相矛盾的展示。
+        boolean applied = notBlankDate(start) && notBlankDate(end);
+        r.setStart(applied ? start : null);
+        r.setEnd(applied ? end : null);
+        r.setRecords(picked.size());
+        r.setExcluded(all.size() - picked.size());
+        return r;
+    }
+
+    /**
+     * 按接诊月份分组。
+     *
+     *
+     * 为什么要按月而不是按年：词表补一批、解析重跑一批，通常只覆盖某些月份的数据；
+     *
+     * 按月才能看出「哪些月份已经吃到新词表、哪些还没」。没有 visitTime 的病历
+     * 归入「未知」一组，不静默丢弃。
+     */
+    private List<StandardizationReportVO.MonthlyBucket> byMonth(List<Record> records) {
+        Map<String, List<Record>> groups = new LinkedHashMap<>();
+        for (Record r : records) {
+            String key = r.getVisitTime() == null
+                    ? "未知"
+                    : YearMonth.from(r.getVisitTime()).toString();
+            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
+        }
+        List<StandardizationReportVO.MonthlyBucket> out = new ArrayList<>();
+        for (Map.Entry<String, List<Record>> en : groups.entrySet()) {
+            List<Record> rs = en.getValue();
+            StandardizationReportVO.MonthlyBucket b = new StandardizationReportVO.MonthlyBucket();
+            b.setMonth(en.getKey());
+            b.setRecords(rs.size());
+
+            int symTotal = 0;
+            int symHit = 0;
+            for (Record r : rs) {
+                Map<String, Object> sd = structured(r);
+                if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
+                    continue;
+                }
+                for (Object o : list) {
+                    if (!(o instanceof Map<?, ?> m)) {
+                        continue;
+                    }
+                    symTotal++;
+                    if (m.get("normLevel") != null) {
+                        symHit++;
+                    } else {
+                        String content = str(m.get("content"));
+                        if (content.isEmpty()) {
+                            content = str(m.get("sourceText"));
+                        }
+                        if (normalizableTerm(content)) {
+                            b.setDictionaryGap(b.getDictionaryGap() + 1);
+                        }
+                    }
+                }
+            }
+            b.setSymptomRate(symTotal == 0 ? null : pct(symHit, symTotal));
+
+            StandardizationReportVO.ScoreDistribution sd2 = scoreDistribution(rs);
+            b.setAvgScore(sd2.getAvg());
+            b.setCapped(sd2.getCapped());
+            out.add(b);
+        }
+        // 「未知」永远排最后；其余按月份倒序（最近的在最前）
+        out.sort(Comparator.comparing((StandardizationReportVO.MonthlyBucket b) -> b.getMonth())
+                .reversed());
+        out.sort(Comparator.comparing(b -> "未知".equals(b.getMonth())));
+        return out;
+    }
+
+    /** 该未归一实体是否属于「本该能归一」的（不是碎片、不是错放） */
+    private boolean normalizableTerm(String content) {
+        if (content.isEmpty() || content.length() <= FRAGMENT_MAX_LEN) {
+            return false;
+        }
+        return !startsWithAny(content, MISROUTED_PREFIX) && !containsAny(content, PHYSICAL_SIGN);
+    }
+
+    private String pct(int part, int total) {
+        return total == 0 ? null
+                : Math.round(part * 1000.0 / total) / 10.0 + "%";
     }
 
     // ------------------------------------------------------------ 甲类 · 词典质量

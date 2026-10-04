@@ -109,6 +109,25 @@ components:
           nullable: true
           example: null
     # ========== 共享数据模型（跨请求/响应复用，非 PO） ==========
+    StandardizationReportRange:
+      type: object
+      description: 本次统计的接诊时间区间
+      properties:
+        start: { type: string, description: 生效的起（yyyy-MM-dd），空表示不限 }
+        end: { type: string, description: 生效的止（yyyy-MM-dd），空表示不限 }
+        records: { type: integer, description: 区间内病历数 }
+        excluded: { type: integer, description: 被过滤掉的病历数；0 表示未过滤 }
+
+    StandardizationReportMonth:
+      type: object
+      properties:
+        month: { type: string, description: 月份 yyyy-MM；接诊时间为空时为「未知」 }
+        records: { type: integer }
+        symptomRate: { type: string, description: 该月症状归一率，未抽取到症状时为空 }
+        avgScore: { type: number, format: double, description: 该月平均质控分 }
+        capped: { type: integer, description: 该月质控扣满上限的病历数 }
+        dictionaryGap: { type: integer, description: 该月症状词表缺口条数（补词表能解决的部分） }
+
     QcCoverage:
       type: object
       description: 质控完成度。报告里的分数与扣分来自 qc_results（质控跑完时写下的结果），质控未完成时这些数字是旧口径，页面应先提示重跑质控再展示结论
@@ -211,6 +230,13 @@ components:
             avg: { type: number, format: double }
         qc:
           $ref: '#/components/schemas/QcCoverage'
+        range:
+          $ref: '#/components/schemas/StandardizationReportRange'
+        byMonth:
+          type: array
+          description: 按接诊月份分组（用于看换了词表之后有没有变好；「未知」表示接诊时间为空的病历）
+          items:
+            $ref: '#/components/schemas/StandardizationReportMonth'
         dataset:
           type: object
           description: 乙类·数据集形态（模板塌缩度决定能否代表真实病历）
@@ -3755,7 +3781,20 @@ s/schemas/DictionaryTermsVO'
       tags:
         - 统计查询
       summary: 标准化质量报告
-      description: 【权限：登录即可】返回标准化质量报告，只读、不触发任何重算。报告刻意分两层：甲类「标准符合度」只取决于词表建得对不对（词典规模/编码覆盖/别名质量/跨类重名），与用哪份数据无关；乙类「数据集覆盖度」（归一率/未归一构成/质控封顶率）只用于验证词表是否建全，**不代表真实病历上的准确率**，不可对外引用为科研结论
+      description: 【权限：登录即可】返回标准化质量报告，只读、不触发任何重算。可按接诊时间区间过滤（start/end 同时给或同时不给）。报告刻意分两层：甲类「标准符合度」只取决于词表建得对不对（词典规模/编码覆盖/别名质量/跨类重名），与用哪份数据无关；乙类「数据集覆盖度」（归一率/未归一构成/质控封顶率）只用于验证词表是否建全，**不代表真实病历上的准确率**，不可对外引用为科研结论。可按接诊时间区间过滤（start/end 同时给或同时不给）
+      parameters:
+        - name: start
+          in: query
+          required: false
+          description: 接诊时间下界（yyyy-MM-dd），空表示不限；只给一端按「未给」处理
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          description: 接诊时间上界（yyyy-MM-dd），空表示不限
+          schema:
+            type: string
       responses:
         '200':
           description: 标准化质量报告

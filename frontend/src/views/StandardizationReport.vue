@@ -2,7 +2,7 @@
   <div class="std-report">
     <!-- 质控未完成时先挡一道：报告里的分数分布与封顶率都来自 qc_results，
          质控没跟上就展示结论等于拿旧数据误导人。 -->
-    <div v-if="!qcComplete" class="gate">
+    <div v-if="showQcGate" class="gate">
       <div class="gate-icon">!</div>
       <div class="gate-body">
         <div class="gate-title">质控评分还没跑完，现在的数字不可信</div>
@@ -26,16 +26,43 @@
       </div>
     </div>
 
-    <!-- 数据来源提示：放在顶部但用轻量样式，不用刺眼的告警条。
-         这批数据只有 10 个模板，数字不能当真实病历性能看，但也不该拦住用户往下读。 -->
-    <div class="src-note">
-      <span class="src-icon">i</span>
-      <span>
-        当前数据共 {{ report?.dataset?.recordCount ?? 0 }} 条病历，主诉只有
-        {{ report?.dataset?.chiefComplaintTemplates ?? 0 }} 种写法，属于测试数据。
-        下面的数字用于<strong>验证词典建设进度</strong>，不代表真实病历上的准确率。
-      </span>
-    </div>
+      <!-- 数据来源提示：放在顶部但用轻量样式，不用刺眼的告警条。
+           这批数据只有 10 个模板，数字不能当真实病历性能看，但也不该拦住用户往下读。 -->
+      <div class="src-note">
+        <span class="src-icon">i</span>
+        <span>
+          当前数据共 {{ report?.dataset?.recordCount ?? 0 }} 条病历，主诉只有
+          {{ report?.dataset?.chiefComplaintTemplates ?? 0 }} 种写法，属于测试数据。
+          下面的数字用于<strong>验证词典建设进度</strong>，不代表真实病历上的准确率。
+        </span>
+      </div>
+
+      <!-- 时间维度：病历接诊时间跨度大，混在一起看不出「换了词表之后有没有变好」 -->
+      <PanelCard title="统计区间">
+        <div class="time-row">
+          <el-radio-group v-model="preset" size="small" @change="applyPreset">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="1y">近一年</el-radio-button>
+            <el-radio-button value="3y">近三年</el-radio-button>
+            <el-radio-button value="custom">自定义</el-radio-button>
+          </el-radio-group>
+          <el-date-picker
+            v-if="preset === 'custom'"
+            v-model="customRange"
+            type="daterange"
+            size="small"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始"
+            end-placeholder="结束"
+            style="width: 240px"
+            @change="applyCustom"
+          />
+          <el-button size="small" :loading="loading" @click="loadReport">刷新</el-button>
+          <span class="tip">{{ rangeTip }}</span>
+        </div>
+      </PanelCard>
+
 
     <!-- 第一屏：一句话结论 + 三个关键卡。看这一屏就知道该做什么、去哪看。 -->
     <div class="headline" :class="headline.tone">
@@ -76,8 +103,39 @@
     </PanelCard>
 
     <!-- 第三屏：明细默认收起。业务用户通常不需要逐类看，展开即可。 -->
-    <el-collapse class="detail">
-      <el-collapse-item name="dict">
+      <!-- 按接诊月份看趋势：补词表 + 重跑解析只会覆盖部分月份，
+           按月看才能判断「哪些月份已经吃到新词表」 -->
+      <el-collapse class="detail">
+        <el-collapse-item name="month">
+          <template #title>
+            <span class="ct">按月份看</span>
+            <span class="ct-sub">补词表后逐月对比，看新词表吃到了哪些数据</span>
+          </template>
+          <el-table :data="report?.byMonth || []" border size="small" max-height="320">
+            <el-table-column prop="month" label="月份" width="110" />
+            <el-table-column prop="records" label="病历数" width="90" align="right" />
+            <el-table-column label="症状归一率" min-width="120">
+              <template #default="{ row }">
+                <span v-if="row.symptomRate">{{ row.symptomRate }}</span>
+                <span v-else class="tip">未抽取</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="dictionaryGap" label="词表缺口" width="100" align="right" />
+            <el-table-column prop="avgScore" label="平均分" width="90" align="right" />
+            <el-table-column label="扣分封顶" width="100" align="right">
+              <template #default="{ row }">
+                <span :class="{ warn: row.capped > 0 }">{{ row.capped }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <p class="detail-note">
+            「词表缺口」是该月未归一里属于「标准词但词表没有收录」的部分 ——
+            补词表能直接解决的就是它。若某个月缺口明显比别的月多，多半是那个月的
+            数据还没重跑过解析。
+          </p>
+        </el-collapse-item>
+
+        <el-collapse-item name="dict">
         <template #title>
           <span class="ct">各词典明细</span>
           <span class="ct-sub">词条数、别名与编码情况</span>
@@ -177,14 +235,65 @@ const loading = ref(false)
 const exporting = ref(false)
 const rerunning = ref(false)
 
+// ---- 时间区间 ----
+// 病历接诊时间跨度大（实测 2019-01 ~ 2025-12），必须能按时间切：
+// 新词表只对重跑过解析的病历生效，而这些病历的接诊时间往往集中在某几个月。
+const preset = ref('all')
+const customRange = ref(null)
+
+const fmtDate = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** 当前生效的区间；null 表示不限 */
+function currentRange() {
+  if (preset.value === 'custom') {
+    const r = customRange.value
+    if (Array.isArray(r) && r.length === 2 && r[0] && r[1]) {
+      return { start: r[0], end: r[1] }
+    }
+    return null
+  }
+  if (preset.value === '1y' || preset.value === '3y') {
+    const years = preset.value === '1y' ? 1 : 3
+    const end = new Date()
+    const start = new Date(end.getFullYear() - years + 1, 0, 1)
+    return { start: fmtDate(start), end: fmtDate(end) }
+  }
+  return null
+}
+
+const rangeTip = computed(() => {
+  const r = report.value?.range
+  if (!r) return ''
+  if (r.start || r.end) {
+    return `当前统计 ${r.start || '不限'} ~ ${r.end || '不限'}，`
+      + `区间内 ${r.records} 条`
+      + (r.excluded > 0 ? `（已排除 ${r.excluded} 条区间外数据）` : '')
+  }
+  return `当前统计全部 ${r.records} 条`
+})
+
+const applyPreset = () => loadReport()
+const applyCustom = () => loadReport()
+
 const pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : '—')
 
 // ---------------- 质控完成度（决定报告有没有意义）
-const qc = computed(() => report.value?.qc || {})
-const qcComplete = computed(() => qc.value.complete === true)
-const qcTotal = computed(() => qc.value.total ?? 0)
-const qcScored = computed(() => qc.value.scored ?? 0)
-const qcLast = computed(() => qc.value.lastScoredAt || '')
+// 三态而不是两态：未加载 / 已加载且未完成 / 已加载且完成。
+// 早前只用两态，页面打开时 report 还是 null，complete 取到 false，
+// 「质控没跑完」的告警会先闪一下再消失 —— 看着像出了故障。
+const qc = computed(() => report.value?.qc || null)
+const qcLoaded = computed(() => qc.value !== null)
+const qcComplete = computed(() => qc.value?.complete === true)
+/** 只在「确实拿到了结果且不完整」时才提示 */
+const showQcGate = computed(() => qcLoaded.value && !qcComplete.value)
+const qcTotal = computed(() => qc.value?.total ?? report.value?.dataset?.recordCount ?? 0)
+const qcScored = computed(() => qc.value?.scored ?? 0)
+const qcLast = computed(() => qc.value?.lastScoredAt || '')
 
 /** 批量重跑：质控 / 解析都可能有几千条，必须先让人确认范围 */
 async function confirmRerun(what, countHint) {
@@ -238,25 +347,27 @@ const rerunAll = async () => {
  * 补一张没数据可匹配的词表，对归一率毫无帮助 —— 要补的是
  * 「量最大 × 词表最小」的那一类，那才是真正的瓶颈。
  */
-const bottleneck = computed(() => {
-  const d = report.value
-  if (!d) return null
-  const extracted = new Map((d.coverage || []).map((c) => [c.field, c.total]))
-  // field -> 词典类型 key 的映射从 coverage 与 dictQuality 的 label 对齐：
-  // 两者都用同一份 label，直接按 label 建索引，避免在前端硬编码映射表
-  const byLabel = new Map((d.dictQuality || []).map((x) => [x.label, x]))
-  const candidates = (d.dictQuality || [])
-    .filter((x) => x.termCount > 0 && (extracted.get(x.label) || 0) > 0)
-  if (!candidates.length) return null
-  // 未归一量 × 词表规模的组合：词表越小越该补，且优先补未归一多的那类
-  const unmatchedOf = (label) => {
-    const c = (d.coverage || []).find((x) => x.label === label)
-    return c ? c.total - c.normalized : 0
-  }
-  return candidates
-    .map((x) => ({ ...x, unmatched: unmatchedOf(x.label) }))
-    .sort((a, b) => (b.unmatched - a.unmatched) || (a.termCount - b.termCount))[0]
-})
+  const bottleneck = computed(() => {
+    const d = report.value
+    if (!d) return null
+    // coverage.field 是 structured_data 的字段名（symptoms/diseases/…），
+    // dictQuality.label 是中文名（症状/疾病/…），两者不同名。
+    // 必须按 label 对齐 —— 早前误用 field 建 Map 再用 label 查，
+    // 结果恒为 0，「最该补的词表」卡片就一直显示「—」。
+    const byLabel = new Map((d.coverage || []).map((c) => [c.label, c]))
+    const candidates = (d.dictQuality || []).filter((x) => {
+      const c = byLabel.get(x.label)
+      return x.termCount > 0 && c && c.total > 0
+    })
+    if (!candidates.length) return null
+    // 未归一量降序、词表量升序：先补「缺口大且词表小」的那类
+    return candidates
+      .map((x) => {
+        const c = byLabel.get(x.label)
+        return { ...x, unmatched: c.total - c.normalized }
+      })
+      .sort((a, b) => (b.unmatched - a.unmatched) || (a.termCount - b.termCount))[0]
+  })
 
 // ---------------- 关键卡 ----------------
 // 三张卡各回答一个业务问题：词典够不够、归一顺不顺、评分灵不灵
@@ -449,7 +560,6 @@ const coverageRows = computed(() =>
     rate: c.total ? pct(c.normalized, c.total) : '未抽取'
   }))
 )
-
 /** 词表非空、也抽到了实体，却一条都没归上 —— 这是解析早于词表建立，补词表无效 */
 const staleTypes = computed(() =>
   (report.value?.coverage || []).filter((c) => c.suspectedStaleExtraction)
@@ -467,17 +577,19 @@ const scoreRange = computed(() => {
 })
 
 const loadReport = async () => {
-  loading.value = true
-  try {
-    const res = await getStandardizationReport()
-    report.value = res.data || null
-  } catch {
-    // 拦截器已提示，这里不叠加泛化文案
-    report.value = null
-  } finally {
-    loading.value = false
+loading.value = true
+try {
+      // 时间区间为空时把参数省略，不发 start=undefined 这类脏参数
+      const range = currentRange()
+      const res = await getStandardizationReport(range || undefined)
+      report.value = res.data || null
+    } catch {
+      // 拦截器已提示，这里不叠加泛化文案
+      report.value = null
+    } finally {
+      loading.value = false
+    }
   }
-}
 
 /** 导出 CSV：BOM 头让 Excel 正确识别 UTF-8，否则中文全是乱码 */
 const handleExport = () => {
@@ -505,6 +617,16 @@ const handleExport = () => {
     rows.push(['未归一构成', '合计', u.total, ''])
     const s = r.score
     rows.push(['评分', '扣分相同占比', pct(s.capped, s.total), `平均分 ${s.avg}，区间 ${s.min}~${s.max}`])
+    // 时间维度一并导出：脱离区间的月度数据没有意义
+    const rg = r.range || {}
+    rows.push(['区间', '统计区间',
+      `${rg.start || '不限'} ~ ${rg.end || '不限'}`, `区间内 ${rg.records} 条，排除 ${rg.excluded || 0} 条`])
+    ;(r.byMonth || []).forEach((m) => {
+      rows.push(['按月份', `${m.month} 病历数`, m.records, ''])
+      rows.push(['按月份', `${m.month} 症状归一率`, m.symptomRate || '未抽取', ''])
+      rows.push(['按月份', `${m.month} 词表缺口`, m.dictionaryGap, '补词表可解决'])
+      rows.push(['按月份', `${m.month} 平均分`, m.avgScore, `扣分封顶 ${m.capped}`])
+    })
     rows.push(['数据集', '病历总数', r.dataset.recordCount, ''])
     rows.push(['数据集', '主诉写法种类', r.dataset.chiefComplaintTemplates, '远小于病历数说明是测试数据'])
     rows.push(['数据集', '来自患者口语', r.dataset.recordsWithColloquialSymptom, '口语不是标准症状词'])
@@ -570,6 +692,13 @@ onMounted(loadReport)
   font-size: 12px;
   line-height: 1.7;
   color: var(--text-sub);
+}
+/* 时间区间条 */
+.time-row {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  flex-wrap: wrap;
 }
 /* 数据来源提示：轻量，不拦截阅读 */
 .src-note {

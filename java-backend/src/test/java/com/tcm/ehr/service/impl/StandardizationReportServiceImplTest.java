@@ -18,6 +18,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -74,6 +75,22 @@ class StandardizationReportServiceImplTest {
         r.setChiefComplaint("失眠3月");
         r.setSelfReport("我这两天睡不着，浑身没力气");
         when(recordMapper.selectList(any())).thenReturn(new ArrayList<>(List.of(r)));
+    }
+
+    /** 造一条带接诊时间的病历，用于时间维度测试 */
+    private static Record recordAt(String id, String visitTime) {
+        Record r = new Record();
+        r.setId(id);
+        r.setOrgId("org-A");
+        r.setScore(95);
+        r.setStructuredData("{\"symptoms\":[]}");
+        r.setQcResults("{\"score\":95,\"deductions\":[]}");
+        r.setVisitTime(java.time.LocalDateTime.parse(visitTime.replace(" ", "T")));
+        return r;
+    }
+
+    private void givenTimedRecords(Record... records) {
+        when(recordMapper.selectList(any())).thenReturn(new ArrayList<>(List.of(records)));
     }
 
     @Test
@@ -159,5 +176,80 @@ class StandardizationReportServiceImplTest {
         assertTrue(vo.getDisclaimer().contains("不代表真实病历"),
                 "声明必须点明乙类不等于真实病历准确率");
         assertNotNull(vo.getGeneratedAt());
+    }
+
+    // ------------------------------------------------------------ 时间维度
+
+    @Test
+    @DisplayName("上下界都给：按接诊时间过滤，且排除数正确")
+    void filtersByVisitTimeWhenBothBoundsGiven() {
+        givenTimedRecords(
+                recordAt("a", "2024-03-15 09:00:00"),
+                recordAt("b", "2024-06-20 09:00:00"),
+                recordAt("c", "2025-01-10 09:00:00"));
+
+        StandardizationReportVO vo = svc.report("2024-01-01", "2024-12-31");
+
+        assertEquals(2, vo.getRange().getRecords(), "只应保留 2024 年的两条");
+        assertEquals(1, vo.getRange().getExcluded(), "被排除的就是 2025 那一条");
+        assertEquals("2024-01-01", vo.getRange().getStart());
+        assertEquals("2024-12-31", vo.getRange().getEnd());
+    }
+
+    @Test
+    @DisplayName("只给一端不算区间：按「未给」处理，返回全部（这条曾写错，返回了 131 条）")
+    void oneSidedRangeIsIgnored() {
+        givenTimedRecords(
+                recordAt("a", "2024-03-15 09:00:00"),
+                recordAt("b", "2025-01-10 09:00:00"));
+
+        // 只给 start：若被当成有效过滤，会只剩 2024 之后的部分；
+        // 项目口径（与 StatsController 一致）是「两端同时给才生效」
+        StandardizationReportVO vo = svc.report("2024-01-01", null);
+
+        assertEquals(2, vo.getRange().getRecords(),
+                "只给一端应视为不限，返回全部 —— 否则用户看到记录变少却找不到原因");
+        assertEquals(0, vo.getRange().getExcluded());
+        assertNull(vo.getRange().getStart(), "未生效的区间不应回显");
+    }
+
+    @Test
+    @DisplayName("按月分组：各组条数之和等于区间内总数")
+    void byMonthSumsToRange() {
+        givenTimedRecords(
+                recordAt("a", "2024-03-15 09:00:00"),
+                recordAt("b", "2024-03-20 09:00:00"),
+                recordAt("c", "2024-04-10 09:00:00"));
+
+        StandardizationReportVO vo = svc.report(null, null);
+
+        int sum = vo.getByMonth().stream()
+                .mapToInt(StandardizationReportVO.MonthlyBucket::getRecords).sum();
+        assertEquals(vo.getRange().getRecords(), sum, "按月求和必须等于总数，否则有记录被静默丢弃");
+        assertEquals(2, vo.getByMonth().size(), "2024-03 与 2024-04 共两组");
+        // 2024-03 有 2 条，2024-04 有 1 条 —— 分组不能把同月拆散
+        StandardizationReportVO.MonthlyBucket mar = vo.getByMonth().stream()
+                .filter(b -> "2024-03".equals(b.getMonth())).findFirst().orElseThrow();
+        assertEquals(2, mar.getRecords());
+    }
+
+    @Test
+    @DisplayName("接诊时间为空的病历不被丢弃，归入「未知」组")
+    void nullVisitTimeGoesToUnknownBucket() {
+        Record noTime = new Record();
+        noTime.setId("x");
+        noTime.setOrgId("org-A");
+        noTime.setScore(95);
+        noTime.setStructuredData("{\"symptoms\":[]}");
+        givenTimedRecords(recordAt("a", "2024-03-15 09:00:00"), noTime);
+
+        StandardizationReportVO vo = svc.report(null, null);
+
+        boolean hasUnknown = vo.getByMonth().stream()
+                .anyMatch(b -> "未知".equals(b.getMonth()));
+        assertTrue(hasUnknown, "没有接诊时间的病历要单独成组，不能静默丢掉");
+        int sum = vo.getByMonth().stream()
+                .mapToInt(StandardizationReportVO.MonthlyBucket::getRecords).sum();
+        assertEquals(2, sum, "未知组的记录也必须计入");
     }
 }

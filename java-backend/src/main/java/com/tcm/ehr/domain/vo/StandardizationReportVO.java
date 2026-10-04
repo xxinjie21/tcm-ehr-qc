@@ -65,6 +65,49 @@ public class StandardizationReportVO {
     /** 报告生成时间（yyyy-MM-dd HH:mm） */
     private String generatedAt;
 
+    /** 本次统计的时间范围（按接诊时间 visit_time） */
+    private TimeRange range = new TimeRange();
+
+    /** 按接诊月份分组的趋势；由近及远，便于看「换了词表之后有没有变好」 */
+    private List<MonthlyBucket> byMonth = new ArrayList<>();
+
+    /**
+     * 统计区间。
+     *
+     *
+     * 病历的接诊时间跨度很大（实测 2019-01 ~ 2025-12），把所有年份混在一起
+     *
+     * 看不出「换了词表之后有没有变好」—— 新词表只对重跑过解析的病历生效，
+     * 而不同批次解析的病历接诊时间往往不同。所以区间必须能看到、能切。
+     */
+    @Data
+    public static class TimeRange {
+        /** 实际生效的起止（yyyy-MM-dd）；为空表示不限 */
+        private String start;
+        private String end;
+        /** 区间内病历数 */
+        private int records;
+        /** 区间外（被本次过滤掉）的病历数，0 表示没过滤 */
+        private int excluded;
+    }
+
+    /** 按接诊月份的分组 */
+    @Data
+    public static class MonthlyBucket {
+        /** 月份（yyyy-MM） */
+        private String month;
+        /** 该月病历数 */
+        private int records;
+        /** 该月症状归一率（yyyy-MM-dd 形式为 null 时按 0 处理） */
+        private String symptomRate;
+        /** 该月平均质控分 */
+        private double avgScore;
+        /** 该月质控封顶的病历数 */
+        private int capped;
+        /** 该月「症状词表缺口」条数（补词表能解决的那部分） */
+        private int dictionaryGap;
+    }
+
     /** 单类词典的质量画像（甲类） */
     @Data
     public static class DictQuality {

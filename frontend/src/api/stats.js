@@ -15,6 +15,7 @@ export function getExtraStats(params) {
 }
 
 // 标准化质量报告（批次 24）：甲类=标准符合度（目标口径），乙类=数据集覆盖度（仅下限验证）
-export function getStandardizationReport() {
-  return request.get('/stats/standardization-report')
+// params 可传 { start, end }（接诊时间 yyyy-MM-dd）；不传即全部区间
+export function getStandardizationReport(params) {
+  return request.get('/stats/standardization-report', { params })
 }

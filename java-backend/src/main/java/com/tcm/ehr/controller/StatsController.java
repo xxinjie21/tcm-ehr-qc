@@ -44,11 +44,15 @@ public class StatsController {
      * （只用于验证词表建全与否，<b>不代表真实病历准确率</b>）。响应里的
      * disclaimer 会原样带到页面，禁止前端隐藏。</p>
      *
-     * @return 甲类标准符合度 + 乙类数据集覆盖度
+     * @param start 接诊时间起（yyyy-MM-dd），空表示不限
+     * @param end   接诊时间止（yyyy-MM-dd），空表示不限；只给一端按「未给」处理
+     * @return 甲类标准符合度 + 乙类数据集覆盖度 + 按月分组
      */
     @GetMapping("/standardization-report")
-    public Result<StandardizationReportVO> standardizationReport() {
-        return Result.ok(reportService.report());
+    public Result<StandardizationReportVO> standardizationReport(
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end) {
+        return Result.ok(reportService.report(start, end));
     }
 
     /**
