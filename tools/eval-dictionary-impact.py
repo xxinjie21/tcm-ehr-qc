@@ -39,12 +39,16 @@ PHYSICAL_SIGN = ('压痛', '触痛', '叩痛', '反跳痛')
 
 # structured_data 里的字段名 → 词典文件（与 EntityNormalizer 的字段映射一致）
 FIELD_TO_FILE = {
-    'diseases': 'diseases.json',
-    'symptoms': 'symptoms.json',
-    'patternList': 'patterns.json',
-    'herbs': 'herbs.json',
-    'formulaList': 'formulas.json',
-}
+        'diseases': 'diseases.json',
+        'symptoms': 'symptoms.json',
+        'patternList': 'patterns.json',
+        'herbs': 'herbs.json',
+        'formulaList': 'formulas.json',
+        # 批次 20 新增：舌象/脉象/治法三本词典
+        'tongueList': 'tongues.json',
+        'pulseList': 'pulses.json',
+        'treatmentList': 'treatments.json',
+    }
 # herbs 的归一目标取 name，其余取 content
 NAME_FIELD = {'herbs': 'name'}
 SCORE_THRESHOLD = 0.8

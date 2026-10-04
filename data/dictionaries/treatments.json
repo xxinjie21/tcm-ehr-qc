@@ -1,0 +1,137 @@
+[
+ {
+  "standardTerm": "解表",
+  "aliases": ["疏解表邪"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "清热",
+  "aliases": ["清热泻火", "清解里热"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "清热解毒",
+  "aliases": [],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "清热燥湿",
+  "aliases": [],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "泻下",
+  "aliases": ["攻下", "峻下"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "和解",
+  "aliases": ["和解表里", "和解少阳"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "理气",
+  "aliases": ["行气", "疏肝理气", "理气解郁"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "活血",
+  "aliases": ["活血化瘀", "行血"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "止血",
+  "aliases": [],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "化痰",
+  "aliases": ["燥湿化痰", "清热化痰"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "止咳平喘",
+  "aliases": ["降气平喘"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "安神",
+  "aliases": ["重镇安神", "养心安神"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "开窍",
+  "aliases": ["醒神开窍"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "补气",
+  "aliases": ["益气", "健脾益气"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "补血",
+  "aliases": ["养血"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "补阴",
+  "aliases": ["滋阴", "滋养阴津"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "补阳",
+  "aliases": ["温阳", "温补阳气"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "温里",
+  "aliases": ["温中", "散寒"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "祛湿",
+  "aliases": ["燥湿", "利湿", "健脾祛湿"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "利水",
+  "aliases": ["利尿", "通利小便"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "消食",
+  "aliases": ["消导"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "驱虫",
+  "aliases": [],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "固涩",
+  "aliases": ["收敛固涩"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "止痒",
+  "aliases": ["祛风止痒"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "舒筋活络",
+  "aliases": ["通络", "舒筋"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "调和气血",
+  "aliases": ["调气和血"],
+  "source": "GB/T 16751.3-2023 治法"
+ },
+ {
+  "standardTerm": "扶正祛邪",
+  "aliases": ["祛邪扶正"],
+  "source": "GB/T 16751.3-2023 治法"
+ }
+]

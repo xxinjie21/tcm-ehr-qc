@@ -1,0 +1,217 @@
+[
+ {
+  "standardTerm": "脉浮",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "脉沉",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "脉迟",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉率）"
+ },
+ {
+  "standardTerm": "脉数",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉率）"
+ },
+ {
+  "standardTerm": "脉虚",
+  "aliases": ["无力脉"],
+  "source": "中医诊断学 脉诊（脉力）"
+ },
+ {
+  "standardTerm": "脉实",
+  "aliases": ["有力脉"],
+  "source": "中医诊断学 脉诊（脉力）"
+ },
+ {
+  "standardTerm": "脉滑",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉涩",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉弦",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉紧",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉细",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉濡",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉弱",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉微",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉洪",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉大",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉小",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉促",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉率）"
+ },
+ {
+  "standardTerm": "脉结",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉率）"
+ },
+ {
+  "standardTerm": "脉代",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉率）"
+ },
+ {
+  "standardTerm": "脉疾",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉率）"
+ },
+ {
+  "standardTerm": "脉动",
+  "aliases": ["动脉"],
+  "source": "中医诊断学 脉诊（脉体）"
+ },
+ {
+  "standardTerm": "脉牢",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "脉革",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "脉散",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "脉伏",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "脉沉细无力",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉浮缓无力",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉弦劲有力",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉滑数有力",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉弦数有力",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉细数",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉弦细",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉沉紧而迟",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "脉细弱",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉象）"
+ },
+ {
+  "standardTerm": "左尺无力",
+  "aliases": ["左尺尤甚", "左尺无力明显"],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "左关尤甚",
+  "aliases": ["左关有力", "左关尤显"],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "左寸",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "左关",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "左尺",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "右寸",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "右关",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ },
+ {
+  "standardTerm": "右尺",
+  "aliases": [],
+  "source": "中医诊断学 脉诊（脉位）"
+ }
+]

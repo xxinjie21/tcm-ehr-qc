@@ -1,0 +1,216 @@
+[
+ {
+  "standardTerm": "舌淡红",
+  "aliases": ["舌质淡红"],
+  "source": "中医诊断学 舌诊（舌质）"
+ },
+ {
+  "standardTerm": "舌淡",
+  "aliases": ["舌质淡"],
+  "source": "中医诊断学 舌诊（舌质）"
+ },
+ {
+  "standardTerm": "舌红",
+  "aliases": ["舌质红"],
+  "source": "中医诊断学 舌诊（舌质）"
+ },
+ {
+  "standardTerm": "舌绛",
+  "aliases": ["舌质绛", "绛舌"],
+  "source": "中医诊断学 舌诊（舌质）"
+ },
+ {
+  "standardTerm": "舌紫",
+  "aliases": ["舌质紫", "紫舌"],
+  "source": "中医诊断学 舌诊（舌质）"
+ },
+ {
+  "standardTerm": "舌胖大",
+  "aliases": ["舌质胖大"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "舌瘦薄",
+  "aliases": ["舌质瘦薄"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "舌点刺",
+  "aliases": ["舌有瘀点", "舌有瘀斑"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "舌有瘀点",
+  "aliases": ["有瘀点", "舌红有瘀点", "舌紫有瘀点"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "舌裂纹",
+  "aliases": ["有裂纹", "舌有裂纹"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "舌齿痕",
+  "aliases": ["边有齿痕", "齿痕", "有齿痕"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "舌芒刺",
+  "aliases": ["有芒刺"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "舌强硬",
+  "aliases": ["舌强"],
+  "source": "中医诊断学 舌态（舌动）"
+ },
+ {
+  "standardTerm": "舌痿软",
+  "aliases": ["痿软舌"],
+  "source": "中医诊断学 舌态（舌动）"
+ },
+ {
+  "standardTerm": "舌颤动",
+  "aliases": ["颤动舌"],
+  "source": "中医诊断学 舌态（舌动）"
+ },
+ {
+  "standardTerm": "舌歪斜",
+  "aliases": ["歪斜舌"],
+  "source": "中医诊断学 舌态（舌动）"
+ },
+ {
+  "standardTerm": "舌吐弄",
+  "aliases": ["吐弄舌"],
+  "source": "中医诊断学 舌态（舌动）"
+ },
+ {
+  "standardTerm": "舌短缩",
+  "aliases": ["短缩舌"],
+  "source": "中医诊断学 舌态（舌动）"
+ },
+ {
+  "standardTerm": "舌淡白",
+  "aliases": ["淡白舌"],
+  "source": "中医诊断学 舌苔（苔色）"
+ },
+ {
+  "standardTerm": "舌红苔",
+  "aliases": [],
+  "source": "中医诊断学 舌苔（苔色）"
+ },
+ {
+  "standardTerm": "舌绛苔",
+  "aliases": [],
+  "source": "中医诊断学 舌苔（苔色）"
+ },
+ {
+  "standardTerm": "舌青紫苔",
+  "aliases": ["青紫舌"],
+  "source": "中医诊断学 舌苔（苔色）"
+ },
+ {
+  "standardTerm": "白苔",
+  "aliases": ["苔白"],
+  "source": "中医诊断学 舌苔（苔色）"
+ },
+ {
+  "standardTerm": "白厚苔",
+  "aliases": ["苔白厚"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "白腻苔",
+  "aliases": ["苔白腻"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "白滑苔",
+  "aliases": ["苔白滑"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "白糙苔",
+  "aliases": ["苔白糙"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "黄苔",
+  "aliases": ["苔黄"],
+  "source": "中医诊断学 舌苔（苔色）"
+ },
+ {
+  "standardTerm": "黄腻苔",
+  "aliases": ["苔黄腻"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "黄燥苔",
+  "aliases": ["苔黄燥"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "黄滑苔",
+  "aliases": ["苔黄滑"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "灰黑苔",
+  "aliases": ["灰苔", "黑苔"],
+  "source": "中医诊断学 舌苔（苔色）"
+ },
+ {
+  "standardTerm": "薄苔",
+  "aliases": ["苔薄"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "厚苔",
+  "aliases": ["苔厚"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "腻苔",
+  "aliases": ["苔腻"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "腐苔",
+  "aliases": ["苔腐", "腐腻苔"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "剥落苔",
+  "aliases": ["少苔", "无苔", "舌红少苔"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+{
+  "standardTerm": "黄燥少津苔",
+  "aliases": ["苔黄燥少津", "黄燥少津"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "白厚苔",
+  "aliases": ["苔白厚"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "薄白苔",
+  "aliases": ["苔薄白", "苔白薄"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "薄黄苔",
+  "aliases": ["苔薄黄", "苔黄薄"],
+  "source": "中医诊断学 舌苔（苔质）"
+ },
+ {
+  "standardTerm": "胖大舌",
+  "aliases": ["舌质淡胖", "舌淡胖"],
+  "source": "中医诊断学 舌诊（舌形）"
+ },
+ {
+  "standardTerm": "裂纹舌",
+  "aliases": []
+ }
+]

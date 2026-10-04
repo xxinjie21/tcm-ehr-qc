@@ -63,7 +63,7 @@ class NlpControllerTest {
         NlpExtractVO vo = NlpExtractVO.empty();
         vo.setModelAvailable(true);
         vo.getSymptoms().add(entity("咽痛"));
-        vo.getTongueList().add(entity("舌红")); // 无独立词典 → 只保留原文
+        vo.getTongueList().add(entity("舌红")); // 批次 20 起舌象有词典，会走归一
         vo.getHerbs().add(herb("双花"));
 
         PythonNlpClient client = mock(PythonNlpClient.class);
@@ -74,6 +74,10 @@ class NlpControllerTest {
                 .thenReturn(new EsTermNormalizer.NormalizeResult("咽喉痛", "中医症状词典", 3, null));
         when(termNormalizer.normalize(eq("herb"), anyString(), eq("双花")))
                 .thenReturn(new EsTermNormalizer.NormalizeResult("金银花", "中药词典", 1, "GS-001"));
+        // 舌象自批次 20 起有词典（tongues.json），与症状/中药同款走归一；
+        // 这里返回未命中，验证「查不到就保留原文、不标命中级别」而不是被丢掉
+        when(termNormalizer.normalize(eq("tongue"), anyString(), eq("舌红")))
+                .thenReturn(new EsTermNormalizer.NormalizeResult("舌红", "", 0, null));
 
         ResponseEntity<Result<NlpExtractVO>> resp =
                 controller(client, termNormalizer).extract(dto("咽痛"));
@@ -91,7 +95,8 @@ class NlpControllerTest {
         assertEquals(Integer.valueOf(1), herb.getNormLevel());
         assertEquals("GS-001", herb.getNormCode());
 
-        // 无词典字段：content 不动、不标命中级别
+        // 舌象查词未命中：content 保留原文、不标命中级别（批次 20 起舌象有词典，
+        // 与从前「无词典 → 完全不查」的差别就在这里）
         assertEquals("舌红", out.getTongueList().get(0).getContent());
         assertEquals("舌红", out.getTongueList().get(0).getSourceText());
         assertNull(out.getTongueList().get(0).getNormLevel());

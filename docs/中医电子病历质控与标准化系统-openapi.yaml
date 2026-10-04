@@ -651,7 +651,7 @@ components:
       type: object
       required: [type, terms]
       properties:
-        type: { type: string, enum: [disease, symptom, pattern, herb, formula] }
+        type: { type: string, enum: [disease, symptom, pattern, herb, formula, tongue, pulse, treatment] }
         terms:
           type: array
           description: 完整目标词典（非增量 diff）
@@ -3017,7 +3017,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [disease, symptom, pattern, herb, formula]
+            enum: [disease, symptom, pattern, herb, formula, tongue, pulse, treatment]
       responses:
         '200':
           description: 基线词条数组
@@ -3063,7 +3063,7 @@ paths:
           description: 术语类型；非法值按 4001 拒绝，与 /import、/archives 同一口径
           schema:
             type: string
-            enum: [disease, symptom, pattern, herb, formula]
+            enum: [disease, symptom, pattern, herb, formula, tongue, pulse, treatment]
       responses:
         '200':
           description: 提案列表
@@ -3122,7 +3122,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [disease, symptom, pattern, herb, formula]
+            enum: [disease, symptom, pattern, herb, formula, tongue, pulse, treatment]
       responses:
         '200':
           description: 解析结果
@@ -3271,7 +3271,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [disease, symptom, pattern, herb, formula]
+            enum: [disease, symptom, pattern, herb, formula, tongue, pulse, treatment]
       responses:
         '200':
           description: 归档版本列表
@@ -3327,7 +3327,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [disease, symptom, pattern, herb, formula]
+            enum: [disease, symptom, pattern, herb, formula, tongue, pulse, treatment]
       responses:
         '200':
           description: 已生成回滚提案

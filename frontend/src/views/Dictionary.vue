@@ -387,7 +387,18 @@ const userStore = useUserStore()
  * 表现为整个组件 setup 失败、页面白屏 —— 而 {@code vite build} 不会报错。
  * 这就是批次 12 工作项 8「TDZ 调序」要防的那类问题。</p>
  */
-const TYPE_LABELS = { disease: '疾病', pattern: '证候', symptom: '症状', herb: '中药', formula: '方剂' }
+// 术语类型的显示名；键名必须与后端 type 参数一致（EntityTypes 的 key）。
+// 批次 20 起新增舌象/脉象/治法三类 —— 后端已给这三类建词典，此处同步暴露入口。
+const TYPE_LABELS = {
+  disease: '疾病',
+  pattern: '证候',
+  symptom: '症状',
+  herb: '中药',
+  formula: '方剂',
+  tongue: '舌象',
+  pulse: '脉象',
+  treatment: '治法'
+}
 
 /** 术语类型选项（页头 radio-group 的数据源） */
 

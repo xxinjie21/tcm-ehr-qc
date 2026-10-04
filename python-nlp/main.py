@@ -42,13 +42,26 @@ LABEL_FIELD = {
 # 换数据集若写「左关尤甚」（无「脉」字）或苔色单独成列，仍会漏。见 §九 9.5 风险 1/2。
 #
 # ①  舌：字符类由「舌」扩到「舌苔」。原正则只认「舌」起头，`舌质淡红，苔薄白` 会把
-#     「苔薄白」整段丢掉（苔色、苔质是舌诊的另一半）。边界里的「、」重复了一次，无害，
-#     但要改就一并清掉。
-# ①b 脉：尾部补**脉位锚**。脉位 = 左右 + 寸关尺，是标准语义锚点（非格式锚点），
-#     故只认「左/右」，不照搬「任意逗号续接」—— 否则 `脉细，舌红` 的「舌红」会被
-#     吞进脉象。
-RULE_TONGUE = re.compile(r"[舌苔][^，。、；;\s]{1,8}")
-RULE_PULSE = re.compile(r"脉[^，。、；;\s]{1,6}(?:[，,](?:左|右)[^，。、；;\s]{1,8})?")
+#     「苔薄白」整段丢掉（苔色、苔质是舌诊的另一半）。
+# ②  舌：补**形态锚**（批次 20）。`边有齿痕`/`有裂纹`/`有瘀点` 不以「舌/苔」起头，
+#     原正则整段丢掉 —— 本数据集 500 条里 50 条含「边有齿痕」，全部丢失。
+#     这几类是舌形/舌面的标准子要素，丢掉等于该子要素完全不可分析。
+#     只认这几个固定形态词，不泛化到任意「有X」——
+#     否则「有神」「有神气」一类描述性措辞会被误当成子要素。
+#     尾部的字符组用 * 而不是 +：`有裂纹` 本身只有 3 字，尾部可能为空，
+#     用 {1,6} 会要求它后面还必须有字，反而漏掉最常见的写法。
+#     「或」连接也收（原文是「舌红少苔，或有裂纹」），输出时去掉这个连词。
+RULE_TONGUE = re.compile(r"^[舌苔][^，。、；;\s]{1,8}$")
+RULE_TONGUE_MORPH = re.compile(r"(?:或)?(?:边有|有裂纹|有瘀点|有瘀)[^，。、；;\s]{0,6}")
+# ③  脉：脉位必须**独立成段**（批次 20）。原正则把「，左尺无力」作为可选续接吞进
+#     前一段，得到 `脉细数，左尺无力` 一条 —— 脉位（左/右 + 寸关尺）是独立于脉象的
+#     标准维度，混在一起就分不出「脉细数」与「左尺无力」两个不同语义。
+#     仍只认「左/右 + 寸关尺」这几个固定锚，不照搬「任意逗号续接」——
+#     否则 `脉细，舌红` 的「舌红」会被吞进脉象。
+RULE_PULSE = re.compile(r"^脉[^，。、；;\s]{1,6}$")
+RULE_PULSE_POSITION = re.compile(r"(?:左|右)(?:寸|关|尺)[^，。、；;\s]{0,4}")
+# 按标点分段的统一切分：舌象/脉象的子要素判定依赖段边界（见 _rules 注释）
+SEG_SPLIT = re.compile(r"[，。、；;\s]+")
 RULE_TREATMENT = re.compile(r"治[以法]?[^，。；;\s]{1,10}")
 RULE_CAUSE_WORDS = ["风寒", "风热", "暑湿", "风湿", "湿热", "寒湿", "气虚", "血虚", "阴虚", "阳虚",
                     "情志", "饮食", "劳倦", "外伤", "痰", "瘀", "外感"]
@@ -205,9 +218,25 @@ def _rules(text: str) -> Dict[str, List[Entity]]:
     def ent(s):
         return Entity(content=s, sourceText=s, source="rule")
 
-    # 1. 舌象 / 脉象 / 治法走正则
-    tongue = [ent(m.group(0)) for m in RULE_TONGUE.finditer(text)]
-    pulse = [ent(m.group(0)) for m in RULE_PULSE.finditer(text)]
+    # 1. 舌象 / 脉象 / 治法走正则：按标点分段逐段判定。
+#    分段而不是整段 finditer 的原因：形态词「或」在原文里自带连接作用
+#    （「舌红少苔，或有裂纹」），只有按段判定才知道它是一段独立描述；
+#    而脉位要独立成段，也依赖段边界。
+    tongue = []
+    for seg in SEG_SPLIT.split(text):
+        if not seg:
+            continue
+        if RULE_TONGUE.match(seg) or RULE_TONGUE_MORPH.match(seg):
+            # 输出时去掉「或」连接词：它是原文的连词，不是子要素的一部分
+            tongue.append(ent(seg[1:] if seg.startswith("或") else seg))
+    # 2. 脉象：脉象本体与脉位分开成段（批次 20）。
+    #    脉位（左/右 + 寸关尺）是独立于脉象的标准维度，合在一段就分不出
+    #    「脉细数」与「左尺无力」两个语义。按标点分段后天然独立，无需额外剥离。
+    pulse = [ent(seg) for seg in SEG_SPLIT.split(text)
+             if seg and RULE_PULSE.match(seg)]
+    pulse.extend(ent(m.group(0)) for m in RULE_PULSE_POSITION.finditer(text)
+                 if m.group(0) not in [p.content for p in pulse])
+    # 脉位排在脉象之后：阅读顺序是「先读脉象，再看哪一部位异常」
     # 2. 病因走词表包含匹配；dict.fromkeys 的去重作用对此处是冗余的（RULE_CAUSE_WORDS 本身无重复项），只保证顺序与控制去重即可
     cause = [ent(w) for w in dict.fromkeys(RULE_CAUSE_WORDS) if w in text]
     treatment = [ent(m.group(0)) for m in RULE_TREATMENT.finditer(text)]

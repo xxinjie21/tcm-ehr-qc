@@ -133,7 +133,10 @@ const TYPES = [
   { value: 'pattern', label: '证候' },
   { value: 'symptom', label: '症状' },
   { value: 'herb', label: '中药' },
-  { value: 'formula', label: '方剂' }
+  { value: 'formula', label: '方剂' },
+  { value: 'tongue', label: '舌象' },
+  { value: 'pulse', label: '脉象' },
+  { value: 'treatment', label: '治法' }
 ]
 const typeLabel = (v) => (TYPES.find((t) => t.value === v) || {}).label || v
 

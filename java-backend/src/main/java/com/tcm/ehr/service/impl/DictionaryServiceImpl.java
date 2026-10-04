@@ -51,23 +51,27 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 术语查询：读词典 JSON，按关键字对标准词与别名做包含匹配。
      *
-     * <p>每次调用都直接读文件 —— 本方法只服务三处：术语词典页列表 / 输入联想 /
-     * 质控规则「期望值」下拉，都是低频请求，5 类词条合计三千余条、读文件代价可忽略。</p>
      *
-     * <p><b>两种返回模式</b>（由 {@code page} 决定）：</p>
-     * <ul>
-     *   <li>{@code page <= 0}（不分页）：返回<b>全部</b>命中词条。供质控规则下拉与
-     *       输入联想使用 —— 两者都需要完整候选集才能选到任意术语。</li>
-     *   <li>{@code page > 0}（分页）：只返回第 {@code page} 页（每页 {@code size} 条），
+     * 每次调用都直接读文件 —— 本方法只服务三处：术语词典页列表 / 输入联想 /
+     *
+     * 质控规则「期望值」下拉，都是低频请求，5 类词条合计三千余条、读文件代价可忽略。
+     *
+     *
+     * 两种返回模式（由 page 决定）：
+     *
+     * 
+     *   - page <= 0（不分页）：返回全部命中词条。供质控规则下拉与
+     *       输入联想使用 —— 两者都需要完整候选集才能选到任意术语。
+     *   - page > 0（分页）：只返回第 page 页（每页 size 条），
      *       供术语词典页翻页浏览。分页切片对越界做了双向夹取，页码超出范围返回空列表
-     *       而非抛异常（{@code subList} 越界会抛 {@code IndexOutOfBounds}）。</li>
-     * </ul>
+     *       而非抛异常（subList 越界会抛 IndexOutOfBounds）。
+     * 
      *
      * @param type    词典类型
      * @param keyword 搜索关键字，可为空（表示不过滤）
-     * @param page    页码，从 1 开始；{@code <= 0} 表示不分页、返回全部命中
-     * @param size    每页条数，仅 {@code page > 0} 时生效
-     * @return 命中词条视图：{@code terms}（standardTerm / aliases）+ {@code total}（命中总数）
+     * @param page    页码，从 1 开始；<= 0 表示不分页、返回全部命中
+     * @param size    每页条数，仅 page > 0 时生效
+     * @return 命中词条视图：terms（standardTerm / aliases）+ total（命中总数）
      * @throws IOException 词典文件读取失败
      */
     public Map<String, Object> searchTerms(String type, String keyword, int page, int size)
@@ -110,11 +114,15 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 词典导入：解析上传文件 -> 与现有词典合并去重 -> 备份 -> 覆盖写文件 -> 全量重建 ES 索引。
      *
-     * <p>按扩展名分流：JSON 走直传解析，Excel/CSV 走表格解析。合并以标准术语为键，
-     * 同词条合并别名并保留已有的 source / code。</p>
      *
-     * <p>索引重建失败会触发补偿：把文件退回导入前版本并尽力重建旧索引，之后仍抛异常 ——
-     * 避免出现「文件已更新、索引未建起」导致归一结果与词典页长期不一致。</p>
+     * 按扩展名分流：JSON 走直传解析，Excel/CSV 走表格解析。合并以标准术语为键，
+     *
+     * 同词条合并别名并保留已有的 source / code。
+     *
+     *
+     * 索引重建失败会触发补偿：把文件退回导入前版本并尽力重建旧索引，之后仍抛异常 ——
+     *
+     * 避免出现「文件已更新、索引未建起」导致归一结果与词典页长期不一致。
      *
      * @param type 词典类型
      * @param file 上传文件（.json / .xlsx / .xls / .csv）
@@ -147,9 +155,11 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 导入到指定组织层（批次 17）。
      *
-     * <p>原实现固定用 {@code currentOrgId()}，管理员无法写基础层；这里把落库目标
-     * 提为参数，{@code orgId=""} 即基础层。提案合并走的是 {@code termStore.replace}
-     * 而不是本方法 —— 本方法带「合并语义 + 自动归档」，那是管理员直写专用通道。</p>
+     *
+     * 原实现固定用 currentOrgId()，管理员无法写基础层；这里把落库目标
+     *
+     * 提为参数，orgId="" 即基础层。提案合并走的是 termStore.replace
+     * 而不是本方法 —— 本方法带「合并语义 + 自动归档」，那是管理员直写专用通道。
      */
     @Override
     public ImportResultVO importDictionary(String type, MultipartFile file, String orgId)
@@ -229,11 +239,15 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * ES 重建失败后的补偿：把库内容退回导入前的版本，再尽力把索引也建回旧版本。
      *
-     * <p>两步都可能再失败 —— 那时只记日志，不掩盖最初的异常（调用方会把它抛出去）。
-     * 无备份（首次导入、本组织原先没有词条）时用 {@code previous} 写回，通常是空列表。</p>
      *
-     * <p>关键：补偿路径<b>不会</b>把失败的那个版本记为已同步。记了就等于谎报，
-     * 启动对账会跳过重建，归一会永远停在这一版错误的数据上。</p>
+     * 两步都可能再失败 —— 那时只记日志，不掩盖最初的异常（调用方会把它抛出去）。
+     *
+     * 无备份（首次导入、本组织原先没有词条）时用 previous 写回，通常是空列表。
+     *
+     *
+     * 关键：补偿路径不会把失败的那个版本记为已同步。记了就等于谎报，
+     *
+     * 启动对账会跳过重建，归一会永远停在这一版错误的数据上。
      */
     private void compensateFailedRebuild(String type, String orgId,
                                          List<TermEntry> previous, String failedVersion) {
@@ -429,8 +443,11 @@ public class DictionaryServiceImpl implements IDictionaryService {
             case "pattern" -> "中医病证分类与代码 GB/T 15657-2021";
             case "symptom" -> "中医临床诊疗术语 症状";
             case "herb" -> "中国药典2025年版";
-            case "formula" -> "中医方剂大辞典";
-            default -> "";
+case "formula" -> "中医方剂大辞典";
+                case "tongue" -> "中医诊断学 舌象";
+                case "pulse" -> "中医诊断学 脉象";
+                case "treatment" -> "GB/T 16751.3-2023 治法";
+                default -> "";
         };
     }
 

@@ -8,11 +8,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 实体类型目录：结构化解析 / 术语词典 / 质控规则 三模块的<b>单一来源</b>。
+ * 实体类型目录：结构化解析 / 术语词典 / 质控规则 三模块的单一来源。
  *
- * <p>固定 9 类（对齐 NLP 可抽取的实体）；其中 {@code dict=true} 的 5 类有独立术语词典
- * （疾病/证候/症状/中药/方剂），其余 4 类（舌象/脉象/病因/治法）仅结构化展示、不建词典。
- * <b>不落盘、不做用户自定义</b>——词典范围限定在 NLP 能提取的实体。</p>
+ *
+ * 固定 9 类（对齐 NLP 可抽取的实体）。批次 20 起有词典的是 8 类
+ *
+ * （疾病/证候/症状/中药/方剂/舌象/脉象/治法），病因仍无词典（依赖规则词表）。
+ * 不落盘、不做用户自定义——词典范围限定在 NLP 能提取的实体。
+ *
+ *
+ * ⚠️ 新增词典类型不会改变质控扣分口径：计分只认
+ *
+ * QcScorer.keyOf() 里硬编码的 5 类，新类型落到 default -> null
+ * 后按 0 条未命中处理（详见《多批次实施计划》批次 20 与 §0.0b）。
  */
 public final class EntityTypes {
 
@@ -46,13 +54,18 @@ public final class EntityTypes {
                     List.of("prescription"), 4),
             new EntityType("formula", "方剂", "formulaList", true, "formulas.json",
                     List.of(), 5),
-            new EntityType("tongue", "舌象", "tongueList", false, null,
+            // 舌象/脉象/治法自批次 20 起有词典（此前 dict=false）：
+            // 子要素先由 python-nlp 按标点分段抽成独立段（舌质/舌苔/齿痕/裂纹、
+            // 脉位与脉象分开），再在这里按 GB/T 47335.1/.2-2026、GB/T 16751.3-2023
+            // 归一到标准术语；抽不到或词表未收录的段保留原文，不算未归一扣分
+            // （QcScorer.keyOf 只映射原 5 类，新类型落 default -> null）。
+            new EntityType("tongue", "舌象", "tongueList", true, "tongues.json",
                     List.of("tongue"), 6),
-            new EntityType("pulse", "脉象", "pulseList", false, null,
+            new EntityType("pulse", "脉象", "pulseList", true, "pulses.json",
                     List.of("pulse"), 7),
             new EntityType("cause", "病因", "causeList", false, null,
                     List.of(), 8),
-            new EntityType("treatment", "治法", "treatmentList", false, null,
+            new EntityType("treatment", "治法", "treatmentList", true, "treatments.json",
                     List.of(), 9)
     );
 
@@ -96,7 +109,7 @@ public final class EntityTypes {
         return out;
     }
 
-    /** 按类型 key 取类型定义；key 为 {@code null} 或未登记时返回 {@code null}，调用方需自行兜底 */
+    /** 按类型 key 取类型定义；key 为 null 或未登记时返回 null，调用方需自行兜底 */
     public static EntityType byKey(String key) {
         return key == null ? null : BY_KEY.get(key);
     }
