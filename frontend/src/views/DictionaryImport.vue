@@ -8,6 +8,24 @@
         · 管理员 → 还可选择「直接生效」写进小组基线（特权通道，不走审核）
       成员若想把本地词表推广给小组：到「词典」页 →「我的词典」提交提案，组长审核后合并。
     -->
+    <!-- 导入后的重跑引导（批次 21）：
+         词表改了不等于归一结果改了 —— structured_data 是解析时写下的快照。
+         不说清楚，用户会以为「导入没生效」，然后反复重传同一个文件。 -->
+    <div v-if="rerunNeeded" class="rerun-hint">
+      <div class="rh-title">词表已生效，但还需要重跑一次解析</div>
+      <div class="rh-desc">
+        术语归一的结果存在每条病历的结构化字段里，是<b>解析那一刻算好就固定下来的</b>。
+        刚导入的新词条不会自动套到已有病历上 —— 必须重跑「结构化解析 + 质控」才会生效。
+      </div>
+      <div class="rh-ops">
+        <el-button type="primary" size="small" :loading="rerunning" @click="rerunAll">
+          立即重跑解析与质控
+        </el-button>
+        <router-link class="rh-link" to="/standardization-report">查看质量报告</router-link>
+        <span class="rh-skip">稍后再说（可随时回来重跑）</span>
+      </div>
+    </div>
+
     <PanelCard title="批量导入词典">
       <!-- 第一步：选类型 -->
       <div class="step">
@@ -145,6 +163,8 @@ import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
 import { importDict, parseDictFile } from '@/api/dictionary'
+import { submitNlpBatch } from '@/api/nlp'
+import { recomputeQc } from '@/api/qc'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
 
@@ -170,6 +190,9 @@ const submitting = ref(false)
 const result = ref(null)
 /** 词表体检结果（批次 21），来自 /parse 响应的 lint 段 */
 const lint = ref(null)
+/** 导入完成后置位：提示需要重跑解析，mode=direct 时才提示（本地词典不影响基线） */
+const rerunHint = ref(null)
+const rerunning = ref(false)
 const type = ref('herb')
 // local = 并入本机个人词典（所有人）；direct = 直接写小组基线（仅管理员）
 const mode = ref(isAdmin.value ? 'direct' : 'local')
@@ -306,19 +329,81 @@ const handleSubmit = async () => {
         failed: (res.data?.failures ?? []).length,
         failures: res.data?.failures ?? []
       }
-      ElMessage.success(`已并入本机个人词典（新增 ${added} 条）`)
+        ElMessage.success(`已并入本机个人词典（新增 ${added} 条）`)
+      }
+      // 导入完成了，但要提醒「词表变了不等于归一结果变了」——
+      // structured_data 是抽取时写下的快照，不重跑解析，新词条不会生效。
+      rerunHint.value = { mode: direct ? 'direct' : 'local', at: new Date().toLocaleString() }
+      uploadRef.value?.clearFiles()
+      importFile.value = null
+    } catch {
+      // 拦截器已提示
+    } finally {
+      submitting.value = false
     }
-    uploadRef.value?.clearFiles()
-    importFile.value = null
-  } catch {
-    // 拦截器已提示
-  } finally {
-    submitting.value = false
   }
-}
-</script>
+
+  // ---- 导入后的重跑引导 ----
+  // 「本机个人词典」只影响这台浏览器上的个人用词，不影响小组基线，
+  // 因此不需要（也不应该）在这里提示重跑；只有落到小组基线的那条路径才需要。
+  const rerunNeeded = computed(() => rerunHint.value?.mode === 'direct')
+
+  const rerunAll = async () => {
+    if (!(await confirmBox(
+      '将对本组织全部病历重跑「结构化解析 + 质控」。新词表要生效必须重跑：'
+      + '解析结果存在病历的结构化字段里，不重跑就还是旧的。',
+      '确认重跑解析与质控',
+      { type: 'warning', confirmButtonText: '开始重跑', cancelButtonText: '取消' }
+    ))) return
+    rerunning.value = true
+    try {
+      await submitNlpBatch()
+      await recomputeQc()
+      ElMessage.success('已提交重跑任务，完成后到「标准化质量报告」查看新结果')
+      rerunHint.value = null
+    } catch {
+      // 拦截器已提示
+    } finally {
+      rerunning.value = false
+    }
+  }
+  </script>
 
 <style scoped>
+/* 导入后的重跑引导：说清「为什么要重跑」，否则用户会以为导入没生效而反复重传 */
+.rerun-hint {
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-3);
+  border-left: 3px solid var(--ochre);
+  background: var(--ochre-surface);
+  border-radius: 4px;
+}
+.rh-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.rh-desc {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-sub);
+}
+.rh-ops {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--sp-2);
+}
+.rh-link {
+  font-size: 12.5px;
+  color: var(--link, #2b6cb0);
+}
+.rh-skip {
+  font-size: 12px;
+  color: var(--text-sub);
+}
 /* 步骤条：序号圆点 + 标题 + 说明，降低「不知道下一步做什么」的成本 */
 .step {
   display: flex;

@@ -1,5 +1,31 @@
 <template>
   <div class="std-report">
+    <!-- 质控未完成时先挡一道：报告里的分数分布与封顶率都来自 qc_results，
+         质控没跟上就展示结论等于拿旧数据误导人。 -->
+    <div v-if="!qcComplete" class="gate">
+      <div class="gate-icon">!</div>
+      <div class="gate-body">
+        <div class="gate-title">质控评分还没跑完，现在的数字不可信</div>
+        <div class="gate-desc">
+          本组织 {{ qcTotal }} 条病历中，有 {{ qcScored }} 条已完成质控评分。
+          报告里的「评分区分度」「扣分封顶」都来自质控结果，
+          <b>质控完成后报告才有意义</b>，否则这些数字是上一次的结果。
+        </div>
+        <div class="gate-ops">
+          <el-button type="primary" size="small" :loading="rerunning" @click="rerunQc">
+            立即重跑质控
+          </el-button>
+          <el-button size="small" :loading="rerunning" @click="rerunAll">
+            重跑「解析 + 质控」
+          </el-button>
+          <span v-if="qcLast" class="tip">上次完成：{{ qcLast }}</span>
+        </div>
+        <div class="gate-note">
+          只想看词典建设进度（甲类），可继续往下看 —— 那部分与质控无关。
+        </div>
+      </div>
+    </div>
+
     <!-- 数据来源提示：放在顶部但用轻量样式，不用刺眼的告警条。
          这批数据只有 10 个模板，数字不能当真实病历性能看，但也不该拦住用户往下读。 -->
     <div class="src-note">
@@ -90,8 +116,14 @@
           <el-table-column prop="label" label="类型" width="90" />
           <el-table-column prop="total" label="抽取到" width="100" align="right" />
           <el-table-column prop="normalized" label="已归一" width="100" align="right" />
+          <el-table-column prop="termCount" label="词条数" width="90" align="right" />
           <el-table-column label="归一率" min-width="110">
             <template #default="{ row }">{{ row.rate }}</template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="150">
+            <template #default="{ row }">
+              <span v-if="row.stale" class="stale-tag">解析早于词表，需重跑</span>
+            </template>
           </el-table-column>
         </el-table>
       </el-collapse-item>
@@ -103,6 +135,10 @@
         </template>
         <div class="misc-grid">
           <div><span>报告时间</span><b>{{ report?.generatedAt || '—' }}</b></div>
+          <div>
+            <span>质控完成</span>
+            <b>{{ qcScored }} / {{ qcTotal }}{{ qcLast ? `（${qcLast}）` : '' }}</b>
+          </div>
           <div><span>病历总数</span><b>{{ report?.dataset?.recordCount ?? 0 }}</b></div>
           <div><span>主诉写法种类</span><b>{{ report?.dataset?.chiefComplaintTemplates ?? 0 }}</b></div>
           <div><span>来自患者口语的记录</span><b>{{ report?.dataset?.recordsWithColloquialSymptom ?? 0 }}</b></div>
@@ -129,15 +165,69 @@
 //   ③ 明细默认收起，需要时再展开。
 // 技术口径（甲类/乙类、normLevel、可归一实体）只在本文件内部使用，不出现在界面上。
 import { ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import { getStandardizationReport } from '@/api/stats'
+import { submitNlpBatch as submitExtractBatch } from '@/api/nlp'
+import { recomputeQc as submitQcBatch } from '@/api/qc'
 import { saveBlob } from '@/utils/download'
 
 const report = ref(null)
 const loading = ref(false)
 const exporting = ref(false)
+const rerunning = ref(false)
 
 const pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : '—')
+
+// ---------------- 质控完成度（决定报告有没有意义）
+const qc = computed(() => report.value?.qc || {})
+const qcComplete = computed(() => qc.value.complete === true)
+const qcTotal = computed(() => qc.value.total ?? 0)
+const qcScored = computed(() => qc.value.scored ?? 0)
+const qcLast = computed(() => qc.value.lastScoredAt || '')
+
+/** 批量重跑：质控 / 解析都可能有几千条，必须先让人确认范围 */
+async function confirmRerun(what, countHint) {
+  try {
+    await ElMessageBox.confirm(
+      `将对本组织全部病历重跑${what}。${countHint ? `当前数据域内约 ${countHint} 条。` : ''}`
+      + '任务在后台执行，期间可以离开页面，进度在对应页面查看。',
+      `确认重跑${what}`,
+      { type: 'warning', confirmButtonText: `重跑${what}`, cancelButtonText: '取消' }
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+const rerunQc = async () => {
+  if (!(await confirmRerun('质控评分', qcTotal.value))) return
+  rerunning.value = true
+  try {
+    const res = await submitQcBatch()
+    ElMessage.success(res.msg || '质控重跑已提交，完成后刷新本页即可看到新结果')
+  } catch {
+    // 拦截器已提示
+  } finally {
+    rerunning.value = false
+  }
+}
+
+const rerunAll = async () => {
+  if (!(await confirmRerun('结构化解析与质控', qcTotal.value))) return
+  rerunning.value = true
+  try {
+    // 先解析后质控：词表变了要重新归一，否则质控拿的还是旧 structured_data
+    await submitExtractBatch()
+    const res = await submitQcBatch()
+    ElMessage.success(res.msg || '解析与质控已提交，完成后刷新本页即可看到新结果')
+  } catch {
+    // 拦截器已提示
+  } finally {
+    rerunning.value = false
+  }
+}
 
 /**
  * 找出「最该补词表」的类型。
@@ -265,15 +355,34 @@ const todos = computed(() => {
   if (!d) return []
   const u = d.unmatched || {}
   const list = []
+  const b = bottleneck.value
+
+  // ① 先说「解析早于词表建立」—— 它排在最前不是因为最严重，
+  //    而是因为它会让后面所有词表相关的判断都失真：不重跑解析，
+  //    你在这页看到的归一率全是旧的，补词表的效果也验证不了。
+  if (staleTypes.value.length) {
+    const names = staleTypes.value.map((c) => `${c.label}（${c.termCount} 词）`).join('、')
+    list.push({
+      title: '重跑结构化解析',
+      desc: `${names} 的词表已经有词、也抽到了实体，却一条都没归上 —— `
+        + `说明这些结构化数据是在词表建好之前算出来的。`
+        + `不重跑解析，下面几条的效果都验证不了。`,
+      owner: '抽取',
+      tagType: 'warning'
+    })
+  }
 
   if (u.dictionaryGap > 0) {
-    const b = bottleneck.value
+    const real = realGapTypes.value
+    const realTotal = real.reduce((a, c) => a + (c.total - c.normalized), 0)
     list.push({
       title: b ? `补充${b.label}标准词表` : '补充标准词表',
-      desc: b
-        ? `按国家/行业标准术语集补录，不从现有数据反推。当前${b.label}只有 ${b.termCount} 条词，`
-          + `补齐后可解决 ${b.unmatched} 条未归一；全部词表缺口合计 ${u.dictionaryGap} 条。`
-        : `按国家/行业标准术语集补录，合计 ${u.dictionaryGap} 条实体因词表未收录而无法归一。`,
+      desc: `按国家/行业标准术语集补录，不从现有数据反推。`
+        + `症状类现有 ${b ? b.termCount : 72} 条词，`
+        + (real.length > 1
+          ? `而未归一的 ${realTotal} 条分布在 ${real.map((c) => c.label).join('、')}。`
+          : `未归一的 ${u.dictionaryGap} 条属于这一类。`)
+        + '补完后需重跑解析才能看到效果。',
       owner: '词表',
       tagType: 'warning'
     })
@@ -307,7 +416,7 @@ const todos = computed(() => {
       tagType: 'warning'
     })
   }
-  const selfAlias = (d.dictQuality || []).reduce((a, b) => a + (b.selfAliasCount || 0), 0)
+  const selfAlias = (d.dictQuality || []).reduce((a, b2) => a + (b2.selfAliasCount || 0), 0)
   if (selfAlias > 0) {
     list.push({
       title: '清理重复别名',
@@ -335,8 +444,21 @@ const coverageRows = computed(() =>
     label: c.label,
     total: c.total,
     normalized: c.normalized,
+    termCount: c.termCount,
+    stale: c.suspectedStaleExtraction,
     rate: c.total ? pct(c.normalized, c.total) : '未抽取'
   }))
+)
+
+/** 词表非空、也抽到了实体，却一条都没归上 —— 这是解析早于词表建立，补词表无效 */
+const staleTypes = computed(() =>
+  (report.value?.coverage || []).filter((c) => c.suspectedStaleExtraction)
+)
+
+/** 真正的「词表没收录」：排除了上述那类，剩下的才是补词表能解决的 */
+const realGapTypes = computed(() =>
+  (report.value?.coverage || [])
+    .filter((c) => c.total > 0 && !c.suspectedStaleExtraction && c.total - c.normalized > 0)
 )
 
 const scoreRange = computed(() => {
@@ -402,6 +524,53 @@ onMounted(loadReport)
 </script>
 
 <style scoped>
+/* 质控未完成时的拦截提示：这是「结论不可信」的告知，不是报错 */
+.gate {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-3);
+  border-left: 3px solid var(--ochre);
+  background: var(--ochre-surface);
+  border-radius: 4px;
+}
+.gate-icon {
+  flex: 0 0 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--ochre);
+  color: var(--surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+.gate-body { flex: 1 1 auto; min-width: 0; }
+.gate-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.gate-desc {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-sub);
+}
+.gate-ops {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--sp-2);
+}
+.gate-note {
+  margin-top: var(--sp-2);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-sub);
+}
 /* 数据来源提示：轻量，不拦截阅读 */
 .src-note {
   display: flex;
@@ -564,6 +733,16 @@ onMounted(loadReport)
 .misc-grid span { color: var(--text-sub); margin-right: 6px; }
 .misc-grid b { color: var(--ink); font-weight: 600; }
 .warn { color: var(--ochre); font-weight: 600; }
+/* 「解析早于词表」标记：这一种补词表无效，得重跑解析，所以要显式标出来 */
+.stale-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--ochre-surface);
+  color: var(--ochre);
+  font-size: 12px;
+  font-weight: 600;
+}
 .foot {
   display: flex;
   gap: var(--sp-2);

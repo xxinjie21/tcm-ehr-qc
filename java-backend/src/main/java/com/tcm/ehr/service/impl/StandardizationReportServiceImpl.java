@@ -69,6 +69,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setUnmatched(unmatched(records, new HashSet<>(symptomTerms())));
         vo.setNormalizable(normalizableRate(records, new HashSet<>(symptomTerms())));
         vo.setScore(scoreDistribution(records));
+        vo.setQc(qcCoverage(records));
         vo.setDataset(datasetShape(records));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
@@ -163,6 +164,19 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 continue;
             }
             byField.values().forEach(c -> countEntities(c, sd.get(c.getField())));
+        }
+        // 标出「解析早于词表建立」的类型：词表非空且抽到了实体，却一条都没归上。
+        // 这一种补词表无效，只能重跑解析 —— 与真正的词表缺口必须分开说。
+        String orgId = RequestUtils.currentOrgId();
+        for (EntityTypes.EntityType t : EntityTypes.all()) {
+            StandardizationReportVO.TypeCoverage c = byField.get(t.structuredKey());
+            if (c == null) {
+                continue;
+            }
+            if (t.dict()) {
+                c.setTermCount(termStore.readEffective(orgId, t.key()).size());
+            }
+            c.setSuspectedStaleExtraction(c.getTermCount() > 0 && c.getTotal() > 0 && c.getNormalized() == 0);
         }
         return new ArrayList<>(byField.values());
     }
@@ -295,6 +309,40 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             d.setAvg(Math.round(sum * 10.0 / scored) / 10.0);
         }
         return d;
+    }
+
+    /**
+     * 质控完成度。
+     *
+     *
+     * 判据不是「有没有 qc_results」而是「qc_results 里的 score 与 records.score 是否一致」：
+     *
+     * 病历重新导入或重跑解析后，score 可能已变而 qc_results 还是上一次的结果，
+     * 那种情况下报告里的分数分布与扣分构成全是旧口径。
+     */
+    private StandardizationReportVO.QcCoverage qcCoverage(List<Record> records) {
+        StandardizationReportVO.QcCoverage c = new StandardizationReportVO.QcCoverage();
+        c.setTotal(records.size());
+        LocalDateTime latest = null;
+        for (Record r : records) {
+            Map<String, Object> qc = parseJson(r.getQcResults());
+            if (qc == null || r.getScore() == null) {
+                continue;
+            }
+            Object scoreInQc = qc.get("score");
+            if (scoreInQc instanceof Number n && n.intValue() == r.getScore()) {
+                c.setScored(c.getScored() + 1);
+                if (r.getUpdateTime() != null
+                        && (latest == null || r.getUpdateTime().isAfter(latest))) {
+                    latest = r.getUpdateTime();
+                }
+            }
+        }
+        c.setComplete(c.getTotal() > 0 && c.getScored() == c.getTotal());
+        if (latest != null) {
+            c.setLastScoredAt(latest.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        }
+        return c;
     }
 
     /** 数据集形态：模板塌缩度决定这批数据能不能代表真实病历 */

@@ -109,6 +109,15 @@ components:
           nullable: true
           example: null
     # ========== 共享数据模型（跨请求/响应复用，非 PO） ==========
+    QcCoverage:
+      type: object
+      description: 质控完成度。报告里的分数与扣分来自 qc_results（质控跑完时写下的结果），质控未完成时这些数字是旧口径，页面应先提示重跑质控再展示结论
+      properties:
+        total: { type: integer, description: 数据域内病历总数 }
+        scored: { type: integer, description: 已完成质控评分的病历数 }
+        complete: { type: boolean, description: 是否已全部完成 }
+        lastScoredAt: { type: string, description: 最近一次质控完成时间 }
+
     DictionaryLint:
       type: object
       description: 词表质量体检结果（批次 21）。同名重复等硬错误会导致导入静默少词或播种整批失败，必须入库前发现
@@ -200,6 +209,8 @@ components:
             min: { type: integer }
             max: { type: integer }
             avg: { type: number, format: double }
+        qc:
+          $ref: '#/components/schemas/QcCoverage'
         dataset:
           type: object
           description: 乙类·数据集形态（模板塌缩度决定能否代表真实病历）
