@@ -55,6 +55,7 @@ public class DictionaryController {
     private final IDictionaryService dictionaryService;
     private final DictProposalService proposalService;
     private final DictArchiveService archiveService;
+    private final com.tcm.ehr.service.IDictionaryLintService lintService;
     private final OperationLogger operationLogger;
 
     /**
@@ -143,9 +144,13 @@ public class DictionaryController {
      * Excel 需服务端 POI 解析（浏览器无 xlsx 能力），故放在这里而非纯前端。
      *
      *
+     * 响应里一并带上词表体检结果（批次 21）：同名重复、别名含标准词、编码形态等
+     * 都是导入不会报错的缺陷，只在这里指出来最合适 —— 用户正准备入库，
+     * 看到提示还能改；等入库后再查，脏数据已经进库并进了 ES 索引。
+     *
      * @param file 词典文件（.xlsx/.xls/.csv/.json）
      * @param type 术语类型
-     * @return { terms: [{standardTerm, code, source, aliases}], failures: [{row, reason}] }
+     * @return { terms: [{standardTerm, code, source, aliases}], failures: [{row, reason}], lint: {...} }
      */
     @PostMapping("/parse")
     public ResponseEntity<Result<Map<String, Object>>> parse(
@@ -166,7 +171,27 @@ public class DictionaryController {
         }
         return ResponseEntity.ok(Result.ok(Map.of(
                 "terms", terms,
-                "failures", parsed.failures)));
+                "failures", parsed.failures,
+                // 体检是纯计算，失败不该拦住「看看文件里有什么」，故降级为空结果
+                "lint", safeLint(type, parsed.terms))));
+    }
+
+    /**
+     * 体检失败不阻断解析。
+     *
+     *
+     * 体检只是「提醒」，如果它自己抛异常就把整个解析带崩，用户连文件内容都看不到 ——
+     *
+     * 那是本末倒置。所以这里兜住并返回一份空结论，让用户至少能下载/查看解析结果。
+     */
+    private Object safeLint(String type, List<TermEntry> terms) {
+        try {
+            return lintService.lint(type, terms);
+        } catch (Exception e) {
+            com.tcm.ehr.domain.vo.DictionaryLintVO empty = new com.tcm.ehr.domain.vo.DictionaryLintVO();
+            empty.setTotal(terms == null ? 0 : terms.size());
+            return empty;
+        }
     }
 
     /**

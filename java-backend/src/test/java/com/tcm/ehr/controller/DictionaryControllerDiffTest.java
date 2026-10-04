@@ -55,6 +55,8 @@ class DictionaryControllerDiffTest {
                 mock(IDictionaryService.class),
                 proposalService,
                 mock(DictArchiveService.class),
+                // 批次 21 起 controller 多一个词表体检依赖（/parse 用它出 lint 结论）
+                mock(com.tcm.ehr.service.IDictionaryLintService.class),
                 mock(OperationLogger.class));
     }
 

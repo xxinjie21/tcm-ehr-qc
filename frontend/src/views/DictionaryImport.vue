@@ -81,20 +81,40 @@
         </div>
       </div>
 
-      <div v-if="result" class="import-result">
-        <StatCard label="文件解析" :value="result.parsed" />
-        <StatCard v-if="result.failed > 0" label="解析失败" :value="result.failed" tone="red" />
-        <StatCard v-if="result.added != null" label="本地新增" :value="result.added" />
-        <div class="what-next">
-          <b>接下来会怎样：</b>{{ nextStepText }}
-        </div>
-        <div v-if="result.failures?.length" class="failures">
-          <div class="ded-hd">解析失败的行（这些不会被导入）</div>
-          <div v-for="(f, i) in result.failures" :key="i" class="ded-item">
-            第 {{ f.row }} 行：{{ f.reason }}
+<div v-if="result" class="import-result">
+          <StatCard label="文件解析" :value="result.parsed" />
+          <StatCard v-if="result.failed > 0" label="解析失败" :value="result.failed" tone="red" />
+          <StatCard v-if="result.added != null" label="本地新增" :value="result.added" />
+          <div class="what-next">
+            <b>接下来会怎样：</b>{{ nextStepText }}
+          </div>
+
+          <!-- 词表体检（批次 21）：这些问题导入时不会报错，
+               但会让词条悄悄变少或归一失效，所以在这里指出来 -->
+          <div v-if="lintIssues.length" class="lint">
+            <div class="lint-hd">
+              词表体检：{{ lintErrors.length }} 项需要修改，{{ lintWarnings.length }} 项建议确认
+            </div>
+            <div v-for="(it, i) in lintIssues" :key="i" class="lint-item" :class="it.level">
+              <div class="lint-top">
+                <el-tag size="small" :type="it.level === 'error' ? 'danger' : 'warning'" effect="plain">
+                  {{ it.level === 'error' ? '需修改' : '建议确认' }}
+                </el-tag>
+                <span class="lint-msg">{{ it.message }}</span>
+                <span v-if="it.count > 1" class="lint-count">（{{ it.count }} 条）</span>
+              </div>
+              <div v-if="it.terms" class="lint-terms">{{ it.terms }}</div>
+              <div v-if="it.advice" class="lint-advice">{{ it.advice }}</div>
+            </div>
+          </div>
+
+          <div v-if="result.failures?.length" class="failures">
+            <div class="ded-hd">解析失败的行（这些不会被导入）</div>
+            <div v-for="(f, i) in result.failures" :key="i" class="ded-item">
+              第 {{ f.row }} 行：{{ f.reason }}
+            </div>
           </div>
         </div>
-      </div>
     </PanelCard>
 
     <PanelCard title="格式示例">
@@ -148,6 +168,8 @@ const dictFileList = ref([])
 const importFile = ref(null)
 const submitting = ref(false)
 const result = ref(null)
+/** 词表体检结果（批次 21），来自 /parse 响应的 lint 段 */
+const lint = ref(null)
 const type = ref('herb')
 // local = 并入本机个人词典（所有人）；direct = 直接写小组基线（仅管理员）
 const mode = ref(isAdmin.value ? 'direct' : 'local')
@@ -169,6 +191,19 @@ const nextStepText = computed(() => {
   }
   return '到「词典」页 →「我的词典」可查看这些词；如想推广给小组，在那里点「提交提案」，组长审核通过后才会进入小组基线。'
 })
+
+// 词表体检（批次 21）：优先取后端已排好序的 topIssues，没有就退回 errors+warnings。
+// 用 topIssues 是因为它按「影响条数」降序 —— 界面上第一条永远是覆盖面最大、
+// 改一处能消掉一大片的那条，而不是按检查顺序流水账。
+const lintIssues = computed(() => {
+  if (!lint.value) return []
+  if (Array.isArray(lint.value.topIssues) && lint.value.topIssues.length) {
+    return lint.value.topIssues
+  }
+  return [...(lint.value.errors || []), ...(lint.value.warnings || [])]
+})
+const lintErrors = computed(() => lint.value?.errors?.length || 0)
+const lintWarnings = computed(() => lint.value?.warnings?.length || 0)
 
 // 个人词典在 localStorage，键与词典页「我的词典」保持一致
 const localKey = () => `dict.local.${userStore.orgId || 'base'}.${type.value}`
@@ -200,13 +235,16 @@ function mergeIntoLocal(terms) {
 }
 
 const onFileChange = (file) => {
-  importFile.value = file
-  result.value = null
-}
-const onFileRemove = () => {
-  importFile.value = null
-  result.value = null
-}
+    importFile.value = file
+    result.value = null
+    // 换文件就清掉上一份的体检结果，否则会误以为是新文件的问题
+    lint.value = null
+  }
+  const onFileRemove = () => {
+    importFile.value = null
+    result.value = null
+    lint.value = null
+  }
 const onFileExceed = (files) => {
   uploadRef.value?.clearFiles()
   const f = files[0]
@@ -244,22 +282,25 @@ const handleSubmit = async () => {
         failures: res.data?.failures ?? []
       }
       ElMessage.success(res.msg || '已导入并生效')
-    } else {
-      const res = await parseDictFile(form, type.value)
-      const terms = res.data?.terms ?? []
-      if (!terms.length) {
-        ElMessage.warning('文件里没有解析出任何术语，请检查首列「标准术语」是否为空')
-        return
-      }
-      let added
-      try {
-        added = mergeIntoLocal(terms)
-      } catch (e) {
-        // localStorage 满 / 隐私模式：明确告知没存进去，不假装成功
-        ElMessage.warning('本机存储不可用或已满，导入未能保存')
-        return
-      }
-      result.value = {
+      } else {
+        const res = await parseDictFile(form, type.value)
+        const terms = res.data?.terms ?? []
+        // 先把体检结果挂上：即便后面因为「没解析出词条」提前返回，
+        // 用户也能看到问题出在哪，而不是只得到一句「没有术语」
+        lint.value = res.data?.lint ?? null
+        if (!terms.length) {
+          ElMessage.warning('文件里没有解析出任何术语，请检查首列「标准术语」是否为空')
+          return
+        }
+        let added
+        try {
+          added = mergeIntoLocal(terms)
+        } catch (e) {
+          // localStorage 满 / 隐私模式：明确告知没存进去，不假装成功
+          ElMessage.warning('本机存储不可用或已满，导入未能保存')
+          return
+        }
+        result.value = {
         parsed: terms.length,
         added,
         failed: (res.data?.failures ?? []).length,
@@ -329,6 +370,58 @@ const handleSubmit = async () => {
 }
 .import-result {
   margin-top: var(--sp-4);
+}
+/* 词表体检（批次 21）：问题清单。错误与警告用左侧色条区分，不用整块红黄底 ——
+   整块底色会让人以为「导入失败了」，其实多数条目仍会正常导入 */
+.lint {
+  margin-top: var(--sp-3);
+}
+.lint-hd {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: var(--sp-2);
+}
+.lint-item {
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-2);
+  border-left: 3px solid var(--line);
+  background: var(--surface-sub);
+  border-radius: 0 4px 4px 0;
+}
+.lint-item.error {
+  border-left-color: var(--danger);
+}
+.lint-item.warning {
+  border-left-color: var(--ochre);
+}
+.lint-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.lint-msg {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.lint-count {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.lint-terms {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text);
+  word-break: break-all;
+}
+.lint-advice {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-sub);
 }
 /* 「接下来会怎样」：把结果落到下一步动作上，而不是只报数字 */
 .what-next {
