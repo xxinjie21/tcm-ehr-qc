@@ -105,6 +105,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             case "质控校验" -> "/qc-check";
             case "人工复核" -> "/review";
             case "清洗与导出" -> "/governance";
+            case "标准化质量报告" -> "/standardization-report";
             case "日志审计" -> "/audit-log";
             case "组织管理" -> "/orgs";
             case "我的组织" -> "/my-org";
@@ -117,7 +118,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      */
     private static final List<MenuNode> ADMIN_MENUS = menus(true,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", DICT_TITLE, "日志审计", "组织管理");
+            "清洗与导出", DICT_TITLE, "标准化质量报告", "日志审计", "组织管理");
 
     /**
      * 所有者菜单：本组数据 + 本组成员管理 + 共用只读（术语词典/日志审计）。
@@ -128,12 +129,12 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      */
     private static final List<MenuNode> OWNER_MENUS = menus(true,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", DICT_TITLE, "日志审计", "我的组织");
+            "清洗与导出", DICT_TITLE, "标准化质量报告", "日志审计", "我的组织");
 
     /** 成员菜单：本组数据 + 共用只读（术语词典/日志审计），无成员管理 */
     private static final List<MenuNode> MEMBER_MENUS = menus(true,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", DICT_TITLE, "日志审计");
+            "清洗与导出", DICT_TITLE, "标准化质量报告", "日志审计");
 
     /**
      * 待分配池 / 审批中的菜单：<b>空列表</b>。

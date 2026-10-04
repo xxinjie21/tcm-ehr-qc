@@ -27,6 +27,8 @@ const routes = [
       // 管理员在该页还能选「直接生效」写小组基线（POST /dictionary/import 仅管理员）。
       { path: 'dictionary/import', name: 'DictionaryImport', component: () => import('@/views/DictionaryImport.vue'), meta: { title: '术语批量导入' } },
       { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '日志审计' } },
+        // 标准化质量报告（批次 24）：只读，登录即可；甲类=标准符合度，乙类=数据集覆盖度
+        { path: 'standardization-report', name: 'StandardizationReport', component: () => import('@/views/StandardizationReport.vue'), meta: { title: '标准化质量报告' } },
       // 组织管理（仅管理员）与我的组织（所有登录用户）
       { path: 'orgs', name: 'Orgs', component: () => import('@/views/Groups.vue'), meta: { title: '组织管理', roles: ['管理员'] } },
       { path: 'my-org', name: 'MyOrg', component: () => import('@/views/MyGroup.vue'), meta: { title: '我的组织' } }

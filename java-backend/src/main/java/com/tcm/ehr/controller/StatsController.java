@@ -5,6 +5,7 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.StatsDTO;
 import com.tcm.ehr.service.IStatsService;
 import com.tcm.ehr.domain.vo.OverviewVO;
+import com.tcm.ehr.domain.vo.StandardizationReportVO;
 import com.tcm.ehr.domain.vo.StatsAllVO;
 import com.tcm.ehr.domain.vo.StatsVO;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,24 @@ import java.util.List;
 public class StatsController {
 
     private final IStatsService statsService;
+
+    private final com.tcm.ehr.service.IStandardizationReportService reportService;
+
+    /**
+     * 标准化质量报告。
+     *
+     * <p>【权限：登录即可 + 数据域】只读，不触发任何重算。</p>
+     *
+     * <p>报告分甲乙两层：甲类是标准符合度（与数据无关），乙类是数据集覆盖度
+     * （只用于验证词表建全与否，<b>不代表真实病历准确率</b>）。响应里的
+     * disclaimer 会原样带到页面，禁止前端隐藏。</p>
+     *
+     * @return 甲类标准符合度 + 乙类数据集覆盖度
+     */
+    @GetMapping("/standardization-report")
+    public Result<StandardizationReportVO> standardizationReport() {
+        return Result.ok(reportService.report());
+    }
 
     /**
      * 首页四个指标卡。

@@ -98,6 +98,8 @@ const ALL_MENUS = [
   { group: '系统配置', title: '术语词典', path: '/dictionary', children: [
     { group: '系统配置', title: '术语批量导入', path: '/dictionary/import' }
   ] },
+  // 标准化质量报告（批次 24）：归一与词典质量的可视化，只读
+  { group: '系统配置', title: '标准化质量报告', path: '/standardization-report' },
   { group: '系统配置', title: '日志审计', path: '/audit-log' },
   { group: '系统配置', title: '组织管理', path: '/orgs' },
   { group: '系统配置', title: '我的组织', path: '/my-org' }

@@ -126,11 +126,13 @@ class AuthServiceTest {
         //  管理员 8 项 → 9 项；管理员从「我的组织」页看的就是自己的组织信息，
         //  与 Orgs 页的组织列表是同一诉求，故只加 1 项以对上计划的数量）
         List<MenuNode> menus = vo.getMenus();
-        assertEquals(9, menus.size(), menus.toString());
+        assertEquals(10, menus.size(), menus.toString());
         assertTrue(titlesOf(menus).contains("组织管理"));
         assertTrue(titlesOf(menus).contains("人工复核"));
         assertTrue(titlesOf(menus).contains("清洗与导出"));
         assertFalse(titlesOf(menus).contains("数据清洗"));
+        // 批次 24 新增：标准化质量报告只读，登录即可，三档菜单都该有
+        assertTrue(titlesOf(menus).contains("标准化质量报告"), menus.toString());
         // 管理员额外能看到「术语词典」的子项「术语批量导入」
         assertTrue(childTitlesOf(menus, "术语词典").contains("术语批量导入"),
                 menus.toString());

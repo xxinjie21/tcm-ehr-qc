@@ -109,6 +109,75 @@ components:
           nullable: true
           example: null
     # ========== 共享数据模型（跨请求/响应复用，非 PO） ==========
+    StandardizationReport:
+      type: object
+      description: 标准化质量报告（甲类=标准符合度为目标；乙类=数据集覆盖度仅为下限验证）
+      properties:
+        dictQuality:
+          type: array
+          description: 甲类·各类词典质量画像
+          items:
+            type: object
+            properties:
+              type: { type: string, description: 术语类型 key }
+              label: { type: string, description: 中文名 }
+              termCount: { type: integer, description: 词条数 }
+              codedCount: { type: integer, description: 有编码的词条数 }
+              aliasedCount: { type: integer, description: 有别名的词条数 }
+              selfAliasCount: { type: integer, description: 别名与标准词相同的条数（归一会自命中） }
+              source: { type: string, description: 主要来源标注 }
+        crossTypeDuplicates:
+          type: array
+          description: 甲类·跨类重名术语（同一词出现在多本词典）
+          items: { type: string }
+        coverage:
+          type: array
+          description: 乙类·各类实体抽取数与已归一数
+          items:
+            type: object
+            properties:
+              field: { type: string, description: structured_data 字段名 }
+              label: { type: string }
+              total: { type: integer }
+              normalized: { type: integer }
+        unmatched:
+          type: object
+          description: 乙类·症状未归一实体的四类构成（责任方不同，不可合并）
+          properties:
+            total: { type: integer }
+            fragment: { type: integer, description: 抽取碎片，责任在抽取侧 }
+            misrouted: { type: integer, description: 脉/舌要素进了症状，责任在抽取侧 }
+            physicalSign: { type: integer, description: 体征错放，责任在抽取侧 }
+            dictionaryGap: { type: integer, description: 多为标准词，责任在词表侧 }
+        normalizable:
+          type: object
+          description: 乙类·可归一实体归一率（分母=已抽取、非抽取缺陷、已在症状词表内）
+          properties:
+            denominator: { type: integer }
+            numerator: { type: integer }
+        score:
+          type: object
+          description: 乙类·质控分数分布与封顶率
+          properties:
+            total: { type: integer }
+            capped: { type: integer, description: 术语未标准化扣满 5 分的病历数 }
+            min: { type: integer }
+            max: { type: integer }
+            avg: { type: number, format: double }
+        dataset:
+          type: object
+          description: 乙类·数据集形态（模板塌缩度决定能否代表真实病历）
+          properties:
+            recordCount: { type: integer }
+            chiefComplaintTemplates: { type: integer }
+            recordsWithColloquialSymptom: { type: integer }
+        disclaimer:
+          type: string
+          description: 数据来源声明，页面须原样显示不可删
+        generatedAt:
+          type: string
+          description: 报告生成时间
+
     Entity:
       type: object
       description: 实体（含内容与原文片段），共享模型
@@ -3632,6 +3701,26 @@ s/schemas/DictionaryTermsVO'
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/stats/standardization-report:
+    get:
+      tags:
+        - 统计查询
+      summary: 标准化质量报告
+      description: 【权限：登录即可】返回标准化质量报告，只读、不触发任何重算。报告刻意分两层：甲类「标准符合度」只取决于词表建得对不对（词典规模/编码覆盖/别名质量/跨类重名），与用哪份数据无关；乙类「数据集覆盖度」（归一率/未归一构成/质控封顶率）只用于验证词表是否建全，**不代表真实病历上的准确率**，不可对外引用为科研结论
+      responses:
+        '200':
+          description: 标准化质量报告
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/StandardizationReport'
+
   /api/stats/departments:
     get:
       tags:
