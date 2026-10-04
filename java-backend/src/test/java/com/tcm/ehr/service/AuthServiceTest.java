@@ -292,11 +292,11 @@ class AuthServiceTest {
         assertTrue(titlesOf(vo.getMenus()).contains("术语词典"), vo.getMenus().toString());
         assertTrue(titlesOf(vo.getMenus()).contains("日志审计"), vo.getMenus().toString());
         assertFalse(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
-        // ⚠️ 普通成员/组长拿不到「术语批量导入」子项 —— 它是管理员特权通道，
-        //    后端 POST /dictionary/import 也是 @RequireRole("管理员")，
-        //    前端露出入口只会让组长点了撞 403。
-        assertFalse(childTitlesOf(vo.getMenus(), "术语词典").contains("术语批量导入"),
-                "非管理员不应看到「术语批量导入」子项: " + vo.getMenus());
+        // 「术语批量导入」对所有身份可见：普通成员走它会**导入本机个人词典**
+        // （POST /dictionary/parse 只解析、不落库），不写小组基线，
+        // 所以不破坏「成员不能直接改基线、必须走提案审核」的约定。
+        assertTrue(childTitlesOf(vo.getMenus(), "术语词典").contains("术语批量导入"),
+                "成员也该看到「术语批量导入」入口（导入本地，不直写基线）: " + vo.getMenus());
     }
 
     /** 取菜单树的顶层标题集合（批次17：menus 由平铺字符串列表升级为树） */

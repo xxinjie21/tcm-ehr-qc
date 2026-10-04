@@ -24,6 +24,21 @@ export function getTerms(params) {
   return request.get('/dictionary/terms', { params })
 }
 
+/**
+ * 上传词典文件 → 只解析成词条返回，**不写任何后端数据**（普通成员的批量导入入口）。
+ *
+ * 成员不能直接改小组基线，但可以把文件导入到**本机个人词典**（localStorage）：
+ * 后端只负责解析（Excel 需 POI），前端把返回的 terms 合并进本地个人词典。
+ * 觉得值得推广，再到「我的词典」提交为提案。
+ */
+export function parseDictFile(formData, type) {
+  return request.post('/dictionary/parse', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    params: { type },
+    timeout: 120000
+  })
+}
+
 /** 导出小组基线全量词条，供存成本地个人词典 */
 export function exportBaseline(params) {
   return request.get('/dictionary/baseline/export', { params })

@@ -1,12 +1,23 @@
 <template>
-  <!-- 词典管理页（管理员）：五个词典类型（疾病 / 证候 / 症状 / 中药 / 方剂）切换，
-       下面依次是术语查询、术语库导入、版本回滚 -->
+  <!-- 词典管理页：按术语类型（疾病 / 证候 / 症状 / 中药 / 方剂）查看与维护。
+       页签：小组基线（只读）/ 我的词典（本地副本）/ 提案审核 / 归档版本。
+       批量导入已剥离为独立页「术语批量导入」——普通成员走那里生成提案，
+       管理员在那里还能选择直接生效。 -->
   <div>
-    <!-- 页头：术语类型筛选器。
-         类型是**全局过滤**（切类型后整个页签内的数据都跟着换），不是页面导航 ——
-         所以用 radio-group 而不是页签：原先那 5 个自闭合的空壳 tab-pane 长得像页签、
-         点的却是下面那一摞内容，观感上就是坏的。 -->
+    <!-- 页头：一句话交代四个页签各自管什么，避免新用户对着名词猜。
+         页签划分依据是「谁能改」：基线=只读现状；我的词典=你自己的副本；
+         提案审核=把改动交给组长；归档版本=历史与回滚。 -->
+    <div class="dict-guide">
+      <span class="dg-item"><b>小组基线</b>组织当前生效的词典（只读）</span>
+      <span class="dg-item"><b>我的词典</b>你自己的副本，改完提交提案</span>
+      <span class="dg-item"><b>提案审核</b>组长在此确认改动并合并</span>
+      <span class="dg-item"><b>归档版本</b>历史快照，可回滚</span>
+    </div>
+
+    <!-- 术语类型筛选器。类型是**全局过滤**（切类型后四个页签的数据都跟着换），
+         不是页面导航 —— 所以用 radio-group 而不是页签。 -->
     <div class="dict-head">
+      <span class="dh-label">术语类型</span>
       <el-radio-group v-model="typeKey" size="small" aria-label="术语类型">
         <el-radio-button v-for="t in TYPE_OPTIONS" :key="t.value" :value="t.value">
           {{ t.label }}
@@ -14,9 +25,10 @@
       </el-radio-group>
     </div>
 
-    <!-- 演示词典规模远小于真实词表（疾病仅 10 条、别名多为空），不说明会被当成系统缺陷 -->
+    <!-- 演示词典规模远小于真实词表，不说明会被当成系统缺陷 -->
     <div class="tip" style="margin: 0 0 var(--sp-2)">
-      当前为演示词典：规模与真实词表差距较大，未命中属正常现象；导入正式词典后可提升归一命中率。
+      当前为演示词典：规模与真实词表差距较大，未命中属正常现象；
+      导入正式词典后可提升归一命中率。
     </div>
 
     <!-- 术语查询：按当前类型 + 关键字模糊匹配（标准词与别名都参与匹配） -->
@@ -98,9 +110,16 @@
 
     <el-tab-pane label="我的词典" name="mine">
     <PanelCard title="个人词典（本地）">
+      <div class="tip" style="margin-bottom: var(--sp-2)">
+        这是你自己的词典副本：可手动增删，也可<b>批量导入文件</b>或从小组基线拉取。
+        它只存在这台电脑，改动要生效必须提交提案、由组长审核。
+      </div>
       <div class="rv-row">
         <el-button size="small" :loading="baselineLoading" @click="loadBaseline">
           拉取小组基线
+        </el-button>
+        <el-button size="small" @click="$router.push('/dictionary/import')">
+          批量导入文件
         </el-button>
         <el-button
           size="small"
@@ -109,9 +128,6 @@
           :disabled="!localTerms.length"
           @click="doSubmitProposal"
         >提交更新提案</el-button>
-        <span class="tip">
-          本地词典只存在这台电脑上，<b>不会自动同步小组基线</b>；改动要生效必须走提案 → 组长审核。
-        </span>
       </div>
       <div v-if="localLoadedAt" class="rv-meta">
         已拉取 {{ localTerms.length }} 条 · {{ localLoadedAt }} ·
@@ -950,11 +966,31 @@ onMounted(() => {
 }
 
 /* ===== 页头：术语类型筛选器 ===== */
+/* 一句话交代四个页签管什么：对���名词页签，新用户只能靠猜 */
+.dict-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-sub);
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--text-sub);
+}
+.dg-item b {
+  color: var(--ink);
+  margin-right: 2px;
+}
 .dict-head {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: var(--sp-2);
   margin-bottom: var(--sp-3);
+}
+.dh-label {
+  font-size: 12.5px;
+  color: var(--text-sub);
 }
 
 /* ===== 提案审核：主从布局 ===== */

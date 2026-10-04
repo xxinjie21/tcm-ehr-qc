@@ -110,6 +110,43 @@ public class DictionaryController {
     // ================================================================ 管理员直写
 
     /**
+     * 上传词典文件 → 只解析返回词条，<b>不落库</b>（普通成员的批量导入入口）。
+     *
+     * <p>【权限：登录即可】普通成员按约定<b>不能直接改小组基线</b>（必须走提案审核）。
+     * 但这个接口不碰基线 —— 它只把文件解析成词条列表返回，前端把它们存进
+     * <b>本机个人词典</b>（localStorage，与小组基线解耦）。成员若觉得这份词表值得
+     * 推广，再到「我的词典」提交为提案，由组长审核合并。既给了批量导入的便利，
+     * 又不绕过审核约定，也不写任何组织数据。</p>
+     *
+     * <p>Excel 需服务端 POI 解析（浏览器无 xlsx 能力），故放在这里而非纯前端。</p>
+     *
+     * @param file 词典文件（.xlsx/.xls/.csv/.json）
+     * @param type 术语类型
+     * @return { terms: [{standardTerm, code, source, aliases}], failures: [{row, reason}] }
+     */
+    @PostMapping("/parse")
+    public ResponseEntity<Result<Map<String, Object>>> parse(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("type") String type) throws IOException {
+        ResponseEntity<Result<String>> bad = badType(type);
+        if (bad != null) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+        }
+        IDictionaryService.ParseResult parsed = dictionaryService.parseTerms(type, file);
+        List<Map<String, Object>> terms = new ArrayList<>();
+        for (TermEntry e : parsed.terms) {
+            terms.add(Map.of(
+                    "standardTerm", e.getStandardTerm() == null ? "" : e.getStandardTerm(),
+                    "code", e.getCode() == null ? "" : e.getCode(),
+                    "source", e.getSource() == null ? "" : e.getSource(),
+                    "aliases", e.getAliases() == null ? List.of() : e.getAliases()));
+        }
+        return ResponseEntity.ok(Result.ok(Map.of(
+                "terms", terms,
+                "failures", parsed.failures)));
+    }
+
+    /**
      * 管理员直写导入（不生成提案，属特权通道）。
      *
      * <p>【权限：仅管理员】用于批量种子数据与基础层词典播种；写入成功后

@@ -73,15 +73,17 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * 名称与前端 MainLayout 的 ALL_MENUS[].title 对应。</p>
      *
      * <p>「术语词典」父项<b>所有人可见</b>（它是日常高频入口）；其子项
-     * 「术语批量导入」<b>仅管理员</b>可见 —— 后端 {@code POST /dictionary/import}
-     * 是 {@code @RequireRole("管理员")}，父项可点但不展开的语义也在这里一并确定。</p>
+     * 「术语批量导入」也<b>所有人可见</b> —— 所有人（含普通成员）都能在该页把文件
+     * 导入<b>本机个人词典</b>（{@code POST /dictionary/parse} 只解析、不落库），
+     * 管理员在那里还能选「直接生效」写小组基线（{@code POST /dictionary/import} 仅管理员）。
+     * 因此前端不会出现「点了撞 403」的入口。</p>
      */
     private static List<MenuNode> menus(boolean withDictImport, String... titles) {
         List<MenuNode> out = new ArrayList<>();
         for (String t : titles) {
             if (DICT_TITLE.equals(t) && withDictImport) {
-                // 只有管理员能看到「术语批量导入」子项：后端 POST /dictionary/import
-                // 是 @RequireRole("管理员")，给组长露出入口只会让人点了撞 403。
+                // 「术语批量导入」所有身份可见：默认去向是个人本地词典（不写后端），
+                // 管理员在同一页另有「直接生效」选项。故不再是管理员专属入口。
                 out.add(new MenuNode(DICT_TITLE, "/dictionary",
                         List.of(new MenuNode(DICT_IMPORT_TITLE, "/dictionary/import"))));
             } else {
@@ -121,15 +123,15 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * 所有者菜单：本组数据 + 本组成员管理 + 共用只读（术语词典/日志审计）。
      *
      * <p>术语词典的读取与日志审计均为「登录即可」（后者按组织三档可见，见 §七 L7），
-     * 故所有者/成员也能用；<b>「术语批量导入」子项不在这里</b> —— 它是管理员特权，
-     * 后端 import 同样是 @RequireRole("管理员")，前端露出入口只会让组长点了撞 403。</p>
+     * 故所有者/成员也能用；「术语批量导入」子项同样给到 —— 默认导入<b>本机个人词典</b>，
+     * 不写小组基线，成员要推广再到「我的词典」提交提案，不绕过审核。</p>
      */
-    private static final List<MenuNode> OWNER_MENUS = menus(false,
+    private static final List<MenuNode> OWNER_MENUS = menus(true,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
             "清洗与导出", DICT_TITLE, "日志审计", "我的组织");
 
     /** 成员菜单：本组数据 + 共用只读（术语词典/日志审计），无成员管理 */
-    private static final List<MenuNode> MEMBER_MENUS = menus(false,
+    private static final List<MenuNode> MEMBER_MENUS = menus(true,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
             "清洗与导出", DICT_TITLE, "日志审计");
 

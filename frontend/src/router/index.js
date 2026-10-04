@@ -22,10 +22,10 @@ const routes = [
       { path: 'qc-check', name: 'QcCheck', component: () => import('@/views/Qc.vue'), meta: { title: '质控校验' } },
       { path: 'governance', name: 'Governance', component: () => import('@/views/Governance.vue'), meta: { title: '清洗与导出' } },
       { path: 'dictionary', name: 'Dictionary', component: () => import('@/views/Dictionary.vue'), meta: { title: '术语词典' } },
-      // 术语批量导入：「术语词典」的子项，仅管理员。批次 17 从词典页剥离成独立页面 ——
-      // 此前它与查词/提案/归档挤在同一页，且前端用三档 canWrite 显示入口、
-      // 后端却是 @RequireRole("管理员")，组长点了必然 403。
-      { path: 'dictionary/import', name: 'DictionaryImport', component: () => import('@/views/DictionaryImport.vue'), meta: { title: '术语批量导入', roles: ['管理员'] } },
+      // 术语批量导入：「术语词典」的子项，所有登录用户可见。
+      // 所有人可把文件导入本机个人词典（POST /dictionary/parse 只解析不落库）；
+      // 管理员在该页还能选「直接生效」写小组基线（POST /dictionary/import 仅管理员）。
+      { path: 'dictionary/import', name: 'DictionaryImport', component: () => import('@/views/DictionaryImport.vue'), meta: { title: '术语批量导入' } },
       { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/AuditLog.vue'), meta: { title: '日志审计' } },
       // 组织管理（仅管理员）与我的组织（所有登录用户）
       { path: 'orgs', name: 'Orgs', component: () => import('@/views/Groups.vue'), meta: { title: '组织管理', roles: ['管理员'] } },

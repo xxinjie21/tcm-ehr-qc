@@ -58,6 +58,34 @@ public interface IDictionaryService {
      */
     java.util.List<com.tcm.ehr.domain.po.TermEntry> currentTerms(String orgId, String type);
 
+    /**
+     * 只解析文件、<b>不落库</b>（供「成员上传词典文件 → 生成提案」用）。
+     *
+     * <p>为什么需要它：{@link #importDictionary} 会直接写基线，那是管理员特权通道；
+     * 普通成员按设计<b>不能</b>直接改基线（必须走提案审核）。但成员同样需要
+     * 「批量导入词典」的便利 —— 让他上传文件后<b>生成提案</b>，组长审核通过才合并，
+     * 既给了便利，又不破坏审核约定。</p>
+     *
+     * @param type 术语类型
+     * @param file Excel/CSV/JSON
+     * @return 解析结果：terms=词条、failures=失败明细
+     */
+    ParseResult parseTerms(String type, MultipartFile file) throws IOException;
+
+    /** 只解析不落库的结果（terms + 逐行失败明细） */
+    class ParseResult {
+        /** 成功解析并规整后的词条 */
+        public final List<com.tcm.ehr.domain.po.TermEntry> terms;
+        /** 失败明细（行号 + 原因），与导入接口同构 */
+        public final List<Map<String, Object>> failures;
+
+        public ParseResult(List<com.tcm.ehr.domain.po.TermEntry> terms,
+                           List<Map<String, Object>> failures) {
+            this.terms = terms;
+            this.failures = failures;
+        }
+    }
+
     // 原 rollback / listBackups / backupExists 已随 dictionary_backups 表废弃（批次 17）：
     // 回滚改为「基于归档版本生成提案 → 组长审核合并」，历史版本改为 GET /api/dictionary/archives。
 

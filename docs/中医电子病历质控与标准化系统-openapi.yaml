@@ -3096,6 +3096,67 @@ paths:
                     example: 200
                   data:
                     $ref: '#/components/schemas/DictProposal'
+  /api/dictionary/parse:
+    post:
+      tags:
+        - 词典管理
+      summary: 上传词典文件解析为词条（不落库）
+      description: 【权限：登录即可】普通成员的「批量导入词典」入口。只把文件解析成词条列表返回，<b>不写任何后端数据</b>；前端据此把词条并入本机个人词典（localStorage）。成员若想把词表推广给小组，再到「我的词典」提交提案，由组长审核合并。Excel 需服务端 POI 解析，故放在服务端。
+      parameters:
+        - name: file
+          in: query
+          required: true
+          description: 词典文件（.xlsx/.xls/.csv/.json），首列「标准术语」不能为空
+          schema:
+            type: string
+            format: binary
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [disease, symptom, pattern, herb, formula]
+      responses:
+        '200':
+          description: 解析结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                    example: 操作成功
+                  data:
+                    type: object
+                    properties:
+                      terms:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            standardTerm:
+                              type: string
+                            code:
+                              type: string
+                            source:
+                              type: string
+                            aliases:
+                              type: array
+                              items:
+                                type: string
+                      failures:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            row:
+                              type: integer
+                            reason:
+                              type: string
   /api/dictionary/proposals/{id}/diff:
     get:
       tags:

@@ -1,110 +1,133 @@
 <template>
   <div class="dict-import">
     <!--
-      术语批量导入（批次 17 从词典页剥离成独立页面）。
+      批量导入词典。
 
-      为什么独立：这是**管理员特权操作**（后端 POST /dictionary/import 是
-      @RequireRole("管理员")），而词典页的日常任务是查词、本地编辑、提提案。
-      挤在同一页既容易误触，又让侧栏入口与门禁对不上 ——
-      此前前端用三档 canWrite 显示入口、后端却只收管理员，组长点了必然 403。
+      **两种去向，按身份给最小选择**：
+        · 所有人 → 导入「本机个人词典」（localStorage，只存你这台浏览器，不碰小组基线）
+        · 管理员 → 还可选择「直接生效」写进小组基线（特权通道，不走审核）
+      成员若想把本地词表推广给小组：到「词典」页 →「我的词典」提交提案，组长审核后合并。
     -->
-    <PanelCard title="术语批量导入">
-      <div class="target-row">
-        <span class="tip">导入目标</span>
-        <el-radio-group v-model="target" size="small">
-          <el-radio-button value="org">当前组织的词典</el-radio-button>
-          <el-radio-button value="base">基础层（全局通用词库）</el-radio-button>
-        </el-radio-group>
-        <span class="tip">
-          {{
-            target === 'base'
-              ? '写入基础层后，所有组织都会使用这批词条；归档版本与组织层独立计数。'
-              : '写入当前组织自有词条；该组织归一时仍会回退基础层。'
-          }}
-        </span>
-      </div>
-
-      <div class="target-row">
-        <span class="tip">术语类型</span>
-        <el-select v-model="type" style="width: 140px" size="small" aria-label="术语类型">
-          <el-option v-for="t in TYPES" :key="t.value" :label="t.label" :value="t.value" />
-        </el-select>
-      </div>
-
-      <div class="import-row">
-        <el-upload
-          ref="uploadRef"
-          v-model:file-list="dictFileList"
-          drag
-          :auto-upload="false"
-          :limit="1"
-          :on-change="onFileChange"
-          :on-remove="onFileRemove"
-          :on-exceed="onExceed"
-          accept=".xlsx,.xls,.csv,.json"
-        >
-          <div class="upload-tip">
-            拖拽文件到此处，或<em>点击选择</em>
-            <div class="sub">支持 Excel(.xlsx/.xls) / CSV / JSON</div>
-          </div>
-        </el-upload>
-        <div class="import-actions">
-          <el-button type="primary" :loading="importing" :disabled="!importFile" @click="handleImport">
-            开始导入
-          </el-button>
-          <!-- 原文案写「导入前会自动备份，可在下方版本回滚恢复」——备份表已随批次17
-               废弃，现在是「导入后生成归档版本」。文案不改会指向已不存在的能力。 -->
-          <div class="tip" style="margin-top: var(--sp-2)">
-            导入成功后会自动生成一份归档版本，可在词典页「归档版本」查看与回滚。
-          </div>
-
-          <!-- 格式说明移出 el-upload 拖拽区：原先嵌在拖拽热区里，
-               <summary> 会冒泡触发原生文件选择 -->
-          <details class="fmt-detail">
-            <summary>查看格式说明</summary>
-            <div class="fmt-body">
-              · Excel / CSV：第 1 列「标准术语」、第 2 列「别名」（多个用 、或 ; 分隔），可选第 3 列「国标代码」<br />
-              · JSON：条目数组，每项含「标准术语」「别名」，可选「来源」「国标代码」
-            </div>
-          </details>
+    <PanelCard title="批量导入词典">
+      <!-- 第一步：选类型 -->
+      <div class="step">
+        <div class="step-no">1</div>
+        <div class="step-body">
+          <div class="step-t">选术语类型</div>
+          <div class="step-d">要与「小组基线」里现有的类型一致，导入后归一才会按新词条命中。</div>
+          <el-select v-model="type" style="width: 160px" size="small" aria-label="术语类型">
+            <el-option v-for="t in TYPES" :key="t.value" :label="t.label" :value="t.value" />
+          </el-select>
         </div>
       </div>
 
-      <div v-if="importResult" class="import-result">
-        <StatCard label="文件总行数" :value="importResult.total" />
-        <StatCard label="成功导入" :value="importResult.imported" tone="green" />
-        <StatCard label="失败" :value="importResult.failed" tone="red" />
-        <StatCard v-if="importResult.archiveVersion" label="归档版本"
-                  :value="'v' + importResult.archiveVersion" tone="green" />
-        <div v-if="importResult.failures?.length" class="failures">
-          <div class="ded-hd">失败明细</div>
-          <div v-for="f in importResult.failures" :key="f.row" class="ded-item">
-            <span>第 {{ f.row }} 行：{{ f.reason }}</span>
+      <!-- 第二步：选文件 -->
+      <div class="step">
+        <div class="step-no">2</div>
+        <div class="step-body">
+          <div class="step-t">上传词典文件</div>
+          <div class="step-d">
+            支持 Excel(.xlsx/.xls)、CSV、JSON。首列必须是<b>标准术语</b>，第二列<b>别名</b>（多个用「、」分隔，可选）。
+          </div>
+          <el-upload
+            ref="uploadRef"
+            v-model:file-list="dictFileList"
+            drag
+            :auto-upload="false"
+            :limit="1"
+            :on-change="onFileChange"
+            :on-remove="onFileRemove"
+            :on-exceed="onFileExceed"
+            accept=".xlsx,.xls,.csv,.json"
+          >
+            <div class="upload-tip">
+              拖拽文件到此处，或<em>点击选择</em>
+              <div class="sub">支持 Excel / CSV / JSON，单个文件不超过 50MB</div>
+            </div>
+          </el-upload>
+        </div>
+      </div>
+
+      <!-- 第三步：确认 -->
+      <div class="step">
+        <div class="step-no">3</div>
+        <div class="step-body">
+          <div class="step-t">选择去向并确认</div>
+          <div class="step-d">{{ modeTip }}</div>
+
+          <!-- 管理员可选「直接生效」；其余身份只有本地一条路，不给选择避免困惑 -->
+          <div v-if="isAdmin" class="target-row">
+            <el-radio-group v-model="mode" size="small">
+              <el-radio-button value="local">导入本机个人词典</el-radio-button>
+              <el-radio-button value="direct">直接生效到小组基线</el-radio-button>
+            </el-radio-group>
+          </div>
+
+          <div v-if="isAdmin && mode === 'direct'" class="target-row">
+            <el-radio-group v-model="target" size="small">
+              <el-radio-button value="org">当前组织</el-radio-button>
+              <el-radio-button value="base">基础层（影响所有组织）</el-radio-button>
+            </el-radio-group>
+          </div>
+
+          <el-button
+            type="primary"
+            class="do-btn"
+            :loading="submitting"
+            :disabled="!importFile"
+            @click="handleSubmit"
+          >{{ submitLabel }}</el-button>
+          <span v-if="!importFile" class="tip">请先在上一步选择文件</span>
+        </div>
+      </div>
+
+      <div v-if="result" class="import-result">
+        <StatCard label="文件解析" :value="result.parsed" />
+        <StatCard v-if="result.failed > 0" label="解析失败" :value="result.failed" tone="red" />
+        <StatCard v-if="result.added != null" label="本地新增" :value="result.added" />
+        <div class="what-next">
+          <b>接下来会怎样：</b>{{ nextStepText }}
+        </div>
+        <div v-if="result.failures?.length" class="failures">
+          <div class="ded-hd">解析失败的行（这些不会被导入）</div>
+          <div v-for="(f, i) in result.failures" :key="i" class="ded-item">
+            第 {{ f.row }} 行：{{ f.reason }}
           </div>
         </div>
       </div>
     </PanelCard>
 
-    <PanelCard title="这条通道的特殊之处">
-      <ul class="notes">
-        <li>普通成员改组织词典<b>必须走提案</b>（词典页「我的词典」→ 提交更新提案 → 组长审核）。本页是管理员直写，不生成提案。</li>
-        <li>直写同样会生成归档版本并计入 5 份限额 —— 否则它会成为唯一一条没有历史版本的改基线方式，出问题回不到上一版。</li>
-        <li>写「基础层」会影响所有组织的归一结果，请谨慎。</li>
-      </ul>
+    <PanelCard title="格式示例">
+      <!-- 直接给可照抄的样子，比抽象描述省事 -->
+      <div class="sample">
+        <div class="sample-t">Excel / CSV（三列：标准术语、别名、国标代码）</div>
+        <table class="sample-tb">
+          <thead><tr><th>标准术语</th><th>别名</th><th>国标代码</th></tr></thead>
+          <tbody>
+            <tr><td>肝郁气滞</td><td>肝气郁结、肝郁</td><td>ZYBNR0101</td></tr>
+            <tr><td>柴胡</td><td>北柴胡、醋柴胡</td><td></td></tr>
+          </tbody>
+        </table>
+        <div class="sample-t" style="margin-top: var(--sp-3)">JSON（等价写法）</div>
+        <pre class="code">[
+  { "standardTerm": "肝郁气滞", "aliases": ["肝气郁结", "肝郁"] },
+  { "standardTerm": "柴胡", "aliases": ["北柴胡", "醋柴胡"] }
+]</pre>
+      </div>
     </PanelCard>
   </div>
 </template>
 
 <script setup>
-// 术语批量导入（管理员直写）。与词典页共用 upload 相关状态。
-import { ref } from 'vue'
+// 批量导入词典。所有人可导入本机个人词典；管理员可直写基线。
+import { ref, computed } from 'vue'
 import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
-import { importDict } from '@/api/dictionary'
+import { importDict, parseDictFile } from '@/api/dictionary'
 import { confirmBox } from '@/utils/confirm'
+import { useUserStore } from '@/stores/user'
 
-// 与 TermTypes.ALL（后端唯一权威）一致；标签沿用词典页的叫法
 const TYPES = [
   { value: 'disease', label: '疾病' },
   { value: 'pattern', label: '证候' },
@@ -114,82 +137,231 @@ const TYPES = [
 ]
 const typeLabel = (v) => (TYPES.find((t) => t.value === v) || {}).label || v
 
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.role === '管理员')
+
 const uploadRef = ref(null)
 const dictFileList = ref([])
 const importFile = ref(null)
-const importing = ref(false)
-const importResult = ref(null)
-// org = 当前组织自有词条；base = 基础层（全局通用词库）
-const target = ref('org')
-// 术语类型：原先由词典页的 activeTab 隐式决定，搬成独立页后必须显式选，
-// 否则会把文件导进「疾病」而用户以为是「证候」—— 静默写错类型，比报错更难发现。
+const submitting = ref(false)
+const result = ref(null)
 const type = ref('herb')
+// local = 并入本机个人词典（所有人）；direct = 直接写小组基线（仅管理员）
+const mode = ref(isAdmin.value ? 'direct' : 'local')
+const target = ref('org')
+
+const modeTip = computed(() => {
+  if (isAdmin.value && mode.value === 'direct') {
+    return '文件直接覆盖写入小组基线并生成归档版本，不经过审核，立即对所有成员生效。仅在确信无误时使用。'
+  }
+  return '文件解析后并入你的本机个人词典（只存在你这台浏览器，不影响小组基线，也不影响其他成员）。'
+})
+
+const submitLabel = computed(() =>
+  isAdmin.value && mode.value === 'direct' ? '直接导入' : '导入本地词典')
+
+const nextStepText = computed(() => {
+  if (isAdmin.value && mode.value === 'direct') {
+    return '已写入小组基线，可在「词典」页的「归档版本」查看这次的快照。'
+  }
+  return '到「词典」页 →「我的词典」可查看这些词；如想推广给小组，在那里点「提交提案」，组长审核通过后才会进入小组基线。'
+})
+
+// 个人词典在 localStorage，键与词典页「我的词典」保持一致
+const localKey = () => `dict.local.${userStore.orgId || 'base'}.${type.value}`
+
+/** 把解析出的词条并入本机个人词典，返回新增条数；同名词以文件为准 */
+function mergeIntoLocal(terms) {
+  let obj = {}
+  try {
+    obj = JSON.parse(localStorage.getItem(localKey()) || '{}') || {}
+  } catch (e) {
+    obj = {}
+  }
+  const list = Array.isArray(obj.terms) ? obj.terms : []
+  const byTerm = new Map(list.map((t) => [t.standardTerm, t]))
+  let added = 0
+  for (const t of terms) {
+    if (!byTerm.has(t.standardTerm)) added++
+    byTerm.set(t.standardTerm, {
+      standardTerm: t.standardTerm,
+      aliases: t.aliases || [],
+      source: t.source || '批量导入'
+    })
+  }
+  localStorage.setItem(localKey(), JSON.stringify({
+    at: new Date().toLocaleString(),
+    terms: [...byTerm.values()]
+  }))
+  return added
+}
 
 const onFileChange = (file) => {
-  // 1. 原样保留用户选择的文件（el-upload 的 UploadFile 本身就是 File 的子类）
   importFile.value = file
-  importResult.value = null
+  result.value = null
 }
-
 const onFileRemove = () => {
   importFile.value = null
-  importResult.value = null
+  result.value = null
 }
-
-const onExceed = (files) => {
-  // limit=1：再次选择时替换掉旧文件，避免「换了文件却没反应」
+const onFileExceed = (files) => {
   uploadRef.value?.clearFiles()
   const f = files[0]
+  if (!f) return
   f.uid = genFileId()
   uploadRef.value?.handleStart(f)
   importFile.value = f
 }
 
-const handleImport = async () => {
+const handleSubmit = async () => {
   if (!importFile.value) return
-  // 覆盖式入库，先二次确认（取消则中止）
-  if (!(await confirmBox(
-    `确定用「${importFile.value.name}」覆盖【${typeLabel(type.value)}】${
-      target.value === 'base' ? '基础层' : '当前组织'
-    }词典吗？`,
-    '术语批量导入',
-    { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' }
-  ))) return
+  const direct = isAdmin.value && mode.value === 'direct'
+  const where = direct
+    ? (target.value === 'base' ? '基础层（影响所有组织）' : '当前组织')
+    : '本机个人词典'
+  const ok = await confirmBox(
+    direct
+      ? `将用「${importFile.value.name}」直接覆盖【${where}】的${typeLabel(type.value)}词典，立即生效。`
+      : `将把「${importFile.value.name}」解析后并入${where}（${typeLabel(type.value)}），不影响小组基线。`,
+    direct ? '确认直接导入' : '确认导入本地',
+    { type: 'warning', confirmButtonText: direct ? '直接导入' : '导入本地', cancelButtonText: '取消' }
+  )
+  if (!ok) return
 
-  importing.value = true
-  importResult.value = null
+  submitting.value = true
   try {
     const form = new FormData()
     form.append('file', importFile.value)
     form.append('type', type.value)
-    const res = await importDict(form, target.value)
-    importResult.value = res.data || null
-    ElMessage.success(`导入完成：成功 ${res.data?.imported ?? 0} / 共 ${res.data?.total ?? 0}`)
+    if (direct) {
+      const res = await importDict(form, target.value)
+      result.value = {
+        parsed: res.data?.imported ?? 0,
+        failed: res.data?.failed ?? 0,
+        failures: res.data?.failures ?? []
+      }
+      ElMessage.success(res.msg || '已导入并生效')
+    } else {
+      const res = await parseDictFile(form, type.value)
+      const terms = res.data?.terms ?? []
+      if (!terms.length) {
+        ElMessage.warning('文件里没有解析出任何术语，请检查首列「标准术语」是否为空')
+        return
+      }
+      let added
+      try {
+        added = mergeIntoLocal(terms)
+      } catch (e) {
+        // localStorage 满 / 隐私模式：明确告知没存进去，不假装成功
+        ElMessage.warning('本机存储不可用或已满，导入未能保存')
+        return
+      }
+      result.value = {
+        parsed: terms.length,
+        added,
+        failed: (res.data?.failures ?? []).length,
+        failures: res.data?.failures ?? []
+      }
+      ElMessage.success(`已并入本机个人词典（新增 ${added} 条）`)
+    }
     uploadRef.value?.clearFiles()
     importFile.value = null
   } catch {
     // 拦截器已提示
   } finally {
-    importing.value = false
+    submitting.value = false
   }
 }
 </script>
 
 <style scoped>
-/* 导入目标选择器 */
+/* 步骤条：序号圆点 + 标题 + 说明，降低「不知道下一步做什么」的成本 */
+.step {
+  display: flex;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px dashed var(--line);
+}
+.step:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+.step-no {
+  flex: 0 0 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--ink-mid);
+  color: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+}
+.step-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.step-t {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.step-d {
+  font-size: 12.5px;
+  color: var(--text-sub);
+  line-height: 1.7;
+  margin-bottom: var(--sp-2);
+}
 .target-row {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   flex-wrap: wrap;
-  margin-bottom: var(--sp-3);
+  margin-bottom: var(--sp-2);
 }
-/* 说明卡里的要点列表 */
-.notes {
-  margin: 0;
-  padding-left: var(--sp-4);
+.do-btn {
+  margin-top: 2px;
+}
+.import-result {
+  margin-top: var(--sp-4);
+}
+/* 「接下来会怎样」：把结果落到下一步动作上，而不是只报数字 */
+.what-next {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--ink-light);
+  border-radius: 4px;
   font-size: 13px;
-  color: var(--text-sub);
-  line-height: 1.9;
+}
+/* 格式示例：给可照抄的表 */
+.sample-t {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: var(--sp-2);
+}
+.sample-tb {
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.sample-tb th,
+.sample-tb td {
+  border: 1px solid var(--line);
+  padding: 5px 12px;
+  text-align: left;
+}
+.sample-tb th {
+  background: var(--surface-sub);
+  font-weight: 600;
+}
+.code {
+  margin: 0;
+  padding: var(--sp-3);
+  background: var(--surface-sub);
+  border-radius: 4px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  overflow-x: auto;
 }
 </style>

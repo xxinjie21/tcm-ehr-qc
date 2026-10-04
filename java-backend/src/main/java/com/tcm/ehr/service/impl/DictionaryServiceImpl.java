@@ -132,6 +132,18 @@ public class DictionaryServiceImpl implements IDictionaryService {
     }
 
     @Override
+    public ParseResult parseTerms(String type, MultipartFile file) throws IOException {
+        List<Map<String, Object>> failures = new ArrayList<>();
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new IllegalArgumentException(
+                    "文件超过 50MB，请拆分后导入（Excel 解析需将整份文件载入内存）");
+        }
+        List<TermEntry> terms = fileName(file).endsWith(".json")
+                ? parseJsonEntries(file, failures)
+                : parseTabularEntries(type, file, failures);
+        return new ParseResult(terms, failures);
+    }
+
     /**
      * 导入到指定组织层（批次 17）。
      *
@@ -139,6 +151,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * 提为参数，{@code orgId=""} 即基础层。提案合并走的是 {@code termStore.replace}
      * 而不是本方法 —— 本方法带「合并语义 + 自动归档」，那是管理员直写专用通道。</p>
      */
+    @Override
     public ImportResultVO importDictionary(String type, MultipartFile file, String orgId)
             throws IOException {
         List<Map<String, Object>> failures = new ArrayList<>();
