@@ -25,12 +25,6 @@
       </el-radio-group>
     </div>
 
-    <!-- 演示词典规模远小于真实词表，不说明会被当成系统缺陷 -->
-    <div class="tip" style="margin: 0 0 var(--sp-2)">
-      当前为演示词典：规模与真实词表差距较大，未命中属正常现象；
-      导入正式词典后可提升归一命中率。
-    </div>
-
     <!-- 术语查询：按当前类型 + 关键字模糊匹配（标准词与别名都参与匹配） -->
     <el-tabs v-model="tab" class="dict-tabs">
 
@@ -112,7 +106,13 @@
     <PanelCard title="个人词典（本地）">
       <div class="tip" style="margin-bottom: var(--sp-2)">
         这是你自己的词典副本：可手动增删，也可<b>批量导入文件</b>或从小组基线拉取。
-        它只存在这台电脑，改动要生效必须提交提案、由组长审核。
+        它只存在这台电脑。
+        <template v-if="isOwner">
+          你是本组组长，改完点「提交更新提案」，再到「提案审核」点「通过」即合并入小组基线。
+        </template>
+        <template v-else>
+          改动要生效必须提交提案、由组长审核通过。
+        </template>
       </div>
       <div class="rv-row">
         <el-button size="small" :loading="baselineLoading" @click="loadBaseline">
@@ -182,31 +182,34 @@
           <el-option label="已拒绝" value="rejected" />
         </el-select>
         <el-button size="small" @click="loadProposals">刷新</el-button>
-        <span class="tip">
-          普通成员只能看到自己提交的提案；组织所有者可审核并合并。
-        </span>
       </div>
-      <el-table :data="proposals" border size="small" max-height="240" style="margin-top: var(--sp-3)"
-        :empty-text="'暂无提案。在上方「个人词典」里改完后点「提交更新提案」'">
-        <el-table-column prop="type" label="类型" width="90" />
-        <el-table-column label="提交人" width="110">
+      <!-- 列表只列「谁 / 多少 / 什么状态」，术语类型由页头筛选器统一控制，
+           审核意见与差异都在右侧详情里 —— 左栏重复一遍只会把列挤到横向滚动。 -->
+      <el-table :data="proposals" border size="small" max-height="300" style="margin-top: var(--sp-2)"
+        :empty-text="`当前类型暂无${statusLabel}提案`">
+        <el-table-column label="提交人" min-width="96" show-overflow-tooltip>
           <template #default="{ row }">{{ row.submitUserId }}</template>
         </el-table-column>
-        <el-table-column prop="termCount" label="词条数" width="90" />
-        <el-table-column prop="status" label="状态" width="90">
+        <el-table-column label="词条数" width="72" align="right" />
+        <el-table-column prop="status" label="状态" width="84">
           <template #default="{ row }">
             <el-tag size="small" :type="statusTagType(row.status)" effect="plain">
               {{ statusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="auditComment" label="审核意见" min-width="140" show-overflow-tooltip />
-        <el-table-column label="操作" width="70">
+        <el-table-column label="操作" width="64">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="selectProposal(row)">查看</el-button>
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="isOwner" class="tip" style="margin-top: var(--sp-2)">
+        你是本组组长：成员提交的改动会列在这里，由你点「通过」才合并入小组基线。
+      </div>
+      <div v-else class="tip" style="margin-top: var(--sp-2)">
+        这里只列出你提交的提案；改动要生效需组长审核通过。
+      </div>
       </div>
 
       <!-- 右侧：差异详情常驻（不再用弹窗 —— 三栏差异塞进 el-dialog 太挤） -->
@@ -608,7 +611,11 @@ const proposals = ref([])
 const proposalStatus = ref('pending')
 const loadProposals = async () => {
   try {
-    const res = await listProposals({ status: proposalStatus.value || undefined })
+    // type 跟随页头的术语类型筛选：基线与归档都按它取数，提案列表不跟随就会割裂
+    const res = await listProposals({
+      status: proposalStatus.value || undefined,
+      type: typeKey.value || undefined
+    })
     proposals.value = res.data || []
   } catch {
     proposals.value = []
@@ -795,6 +802,8 @@ const saveProposalTerms = async () => {
 
 const statusText = (st) => ({ pending: '待审核', approved: '已通过', rejected: '已拒绝' }[st] || st)
 const statusTagType = (st) => ({ pending: 'warning', approved: 'success', rejected: 'info' }[st] || 'info')
+/** 当前筛选状态的文案，供空态拼句用 */
+const statusLabel = computed(() => statusText(proposalStatus.value))
 
 const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '—')
 
@@ -994,16 +1003,20 @@ onMounted(() => {
 }
 
 /* ===== 提案审核：主从布局 ===== */
-/* 左侧固定 340px 列表、右侧自适应详情。
-   原先是「列表在上 + 弹窗看差异」，三栏差异塞进 el-dialog 极挤。 */
+/* 左侧固定 420px 列表、右侧自适应详情。
+   原先是「列表在上 + 弹窗看差异」，三栏差异塞进 el-dialog 极挤。
+   宽度从 340px 提到 420px：左列表的列宽合计约 316px（提交人 96 + 词条数 72
+   + 状态 84 + 操作 64），340px 时会被挤到横向滚动。
+   「类型」与「审核意见」两列已删除：类型由页头筛选器统一控制，
+   审核意见在右侧详情里有 —— 左栏重复一遍只会把列挤窄。 */
 .rv-master {
   display: flex;
   gap: var(--sp-4);
   align-items: flex-start;
 }
 .rv-side {
-  flex: 0 0 340px;
-  min-width: 300px;
+  flex: 0 0 420px;
+  min-width: 360px;
 }
 .rv-detail {
   flex: 1 1 auto;
@@ -1040,7 +1053,7 @@ onMounted(() => {
   flex-wrap: wrap;
   margin-bottom: var(--sp-2);
 }
-/* 窄屏（<1200px）下主从退化为上下堆叠：340px 固定 + 详情在 1366 视口里
+/* 窄屏（<1200px）下主从退化为上下堆叠：420px 固定 + 详情在 1366 视口里
    与侧栏(约220px)相加会挤掉内容，堆叠更稳。 */
 @media (max-width: 1200px) {
   .rv-master {

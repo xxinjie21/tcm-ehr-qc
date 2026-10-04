@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.DistLock;
+import com.tcm.ehr.domain.dto.DictProposalDTOs;
 import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.po.DictProposalTerm;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -31,12 +32,16 @@ import java.util.UUID;
 /**
  * 词典基线更新提案（批次 17）。
  *
- * <p>成员不能直接改小组基线，只能提交一份「完整目标词典」提案；组长审核通过后才合并进
- * {@code dictionary_terms} 并生成归档版本。</p>
  *
- * <p><b>为什么提案存全量而不是增量 diff</b>：合并是整快照替换（这样才能支持删除），
+ * 成员不能直接改小组基线，只能提交一份「完整目标词典」提案；组长审核通过后才合并进
+ *
+ * dictionary_terms 并生成归档版本。
+ *
+ *
+ * 为什么提案存全量而不是增量 diff：合并是整快照替换（这样才能支持删除），
+ *
  * 组长审核时在快照上直接增删改即可，不必在合并那一刻再算一次差异、也不必处理
- * 「diff 与快照对不上」这种中间态。</p>
+ * 「diff 与快照对不上」这种中间态。
  */
 @Slf4j
 @Service
@@ -62,9 +67,9 @@ public class DictProposalService {
     /**
      * 导出「小组基线」给前端存本地个人词典。
      *
-     * @param orgId 组织；{@code ""} = 基础层
+     * @param orgId 组织；"" = 基础层
      * @param type  术语类型
-     * @return 该层完整词条（与 {@code read} 一致，不是 effective：个人词典要能看出
+     * @return 该层完整词条（与 read 一致，不是 effective：个人词典要能看出
      *         「本组织没有自有词条」，否则用户会以为拉到的是空的）
      */
     public List<TermEntry> exportBaseline(String orgId, String type) {
@@ -76,8 +81,10 @@ public class DictProposalService {
     /**
      * 提交提案（先校验待审上限）。
      *
-     * <p>上限的作用是防止反复提交把 {@code dict_proposal_term} 撑爆：每个提案都带一份
-     * 全量快照（疾病类可上千条），无上限时刷 100 次就是十万行。</p>
+     *
+     * 上限的作用是防止反复提交把 dict_proposal_term 撑爆：每个提案都带一份
+     *
+     * 全量快照（疾病类可上千条），无上限时刷 100 次就是十万行。
      *
      * @throws BusinessException 已有 5 条待审提案
      */
@@ -108,26 +115,30 @@ public class DictProposalService {
 
     // ---------------------------------------------------------------- 列表 / 详情
 
-    /**
-     * 提案列表（顺带做惰性清理）。
-     *
-     * @param orgId    null = 不按组织过滤（管理员看全部）
-     * @param status   null = 全部
-     * @param isOwner  true = 组长视角（看全组），false = 成员视角（只看自己提交的）
-     * @param submitUserId 成员视角下「我」的 userId
-     */
-    public List<DictProposalVO> list(String orgId, String status, boolean isOwner, String submitUserId) {
+/**
+ * 提案列表（顺带做惰性清理）。
+ *
+ * 过滤维度收在 ProposalQuery 里：组织、状态、类型、视角、提交人。
+ * type 为空则不限类型，供管理员跨类型查看。
+ *
+ * @param query 查询条件，调用方负责填好视角与提交人
+ * @return 提案视图列表，按提交时间倒序，最多 200 条
+ */
+public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         purgeExpiredSnapshots();
         QueryWrapper<DictProposal> q = new QueryWrapper<>();
-        if (orgId != null) {
-            q.eq("org_id", orgId);
+        if (query.getOrgId() != null) {
+            q.eq("org_id", query.getOrgId());
         }
-        if (status != null && !status.isBlank()) {
-            q.eq("status", status);
+        if (notBlank(query.getStatus())) {
+            q.eq("status", query.getStatus());
         }
-        if (!isOwner) {
+        if (notBlank(query.getType())) {
+            q.eq("type", query.getType());
+        }
+        if (query.filterBySubmitter()) {
             // 成员只看自己提交的提案：否则能翻出别人的提交内容
-            q.eq("submit_user_id", submitUserId);
+            q.eq("submit_user_id", query.getSubmitUserId());
         }
         q.orderByDesc("create_time").last("LIMIT 200");
         List<DictProposal> rows = proposalMapper.selectList(q);
@@ -149,7 +160,7 @@ public class DictProposalService {
      * 实时算提案与当前基线的差异（不落表）。
      *
      * @param proposalId 提案
-     * @return 新增 / 修改 / 删除三组；两组都空时 {@code noDiff=true}
+     * @return 新增 / 修改 / 删除三组；两组都空时 noDiff=true
      */
     public DictProposalDiffVO diff(String proposalId) {
         purgeExpiredSnapshots();
@@ -210,9 +221,11 @@ public class DictProposalService {
     /**
      * 审核提案：通过则合并进基线并生成归档版本；拒绝则标记作废并设置快照清理时间。
      *
-     * <p>合并这一段是最需要小心的：基线写入 → ES 重建 → markIndexed → 归档。
-     * 其中 <b>markIndexed 绝不能漏</b>，漏了启动对账会认为已同步，归一就静默用旧数据
-     * （批次 8b 的 {@code aliases_json} 与 ES 映射不兼容就是这么排查出来的）。</p>
+     *
+     * 合并这一段是最需要小心的：基线写入 → ES 重建 → markIndexed → 归档。
+     *
+     * 其中 markIndexed 绝不能漏，漏了启动对账会认为已同步，归一就静默用旧数据
+     * （批次 8b 的 aliases_json 与 ES 映射不兼容就是这么排查出来的）。
      *
      * @param approve true=通过并合并
      */
@@ -277,10 +290,12 @@ public class DictProposalService {
     // ---------------------------------------------------------------- 回滚（生成提案）
 
     /**
-     * 基于历史归档版本生成一份<b>新提案</b>（不直接还原基线）。
+     * 基于历史归档版本生成一份新提案（不直接还原基线）。
      *
-     * <p>走提案是有意的：回滚若直接改基线，就绕过了审核，与「任何基线变更都要过组长」
-     * 的约定冲突。</p>
+     *
+     * 走提案是有意的：回滚若直接改基线，就绕过了审核，与「任何基线变更都要过组长」
+     *
+     * 的约定冲突。
      *
      * @return 新提案的 VO
      */
@@ -299,10 +314,12 @@ public class DictProposalService {
     // ---------------------------------------------------------------- 惰性清理
 
     /**
-     * 惰性清理过期快照：<b>只删 dict_proposal_term</b>，提案主记录永久保留。
+     * 惰性清理过期快照：只删 dict_proposal_term，提案主记录永久保留。
      *
-     * <p>刻意不引入定时任务（与计划附录 B.1「不做定时任务/自动清理」的既有决议一致），
-     * 由「提交提案 / 查列表 / 看详情」三个入口顺带触发。</p>
+     *
+     * 刻意不引入定时任务（与计划附录 B.1「不做定时任务/自动清理」的既有决议一致），
+     *
+     * 由「提交提案 / 查列表 / 看详情」三个入口顺带触发。
      */
     private void purgeExpiredSnapshots() {
         List<DictProposal> expired = proposalMapper.selectList(new QueryWrapper<DictProposal>()
@@ -455,6 +472,11 @@ public class DictProposalService {
         } catch (Exception e) {
             return new ArrayList<>();
         }
+    }
+
+    /** 查询条件里 null 与空白一视同仁：都表示「这一维度不过滤」 */
+    private static boolean notBlank(String v) {
+        return v != null && !v.isBlank();
     }
 
     private String norm(String orgId) {

@@ -3049,7 +3049,7 @@ paths:
       tags:
         - 词典管理
       summary: 提案列表
-      description: 【权限：登录即可】普通成员只看到自己提交的提案；组织所有者看到全组提案。查询时顺带惰性清理已驳回且过期的提案快照（提案主记录永久保留）
+      description: 【权限：登录即可】普通成员只看到自己提交的提案；组织所有者看到全组提案。查询时顺带惰性清理已驳回且过期的提案快照（提案主记录永久保留）。type 可选，用于跟随词典页的类型筛选；省略则返回全部类型
       parameters:
         - name: status
           in: query
@@ -3057,6 +3057,13 @@ paths:
           schema:
             type: string
             enum: [pending, approved, rejected]
+        - name: type
+          in: query
+          required: false
+          description: 术语类型；非法值按 4001 拒绝，与 /import、/archives 同一口径
+          schema:
+            type: string
+            enum: [disease, symptom, pattern, herb, formula]
       responses:
         '200':
           description: 提案列表

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.DistLock;
+import com.tcm.ehr.domain.dto.DictProposalDTOs;
 import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.DictProposalDiffVO;
@@ -36,10 +37,12 @@ import static org.mockito.Mockito.when;
 /**
  * 提案域的关键契约（批次 17 第 3 步）。
  *
- * <p>重点锁三件容易出错、且出错后<b>不报错</b>的事：<br>
- * ① 合并后必须调用 {@code markIndexed} —— 漏了启动对账会认为已同步，归一静默用旧数据；<br>
- * ② 待审上限必须先查再建 —— 顺序反了就是「先写完快照再发现有超限」；<br>
- * ③ 回滚必须<b>生成提案</b>而不是直接改基线 —— 直接改就绕过了审核。</p>
+ *
+ * 重点锁三件容易出错、且出错后不报错的事：
+ *
+ * ① 合并后必须调用 markIndexed —— 漏了启动对账会认为已同步，归一静默用旧数据；
+ * ② 待审上限必须先查再建 —— 顺序反了就是「先写完快照再发现有超限」；
+ * ③ 回滚必须生成提案而不是直接改基线 —— 直接改就绕过了审核。
  */
 class DictProposalServiceTest {
 
@@ -103,6 +106,72 @@ class DictProposalServiceTest {
         }
         when(termMapper.selectList(any())).thenReturn(rows);
         when(termMapper.selectCount(any())).thenReturn((long) rows.size());
+    }
+
+    // ------------------------------------------------------------ 列表过滤
+
+    /** 组一份列表查询条件，省得每个用例都摆五个位置参数 */
+    private DictProposalDTOs.ProposalQuery query(String orgId, String status,
+                                                String type, boolean isOwner, String submitUserId) {
+        DictProposalDTOs.ProposalQuery q = new DictProposalDTOs.ProposalQuery();
+        q.setOrgId(orgId);
+        q.setStatus(status);
+        q.setType(type);
+        q.setIsOwner(isOwner);
+        q.setSubmitUserId(submitUserId);
+        return q;
+    }
+
+    @Test
+    @DisplayName("按 type 过滤：跟随前端页头的术语类型筛选")
+    void listFiltersByType() {
+        when(proposalMapper.selectList(any())).thenReturn(new ArrayList<>());
+
+        svc.list(query("org-A", null, "herb", true, "alice"));
+
+        QueryWrapper<DictProposal> q = capturedListQuery();
+        assertTrue(q.getSqlSegment().contains("type"),
+                "type 条件必须下推到 SQL，否则前端切了类型、提案列表还是显示别的类型");
+        assertTrue(q.getParamNameValuePairs().containsValue("herb"),
+                "type 的取值 herb 必须作为参数绑上");
+    }
+
+    @Test
+    @DisplayName("type 为空则不加该条件（管理员可看全部类型）")
+    void listWithoutTypeHasNoTypeCondition() {
+        when(proposalMapper.selectList(any())).thenReturn(new ArrayList<>());
+
+        svc.list(query(null, null, null, true, "alice"));
+
+        assertFalse(capturedListQuery().getSqlSegment().contains("type"),
+                "type 为空时不应生成 type 条件");
+    }
+
+    @Test
+    @DisplayName("成员视角仍只看自己提交的提案（type 过滤不能把这个约束挤掉）")
+    void listKeepsOwnerScopeForMembers() {
+        when(proposalMapper.selectList(any())).thenReturn(new ArrayList<>());
+
+        svc.list(query("org-A", null, "herb", false, "alice"));
+
+        QueryWrapper<DictProposal> q = capturedListQuery();
+        assertTrue(q.getSqlSegment().contains("submit_user_id"),
+                "非组长必须按提交人过滤，否则能翻出别人的提交内容");
+        assertTrue(q.getParamNameValuePairs().containsValue("alice"));
+    }
+
+    /**
+     * 抓取列表查询本身的查询条件。
+     *
+     * list() 进来先做惰性清理，那也会调一次 selectList，所以这里要的是
+     * 最后一次 —— 第一次是清理过期提案，与过滤条件无关。
+     */
+    private QueryWrapper<DictProposal> capturedListQuery() {
+        org.mockito.ArgumentCaptor<QueryWrapper<DictProposal>> cap =
+                org.mockito.ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(proposalMapper, times(2)).selectList(cap.capture());
+        List<QueryWrapper<DictProposal>> all = cap.getAllValues();
+        return all.get(all.size() - 1);
     }
 
     // ------------------------------------------------------------ 待审上限
@@ -311,7 +380,7 @@ class DictProposalServiceTest {
         when(termMapper.delete(any())).thenReturn(7);
         when(termMapper.selectCount(any())).thenReturn(0L);
 
-        svc.list("org-A", null, true, "owner-1");
+        svc.list(query("org-A", null, null, true, "owner-1"));
 
         // 只对 dict_proposal_term 删；proposal 主记录既不删也不按 id 删
         verify(termMapper).delete(any());

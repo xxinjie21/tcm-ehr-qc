@@ -37,11 +37,15 @@ import java.util.Map;
 /**
  * 术语词典：基线查询、管理员直写导入、提案与归档版本（批次 17）。
  *
- * <p><b>写基线只有两条路</b>：① 管理员直写 {@code /import}（特权通道，不生成提案）；
- * ② 成员提交提案 → 组长审核通过后合并。<b>普通成员没有第三条路</b>。</p>
  *
- * <p>历史版本不再由「每次导入留一份备份」提供（{@code dictionary_backups} 已废弃），
- * 改由归档版本体系：每次基线合并后留一份快照，每组每 type 最多 5 份。</p>
+ * 写基线只有两条路：① 管理员直写 /import（特权通道，不生成提案）；
+ *
+ * ② 成员提交提案 → 组长审核通过后合并。普通成员没有第三条路。
+ *
+ *
+ * 历史版本不再由「每次导入留一份备份」提供（dictionary_backups 已废弃），
+ *
+ * 改由归档版本体系：每次基线合并后留一份快照，每组每 type 最多 5 份。
  */
 @RestController
 @RequestMapping("/api/dictionary")
@@ -53,8 +57,19 @@ public class DictionaryController {
     private final DictArchiveService archiveService;
     private final OperationLogger operationLogger;
 
-    /** 校验术语类型，非法返回 null（调用方据此回 4001） */
+    /**
+     * 校验术语类型，非法返回 null（调用方据此回 4001）。
+     *
+     * null 与空白视为「不按类型过滤」并放行。
+     *
+     * ⚠️ TermTypes.ALL 是 Set.of(...)，不接受 null，contains(null) 会抛 NPE 变成 500。
+     * 所以参数可空的端点（本类的 type 可选）必须先挡掉 null，
+     * 否则「省略参数」比「传错参数」错得更离谱。
+     */
     private static ResponseEntity<Result<String>> badType(String type) {
+        if (type == null || type.isBlank()) {
+            return null;
+        }
         if (!TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
@@ -66,8 +81,10 @@ public class DictionaryController {
     /**
      * 词典分页查询（供词典页翻页 / 输入联想 / 质控规则下拉）。
      *
-     * <p>【权限：登录即可】按标准词与别名模糊匹配。不传 {@code page} 返回全部命中，
-     * 传 {@code page} 则分页。</p>
+     *
+     * 【权限：登录即可】按标准词与别名模糊匹配。不传 page 返回全部命中，
+     *
+     * 传 page 则分页。
      */
     @GetMapping("/terms")
     public ResponseEntity<Result<Map<String, Object>>> terms(
@@ -86,8 +103,10 @@ public class DictionaryController {
     /**
      * 导出「小组基线」全量词条，供前端存成本地个人词典。
      *
-     * <p>【权限：登录即可】前端拿到后可在本地编辑；改动要生效必须走提案流程
-     * （本地词典不会自动同步回小组基线）。</p>
+     *
+     * 【权限：登录即可】前端拿到后可在本地编辑；改动要生效必须走提案流程
+     *
+     * （本地词典不会自动同步回小组基线）。
      */
     @GetMapping("/baseline/export")
     public ResponseEntity<Result<List<Map<String, Object>>>> exportBaseline(
@@ -110,15 +129,19 @@ public class DictionaryController {
     // ================================================================ 管理员直写
 
     /**
-     * 上传词典文件 → 只解析返回词条，<b>不落库</b>（普通成员的批量导入入口）。
+     * 上传词典文件 → 只解析返回词条，不落库（普通成员的批量导入入口）。
      *
-     * <p>【权限：登录即可】普通成员按约定<b>不能直接改小组基线</b>（必须走提案审核）。
+     *
+     * 【权限：登录即可】普通成员按约定不能直接改小组基线（必须走提案审核）。
+     *
      * 但这个接口不碰基线 —— 它只把文件解析成词条列表返回，前端把它们存进
-     * <b>本机个人词典</b>（localStorage，与小组基线解耦）。成员若觉得这份词表值得
+     * 本机个人词典（localStorage，与小组基线解耦）。成员若觉得这份词表值得
      * 推广，再到「我的词典」提交为提案，由组长审核合并。既给了批量导入的便利，
-     * 又不绕过审核约定，也不写任何组织数据。</p>
+     * 又不绕过审核约定，也不写任何组织数据。
      *
-     * <p>Excel 需服务端 POI 解析（浏览器无 xlsx 能力），故放在这里而非纯前端。</p>
+     *
+     * Excel 需服务端 POI 解析（浏览器无 xlsx 能力），故放在这里而非纯前端。
+     *
      *
      * @param file 词典文件（.xlsx/.xls/.csv/.json）
      * @param type 术语类型
@@ -149,12 +172,16 @@ public class DictionaryController {
     /**
      * 管理员直写导入（不生成提案，属特权通道）。
      *
-     * <p>【权限：仅管理员】用于批量种子数据与基础层词典播种；写入成功后
-     * <b>自动生成归档版本</b>并计入 5 份限额。</p>
      *
-     * <p>{@code target=base} 写基础层（{@code org_id=''}，全局通用词库，
-     * 与组织层的归档限额<b>独立</b>）；缺省或 {@code target=org} 写当前组织。
-     * 刻意不开放任意 {@code orgId} 入参 —— 否则就是「管理员可写任意组织词库」的越权面。</p>
+     * 【权限：仅管理员】用于批量种子数据与基础层词典播种；写入成功后
+     *
+     * 自动生成归档版本并计入 5 份限额。
+     *
+     *
+     * target=base 写基础层（org_id=''，全局通用词库，
+     *
+     * 与组织层的归档限额独立）；缺省或 target=org 写当前组织。
+     * 刻意不开放任意 orgId 入参 —— 否则就是「管理员可写任意组织词库」的越权面。
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/import")
@@ -187,7 +214,9 @@ public class DictionaryController {
     /**
      * 提交基线更新提案（携带完整目标词典）。
      *
-     * <p>【权限：登录即可】同一 (组织, 类型) 最多 5 条待审，超出直接拒绝。</p>
+     *
+     * 【权限：登录即可】同一 (组织, 类型) 最多 5 条待审，超出直接拒绝。
+     *
      */
     @PostMapping("/proposals")
     public ResponseEntity<Result<DictProposalVO>> submitProposal(
@@ -202,32 +231,51 @@ public class DictionaryController {
         return ResponseEntity.ok(Result.ok("提案已提交，等待组长审核", vo));
     }
 
-    /**
-     * 提案列表。成员只看自己提交的，组长看全组。
-     *
-     * <p>【权限：登录即可】</p>
-     */
+/**
+ * 提案列表。成员只看自己提交的，组长看全组。
+ *
+ * 【权限：登录即可】
+ *
+ * type 可选：前端词典页的类型筛选是全局过滤（基线与归档都按它取数），
+ * 提案列表跟随同一筛选器，页面上才不会出现「切了类型但提案还是别的类型」的割裂感。
+ * 非法类型按 4001 拒绝，与 /import、/archives 同一口径。
+ */
     @GetMapping("/proposals")
     public ResponseEntity<Result<List<DictProposalVO>>> listProposals(
-            @RequestParam(value = "status", required = false) String status) {
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "type", required = false) String type) {
+        ResponseEntity<Result<String>> bad = badType(type);
+        if (bad != null) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
+        }
         boolean isOwner = RequestUtils.isOrgOwner();
-        String orgId = isOwner ? null : RequestUtils.currentOrgId();
-        return ResponseEntity.ok(Result.ok(proposalService.list(
-                orgId, status, isOwner, RequestUtils.currentUsername())));
+        DictProposalDTOs.ProposalQuery query = new DictProposalDTOs.ProposalQuery();
+        query.setOrgId(isOwner ? null : RequestUtils.currentOrgId());
+        query.setStatus(status);
+        query.setType(type);
+        query.setIsOwner(isOwner);
+        query.setSubmitUserId(RequestUtils.currentUsername());
+        return ResponseEntity.ok(Result.ok(proposalService.list(query)));
     }
 
-    /**
-     * 提案与当前基线的差异（实时计算，不落表）。
-     *
-     * <p>【权限：登录即可】仅提交者本人与组长可看。</p>
-     */
+/**
+ * 提案与当前基线的差异（实时计算，不落表）。
+ *
+ * 【权限：登录即可】仅提交者本人与组长可看。
+ *
+ * ⚠️ 比对对象必须是 username，不是 userId：submit_user_id 列存的是
+ * RequestUtils.currentUsername()（见本类 submit），而 JWT 的 subject 是 user.getId()，
+ * 两者是不同的值。此前这里误用 currentUserId() 去比，普通成员永远打不开
+ * 自己提案的差异，只会拿到「无权查看该提案」。list 与 editTerms 两处都比 username，
+ * 只有 diff 写错。回归测试见 DictionaryControllerDiffTest。
+ */
     @GetMapping("/proposals/{id}/diff")
     public ResponseEntity<Result<DictProposalDiffVO>> diff(@PathVariable("id") String id) {
         var p = proposalService.get(id);
         if (p == null) {
             return ResponseEntity.badRequest().body(Result.error(4001, "提案不存在"));
         }
-        boolean canSee = RequestUtils.isOrgOwner() || p.getSubmitUserId().equals(RequestUtils.currentUserId());
+        boolean canSee = RequestUtils.isOrgOwner() || p.getSubmitUserId().equals(RequestUtils.currentUsername());
         if (!canSee) {
             return ResponseEntity.badRequest().body(Result.error(403, "无权查看该提案"));
         }
@@ -237,7 +285,9 @@ public class DictionaryController {
     /**
      * 在线编辑自己提交的提案内容（只影响提案，不动基线）。
      *
-     * <p>【权限：登录即可】服务端强制校验「操作人 == 提交者」，且仅待审提案可编辑。</p>
+     *
+     * 【权限：登录即可】服务端强制校验「操作人 == 提交者」，且仅待审提案可编辑。
+     *
      */
     @PutMapping("/proposals/{id}/terms")
     public ResponseEntity<Result<Void>> editProposalTerms(
@@ -250,7 +300,9 @@ public class DictionaryController {
     /**
      * 审核提案：通过则合并进基线并生成归档版本；拒绝则作废并安排 7 天后清理快照。
      *
-     * <p>【权限：仅组织所有者】</p>
+     *
+     * 【权限：仅组织所有者】
+     *
      */
     @RequireOrgRole("owner")
     @PostMapping("/proposals/{id}/audit")
@@ -272,7 +324,9 @@ public class DictionaryController {
     /**
      * 归档版本列表（每组每 type 最多 5 份快照，元信息永久保留）。
      *
-     * <p>【权限：登录即可】</p>
+     *
+     * 【权限：登录即可】
+     *
      */
     @GetMapping("/archives")
     public ResponseEntity<Result<List<DictArchiveVersion>>> archives(
@@ -286,9 +340,11 @@ public class DictionaryController {
     }
 
     /**
-     * 基于历史归档版本生成一份<b>新提案</b>（不直接还原基线）。
+     * 基于历史归档版本生成一份新提案（不直接还原基线）。
      *
-     * <p>【权限：仅组织所有者】回滚走提案是为了不绕过审核；生成后仍需再走一次审核流程。</p>
+     *
+     * 【权限：仅组织所有者】回滚走提案是为了不绕过审核；生成后仍需再走一次审核流程。
+     *
      */
     @RequireOrgRole("owner")
     @PostMapping("/archives/{versionNo}/rollback")
@@ -308,7 +364,9 @@ public class DictionaryController {
     /**
      * 强制重建当前组织某一类词典的 ES 索引（不落库、不改词条）。
      *
-     * <p>【权限：仅管理员】用于「库里词条正确、但索引落后」的自愈。</p>
+     *
+     * 【权限：仅管理员】用于「库里词条正确、但索引落后」的自愈。
+     *
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/reindex")
