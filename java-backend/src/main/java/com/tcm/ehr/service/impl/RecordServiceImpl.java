@@ -89,36 +89,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /** 删除分块大小（先删 review_tasks 再删 records，避免一次 IN 过大） */
     private static final int DELETE_CHUNK = 500;
 
-    /** 表头中文名 → 字段标识（与 docs/电子病历精简脱敏数据_500行.xlsx 的表头一致） */
-    // P5.4：构建期填充，完成后 unmodifiable（同 EntityTypes）
-    private static final Map<String, String> HEADER_FIELD;
-
-    static {
-        Map<String, String> header = new LinkedHashMap<>();
-        header.put("登记号", "registrationNo");
-        header.put("门诊号", "outpatientNo");
-        header.put("性别", "gender");
-        header.put("年龄", "age");
-        header.put("就诊次数", "visitCount");
-        header.put("西医诊断", "westernDiagnosis");
-        header.put("中医诊断", "tcmDiagnosis");
-        header.put("现病史", "presentIllness");
-        header.put("主诉", "chiefComplaint");
-        header.put("自诉", "selfReport");
-        header.put("望诊", "inspection");
-        header.put("脉诊", "pulse");
-        header.put("舌诊", "tongue");
-        header.put("查体", "physicalExam");
-        header.put("辨证结论", "pattern");
-        header.put("证型", "pattern"); // 兼容旧表头
-        header.put("草药", "prescription");
-        header.put("随访", "followUp");
-        header.put("治疗效果", "treatmentEffect");
-        header.put("开单科室", "department");
-        header.put("医生工号", "doctorId");
-        header.put("接诊时间", "visitTime");
-        HEADER_FIELD = java.util.Collections.unmodifiableMap(header);
-    }
+    /** 21 列表头中文名 → 字段标识 已随批次 13 · 13.3 搬到 {@link ExcelHeaderFields} */
 
     /** 「接诊时间」列里的纯数字紧凑串：8 位到日 / 12 位到分 / 14 位到秒 */
 
@@ -622,7 +593,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             if (TextUtil.isBlank(text)) {
                 continue;
             }
-            String field = HEADER_FIELD.get(text.trim());
+            String field = ExcelHeaderFields.MAP.get(text.trim());
             // 2. 只认能映射的列；同名字段取第一次出现的列，避免后面重复表头覆盖它
             if (field != null && !idx.containsKey(field)) {
                 idx.put(field, cell.getColumnIndex());
@@ -720,7 +691,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                     if (TextUtil.isBlank(t)) {
                         continue;
                     }
-                    String field = HEADER_FIELD.get(t.trim());
+                    String field = ExcelHeaderFields.MAP.get(t.trim());
                     if (field != null && !idx.containsKey(field)) {
                         idx.put(field, c.col());
                     }
