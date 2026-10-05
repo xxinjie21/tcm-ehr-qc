@@ -155,6 +155,15 @@ public class StandardizationReportVO {
     /** 症状未归一实体的四类构成（乙类） */
     @Data
     public static class UnmatchedBreakdown {
+        /**
+         * 未归一词表缺口的高频明细（批次2）：键=实体原文，值=出现次数，按次数降序。
+         * 只收录「词表缺口」一类 —— 它是唯一能靠补词表消除的构成，因此是前端一键
+         * 「加入我的词典 / 生成提案」的输入；数据来自服务逐实体分类的同一次遍历，不额外扫库。
+         * 用 Map 而非自定义内部类：避免依赖 Lombok 作用到内部类（外层 @Data 不覆盖内部类）。
+         */
+        private java.util.Map<String, Integer> top = new java.util.LinkedHashMap<>();
+        public java.util.Map<String, Integer> getTop() { return top; }
+        public void setTop(java.util.Map<String, Integer> top) { this.top = top; }
         /** 未归一总数 */
         private int total;
         /** 抽取碎片：长度过短的残词，责任在抽取侧 */

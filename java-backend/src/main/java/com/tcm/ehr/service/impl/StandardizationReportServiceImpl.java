@@ -351,6 +351,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     private StandardizationReportVO.UnmatchedBreakdown unmatched(List<Record> records, Set<String> symptomDict) {
         StandardizationReportVO.UnmatchedBreakdown b = new StandardizationReportVO.UnmatchedBreakdown();
+        // 批次2：同一次遍历内累积「词表缺口」项的次数（键=实体原文），不额外扫库
+        java.util.Map<String, Integer> gapCount = new java.util.LinkedHashMap<>();
         for (Record r : records) {
             Map<String, Object> sd = structured(r);
             if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
@@ -380,9 +382,15 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 } else {
                     // ③ 多为标准词但词表没有 → 词表侧
                     b.setDictionaryGap(b.getDictionaryGap() + 1);
+                    gapCount.merge(content, 1, Integer::sum);
                 }
             }
         }
+        // 批次2：按次数降序装入（LinkedHashMap 保序），前端直接渲染为可行动清单
+        gapCount.entrySet().stream()
+                .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
+                .limit(15)
+                .forEach(e -> b.getTop().put(e.getKey(), e.getValue()));
         return b;
     }
 
