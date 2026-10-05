@@ -250,17 +250,14 @@ public final class QcScorer {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** 术语类型 → 结构化 structuredKey */
+    /** 术语类型 → 结构化 structuredKey；未纳入未归一扣分的类型返回 null */
     private static String keyOf(String type) {
-        // 1. 只映射参与标准化判定的 5 类；其余类型不查词典
-        return switch (type) {
-            case "disease" -> "diseases";
-            case "pattern" -> "patternList";
-            case "symptom" -> "symptoms";
-            case "herb" -> "herbs";
-            case "formula" -> "formulaList";
-            default -> null;
-        };
+        // 批次14 · 14.1：这张「5 类」的小表已搬进 EntityTypes（countsUnnormalized），
+        // 这里改为查目录 —— 以后新增类型（或改某类是否计分）只动 EntityTypes 一处。
+        // 语义与搬走前逐字相同：只有 countsUnnormalized=true 的类型才映射出 structuredKey。
+        com.tcm.ehr.common.config.EntityTypes.EntityType t =
+                com.tcm.ehr.common.config.EntityTypes.byKey(type);
+        return t != null && t.countsUnnormalized() ? t.structuredKey() : null;
     }
 
     /** 该类型下未命中词典（无 normLevel）的实体数 */

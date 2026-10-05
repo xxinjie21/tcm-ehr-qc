@@ -32,9 +32,17 @@ public final class EntityTypes {
      * @param fileName      词典文件名（无词典为 null）
      * @param fallback      无结构化结果时的原始列回退字段（Record 属性名）
      * @param order         展示顺序
+     * @param countsUnnormalized
+     *        该类未归一的实体**是否计入质控的未归一扣分**（批次 14 · 14.1 把它从
+     *        QcScorer 的 switch 搬到这里，成为目录里的一项声明）。
+     *        <p><b>为什么舌象/脉象/治法为 false</b>：它们的子要素由 python-nlp 按标点先分段
+     *        （舌质/舌苔/齿痕/裂纹、脉位与脉象分开），分段本身有损；抽不到或词表未收录的段
+     *        保留原文，若计入扣分，等于拿分段器的行为去惩罚用户。故这三类（以及无词典的病因）
+     *        不计入未归一扣分 —— 这是政策，不是遗漏。</p>
      */
     public record EntityType(String key, String label, String structuredKey, boolean dict,
-                             String fileName, List<String> fallback, int order) {
+                             String fileName, List<String> fallback, int order,
+                             boolean countsUnnormalized) {
     }
 
     // rawFields = 该类型的「专属原文来源列」。空列表不等于「抽不出来」：
@@ -44,29 +52,31 @@ public final class EntityTypes {
     // 本数据集 prescription 列是纯中药清单（无方剂名）、也没有「治以…」文本，
     // 方剂/治法恒空是数据如此，不是接线问题。
     private static final List<EntityType> ALL = List.of(
+            // 最后一位 countsUnnormalized：未归一时是否计入质控扣分（见 record 上的说明）
             new EntityType("disease", "疾病", "diseases", true, "diseases.json",
-                    List.of("tcmDiagnosis", "westernDiagnosis"), 1),
+                    List.of("tcmDiagnosis", "westernDiagnosis"), 1, true),
             new EntityType("pattern", "证候", "patternList", true, "patterns.json",
-                    List.of("pattern"), 2),
+                    List.of("pattern"), 2, true),
             new EntityType("symptom", "症状", "symptoms", true, "symptoms.json",
-                    List.of("chiefComplaint", "selfReport", "presentIllness"), 3),
+                    List.of("chiefComplaint", "selfReport", "presentIllness"), 3, true),
             new EntityType("herb", "中药", "herbs", true, "herbs.json",
-                    List.of("prescription"), 4),
+                    List.of("prescription"), 4, true),
             new EntityType("formula", "方剂", "formulaList", true, "formulas.json",
-                    List.of(), 5),
+                    List.of(), 5, true),
             // 舌象/脉象/治法自批次 20 起有词典（此前 dict=false）：
             // 子要素先由 python-nlp 按标点分段抽成独立段（舌质/舌苔/齿痕/裂纹、
             // 脉位与脉象分开），再在这里按 GB/T 47335.1/.2-2026、GB/T 16751.3-2023
             // 归一到标准术语；抽不到或词表未收录的段保留原文，不算未归一扣分
-            // （QcScorer.keyOf 只映射原 5 类，新类型落 default -> null）。
+            // —— 这条政策自批次 14 起由本行的 countsUnnormalized=false 声明，
+            // 不再靠 QcScorer 里那张远处的小表维护。
             new EntityType("tongue", "舌象", "tongueList", true, "tongues.json",
-                    List.of("tongue"), 6),
+                    List.of("tongue"), 6, false),
             new EntityType("pulse", "脉象", "pulseList", true, "pulses.json",
-                    List.of("pulse"), 7),
+                    List.of("pulse"), 7, false),
             new EntityType("cause", "病因", "causeList", false, null,
-                    List.of(), 8),
+                    List.of(), 8, false),
             new EntityType("treatment", "治法", "treatmentList", true, "treatments.json",
-                    List.of(), 9)
+                    List.of(), 9, false)
     );
 
     // P5.4：构建期用临时可变表，构建完即包成 unmodifiable 后赋给 final 字段，
