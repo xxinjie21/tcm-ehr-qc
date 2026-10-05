@@ -227,7 +227,7 @@ const levelDesc = (level, raw, name) => {
   padding: 6px 10px;
   border: 1px solid var(--ochre);
   border-radius: 4px;
-  background: var(--ochre-surface, #f3ecdf);
+  background: var(--ochre-surface, var(--ochre-light));
   color: var(--text);
   font-size: 12.5px;
 }
