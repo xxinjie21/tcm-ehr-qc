@@ -52,6 +52,26 @@ public class DictionaryTermStore {
     private final ObjectMapper objectMapper;
 
     /**
+     * 版本号缓存（批次 12 · 12a）：键 {@code org|type}，TTL 5 秒 + 写路径主动失效。
+     *
+     * <p>为什么值得缓存：{@code read} 每次都要查一次 {@code dictionary_versions} 才知道词条缓存是否
+     * 失效，而 {@code readEffective} 要读两层 ⇒ 一次读就是 <b>2 次</b>版本查询；NLP 归一按记录反复
+     * 调它，同一份版本号被查了成百上千次 —— 这正是 12a 说的「每条查 4 次词典元数据」。</p>
+     *
+     * <p><b>不脏读的做法</b>：① 写路径（{@link #replace} 与 {@code saveVersion}）主动失效 ⇒
+     * 本实例内的改动立即生效；② 仍留 5 秒 TTL，覆盖「别的实例改了词表」的情况 ——
+     * 跨实例最多迟 5 秒。词表改动不是高频操作，5 秒的可感延迟远小于「每条记录查一次库」的代价。</p>
+     */
+    private static final long VERSION_CACHE_TTL_MS = 5_000L;
+
+    /** 版本缓存项：值 + 写入时刻（用于 TTL 判断） */
+    private record CachedVersion(DictionaryVersion version, long at) {
+    }
+
+    private final java.util.Map<String, CachedVersion> versionCache =
+            java.util.Collections.synchronizedMap(new java.util.HashMap<>());
+
+    /**
      * 读某组织生效的词条：有自有词条读自己的，否则回退基础层。
      *
      * @param orgId 组织号；空串/null 视为基础层
@@ -96,9 +116,32 @@ public class DictionaryTermStore {
         String org = norm(orgId);
         // 版本取 dictionary_versions.version —— 它是「内容哈希」，内容一变版本必变，
         // 比时间戳可靠（不存在同秒撞版本的问题）；写入侧 replace 还会主动失效一次兜底。
-        DictionaryVersion v = findVersion(org, type);
+        DictionaryVersion v = cachedVersion(org, type);
         String version = v == null || v.getVersion() == null ? "" : v.getVersion();
         return termsCache.get(org + "|" + type, version, () -> loadTerms(org, type));
+    }
+
+    /**
+     * 取版本号，带 5 秒 TTL 的缓存（批次 12 · 12a）。
+     *
+     * <p>写路径会主动失效 ⇒ 本实例内的改动立即生效；跨实例最多迟 {@link #VERSION_CACHE_TTL_MS}。
+     * 「版本行不存在」（null）也会被缓存：那种行随后会被 {@code upsertVersion} 写入并失效缓存。</p>
+     */
+    private DictionaryVersion cachedVersion(String org, String type) {
+        String key = org + "|" + type;
+        long now = System.currentTimeMillis();
+        CachedVersion hit = versionCache.get(key);
+        if (hit != null && now - hit.at() < VERSION_CACHE_TTL_MS) {
+            return hit.version();
+        }
+        DictionaryVersion v = findVersion(org, type);
+        versionCache.put(key, new CachedVersion(v, now));
+        return v;
+    }
+
+    /** 让版本缓存失效（写路径必须调用，否则会读到旧版本号） */
+    private void invalidateVersionCache(String org, String type) {
+        versionCache.remove(org + "|" + type);
     }
 
     /**
@@ -154,6 +197,8 @@ public class DictionaryTermStore {
         // 主动失效：内容哈希相同（同一份内容重灌）时版本不变，但库里的行 ID 已经换了一批，
         // 缓存里那份 list 仍是可用的等价内容 —— 这里失效是为了让「重灌后立刻读」拿到新行
         termsCache.invalidate(org + "|" + type);
+        // 版本缓存同样要失效（批次 12 · 12a）：否则重灌后紧接着的读会拿旧版本号
+        invalidateVersionCache(org, type);
         return version;
     }
 
@@ -368,6 +413,8 @@ public class DictionaryTermStore {
                     .set("indexed_version", v.getIndexedVersion())
                     .set("indexed_at", v.getIndexedAt()));
         }
+        // 版本行已变 ⇒ 版本缓存必须失效，否则写路径自己可能读到旧版本号（批次 12 · 12a）
+        invalidateVersionCache(v.getOrgId(), v.getType());
     }
 
     private TermEntry toEntry(DictionaryTerm r) {
