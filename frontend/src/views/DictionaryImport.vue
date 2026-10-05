@@ -72,6 +72,16 @@
         <div class="step-body">
           <div class="step-t">选择去向并确认</div>
           <div class="step-d">{{ modeTip }}</div>
+          <!-- 批次7：dry-run 预览。后端 /dictionary/parse 明确「只解析、不落库」，
+               所以可以放心在点确认之前先把影响面摆出来（条数 + 前几条样例）。 -->
+          <div style="margin-top: 6px">
+            <span v-if="previewLoading" class="tip">正在解析文件（只解析，不会写入任何数据）…</span>
+            <template v-else-if="preview && preview.count">
+              <b>将写入 {{ preview.count }} 条术语</b>
+              <span v-if="preview.sample.length" class="tip">示例：{{ preview.sample.join('、') }}</span>
+            </template>
+            <span v-else-if="importFile" class="tip">未取得预览（解析失败或格式不符），仍可继续，但请自行确认文件内容</span>
+          </div>
 
           <!-- 管理员可选「直接生效」；其余身份只有本地一条路，不给选择避免困惑 -->
           <div v-if="isAdmin" class="target-row">
@@ -185,6 +195,9 @@ const isAdmin = computed(() => userStore.role === '管理员')
 
 const uploadRef = ref(null)
 const dictFileList = ref([])
+// 批次7：dry-run 预览结果 { count, sample } 与加载态
+const preview = ref(null)
+const previewLoading = ref(false)
 const importFile = ref(null)
 const submitting = ref(false)
 const result = ref(null)
@@ -257,11 +270,40 @@ function mergeIntoLocal(terms) {
   return added
 }
 
+/**
+ * 批次 7：dry-run 预览 —— 调「只解析、不落库」的解析接口（后端 javadoc 明确如此），
+ * 算出条目数与前几条样例。覆盖型导入（组织 / 基础层）会把共享词典整体换掉，
+ * 用户点确认前必须看到影响面，而不是只看到文件名。
+ */
+const loadPreview = async (file) => {
+  previewLoading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('type', type.value)
+    const res = await parseDictFile(form, type.value)
+    // 兼容两种返回：直接是数组，或包在 terms 里
+    const terms = Array.isArray(res.data) ? res.data : (res.data?.terms || [])
+    preview.value = {
+      count: terms.length,
+      sample: terms.slice(0, 6).map((t) => t.standardTerm || t.term || '').filter(Boolean)
+    }
+  } catch {
+    // 预览失败不阻断导入，但绝不假装「0 条」—— 置 null，界面按「未预览」呈现
+    preview.value = null
+  } finally {
+    previewLoading.value = false
+  }
+}
+
 const onFileChange = (file) => {
     importFile.value = file
     result.value = null
     // 换文件就清掉上一份的体检结果，否则会误以为是新文件的问题
     lint.value = null
+    // 批次7：换文件即重算预览，避免「看着 A 的预览导入了 B」
+    preview.value = null
+    loadPreview(file)
   }
   const onFileRemove = () => {
     importFile.value = null
