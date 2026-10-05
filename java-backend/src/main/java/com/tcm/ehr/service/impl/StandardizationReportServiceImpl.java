@@ -95,8 +95,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setCoverage(coverage(from, to));
         vo.setUnmatched(unmatched(from, to));
         vo.setNormalizable(normalizableRate(from, to));
-        vo.setScore(scoreDistribution(records));
-        vo.setQc(qcCoverage(records));
+        vo.setScore(scoreDistribution(from, to));
+        vo.setQc(qcCoverage(from, to));
         vo.setDataset(datasetShape(records));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
@@ -426,6 +426,52 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             r.setNumerator(num(row.get("numerator")));
         }
         return r;
+    }
+
+    /** 评分分布（批次12·12d，report 用）：走库内聚合，见 RecordMapper.selectScoreAndQc */
+    private StandardizationReportVO.ScoreDistribution scoreDistribution(java.time.LocalDateTime from,
+                                                                       java.time.LocalDateTime to) {
+        StandardizationReportVO.ScoreDistribution d = new StandardizationReportVO.ScoreDistribution();
+        Map<String, Object> row = reportAggregates(from, to);
+        // 口径与下面的 List 版一致：total 与 avg 都基于「有分数的记录」
+        d.setTotal(num(row.get("total")));
+        d.setMin(num(row.get("minScore")));
+        d.setMax(num(row.get("maxScore")));
+        d.setCapped(num(row.get("capped")));
+        d.setAvg(row.get("avgScore") instanceof Number n ? n.doubleValue() : 0.0);
+        return d;
+    }
+
+    /**
+     * 质控完成度（批次12·12d，report 用）：走库内聚合。
+     *
+     * <p>total 用**全部记录数**（totalAll），scored 用「qc_results.score 与 records.score 一致」的数
+     * —— 与下面的 List 版口径一致；两处计数不同，别合并成一个。</p>
+     */
+    private StandardizationReportVO.QcCoverage qcCoverage(java.time.LocalDateTime from,
+                                                         java.time.LocalDateTime to) {
+        StandardizationReportVO.QcCoverage c = new StandardizationReportVO.QcCoverage();
+        Map<String, Object> row = reportAggregates(from, to);
+        int totalAll = num(row.get("totalAll"));
+        int scored = num(row.get("qcScored"));
+        c.setTotal(totalAll);
+        c.setScored(scored);
+        c.setComplete(totalAll > 0 && scored == totalAll);
+        Object last = row.get("lastScoredAt");
+        if (last != null) {
+            // 库里是 DATETIME，取出可能是 Timestamp/LocalDateTime —— 统一转成同一格式
+            java.time.LocalDateTime ldt = last instanceof java.time.LocalDateTime l
+                    ? l : java.time.LocalDateTime.parse(String.valueOf(last).replace(' ', 'T'));
+            c.setLastScoredAt(ldt.withNano(0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        }
+        return c;
+    }
+
+    /** 评分分布与质控完成度共用一条聚合（批次12·12d），避免同一批数据算两遍 */
+    private Map<String, Object> reportAggregates(java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        Map<String, Object> row = recordMapper.selectScoreAndQc(
+                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), from, to);
+        return row == null ? Map.of() : row;
     }
 
     /** 质控分数分布与封顶率；封顶率高说明评分失去区分度 */
