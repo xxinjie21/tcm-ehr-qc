@@ -1,4 +1,4 @@
-﻿openapi: 3.0.3
+openapi: 3.0.3
 info:
   title: 中医电子病历质控与标准化系统
   description: |
@@ -1236,7 +1236,7 @@ components:
         deadlineTime:
           type: string
           format: date-time
-          description: 复核截止时间（7个工作日时限）
+          description: 复核截止时间（7 个自然日时限 —— 原写「工作日」有误，2026-10-05 校正，实现按自然日算）
         overdue:
           type: boolean
           description: 是否已超截止时间（计算属性，仅视觉提醒，不自动流转）

@@ -40,7 +40,7 @@ public final class RequestUtils {
 
     /** 系统级角色：管理员（唯一有跨组与配置写权限的身份） */
     public static final String ROLE_ADMIN = "管理员";
-    /** 系统级角色：普通用户（组长 / 组员 / 待分配池都是它） */
+    /** 系统级角色：普通用户（组织所有者 / 普通成员都是它；「待分配池」概念已废弃） */
     public static final String ROLE_USER = "用户";
 
     /** 组内角色：组长 */

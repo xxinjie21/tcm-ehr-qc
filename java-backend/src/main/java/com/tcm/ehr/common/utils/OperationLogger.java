@@ -74,7 +74,7 @@ public class OperationLogger {
      *
      * <p>异步任务的收尾日志必须用它：worker 线程既拿不到 operator / role，
      * 也拿不到 orgId（{@code RequestContextHolder} 不在该线程上）。
-     * orgId 若在提交线程即时为空（待分配池用户提交），这里应传空串，
+     * orgId 若在提交线程即时为空（提交线程尚未确定组织时），这里应传空串，这里应传空串，
      * 落库的 {@code org_id} 即为 NULL —— 该操作永远只对操作人本人可见。</p>
      *
      * @param action   操作类型
