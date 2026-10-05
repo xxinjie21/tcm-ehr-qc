@@ -222,6 +222,13 @@ class StandardizationReportServiceImplTest {
         when(recordMapper.selectRangeAndDataset(any(), anyBoolean(), any(), any()))
                 .thenReturn(java.util.Map.of("totalAll", 3, "recordCount", 3,
                         "templates", 1, "colloquial", 0));
+        // 批次12（12d）：按月分组改走库内聚合 —— 替身给的是**原始行**（VO 由服务侧装配），
+        // 数字与上面三条记录一致：2024-03 两条（归一 2/4=50.0%）、2024-04 一条。
+        when(recordMapper.selectByMonth(any(), anyBoolean(), any(), any())).thenReturn(List.of(
+                java.util.Map.of("month", "2024-03", "records", 2, "symTotal", 4, "symHit", 2,
+                        "gap", 1, "avgScore", 95.0, "capped", 1),
+                java.util.Map.of("month", "2024-04", "records", 1, "symTotal", 2, "symHit", 2,
+                        "gap", 0, "avgScore", 96.0, "capped", 0)));
 
         StandardizationReportVO vo = svc.report(null, null);
 
@@ -245,11 +252,21 @@ class StandardizationReportServiceImplTest {
         noTime.setStructuredData("{\"symptoms\":[]}");
         givenTimedRecords(recordAt("a", "2024-03-15 09:00:00"), noTime);
 
+        // 批次12（12d）：按月分组改走库内聚合 —— 替身故意把「未知」放在**最前**，
+        // 用来验证 Java 侧的展示规则（未知永远排最后）确实生效。
+        when(recordMapper.selectByMonth(any(), anyBoolean(), any(), any())).thenReturn(List.of(
+                java.util.Map.of("month", "未知", "records", 1, "symTotal", 0, "symHit", 0,
+                        "gap", 0, "avgScore", 95.0, "capped", 0),
+                java.util.Map.of("month", "2024-03", "records", 1, "symTotal", 0, "symHit", 0,
+                        "gap", 0, "avgScore", 95.0, "capped", 0)));
+
         StandardizationReportVO vo = svc.report(null, null);
 
         boolean hasUnknown = vo.getByMonth().stream()
                 .anyMatch(b -> "未知".equals(b.getMonth()));
         assertTrue(hasUnknown, "没有接诊时间的病历要单独成组，不能静默丢掉");
+        assertEquals("未知", vo.getByMonth().get(vo.getByMonth().size() - 1).getMonth(),
+                "「未知」组必须排在最后 —— 排序属 Java 侧展示规则，替身故意把它放在最前");
         int sum = vo.getByMonth().stream()
                 .mapToInt(StandardizationReportVO.MonthlyBucket::getRecords).sum();
         assertEquals(2, sum, "未知组的记录也必须计入");
