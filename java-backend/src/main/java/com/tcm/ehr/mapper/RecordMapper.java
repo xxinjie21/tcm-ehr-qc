@@ -256,6 +256,47 @@ public interface RecordMapper extends BaseMapper<Record> {
                                                @Param("end") java.time.LocalDateTime end);
 
     /**
+     * 时间区间计数 + 数据集形态（批次 12 · 12d）：一条查询同时供 rangeOf 与 datasetShape。
+     *
+     * <p>已在 500 条真实数据上逐位核对：totalAll=500 recordCount=500 templates=10 colloquial=320
+     * —— 与接口完全一致（excluded 由 totalAll-recordCount 得到，无区间时为 0）。</p>
+     *
+     * <p><b>两个易错点</b>：① 口语症状必须按记录去重（{@code COUNT(DISTINCT r2.id)}）—— Java 侧是
+     * boolean 判定、每条记录只算一次，而 JOIN 后一条记录可能命中多个症状，不去重会多算；
+     * ② 跨源 LIKE 必须显式 {@code COLLATE} —— JSON_TABLE 取出的串是 utf8mb4_0900_ai_ci，
+     * 而表列是 utf8mb4_unicode_ci，MySQL 9 下直接 LIKE 会报 Illegal mix of collations。</p>
+     */
+    @Select("""
+            SELECT
+                (SELECT COUNT(*) FROM records r0
+                  WHERE (#{viewAll} = 1 OR r0.org_id = #{orgId})) AS totalAll,
+                COUNT(*) AS recordCount,
+                COUNT(DISTINCT CASE WHEN chief_complaint IS NOT NULL AND chief_complaint <> ''
+                                    THEN REGEXP_REPLACE(chief_complaint, '[0-9]+', 'N') END) AS templates,
+                (SELECT COUNT(DISTINCT r2.id)
+                   FROM records r2,
+                        JSON_TABLE(r2.structured_data, '$.symptoms[*]'
+                            COLUMNS (c VARCHAR(200) PATH '$.content',
+                                     s VARCHAR(200) PATH '$.sourceText',
+                                     normLevel VARCHAR(20) PATH '$.normLevel')) jt
+                  WHERE (#{viewAll} = 1 OR r2.org_id = #{orgId})
+                    AND jt.normLevel IS NULL
+                    AND r2.self_report IS NOT NULL AND r2.self_report <> ''
+                    AND r2.self_report LIKE CONCAT('%', COALESCE(NULLIF(jt.c, ''), jt.s), '%')
+                        COLLATE utf8mb4_unicode_ci
+                    AND (#{start} IS NULL OR r2.visit_time >= #{start})
+                    AND (#{end} IS NULL OR r2.visit_time < #{end})) AS colloquial
+              FROM records r
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId})
+               AND (#{start} IS NULL OR r.visit_time >= #{start})
+               AND (#{end} IS NULL OR r.visit_time < #{end})
+            """)
+    Map<String, Object> selectRangeAndDataset(@Param("orgId") String orgId,
+                                              @Param("viewAll") boolean viewAll,
+                                              @Param("start") java.time.LocalDateTime start,
+                                              @Param("end") java.time.LocalDateTime end);
+
+    /**
      * 评分分布 + 质控完成度（批次 12 · 12d）：一条查询同时供评分分布与质控完成度。
      *
      * <p>与 Java 版逐位核对一致（500 条真实数据）：totalAll=500 total=500 scored=500 avg=96.0

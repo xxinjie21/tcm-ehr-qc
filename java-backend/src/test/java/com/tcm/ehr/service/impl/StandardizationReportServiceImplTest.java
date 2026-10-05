@@ -60,6 +60,12 @@ class StandardizationReportServiceImplTest {
         agg.put("qcScored", 1);
         agg.put("lastScoredAt", java.time.LocalDateTime.of(2026, 10, 5, 16, 7, 29));
         when(recordMapper.selectScoreAndQc(any(), anyBoolean(), any(), any())).thenReturn(agg);
+        java.util.Map<String, Object> agg2 = new java.util.HashMap<>();
+        agg2.put("totalAll", 1);
+        agg2.put("recordCount", 1);
+        agg2.put("templates", 1);
+        agg2.put("colloquial", 1);
+        when(recordMapper.selectRangeAndDataset(any(), anyBoolean(), any(), any())).thenReturn(agg2);
         svc = new StandardizationReportServiceImpl(recordMapper, termStore,
                 new tools.jackson.databind.ObjectMapper());
 
