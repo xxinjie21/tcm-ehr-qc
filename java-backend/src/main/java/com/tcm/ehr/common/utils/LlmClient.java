@@ -59,8 +59,8 @@ public class LlmClient {
     /** 连通性探测用提示词：只求最小往返，不要模型长篇输出 */
     private static final String PROBE_PROMPT = "ping";
 
-    /** 未配置超时时的兜底值（与 {@code llm.timeout} 默认值一致） */
-    private static final int DEFAULT_TIMEOUT_MS = 60000;
+    /** 未配置超时时的兜底值（与 {@code llm.timeout} 默认值一致，批次15 · 15.2 起为 20s 级） */
+    private static final int DEFAULT_TIMEOUT_MS = 20000;
 
     /**
      * 不重试的模板。Spring AI 默认重试模板连「连接被拒」也重试 3 次并指数退避
