@@ -20,13 +20,11 @@
              用户会以为自己没有组织。EmptyState 区分 failed 并给「重试」出口。 -->
         <EmptyState v-if="orgFailed" failed :loading="loading"
                     text="组织信息加载失败，请重试" @retry="loadMyOrg" />
-        <el-empty v-else description="你还没有加入任何组织">
-          <template #description>
-            <p class="empty-hint">你可以自己创建一个组织（创建后你就是所有者），</p>
-            <p class="empty-hint">也可以等待某个组织的所有者按用户名把你拉入。</p>
-          </template>
+        <EmptyState v-else text="你还没有加入任何组织">
+          <p class="empty-hint">你可以自己创建一个组织（创建后你就是所有者），</p>
+          <p class="empty-hint">也可以等待某个组织的所有者按用户名把你拉入。</p>
           <el-button type="primary" size="small" @click="createDialog = true">创建组织</el-button>
-        </el-empty>
+        </EmptyState>
       </div>
 
       <!-- 有组织：所有者 / 成员共用 -->

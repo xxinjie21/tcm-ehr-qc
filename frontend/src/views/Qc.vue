@@ -26,7 +26,10 @@
     <PanelCard title="质控评分标准">
       <template #header>
         <span>质控评分标准</span>
-        <el-button v-if="canWriteRules" link type="primary" class="hd-action" @click="openRules">规则配置</el-button>
+        <!-- 无写权限时不隐藏按钮，而是禁用并常驻写明原因：
+             藏起来用户只会以为「这页没有这个功能」，永远不知道是权限问题 -->
+        <el-button link type="primary" class="hd-action" :disabled="!canWriteRules" @click="openRules">规则配置</el-button>
+        <span v-if="!canWriteRules" class="tip">需管理员、组织所有者或被授权成员才能改规则</span>
       </template>
       <!-- 标准摘要：把当前生效的规则用自然语言摊开，改规则即随之变化（与规则同源） -->
       <div v-if="rules" class="std-grid">
@@ -50,7 +53,11 @@
         </div>
         <div class="st">
           <span class="st-k">术语标准化</span>
-          <span class="st-v">{{ rules.standardization.enabled ? ('开 · 每个 -' + rules.standardization.weightEach + ' 上限 -' + rules.standardization.cap) : '已关闭' }}</span>
+          <span class="st-v">{{ rules.standardization.enabled
+            ? ('开 · 未命中词典的每个 -' + rules.standardization.weightEach
+               + '；超过 ' + rules.standardization.cap + ' 个后，每再满 '
+               + rules.standardization.cap + ' 个追加一档（分段扣分，避免大量未归一时触顶、分数失去区分度）')
+            : '已关闭' }}</span>
         </div>
         <div class="st">
           <span class="st-k">重复</span>
@@ -68,7 +75,7 @@
         </el-collapse-item>
       </el-collapse>
       <div v-if="ruleWarnings.length" class="trunc-hint">规则告警：{{ ruleWarnings.join('；') }}</div>
-      <el-empty v-if="!rules" description="标准加载中…" :image-size="60" />
+      <EmptyState v-if="!rules" text="标准加载中…" :image-size="60" />
     </PanelCard>
 
     <!-- 规则配置（管理员 / 所有者 / 被授权成员）：句子清单 + 就地编辑，保存即生效 -->
@@ -168,9 +175,10 @@
           <el-switch v-model="form.rules.standardization.enabled" />
           术语标准化：未命中词典的每个扣
           <el-input-number v-model="form.rules.standardization.weightEach" size="small" :min="0" :controls="false" />
-          分，最多扣
+          分；未归一条数超过
           <el-input-number v-model="form.rules.standardization.cap" size="small" :min="0" :controls="false" />
-          分。
+          后按档累加（每满该条数再加扣一档，<b>不再封顶</b>，避免大量未归一时分数失去区分度）。
+          保存即生效；已评过的病历需重跑质控才会更新。
         </div>
         <div class="rc-line">
           重复病历扣
@@ -228,7 +236,7 @@
           </div>
           <div v-if="dedStats.truncated" class="trunc-hint">超出扫描上限，仅统计前 {{ dedStats.scanned }} 份</div>
         </template>
-        <el-empty v-else-if="!dedLoading" description="点击上方「查询」查看本范围扣分构成" :image-size="70" />
+        <EmptyState v-else-if="!dedLoading" text="当前范围暂无可统计的评分结果" :image-size="70" />
       </div>
     </PanelCard>
 
@@ -332,6 +340,7 @@ import { useTermOptions } from '@/composables/useTermOptions'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
+import { usePagedList } from '@/composables/usePagedList'
 import RecordTable from '@/components/RecordTable.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -358,8 +367,6 @@ const catalogElements = ref([])
 const catalogFormats = ref([])
 const dedStats = ref(null)
 const dedLoading = ref(false)
-// 词典类型固定五类，供一致性规则的「期望值」下拉使用
-const TERM_TYPES = ['disease', 'pattern', 'symptom', 'herb', 'formula']
 
 // 读取当前生效规则与说明文案
 const loadRules = async () => {
@@ -497,10 +504,15 @@ const openRules = async () => {
     weight: c.weight ?? 10
   }))
   // 6. 回填标准化 / 重复扣分 / 分级阈值
+  //    ⚠️ 这里**不许再写业务数字**：原先写成 `r.thresholds || { qualified: 90, invalid: 60,
+  //    seriousFullMissing: 3 }`、`weightEach: 1, cap: 5`、`duplicateWeight ?? 5`。
+  //    后端正常都会下发这些值，所以那些字面量平时是死分支；一旦真走到（后端漏字段 /
+  //    版本不齐），表单会显示一套「后端没说过」的数字，用户一保存就把它们写进本组织规则 ——
+  //    静默改口径。故缺失时退到本页已从后端取到的生效规则，仍无则留空让用户看见。
   form.rules = {
-    standardization: r.standardization || { enabled: true, elementTypes: TERM_TYPES, weightEach: 1, cap: 5 },
-    duplicateWeight: r.duplicateWeight ?? 5,
-    thresholds: r.thresholds || { qualified: 90, invalid: 60, seriousFullMissing: 3 }
+    standardization: r.standardization || rules.value?.standardization || null,
+    duplicateWeight: r.duplicateWeight ?? rules.value?.duplicateWeight ?? null,
+    thresholds: r.thresholds || rules.value?.thresholds || null
   }
   // 7. 打开弹窗，并预热词典候选（供「期望值」下拉）
   rulesVisible.value = true
@@ -638,42 +650,27 @@ const resetRules = async () => {
 // 分级不再单独持有：统一由上方「范围查询」的 filters.grade 驱动，
 // 否则同一页会出现两个互不相干的分级口径
 // 预检列表状态
-const precheckRows = ref([])
-const precheckTotal = ref(0)
 const precheckPage = ref(1)
 const precheckSize = ref(10)
-const precheckLoading = ref(false)
 // 预检列表加载失败：与「范围内确实没有病历」区分开（三态统一）
-const precheckFailed = ref(false)
 
 // 加载预检列表；传数字即跳到该页
 // latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页时慢的旧响应
 // 不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
-let precheckSeq = 0
+// 列表骨架统一走 usePagedList：失败保留已有行并标记失败（空态据此给重试入口）
+const {
+  list: precheckRows, total: precheckTotal, loading: precheckLoading,
+  failed: precheckFailed, load: loadPrecheckList
+} = usePagedList({
+  fetcher: () => searchRecords({ ...filters, page: precheckPage.value, pageSize: precheckSize.value }),
+  extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
+  clearOnFailure: false
+})
+
+// 加载预检列表；传数字即跳到该页
 const loadPrecheck = async (p) => {
-  // 1. 入参是页码数字时先跳页（分页组件切换时会带上页码）
   if (typeof p === 'number') precheckPage.value = p
-  // 1.5 取本次请求的号
-  const mine = ++precheckSeq
-  // 2. 置加载态，并清掉上一次的失败标记
-  precheckLoading.value = true
-  precheckFailed.value = false
-  try {
-    // 3. 按当前范围 + 分页参数拉取预检列表
-    const res = await searchRecords({ ...filters, page: precheckPage.value, pageSize: precheckSize.value })
-    if (mine !== precheckSeq) return
-    // 4. 回填列表与总数
-    precheckRows.value = res.data?.records || []
-    precheckTotal.value = res.data?.total || 0
-  } catch {
-    if (mine !== precheckSeq) return
-    // 失败态与「范围内确实没有病历」区分开，空态据此给重试入口
-    precheckFailed.value = true
-    // 拦截器已提示
-  } finally {
-    // 只有最新一次请求才复位加载态
-    if (mine === precheckSeq) precheckLoading.value = false
-  }
+  await loadPrecheckList()
 }
 
 // 每页条数变化回到第 1 页

@@ -6,17 +6,17 @@
     <div class="auth-role-tip">注册账号为「用户」（在组织内可能是所有者或成员），管理员账号由系统预置。</div>
 
     <!-- 可选「同时创建组织」：提交后组织立即生效，创建者即所有者 -->
-    <el-collapse v-model="form.groupOpen" class="group-collapse">
-      <el-collapse-item title="同时创建组织（可选）" name="group">
+    <el-collapse v-model="form.orgOpen" class="org-collapse">
+      <el-collapse-item title="同时创建组织（可选）" name="org">
         <p class="hint">勾选后提交会注册并<b>立即创建组织</b>（无需审批），你成为该组织所有者。不勾选则登录后自行创建，或等待其他组织所有者邀请。</p>
-        <el-form-item v-if="form.groupOpen" label="组织编码" prop="groupCode">
-          <el-input v-model="form.groupCode" placeholder="可留空；大写字母/数字/连字符，2~50 位" size="large" />
+        <el-form-item v-if="form.orgOpen" label="组织编码" prop="orgCode">
+          <el-input v-model="form.orgCode" placeholder="可留空；大写字母/数字/连字符，2~50 位" size="large" />
         </el-form-item>
-        <el-form-item v-if="form.groupOpen" label="组织名称" prop="groupName">
-          <el-input v-model="form.groupName" placeholder="名称最长 100 字" size="large" />
+        <el-form-item v-if="form.orgOpen" label="组织名称" prop="orgName">
+          <el-input v-model="form.orgName" placeholder="名称最长 100 字" size="large" />
         </el-form-item>
-        <el-form-item v-if="form.groupOpen" label="用途说明（可选）">
-          <el-input v-model="form.groupPurpose" type="textarea" :rows="2" placeholder="可选" />
+        <el-form-item v-if="form.orgOpen" label="用途说明（可选）">
+          <el-input v-model="form.orgPurpose" type="textarea" :rows="2" placeholder="可选" />
         </el-form-item>
       </el-collapse-item>
     </el-collapse>
@@ -77,7 +77,7 @@ const router = useRouter()
 const formRef = ref(null)
 const loading = ref(false)
 
-const form = reactive({ username: '', password: '', confirmPassword: '', groupOpen: false, groupCode: '', groupName: '', groupPurpose: '' })
+const form = reactive({ username: '', password: '', confirmPassword: '', orgOpen: false, orgCode: '', orgName: '', orgPurpose: '' })
 
 // 密码变了，上一次「确认密码」的一致性结论就失效，需要重新判定
 watch(
@@ -116,11 +116,11 @@ const rules = {
     { min: 6, message: '密码至少 6 位', trigger: 'blur' }
   ],
   confirmPassword: [{ required: true, validator: validateConfirm, trigger: 'blur' }],
-  groupCode: [
+  orgCode: [
     { required: true, whitespace: true, message: '请输加入组织织编码', trigger: 'blur' },
     { pattern: /^[A-Za-z0-9_-]{2,50}$/, message: '编码为 2~50 位字母、数字、短横线或下划线', trigger: 'blur' }
   ],
-  groupName: [{ required: true, whitespace: true, message: '请输加入组织织名称', trigger: 'blur' }]
+  orgName: [{ required: true, whitespace: true, message: '请输入组织名称', trigger: 'blur' }]
 }
 
 // 提交注册：校验通过后只提交用户名与密码（角色由后端固定为「用户」）；
@@ -132,18 +132,20 @@ const handleRegister = async () => {
   // 2. 置加载态：按钮转圈，避免重复提交
   loading.value = true
   try {
-    // 构建请求体：同时创建组织时勾上 createGroup；角色由后端固定为「用户」
+    // 构建请求体：同时创建组织时带上 createGroup；角色由后端固定为「用户」
+    // ⚠️ 这个键名必须保持 createGroup：它是后端契约字段（RegisterDTO.createGroup），
+    //    《计划》§1.5 明确不做「为一致性改契约字段名」。前端自己的标识符已统一成 org*
     const payload = { username: form.username, password: form.password }
-    if (form.groupOpen) {
+    if (form.orgOpen) {
       payload.createGroup = {
-        code: form.groupCode,
-        name: form.groupName,
-        purpose: form.groupPurpose || undefined
+        code: form.orgCode,
+        name: form.orgName,
+        purpose: form.orgPurpose || undefined
       }
     }
     await register(payload)
     // 3. 提示成功：创建组织请求与单纯注册用不同的口径提示
-    ElMessage.success(form.groupOpen ? '注册成功，组织已创建，你是该组织所有者' : '注册成功，请登录后创建或加入组织')
+    ElMessage.success(form.orgOpen ? '注册成功，组织已创建，你是该组织所有者' : '注册成功，请登录后创建或加入组织')
     router.push({ path: '/login', query: { username: form.username } })
   } catch {
     // 拦截器已提示（如用户名已存在）

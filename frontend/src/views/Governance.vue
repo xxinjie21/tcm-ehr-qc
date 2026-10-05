@@ -196,7 +196,7 @@
             </template>
           </el-table-column>
           <template #empty>
-            <el-empty description="筛选范围内没有质控合格的病历" :image-size="80" />
+            <EmptyState text="筛选范围内没有质控合格的病历" />
           </template>
         </el-table>
       </div>
@@ -215,11 +215,13 @@ import { useDepartments } from '@/composables/useDepartments'
 import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
+import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
-import { clean as cleanApi, exportDataset, previewDataset, governanceStats } from '@/api/governance'
+import { clean as cleanApi, governanceStats } from '@/api/governance'
+import { exportDataset, previewDataset } from '@/api/export'
 import { saveBlob } from '@/utils/download'
 import { useAiContextStore } from '@/stores/ai'
 import { LEVEL_TINY } from '@/utils/structured'
@@ -507,7 +509,6 @@ onMounted(() => {
 }
 .flow-tip b {
   color: var(--ink);
-  font-weight: normal;
 }
 
 /* ===== 清洗流程图 ===== */

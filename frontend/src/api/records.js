@@ -35,3 +35,9 @@ export function deleteRecordsByFilter(filters) {
 export function searchRecords(data) {
   return request.post('/records/search', data)
 }
+
+// 人工复核提交（POST /records/{id}/review）：路径域属 /records/*，故从 review.js 移来。
+// correctedData 可空（仅裁定，不改结构化数据）
+export function submitReview(recordId, data) {
+  return request.post(`/records/${recordId}/review`, data)
+}

@@ -151,6 +151,9 @@
                 <!-- 禁用时说明原因，而不是让用户猜-->
                 <span v-if="!recordId" class="tip">先在上方列表点选一份病历才能保存</span>
                 <span v-else-if="!result" class="tip">先执行抽取才能保存</span>
+                <span v-else-if="resultEmpty" class="tip">
+                  本次没有抽到任何要素，写回会把原有结构化数据清空，已禁用
+                </span>
               </div>
             </div>
 
@@ -203,7 +206,7 @@
               </div>
 
               <StructuredDataCard v-if="result" :data="result" />
-              <el-empty v-else description="尚未抽取" :image-size="80" />
+              <EmptyState v-else text="尚未抽取" />
 
               <!-- 术语归一试算：词典直查，不依赖 Python NLP 服务，
                    让用户在本页就能亲自跑一次归一、看到「原文 → 标准词」 -->
@@ -319,7 +322,9 @@
 
           <!-- 最近任务 -->
           <div v-if="batchTasks.length" class="batch-list">
-            <div class="bf-hd">最近任务（最多显示最近 50 条）</div>
+            <div class="bf-hd">
+              最近任务（最多 {{ taskListLimit }} 条）<span v-if="taskListTruncated" class="bf-trunc">已省略更早的任务</span>
+            </div>
             <el-table :data="batchTasks" border size="small" max-height="260">
               <el-table-column label="提交时间" width="170">
                 <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
@@ -355,6 +360,7 @@ import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
+import { usePagedList } from '@/composables/usePagedList'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -363,7 +369,7 @@ import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
-import { apiErrorMessage } from '@/utils/request'
+import { apiErrorMessage } from '@/utils/errorMessage'
 import { MULTI_AUTOSIZE } from '@/utils/recordFields'
 import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
 import { confirmBox } from '@/utils/confirm'
@@ -373,41 +379,24 @@ const activeTab = ref('single')
 
 // ===== 病历列表=====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
-const rows = ref([])
-const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
-const listLoading = ref(false)
 // 列表加载失败：与「确实没有匹配」区分开（三态统一）
-const listFailed = ref(false)
 
 // 查询病历列表（分页 / 筛选 / 重试共用）：传数字即跳到该页；失败置 listFailed 与「确实没有匹配」区分，toast 由拦截器出
 // latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页时慢的旧响应不覆盖新结果，
 // 也不提前收掉 loading（范式同 components/TermInput.vue）
-let listSeq = 0
+// 列表骨架统一走 usePagedList：失败保留已有行，但仍标记失败（与「确实没有匹配」区分）
+const { list: rows, total, loading: listLoading, failed: listFailed, load: loadRecords } = usePagedList({
+  fetcher: () => searchRecords({ ...query, page: page.value, pageSize: pageSize.value }),
+  extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
+  clearOnFailure: false
+})
+
+// 查询病历列表（分页 / 筛选 / 重试共用）：传数字即跳到该页
 const search = async (p) => {
-  // 1. 传数字即跳到该页（翻页与重试共用同一入口）
   if (typeof p === 'number') page.value = p
-  // 1.5 取本次请求的号
-  const mine = ++listSeq
-  // 2. 进入加载态，并清掉上一次的失败标记
-  listLoading.value = true
-  listFailed.value = false
-  try {
-    // 3. 拉取列表数据，回填行与总数
-    const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
-    if (mine !== listSeq) return
-    rows.value = res.data?.records || []
-    total.value = res.data?.total || 0
-  } catch {
-    if (mine !== listSeq) return
-    // 4. 请求失败置失败标记，与「确实没有匹配」区分开
-    listFailed.value = true
-    // 拦截器已提示
-  } finally {
-    // 5. 只有最新一次请求才收掉加载态
-    if (mine === listSeq) listLoading.value = false
-  }
+  await loadRecords()
 }
 
 // 每页条数变化：重置回第 1 页再查，避免停留在越界页码上拿到空列表
@@ -496,8 +485,11 @@ const extracting = ref(false)
  */
 const extractError = ref('')
 
-// 可写回的前提：既载入了病历、又有抽取结果；两者缺一即禁用保存并给出对应提示
-const canSave = computed(() => !!recordId.value && !!result.value)
+// 可写回的前提：既载入了病历、又有抽取结果，且结果不是「9 类全空」。
+// 最后一条是必须的：上游不可用时后端会规范化成「200 + 空 9 类」，
+// 空对象也是真值，只判 !!result 会让保存按钮可用，一点就把已有结构化数据清成空，
+// 而且写回会打上人工修改标记，清洗链路从此跳过该病历、再也补不回来。
+const canSave = computed(() => !!recordId.value && !!result.value && !resultEmpty.value)
 
 // 载入一份病历：换病历时必须清空上一次抽取结果，否则会把 A 的结果存进 B
 const loadRecord = async (row) => {
@@ -697,6 +689,10 @@ const submitting = ref(false)
 const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const activeTask = ref(null)
 const batchTasks = ref([])
+// 列表是否被服务端截断（true = 还有更早的任务没返回）；上限条数由后端下发，别在前端写死
+// ⚠️ 名字不能叫 batchLimit —— 那个已被「本次只处理前 N 条」的输入框占用（语义完全不同）
+const taskListTruncated = ref(false)
+const taskListLimit = ref(50)
 let pollTimer = null
 
 const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
@@ -718,10 +714,14 @@ const statusText = (t) => {
 }
 
 // 拉取最近任务列表；失败静默（拦截器已提示），不阻塞当前进度展示
+// 返回的是 { tasks, truncated, limit }：truncated 为真说明还有更早的任务没返回，
+// 页面必须说出来 —— 原先标题写死「最多显示最近 50 条」，不足 50 条时那句话本身就是错的
 const loadBatchList = async () => {
   try {
     const res = await listNlpBatch()
-    batchTasks.value = res.data || []
+    batchTasks.value = res.data?.tasks || []
+    taskListTruncated.value = res.data?.truncated === true
+    taskListLimit.value = res.data?.limit || 50
   } catch {
     // 拦截器已提示
   }
@@ -888,7 +888,7 @@ onBeforeUnmount(stopPoll)
 .nlp-tabs :deep(.el-tabs__header) { margin-bottom: var(--sp-3); }
 .nlp-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
 /* 「换病历」入口：选择病历卡收起后挂在载入条右侧 */
-.picker-toggle { font-weight: normal; margin-left: auto; }
+.picker-toggle { margin-left: auto; }
 .loaded-bar {
   display: flex;
   align-items: center;
@@ -926,7 +926,7 @@ onBeforeUnmount(stopPoll)
 }
 .pane { min-width: 0; }
 .pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: var(--sp-2); }
-.src-note { font-size: 11.5px; color: var(--ink-mid); font-weight: normal; margin-left: var(--sp-2); }
+.src-note { font-size: 11.5px; color: var(--ink-mid); margin-left: var(--sp-2); }
 .src-note.warn { color: var(--danger); }
 .norm-note {
   font-size: 12px;
@@ -938,7 +938,7 @@ onBeforeUnmount(stopPoll)
   margin-bottom: 10px;
   line-height: 1.7;
 }
-.norm-note b { color: var(--ink); font-weight: normal; }
+.norm-note b { color: var(--ink); }
 .norm-note.warn {
   background: var(--danger-surface);
   border-color: #e3c3bb;
@@ -1016,7 +1016,7 @@ onBeforeUnmount(stopPoll)
 .nt-in { color: var(--text-sub); }
 .nt-arrow { color: #c9c3b4; }
 .nt-out { color: var(--ink); font-weight: bold; }
-.nt-out.miss { color: var(--danger); font-weight: normal; }
+.nt-out.miss { color: var(--danger); }
 .nt-src { font-size: 11.5px; color: var(--text-sub); margin-left: auto; }
 .nt-hint { margin-top: var(--sp-2); font-size: 11.5px; color: var(--text-sub); line-height: 1.7; }
 
@@ -1112,6 +1112,8 @@ onBeforeUnmount(stopPoll)
 .batch-failures { margin-top: 14px; border-top: 1px dashed #ece8dc; padding-top: var(--sp-3); }
 .batch-list { margin-top: var(--sp-4); border-top: 1px dashed #ece8dc; padding-top: var(--sp-3); }
 .bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: var(--sp-2); }
+/* 截断提示：用的是次要色而不是警示色 —— 列表被截断是正常上限行为，不是错误 */
+.bf-trunc { margin-left: var(--sp-2); color: var(--ochre); }
 
 @media (max-width: 1560px) {
   .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

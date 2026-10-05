@@ -212,6 +212,7 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
+import { usePagedList } from '@/composables/usePagedList'
 import RecordTable from '@/components/RecordTable.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -273,41 +274,20 @@ const hasFilter = computed(() => {
   const range = Array.isArray(r) && r.length === 2 && r[0] && r[1]
   return !!(query.department || query.pattern || query.grade || range)
 })
-const rows = ref([])
-const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
-const searching = ref(false)
-// 列表加载失败：与「确实没有匹配」区分开（三态统一）
-const listFailed = ref(false)
+// 列表骨架统一走 usePagedList：本页失败**保留已有行**、但仍要标记失败
+// （空态据此区分「加载失败」与「确实无数据」），故 clearOnFailure: false
+const {
+  list: rows, total, loading: searching, failed: listFailed, load: loadList
+} = usePagedList({
+  fetcher: () => searchRecords({ ...query, page: page.value, pageSize: pageSize.value }),
+  extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
+  clearOnFailure: false
+})
 
-// 查询列表：按当前筛选条件 + 分页参数请求，成功后覆盖表格数据与总数；
-// 失败时置 listFailed，使空态能区分「加载失败」与「确实无数据」（错误提示由拦截器统一给出）
-// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页/改筛选时，
-// 慢的旧响应不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
-let listSeq = 0
-const handleSearch = async () => {
-  // 0. 取本次请求的号
-  const mine = ++listSeq
-  // 1. 置加载态并清空上次失败态，重试时能重新给出 loading
-  searching.value = true
-  listFailed.value = false
-  try {
-    // 2. 按当前筛选条件 + 分页参数请求列表，成功后覆盖表格数据与总数
-    const res = await searchRecords({ ...query, page: page.value, pageSize: pageSize.value })
-    if (mine !== listSeq) return
-    rows.value = res.data?.records || []
-    total.value = res.data?.total || 0
-  } catch {
-    if (mine !== listSeq) return
-    // 3. 标记失败态，让空态能区分「加载失败」与「确实无数据」
-    listFailed.value = true
-    // 拦截器已提示
-  } finally {
-    // 4. 只有最新一次请求才关 loading，否则会把还在飞的请求的 loading 提前收掉
-    if (mine === listSeq) searching.value = false
-  }
-}
+// 查询列表：翻页 / 改筛选 / 重试共用同一入口
+const handleSearch = () => loadList()
 
 // 每页条数变化回到第 1 页
 const handleSizeChange = () => {
@@ -411,8 +391,13 @@ const handleBatchDelete = async () => {
   // 4. 一次提交全部 id
   try {
     const res = await deleteRecords(ids)
-    const n = res.data?.deletedCount ?? ids.length
-    ElMessage.success(`已删除 ${n} 份病历`)
+    const n = res.data?.deletedCount ?? 0
+    // 一条都没删掉时不能报成功：不属于当前组织或已被删除的 id 会被后端剔除
+    if (n === 0) {
+      ElMessage.warning('没有删除任何病历：选中的病历可能不属于当前组织，或已被删除')
+    } else {
+      ElMessage.success(`已删除 ${n} 份病历`)
+    }
     // 5. 当前详情记录在被删集合内时，收起弹窗并清空引用
     if (ids.includes(activeId.value)) {
       closeDetail()
@@ -526,6 +511,8 @@ const handleImport = async () => {
   resetImportState(files.length)
   // 3. 标记本次是否提交了后台结构化解析，供完成文案区分
   let autoTaskSubmitted = false
+  // 3.1 开关是否开着：开着却没拿到任务号要显式提示，不能只说「导入完成」
+  let autoRequested = false
   // 4. 逐文件串行上传：后端是同步接口，进度只能按「文件」粒度推进
   try {
     const failures = []
@@ -537,6 +524,7 @@ const handleImport = async () => {
       // 6. 单文件上传（P3.4 抽出 uploadOneFile）
       const one = await uploadOneFile(files[i], i)
       if (one.autoTaskId) autoTaskSubmitted = true
+      if (one.autoRequested) autoRequested = true
       progress.success += one.success
       progress.failed += one.failed
       if (one.failures.length) failures.push(...one.failures)
@@ -552,6 +540,12 @@ const handleImport = async () => {
     const tail = cancelled.value ? '（已取消，未处理剩余文件）' : ''
     const autoTail = autoTaskSubmitted ? '；已提交后台结构化解析' : ''
     ElMessage.success(`导入完成：成功 ${progress.success} 条，失败 ${progress.failed} 条${autoTail}${tail}`)
+    // 9.1 开关开着却没提交上：后端在「抽取服务未开启」或上游不可用时只写日志，
+    //     接口照旧返回成功。不提示的话用户以为解析在跑，实际一条都不会解析
+    if (autoRequested && !autoTaskSubmitted) {
+      ElMessage.warning('导入完成，但自动结构化解析未提交（抽取服务未开启或上游不可用）；'
+        + '可在「批量解析」页手动提交')
+    }
     // 10. 清空文件列表并刷新查询列表
     fileList.value = []
     handleSearch()
@@ -599,7 +593,10 @@ const uploadOneFile = async (file, index) => {
     success: s.success || 0,
     failed: s.failed || 0,
     failures: s.failures || [],
-    autoTaskId: res.data.autoExtractTaskId || null
+    autoTaskId: res.data.autoExtractTaskId || null,
+    // 本次是否请求了自动解析：开关开着却没拿到任务号 = 后端没能提交上，
+    // 完成文案必须说出来，不能只显示「导入完成」替后端谎报成功
+    autoRequested: autoExtract.value === true
   }
 }
 

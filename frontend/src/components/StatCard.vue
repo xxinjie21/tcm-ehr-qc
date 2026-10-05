@@ -57,7 +57,6 @@ const display = computed(() =>
 }
 .stat .num small {
   font-size: 13px;
-  font-weight: normal;
   color: var(--text-sub);
 }
 .stat .lbl {

@@ -77,14 +77,11 @@
         </el-table-column>
         <template #empty>
           <!-- P5.8：空态必须解释「为什么空 / 怎么才有内容」；加载失败与真为空分开 -->
-          <el-empty
-            :description="termsFailed
-              ? '术语加载失败，请点击「查 询」重试'
-              : (keyword ? `没有匹配「${keyword}」的术语：换个更短的关键词，或确认该类型已导入过词条` : '该词典暂无术语：使用「术语库导入」上传词典后可在此检索')"
-            :image-size="80"
-          >
-            <el-button v-if="termsFailed" size="small" @click="loadTerms(true)">重 试</el-button>
-          </el-empty>
+          <EmptyState
+            :failed="termsFailed"
+            :text="keyword ? `没有匹配「${keyword}」的术语：换个更短的关键词，或确认该类型已导入过词条` : '该词典暂无术语：使用「术语库导入」上传词典后可在此检索'"
+            @retry="loadTerms(true)"
+          />
         </template>
       </el-table>
       <!-- 分页：词典已从演示的十几条涨到上千条（如疾病 1357、证候 2080），
@@ -222,9 +219,9 @@
 
       <!-- 右侧：差异详情常驻（不再用弹窗 —— 三栏差异塞进 el-dialog 太挤） -->
       <div class="rv-detail">
-        <el-empty
+        <EmptyState
           v-if="!currentProposal"
-          description="从左侧选择一条提案查看差异"
+          text="从左侧选择一条提案查看差异"
           :image-size="70"
         />
         <template v-else>
@@ -264,7 +261,7 @@
                 {{ t.standardTerm }}
                 <span class="rv-diff-al">别名：{{ (t.aliases || []).join('、') || '—' }}</span>
               </div>
-              <el-empty v-if="!diff?.added?.length" description="无新增" :image-size="44" />
+              <EmptyState v-if="!diff?.added?.length" text="无新增" :image-size="44" />
             </div>
             <div class="rv-diff-sec">
               <div class="rv-diff-hd mod">修改 {{ diff?.modified?.length || 0 }} 条</div>
@@ -275,14 +272,14 @@
                   → {{ (t.aliases || []).join('、') || '—' }}
                 </span>
               </div>
-              <el-empty v-if="!diff?.modified?.length" description="无修改" :image-size="44" />
+              <EmptyState v-if="!diff?.modified?.length" text="无修改" :image-size="44" />
             </div>
             <div class="rv-diff-sec">
               <div class="rv-diff-hd del">删除 {{ diff?.removed?.length || 0 }} 条</div>
               <div v-for="(t, i) in diff?.removed || []" :key="'d' + i" class="rv-diff-row">
                 {{ t }}
               </div>
-              <el-empty v-if="!diff?.removed?.length" description="无删除" :image-size="44" />
+              <EmptyState v-if="!diff?.removed?.length" text="无删除" :image-size="44" />
             </div>
             <el-alert
               v-if="diff && diff.noDiff" type="info" :closable="false" show-icon
@@ -375,6 +372,7 @@
 // 导入只有一条路径 —— Excel / CSV / JSON 覆盖入库（导入前自动备份）。
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import {
   getTerms, exportBaseline, submitProposal, listProposals,
@@ -605,6 +603,32 @@ const removeLocalTerm = (std) => {
 
 /** 提交提案：带上完整目标词典 */
 const doSubmitProposal = async () => {
+  // 1. 先取该类型的基线全量条数（不带关键字过滤）——不能直接用列表上的 total：
+  //    它受页头关键词过滤影响，有过滤时会把它当成全量基线，删除条数就报错了
+  let baselineTotal = null
+  try {
+    const r = await getTerms({ type: typeKey.value, page: 1, size: 1 })
+    baselineTotal = r.data?.total ?? null
+  } catch {
+    // 取不到就不硬算：确认框退化成「只报提交条数」，不让一次统计失败挡住提交
+  }
+  // 2. 条数对比 + 二次确认：合并是整快照替换，缩水意味着要删基线里的词条，
+  //    必须在提交前把「会删多少」说清楚（缩水超 20% 后端还会直接拒绝）
+  const nextCount = localTerms.value.length
+  const shrink = baselineTotal == null ? 0 : baselineTotal - nextCount
+  const head = baselineTotal == null
+    ? `将提交 ${nextCount} 条词条作为新的基线快照。`
+    : `基线将由 ${baselineTotal} 条变为 ${nextCount} 条`
+      + (shrink > 0 ? `（净删除 ${shrink} 条）` : '') + '。'
+  const tail = shrink > 0
+    ? '整快照替换会删掉旧基线里未出现在本次快照中的词条（缩水超过 20% 后端会直接拒绝）。确定提交？'
+    : '通过后整快照替换当前基线并生成归档版本。确定提交？'
+  if (!(await confirmBox(head + tail, '提交基线更新提案', {
+    type: shrink > 0 ? 'warning' : 'info',
+    confirmButtonText: '提交提案', cancelButtonText: '取消'
+  }))) {
+    return
+  }
   submittingProposal.value = true
   try {
     const res = await submitProposal({

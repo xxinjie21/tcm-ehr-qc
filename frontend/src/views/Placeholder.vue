@@ -1,5 +1,9 @@
 <template>
   <el-card>
-    <el-empty :description="$route.meta.title + ' - 页面待开发'" />
+    <EmptyState :text="$route.meta.title + ' - 页面待开发'" />
   </el-card>
 </template>
+
+<script setup>
+import EmptyState from '@/components/EmptyState.vue'
+</script>

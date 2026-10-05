@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.utils.ExcelRawStreamReader;
+import java.io.IOException;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
@@ -22,7 +24,6 @@ import com.tcm.ehr.domain.vo.ImportTaskVO;
 import com.tcm.ehr.domain.vo.RawRecordVO;
 import com.tcm.ehr.domain.vo.SearchVO;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.IRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -70,11 +72,12 @@ import java.util.regex.Pattern;
 public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> implements IRecordService {
 
     private final ObjectMapper objectMapper;
-    private final IDictionaryFileService dictionaryFileService;
     private final com.tcm.ehr.service.INlpBatchService nlpBatchService;
     private final com.tcm.ehr.mapper.ReviewTaskMapper reviewTaskMapper;
+    /** 写回结构化数据时打词典版本戳（与解析链路同口径，保证可追溯） */
+    private final com.tcm.ehr.service.DictionaryTermStore termStore;
 
-    /** 原始 21 字段（禁止通过修改接口变更，命中即 400 code=1007） */
+    /** 原始 21 字段（禁止通过修改接口变更，命中即 400） */
     private static final Set<String> ORIGINAL_FIELDS = Set.of(
             "registrationNo", "outpatientNo", "gender", "age", "visitCount",
             "westernDiagnosis", "tcmDiagnosis", "presentIllness", "chiefComplaint", "selfReport",
@@ -198,11 +201,31 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 6. 逐行去重并收进待插入列表（P3.4 拆出 dedupeAndCollect）
         dedupeAndCollect(parsedRows, existingHash, summary, toInsert);
 
-        // 7. 批量落库并回填成功数
+        // 7. 批量落库并回填成功数。
+        //    并发导入同一份文件时，上面的「先查后插」会双双通过，其中一个撞
+        //    uk_records_org_text_hash —— 整批抛出去会让「已入库的前若干行」与回执对不上
+        //    （用户看到失败，库里却已有数据）。这里退化为逐行插入：撞键的行计入失败明细，
+        //    其余行照常入库，成功数与库内实际新增一致。
         if (!toInsert.isEmpty()) {
-            saveBatch(toInsert);
+            try {
+                saveBatch(toInsert);
+                summary.setSuccess(toInsert.size());
+            } catch (DataIntegrityViolationException e) {
+                log.warn("[病历导入] 批量插入撞唯一键，退化为逐行插入并逐行记失败: {}", e.getMessage());
+                int inserted = 0;
+                for (Record r : toInsert) {
+                    try {
+                        baseMapper.insert(r);
+                        inserted++;
+                    } catch (DataIntegrityViolationException dup) {
+                        summary.setFailed(summary.getFailed() + 1);
+                        summary.getFailures().add(new ImportSummaryVO.Failure("(并发导入)",
+                                "重复病历（撞唯一键）：登记号 " + r.getRegistrationNo()));
+                    }
+                }
+                summary.setSuccess(inserted);
+            }
         }
-        summary.setSuccess(toInsert.size());
 
         // 导入后自动结构化解析（用户开关，默认关）：投后台批任务，导入本身不阻塞
         String autoTaskId = null;
@@ -254,6 +277,17 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             summary.getFailures().add(new ImportSummaryVO.Failure(filename, "仅支持 .xlsx / .xls"));
             return;
         }
+        if (lower.endsWith(".xlsx")) {
+            try {
+                parseXlsxStreaming(file, filename, summary, batchRegNos, parsedRows,
+                        visitTimeWarn, visitTimeWarnSamples);
+            } catch (Exception e) {
+                summary.setFailed(summary.getFailed() + 1);
+                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "解析失败：" + e.getMessage()));
+            }
+            return;
+        }
+
         try (InputStream in = file.getInputStream(); Workbook wb = WorkbookFactory.create(in)) {
             Sheet sheet = wb.getSheetAt(0);
             Row header = sheet.getRow(sheet.getFirstRowNum());
@@ -263,14 +297,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 return;
             }
             Map<String, Integer> colIndex = buildHeaderIndex(header);
-            if (!colIndex.containsKey("registrationNo")) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「登记号」"));
-                return;
-            }
-            if (!colIndex.containsKey("visitTime")) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「接诊时间」"));
+            if (!checkRequiredColumns(colIndex, summary, filename)) {
                 return;
             }
             // 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
@@ -281,7 +308,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 }
                 summary.setTotal(summary.getTotal() + 1);
                 try {
-                    Record r = mapRow(row, colIndex);
+                    Record r = mapRow(rowAccess(row), colIndex);
                     if (TextUtil.isBlank(r.getOutpatientNo())) {
                         throw new IllegalArgumentException("门诊号为空");
                     }
@@ -378,6 +405,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         r.setDepartment(dto.getDepartment());
         r.setDoctorId(dto.getDoctorId());
         r.setVisitTime(dto.getVisitTime());
+        // 3.1 初始状态：新入库的病历还没跑质控。写 pending 而不是留空 ——
+        //     status 的取值集是 pending/reviewing/completed/invalid，留空等于第四个「看不见」的值
+        r.setStatus("pending");
         // 4. 去重兜底：与导入同口径算 text_hash，让唯一键能拦住重复单条新增
         r.setTextHash(RecordUtil.textHash(r));
         // 5. 落库
@@ -464,7 +494,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (!RecordFilter.canAccess(r)) {
             throw new ForbiddenException("无权修改该病历");
         }
-        // 原始 21 字段只读：显式携带原始字段即拒绝（code=1007 语义）
+        // 原始 21 字段只读：显式携带原始字段即拒绝（由 GlobalExceptionHandler 统一转 400）
         if (body != null) {
             for (String key : body.keySet()) {
                 if (ORIGINAL_FIELDS.contains(key)) {
@@ -484,13 +514,15 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         } catch (Exception e) {
             throw new IllegalArgumentException("structuredData 格式错误");
         }
-        // 4. 打「人工修改」标记后落库
-        //    原来是 stamp(..., dictionaryFileService.currentVersion()) —— 那是词典还在
-        //    文件时代的文件哈希，批次 8b 词典入库后它已冻结不变，等于给每条人工修改的
-        //    病历盖上一个与实际词典无关的版本戳。这里改为标记人工修改：
-        //    人工改过就不该再声称「依据某一版词典归一出来的」。
-        json = StructuredDataMeta.stampManual(objectMapper, json,
-                RequestUtils.currentUsername());
+        // 4. 落库：打上当前词典版本戳（与解析链路的 processOne 同口径），
+        //    这样这份结构化数据「依据哪一版词典」可追溯。
+        //    这条路径是解析页的「写回结构化数据」：内容来自模型抽取 / 规则兜底，是模型产出，
+        //    不是人工修正 —— 打 manuallyEdited 会让「评估模型准确率时排除人工补过的数据」
+        //    这个唯一用途失真，而且清洗会按方案 A 永久跳过该病历。
+        //    人工修改标记只由复核路径（correctedData）写，见 ReviewServiceImpl。
+        json = StructuredDataMeta.stamp(objectMapper, json,
+                termStore.effectiveDictVersion(RequestUtils.currentOrgId()),
+                termStore.effectiveTermCount(RequestUtils.currentOrgId()));
         baseMapper.updateStructuredData(recordId, json);
     }
 
@@ -508,8 +540,44 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
             throw new IllegalArgumentException("未选择要操作的病历");
         }
-        // 2. 交给同一段删除逻辑（事务已加在本方法上）
-        return doDelete(dto.getIds());
+        // 2. 先按数据域筛出可访问的 id：请求体里的 id 不可信，别组的必须剔除
+        List<String> accessible = filterAccessibleIds(dto.getIds());
+        // 3. 交给同一段删除逻辑（事务已加在本方法上）
+        return doDelete(accessible);
+    }
+
+    /**
+     * 按当前数据域筛出可访问的病历 id，供按 ID 删除做前置过滤。
+     *
+     * 本方法存在的唯一理由：按 ID 删除与按范围删除必须同一口径。按范围删除经
+     * RecordFilter.build 天然带数据域，而按 ID 删除的 id 来自请求体，少了这一步
+     * 就能删掉别组病历（连带其 review_tasks）。
+     *
+     * 不可访问的 id 直接剔除、不报错：一条 id 属不属于本组是授权问题，不是业务错误，
+     * 与数据清洗按 ID 取数的处理方式一致。
+     *
+     * 分块查询的原因：ids 由请求体给出、没有数量上限，一次 IN 太长会拖慢 SQL，
+     * 故与删除共用 DELETE_CHUNK。
+     *
+     * 管理员处于「看全部」时 RecordFilter 不加组织条件，故管理员仍可跨组删 ——
+     * 这是《开发指南》九章的既定设计，不是本方法的漏洞；验收须用非管理员身份。
+     *
+     * @param ids 请求体里的病历 id，允许重复与不可访问项
+     * @return 当前数据域内真实存在的 id（可能为空）
+     */
+    private List<String> filterAccessibleIds(List<String> ids) {
+        List<String> accessible = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i += DELETE_CHUNK) {
+            List<String> chunk = ids.subList(i, Math.min(i + DELETE_CHUNK, ids.size()));
+            List<Record> rows = baseMapper.selectList(RecordFilter
+                    .build(RequestUtils.currentOrgId(), new FiltersDTO())
+                    .select("id")
+                    .in("id", chunk));
+            for (Record row : rows) {
+                accessible.add(row.getId());
+            }
+        }
+        return accessible;
     }
 
     /**
@@ -638,8 +706,169 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return idx;
     }
 
+    /**
+     * 「一行怎么取值」的抽象：POI 全量读与 SAX 流式读共用同一套 21 列映射。
+     *
+     * <p>抽它的理由：两条路径的<b>取值口径</b>必须一致（字符串 trim、数值整数不带 .0、
+     * 日期按类型或文本解析）。若各写一份映射，迟早出现「xlsx 导入少一列、xls 正常」
+     * 这类只在某种格式下复现的问题。</p>
+     */
+    private interface RowAccess {
+        /** 按列号取文本（与 {@link #cellText} 同口径） */
+        String text(int col);
+
+        /** 按列号取接诊时间（与 {@link #parseDateTime} 同口径） */
+        LocalDateTime dateTime(int col);
+    }
+
+    /** POI 行适配器 */
+    private RowAccess rowAccess(Row row) {
+        return new RowAccess() {
+            @Override
+            public String text(int col) {
+                return cellText(row.getCell(col));
+            }
+
+            @Override
+            public LocalDateTime dateTime(int col) {
+                return parseDateTime(row.getCell(col));
+            }
+        };
+    }
+
+    /** 流式行适配器：RawCell 同时带原始值与「是不是日期」，日期列因此不会退化成文本 */
+    private static RowAccess rowAccess(List<ExcelRawStreamReader.RawCell> cells) {
+        return new RowAccess() {
+            @Override
+            public String text(int col) {
+                ExcelRawStreamReader.RawCell c = find(col);
+                return c == null ? null : c.text();
+            }
+
+            @Override
+            public LocalDateTime dateTime(int col) {
+                ExcelRawStreamReader.RawCell c = find(col);
+                if (c == null) {
+                    return null;
+                }
+                // 与 parseDateTime 同口径：真日期型直接取值；其余按文本归一后解析
+                if (c.dateFormatted()) {
+                    return ExcelRawStreamReader.localDateTime(c);
+                }
+                String s = c.text();
+                if (TextUtil.isBlank(s)) {
+                    return null;
+                }
+                try {
+                    return LocalDateTime.parse(normalizeDateTime(s), DT);
+                } catch (Exception e) {
+                    return null;
+                }
+            }
+
+            private ExcelRawStreamReader.RawCell find(int col) {
+                for (ExcelRawStreamReader.RawCell c : cells) {
+                    if (c.col() == col) {
+                        return c;
+                    }
+                }
+                return null;
+            }
+        };
+    }
+
+    /** 流式读 .xlsx：表头为首行，逐行回调直接走同一套映射 */
+    private void parseXlsxStreaming(MultipartFile file, String filename, ImportSummaryVO summary,
+                                    Set<String> batchRegNos, List<Object[]> parsedRows,
+                                    int[] visitTimeWarn, List<String> visitTimeWarnSamples) throws IOException {
+        Map<String, Integer>[] colIndex = new Map[]{null};
+        // 表头校验失败要中止整份文件：用异常跳出 SAX 回调，下面就地接住
+        IllegalStateException[] abort = new IllegalStateException[1];
+        ExcelRawStreamReader.forEachXlsxRow(file.getInputStream(), (rowNum, cells) -> {
+            if (abort[0] != null) {
+                return;
+            }
+            if (rowNum == 0) {
+                Map<String, Integer> idx = new HashMap<>();
+                for (ExcelRawStreamReader.RawCell c : cells) {
+                    String t = c.text();
+                    if (TextUtil.isBlank(t)) {
+                        continue;
+                    }
+                    String field = HEADER_FIELD.get(t.trim());
+                    if (field != null && !idx.containsKey(field)) {
+                        idx.put(field, c.col());
+                    }
+                }
+                if (idx.isEmpty()) {
+                    summary.setFailed(summary.getFailed() + 1);
+                    summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少表头"));
+                    abort[0] = new IllegalStateException("abort");
+                    return;
+                }
+                if (!checkRequiredColumns(idx, summary, filename)) {
+                    abort[0] = new IllegalStateException("abort");
+                    return;
+                }
+                colIndex[0] = idx;
+                return;
+            }
+            if (colIndex[0] == null) {
+                return;
+            }
+            // 与 POI 路径共用同一段逐行处理
+            processRow(rowAccess(cells), rowNum, colIndex[0], filename, summary, batchRegNos,
+                    parsedRows, visitTimeWarn, visitTimeWarnSamples);
+        });
+    }
+
+    /** 必需列校验（两条路径共用，失败文案只此一份） */
+    private boolean checkRequiredColumns(Map<String, Integer> colIndex, ImportSummaryVO summary, String filename) {
+        if (!colIndex.containsKey("registrationNo")) {
+            summary.setFailed(summary.getFailed() + 1);
+            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「登记号」"));
+            return false;
+        }
+        if (!colIndex.containsKey("visitTime")) {
+            summary.setFailed(summary.getFailed() + 1);
+            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少必需列「接诊时间」"));
+            return false;
+        }
+        return true;
+    }
+
+    /** 逐行映射与记账（POI 与流式两条路径共用） */
+    private void processRow(RowAccess row, int rowNum, Map<String, Integer> colIndex, String filename,
+                            ImportSummaryVO summary, Set<String> batchRegNos, List<Object[]> parsedRows,
+                            int[] visitTimeWarn, List<String> visitTimeWarnSamples) {
+        if (TextUtil.isBlank(row.text(colIndex.getOrDefault("registrationNo", -1)))) {
+            return;
+        }
+        summary.setTotal(summary.getTotal() + 1);
+        try {
+            Record r = mapRow(row, colIndex);
+            if (TextUtil.isBlank(r.getOutpatientNo())) {
+                throw new IllegalArgumentException("门诊号为空");
+            }
+            batchRegNos.add(r.getRegistrationNo());
+            parsedRows.add(new Object[]{r, filename});
+            // 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕
+            String rawVisit = row.text(colIndex.get("visitTime"));
+            if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
+                visitTimeWarn[0]++;
+                if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
+                    visitTimeWarnSamples.add("第 " + (rowNum + 1) + " 行「" + rawVisit + "」");
+                }
+            }
+        } catch (Exception e) {
+            summary.setFailed(summary.getFailed() + 1);
+            summary.getFailures().add(new ImportSummaryVO.Failure(filename,
+                    "第 " + (rowNum + 1) + " 行：" + e.getMessage()));
+        }
+    }
+
     /** 数据行 → 病历实体：按表头索引逐字段取值，缺列一律 null */
-    private Record mapRow(Row row, Map<String, Integer> idx) {
+    private Record mapRow(RowAccess row, Map<String, Integer> idx) {
         Record r = new Record();
         // 1. 文本列按表头索引逐字段取，缺列由 get() 兜成 null
         r.setRegistrationNo(get(row, idx, "registrationNo"));
@@ -665,15 +894,17 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 缺列时返回 null：不能写 getCell(idx.getOrDefault("visitTime", -1))，
         // 那样 getCell(-1) 会抛 IllegalArgumentException，整行都被记成解析失败
         Integer visitIdx = idx.get("visitTime");
-        r.setVisitTime(visitIdx == null ? null : parseDateTime(row.getCell(visitIdx)));
+        r.setVisitTime(visitIdx == null ? null : row.dateTime(visitIdx));
+        // 导入与单条新增同口径：新入库一律 pending（还没跑质控），别留空
+        r.setStatus("pending");
         return r;
     }
 
     /** 按字段标识取单元格文本；该列在表头里不存在时返回 null */
-    private String get(Row row, Map<String, Integer> idx, String field) {
+    private String get(RowAccess row, Map<String, Integer> idx, String field) {
         // 1. 表头里没这列就返回 null，调用侧不必判存在性
         Integer c = idx.get(field);
-        return c == null ? null : cellText(row.getCell(c));
+        return c == null ? null : row.text(c);
     }
 
     private Integer parseInt(String s) {

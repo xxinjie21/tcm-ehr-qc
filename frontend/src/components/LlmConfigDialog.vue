@@ -123,7 +123,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getLlmConfig, updateLlmConfig, testLlmConfig } from '@/api/llm'
-import { apiErrorMessage } from '@/utils/request'
+import { apiErrorMessage } from '@/utils/errorMessage'
 
 // 常用模型（可选择或手输；避免用户不知道填什么）
 const MODEL_OPTIONS = {
@@ -272,7 +272,6 @@ async function handleSave() {
 /* 提示条里的 <b> 只用来加重语义，不加粗，避免整段显得嘈杂 */
 .llm-tip b {
   color: var(--ink);
-  font-weight: normal;
 }
 
 /* 左右两栏：窄屏（<720px）自动收为单栏，不产生横向滚动 */

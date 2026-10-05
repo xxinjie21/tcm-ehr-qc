@@ -5,7 +5,5 @@ export function listReviewTasks(params) {
   return request.get('/review/tasks', { params })
 }
 
-// 人工校正与复核：correctedData 可空（仅裁定）
-export function submitReview(recordId, data) {
-  return request.post(`/records/${recordId}/review`, data)
-}
+// 复核提交（POST /records/{id}/review）按「接口路径域」放在 @/api/records：
+// 本目录以路径域分模块，把 /records/* 的调用留在这里会让同一路径域的调用散在两处。

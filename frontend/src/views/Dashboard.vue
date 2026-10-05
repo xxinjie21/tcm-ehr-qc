@@ -335,7 +335,6 @@ onBeforeUnmount(() => {
 /* 「仅管理员」小标记 */
 .todo-lock {
   font-size: 11.5px;
-  font-weight: normal;
   color: var(--text-sub);
   border: 1px solid var(--line);
   border-radius: 2px;

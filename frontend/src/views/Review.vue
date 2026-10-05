@@ -49,7 +49,7 @@
           </template>
         </el-table-column>
         <template #empty>
-          <el-empty description="暂无复核任务" :image-size="80" />
+          <EmptyState text="暂无复核任务" />
         </template>
       </el-table>
 
@@ -273,8 +273,9 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
-import { listReviewTasks, submitReview } from '@/api/review'
-import { getRawRecord } from '@/api/records'
+import { listReviewTasks } from '@/api/review'
+import { usePagedList } from '@/composables/usePagedList'
+import { getRawRecord, submitReview } from '@/api/records'
 import { aiReview } from '@/api/ai'
 import { qcScore, getQcRules } from '@/api/qc'
 import { fmtDateTime, fieldOf } from '@/utils/format'
@@ -332,24 +333,36 @@ const fmt = (t) => (t ? fmtDateTime(t,'minute') : '—')
 
 // ===== ① 任务列表 =====
 const status = ref('待复核')
-const rows = ref([])
-const total = ref(0)
 // P5.2：因关联病历已删而跳过的任务数
 const skippedMissing = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
+// 列表骨架统一走 usePagedList：本页按原口径「失败只由拦截器提示 —— 不清空已有行、
+// 也不置失败标记」，故 clearOnFailure / trackFailure 都关掉
+const { list: rows, total, loading, load: loadTasks } = usePagedList({
+  fetcher: () => listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value }),
+  extract: (res) => ({ list: res.data?.tasks, total: res.data?.total }),
+  onLoaded: (res) => { skippedMissing.value = res.data?.skippedMissing || 0 },
+  clearOnFailure: false,
+  trackFailure: false
+})
 
 // ===== 页签 =====
 const activeTab = ref('tasks')
 
 // ===== 「全部病历」列表 =====
-const allRows = ref([])
-const allTotal = ref(0)
 const allPage = ref(1)
 const allPageSize = ref(10)
-const allLoading = ref(false)
-const allFailed = ref(false)
 const allTableRef = ref(null)
+// 「全部病历」列表：本页原本没有取号（后到的旧响应会覆盖新结果）—— 按验收「行为不变」
+// 的要求保留这一现状，故 race: false；失败要清空并标记，走默认
+const {
+  list: allRows, total: allTotal, loading: allLoading, failed: allFailed, load: loadAllList
+} = usePagedList({
+  fetcher: () => searchRecords({ page: allPage.value, pageSize: allPageSize.value }),
+  extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
+  race: false
+})
 
 /**
  * 拉「全部病历」列表。
@@ -359,52 +372,17 @@ const allTableRef = ref(null)
  */
 const loadAllRecords = async (p) => {
   if (p) allPage.value = p
-  allLoading.value = true
-  allFailed.value = false
-  try {
-    const res = await searchRecords({ page: allPage.value, pageSize: allPageSize.value })
-    allRows.value = res.data?.records || []
-    allTotal.value = res.data?.total || 0
-  } catch {
-    // 拦截器已提示；仍要标成失败，否则空态会误显示成「没有病历」
-    allFailed.value = true
-    allRows.value = []
-  } finally {
-    allLoading.value = false
-  }
+  await loadAllList()
 }
 
 const handleAllSizeChange = (sz) => {
   allPageSize.value = sz
   loadAllRecords(1)
 }
-const loading = ref(false)
-
-// 查询复核任务列表：传数字即跳到该页；失败由拦截器提示，不清空已有行
-// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点翻页时慢的旧响应
-// 不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
-let listSeq = 0
+// 查询复核任务列表：传数字即跳到该页（翻页与重试共用同一入口）
 const load = async (p) => {
-  // 1. 传数字即跳到该页（翻页与重试共用同一入口）
   if (typeof p === 'number') page.value = p
-  // 1.5 取本次请求的号
-  const mine = ++listSeq
-  // 2. 进入加载态
-  loading.value = true
-  try {
-    // 3. 拉取任务列表，回填行与总数
-    const res = await listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value })
-    if (mine !== listSeq) return
-    rows.value = res.data?.tasks || []
-    total.value = res.data?.total || 0
-    skippedMissing.value = res.data?.skippedMissing || 0
-  } catch {
-    if (mine !== listSeq) return
-    // 拦截器已提示
-  } finally {
-    // 4. 只有最新一次请求才收掉加载态
-    if (mine === listSeq) loading.value = false
-  }
+  await loadTasks()
 }
 
 // 每页条数变化：回到第 1 页再查，防止页码越界后拿到空列表
@@ -880,6 +858,13 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
 }
+/* 标题左侧的竖条装饰：与 PanelCard.vue 同一视觉语言（本页自写面板时漏了它） */
+.panel-hd::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: var(--ink-mid);
+}
 .panel-hd.hd-left {
   border-bottom-color: #eee4d3;
   background: #faf6ee;
@@ -892,7 +877,6 @@ onMounted(() => {
 }
 .mini-tag {
   font-size: 11.5px;
-  font-weight: normal;
   color: var(--text-sub);
   border: 1px solid var(--line);
   border-radius: 2px;

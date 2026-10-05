@@ -9,14 +9,7 @@ export function clean(data) {
   return request.post('/governance/clean', data, { timeout: 300000 })
 }
 
-// 导出走文件流，数据量大时远超默认 30s，单独放宽超时
-export function exportDataset(data) {
-  return request.post('/export/dataset', data, { responseType: 'blob', timeout: 200000 })
-}
-
-export function previewDataset(data) {
-  return request.post('/export/dataset/preview', data, { timeout: 60000 })
-}
+// 导出与预览在 @/api/export（路径域是 /export/*，不属于本模块）
 
 export function governanceStats() {
   return request.get('/governance/stats')

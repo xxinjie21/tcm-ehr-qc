@@ -79,9 +79,9 @@
             **哪怕 9 类全空**，所以「有对象但 9 类都空」明确代表抽取跑过了。
          原先两种都写「无标准化数据」，用户会以为「抽取没问题、只是没东西」，
          而实际可能是一次都没抽过 —— 两者的下一步动作完全不同。 -->
-    <el-empty v-else :description="emptyTitle" :image-size="70">
+    <EmptyState v-else :text="emptyTitle" :image-size="70">
       <div class="empty-hint">{{ emptyHint }}</div>
-    </el-empty>
+    </EmptyState>
   </div>
 </template>
 
@@ -90,6 +90,7 @@
 // 按「有无独立词典」分组渲染，实体上标注来源（规则 / 模型）与归一命中等级。
 // 设计取舍：空态必须区分「压根没抽过」与「抽过但没识别出要素」——两者的下一步动作不同。
 import { computed } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, LEVEL_UNMATCHED, entityName, pct } from '@/utils/structured'
 
 const props = defineProps({
@@ -219,7 +220,7 @@ const levelDesc = (level, raw, name) => {
   padding-bottom: 6px;
   border-bottom: 1px dashed var(--line);
 }
-.sd-meta b { color: var(--ink-mid); font-weight: normal; }
+.sd-meta b { color: var(--ink-mid); }
 .sd-meta-t { margin-left: var(--sp-1); }
 .sd-manual {
   margin-top: var(--sp-2);
@@ -253,7 +254,7 @@ const levelDesc = (level, raw, name) => {
   padding-left: var(--sp-2);
   margin-bottom: var(--sp-2);
 }
-.sd-sec-hint { font-size: 11.5px; font-weight: normal; color: var(--text-sub); margin-left: 6px; }
+.sd-sec-hint { font-size: 11.5px; color: var(--text-sub); margin-left: 6px; }
 .sd-items { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .sd-item {
   background: var(--paper);

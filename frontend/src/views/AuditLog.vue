@@ -18,7 +18,7 @@
         />
         <el-button type="primary" :loading="loading" @click="loadLogs">查 询</el-button>
         <!-- 导出依赖「日志可用」：加载失败时禁用，避免对空列表做导出 -->
-        <el-button :loading="exporting" :disabled="!available" @click="handleExport">导出 CSV</el-button>
+        <el-button :loading="exporting" :disabled="logFailed" @click="handleExport">导出 CSV</el-button>
         <span class="tip">共 {{ total }} 条</span>
       </div>
 
@@ -44,12 +44,11 @@
         <el-table-column prop="detail" label="详情" min-width="240" show-overflow-tooltip />
         <!-- 空态分两种：确实没日志 vs 加载失败（后者才给「重试」入口） -->
         <template #empty>
-          <el-empty
-            :description="available ? '暂无日志记录' : '日志加载失败'"
-            :image-size="80"
-          >
-            <el-button v-if="!available" size="small" @click="loadLogs">重 试</el-button>
-          </el-empty>
+          <EmptyState
+            :failed="logFailed"
+            :text="logFailed ? '日志加载失败' : '暂无日志记录'"
+            @retry="loadLogs"
+          />
         </template>
       </el-table>
 
@@ -73,6 +72,8 @@
 // 日志只增不删（§七 L3）：日志删除功能已删，清理只能由运维人工归档。
 import { computed, onMounted, reactive, ref } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import { usePagedList } from '@/composables/usePagedList'
 import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 import { fmtDateTime } from '@/utils/format'
@@ -127,45 +128,16 @@ const auditStamp = () => {
 
 // 查询条件；page / pageSize 直接双向绑定分页组件（与其余列表页与 /api/logs 契约一致）
 const query = reactive({ action: '', keyword: '', page: 1, pageSize: 10 })
-const logs = ref([])
-const total = ref(0)
-const loading = ref(false)
 const exporting = ref(false)
-// 加载失败（超时 / 服务异常 / 无权限）置 false，空态给出「重试」入口；
-// 无论何种情况都不退化成展示编造的日志
-const available = ref(true)
+// 列表骨架统一走 usePagedList；本页失败要「清空 + 标记」（不退化成展示编造的日志，
+// 空态据此给重试入口、导出按钮据此禁用），故三个开关都用默认
+const { list: logs, total, loading, failed: logFailed, load: loadLogs } = usePagedList({
+  fetcher: () => getLogs(query),
+  extract: (res) => ({ list: res.data?.list, total: res.data?.total })
+})
 
 // 操作类型 → el-tag 配色；未登记的走默认色
 const tagType = (action) => TAG_TYPES[action] || 'primary'
-
-// 拉取日志列表：成功后刷新总数；失败则清空并标记不可用（供空态与按钮禁用判断）
-// latest-wins：发起时取号，回来时号不是最新就整体丢弃 —— 快速连点查询/翻页时慢的旧响应
-// 不覆盖新结果，也不提前收掉 loading（范式同 components/TermInput.vue）
-let listSeq = 0
-const loadLogs = async () => {
-  // 0. 取本次请求的号
-  const mine = ++listSeq
-  // 1. 置加载态：表格进入 loading
-  loading.value = true
-  try {
-    // 2. 按当前查询条件（类型 / 关键字 / 分页）拉取日志
-    const res = await getLogs(query)
-    if (mine !== listSeq) return
-    // 3. 回填列表与总数，并标记日志可用（导出按钮据此解禁）
-    logs.value = res.data?.list || []
-    total.value = res.data?.total || 0
-    available.value = true
-  } catch {
-    if (mine !== listSeq) return
-    logs.value = []
-    total.value = 0
-    // 失败即清空并标记不可用：不退化成展示编造的日志，空态给出重试入口
-    available.value = false
-  } finally {
-    // 只有最新一次请求才复位加载态
-    if (mine === listSeq) loading.value = false
-  }
-}
 
 // 每页条数变化回到第 1 页
 const handleSizeChange = () => {

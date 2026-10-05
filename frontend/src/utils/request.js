@@ -2,6 +2,17 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { useUserStore } from '@/stores/user'
+import { describeBizError, describeHttpError } from '@/utils/errorMessage'
+
+/**
+ * 全局 axios 实例与两个拦截器。
+ *
+ * ⚠️ 本文件只管「怎么发请求、失败后做什么副作用」；**面向用户的文案在
+ * `@/utils/errorMessage`**（`apiErrorMessage` / `describeHttpError` / `describeBizError`）。
+ * 两者原先挤在一个文件里，改一句提示得先读懂拦截器。
+ *
+ * 文件流（responseType: 'blob'）不套 Result，拦截器直接透传 response.data。
+ */
 
 const request = axios.create({
   baseURL: '/api',
@@ -39,15 +50,15 @@ request.interceptors.response.use(
   (response) => {
     // 文件流（blob）不套 Result，直接返回
     if (response.config.responseType === 'blob') {
-      // 1. 文件流直接透传原始数据
       return response.data
     }
-    // 2. 取出统一响应体 Result
+    // 统一响应体 Result
     const res = response.data
-    // 3. 非 200 视为失败：提示后 reject，401 额外清登录态
+    // 非 200 视为失败：提示后 reject，401 额外清登录态
     if (res.code !== 200) {
-      ElMessage.error(res.msg || '请求失败')
-      if (res.code === 401) {
+      const { message, logout } = describeBizError(res)
+      ElMessage.error(message)
+      if (logout) {
         redirectToLogin()
       }
       return Promise.reject(new Error(res.msg))
@@ -55,35 +66,13 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
-    // 1. 取出状态码与后端 msg
-    const status = error.response && error.response.status
-    const msg = error.response && error.response.data && error.response.data.msg
-    // 2. 401 未授权：提示并清登录态
-    if (status === 401) {
-      // 凭证错误 / token 过期：以后端 msg 为准（登录页密码错误也走这里）
-      ElMessage.error(msg || '登录已过期，请重新登录')
+    const { message, logout } = describeHttpError(error)
+    ElMessage.error(message)
+    if (logout) {
       redirectToLogin()
-    } else if (status === 403) {
-      // 3. 403 无权限：仅提示，不跳转
-      ElMessage.error(msg || '无权限执行该操作')
-    } else {
-      // 4. 其余情况：通用错误提示
-      ElMessage.error(msg || error.message || '网络异常')
     }
     return Promise.reject(error)
   }
 )
-
-/**
- * 从 axios 错误里取出「能给用户看」的那句文案。
- *
- * 后端统一回 Result{code,msg,data}，其中 msg 是面向用户的 —— 例如
- * LlmProbeException 的消息契约上就写明「已脱敏、可直接展示给用户」。
- * 而 axios 自己的 error.message 只有 "Request failed with status code 502"
- * 这种英文兜底。两个混用时用户看到的是后者，服务端已经准备好的原因被白白丢掉。
- */
-export function apiErrorMessage(e, fallback = '请求失败') {
-  return e?.response?.data?.msg || e?.message || fallback
-}
 
 export default request

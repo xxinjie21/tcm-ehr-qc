@@ -1,11 +1,14 @@
 <template>
   <!-- 失败态：区分「加载失败」与「确实没有数据」，并给出重试与上报两条出口-->
-  <el-empty v-if="failed" description="数据加载失败" :image-size="80">
+  <el-empty v-if="failed" description="数据加载失败" :image-size="imageSize">
     <el-button size="small" @click="$emit('retry')">重 试</el-button>
     <el-button size="small" plain @click="reportHint">联系管理员</el-button>
+    <slot />
   </el-empty>
   <!-- 成功但为空 -->
-  <el-empty v-else-if="!loading" :description="text" :image-size="80" />
+  <el-empty v-else-if="!loading" :description="text" :image-size="imageSize">
+    <slot />
+  </el-empty>
 </template>
 
 <script setup>
@@ -18,7 +21,15 @@ import { ElMessage } from 'element-plus'
 defineProps({
   failed: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
-  text: { type: String, default: '暂无数据' }
+  text: { type: String, default: '暂无数据' },
+  /**
+   * 空态插图尺寸。
+   *
+   * 默认 80 是页面级空态的统一口径；但在紧凑容器里（如词典差异面板里
+   * 「无新增 / 无修改 / 无删除」那三行）原本就是 44，硬拉到 80 会把面板撑变形 ——
+   * 尺寸属于排版，本批不改排版，故留这个口子单独指定。
+   */
+  imageSize: { type: Number, default: 80 }
 })
 
 defineEmits(['retry'])

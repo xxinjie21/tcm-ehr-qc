@@ -77,7 +77,6 @@
   font-size: 21px;
   line-height: 1.6;
   color: var(--ink);
-  font-weight: normal;
   letter-spacing: 2px;
 }
 .auth-brand .en {
@@ -106,7 +105,6 @@
 .auth-form h3 {
   font-size: 16px;
   color: var(--ink);
-  font-weight: normal;
   letter-spacing: 1px;
 }
 .auth-form .hint {
@@ -154,7 +152,6 @@
 }
 .auth-demo b {
   color: var(--ink);
-  font-weight: normal;
 }
 .auth-demo code {
   font-family: Consolas, monospace;
