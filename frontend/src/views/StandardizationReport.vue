@@ -212,7 +212,8 @@
           下方列表里带「解析早于词表，需重跑」标记的行，就是还没吃到新词表的病历。
         </div>
         <div class="misc-grid">
-          <div><span>报告时间</span><b>{{ report?.generatedAt || '—' }}</b></div>
+                    <FreshnessTag :time="report?.generatedAt" :stale="hasStaleRows"
+                        reason="部分病历的解析早于词表，需重跑" />
           <div>
             <span>质控完成</span>
             <b>{{ qcScored }} / {{ qcTotal }}{{ qcLast ? `（${qcLast}）` : '' }}</b>
@@ -243,6 +244,7 @@
 //   ③ 明细默认收起，需要时再展开。
 // 技术口径（甲类/乙类、normLevel、可归一实体）只在本文件内部使用，不出现在界面上。
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import FreshnessTag from '@/components/FreshnessTag.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import { getStandardizationReport } from '@/api/stats'
@@ -314,6 +316,8 @@ const showQcGate = computed(() => qcLoaded.value && !qcComplete.value)
 const qcTotal = computed(() => qc.value?.total ?? report.value?.dataset?.recordCount ?? 0)
 const qcScored = computed(() => qc.value?.scored ?? 0)
 const qcLast = computed(() => qc.value?.lastScoredAt || '')
+// P2-9：是否存在「解析早于词表」的行 —— 新鲜度徽标的过期态取这里
+const hasStaleRows = computed(() => (report.value?.monthly || []).some((r) => r.stale))
 
 /** 批量重跑：质控 / 解析都可能有几千条，必须先让人确认范围 */
 async function confirmRerun(what, countHint) {
