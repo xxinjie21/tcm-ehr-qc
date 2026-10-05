@@ -255,6 +255,54 @@ public interface RecordMapper extends BaseMapper<Record> {
                                                @Param("start") java.time.LocalDateTime start,
                                                @Param("end") java.time.LocalDateTime end);
 
+    /**
+     * 评分分布 + 质控完成度（批次 12 · 12d）：一条查询同时供评分分布与质控完成度。
+     *
+     * <p>与 Java 版逐位核对一致（500 条真实数据）：totalAll=500 total=500 scored=500 avg=96.0
+     * min=93 max=100 qcScored=500 lastScoredAt=2026-10-05 16:07:29 capped=234。</p>
+     *
+     * <p><b>两个计数的口径不同，别合并</b>：{@code total}（COUNT(score)）是「有分数的记录数」，
+     * 对应 Java 版 {@code d.setTotal} 位于空值判断之后；{@code totalAll}（COUNT(*)）是全部记录数，
+     * 对应质控完成度的分母。</p>
+     *
+     * <p>两处 JSON 语义：① 封顶＝{@code qc_results.deductions} 存在
+     * {@code type='术语未标准化' AND points>=5}（对应 cap=5 的封顶判定）；② 「质控是否过期」＝
+     * {@code JSON_EXTRACT(qc_results,'$.score')} 与 {@code records.score} 相等 —— 不等说明重跑解析后
+     * 分数已变、qc_results 还是旧的，这类不计入 qcScored，也不参与 lastScoredAt。</p>
+     */
+    @Select("""
+            SELECT
+                COUNT(*) AS totalAll,
+                COUNT(score) AS total,
+                COUNT(score) AS scored,
+                COALESCE(ROUND(AVG(score), 1), 0) AS avgScore,
+                COALESCE(MIN(score), 0) AS minScore,
+                COALESCE(MAX(score), 0) AS maxScore,
+                COALESCE(SUM(CASE WHEN score IS NOT NULL
+                                   AND JSON_EXTRACT(qc_results, '$.score') = score
+                                  THEN 1 ELSE 0 END), 0) AS qcScored,
+                MAX(CASE WHEN score IS NOT NULL
+                          AND JSON_EXTRACT(qc_results, '$.score') = score
+                         THEN update_time END) AS lastScoredAt,
+                (SELECT COUNT(DISTINCT r2.id)
+                   FROM records r2,
+                        JSON_TABLE(r2.qc_results, '$.deductions[*]'
+                            COLUMNS (t VARCHAR(64) PATH '$.type',
+                                     p DECIMAL(6, 2) PATH '$.points')) jt
+                  WHERE (#{viewAll} = 1 OR r2.org_id = #{orgId})
+                    AND t = '术语未标准化' AND p >= 5
+                    AND (#{start} IS NULL OR r2.visit_time >= #{start})
+                    AND (#{end} IS NULL OR r2.visit_time < #{end})) AS capped
+              FROM records r
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId})
+               AND (#{start} IS NULL OR r.visit_time >= #{start})
+               AND (#{end} IS NULL OR r.visit_time < #{end})
+            """)
+    Map<String, Object> selectScoreAndQc(@Param("orgId") String orgId,
+                                         @Param("viewAll") boolean viewAll,
+                                         @Param("start") java.time.LocalDateTime start,
+                                         @Param("end") java.time.LocalDateTime end);
+
     /** 清洗后的字段修复（trim/空值清理/状态标记）——仅隔离路径用：它要同时改 status/grade */
     @Update("""
             UPDATE records
