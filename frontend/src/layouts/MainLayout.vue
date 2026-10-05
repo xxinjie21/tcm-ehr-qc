@@ -250,7 +250,7 @@ const handleLogout = async () => {
    之前按浅底习惯写了 color: var(--ink)，等于深绿字压深绿底，用户完全看不清。 */
 .user-name {
   font-weight: 600;
-  color: #f2f6f3;          /* 近白：与 --ink 底对比度 ≈ 12:1 */
+  color: var(--el-color-primary-light-9);          /* 近白：与 --ink 底对比度 ≈ 12:1 */
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -280,7 +280,7 @@ const handleLogout = async () => {
 }
 aside {
   width: 176px;
-  background: #fbfaf6;
+  background: var(--el-table-header-bg-color);
   border-right: 1px solid var(--line);
   flex-shrink: 0;
   overflow-y: auto;
@@ -292,7 +292,7 @@ aside {
 .menu a {
   display: block;
   padding: var(--sp-3) var(--sp-4);
-  color: #55534c;
+  color: var(--el-text-color-regular);
   text-decoration: none;
   font-size: 13.5px;
   border-left: 3px solid transparent;
