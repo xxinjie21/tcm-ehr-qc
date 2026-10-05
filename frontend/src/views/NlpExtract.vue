@@ -2,6 +2,7 @@
   <div>
     <!-- ① 选择病历：看板式列表，常驻可见-->
     <PanelCard title="选择病历">
+      <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
       <RangeFilter v-model="query" />
       <div class="actions">
         <el-button type="primary" :loading="listLoading" @click="search(1)">查 询</el-button>
@@ -355,6 +356,7 @@
 // 单条：原文按字段模块化可逐项改，抽取后展示归一结果、可写回该病历结构化数据（覆盖原有）；
 // 批量：后端异步任务（提交后可关页面、靠轮询刷新进度）；权限为「登录即可」——nlp 域 5 个端点皆 LOGIN，本页无任何管理员守卫（原注释写「仅管理员可见」有误，2026-10-05 校正）。归一只认 ES 词典，索引不可用即整体失败。
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
+import FreshnessTag from '@/components/FreshnessTag.vue'
 import RecordTable from '@/components/RecordTable.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
@@ -377,6 +379,8 @@ import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 const activeTab = ref('single')
 
+// P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
+const loadedAt = ref(new Date().toLocaleString())
 // ===== 病历列表=====
 const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
 const page = ref(1)
