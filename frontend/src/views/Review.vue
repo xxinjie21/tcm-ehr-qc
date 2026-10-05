@@ -16,6 +16,7 @@
         </el-select>
         <el-button size="small" @click="load()">刷新</el-button>
         <span class="tip">超时仅视觉提醒、不自动流转；点击「进入复核」在下方展开对照</span>
+        <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
       </div>
 
       <el-table
@@ -283,6 +284,7 @@ import { fieldsWithWide } from '@/utils/recordFields'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 import RecordTable from '@/components/RecordTable.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import FreshnessTag from '@/components/FreshnessTag.vue'
 import { searchRecords } from '@/api/records'
 import { gradeOf, gradeHint, gradeClass, THRESHOLD_PLACEHOLDER } from '@/utils/grade'
 
@@ -349,6 +351,8 @@ const { list: rows, total, loading, load: loadTasks } = usePagedList({
 
 // ===== 页签 =====
 const activeTab = ref('tasks')
+// P2-9 data freshness: page read time (honest, no backend field, no guessing load internals)
+const loadedAt = ref(new Date().toLocaleString())
 
 // ===== 「全部病历」列表 =====
 const allPage = ref(1)
