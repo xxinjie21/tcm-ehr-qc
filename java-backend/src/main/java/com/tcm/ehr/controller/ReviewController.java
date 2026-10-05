@@ -43,8 +43,9 @@ public class ReviewController {
     @GetMapping("/review/tasks")
     public Result<ReviewTasksVO> tasks(@RequestParam(defaultValue = "1") Integer page,
                                        @RequestParam(defaultValue = "20") Integer pageSize,
-                                       @RequestParam(required = false) String status) {
-        return Result.ok(reviewService.listTasks(page, PageSizeGuard.clamp(pageSize), status));
+                                       @RequestParam(required = false) String status,
+                                       @RequestParam(required = false) Boolean overdueOnly) {
+        return Result.ok(reviewService.listTasks(page, PageSizeGuard.clamp(pageSize), status, overdueOnly));
     }
 
     /**

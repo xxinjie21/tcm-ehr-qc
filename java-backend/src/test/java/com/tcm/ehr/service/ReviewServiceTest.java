@@ -211,7 +211,7 @@ class ReviewServiceTest {
                 });
         when(recordMapper.selectById("rec-4")).thenReturn(record("rec-4", false));
 
-        ReviewTasksVO vo = service.listTasks(1, 10, "待复核");
+        ReviewTasksVO vo = service.listTasks(1, 10, "待复核", null);
 
         assertEquals(1, vo.getTotal());
         ReviewTaskVO first = vo.getTasks().get(0);

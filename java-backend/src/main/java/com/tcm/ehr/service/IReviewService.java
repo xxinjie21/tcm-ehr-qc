@@ -17,9 +17,10 @@ public interface IReviewService extends IService<ReviewTask> {
      * @param page     页码
      * @param pageSize 每页条数
      * @param status   状态，为空表示不限
+     * @param overdueOnly 批次9：true 时只返回「已超期且仍待复核」的任务（worklist「只需我处理」）
      * @return total=总条数；tasks=任务列表
      */
-    ReviewTasksVO listTasks(Integer page, Integer pageSize, String status);
+    ReviewTasksVO listTasks(Integer page, Integer pageSize, String status, Boolean overdueOnly);
 
     /**
      * 提交人工复核并自动重算分级。

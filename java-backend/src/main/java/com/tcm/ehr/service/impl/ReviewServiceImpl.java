@@ -64,7 +64,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
      * @return 命中总数与任务列表项
      */
     @Override
-    public ReviewTasksVO listTasks(Integer page, Integer pageSize, String status) {
+    public ReviewTasksVO listTasks(Integer page, Integer pageSize, String status, Boolean overdueOnly) {
         // 1. 分页参数非法时回退为第 1 页 / 每页 20 条
         int p = page != null && page > 0 ? page : 1;
         int s = pageSize != null && pageSize > 0 ? pageSize : 20;
@@ -83,6 +83,13 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         String dbStatus = dbStatus(status);
         if (dbStatus != null) {
             w.eq("status", dbStatus);
+        }
+        // 4.1 批次9：worklist「只需我处理」= 已超期且仍待复核的任务（最该先做的那批）。
+        //     过滤必须落在 SQL 层：前端过滤只作用于当前页，用户会以为「我处理完了」而其它页还有
+        //     超期任务 —— 那是状态撒谎。overdueOnly 优先于 status 入参（勾了它就是唯一口径）。
+        if (Boolean.TRUE.equals(overdueOnly)) {
+            w.eq("status", dbStatus("待复核"));
+            w.lt("deadline_time", LocalDateTime.now());
         }
         w.orderByDesc("create_time");
 
