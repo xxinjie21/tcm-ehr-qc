@@ -680,6 +680,13 @@ const todos = computed(() => {
   if (u.dictionaryGap > 0) {
     const real = realGapTypes.value
     const realTotal = real.reduce((a, c) => a + (c.total - c.normalized), 0)
+    // 批次2：后端新给的「词表缺口 TOP15」（键=实体原文，值=次数）—— 让这条待办从
+    // 「有 N 条没归上」变成「先补这几个词」，用户可直接拿它去补词表（不再需要自己去翻数据）
+    const topWords = Object.entries(u.top || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([w, n]) => `${w}（${n} 次）`)
+      .join('、')
     list.push({
       title: b ? `补充${b.label}标准词表` : '补充标准词表',
       desc: `按国家/行业标准术语集补录，不从现有数据反推。`
@@ -691,6 +698,7 @@ const todos = computed(() => {
         // 因此它的未归一是**结构性的**：用户看到病因近 100% 未归一，很容易以为是系统坏了。
         // 这句是恒定成立的事实，不随数据变化。
         + `另：病因类目前没有独立词表，其未归一属词表缺口而非解析问题。`
+        + (topWords ? `最该先补的 ${topWords.split('、').length} 个（按出现次数）：${topWords}。` : '')
         + '补完后需重跑解析才能看到效果。',
       owner: '词表',
       tagType: 'warning'
