@@ -22,6 +22,9 @@
           立即重跑解析与质控
         </el-button>
         <router-link class="rh-link" to="/standardization-report">查看质量报告</router-link>
+        <!-- 与「查看质量报告」并排：导入完这一页的任务就结束了，用户要么去看结果，
+             要么回词典确认新词条 —— 两条出口都给，别让人靠侧边栏自己找路 -->
+        <router-link class="rh-link" to="/dictionary">返回术语词典</router-link>
         <span class="rh-skip">稍后再说（可随时回来重跑）</span>
       </div>
     </div>
@@ -142,6 +145,14 @@
               第 {{ f.row }} 行：{{ f.reason }}
             </div>
           </div>
+
+          <!-- 导入完成后给出明确出口。
+               原先这一页导入完就「断」在这里：没有任何按钮回到术语词典，
+               用户只能自己去侧边栏找路（面包屑也不是链接）。 -->
+          <div class="import-done-ops">
+            <el-button type="primary" @click="goDictionary">返回术语词典</el-button>
+            <span class="tip">在「我的词典」里可以核对刚导入的词条</span>
+          </div>
         </div>
     </PanelCard>
 
@@ -169,6 +180,7 @@
 <script setup>
 // 批量导入词典。所有人可导入本机个人词典；管理员可直写基线。
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
@@ -192,6 +204,11 @@ const typeLabel = (v) => (TYPES.find((t) => t.value === v) || {}).label || v
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.role === '管理员')
+
+// 导入完成后回术语词典。用 router.push 而不是 <router-link>：
+// 结果区里它要呈现为**主按钮**（这一步的出口），而 rh-link 那套链接样式是给提示条用的。
+const router = useRouter()
+const goDictionary = () => router.push('/dictionary')
 
 const uploadRef = ref(null)
 const dictFileList = ref([])
@@ -592,5 +609,15 @@ const handleSubmit = async () => {
   font-size: var(--fs-md);
   line-height: 1.7;
   overflow-x: auto;
+}
+/* 导入完成后的出口行：与上方统计卡留出间距，按钮与说明同一行对齐 */
+.import-done-ops {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
 }
 </style>
