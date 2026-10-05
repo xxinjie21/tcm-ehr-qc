@@ -46,7 +46,11 @@ export function useUrlFilters(state, page, pageSize, options = {}) {
   // ---- 1. 从 URL 还原（同步，先于页面的 onMounted 加载）----
   // 先记住"页面自带的每页条数"：URL 没给 pageSize 时它就是默认值，不该写进链接。
   // （不能用「比较 pageSize.value 与它自己」那种写法 —— 恒为假，等于 pageSize 永不入 URL。）
-  const initialPageSize = pageSize.value
+  const initialPageSize = pageSize ? pageSize.value : null
+  // 有些页面把 page / pageSize 放在筛选对象**里**（如审计页 query={action,keyword,page,pageSize}），
+  // 那种形态没有独立的 ref 可传。这里直接认 state 上的这两个键，调用处传 null 即可 ——
+  // 与其逼所有页面改成同一种形状，不如让这个小工具接受两种都见过的形状。
+  const inState = state != null && ('page' in state || 'pageSize' in state)
   const q = route.query || {}
   Object.keys(state).forEach((k) => {
     if (omit.has(k) || !(k in q)) return
@@ -65,11 +69,13 @@ export function useUrlFilters(state, page, pageSize, options = {}) {
       state[k] = String(raw)
     }
   })
-  // 分页只在 URL 里显式给了合法值时才还原
-  const p = Number(q.page)
-  if (Number.isInteger(p) && p > 0) page.value = p
-  const ps = Number(q.pageSize)
-  if (Number.isInteger(ps) && ps > 0) pageSize.value = ps
+  // 分页只在 URL 里显式给了合法值时才还原（page/pageSize 在 state 里时，上面的通用循环已经处理过）
+  if (!inState) {
+    const p = Number(q.page)
+    if (Number.isInteger(p) && p > 0) page.value = p
+    const ps = Number(q.pageSize)
+    if (Number.isInteger(ps) && ps > 0) pageSize.value = ps
+  }
 
   // ---- 2. 状态变化写回 URL ----
   const write = () => {
@@ -83,12 +89,14 @@ export function useUrlFilters(state, page, pageSize, options = {}) {
       if (!isEmpty) next[k] = Array.isArray(v) ? v.join(',') : String(v)
     })
     // 第一页是默认值，不进 URL：/records 与 /records?page=1 是同一个视图
-    if (page.value > 1) next.page = String(page.value)
-    if (pageSize.value !== initialPageSize) next.pageSize = String(pageSize.value)
+    if (!inState) {
+      if (page.value > 1) next.page = String(page.value)
+      if (pageSize.value !== initialPageSize) next.pageSize = String(pageSize.value)
+    }
     // replace：见类注释第 ① 条，避免污染后退历史
     router.replace({ query: next }).catch(() => {})
   }
 
-  watch([state, page, pageSize], write, { deep: true })
+  watch(inState ? [state] : [state, page, pageSize], write, { deep: true })
   return { write }
 }

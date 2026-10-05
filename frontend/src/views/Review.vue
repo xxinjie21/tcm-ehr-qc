@@ -278,6 +278,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import TermInput from '@/components/TermInput.vue'
 import { listReviewTasks } from '@/api/review'
 import { usePagedList } from '@/composables/usePagedList'
+import { useUrlFilters } from '@/composables/useUrlFilters'
 import { getRawRecord, submitReview } from '@/api/records'
 import { aiReview, runAiAsync } from '@/api/ai'
 import { qcScore, getQcRules } from '@/api/qc'
@@ -356,6 +357,14 @@ const { list: rows, total, loading, load: loadTasks } = usePagedList({
 
 // ===== 页签 =====
 const activeTab = ref('tasks')
+
+// 对标 E5「可分享视图」：这一步必须放在页签声明之后、onMounted 之前。
+// 本页的筛选是两个独立 ref（status / overdueOnly），用 reactive 包一层得到组合式期望的
+// 「状态对象」—— Vue 的 reactive 会自动解包 ref 属性，写入会回到原 ref，
+// 因此这两个 ref 的既有用法一行都不用改。分享场景很典型：
+// 「把『只看超期』这个队列发给同事」，打开就是同一个视图。
+const urlFilters = reactive({ status, overdueOnly })
+useUrlFilters(urlFilters, page, pageSize)
 // P2-9 data freshness: page read time (honest, no backend field, no guessing load internals)
 const loadedAt = ref(new Date().toLocaleString())
 

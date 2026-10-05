@@ -74,6 +74,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { usePagedList } from '@/composables/usePagedList'
+import { useUrlFilters } from '@/composables/useUrlFilters'
 import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 import { fmtDateTime } from '@/utils/format'
@@ -138,6 +139,11 @@ const { list: logs, total, loading, failed: logFailed, load: loadLogs } = usePag
 
 // 操作类型 → el-tag 配色；未登记的走默认色
 const tagType = (action) => TAG_TYPES[action] || 'primary'
+
+// 对标 E5「可分享视图」：本页把 page/pageSize 放在 query 里，所以组合式传 null、
+// 由它认 state 上的这两个键；defaults 明确 1/10 是默认值，免得链接里出现 ?page=1。
+// 审计页是最典型的分享场景：「按这个条件筛出来的日志」发给同事。
+useUrlFilters(query, null, null, { defaults: { page: 1, pageSize: 10 } })
 
 // 每页条数变化回到第 1 页
 const handleSizeChange = () => {

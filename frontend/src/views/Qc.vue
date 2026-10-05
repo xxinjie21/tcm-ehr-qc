@@ -667,6 +667,11 @@ const {
   clearOnFailure: false
 })
 
+// 对标 E5「可分享视图」：整页筛选 + 预检列表分页同步到 URL。
+// filters 是整页共用条件（同时喂给批量提交与预检列表），precheckPage/Size 是预检列表分页 ——
+// 正好是组合式期望的形状。在 setup 阶段同步还原，onMounted 的首次加载自动带上条件。
+useUrlFilters(filters, precheckPage, precheckSize)
+
 // 加载预检列表；传数字即跳到该页
 const loadPrecheck = async (p) => {
   if (typeof p === 'number') precheckPage.value = p
