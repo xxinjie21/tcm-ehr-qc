@@ -40,6 +40,7 @@
 
       <!-- 质控趋势（跨整行） -->
       <PanelCard title="质控趋势（按月）" class="mb">
+        <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
         <div
           v-if="extra.trend.length"
           ref="trendRef"
@@ -97,6 +98,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import echarts from '@/utils/echarts'
 import StatsFilter from '@/components/StatsFilter.vue'
+import FreshnessTag from '@/components/FreshnessTag.vue'
 import StatCard from '@/components/StatCard.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -126,6 +128,8 @@ const go = (path, menuTitle) => {
 // 筛选条件：科室 + 就诊日期区间；只作用于图表接口
 const filter = reactive({ department: '', start: '', end: '' })
 const loading = ref(false)
+// P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
+const loadedAt = ref(new Date().toLocaleString())
 // 区分「加载失败」与「确实为空」
 const failed = ref(false)
 
