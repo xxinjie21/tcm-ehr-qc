@@ -1102,8 +1102,10 @@ onBeforeUnmount(stopPoll)
   font-size: var(--fs-md);
   line-height: 1.9;
   color: var(--text);
-  max-height: 220px;
-  overflow: auto;
+  /* 批次16 · 16.5：去掉框内滚动。
+     这里原本是 max-height:220px + overflow:auto —— 正是本项目「长内容同页展开」口径要避免的
+     那种框内滚动：内容在 220px 处被截断，用户得在面板里再滚一层才能看全（本页上方注释
+     记为「第九轮改回同页展开」时漏掉的这处）。同页展开即可，页面自身滚动。 */
   white-space: pre-wrap;
   margin-bottom: 10px;
 }
