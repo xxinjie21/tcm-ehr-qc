@@ -37,7 +37,7 @@ defineProps({
 .panel-hd {
   margin: 0;
   padding: 10px var(--sp-4);
-  border-bottom: 1px solid #eee9dd;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   font-size: 14px;
   font-weight: bold;
   color: var(--ink);
