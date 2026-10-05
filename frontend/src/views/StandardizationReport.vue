@@ -105,6 +105,15 @@
             <div class="todo-desc">{{ t.desc }}</div>
           </div>
           <el-tag size="small" :type="t.tagType" effect="plain">{{ t.owner }}</el-tag>
+          <!-- 批次2：把这条待办的「待补词」一键复制走 —— 直达词典导入页粘贴即可，
+               避免用户看完「先补这 8 个词」还得自己手抄。无接口调用，不会有副作用。 -->
+          <el-button
+            v-if="t.words && t.words.length"
+            size="small"
+            @click="navigator.clipboard.writeText(t.words.join('、'))
+              .then(() => ElMessage.success(`已复制 ${t.words.length} 个待补词，可到「术语词典 → 批量导入」粘贴`))
+              .catch(() => ElMessage.warning('复制失败，请手动选中复制'))"
+          >复制待补词</el-button>
         </li>
       </ol>
       <div v-if="!todos.length" class="empty-tip">
@@ -682,13 +691,14 @@ const todos = computed(() => {
     const realTotal = real.reduce((a, c) => a + (c.total - c.normalized), 0)
     // 批次2：后端新给的「词表缺口 TOP15」（键=实体原文，值=次数）—— 让这条待办从
     // 「有 N 条没归上」变成「先补这几个词」，用户可直接拿它去补词表（不再需要自己去翻数据）
-    const topWords = Object.entries(u.top || {})
+    const topPairs = Object.entries(u.top || {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
-      .map(([w, n]) => `${w}（${n} 次）`)
-      .join('、')
+    const topWords = topPairs.map(([w, n]) => `${w}（${n} 次）`).join('、')
     list.push({
       title: b ? `补充${b.label}标准词表` : '补充标准词表',
+      // 批次2：把 TOP8 词原文一并带上，供模板里的「复制待补词」按钮使用（可行动清单的出口）
+      words: topPairs.map(([w]) => w),
       desc: `按国家/行业标准术语集补录，不从现有数据反推。`
         + `症状类现有 ${b ? b.termCount : 72} 条词，`
         + (real.length > 1
