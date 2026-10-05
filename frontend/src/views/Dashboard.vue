@@ -193,12 +193,12 @@ const renderTrend = () => {
       {
         name: '合格率', type: 'line', smooth: true, yAxisIndex: 0,
         data: t.map((p) => p.qualifiedRate),
-        itemStyle: { color: '#3d5a4c' }, areaStyle: { color: 'rgba(61,90,76,0.10)' }
+        itemStyle: { color: 'var(--ink-mid)' }, areaStyle: { color: 'rgba(61,90,76,0.10)' }
       },
       {
         name: '待复核', type: 'line', smooth: true, yAxisIndex: 1,
         data: t.map((p) => p.pendingReview),
-        itemStyle: { color: '#96714f' }, lineStyle: { type: 'dashed' }
+        itemStyle: { color: 'var(--ochre)' }, lineStyle: { type: 'dashed' }
       }
     ]
   })
