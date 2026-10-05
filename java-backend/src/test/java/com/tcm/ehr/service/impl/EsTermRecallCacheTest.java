@@ -7,6 +7,7 @@ import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.search.SearchHits;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -79,6 +80,33 @@ class EsTermRecallCacheTest {
     @DisplayName("空白入参不发 ES 请求（与逐条查的行为一致）")
     void blankInputDoesNotHitEs() throws Exception {
         svc.search("symptom", "org-A", "   ", 5);
+        verify(client, times(0)).search(any(SearchRequest.class), any(RequestOptions.class));
+    }
+
+    @Test
+    @DisplayName("批量预取会把结果写进缓存 —— 预取一次后，循环里的逐术语调用不再打 ES")
+    void batchWarmsCacheForPerTermCalls() throws Exception {
+        org.elasticsearch.action.search.MultiSearchResponse multi =
+                mock(org.elasticsearch.action.search.MultiSearchResponse.class);
+        org.elasticsearch.action.search.MultiSearchResponse.Item item =
+                mock(org.elasticsearch.action.search.MultiSearchResponse.Item.class);
+        SearchResponse one = mock(SearchResponse.class);
+        SearchHits hits = mock(SearchHits.class);
+        when(hits.getHits()).thenReturn(new org.elasticsearch.search.SearchHit[0]);
+        when(one.getHits()).thenReturn(hits);
+        when(item.isFailure()).thenReturn(false);
+        when(item.getResponse()).thenReturn(one);
+        when(multi.getResponses()).thenReturn(new org.elasticsearch.action.search.MultiSearchResponse.Item[]{item, item});
+        when(client.msearch(any(org.elasticsearch.action.search.MultiSearchRequest.class),
+                any(RequestOptions.class))).thenReturn(multi);
+
+        svc.searchBatch("symptom", "org-A", List.of("失眠", "头晕"), 5);
+        verify(client, times(1)).msearch(any(org.elasticsearch.action.search.MultiSearchRequest.class),
+                any(RequestOptions.class));
+
+        // 预取已把 失眠/头晕 写进缓存 ⇒ 这两次逐术语调用不应再打到 ES
+        svc.search("symptom", "org-A", "失眠", 5);
+        svc.search("symptom", "org-A", "头晕", 5);
         verify(client, times(0)).search(any(SearchRequest.class), any(RequestOptions.class));
     }
 }

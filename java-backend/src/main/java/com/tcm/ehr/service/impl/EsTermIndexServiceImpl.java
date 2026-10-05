@@ -257,6 +257,10 @@ doc.put("standard_term", e.getStandardTerm());
                 }
             }
             out.put(asked.get(i), candidates);
+            // 顺手把结果写进同一份召回缓存（键与 search 完全一致）：这样调用方只要在循环前
+            // 用 searchBatch 预取一次，循环里的逐术语 normalize 就会全部命中缓存 ——
+            // 既拿到了「批量」的收益，又不必改任何循环体的写法。
+            RECALL_CACHE.put(type + "|" + org + "|" + asked.get(i), List.copyOf(candidates));
         }
         log.debug("[ES] {} 批量召回 {} 个术语（1 次 msearch，org_id='{}'）", indexName(type), asked.size(), org);
         return out;
