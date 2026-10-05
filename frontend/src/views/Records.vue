@@ -6,6 +6,7 @@
       <!-- ============ 病历查询 ============ -->
       <el-tab-pane label="病历查询" name="query">
         <PanelCard title="病历查询">
+          <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
           <RangeFilter v-model="query" />
           <div class="actions">
             <el-button type="primary" :loading="searching" @click="handleSearch">查 询</el-button>
@@ -212,6 +213,7 @@ import { reactive, ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
+import FreshnessTag from '@/components/FreshnessTag.vue'
 import { usePagedList } from '@/composables/usePagedList'
 import RecordTable from '@/components/RecordTable.vue'
 import PanelCard from '@/components/PanelCard.vue'
@@ -232,6 +234,8 @@ const aiStore = useAiContextStore()
 // 当前标签页；导入与新增懒加载，首屏只渲染查询表
 const activeTab = ref('query')
 
+// P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
+const loadedAt = ref(new Date().toLocaleString())
 /**
  * 21 个原始字段。
  *
