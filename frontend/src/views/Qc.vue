@@ -761,7 +761,9 @@ const handleRecompute = async () => {
   stopPoll()
   try {
     // 3. 按当前范围提交重算（只拿 taskId，不等结果）
-    const res = await recomputeQc({ filters: { ...filters } })
+    //    批次5：带幂等键 —— 一次用户动作一个键；网关/代理重放同一请求时键相同，
+    //    服务端会返回同一条任务，不会又建一条。用户再点一次是新意图，故每次执行都新生成。
+    const res = await recomputeQc({ filters: { ...filters }, requestKey: crypto.randomUUID() })
     const t = res.data || {}
     recomputeProgress.value = t
     // 4. 空范围提交出来的是 total=0 的任务：直接当完成，不必轮询
