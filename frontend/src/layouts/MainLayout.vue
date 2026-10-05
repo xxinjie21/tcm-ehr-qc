@@ -221,27 +221,27 @@ const handleLogout = async () => {
   color: var(--surface);
 }
 .brand {
-  font-size: 16px;
+  font-size: var(--fs-title);
   letter-spacing: 1px;
 }
 .brand em {
   font-style: normal;
   color: #c9b99a;
   margin-left: var(--sp-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .topbar .user {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: #d8dfd9;
 }
 /* 导入 LLM 入口：与「退出」同为顶栏次级操作，样式保持一致 */
 .llm-entry {
   color: #d8dfd9;
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .llm-entry:hover {
   color: var(--surface);
@@ -260,7 +260,7 @@ const handleLogout = async () => {
   padding: 1px 6px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 2px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: #dbe4de;          /* 徽标比用户名弱一档，与 --surface(#fff) 区分 */
 }
 .logout {
@@ -309,7 +309,7 @@ aside {
 }
 .menu .sec {
   padding: 14px var(--sp-4) var(--sp-1);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
 }
 
@@ -317,7 +317,7 @@ aside {
    父项本身也可点，故不做展开/收起，子项常驻。 */
 .menu .sub a {
   padding-left: var(--sp-5);
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
 }
 .menu .sub a:hover {
@@ -352,7 +352,7 @@ main > * {
   align-items: center;
   gap: 6px;
   margin-bottom: var(--sp-3);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 .crumb-item:last-child {

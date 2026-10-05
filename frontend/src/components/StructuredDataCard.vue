@@ -212,9 +212,9 @@ const levelDesc = (level, raw, name) => {
 </script>
 
 <style scoped>
-.sd-card { font-size: 13px; }
+.sd-card { font-size: var(--fs-base); }
 .sd-meta {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 10px;
   padding-bottom: 6px;
@@ -229,7 +229,7 @@ const levelDesc = (level, raw, name) => {
   border-radius: 4px;
   background: var(--ochre-surface, var(--ochre-light));
   color: var(--text);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .sd-manual strong {
   margin-right: var(--sp-2);
@@ -247,14 +247,14 @@ const levelDesc = (level, raw, name) => {
 }
 .sd-sec { margin-bottom: var(--sp-3); }
 .sd-sec-title {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
   padding-left: var(--sp-2);
   margin-bottom: var(--sp-2);
 }
-.sd-sec-hint { font-size: 11.5px; color: var(--text-sub); margin-left: 6px; }
+.sd-sec-hint { font-size: var(--fs-xs); color: var(--text-sub); margin-left: 6px; }
 .sd-items { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .sd-item {
   background: var(--paper);
@@ -263,11 +263,11 @@ const levelDesc = (level, raw, name) => {
   padding: var(--sp-1) 10px;
   color: var(--ink);
 }
-.sd-item .src { font-size: 11.5px; color: var(--text-sub); margin-left: 6px; }
+.sd-item .src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: 6px; }
 .sd-item .dosage { color: var(--ochre); margin-left: var(--sp-1); }
 .sd-item .tag {
   font-style: normal;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   margin-left: 6px;
   padding: 0 var(--sp-1);
   border-radius: 2px;
@@ -284,12 +284,12 @@ const levelDesc = (level, raw, name) => {
 .sd-item .tag.lv1 { color: var(--ink-mid); }
 .sd-item .tag.lv2 { color: var(--ochre); }
 .sd-item .tag.lv3 { color: var(--danger); }
-.sd-item .conf { font-size: 11.5px; color: var(--text-sub); margin-left: var(--sp-1); }
+.sd-item .conf { font-size: var(--fs-xs); color: var(--text-sub); margin-left: var(--sp-1); }
 /* 空态副文案：标题只说「哪一种空」，下一步动作放这里 */
 .empty-hint {
   max-width: 420px;
   margin: 2px auto 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -297,7 +297,7 @@ const levelDesc = (level, raw, name) => {
 
 <!-- 非 scoped：el-tooltip 的内容被 teleport 到 body，scoped 选择器命中不到，必须用全局块 -->
 <style>
-.el-popper .tp { max-width: 340px; font-size: 12px; line-height: 1.7; }
+.el-popper .tp { max-width: 340px; font-size: var(--fs-sm); line-height: 1.7; }
 .el-popper .tp-hd { font-weight: bold; margin-bottom: var(--sp-1); color: #2b2b2b; }
 .el-popper .tp-row { display: flex; gap: var(--sp-2); }
 .el-popper .tp-k { flex: 0 0 62px; color: #8a8578; }

@@ -475,7 +475,7 @@ onMounted(() => {
   gap: var(--sp-5);
 }
 .gs {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
 }
 .gs b {
@@ -486,7 +486,7 @@ onMounted(() => {
 /* 统计失败提示*/
 .gs-fail {
   margin-left: auto;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--danger);
 }
 
@@ -504,7 +504,7 @@ onMounted(() => {
   justify-content: space-between;
   margin-top: 10px;
 }
-.scope-tip { font-size: 13px; color: var(--text-sub); }
+.scope-tip { font-size: var(--fs-base); color: var(--text-sub); }
 .scope-tip b { color: var(--ink); }
 
 /* ===== 流程说明条 =====
@@ -514,7 +514,7 @@ onMounted(() => {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 14px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink-mid);
   line-height: 1.7;
   margin-bottom: var(--sp-4);
@@ -556,20 +556,20 @@ onMounted(() => {
   border-radius: 50%;
   background: var(--ink-mid);
   color: var(--surface);
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: bold;
   line-height: 30px;
   margin: 0 auto var(--sp-2);
 }
 .step-title {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
 }
 /* 每步的一句话解释：卡内常显，不再收进折叠区 */
 .step-desc {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--text-sub);
 }
@@ -578,7 +578,7 @@ onMounted(() => {
   width: 20px;
   flex-shrink: 0;
   text-align: center;
-  font-size: 20px;
+  font-size: var(--fs-page);
   color: var(--ochre);
   font-weight: bold;
 }
@@ -595,7 +595,7 @@ onMounted(() => {
   margin-bottom: var(--sp-1);
 }
 .tip {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 
@@ -606,7 +606,7 @@ onMounted(() => {
   padding-top: var(--sp-4);
 }
 .result-hd {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   margin-bottom: 14px;
@@ -629,7 +629,7 @@ onMounted(() => {
   color: var(--ink);
 }
 .stat-item .lbl {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   margin-top: var(--sp-1);
 }
@@ -643,10 +643,10 @@ onMounted(() => {
   align-items: center;
   gap: var(--sp-4);
   margin-top: var(--sp-3);
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--ink);
 }
-.level-dist .ld-lbl { color: var(--text-sub); font-size: 12.5px; }
+.level-dist .ld-lbl { color: var(--text-sub); font-size: var(--fs-md); }
 .level-dist .ld { padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .level-dist .ld.exact { color: var(--ink-mid); }
 .level-dist .ld.contain { color: var(--ochre); }
@@ -664,7 +664,7 @@ onMounted(() => {
 label,
 .field-lbl {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   margin-bottom: 3px;
 }
@@ -674,7 +674,7 @@ label,
   padding-top: var(--sp-3);
 }
 .preview-hd {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   margin-bottom: var(--sp-2);

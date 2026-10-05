@@ -198,7 +198,7 @@ onMounted(load)
 <style scoped>
 .tip {
   color: var(--text-sub);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   margin: 0 0 var(--sp-2);
 }
 </style>

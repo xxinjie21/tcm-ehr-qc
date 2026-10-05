@@ -898,7 +898,7 @@ onBeforeUnmount(stopPoll)
 </script>
 
 <style scoped>
-.tip { font-size: 12.5px; color: var(--text-sub); line-height: 1.7; }
+.tip { font-size: var(--fs-md); color: var(--text-sub); line-height: 1.7; }
 .actions { margin-top: var(--sp-3); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .nlp-tabs :deep(.el-tabs__header) { margin-bottom: var(--sp-3); }
 .nlp-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
@@ -913,7 +913,7 @@ onBeforeUnmount(stopPoll)
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: var(--sp-2) 14px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   margin-bottom: 14px;
 }
@@ -945,11 +945,11 @@ onBeforeUnmount(stopPoll)
    45px 为实拍测量值；只此一处，若调整 Element 标签主题需同步改这里。 */
 .split > .pane:first-child { margin-top: 45px; }
 .pane { min-width: 0; }
-.pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: var(--sp-2); }
-.src-note { font-size: 11.5px; color: var(--ink-mid); margin-left: var(--sp-2); }
+.pane-hd { font-size: var(--fs-base); font-weight: bold; color: var(--ink); margin-bottom: var(--sp-2); }
+.src-note { font-size: var(--fs-xs); color: var(--ink-mid); margin-left: var(--sp-2); }
 .src-note.warn { color: var(--danger); }
 .norm-note {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -966,7 +966,7 @@ onBeforeUnmount(stopPoll)
 }
 /* 归一汇总（第九轮）：把命中数、未命中数、走 ES 还是内存摊开 */
 .norm-stat {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -986,7 +986,7 @@ onBeforeUnmount(stopPoll)
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
 }
 .ns-legend .lg { display: flex; align-items: flex-start; gap: 5px; }
 /* 文案必须包在一个 span 里：.lg 是 flex 容器，裸文本节点与 <b> 会各自变成匿名 flex 项，
@@ -1007,7 +1007,7 @@ onBeforeUnmount(stopPoll)
   border-radius: 6px;
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-3);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.8;
   color: #8a3d33;
 }
@@ -1021,7 +1021,7 @@ onBeforeUnmount(stopPoll)
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.nt-hd { font-size: 12px; color: var(--text-sub); margin-bottom: var(--sp-2); }
+.nt-hd { font-size: var(--fs-sm); color: var(--text-sub); margin-bottom: var(--sp-2); }
 .nt-row { display: flex; gap: var(--sp-2); align-items: center; }
 .nt-result {
   display: flex;
@@ -1031,14 +1031,14 @@ onBeforeUnmount(stopPoll)
   margin-top: var(--sp-2);
   padding-top: var(--sp-2);
   border-top: 1px dashed var(--line-soft);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .nt-in { color: var(--text-sub); }
 .nt-arrow { color: #c9c3b4; }
 .nt-out { color: var(--ink); font-weight: bold; }
 .nt-out.miss { color: var(--danger); }
-.nt-src { font-size: 11.5px; color: var(--text-sub); margin-left: auto; }
-.nt-hint { margin-top: var(--sp-2); font-size: 11.5px; color: var(--text-sub); line-height: 1.7; }
+.nt-src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: auto; }
+.nt-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.7; }
 
 /* 原文模块化字段；分区常显 + 3 列栅格：
    wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。
@@ -1050,7 +1050,7 @@ onBeforeUnmount(stopPoll)
   position: relative;
   padding: 3px 0 var(--sp-1) var(--sp-2);
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: bold;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
@@ -1065,7 +1065,7 @@ onBeforeUnmount(stopPoll)
   background: var(--ink-mid);
 }
 .form-grid :deep(.el-form-item) { margin-bottom: 6px; }
-.form-grid :deep(.el-form-item__label) { font-size: 12px; color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
+.form-grid :deep(.el-form-item__label) { font-size: var(--fs-sm); color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
 .field-form { margin-bottom: 6px; }
 /* 整段文本只读对照：默认收起，不占填写区版面 */
 .composed-panel {
@@ -1078,7 +1078,7 @@ onBeforeUnmount(stopPoll)
   cursor: pointer;
   list-style: none;
   padding: var(--sp-2) 0;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink-mid);
 }
 .composed-hd::-webkit-details-marker { display: none; }
@@ -1099,7 +1099,7 @@ onBeforeUnmount(stopPoll)
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 10px var(--sp-3);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.9;
   color: var(--text);
   max-height: 220px;
@@ -1117,7 +1117,7 @@ onBeforeUnmount(stopPoll)
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.bf-title { font-size: 12.5px; color: var(--text-sub); margin-bottom: var(--sp-2); }
+.bf-title { font-size: var(--fs-md); color: var(--text-sub); margin-bottom: var(--sp-2); }
 .batch-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 var(--sp-1); }
 .batch-progress {
   margin-top: 14px;
@@ -1126,12 +1126,12 @@ onBeforeUnmount(stopPoll)
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.bp-hd { font-size: 12.5px; color: var(--text); margin-bottom: var(--sp-2); }
+.bp-hd { font-size: var(--fs-md); color: var(--text); margin-bottom: var(--sp-2); }
 .bp-hd b { color: var(--ink); }
-.bp-sub { margin-top: var(--sp-2); font-size: 12px; color: var(--text-sub); }
+.bp-sub { margin-top: var(--sp-2); font-size: var(--fs-sm); color: var(--text-sub); }
 .batch-failures { margin-top: 14px; border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
 .batch-list { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
-.bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: var(--sp-2); }
+.bf-hd { font-size: var(--fs-md); color: var(--text-sub); margin-bottom: var(--sp-2); }
 /* 截断提示：用的是次要色而不是警示色 —— 列表被截断是正常上限行为，不是错误 */
 .bf-trunc { margin-left: var(--sp-2); color: var(--ochre); }
 

@@ -172,7 +172,7 @@ onMounted(() => {
 <style scoped>
 .scope-tip {
   margin: var(--sp-2) 0 0;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 /* 筛选行：单行排列，窄屏自动换行 */
@@ -184,7 +184,7 @@ onMounted(() => {
 }
 /* 右侧条数提示 */
 .tip {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 </style>

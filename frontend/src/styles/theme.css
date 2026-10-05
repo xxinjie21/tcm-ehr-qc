@@ -106,7 +106,7 @@ h1, h2, h3, h4, h5, h6, b, strong {
 /* ===== 全局基础 ===== */
 body {
   font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  font-size: 13px;
+  font-size: var(--fs-base);
   line-height: 1.65;
   color: var(--text);
   background: var(--paper);
@@ -118,16 +118,16 @@ body {
   --el-table-header-bg-color: #fbfaf6;
   --el-table-header-text-color: var(--ink);
   --el-table-row-hover-bg-color: #f7f5ee;
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .el-table th.el-table__cell {
   font-weight: bold;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 
 /* ===== 按钮（原型 btn 风格） ===== */
 .el-button {
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 
 /* ===== 标签（原型 tag 风格：小圆角方标签） ===== */
@@ -168,7 +168,7 @@ body {
   margin-bottom: 14px;
 }
 .compact-form .el-form-item__label {
-  font-size: 13px;
+  font-size: var(--fs-base);
   line-height: 1.5;
   padding-bottom: 2px;
 }
@@ -183,7 +183,7 @@ body {
 .compact-form .el-form-item__error {
   position: static;
   padding-top: 3px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 /* 聚焦描边加粗一档：控件变大后更需要明确的焦点指示 */
 .compact-form .el-input__wrapper.is-focus,

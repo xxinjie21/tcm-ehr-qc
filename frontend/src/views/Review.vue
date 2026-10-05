@@ -707,7 +707,7 @@ onMounted(() => {
 }
 .no-task-tip {
   color: var(--text-sub);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .rv-bar {
   display: flex;
@@ -717,11 +717,11 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .rv-bar > span:first-child {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
 }
 .tip {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 .overdue {
@@ -756,7 +756,7 @@ onMounted(() => {
 .tag {
   display: inline-block;
   padding: 1px var(--sp-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   border-radius: 2px;
   line-height: 20px;
 }
@@ -772,7 +772,7 @@ onMounted(() => {
 }
 .deadline {
   margin-left: auto;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
 }
 .deadline b {
@@ -793,7 +793,7 @@ onMounted(() => {
 }
 .raw-panel summary {
   padding: 10px var(--sp-4);
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: bold;
   color: var(--ink);
   cursor: pointer;
@@ -825,7 +825,7 @@ onMounted(() => {
   display: flex;
   padding: var(--sp-2) 0;
   border-bottom: 1px dashed var(--line-soft);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .raw-item.full {
   grid-column: 1 / -1;
@@ -861,7 +861,7 @@ onMounted(() => {
   margin: 0;
   padding: 10px var(--sp-4);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -885,7 +885,7 @@ onMounted(() => {
   color: var(--ink-mid);
 }
 .mini-tag {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -916,7 +916,7 @@ onMounted(() => {
 .flabel {
   width: 78px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
   padding-top: 6px;
 }
@@ -930,16 +930,16 @@ onMounted(() => {
   background: var(--danger-surface);
   padding: 2px 10px;
   border-radius: 2px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   display: inline-block;
 }
 .term-note {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin: 6px 0 var(--sp-2) 78px;
 }
 .ded-hd {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   margin: var(--sp-3) 0 var(--sp-2);
 }
@@ -951,7 +951,7 @@ onMounted(() => {
   border-radius: 2px;
   padding: 6px var(--sp-3);
   margin-bottom: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .ded-item .pts {
   color: var(--danger);
@@ -965,14 +965,14 @@ onMounted(() => {
 .ok {
   padding: 6px 0;
   color: var(--ink-mid);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .ai-box {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 10px var(--sp-3);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.8;
   color: var(--ink);
 }
@@ -982,7 +982,7 @@ onMounted(() => {
 .ai-src {
   display: inline-block;
   margin-top: var(--sp-1);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .preview {
@@ -991,7 +991,7 @@ onMounted(() => {
   border: 1px solid #cddcd2;
   border-radius: 2px;
   padding: var(--sp-2) 14px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--ink-mid);
   display: flex;
   align-items: center;
@@ -1007,10 +1007,10 @@ onMounted(() => {
   border: 1px solid var(--ink-mid);
   border-radius: 2px;
   padding: 1px var(--sp-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .est-note {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 
@@ -1033,7 +1033,7 @@ onMounted(() => {
 }
 .result-bar .rv {
   color: var(--text-sub);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .result-bar b {
   color: var(--ink-mid);
@@ -1084,5 +1084,5 @@ onMounted(() => {
   }
 }
 /* P5.2：跳过已删病历的提示 */
-.skip-hint { margin-top: var(--sp-2); font-size: 12.5px; color: var(--text-sub); }
+.skip-hint { margin-top: var(--sp-2); font-size: var(--fs-md); color: var(--text-sub); }
 </style>

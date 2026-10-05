@@ -81,7 +81,7 @@ const FIELDS = fieldsWithWide([
 }
 /* 栏标题：小字次级色，只作分区提示 */
 .col-hd {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   margin-bottom: var(--sp-2);
 }

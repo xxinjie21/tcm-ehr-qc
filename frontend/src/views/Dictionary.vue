@@ -907,7 +907,7 @@ onMounted(() => {
 /* 批次 22：国标编码用等宽字体，便于逐字符核对（编码错一位就查不出来了） */
 .code-cell {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 /* 类型 tab：激活态与下划线改用主题墨色，替换 Element Plus 默认蓝 */
@@ -927,7 +927,7 @@ onMounted(() => {
 .dl-down { color: var(--danger); }
 .dl-flat { color: var(--text-sub); }
 .tip {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 /* 词典作用域提示条：与查询区同一行基线，标签 + 说明一行排开 */
@@ -945,11 +945,11 @@ onMounted(() => {
 }
 /* 拖拽区内的主提示与副说明 */
 .upload-tip {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text);
 }
 .upload-tip .sub {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   margin-top: var(--sp-1);
 }
@@ -957,7 +957,7 @@ onMounted(() => {
    位置在 import-actions 内，不再落在上传热区*/
 .fmt-detail {
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
 }
 .fmt-detail summary {
@@ -1001,7 +1001,7 @@ onMounted(() => {
 }
 /* 失败明细小标题 */
 .ded-hd {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
   margin-bottom: 6px;
 }
@@ -1011,7 +1011,7 @@ onMounted(() => {
   border-radius: 2px;
   padding: 6px var(--sp-3);
   margin-bottom: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 
 /* ===== 批次17：个人词典 / 提案 / 归档 ===== */
@@ -1023,7 +1023,7 @@ onMounted(() => {
 }
 .rv-meta {
   margin-top: var(--sp-2);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 .rv-dirty {
@@ -1049,7 +1049,7 @@ onMounted(() => {
 }
 .rv-diff-hd {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-base);
   margin-bottom: var(--sp-2);
   padding-left: var(--sp-2);
   border-left: 3px solid var(--line);
@@ -1059,13 +1059,13 @@ onMounted(() => {
 .rv-diff-hd.del { border-left-color: var(--danger); color: var(--danger); }
 .rv-diff-row {
   padding: 3px var(--sp-2);
-  font-size: 13px;
+  font-size: var(--fs-base);
   border-bottom: 1px solid var(--line);
 }
 .rv-diff-al {
   margin-left: var(--sp-2);
   color: var(--text-sub);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* ===== 页头：术语类型筛选器 ===== */
@@ -1078,7 +1078,7 @@ onMounted(() => {
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface-sub);
   border-radius: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 .dg-item b {
@@ -1092,7 +1092,7 @@ onMounted(() => {
   margin-bottom: var(--sp-3);
 }
 .dh-label {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 

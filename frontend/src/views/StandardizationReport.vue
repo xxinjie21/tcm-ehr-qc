@@ -212,7 +212,7 @@
         </template>
         <!-- 体验修复（2026-10-05）：此前页面没有任何「本页不自动刷新」的说明，
              用户不知道报告何时更新、该点哪个按钮才生效。 -->
-        <div style="margin-bottom:8px; padding:8px 10px; font-size:12px; line-height:1.7;
+        <div style="margin-bottom:8px; padding:8px 10px; font-size: var(--fs-sm); line-height:1.7;
                     color:var(--text); background:var(--ochre-light); border-left:3px solid var(--ochre); border-radius:4px;">
           <b>本页不会自动刷新。</b>怎么让它更新：
           <b>补了词表</b> → 点「重跑『解析 + 质控』」（新词表只对重跑过解析的病历生效）；
@@ -899,18 +899,18 @@ function onVisibilityChange() {
   border-radius: 50%;
   background: var(--ochre);
   color: var(--surface);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
 }
 .gate-body { flex: 1 1 auto; min-width: 0; }
 .gate-title {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 2px;
 }
 .gate-desc {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -930,13 +930,13 @@ function onVisibilityChange() {
 }
 .gp-label {
   flex: 0 0 auto;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   white-space: nowrap;
 }
 .gate-note {
   margin-top: var(--sp-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -956,7 +956,7 @@ function onVisibilityChange() {
   margin-bottom: var(--sp-3);
   background: var(--surface-sub);
   border-radius: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -996,7 +996,7 @@ function onVisibilityChange() {
   line-height: 20px;
   text-align: center;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--surface);
   background: var(--ink-mid);
@@ -1010,7 +1010,7 @@ function onVisibilityChange() {
   margin-bottom: 2px;
 }
 .hl-desc {
-  font-size: 13px;
+  font-size: var(--fs-base);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -1032,7 +1032,7 @@ function onVisibilityChange() {
 .kpi.warn { border-left: 3px solid var(--ochre); }
 .kpi.ok { border-left: 3px solid var(--success, #3a7d44); }
 .kpi-label {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   margin-bottom: 2px;
 }
@@ -1044,7 +1044,7 @@ function onVisibilityChange() {
 }
 .kpi-note {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--text-sub);
 }
@@ -1070,7 +1070,7 @@ function onVisibilityChange() {
   border-radius: 50%;
   background: var(--ink-mid);
   color: var(--surface);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .todo-body { flex: 1 1 auto; min-width: 0; }
@@ -1081,22 +1081,22 @@ function onVisibilityChange() {
   margin-bottom: 2px;
 }
 .todo-desc {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.7;
   color: var(--text-sub);
 }
 .empty-tip {
   padding: var(--sp-3) 0;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
 }
 /* 明细折叠 */
 .detail { margin-bottom: var(--sp-3); }
 .ct { font-size: 13.5px; font-weight: 600; color: var(--ink); }
-.ct-sub { margin-left: var(--sp-2); font-size: 12px; color: var(--text-sub); font-weight: 400; }
+.ct-sub { margin-left: var(--sp-2); font-size: var(--fs-sm); color: var(--text-sub); font-weight: 400; }
 .detail-note {
   margin-top: var(--sp-2);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -1104,7 +1104,7 @@ function onVisibilityChange() {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--sp-2) var(--sp-4);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .misc-grid span { color: var(--text-sub); margin-right: 6px; }
 .misc-grid b { color: var(--ink); font-weight: 600; }
@@ -1116,7 +1116,7 @@ function onVisibilityChange() {
   border-radius: 3px;
   background: var(--ochre-surface);
   color: var(--ochre);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .foot {

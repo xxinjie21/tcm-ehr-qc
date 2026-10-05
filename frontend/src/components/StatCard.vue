@@ -56,14 +56,14 @@ const display = computed(() =>
   line-height: 1.2;
 }
 .stat .num small {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
 }
 .stat .lbl {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   margin-top: 2px;
 }

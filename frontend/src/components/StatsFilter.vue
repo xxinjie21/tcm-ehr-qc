@@ -53,7 +53,7 @@ defineEmits(['search', 'reset'])
   align-items: flex-end;
 }
 .filter .cap {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   margin-right: 6px;
@@ -62,7 +62,7 @@ defineEmits(['search', 'reset'])
 /* 标签压在各自控件上方（block + 下间距），与 align-items:flex-end 配合对齐控件底边 */
 .filter label {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   margin-bottom: 3px;
 }

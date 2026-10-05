@@ -338,7 +338,7 @@ onBeforeUnmount(() => {
 }
 /* 「仅管理员」小标记 */
 .todo-lock {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -356,7 +356,7 @@ onBeforeUnmount(() => {
 .todo.warn .todo-num { color: var(--ochre); }
 .todo-lbl {
   display: block;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   margin-top: 2px;
 }
@@ -400,7 +400,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 /* 科室名固定宽度右对齐，过长省略（完整名放 title） */
 .rate-name {
@@ -443,5 +443,5 @@ onBeforeUnmount(() => {
   }
 }
 /* P5.2：趋势截断提示 */
-.trend-trunc { margin: var(--sp-2) 0 0; font-size: 12.5px; color: var(--text-sub); }
+.trend-trunc { margin: var(--sp-2) 0 0; font-size: var(--fs-md); color: var(--text-sub); }
 </style>

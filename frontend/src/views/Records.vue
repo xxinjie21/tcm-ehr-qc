@@ -705,13 +705,13 @@ onMounted(handleSearch)
   display: none;
 }
 .tip {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
   line-height: 1.7;
   margin-bottom: 14px;
 }
 .tip-inline {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 .import-auto {
@@ -720,7 +720,7 @@ onMounted(handleSearch)
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: var(--sp-3);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink);
 }
 .import-auto .tip {
@@ -734,7 +734,7 @@ onMounted(handleSearch)
 .up-inner { text-align: center; }
 .up-title { font-size: 13.5px; color: var(--ink); }
 .up-title em { color: var(--ink-mid); font-style: normal; font-weight: bold; }
-.up-sub { font-size: 12px; color: var(--text-sub); margin-top: var(--sp-1); }
+.up-sub { font-size: var(--fs-sm); color: var(--text-sub); margin-top: var(--sp-1); }
 .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
 .result { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: 14px; }
 .import-failed {
@@ -743,7 +743,7 @@ onMounted(handleSearch)
   background: var(--danger-surface);
   border: 1px solid #e3c3bb;
   border-radius: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--danger);
 }
 /* 逐文件导入进度*/
@@ -755,7 +755,7 @@ onMounted(handleSearch)
   border-radius: 4px;
 }
 .ip-hd {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text);
   margin-bottom: var(--sp-2);
 }
@@ -764,14 +764,14 @@ onMounted(handleSearch)
 }
 .ip-sub {
   margin-top: var(--sp-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
 }
-.result-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: var(--sp-3); }
+.result-hd { font-size: var(--fs-base); font-weight: bold; color: var(--ink); margin-bottom: var(--sp-3); }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: var(--sp-3) var(--sp-4); text-align: center; }
 .stat-item .num { font-size: 22px; font-weight: bold; color: var(--ink); }
-.stat-item .lbl { font-size: 12px; color: var(--text-sub); margin-top: var(--sp-1); }
+.stat-item .lbl { font-size: var(--fs-sm); color: var(--text-sub); margin-top: var(--sp-1); }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.red .num { color: var(--danger); }
 /* 多列栅格：3 列时 21 字段压到约 11 行，常规屏幕一屏可填完。
@@ -790,7 +790,7 @@ onMounted(handleSearch)
   margin-bottom: 6px;
 }
 .form-grid :deep(.el-form-item__label) {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   padding-bottom: 0;
 }
@@ -802,7 +802,7 @@ onMounted(handleSearch)
   position: relative;
   padding: 3px 0 var(--sp-1) var(--sp-2);
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: bold;
   color: var(--ink);
   border-bottom: 1px solid var(--line);

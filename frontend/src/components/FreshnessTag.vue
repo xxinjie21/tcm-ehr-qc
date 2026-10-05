@@ -33,7 +33,7 @@ defineProps({
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--ink-mid);
 }
 .fresh-tag .k { color: var(--text-sub); }

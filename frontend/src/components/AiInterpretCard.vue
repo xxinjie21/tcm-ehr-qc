@@ -158,7 +158,7 @@ watch(() => props.recordId, () => {
   padding-left: var(--sp-2);
 }
 .aii-src {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 /* margin-left: auto 把按钮推到标题行最右 */
@@ -206,18 +206,18 @@ watch(() => props.recordId, () => {
 }
 /* flex-shrink:0 保证标签不被长文本挤窄 */
 .sum-item .sum-key {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   flex-shrink: 0;
 }
 .sum-item span {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink);
   word-break: break-all;
 }
 /* LLM 叙述正文：加宽行距便于长段阅读 */
 .aii-narrative {
-  font-size: 13px;
+  font-size: var(--fs-base);
   line-height: 1.8;
   color: var(--ink);
   background: var(--surface);
@@ -239,14 +239,14 @@ watch(() => props.recordId, () => {
   padding: 10px var(--sp-3);
 }
 .blk-title {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   font-weight: bold;
   color: var(--ink);
   margin-bottom: var(--sp-2);
 }
 /* 「无缺项 / 无提示」时的正向文案，用次级色与警示标签区分 */
 .blk-ok {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink-mid);
 }
 .chips {
@@ -256,7 +256,7 @@ watch(() => props.recordId, () => {
 }
 /* 描边标签：用于归一命中分档；实心感留给「怎么来的」类标签 */
 .chip {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   padding: 2px var(--sp-2);
   border-radius: 2px;
   border: 1px solid var(--line);
@@ -271,21 +271,21 @@ watch(() => props.recordId, () => {
 .hints {
   margin: 0;
   padding-left: var(--sp-4);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink);
   line-height: 1.8;
 }
 /* 免责声明：右上分隔线，与正文拉开距离 */
 .aii-disclaimer {
   margin-top: var(--sp-3);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   text-align: right;
   border-top: 1px dashed var(--line-soft);
   padding-top: var(--sp-2);
 }
 .aii-tip {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 /* 窄屏（<1200px）摘要与结论块由两列塌成一列 */

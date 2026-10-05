@@ -384,7 +384,7 @@ onBeforeUnmount(() => {
   background: #9bb7a4;
 }
 .aii-title { font-size: 13.5px; font-weight: bold; }
-.aii-sub { font-size: 11.5px; color: #c9b99a; margin-left: 2px; }
+.aii-sub { font-size: var(--fs-xs); color: #c9b99a; margin-left: 2px; }
 /* 「清空」「收起」用无底透明按钮，避免在深色标题栏上抢视觉 */
 .aii-clear,
 .aii-close {
@@ -394,14 +394,14 @@ onBeforeUnmount(() => {
   cursor: pointer;
   line-height: 1;
 }
-.aii-clear { margin-left: auto; font-size: 12px; }
+.aii-clear { margin-left: auto; font-size: var(--fs-sm); }
 .aii-close { font-size: 18px; }
 .aii-clear:hover, .aii-close:hover { color: var(--surface); }
 
 /* 可查范围提示条：浅色底与上方标题栏区分 */
 .aii-scope {
   padding: var(--sp-2) var(--sp-3);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub, #8a8578);
   background: var(--ink-light, #eef3ee);
   border-bottom: 1px solid var(--line-soft);
@@ -416,7 +416,7 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--line-soft);
 }
 .cmd {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--ink, var(--ink));
   background: var(--surface);
   border: 1px solid var(--line, #e4dfd2);
@@ -432,7 +432,7 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   padding: var(--sp-3);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.7;
 }
 .aii-empty { color: var(--text-sub, #8a8578); }
@@ -454,7 +454,7 @@ onBeforeUnmount(() => {
 .msg-src {
   display: inline-block;
   margin-top: 6px;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub, #8a8578);
 }
 .msg.loading { color: var(--text-sub, #8a8578); }

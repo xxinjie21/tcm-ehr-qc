@@ -831,7 +831,7 @@ onMounted(() => {
 }
 /* 次级说明文字 */
 .tip {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 /* 截断 / 告警提示条：浅黄底，与错误红区分 */
@@ -841,7 +841,7 @@ onMounted(() => {
   color: var(--ochre);
   border-radius: 6px;
   padding: 6px var(--sp-3);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   margin-bottom: var(--sp-2);
 }
 /* 预检列表上方说明行 */
@@ -852,12 +852,12 @@ onMounted(() => {
   margin-bottom: 10px;
 }
 .precheck-bar > span:first-child {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-sub);
 }
 /* 弹窗内的小节标题 */
 .sd-title {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   margin: 14px 0 var(--sp-2);
@@ -873,12 +873,12 @@ onMounted(() => {
 .ok {
   padding: var(--sp-2);
   color: var(--ink-mid);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 /* 面板内二级标题（左竖线） */
 .sub-hd {
   margin: var(--sp-4) 0 var(--sp-2);
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
@@ -889,7 +889,7 @@ onMounted(() => {
 /* 以下 .std-title / .std-body / .std-cols / .std-col / .std-dim / .std-grade / .rule-card
    为旧版标准面板样式；当前模板已改用 .std-grid / .st / .chip，这些类暂无引用（保留待清理） */
 .std-title {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
 }
@@ -911,7 +911,7 @@ onMounted(() => {
   gap: 10px;
   padding: 6px 0;
   border-bottom: 1px dashed var(--line);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .std-dim .sd-name {
   font-weight: bold;
@@ -930,7 +930,7 @@ onMounted(() => {
 .std-grade {
   padding: 6px 10px;
   border-radius: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   margin-bottom: 6px;
 }
 .std-grade.ok {
@@ -955,7 +955,7 @@ onMounted(() => {
   border-left: 3px solid var(--ink-mid);
   border-radius: 4px;
   background: var(--paper);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink);
 }
 .rule-card.tongue {
@@ -973,7 +973,7 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   margin-bottom: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .dist-row .dr-l {
   flex: 0 0 130px;
@@ -1003,7 +1003,7 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .grade-chips .gc {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   padding: 3px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -1024,7 +1024,7 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 3px 0;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
 }
 .wf-item .wf-l {
   flex: 1 1 auto;
@@ -1049,7 +1049,7 @@ onMounted(() => {
 }
 /* 最终得分旁的分级胶囊 */
 .wf-grade {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 1px var(--sp-2);
   border-radius: 6px;
 }
@@ -1067,7 +1067,7 @@ onMounted(() => {
 }
 /* 合格线说明 */
 .wf-note {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   margin-bottom: 10px;
 }
@@ -1078,7 +1078,7 @@ onMounted(() => {
 }
 /* 折叠区内的单条规则说明 */
 .std-desc {
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.9;
   color: var(--ink);
   padding: 2px 0;
@@ -1094,7 +1094,7 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   line-height: 1.8;
 }
 .st-k {
@@ -1110,7 +1110,7 @@ onMounted(() => {
   display: inline-block;
   margin: 0 6px 2px 0;
   padding: 0 var(--sp-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--ink-light);
@@ -1135,7 +1135,7 @@ onMounted(() => {
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--text-sub);
 }
 .rc-fmt.on {
@@ -1153,7 +1153,7 @@ onMounted(() => {
 }
 /* 弹窗顶部说明 */
 .rc-tip {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   margin-bottom: 6px;
 }
@@ -1164,7 +1164,7 @@ onMounted(() => {
   gap: var(--sp-2);
   flex-wrap: wrap;
   margin: var(--sp-2) 0;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink);
   line-height: 2;
 }
@@ -1179,7 +1179,7 @@ onMounted(() => {
 /* ①②③④ 分段标题 */
 .rc-hd {
   margin: var(--sp-4) 0 var(--sp-2);
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
@@ -1192,7 +1192,7 @@ onMounted(() => {
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: var(--sp-2);
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   color: var(--ink);
 }
 </style>

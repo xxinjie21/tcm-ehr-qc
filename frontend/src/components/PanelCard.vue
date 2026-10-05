@@ -38,7 +38,7 @@ defineProps({
   margin: 0;
   padding: 10px var(--sp-4);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: bold;
   color: var(--ink);
   display: flex;

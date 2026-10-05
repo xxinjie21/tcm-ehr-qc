@@ -81,7 +81,7 @@
 }
 .auth-brand .en {
   margin-top: 14px;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   line-height: 1.75;
   color: var(--ochre);
   letter-spacing: 1.2px;
@@ -89,7 +89,7 @@
 }
 .auth-brand .ver {
   margin-top: auto;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   letter-spacing: 0.5px;
 }
@@ -103,12 +103,12 @@
   min-width: 0;
 }
 .auth-form h3 {
-  font-size: 16px;
+  font-size: var(--fs-title);
   color: var(--ink);
   letter-spacing: 1px;
 }
 .auth-form .hint {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   margin: var(--sp-2) 0 var(--sp-5);
 }
@@ -118,7 +118,7 @@
   margin-bottom: var(--sp-4);
 }
 .auth-form .el-form-item__label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   letter-spacing: 0.5px;
   padding-bottom: var(--sp-1);
@@ -131,7 +131,7 @@
 }
 .auth-switch {
   margin-top: var(--sp-4);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
 }
 .auth-switch a {
@@ -146,7 +146,7 @@
   margin-top: auto;
   padding-top: 20px;
   border-top: 1px dashed var(--line);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-sub);
   line-height: 2;
 }
@@ -164,7 +164,7 @@
   border-left: 3px solid var(--ochre);
   background: var(--ochre-light);
   padding: var(--sp-2) var(--sp-3);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: #6b5a44;
   margin: 0 0 var(--sp-4);
 }
@@ -172,7 +172,7 @@
 .copyright {
   margin-top: var(--sp-5);
   text-align: center;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   letter-spacing: 0.5px;
 }
