@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @TableName("users")
 public class User {
 
-    public static final String STATUS_PENDING = "pending";
+    /** 生效账号：可以是「无组织」状态（未加入组织时可见范围由 RecordFilter fail-closed 兜底） */
     public static final String STATUS_ACTIVE = "active";
     public static final String STATUS_DISABLED = "disabled";
 

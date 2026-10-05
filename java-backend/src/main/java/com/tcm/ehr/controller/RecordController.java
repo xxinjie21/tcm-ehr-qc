@@ -96,7 +96,7 @@ public class RecordController {
     /**
      * 修改病历的结构化数据。
      *
-     * <p>【权限：登录即可】只允许改 structuredData，携带原始字段按只读冲突返回 1007。</p>
+     * 【权限：登录即可】只允许改 structuredData，携带原始字段按只读冲突返回 400。
      *
      * <p>入参是「部分更新」语义的有序 Map（带原始字段要报冲突，不能收窄成 DTO），
      * 所以无法用 Bean Validation，改在入口做守卫：空体与不带 structuredData 一律 400。</p>
@@ -114,7 +114,7 @@ public class RecordController {
         if (!body.containsKey("structuredData")) {
             throw new IllegalArgumentException("只允许修改结构化数据（structuredData）");
         }
-        // 2. 只改结构化数据；带原始字段的冲突由 service 抛 1007
+        // 2. 只改结构化数据；带原始字段的冲突由 service 抛 IllegalArgumentException（400）
         recordService.updateRecord(recordId, body);
         // 3. 留痕：改了什么病历必须可查
         operationLogger.log("病历修改", recordId, "更新结构化数据");
@@ -124,16 +124,19 @@ public class RecordController {
     /**
      * 按 ID 批量删除病历。
      *
-     * <p>【权限：登录即可】先清复核任务再删，避免外键约束失败。</p>
+     * 【权限：登录即可】先清复核任务再删，避免外键约束失败。
+     * 数据域在 service 内先行过滤：请求体里不属于当前组的 id 会被剔除，不计入删除数。
      *
      * @param dto ids=待删除的病历ID集合
      * @return deletedCount=实际删除条数
      */
     @DeleteMapping("")
     public Result<DeleteRecordsVO> deleteRecords(@Valid @RequestBody DeleteRecordsDTO dto) {
-        // 1. 删（service 内先清复核任务再删病历）2. 留痕
+        // 1. 删（service 内先按数据域过滤，再清复核任务、删病历）
         DeleteRecordsVO vo = recordService.deleteRecords(dto);
-        operationLogger.log("病历删除", "共" + vo.getDeletedCount() + "条", null);
+        // 2. 留痕：请求条数与实际删除条数分开记，跨组尝试才看得出来
+        operationLogger.log("病历删除",
+                "请求" + dto.getIds().size() + "条 / 实际删除" + vo.getDeletedCount() + "条", null);
         return Result.ok("删除成功", vo);
     }
 
@@ -149,7 +152,10 @@ public class RecordController {
     public Result<DeleteRecordsVO> deleteByFilter(@Valid @RequestBody FiltersDTO filters) {
         // 1. 按范围删；条件全空会被 service 拒绝（防误删全库）2. 留痕
         DeleteRecordsVO vo = recordService.deleteByFilter(filters);
-        operationLogger.log("病历删除", "按范围", "共" + vo.getDeletedCount() + "条");
+        // 留痕要写明范围是否跨机构：管理员「看全部」时这条会把全部机构一起删掉，
+        // 日志里只写「按范围」事后看不出影响面
+        operationLogger.log("病历删除", "按范围", "共" + vo.getDeletedCount() + "条"
+                + (com.tcm.ehr.common.utils.RequestUtils.viewAllOrgs() ? "（全部机构）" : ""));
         return Result.ok("删除成功", vo);
     }
 

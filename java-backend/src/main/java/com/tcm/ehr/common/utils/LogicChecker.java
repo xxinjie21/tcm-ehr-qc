@@ -43,7 +43,8 @@ public final class LogicChecker {
             if (triggers.isEmpty()) {
                 continue;
             }
-            boolean hit = triggers.stream().anyMatch(t -> anyContains(t, rule.getTriggerValues()));
+            boolean hit = triggers.stream()
+                    .anyMatch(triggerValue -> anyContains(triggerValue, rule.getTriggerValues()));
             if (!hit) {
                 continue;
             }
@@ -65,8 +66,8 @@ public final class LogicChecker {
     private static List<String> listOf(Map<String, Object> data, String type) {
         List<String> out = new ArrayList<>();
         // 1. 类型未登记或该 key 不是列表 → 空结果
-        EntityTypes.EntityType t = EntityTypes.byKey(type);
-        if (t == null || !(data.get(t.structuredKey()) instanceof List<?> list)) {
+        EntityTypes.EntityType entityType = EntityTypes.byKey(type);
+        if (entityType == null || !(data.get(entityType.structuredKey()) instanceof List<?> list)) {
             return out;
         }
         // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
@@ -86,8 +87,8 @@ public final class LogicChecker {
 
     /** 类型 key → 中文名（描述冲突时用；类型不认识则原样返回 key） */
     private static String labelOf(String type) {
-        EntityTypes.EntityType t = EntityTypes.byKey(type);
-        return t == null ? type : t.label();
+        EntityTypes.EntityType entityType = EntityTypes.byKey(type);
+        return entityType == null ? type : entityType.label();
     }
 
     /** 文本是否包含任一关键词（contains 语义，不做分词） */

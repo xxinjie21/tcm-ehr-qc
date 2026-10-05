@@ -46,6 +46,9 @@ public class DictionaryTermStore {
 
     private final DictionaryTermMapper termMapper;
     private final DictionaryVersionMapper versionMapper;
+    /** 词条读取缓存：键 `org|type`，版本用 dictionary_versions.version（内容哈希） */
+    private final com.tcm.ehr.common.utils.VersionedCache<List<TermEntry>> termsCache =
+            new com.tcm.ehr.common.utils.VersionedCache<>(64);
     private final ObjectMapper objectMapper;
 
     /**
@@ -56,11 +59,30 @@ public class DictionaryTermStore {
      * @return 词条列表；两层都没有返回空列表（不是 null）
      */
     public List<TermEntry> readEffective(String orgId, String type) {
+        List<TermEntry> base = isBase(orgId) ? List.of() : read(BASE_ORG, type);
         List<TermEntry> own = read(orgId, type);
-        if (!own.isEmpty()) {
+        if (base.isEmpty()) {
             return own;
         }
-        return isBase(orgId) ? List.of() : read(BASE_ORG, type);
+        if (own.isEmpty()) {
+            return base;
+        }
+        // 基础层 + 本组织：同一标准词以本组织为准（组织层是叠加，不是替换）。
+        // 必须与 ES 侧的 org_id IN ('', 本组织) 同一口径 —— 原来「有自有层就不回落」
+        // 会让词典页、报告与归一实际用到的不是同一份数据
+        java.util.Map<String, TermEntry> merged = new java.util.LinkedHashMap<>();
+        for (TermEntry e : base) {
+            merged.put(termKey(e), e);
+        }
+        for (TermEntry e : own) {
+            merged.put(termKey(e), e);
+        }
+        return new ArrayList<>(merged.values());
+    }
+
+    /** 合并用的键：标准词（null / 空白归一为「无标准词」） */
+    private static String termKey(TermEntry e) {
+        return e.getStandardTerm() == null ? "" : e.getStandardTerm().trim();
     }
 
     /**
@@ -72,6 +94,20 @@ public class DictionaryTermStore {
      */
     public List<TermEntry> read(String orgId, String type) {
         String org = norm(orgId);
+        // 版本取 dictionary_versions.version —— 它是「内容哈希」，内容一变版本必变，
+        // 比时间戳可靠（不存在同秒撞版本的问题）；写入侧 replace 还会主动失效一次兜底。
+        DictionaryVersion v = findVersion(org, type);
+        String version = v == null || v.getVersion() == null ? "" : v.getVersion();
+        return termsCache.get(org + "|" + type, version, () -> loadTerms(org, type));
+    }
+
+    /**
+     * 真正查库装载某层词条。
+     *
+     * 单独抽出来是为了让 read 走缓存：标准化报告一次要读 8 类 × （基础层 + 本组织），
+     * 不缓存就是十几条 selectList，而词表内容在一次报告期间不会变。
+     */
+    private List<TermEntry> loadTerms(String org, String type) {
         List<DictionaryTerm> rows = termMapper.selectList(new QueryWrapper<DictionaryTerm>()
                 .eq("org_id", org)
                 .eq("type", type));
@@ -115,6 +151,9 @@ public class DictionaryTermStore {
         //    因导入顺序不同算出两个版本」而白白触发一次 ES 全量重建
         String version = contentVersion(entries);
         upsertVersion(org, type, version);
+        // 主动失效：内容哈希相同（同一份内容重灌）时版本不变，但库里的行 ID 已经换了一批，
+        // 缓存里那份 list 仍是可用的等价内容 —— 这里失效是为了让「重灌后立刻读」拿到新行
+        termsCache.invalidate(org + "|" + type);
         return version;
     }
 
@@ -144,6 +183,27 @@ public class DictionaryTermStore {
         return versionMapper.selectOne(new QueryWrapper<DictionaryVersion>()
                 .eq("org_id", org)
                 .eq("type", type));
+    }
+
+    /**
+     * 词典里出现过的全部组织号（含基础层空串），按字典序稳定输出。
+     *
+     * 给「重放全量索引」用：词条表与版本表都算来源 —— 只查词条表会漏掉「词条被清空、
+     * 但版本行还在（ES 里可能仍有残留）」的组织，而那恰恰是最需要重建的情形。
+     *
+     * @return 组织号列表（去重、稳定排序）
+     */
+    public List<String> listOrgs() {
+        java.util.TreeSet<String> set = new java.util.TreeSet<>();
+        for (DictionaryTerm t : termMapper.selectList(
+                new QueryWrapper<DictionaryTerm>().select("DISTINCT org_id"))) {
+            set.add(t.getOrgId() == null ? BASE_ORG : t.getOrgId());
+        }
+        for (DictionaryVersion v : versionMapper.selectList(
+                new QueryWrapper<DictionaryVersion>().select("DISTINCT org_id"))) {
+            set.add(v.getOrgId() == null ? BASE_ORG : v.getOrgId());
+        }
+        return new ArrayList<>(set);
     }
 
     /**
@@ -178,9 +238,14 @@ public class DictionaryTermStore {
      * 每次导入都触发一次全量 ES 重建。</p>
      */
     public String contentVersion(List<TermEntry> entries) {
+        // 哈希输入必须覆盖「归一判定真正用到的字段」：只哈希标准词的话，
+        // 只改别名或编码不会换版本 —— 启动对账判「已同步」，归一继续用旧别名
         List<String> keys = new ArrayList<>(entries.size());
         for (TermEntry e : entries) {
-            keys.add(e.getStandardTerm() == null ? "" : e.getStandardTerm().trim());
+            String std = e.getStandardTerm() == null ? "" : e.getStandardTerm().trim();
+            String aliases = e.getAliases() == null ? "" : String.join(",", e.getAliases());
+            String code = e.getCode() == null ? "" : e.getCode().trim();
+            keys.add(std + "\u0002" + aliases + "\u0002" + code);
         }
         keys.sort(String::compareTo);
         String joined = String.join("\u0001", keys);

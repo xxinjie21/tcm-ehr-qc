@@ -47,16 +47,6 @@ public interface IDictionaryFileService {
      */
     void write(String type, List<TermEntry> entries) throws IOException;
 
-
-    /**
-     * 当前词典版本（各类型内容合成，内容不变则稳定）。
-     *
-     * <p>结构化数据落库时记下这个值，用于回答"这次归一依据哪一版词典"。</p>
-     *
-     * @return 版本串
-     */
-    String currentVersion();
-
     /**
      * 读文本文件内容。
      *

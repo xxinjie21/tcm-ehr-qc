@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.DistLock;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.DictProposalDTOs;
 import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.po.DictProposalTerm;
@@ -61,6 +62,8 @@ public class DictProposalService {
     private final IEsTermIndexService esIndexService;
     private final ObjectMapper objectMapper;
     private final DistLock distLock;
+    /** 词典写权限（批次 6 工作项 4）：授权位在 organization_members 里，不能只看 JWT 的 role */
+    private final com.tcm.ehr.service.IOrgPermissionService orgPermission;
 
     // ---------------------------------------------------------------- 基线导出
 
@@ -139,7 +142,12 @@ public DictProposalVO submit(String orgId, String type, List<TermEntry> terms, S
 public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         purgeExpiredSnapshots();
         QueryWrapper<DictProposal> q = new QueryWrapper<>();
-        if (query.getOrgId() != null) {
+        // 组织条件必填：以前 orgId 为 null 时不加条件，组长便能看到全库提案
+        // （含别组提案的完整词条快照）。要「本组 + 基础层」必须用括号把 OR 包起来，
+        // 否则 OR 会与后面的状态/类型条件平级，把过滤条件整个失效
+        if (query.isIncludeBaseLayer()) {
+            q.and(w -> w.eq("org_id", query.getOrgId()).or().eq("org_id", ""));
+        } else {
             q.eq("org_id", query.getOrgId());
         }
         if (notBlank(query.getStatus())) {
@@ -164,6 +172,37 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
     /** 取提案；不存在返回 null */
     public DictProposal get(String proposalId) {
         return proposalMapper.selectById(proposalId);
+    }
+
+    /**
+     * 审核权限：管理员一律可以；基础层提案（org_id 为空串）只允许管理员；
+     * 其余要求「提案属于当前组织」且「当前用户是所有者或被授予词典写权限」。
+     *
+     * 为什么必须按提案自身的 org_id 判，而不是看调用方传来的 isOwner 布尔：isOwner 只说明
+     * 「我在自己组织里是 owner」，对任何组织的 owner 都为真，与目标提案属于哪个组织无关
+     * （2026-10-05 之前就是这么漏的）。批次 6 工作项 4 起另加授权位判定，
+     * 于是本方法与 {@code QcController.requireRuleWrite} 同一口径。
+     *
+     * @param p 提案行
+     * @throws ForbiddenException 无权审核时抛出，消息按原因区分
+     */
+    private void requireAuditable(DictProposal p) {
+        if (RequestUtils.isAdmin()) {
+            return;
+        }
+        String proposalOrg = p.getOrgId();
+        if (proposalOrg == null || proposalOrg.isBlank()) {
+            throw new ForbiddenException("基础层提案仅管理员可审核");
+        }
+        String currentOrgId = RequestUtils.currentOrgId();
+        if (currentOrgId == null || currentOrgId.isBlank() || !proposalOrg.equals(currentOrgId)) {
+            throw new ForbiddenException("无权审核其它课题组的提案");
+        }
+        // 授权位按「主组织」查，故只在确认提案属于本组织之后才用它 ——
+        // 否则「在 A 组被授权」会等价于「可审 A 组以外的提案」
+        if (!orgPermission.canWriteDictionary(RequestUtils.currentUserId())) {
+            throw new ForbiddenException("需管理员、组织所有者或被授权成员才能审核提案");
+        }
     }
 
     // ---------------------------------------------------------------- 差异
@@ -243,15 +282,15 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
      */
     @Transactional(rollbackFor = Exception.class)
     public DictProposalVO audit(String proposalId, boolean approve, String comment,
-                                String auditor, boolean isOwner) {
+                                String auditor) {
         purgeExpiredSnapshots();
         DictProposal p = proposalMapper.selectById(proposalId);
         if (p == null) {
             throw new BusinessException(4003, "提案不存在");
         }
-        if (!isOwner) {
-            throw new ForbiddenException("仅组长可审核提案");
-        }
+        // 权限与归属一起判（批次 6 工作项 4）：合并会整份替换目标组织的基线并重建其 ES 索引，
+        // 属跨机构写。原实现只看调用方传来的 isOwner（恒为真），等于没判
+        requireAuditable(p);
         if (!p.isPending()) {
             // 重复提交审核：直接返回当前状态，不二次合并（否则会生成两份归档）
             throw new BusinessException(4003, "该提案已" + statusText(p.getStatus()) + "，不能重复审核");

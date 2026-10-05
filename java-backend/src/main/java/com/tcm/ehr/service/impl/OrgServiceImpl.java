@@ -2,6 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.OrganizationMember;
@@ -363,6 +364,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     @Override
     public List<OrgVOs.MemberInfo> members(String orgId) {
         requireOrg(orgId);
+        requireOwnOrg(orgId);
         List<OrgVOs.MemberInfo> out = new ArrayList<>();
         // owner 排前，便于前端直接看出所有者
         List<OrganizationMember> rows = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
@@ -384,6 +386,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     @Transactional(rollbackFor = Exception.class)
     public void addMember(String orgId, String userId) {
         requireOrg(orgId);
+        requireOwnOrg(orgId);
         User u = userMapper.selectById(userId);
         if (u == null) {
             throw new ResourceNotFoundException(1006, "用户不存在");
@@ -419,18 +422,24 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     @Transactional(rollbackFor = Exception.class)
     public void removeMember(String orgId, String userId) {
         requireOrg(orgId);
+        requireOwnOrg(orgId);
         OrganizationMember m = memberOf(orgId, userId);
         if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
             throw new IllegalArgumentException("不能直接移除所有者，请先转让所有者");
         }
         memberMapper.deleteById(m.getId());
-        updateUserStatus(userId, User.STATUS_PENDING, false);
+        // 被移出 / 主动退出组织后账号仍是 active：组织模型取代了「待分配池 / 审批中」，
+        // users.status 只剩 active/disabled 两个取值。无组织用户的可见范围由
+        // RecordFilter 的 fail-closed 兜底（未加入组织时仅「LLM 配置」「创建组织」可用），
+        // 不再用账号状态表达「没有归属」
+        updateUserStatus(userId, User.STATUS_ACTIVE, false);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void transferOwner(String orgId, String newOwnerUserId) {
         requireOrg(orgId);
+        requireOwnOrg(orgId);
         OrganizationMember newOwner = memberOf(orgId, newOwnerUserId);
         // 原组长降为组员：两行必须同生共死（加了 @Transactional）
         List<OrganizationMember> owners = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
@@ -452,6 +461,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     @Transactional(rollbackFor = Exception.class)
     public void leave(String orgId) {
         requireOrg(orgId);
+        requireOwnOrg(orgId);
         String userId = RequestUtils.currentUserId();
         OrganizationMember m = memberOf(orgId, userId);
         if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
@@ -473,7 +483,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             memberMapper.updateById(successor);
         }
         memberMapper.deleteById(m.getId());
-        updateUserStatus(userId, User.STATUS_PENDING, false);
+        // 被移出 / 主动退出组织后账号仍是 active：组织模型取代了「待分配池 / 审批中」，
+        // users.status 只剩 active/disabled 两个取值。无组织用户的可见范围由
+        // RecordFilter 的 fail-closed 兜底（未加入组织时仅「LLM 配置」「创建组织」可用），
+        // 不再用账号状态表达「没有归属」
+        updateUserStatus(userId, User.STATUS_ACTIVE, false);
     }
 
     /**
@@ -490,6 +504,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     public void setPermissions(String orgId, String userId,
                               Boolean canWriteDictionary, Boolean canWriteQcRules) {
         requireOrg(orgId);
+        requireOwnOrg(orgId);
         OrganizationMember m = memberOf(orgId, userId);
         if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
             throw new IllegalArgumentException("所有者本就拥有全部写权限，无需单独授权");
@@ -525,6 +540,23 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             throw new IllegalArgumentException("该用户不在此组织");
         }
         return m;
+    }
+
+    /**
+     * 调用者必须属于 pathOrgId 这个机构：owner 只能管自己的机构。
+     *
+     * 与 OrgRoleInterceptor 的第二项校验同口径，这里是兜底 —— 拦截器依赖注解声明了正确的
+     * pathVar，一旦新增路由漏写，服务层这道校验仍在。管理员不在此放行：管理员的兜底入口是
+     * reassign-owner（仅管理员、不走本校验）。
+     *
+     * @param pathOrgId 路径里的机构 id
+     * @throws ForbiddenException 调用者当前机构与 pathOrgId 不一致时抛出
+     */
+    private void requireOwnOrg(String pathOrgId) {
+        String currentOrgId = RequestUtils.currentOrgId();
+        if (currentOrgId == null || currentOrgId.isBlank() || !currentOrgId.equals(pathOrgId)) {
+            throw new ForbiddenException("无权操作其它课题组");
+        }
     }
 
     /** 组装组概要；withOwner=false 时跳过组长的二次查询（我的组只有一组，没必要） */

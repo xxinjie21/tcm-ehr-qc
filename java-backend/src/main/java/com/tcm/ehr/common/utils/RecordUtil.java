@@ -38,7 +38,10 @@ public final class RecordUtil {
                 nvl(r.getPrescription()), nvl(r.getFollowUp()), nvl(r.getTreatmentEffect()),
                 nvl(r.getDepartment()), nvl(r.getDoctorId()),
                 nvl(r.getVisitCount() == null ? null : String.valueOf(r.getVisitCount())),
-                nvl(r.getVisitTime() == null ? null : r.getVisitTime().toString()));
+                // 接诊时间先截到秒再参与哈希：visit_time 列是 DATETIME（无小数秒），
+                // 直接 toString() 会把亚秒带上，于是「入库前算的哈希」与「从库读回重算的哈希」
+                // 不相等 —— 去重预筛失效，还会撞唯一键
+                nvl(r.getVisitTime() == null ? null : r.getVisitTime().withNano(0).toString()));
         return md5Hex(joined);
     }
 

@@ -57,7 +57,9 @@ class DictionaryControllerDiffTest {
                 mock(DictArchiveService.class),
                 // 批次 21 起 controller 多一个词表体检依赖（/parse 用它出 lint 结论）
                 mock(com.tcm.ehr.service.IDictionaryLintService.class),
-                mock(OperationLogger.class));
+                mock(OperationLogger.class),
+                // 批次 6 工作项 4 起 controller 多一个词典写权限依赖
+                mock(com.tcm.ehr.service.IOrgPermissionService.class));
     }
 
     @AfterEach

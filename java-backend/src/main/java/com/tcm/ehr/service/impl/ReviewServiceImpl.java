@@ -69,12 +69,16 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         int p = page != null && page > 0 ? page : 1;
         int s = pageSize != null && pageSize > 0 ? pageSize : 20;
 
-        // 2. 组装查询条件：只取本组、未失效任务，按创建时间倒序
+        // 2. 组装查询条件：未失效任务，按创建时间倒序
         QueryWrapper<ReviewTask> w = new QueryWrapper<>();
         w.eq("is_obsolete", 0);
         // 3. § 6.3 缺点 7：不能看到别组的复核任务（与判杂志事实同级的数据）。
         //    review_tasks 打组是写入时做的（upsertReviewTask），这里只需等值过滤。
-        w.eq("org_id", RequestUtils.currentOrgId());
+        //    管理员「看全部」时不加这条 —— 与病历列表/详情同一口径（RecordFilter.canAccess
+        //    已按 viewAllOrgs 放行），否则管理员能看到他组病历却看不到它的复核任务
+        if (!RequestUtils.viewAllOrgs()) {
+            w.eq("org_id", RequestUtils.currentOrgId());
+        }
         // 4. 状态筛选：无组时上面的 org_id 等值已让结果为空，不再需要角色判断
         String dbStatus = dbStatus(status);
         if (dbStatus != null) {
@@ -128,6 +132,11 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         if (!RecordFilter.canAccess(r)) {
             throw new ForbiddenException("无权复核该病历");
         }
+        // 已隔离（无效）的病历不许复核：复核会用当前数据重算，把「无效」翻回「合格」，
+        // 等于一道越权之外的旁路把隔离结论撤销掉。隔离是终态，要改只能重新导入 / 清洗
+        if ("无效".equals(r.getGrade())) {
+            throw new ForbiddenException("该病历已被隔离（无效），不能复核");
+        }
 
         List<ReviewTask> tasks = baseMapper.selectList(new QueryWrapper<ReviewTask>()
                 .eq("record_id", recordId).eq("is_obsolete", 0).eq("status", "pending"));
@@ -162,7 +171,13 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         }
 
         // 2. 自动重算（判定地基仍是规则）
-        ScoreResultVO sr = QcScorer.score(asMap(r.getStructuredData()), r, false, qcRuleStore.get());
+        //    规则必须按当前组织取：用进程内基线 get() 会与质控页的 getFor(组织) 分叉，
+        //    表现为「同一条病历复核后的分级与质控页不一致」。
+        //    「重复」标志从上一次落库的评分结果里读回 —— 原来恒传 false，等于复核一次
+        //    就把批量扣掉的「重复数据」-5 分抹掉（85 分的重复病历一点通过就变 90 分合格）
+        ScoreResultVO sr = QcScorer.score(asMap(r.getStructuredData()), r,
+                duplicateFromQcResults(r.getQcResults()),
+                qcRuleStore.getFor(RequestUtils.currentOrgId()));
         String status = switch (sr.getGrade()) {
             case "合格" -> "completed";
             case "待复核" -> "reviewing";
@@ -175,7 +190,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             throw new IllegalStateException("评分结果写入失败", e);
         }
 
-        // 3. 任务流转：仍待复核 → 保持 pending 并刷新；否则完成
+        // 3. 任务流转：仍待复核 → 保持 pending 并刷新；判为无效 → 与批量路径同一口径作废；否则完成
         ReviewResultVO result = new ReviewResultVO();
         result.setScore(sr.getScore());
         if ("待复核".equals(sr.getGrade())) {
@@ -184,6 +199,16 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             task.setIssueType(issueType(sr));
             baseMapper.updateById(task);
             result.setStatus("待复核");
+        } else if ("无效".equals(sr.getGrade())) {
+            // 批量路径判无效时写 obsolete/is_obsolete=1，复核路径原来写 completed ——
+            // 同一结论两条路径两种终态，按任务表统计复核工作量时口径不可比
+            task.setScore(sr.getScore());
+            task.setStatus("obsolete");
+            task.setIsObsolete(1);
+            task.setReviewedBy(RequestUtils.currentUsername());
+            task.setCompletedTime(LocalDateTime.now().withNano(0));
+            baseMapper.updateById(task);
+            result.setStatus("无效");
         } else {
             task.setStatus("completed");
             task.setScore(sr.getScore());
@@ -224,6 +249,28 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             return "缺失字段";
         }
         return "评分不达标";
+    }
+
+    /**
+     * 复核重算用的「重复」标志：从上一次落库的评分结果里读回。
+     *
+     * 复核曾恒传 false —— 批量按批内哈希扣掉的「重复数据」-5 分会凭空回来，
+     * 同一条病历的分数取决于走哪个入口，不可复现。判定必须与上次一致。
+     *
+     * 解析不了就当不重复：宁可少扣分，也不要因为一条脏 qc_results 让复核失败。
+     */
+    private boolean duplicateFromQcResults(String qcResults) {
+        if (qcResults == null || qcResults.isBlank()) {
+            return false;
+        }
+        try {
+            ScoreResultVO prev = objectMapper.readValue(qcResults, ScoreResultVO.class);
+            return prev.getDeductions() != null && prev.getDeductions().stream()
+                    .anyMatch(d -> "重复数据".equals(d.getType()));
+        } catch (Exception e) {
+            log.warn("[复核] qc_results 解析失败，重复标志按 false 处理：{}", e.getMessage());
+            return false;
+        }
     }
 
     /** 解析结构化数据；空或坏 JSON 返回空 map（复核时按"未结构化"继续，不中断） */

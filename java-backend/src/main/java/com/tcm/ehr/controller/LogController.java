@@ -33,7 +33,8 @@ public class LogController {
     /**
      * 分页查询操作日志。
      *
-     * <p>【权限：仅管理员】</p>
+     * 【权限：登录即可】可见范围按三档：管理员看全部、组织所有者看本组织、成员只看自己
+     * （实现在 LogServiceImpl，不在本方法加注解 —— 档位要查库里的成员授权位，注解表达不了）。
      *
      * @param action  操作类型，空表示不限
      * @param keyword 关键字，匹配操作人/对象/详情
@@ -46,7 +47,7 @@ public class LogController {
                                             @RequestParam(required = false) String keyword,
                                             @RequestParam(defaultValue = "1") int page,
                                             @RequestParam(defaultValue = "10") int pageSize) {
-        return Result.ok(logService.page(action, keyword, page, pageSize));
+        return Result.ok(logService.page(action, keyword, page, PageSizeGuard.clamp(pageSize)));
     }
 
     /**

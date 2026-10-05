@@ -46,7 +46,9 @@ class GlobalExceptionHandlerTest {
                                 Mockito.mock(com.tcm.ehr.service.DictArchiveService.class),
                                 // 批次 21 起 controller 多一个词表体检依赖
                                 Mockito.mock(com.tcm.ehr.service.IDictionaryLintService.class),
-                                Mockito.mock(OperationLogger.class)))
+                                Mockito.mock(OperationLogger.class),
+                                // 批次 6 工作项 4 起 controller 多一个词典写权限依赖
+                                Mockito.mock(com.tcm.ehr.service.IOrgPermissionService.class)))
                 .setControllerAdvice(handler)
                 .build();
 

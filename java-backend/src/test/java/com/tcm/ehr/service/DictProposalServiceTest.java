@@ -8,6 +8,7 @@ import com.tcm.ehr.domain.dto.DictProposalDTOs;
 import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.DictProposalDiffVO;
+import com.tcm.ehr.service.IOrgPermissionService;
 import com.tcm.ehr.mapper.DictArchiveTermMapper;
 import com.tcm.ehr.mapper.DictArchiveVersionMapper;
 import com.tcm.ehr.mapper.DictProposalMapper;
@@ -15,6 +16,9 @@ import com.tcm.ehr.mapper.DictProposalTermMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +57,8 @@ class DictProposalServiceTest {
     private DictArchiveService archiveService;
     private IEsTermIndexService esIndexService;
     private DistLock distLock;
+    /** 批次 6 工作项 4 起 audit 会消费词典写授权位，故本类要能控制它的返回值 */
+    private IOrgPermissionService orgPermission;
     private DictProposalService svc;
 
     @BeforeEach
@@ -72,8 +78,32 @@ class DictProposalServiceTest {
         });
 
         when(termStore.replace(anyString(), anyString(), any())).thenReturn("v-new");
+        orgPermission = mock(IOrgPermissionService.class);
         svc = new DictProposalService(proposalMapper, termMapper, termStore,
-                archiveService, esIndexService, new tools.jackson.databind.ObjectMapper(), distLock);
+                archiveService, esIndexService, new tools.jackson.databind.ObjectMapper(), distLock,
+                orgPermission);
+        // 默认按管理员绑定：audit 现在会按提案自身的 org_id 判归属，管理员可审任意提案
+        bindAdmin();
+    }
+
+    /** 绑定「管理员」请求上下文（可审任意机构的提案，含基础层） */
+    private void bindAdmin() {
+        bind("管理员", "org-A", null);
+    }
+
+    /** 绑定「org-A 的组长」请求上下文 */
+    private void bindOwnerOfOrgA() {
+        bind("用户", "org-A", "owner");
+    }
+
+    private void bind(String role, String orgId, String orgRole) {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute("currentUserId", "u-1");
+        req.setAttribute("currentUsername", "auditor");
+        req.setAttribute("currentRole", role);
+        req.setAttribute("currentOrgId", orgId);
+        req.setAttribute("currentOrgRole", orgRole);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
     }
 
     private static List<TermEntry> terms(String... names) {
@@ -259,7 +289,7 @@ class DictProposalServiceTest {
         snapshotContains("甘草", "人参");
         when(termStore.read(anyString(), anyString())).thenReturn(terms("旧词"));
 
-        var vo = svc.audit("p1", true, "同意", "owner-1", true);
+        var vo = svc.audit("p1", true, "同意", "owner-1");
 
         // 1) 基线被替换
         verify(termStore).replace(eq("org-A"), eq("herb"), any());
@@ -280,7 +310,7 @@ class DictProposalServiceTest {
         snapshotContains("甘草");
         when(termStore.read(anyString(), anyString())).thenReturn(List.of());
 
-        svc.audit("p1", true, null, "owner-1", true);
+        svc.audit("p1", true, null, "owner-1");
 
         verify(distLock).runLocked(eq(DistLock.dictRebuildLock("herb", "org-A")), any());
     }
@@ -290,7 +320,7 @@ class DictProposalServiceTest {
     void refusesDoubleAudit() {
         when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.APPROVED));
 
-        assertThrows(BusinessException.class, () -> svc.audit("p1", true, null, "owner-1", true));
+        assertThrows(BusinessException.class, () -> svc.audit("p1", true, null, "owner-1"));
 
         verify(termStore, never()).replace(anyString(), anyString(), any());
         verify(archiveService, never()).archive(anyString(), anyString(), any(),
@@ -298,11 +328,77 @@ class DictProposalServiceTest {
     }
 
     @Test
-    @DisplayName("非组长审核：拒绝")
+    @DisplayName("非组长且非管理员审核：拒绝")
     void nonOwnerCannotAudit() {
+        // 管理员可审（见 baseLayerProposalOnlyAdminCanAudit），所以这里必须绑成普通成员
+        bind("用户", "org-A", null);
         when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.PENDING));
 
-        assertThrows(ForbiddenException.class, () -> svc.audit("p1", true, null, "member", false));
+        assertThrows(ForbiddenException.class, () -> svc.audit("p1", true, null, "member"));
+    }
+
+    @Test
+    @DisplayName("跨组审核：组长只能审本组织的提案（isOwner 这个布尔说明不了目标提案属于谁）")
+    void ownerCannotAuditOtherOrg() {
+        bindOwnerOfOrgA();
+        DictProposal other = proposal(DictProposal.PENDING);
+        other.setOrgId("org-B");
+        when(proposalMapper.selectById("p1")).thenReturn(other);
+
+        assertThrows(ForbiddenException.class, () -> svc.audit("p1", true, null, "owner-1"));
+        verify(termStore, never()).replace(anyString(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("基础层提案（org_id 为空串）：组长不能审，只有管理员能审")
+    void baseLayerProposalOnlyAdminCanAudit() {
+        // 1) 组长：拒绝
+        bindOwnerOfOrgA();
+        DictProposal base = proposal(DictProposal.PENDING);
+        base.setOrgId("");
+        when(proposalMapper.selectById("p1")).thenReturn(base);
+        assertThrows(ForbiddenException.class, () -> svc.audit("p1", true, null, "owner-1"));
+        verify(termStore, never()).replace(anyString(), anyString(), any());
+
+        // 2) 管理员：放行（走到合并）
+        bindAdmin();
+        snapshotContains("甘草");
+        when(termStore.read(anyString(), anyString())).thenReturn(List.of());
+        assertDoesNotThrow(() -> svc.audit("p1", true, null, "admin"));
+        verify(termStore).replace(eq(""), eq("herb"), any());
+    }
+
+    @Test
+    @DisplayName("批次 6 工作项 4：本组织提案的审核看 can_write_dictionary —— 授权位为真才放行")
+    void auditConsumesDictionaryWriteFlag() {
+        bindOwnerOfOrgA();
+        when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.PENDING));
+        snapshotContains("甘草");
+        when(termStore.read(anyString(), anyString())).thenReturn(List.of());
+
+        // 1) 授权位为假（含「非 owner 且未授权」的成员）→ 403
+        when(orgPermission.canWriteDictionary("u-1")).thenReturn(false);
+        assertThrows(ForbiddenException.class, () -> svc.audit("p1", true, null, "u-1"));
+        verify(termStore, never()).replace(anyString(), anyString(), any());
+
+        // 2) 授权位为真 → 放行到合并
+        when(orgPermission.canWriteDictionary("u-1")).thenReturn(true);
+        assertDoesNotThrow(() -> svc.audit("p1", true, null, "u-1"));
+        verify(termStore).replace(eq("org-A"), eq("herb"), any());
+    }
+
+    @Test
+    @DisplayName("列表含基础层：OR 必须被括号包住，否则会与状态/类型条件平级而失效")
+    void listBaseLayerWrapsOrInParentheses() {
+        when(proposalMapper.selectList(any())).thenReturn(new ArrayList<>());
+        DictProposalDTOs.ProposalQuery q = query("org-A", "PENDING", "herb", true, "alice");
+        q.setIncludeBaseLayer(true);
+
+        svc.list(q);
+
+        String sql = capturedListQuery().getSqlSegment();
+        assertTrue(sql.contains("(org_id"), "OR 条件必须成组，否则状态/类型过滤会被 OR 旁路：" + sql);
+        assertTrue(sql.contains("OR"), sql);
     }
 
     @Test
@@ -310,7 +406,7 @@ class DictProposalServiceTest {
     void rejectDoesNotTouchBaseline() {
         when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.PENDING));
 
-        var vo = svc.audit("p1", false, "术语不准确", "owner-1", true);
+        var vo = svc.audit("p1", false, "术语不准确", "owner-1");
 
         assertEquals(DictProposal.REJECTED, vo.getStatus());
         assertTrue(vo.getPurgeAfter() != null, "驳回应安排快照清理时间");

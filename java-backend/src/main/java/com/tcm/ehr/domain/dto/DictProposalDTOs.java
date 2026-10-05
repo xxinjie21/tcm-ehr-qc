@@ -50,13 +50,24 @@ public final class DictProposalDTOs {
     /**
      * 提案列表的查询条件。
      *
-     * 聚成 DTO 而不是继续加位置参数：列表的过滤维度已经涨到 5 个
-     * （组织 / 状态 / 类型 / 视角 / 提交人），再往后每个调用点都得数参数顺序。
+     * 聚成 DTO 而不是继续加位置参数：列表的过滤维度已经涨到 6 个
+     * （组织 / 是否含基础层 / 状态 / 类型 / 视角 / 提交人），再往后每个调用点都得数参数顺序。
+     *
+     * 组织维度是必填语义：orgId 为空串表示只看基础层，不允许「null = 不限组织」——
+     * 那会让任意一个机构的组长翻到别组的提案全文（2026-10-05 修）。
      */
     @Data
     public static class ProposalQuery {
-        /** 按组织过滤；null = 不限组织（管理员可跨组织看） */
+        /** 按组织过滤；必填（调用方传当前机构，空串＝只看基础层） */
         private String orgId;
+
+        /**
+         * 是否把基础层（org_id 为空串）的提案一起列出来。
+         *
+         * 基础层是所有机构共用的系统基线，组长看得到才谈得上「知道基线要改什么」；
+         * 成员视角不带它，避免与提交人过滤叠加后语义含糊。
+         */
+        private boolean includeBaseLayer;
 
         /** 按状态过滤；null / 空白 = 全部 */
         private String status;
@@ -64,7 +75,7 @@ public final class DictProposalDTOs {
         /** 按术语类型过滤；null / 空白 = 全部类型 */
         private String type;
 
-        /** true = 组长视角（看全组）；false = 成员视角（只看自己提交的） */
+        /** true = 组长视角（看本组织全部提案）；false = 成员视角（只看自己提交的） */
         private Boolean isOwner;
 
         /** 成员视角下「我」的提交人标识；与 submit 写入 proposal.submitUserId 的是同一个值 */

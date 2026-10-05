@@ -255,7 +255,8 @@ public class AiServiceImpl implements IAiService {
      * <p>也分两档：真缺失 / 漏抽（原始病历有记录但未结构化）。</p>
      */
     private QcScorer.Missing coreMissing(Map<String, Object> data, Record r) {
-        return QcScorer.missingElements(data, r, qcRuleStore.get());
+        // 与质控页同口径：按当前组织取规则，不能用进程内基线 get()
+        return QcScorer.missingElements(data, r, qcRuleStore.getFor(RequestUtils.currentOrgId()));
     }
 
     /** 统计 9 类实体的归一命中数，按精确/包含/模糊分档 */
@@ -493,7 +494,9 @@ public class AiServiceImpl implements IAiService {
         Map<String, Object> data = structured(r);
 
         // 1. 结论来自规则重算（与 records.qc_results 同源，页面看到的判定和这里一致）
-        ScoreResultVO sr = QcScorer.score(data, r, false, qcRuleStore.get());
+        //    规则同样按当前组织取，否则与质控页的判定分叉
+        ScoreResultVO sr = QcScorer.score(data, r, false,
+                qcRuleStore.getFor(RequestUtils.currentOrgId()));
         String precheck = precheckText(sr, r);
 
         AiReplyVO vo = new AiReplyVO();
@@ -622,11 +625,11 @@ public class AiServiceImpl implements IAiService {
         return list == null || list.isEmpty() ? "无" : String.join("、", list);
     }
 
-    private static int parseInt(Object o) {
+    private static int parseInt(Object value) {
         // 1. 数值类型直接取整（JSON 解析出来的整数就是 Number）
-        if (o instanceof Number n) return n.intValue();
+        if (value instanceof Number n) return n.intValue();
         try {
-            return Integer.parseInt(String.valueOf(o).trim());
+            return Integer.parseInt(String.valueOf(value).trim());
         } catch (NumberFormatException e) {
             // 2. 解析不了给 -1：调用侧据此判断"年龄/次数无效"
             return -1;
@@ -641,8 +644,8 @@ public class AiServiceImpl implements IAiService {
      * 所以名字各不相同 —— 原来三处都叫 {@code str(Object)}，光看调用点无法判断
      * 拿到的是 null 还是空串。</p>
      */
-    private static String rawOrNull(Object o) {
-        return o == null ? null : String.valueOf(o);
+    private static String rawOrNull(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private static String nz(String s) {

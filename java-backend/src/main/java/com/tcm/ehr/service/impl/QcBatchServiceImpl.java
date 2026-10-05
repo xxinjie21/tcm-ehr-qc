@@ -1,6 +1,7 @@
 package com.tcm.ehr.service.impl;
 
 import com.tcm.ehr.common.exception.BusinessException;
+import com.tcm.ehr.common.exception.ForbiddenException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -231,7 +232,9 @@ public class QcBatchServiceImpl implements IQcBatchService {
             throw new IllegalArgumentException("有另一个重算任务正在提交，请稍后重试");
         }
         try {
+            // 防重按组织算：任务是组织级的，A 组排队不该挡住 B 组提交
             Long active = taskMapper.selectCount(new QueryWrapper<QcTask>()
+                    .eq("org_id", orgId)
                     .in("status", List.of(QcTask.QUEUED, QcTask.RUNNING)));
             if (active != null && active > 0) {
                 throw new IllegalArgumentException("已有重算任务在排队或运行中，请等它结束或先取消");
@@ -251,8 +254,11 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /** 查重通过后真正落库的那一段（被提交互斥包住） */
     private QcTaskVO insertTask(QcBatchDTO dto, FiltersDTO filters, String orgId,
                                String operator, String role) {
-        // 3. 用提交线程的角色构造数据域过滤，统计计划条数
-        long count = recordMapper.selectCount(RecordFilter.build(orgId, filters));
+        // 3. 用提交线程的角色构造数据域过滤，统计计划条数。
+        //    必须用 buildWithinOrg：worker 在后台线程按 org_id 快照重建条件，那里
+        //    viewAllOrgs() 恒为 false；管理员提交时若用 build() 计数会算成全库，
+        //    total 与实际执行范围对不上（分级汇总的分母也跟着错）
+        long count = recordMapper.selectCount(RecordFilter.buildWithinOrg(orgId, filters));
         if (count > maxRecords) {
             throw new IllegalArgumentException("本次范围 " + count + " 条，超过单次上限 " + maxRecords
                     + " 条。请按科室或就诊时间分批重算。");
@@ -289,7 +295,25 @@ public class QcBatchServiceImpl implements IQcBatchService {
     @Override
     public QcTaskVO get(String id) {
         QcTask t = taskMapper.selectById(id);
-        return t == null ? null : toVO(t, true);
+        // 不属于本组织一律按「不存在」返回：读操作不区分「不存在」与「无权查看」
+        return t == null || !belongsToCurrentOrg(t) ? null : toVO(t, true);
+    }
+
+    /**
+     * 任务是否属于当前组织。
+     *
+     * 与 NlpBatchServiceImpl.satisfiesGroup 同口径：不含管理员特权，管理员也按组织过滤 ——
+     * 批任务带失败明细（含 recordId），沿用「与病历访问同一口径」比另开一套规则更好维护。
+     * 无组织用户 currentOrgId() 为空串，一律判否，与病历读取的 fail-closed 一致。
+     */
+    private boolean belongsToCurrentOrg(QcTask t) {
+        if (t == null) {
+            return false;
+        }
+        String taskOrg = t.getOrgId();
+        String currentOrg = RequestUtils.currentOrgId();
+        return taskOrg != null && currentOrg != null && !currentOrg.isBlank()
+                && taskOrg.equals(currentOrg);
     }
 
     @Override
@@ -300,11 +324,18 @@ public class QcBatchServiceImpl implements IQcBatchService {
             // 「不存在」是 404，「参数非法」才是 400，两者语义不同
             throw new ResourceNotFoundException(1008, "任务不存在");
         }
+        // 写操作按「不许」报 403：不能把「存在但看不到」说成「不存在」
+        if (!belongsToCurrentOrg(t)) {
+            throw new ForbiddenException("无权操作该任务");
+        }
         if (QcTask.QUEUED.equals(t.getStatus())) {
             // 1. 排队中：还没进 worker，直接落终态
             t.setStatus(QcTask.CANCELLED);
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             taskMapper.updateById(t);
+            // 内存取消位一并置：worker 可能已 poll 到该任务、还没读状态，
+            // 只改库会让它拿旧对象覆写成 RUNNING（check-then-act 竞态）
+            cancelFlags.add(id);
         } else if (QcTask.RUNNING.equals(t.getStatus())) {
             // 2. 运行中：不能直接改状态（worker 还会覆写），只置取消位让它自己收尾
             cancelFlags.add(id);
@@ -318,7 +349,9 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
     @Override
     public List<QcTaskVO> list() {
+        // 只列本组织的任务：任务行带失败明细（含 recordId），跨组织可见等于泄露他组病历标识
         List<QcTask> tasks = taskMapper.selectList(new QueryWrapper<QcTask>()
+                .eq("org_id", RequestUtils.currentOrgId())
                 .orderByDesc("create_time").last("LIMIT " + LIST_LIMIT));
         List<QcTaskVO> out = new ArrayList<>();
         for (QcTask t : tasks) {
@@ -337,6 +370,9 @@ public class QcBatchServiceImpl implements IQcBatchService {
         }
 
         // 2. 标记运行中并记录开始时间（此刻起进度才对外可见）
+        //    先清掉取消位再落库：t 是取任务时的快照，直接 updateById 会把
+        //    cancel_requested=0 写回，抹掉这一步之间刚到达的取消请求
+        t.setCancelRequested(null);
         t.setStatus(QcTask.RUNNING);
         t.setStartedAt(LocalDateTime.now().withNano(0));
         taskMapper.updateById(t);
@@ -345,27 +381,42 @@ public class QcBatchServiceImpl implements IQcBatchService {
         QcBatchResultVO result = new QcBatchResultVO();
         result.setTotal(t.getTotal() == null ? 0 : t.getTotal());
         Set<String> seenHash = new HashSet<>();
-        // 规则快照整批共用（避免逐条重复读取）
-        QcRuleSet rules = ruleStore.get();
+        // 规则快照整批共用（避免逐条重复读取）。
+        // 必须按任务行上的组织取：单条评分走的是 getFor(当前组织)，
+        // 整批若用 get()（进程内基线）就会与单条结论分叉
+        QcRuleSet rules = ruleStore.getFor(t.getOrgId());
         List<QcTaskVO.Failure> failures = new ArrayList<>();
         boolean[] truncated = {false};
         int[] processed = {0};
         boolean cancelled = false;
+        boolean failed = false;
         try {
             cancelled = run(id, t, result, seenHash, rules, failures, truncated, processed);
+        } catch (Exception e) {
+            // 执行期异常必须落 FAILED。
+            // 不能指望 workerLoop 的 markFailed：finally 会先把终态写成 COMPLETED，
+            // 而 markFailed 见终态即 return，FAILED 就永远落不下来。
+            failed = true;
+            log.error("[批重算] 任务 {} 执行异常，落 FAILED", id, e);
         } finally {
             // 4. 无论正常跑完、取消还是异常，都要在这里落终态，否则任务会永远停在运行中
-            t.setStatus(endStatus(running, cancelled, processed[0], t.getTotal()));
+            t.setStatus(failed ? QcTask.FAILED
+                    : endStatus(running, cancelled, processed[0], t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
             t.setDone(processed[0]);
-            t.setSuccess(result.getTotal() - result.getFailed());
+            // success 以「已尝试 - 失败」为准：原式用 total - failed，取消 / 中断提前退出时
+            // 会把没处理的记录也算成成功，出现 done=25 而 success=1000 的自相矛盾
+            t.setSuccess(Math.max(0, processed[0] - result.getFailed()));
             t.setFailed(result.getFailed());
             t.setQualified(result.getQualified());
             t.setPendingReview(result.getPendingReview());
             t.setInvalid(result.getInvalid());
             t.setFailureList(writeJson(failures));
             t.setFailureTruncated(truncated[0]);
+            // 不把库里的取消位写回：t 是任务开始时的快照，updateById 会带上 cancel_requested=0，
+            // 抹掉并发取消。置 null 后 MyBatis-Plus 的 NOT_NULL 策略会跳过该列。
+            t.setCancelRequested(null);
             taskMapper.updateById(t);
             cancelFlags.remove(id);
             // 5. 审计日志用提交时捕获的操作人/角色回填 —— worker 线程读不到请求上下文
@@ -401,9 +452,11 @@ public class QcBatchServiceImpl implements IQcBatchService {
             if (list.isEmpty()) {
                 break;
             }
-            // 3. 逐条处理
+            // 3. 逐条处理：内存取消位逐条查（同实例取消立即生效）；库里的取消位每
+            //    PROGRESS_EVERY 条查一次 —— 逐条查库在 3.5 万条量级就是 3.5 万次查询
             for (Record r : list) {
-                if (cancelFlags.contains(id) || isCancelRequested(id)) {
+                if (cancelFlags.contains(id)
+                        || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
                     return true;
                 }
                 step(id, r, t, result, seenHash, rules, failures, truncated, processed);
@@ -461,8 +514,17 @@ public class QcBatchServiceImpl implements IQcBatchService {
         t.setInvalid(result.getInvalid());
         t.setFailed(result.getFailed());
         // 5. 每 PROGRESS_EVERY 条落一次库：每条都写会把库压垮
+        //    只 set 进度列，不用整实体 updateById —— 后者会把 t 里过期的
+        //    cancel_requested=0 一并写回，抹掉并发下刚置的取消位
         if (processed[0] % PROGRESS_EVERY == 0) {
-            taskMapper.updateById(t);
+            taskMapper.update(null, new UpdateWrapper<QcTask>()
+                    .eq("id", id)
+                    .set("done", processed[0])
+                    .set("current_label", t.getCurrentLabel())
+                    .set("qualified", result.getQualified())
+                    .set("pending_review", result.getPendingReview())
+                    .set("invalid", result.getInvalid())
+                    .set("failed", result.getFailed()));
         }
     }
 

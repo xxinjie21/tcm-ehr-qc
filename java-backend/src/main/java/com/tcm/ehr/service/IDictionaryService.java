@@ -102,5 +102,18 @@ public interface IDictionaryService {
      * @return 视图含 {@code type} / {@code orgId} / {@code entries} / {@code version}
      * @throws IOException ES 重建失败
      */
-    Map<String, Object> reindex(String type) throws IOException;
+    /**
+     * 手动重建 ES 索引（仅管理员；ES 是可丢弃可重放的派生索引，本入口用于「库里对、索引落后」）。
+     *
+     * <p>默认只重建<b>当前组织 + 指定类型</b>：基础层或别的组织若也落后，重建它们会让那一层
+     * 同时进入空窗（归一 503），不该由一次手动操作顺带触发。要全量重放必须显式传参 ——
+     * 那是「索引大面积丢失」时的灾难恢复入口。</p>
+     *
+     * @param type 术语类型；空 = 全部类型
+     * @param org  组织号；空 = 当前组织；{@code *} = 词典里出现过的全部组织
+     * @return 汇总：{@code pairs} / {@code entries} / {@code results} / {@code failures}；
+     *         单个 (type, org) 的失败不中断整批，列进 {@code failures}
+     * @throws IOException 仅当参数解析本身出错（单点失败已收进 failures）
+     */
+    Map<String, Object> reindex(String type, String org) throws IOException;
 }

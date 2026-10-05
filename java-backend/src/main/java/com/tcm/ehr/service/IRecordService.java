@@ -51,7 +51,7 @@ public interface IRecordService extends IService<Record> {
      * 修改病历的结构化数据。
      *
      * @param recordId 病历ID
-     * @param body     只接受 structuredData 键，携带原始字段按只读冲突抛 1007
+     * @param body     只接受 structuredData 键，携带原始字段按只读冲突抛 400
      */
     void updateRecord(String recordId, Map<String, Object> body);
 

@@ -17,11 +17,13 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CleanResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.IDictionaryFileService;
+import java.time.LocalDateTime;
 import com.tcm.ehr.service.IGovernanceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -47,8 +49,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     private final EsTermNormalizer termNormalizer;
     private final ObjectMapper objectMapper;
-    private final IDictionaryFileService dictionaryFileService;
     private final com.tcm.ehr.service.DictionaryTermStore termStore;
+    /** 隔离病历时要同步作废它的待复核任务，否则它会继续挂在复核页待办里 */
+    private final com.tcm.ehr.mapper.ReviewTaskMapper reviewTaskMapper;
 
     /**
      * 单条术语归一（清洗页的「归一测试」入口）。
@@ -75,6 +78,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      *
      * <p>只规整与标记，<b>不填充医生未书写的内容，也不删除任何病历</b>；各步的判断口径见方法体注释。</p>
      */
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters) {
         List<Record> records;
@@ -110,6 +114,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (!seenTextHash.add(textHash)) {
                 baseMapper.updateCleanFields(r.getId(), trim(r.getGender()), trim(r.getAge()),
                         trim(r.getPattern()), trim(r.getPrescription()), "invalid", "无效");
+                // 与下面「不可修复」分支同理：隔离必须同步作废待复核任务
+                reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
                 vo.setDeduped(vo.getDeduped() + 1);
                 continue;
             }
@@ -135,21 +141,57 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     && TextUtil.isBlank(r.getPresentIllness()) && TextUtil.isBlank(r.getSelfReport()))
                     || (r.getStructuredData() != null && !r.getStructuredData().isBlank()
                         && !isValidJson(r.getStructuredData()));
-            if (unrecoverable && !"invalid".equals(status)) {
+            boolean isolatedNow = unrecoverable && !"invalid".equals(status);
+            if (isolatedNow) {
                 vo.setIsolated(vo.getIsolated() + 1);
                 status = "invalid";
                 grade = "无效";
+                // 隔离必须同步作废待复核任务：不作废的话它仍挂在复核页，
+                // 而复核会按当前数据重算，把「无效」翻回「合格」——隔离结论就被撤销了
+                reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
             }
 
-            baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, status, grade);
+            if (isolatedNow) {
+                // 只有真改了结论才写 status/grade；常规路径不碰这两列，
+                // 否则会把清洗开始时的旧快照盖到并发质控/复核的新结论上
+                baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, status, grade);
+            } else {
+                baseMapper.updateCleanFieldsWithoutStatus(r.getId(), gender, age, pattern, prescription);
+            }
+
+            // 6. 回写 text_hash：上面 trim/置空的四列都参与哈希，不回写会让「库里存的哈希」
+            //    与「按内容现算的哈希」永久不一致 —— 导入的判重预筛（按内容现算）就再也
+            //    认不出这条病历，同一份数据会重新进库
+            r.setGender(gender);
+            r.setAge(age);
+            r.setPattern(pattern);
+            r.setPrescription(prescription);
+            String freshHash = RecordUtil.textHash(r);
+            if (!freshHash.equals(r.getTextHash())) {
+                try {
+                    baseMapper.updateTextHash(r.getId(), freshHash);
+                } catch (DataIntegrityViolationException dup) {
+                    // 撞唯一键 = 该机构内已有一条内容相同的病历，与本方法开头的去重是同一结论
+                    log.warn("[清洗] 病历 {} 回写 text_hash 撞唯一键，按重复处理并置为无效", r.getId());
+                    baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, "invalid", "无效");
+                    reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
+                    vo.setDeduped(vo.getDeduped() + 1);
+                    continue;
+                }
+            }
 
             // 5. 术语归一（兜底）：仅对合格病历执行，归一后标记已清洗
             //    ⚠️ 人工修改过的病历**跳过归一**（方案 A）：归一会重跑标准化，把人工改成
             //    非标准词的术语又归一回标准词 —— 等于清洗一次就撤销一次人工修正。
             //    人工成果优先，所以这里直接不碰它的 structured_data。
+            //    注意：合格但 structured_data 为空/空白的病历不在此列，它保持「待清洗」，
+            //    因而不会被导出条件 governed=1 选中 —— 这是刻意的（没有结构化结果不算标准数据集）。
             if ("合格".equals(grade) && r.getStructuredData() != null && !r.getStructuredData().isBlank()) {
                 if (StructuredDataMeta.isManuallyEdited(objectMapper, r.getStructuredData())) {
                     vo.setManualSkipped(vo.getManualSkipped() + 1);
+                    // 人工修正过的按已清洗处理：它的 structured_data 已定案（方案 A 不重跑归一），
+                    // 不打标记会让它永远落在「待清洗」，并被导出条件 governed=1 永久排除
+                    baseMapper.markGoverned(r.getId());
                 } else {
                     int[] norm = normalizeStructuredData(r);
                     vo.setNormalized(vo.getNormalized() + norm[0]);
@@ -382,7 +424,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public Map<String, Object> governanceStats() {
-        return baseMapper.selectGovernanceStats(RecordFilter.domainOrgId());
+        // viewAllOrgs 一并下推：清洗页的「待清洗/已清洗」必须与 clean() 实际会处理的范围同域
+        return baseMapper.selectGovernanceStats(RecordFilter.domainOrgId(), RequestUtils.viewAllOrgs());
     }
 
     /**
@@ -391,11 +434,21 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * <p>证候存在 {@code structured_data} 的 JSON 里，SQL 表达不了，只能留给调用方在内存筛。</p>
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
-        // 1. 条件组装复用 RecordFilter（与其余读路径同一个函数）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(),
-                RecordFilter.fromMap(dto.getFilters()));
-        // 2. 追加导出自己的硬约束：只导合格病历
+        // 1. 条件组装复用 RecordFilter（与其余读路径同一个函数），但**去掉 pattern**：
+        //    证候存在 structured_data 的 JSON 里，SQL 表达不了；若在这里带上，
+        //    RecordFilter 会把它翻译成「原始 pattern 列 LIKE」，而归一后的证候写法
+        //    常与医生原写法不同 —— 那一步收窄会在内存筛之前就把本该命中的病历排除掉。
+        //    证候判定统一交给 filterQualified 的内存筛（含原始列回退）。
+        FiltersDTO f = RecordFilter.fromMap(dto.getFilters());
+        if (f != null) {
+            f.setPattern(null);
+        }
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), f);
+        // 2. 追加导出自己的硬约束：只导「合格且已清洗」的病历。
+        //    governed=1 是清洗完成的标记（术语归一跑过、且不是人工跳过的那一类），
+        //    少了它，从未归一过的结构化数据会以「标准数据集」的名义被导出去
         wrapper.eq("grade", "合格");
+        wrapper.eq("governed", 1);
         return wrapper;
     }
 
@@ -415,10 +468,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 : records.stream().filter(r -> structuredPatternContains(r, pattern)).toList();
     }
 
-    /** structuredData.patternList 是否包含指定证候（模糊包含匹配） */
+    /** structuredData.patternList 是否包含指定证候（模糊包含匹配），否则回退原始辨证结论列 */
     private boolean structuredPatternContains(Record r, String pattern) {
-        // 1. 没有结构化数据就只剩原始列可比
-        if (r.getStructuredData() == null) return false;
+        // 1. 只在真有结构化数据时才解析 JSON。
+        //    不能在这里提前 return false —— 注释里承诺的「原始列回退」会永远走不到，
+        //    未结构化的合格病历会在带证候筛选时被整批丢掉
+        if (r.getStructuredData() == null || r.getStructuredData().isBlank()) {
+            return r.getPattern() != null && r.getPattern().contains(pattern);
+        }
         try {
             Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
                     new tools.jackson.core.type.TypeReference<Map<String, Object>>() {

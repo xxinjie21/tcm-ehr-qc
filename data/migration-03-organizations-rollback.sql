@@ -31,7 +31,7 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- R.8 复核「至多一条活跃任务」约束
 SET @sql := IF(
-  (SELECT COUNT(*) FROM information_schema.STATISTICS
+  (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'review_tasks'
       AND INDEX_NAME = 'uk_record_active') = 1,
   'ALTER TABLE review_tasks DROP INDEX uk_record_active', 'DO 0');
@@ -46,7 +46,7 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- R.7 去重兜底
 SET @sql := IF(
-  (SELECT COUNT(*) FROM information_schema.STATISTICS
+  (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'records'
       AND INDEX_NAME = 'uk_records_org_text_hash') = 1,
   'ALTER TABLE records DROP INDEX uk_records_org_text_hash', 'DO 0');
@@ -75,21 +75,21 @@ ALTER TABLE users
 
 -- R.4 日志索引还原
 SET @sql := IF(
-  (SELECT COUNT(*) FROM information_schema.STATISTICS
+  (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'operation_log'
       AND INDEX_NAME = 'idx_operator') = 0,
   'ALTER TABLE operation_log ADD INDEX idx_operator (operator)', 'DO 0');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql := IF(
-  (SELECT COUNT(*) FROM information_schema.STATISTICS
+  (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'operation_log'
       AND INDEX_NAME = 'idx_group_time') = 1,
   'ALTER TABLE operation_log DROP INDEX idx_group_time', 'DO 0');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql := IF(
-  (SELECT COUNT(*) FROM information_schema.STATISTICS
+  (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'operation_log'
       AND INDEX_NAME = 'idx_operator_time') = 1,
   'ALTER TABLE operation_log DROP INDEX idx_operator_time', 'DO 0');

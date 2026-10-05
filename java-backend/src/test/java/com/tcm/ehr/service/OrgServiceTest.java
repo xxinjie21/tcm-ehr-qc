@@ -1,5 +1,6 @@
 package com.tcm.ehr.service;
 
+import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.domain.dto.OrgDTOs;
 import com.tcm.ehr.domain.po.Organization;
@@ -59,6 +60,22 @@ class OrgServiceTest {
         ReflectionTestUtils.setField(service, "baseMapper", orgMapper);
         // requireOrg / memberOf 之外，多数用例需要「组织存在」
         when(orgMapper.selectById(any())).thenReturn(org("g1", "NEURO", Organization.ACTIVE));
+    }
+
+    /**
+     * 绑定「g1 的组长」请求上下文。
+     *
+     * service 层现在有 requireOwnOrg 兜底（与 OrgRoleInterceptor 同口径），
+     * 直接调 service 的用例必须把机构绑对，否则先撞 403、测不到原本的业务校验。
+     */
+    private void bindOwnerOfG1() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute("currentUserId", "u-owner");
+        req.setAttribute("currentUsername", "owner1");
+        req.setAttribute("currentRole", "用户");
+        req.setAttribute("currentOrgId", "g1");
+        req.setAttribute("currentOrgRole", "owner");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
     }
 
     private Organization org(String id, String code, String status) {
@@ -225,9 +242,28 @@ class OrgServiceTest {
 
     // ---------------------------------------------------------------- 授权开关
 
+    /**
+     * 转让所有者：继任者不在本组织 → 拒，且一行都不写。
+     *
+     * 附录 B.6「待办批次应新增」里点名要补的用例：继任者非法时必须当场拒绝，
+     * 否则会出现「旧所有者已降级、新所有者没提升」的半截状态。
+     */
+    @Test
+    void transferOwnerRejectsNonMember() {
+        bindOwnerOfG1();
+        // memberOf 查不到继任者 → 抛「该用户不在此组织」
+        when(memberMapper.selectOne(any())).thenReturn(null);
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> service.transferOwner("g1", "u-outsider"));
+        assertTrue(e.getMessage().contains("不在此组织"), e.getMessage());
+        verify(memberMapper, never()).updateById(any(OrganizationMember.class));
+    }
+
     /** 两个开关独立：只传一个，另一位保持不变（null = 不改） */
     @Test
     void setPermissionsOnlyTouchesProvidedFlag() {
+        bindOwnerOfG1();
         OrganizationMember m = member("m1", "g1", "u-m", OrganizationMember.ROLE_MEMBER);
         m.setCanWriteDictionary(0);
         m.setCanWriteQcRules(1);
@@ -244,6 +280,7 @@ class OrgServiceTest {
     /** 不能给 owner 授权：owner 本就拥有全部写权限 */
     @Test
     void setPermissionsRejectsOwner() {
+        bindOwnerOfG1();
         when(memberMapper.selectOne(any()))
                 .thenReturn(member("m1", "g1", "u-owner", OrganizationMember.ROLE_OWNER));
 
@@ -255,11 +292,25 @@ class OrgServiceTest {
     /** 两个都没给 → 拒绝（一次无意义的写库） */
     @Test
     void setPermissionsRejectsEmptyRequest() {
+        bindOwnerOfG1();
         when(memberMapper.selectOne(any()))
                 .thenReturn(member("m1", "g1", "u-m", OrganizationMember.ROLE_MEMBER));
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.setPermissions("g1", "u-m", null, null));
+    }
+
+    /** 跨组织：路径机构 ≠ 自己所属机构 → 403（服务层兜底，与 OrgRoleInterceptor 同口径） */
+    @Test
+    void memberOpsRejectOtherOrg() {
+        bindOwnerOfG1();
+
+        assertThrows(ForbiddenException.class, () -> service.members("g2"));
+        assertThrows(ForbiddenException.class, () -> service.addMember("g2", "u-x"));
+        assertThrows(ForbiddenException.class, () -> service.removeMember("g2", "u-x"));
+        assertThrows(ForbiddenException.class, () -> service.transferOwner("g2", "u-x"));
+        assertThrows(ForbiddenException.class, () -> service.setPermissions("g2", "u-x", true, null));
+        assertThrows(ForbiddenException.class, () -> service.leave("g2"));
     }
 
     // ---------------------------------------------------------------- 成员搜索 / 拉人
@@ -288,6 +339,7 @@ class OrgServiceTest {
     /** 拉人：已在其他组织 → 拒（一人一组织） */
     @Test
     void addMemberRejectsUserAlreadyInOrg() {
+        bindOwnerOfG1();
         when(userMapper.selectById("u-busy")).thenReturn(user("u-busy", "busy", User.STATUS_ACTIVE));
         when(memberMapper.selectCount(any())).thenReturn(1L);
 
@@ -300,6 +352,7 @@ class OrgServiceTest {
     /** 拉人：停用账号不拉（拉进来也登不了，只会让 owner 以为多了个人） */
     @Test
     void addMemberRejectsDisabledUser() {
+        bindOwnerOfG1();
         when(userMapper.selectById("u-off")).thenReturn(user("u-off", "off", User.STATUS_DISABLED));
         when(memberMapper.selectCount(any())).thenReturn(0L);
 
@@ -311,6 +364,7 @@ class OrgServiceTest {
     /** 拉人成功：写 member 并把账号置 active */
     @Test
     void addMemberSucceedsForFreeUser() {
+        bindOwnerOfG1();
         when(userMapper.selectById("u-free")).thenReturn(user("u-free", "free", User.STATUS_ACTIVE));
         when(memberMapper.selectCount(any())).thenReturn(0L);
 

@@ -116,10 +116,40 @@ def perm_of_nearby_annotations(lines, i):
     return "登录即可"
 
 
+def collapse_annotations(lines):
+    """把跨行写的 @XxxMapping(...) 拼成一行（其余行置空，保持行号对齐）。
+
+    ⚠️ 必须做这一步：原实现逐行匹配 `@XxxMapping(...)`，而 `(.*)` 要求右括号同在该行。
+    OrgController 的双路径数组就是这么写的：
+
+        @PutMapping({"/api/orgs/{id}/members/{userId}/permissions",
+                     "/api/groups/{id}/members/{userId}/permissions"})
+
+    该行没有右括号 → 可选括号组失配 → 路径取空 → 落成 `[""]` → 拼上类级前缀后
+    不以 `/api/` 开头 → **整条端点被静默跳过**，从未参与比对。
+    批次 6 补 openapi 的 permissions 端点时，正是反向检查（openapi 有、后端没有）
+    把这个盲区暴露出来的。
+    """
+    out = list(lines)
+    for i, line in enumerate(out):
+        if not re.search(r'@(Get|Post|Put|Delete|Patch)Mapping\s*\(', line):
+            continue
+        if line.count("(") <= line.count(")"):
+            continue
+        merged = line
+        j = i + 1
+        while j < len(out) and merged.count("(") > merged.count(")"):
+            merged += " " + out[j].strip()
+            out[j] = ""
+            j += 1
+        out[i] = merged
+    return out
+
+
 def collect_backend():
     out = {}
     for p in BACKEND.rglob("*.java"):
-        lines = io.open(p, encoding="utf-8").read().split("\n")
+        lines = collapse_annotations(io.open(p, encoding="utf-8").read().split("\n"))
         for i, line in enumerate(lines):
             method, raw_paths = paths_of(line)
             if not method or not raw_paths:

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.mapper.RecordMapper;
+import com.tcm.ehr.service.DictionaryTermStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +33,7 @@ import static org.mockito.Mockito.when;
  *
  * 背景：病历的 21 个原始字段是质控与科研分析的**事实来源**。一旦被程序改写，
  * 所有基于它的统计结论随之失效。因此修改接口只允许写 structuredData，
- * 携带任何原始字段一律拒绝（错误语义 code=1007）。
+ * 携带任何原始字段一律拒绝（错误语义 code=400）。
  *
  * 为什么必须有这个测试：这条约束此前只存在于 RecordServiceImpl 的实现里，
  * **一个断言都没有**。它属于「不抛异常、只是悄悄失效」的那类约定 ——
@@ -69,7 +70,11 @@ class RecordOriginalFieldsReadOnlyTest {
         existing.setStatus("已完成");
         when(recordMapper.selectById("r-1")).thenReturn(existing);
 
-        svc = new RecordServiceImpl(new ObjectMapper(), null, null, null);
+        // termStore 用来给写回的结构化数据打词典版本戳（与解析链路同口径）
+        DictionaryTermStore termStore = mock(DictionaryTermStore.class);
+        when(termStore.effectiveDictVersion(anyString())).thenReturn("v-test");
+        when(termStore.effectiveTermCount(anyString())).thenReturn(0);
+        svc = new RecordServiceImpl(new ObjectMapper(), null, null, termStore);
         // baseMapper 来自 ServiceImpl 父类，构造器不接，只能反射塞进去
         ReflectionTestUtils.setField(svc, "baseMapper", recordMapper);
 

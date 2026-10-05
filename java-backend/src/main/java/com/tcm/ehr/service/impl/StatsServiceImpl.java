@@ -14,7 +14,6 @@ import com.tcm.ehr.domain.vo.OverviewVO;
 import com.tcm.ehr.domain.vo.StatsAllVO;
 import com.tcm.ehr.domain.vo.StatsVO;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.IStatsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +55,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public List<String> departments() {
-        return baseMapper.selectDepartments(domainOrgId());
+        return baseMapper.selectDepartments(domainOrgId(), RequestUtils.viewAllOrgs());
     }
 
     /**
@@ -69,8 +68,10 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public OverviewVO overview() {
-        // 1. 指标在库里聚合，只按数据域过滤（总览不受页面筛选影响）
-        Map<String, Object> row = baseMapper.selectOverview(domainOrgId());
+        // 1. 指标在库里聚合，只按数据域过滤（总览不受页面筛选影响）。
+        //    viewAllOrgs 必须一并下推：同一次响应里的词频走 RecordFilter.build（认看全部），
+        //    指标卡若不认，管理员的卡片数字与词频/列表就对不上
+        Map<String, Object> row = baseMapper.selectOverview(domainOrgId(), RequestUtils.viewAllOrgs());
         OverviewVO vo = new OverviewVO();
         vo.setTotalRecords(num(row.get("totalRecords")));
         vo.setQualifiedCount(num(row.get("qualifiedCount")));

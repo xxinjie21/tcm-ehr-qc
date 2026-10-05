@@ -59,6 +59,8 @@ import java.util.regex.Pattern;
 public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements com.tcm.ehr.service.IQcService {
 
     private static final int BATCH_PAGE_SIZE = 1000;
+    /** 复核时限：N 个工作日（跳周末）。DDL 注释、seed 脚本与设计文档都写 7 个工作日 */
+    private static final int REVIEW_DEADLINE_WORKDAYS = 7;
     /**
      * 扣分聚合的扫描上限：40000（目标数据集规模，实测 35355 条 × 1.13 KB/条 ≈ 40MB）。
      * 触顶时置 {@code truncated} 标记 —— 这是「真的超过上限」，不再是无谓的 3000 硬顶。
@@ -88,8 +90,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         // 1. 载入原始病历（缺省时按 recordId 取，无则 null）
         Record raw = loadRaw(dto == null ? null : dto.getRecordId());
         // 2. 组装结构化数据：请求内联优先、病历回退
-        Map<String, Object> data = asMap(dto == null ? null : dto.getStructuredData(),
-                raw == null ? null : raw.getStructuredData());
+        Map<String, Object> data = asMap(null, raw == null ? null : raw.getStructuredData());
         // 3. 取当前生效规则
         QcRuleSet rules = ruleStore.getFor(RequestUtils.currentOrgId());
 
@@ -163,15 +164,14 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         // 1. 载入原始病历
         Record raw = loadRaw(dto == null ? null : dto.getRecordId());
         // 2. 取请求内联的结构化数据
-        Object sd = dto == null ? null : dto.getStructuredData();
         // 3. 两者都缺 → 参数错误，不落到空评分
-        if (sd == null && raw == null) {
+        if (raw == null) {
             // 文案只说用户看得懂的事：原来直接抛字段名 structuredData / recordId，
             // 这两个 key 只会出现在接口契约里，界面用户无从对应
             throw new IllegalArgumentException("请提供病历标识，或直接提交已抽取的结构化数据（两者至少给一项）");
         }
         // 4. 组装数据并评分（只读：不写回 records，也不生成复核任务）
-        Map<String, Object> data = asMap(sd, raw == null ? null : raw.getStructuredData());
+        Map<String, Object> data = asMap(null, raw == null ? null : raw.getStructuredData());
         return QcScorer.score(data, raw, false, ruleStore.getFor(RequestUtils.currentOrgId()));
     }
 
@@ -237,10 +237,14 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private void upsertReviewTask(Record r, ScoreResultVO vo) {
         LocalDateTime now = LocalDateTime.now().withNano(0);
         if ("待复核".equals(vo.getGrade())) {
-            // 1. 原子 upsert：已有活跃行就刷新，没有就新建（时限默认 7 个工作日）
+            // 1. 原子 upsert：已有活跃行就刷新，没有就新建。
+            //    时限在 Java 侧按「N 个工作日（跳周末）」算好再传：原先写死在 SQL 里
+            //    用 INTERVAL 7 DAY，是自然日，与 DDL 注释、seed 脚本、设计文档的
+            //    「7 个工作日」都不符，而 addWorkdays 一直是死代码。
             //    复核任务打组织标记——写入时打标，避免查询期 JOIN（QueryWrapper 不便于 JOIN）
+            LocalDateTime deadline = addWorkdays(now, REVIEW_DEADLINE_WORKDAYS);
             reviewTaskMapper.upsertPending(r.getId(), r.getOrgId(), vo.getScore(),
-                    issueType(vo), now);
+                    issueType(vo), now, deadline);
         } else {
             // 2. 已达标则把未作废任务作废而不是删除，历史复核轨迹要留
             reviewTaskMapper.obsoleteActive(r.getId(), now);

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>超时只在前端高亮，没有定时任务、不会自动流转。</p>
  */
 @RestController
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class ReviewController {
 
@@ -38,7 +40,7 @@ public class ReviewController {
      * @param status   任务状态，为空表示不限
      * @return total=总条数；tasks=任务列表
      */
-    @GetMapping("/api/review/tasks")
+    @GetMapping("/review/tasks")
     public Result<ReviewTasksVO> tasks(@RequestParam(defaultValue = "1") Integer page,
                                        @RequestParam(defaultValue = "20") Integer pageSize,
                                        @RequestParam(required = false) String status) {
@@ -54,7 +56,7 @@ public class ReviewController {
      * @param dto      correctedData=人工校正后的结构化数据；remark=复核意见，均可为空
      * @return status=复核后状态；score=重算得分
      */
-    @PostMapping("/api/records/{recordId}/review")
+    @PostMapping("/records/{recordId}/review")
     public Result<ReviewResultVO> review(@PathVariable String recordId,
                                          @Valid @RequestBody(required = false) ReviewDTO dto) {
         // 1. 复核（dto 可空 = 不做人工修正，只重算）

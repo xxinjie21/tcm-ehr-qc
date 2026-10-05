@@ -122,7 +122,9 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
                 r.setJsonEntity("{\"query\":{\"term\":{\"org_id\":\"" + escapeJson(org) + "\"}}}");
                 client.getLowLevelClient().performRequest(r);
             } catch (Exception e) {
-                log.warn("[ES] delete_by_query( org_id={}) 失败（索引可能有残留，继续 bulk）: {}", org, e.getMessage());
+                // 失败必须让整个重建失败：吞掉的话该组织的旧文档会留在索引里继续参与归一，
+                // 而 indexed_version 照样会被记为最新 —— 词典里已删掉的词还在命中，且无任何信号
+                throw new IOException("清空该组织旧文档失败，已中止重建以免留下混合索引", e);
             }
         }
 
@@ -152,10 +154,13 @@ doc.put("standard_term", e.getStandardTerm());
             return List.of();
         }
         String org = normalizeOrg(orgId);
+        // _source 白名单必须与写入侧（bulk 的 doc.put）逐字段对齐：
+        // 少一个 code，toEntry 里的 src.get("code") 就永远是 null，
+        // 表现为「词典页有编码、归一结果没有 normCode」，且不报错
         SearchSourceBuilder source = new SearchSourceBuilder()
                 .size(maxCandidates)
                 .query(recallQuery(org, input))
-                .fetchSource(new String[]{"standard_term", "aliases", "source", "org_id"}, null);
+                .fetchSource(new String[]{"standard_term", "aliases", "source", "code", "org_id"}, null);
 
         SearchResponse response = client.search(new SearchRequest(indexName(type)).source(source), RequestOptions.DEFAULT);
         List<TermEntry> candidates = new ArrayList<>();

@@ -2,6 +2,7 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.domain.dto.NlpBatchDTO;
 import com.tcm.ehr.domain.vo.NlpTaskVO;
+import com.tcm.ehr.domain.vo.NlpTasksVO;
 
 import java.util.List;
 
@@ -47,9 +48,9 @@ public interface INlpBatchService {
     NlpTaskVO cancel(String id);
 
     /**
-     * 最近任务列表。
+     * 最近任务列表（最多 {@code limit} 条，超出时 {@code truncated = true}）。
      *
-     * @return 按提交时间倒序
+     * @return 按提交时间倒序的包装体：任务列表 + 截断标记 + 上限条数
      */
-    List<NlpTaskVO> list();
+    NlpTasksVO list();
 }

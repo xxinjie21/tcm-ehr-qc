@@ -1,6 +1,8 @@
 package com.tcm.ehr.common.config;
 
+import com.tcm.ehr.common.utils.AtomicJsonWriter;
 import com.tcm.ehr.common.utils.LlmSecretCipher;
+import com.tcm.ehr.common.utils.VersionedCache;
 import com.tcm.ehr.domain.po.UserLlmConfig;
 import com.tcm.ehr.mapper.UserLlmConfigMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +15,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * LLM 配置存储：<b>系统基线</b> + <b>每人一份私有配置</b>。
@@ -40,22 +41,24 @@ public class LlmConfigStore {
     /** 密钥加解密 */
     private final LlmSecretCipher cipher;
 
-    private volatile LlmConfig current;
+    /**
+     * 「配置 + 版本」一次性发布。
+     *
+     * 用一条 volatile 引用把两者绑在一起：读者要么看到「旧配置 + 旧版本」，
+     * 要么看到「新配置 + 新版本」，不存在混搭的中间态。
+     * 原实现是两次独立的 volatile 写（先换 current 再自增 version），中间那一瞬读到的组合是错的 ——
+     * 计划里记的改法是「把两句调个个儿」，但那只是把窗口换个方向：版本先变、值后变时，
+     * 读者会按新版本重建出基于旧值的对象并被缓存住，反而更难自愈。
+     */
+    private record Snapshot(LlmConfig config, long version) {
+    }
+
+    private volatile Snapshot snapshot;
 
     /** 单用户解析结果的缓存上限：每次 LLM 调用都会解析，命中 DB 没必要，但也不能无限长 */
     private static final int CACHE_MAX = 200;
-    private final Map<String, CacheEntry> perUser = new LinkedHashMap<>(16, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
-            return size() > CACHE_MAX;
-        }
-    };
-
-    /** 缓存项：配置 + 版本串 */
-    private record CacheEntry(LlmConfig config, String version) {
-    }
-
-    private final AtomicLong version = new AtomicLong();
+    /** 版本没变就复用上次解析好的合并结果（省掉逐字段合并） */
+    private final VersionedCache<LlmConfig> perUser = new VersionedCache<>(CACHE_MAX);
 
     public LlmConfigStore(LlmProperties props, ObjectMapper mapper,
                           UserLlmConfigMapper userMapper, LlmSecretCipher cipher) {
@@ -63,7 +66,7 @@ public class LlmConfigStore {
         this.mapper = mapper;
         this.userMapper = userMapper;
         this.cipher = cipher;
-        this.current = load(props);
+        this.snapshot = new Snapshot(load(props), 0);
     }
 
     /**
@@ -76,14 +79,7 @@ public class LlmConfigStore {
             return get();
         }
         UserLlmConfig row = userMapper.selectById(userId);
-        String v = versionOf(row);
-        CacheEntry hit = perUser.get(userId);
-        if (hit != null && hit.version().equals(v)) {
-            return hit.config();
-        }
-        LlmConfig merged = merge(row);
-        perUser.put(userId, new CacheEntry(merged, v));
-        return merged;
+        return perUser.get(userId, versionOf(row), () -> merge(row));
     }
 
     /**
@@ -123,8 +119,11 @@ public class LlmConfigStore {
             }
             userMapper.updateById(row);
         }
-        perUser.remove(userId);
-        version.incrementAndGet();
+        perUser.invalidate(userId);
+        // 用户行变了，基线版本也要推进：versionFor 把两者拼在一起，不推进的话
+        // 同秒内的两次保存会得到同一个版本串，缓存与 LlmClient 都不会重建
+        Snapshot prev = snapshot;
+        snapshot = new Snapshot(prev.config(), prev.version() + 1);
     }
 
     /**
@@ -132,7 +131,7 @@ public class LlmConfigStore {
      */
     public String versionFor(String userId) {
         if (userId == null || userId.isBlank()) {
-            return String.valueOf(version.get());
+            return String.valueOf(version());
         }
         return versionOf(userMapper.selectById(userId));
     }
@@ -148,10 +147,11 @@ public class LlmConfigStore {
      * 故并入各字段值 + 密文长度兜底。</p>
      */
     private String versionOf(UserLlmConfig row) {
+        long v = version();
         if (row == null) {
-            return version.get() + ":none";
+            return v + ":none";
         }
-        return version.get() + ":"
+        return v + ":"
                 + (row.getUpdateTime() == null ? "" : row.getUpdateTime().toString())
                 + "|" + row.getEnabled() + "|" + row.getProvider() + "|" + row.getBaseUrl()
                 + "|" + row.getModel() + "|" + row.getTemperature() + "|" + row.getTimeout()
@@ -176,25 +176,25 @@ public class LlmConfigStore {
 
     /** 当前生效配置 */
     public LlmConfig get() {
-        return current;
+        return snapshot.config();
     }
 
     /** 配置版本号；每次覆盖自增 */
     public long version() {
-        return version.get();
+        return snapshot.version();
     }
 
-    /** 覆盖运行时配置：更新内存、自增版本、并把非密钥字段落盘 */
+    /** 覆盖运行时配置：更新内存、推进版本、并把非密钥字段落盘 */
     public LlmConfig update(LlmConfig next) {
-        // 1. 换内存配置
-        this.current = next;
-        // 2. 版本号自增：LlmClient 据此判断要不要重建客户端
-        long v = version.incrementAndGet();
-        // 3. 非密钥字段落盘（api-key 只留在内存）
+        // 1. 配置与版本一次性发布（见 Snapshot 的注释：分两步写会露出混搭的中间态）
+        Snapshot prev = snapshot;
+        long v = prev.version() + 1;
+        snapshot = new Snapshot(next, v);
+        // 2. 非密钥字段落盘（api-key 只留在内存）
         persist(next);
         log.info("[LLM] 运行时配置已更新(v{})：enabled={}，provider={}，model={}（非密钥字段已落盘）",
                 v, next.enabled(), next.provider(), next.model());
-        return current;
+        return get();
     }
 
     // ------------------------------------------------------------------ 内部
@@ -246,11 +246,8 @@ public class LlmConfigStore {
         m.put("temperature", c.temperature());
         m.put("timeout", c.timeout());
         try {
-            Path f = Paths.get(props.getConfigFile());
-            if (f.getParent() != null) {
-                Files.createDirectories(f.getParent());
-            }
-            mapper.writerWithDefaultPrettyPrinter().writeValue(f.toFile(), m);
+            // 2. 原子写：先写临时文件再 move，避免半截 JSON 让下次启动静默回退默认
+            AtomicJsonWriter.write(mapper, Paths.get(props.getConfigFile()), m);
         } catch (Exception e) {
             log.warn("[LLM] 运行时配置落盘失败（本次仅在内存生效）: {}", e.getMessage());
         }

@@ -40,6 +40,9 @@ public class QcRuleStore {
 
     private final java.util.concurrent.atomic.AtomicLong version =
             new java.util.concurrent.atomic.AtomicLong();
+    /** 组织级规则的解析结果缓存（版本一致就复用，避免批任务逐条重新解析 rules_json） */
+    private final com.tcm.ehr.common.utils.VersionedCache<QcRuleSet> perOrg =
+            new com.tcm.ehr.common.utils.VersionedCache<>(64);
     private final List<String> warnings = new CopyOnWriteArrayList<>();
 
     public QcRuleStore(ObjectMapper mapper, QcRuleMapper ruleMapper) {
@@ -70,11 +73,20 @@ public class QcRuleStore {
         if (row == null || row.getRulesJson() == null || row.getRulesJson().isBlank()) {
             return baseline();
         }
+        // 版本没变就复用上次解析好的规则集：批任务逐条调用 getFor，每次重新解析 rules_json
+        // 是纯浪费。版本串并入进程内计数器（本实例任何一次写入都会推进它），
+        // 再并上 update_time 兜住「同秒内两处写」与「另一个实例改了库」。
+        String v = version.get() + ":"
+                + (row.getUpdateTime() == null ? "" : row.getUpdateTime().toString());
+        return perOrg.get(orgId, v, () -> parseOrBaseline(orgId, row));
+    }
+
+    /** 解析某组织的规则 JSON；坏数据回退默认并留告警（存量坏数据不该让质检停摆） */
+    private QcRuleSet parseOrBaseline(String orgId, QcRule row) {
         try {
             QcRuleSet parsed = mapper.readValue(row.getRulesJson(), QcRuleSet.class);
             return normalize(parsed);
         } catch (Exception e) {
-            // 存量坏数据不该让整个质检停摆：退回默认并留告警
             log.warn("[质控规则] 组织 {} 的规则解析失败，回退内置默认：{}", orgId, e.getMessage());
             return baseline();
         }
@@ -111,6 +123,7 @@ public class QcRuleStore {
             ruleMapper.updateById(row);
         }
         bump();
+        invalidate(orgId);
         return normalized;
     }
 
@@ -121,6 +134,7 @@ public class QcRuleStore {
         }
         ruleMapper.deleteById(orgId);
         bump();
+        invalidate(orgId);
         return baseline();
     }
 
@@ -146,6 +160,11 @@ public class QcRuleStore {
         version.incrementAndGet();
     }
 
+    /** 写路径改完必须显式失效该组织的缓存：版本串里的 update_time 只到秒，同秒两次写会撞上 */
+    private void invalidate(String orgId) {
+        perOrg.invalidate(orgId);
+    }
+
     public List<String> warnings() {
         return new ArrayList<>(warnings);
     }
@@ -165,8 +184,8 @@ public class QcRuleStore {
     public QcRuleSet reset() {
         // 1. 删规则文件：否则重启后又会被它覆盖回来
         try {
-            Path f = Paths.get(rulesFile);
-            Files.deleteIfExists(f);
+            Path rulesPath = Paths.get(rulesFile);
+            Files.deleteIfExists(rulesPath);
         } catch (Exception e) {
             log.warn("[质控规则] 删除规则文件失败: {}", e.getMessage());
         }
@@ -201,12 +220,12 @@ public class QcRuleStore {
 
     private Map<String, Object> readFile() {
         try {
-            Path f = Paths.get(rulesFile);
+            Path rulesPath = Paths.get(rulesFile);
             // 1. 文件不存在是正常状态（从未改过规则）
-            if (!Files.exists(f)) {
+            if (!Files.exists(rulesPath)) {
                 return null;
             }
-            return mapper.readValue(f.toFile(), new TypeReference<Map<String, Object>>() {
+            return mapper.readValue(rulesPath.toFile(), new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
             // 2. 坏了记告警并按"无文件"处理，服务照常起
@@ -217,13 +236,10 @@ public class QcRuleStore {
 
     private void persist(QcRuleSet rules) {
         try {
-            // 1. 确保父目录存在
-            Path f = Paths.get(rulesFile);
-            if (f.getParent() != null) {
-                Files.createDirectories(f.getParent());
-            }
+            // 1. 原子写：先写同目录临时文件再 move（直接 writeValue 写到一半会留下半截 JSON，
+            //    下次启动读它解析失败就无声回退默认，且原内容已被截断）
             // 2. 美化输出，便于管理员手工核对规则内容
-            mapper.writerWithDefaultPrettyPrinter().writeValue(f.toFile(), rules);
+            com.tcm.ehr.common.utils.AtomicJsonWriter.write(mapper, Paths.get(rulesFile), rules);
         } catch (Exception e) {
             // 3. 落盘失败只告警：内存里已生效，不该让保存操作整个失败
             log.warn("[质控规则] 落盘失败（本次仅内存生效）: {}", e.getMessage());

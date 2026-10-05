@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.util.Map;
  * <p>清洗只规整与标记，不填充医生未书写的内容，也不删除病历。</p>
  */
 @RestController
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class GovernanceController {
 
@@ -45,7 +47,7 @@ public class GovernanceController {
      * @param dto type=术语类型；term=待归一术语
      * @return standardTerm=标准词（未命中时为原文）；source=词典来源；level=命中层级；code=国标代码
      */
-    @PostMapping("/api/governance/normalize")
+    @PostMapping("/governance/normalize")
     public ResponseEntity<Result<Map<String, Object>>> normalize(@Valid @RequestBody NormalizeDTO dto) {
         // 1. 术语必填（错误体下沉：抛 BusinessException 由 GlobalExceptionHandler 统一出口）
         if (dto.getTerm() == null || dto.getTerm().isBlank()) {
@@ -73,7 +75,7 @@ public class GovernanceController {
      * @param dto recordIds=限定病历集合；filters=范围条件，二选一
      * @return total/deduped/repaired/isolated/normalized=各步处理条数
      */
-    @PostMapping("/api/governance/clean")
+    @PostMapping("/governance/clean")
     public Result<CleanResultVO> clean(@Valid @RequestBody CleanDTO dto) {
         // 1. 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
         CleanResultVO result = governanceService.clean(dto.getRecordIds(), dto.getFilters());
@@ -90,7 +92,7 @@ public class GovernanceController {
      * @param dto format=csv/json；filters=范围条件
      * @return 文件流（带 UTF-8 文件名的附件）
      */
-    @PostMapping("/api/export/dataset")
+    @PostMapping("/export/dataset")
     public ResponseEntity<byte[]> export(@Valid @RequestBody ExportDTO dto) throws IOException {
         // 1. 取导出件；null = 范围内无合格病历
         IGovernanceService.ExportedFile file = governanceService.export(dto);
@@ -120,7 +122,7 @@ public class GovernanceController {
      * @param dto format=csv/json；filters=范围条件
      * @return total=命中条数；sample=前 10 条样本
      */
-    @PostMapping("/api/export/dataset/preview")
+    @PostMapping("/export/dataset/preview")
     public Result<Map<String, Object>> preview(@Valid @RequestBody ExportDTO dto) {
         return Result.ok(governanceService.previewDataset(dto));
     }
@@ -132,7 +134,7 @@ public class GovernanceController {
      *
      * @return qualified=质控合格数；pendingGovern=待清洗数；governedCount=已清洗数
      */
-    @GetMapping("/api/governance/stats")
+    @GetMapping("/governance/stats")
     public Result<Map<String, Object>> governanceStats() {
         return Result.ok(governanceService.governanceStats());
     }

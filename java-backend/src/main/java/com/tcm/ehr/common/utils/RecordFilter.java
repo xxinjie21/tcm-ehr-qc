@@ -56,7 +56,7 @@ public final class RecordFilter {
     public static QueryWrapper<Record> build(String orgId, SearchDTO dto) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
         // 1. 数据域（行级权限）——必须先于用户筛选
-        operatorScope(wrapper, orgId);
+        operatorScope(wrapper, orgId, RequestUtils.viewAllOrgs());
 
         // 2. 用户筛选（与数据域取交集，各条件之间取并集）
         if (dto != null) {
@@ -94,7 +94,9 @@ public final class RecordFilter {
         // 原先按 create_time 排，但批量导入/灌库场景下 create_time 会大量同值 ——
         // 实测 500 条演示数据 create_time 只有 1 个不同值，排序完全失效、返回 UUID 序，
         // 对用户等于随机。visit_time 有真实分布（2019~2025），且可走 idx_department_visit_time。
-        wrapper.orderByDesc("visit_time");
+        // 次级键 id 不能省：visit_time 大量同值时，LIMIT/OFFSET 分页在页边界会重复取或漏取
+        // （批任务据此累加分级计数，重复取到的还会被批内判重扣分）
+        wrapper.orderByDesc("visit_time").orderByAsc("id");
         return wrapper;
     }
 
@@ -105,13 +107,13 @@ public final class RecordFilter {
      * 是本次改造中最严重的越权。它也是防止写退出一个不可能的 id：
      * 以后若有人导入了它，无组用户就会看到那一条。</p>
      */
-    private static void operatorScope(QueryWrapper<Record> wrapper, String orgId) {
+    private static void operatorScope(QueryWrapper<Record> wrapper, String orgId, boolean viewAllOrgs) {
         // 0. 管理员看全部：明确「不加组织条件」。
         //    ⚠️ 这里必须靠独立的 viewAllOrgs 标记判断，**不能**写成
         //    「orgId 为空就不加条件」—— 批次 4 之后 orgId 为空是 fail-closed
         //    （查不到任何数据），那样会让「看全部」变成「什么都看不到」，
         //    是个方向相反、很难一眼看出的 bug。
-        if (RequestUtils.viewAllOrgs()) {
+        if (viewAllOrgs) {
             return;
         }
         if (orgId == null || orgId.isBlank()) {
@@ -131,6 +133,11 @@ public final class RecordFilter {
     public static boolean canAccess(Record record) {
         if (record == null) {
             return false;
+        }
+        // 管理员「看全部」时不加组织条件，与 operatorScope 同一口径 ——
+        // 少了这一条，管理员在列表里看得到他组病历、点开详情却是 404（三处口径互斥）
+        if (RequestUtils.viewAllOrgs()) {
+            return record.getOrgId() != null;
         }
         String orgId = currentOrgId();
         // 无组 → 一条也看不到（与 operatorScope 同一口径）
@@ -152,20 +159,20 @@ public final class RecordFilter {
      */
     public static FiltersDTO fromMap(Map<String, Object> filters) {
         // 1. 无 filters 给空 DTO（= 不限范围）
-        FiltersDTO f = new FiltersDTO();
+        FiltersDTO filterDto = new FiltersDTO();
         if (filters == null) {
-            return f;
+            return filterDto;
         }
         // 2. 三个标量条件逐个翻译
-        f.setDepartment(text(filters.get("department")));
-        f.setPattern(text(filters.get("pattern")));
-        f.setGrade(text(filters.get("grade")));
+        filterDto.setDepartment(text(filters.get("department")));
+        filterDto.setPattern(text(filters.get("pattern")));
+        filterDto.setGrade(text(filters.get("grade")));
         // 3. 时间区间要两端都有才成立，缺一端当没给
-        if (filters.get("dateRange") instanceof List<?> range && range.size() == 2
-                && text(range.get(0)) != null && text(range.get(1)) != null) {
-            f.setDateRange(List.of(text(range.get(0)), text(range.get(1))));
+        if (filters.get("dateRange") instanceof List<?> dateRange && dateRange.size() == 2
+                && text(dateRange.get(0)) != null && text(dateRange.get(1)) != null) {
+            filterDto.setDateRange(List.of(text(dateRange.get(0)), text(dateRange.get(1))));
         }
-        return f;
+        return filterDto;
     }
 
     /**
@@ -185,21 +192,21 @@ public final class RecordFilter {
         String start = null;
         String end = null;
         // 1. 两种契约形态都要支持：DTO（列表/批量）与 Map（导出）
-        if (filters instanceof FiltersDTO f) {
-            department = f.getDepartment();
-            grade = f.getGrade();
-            pattern = f.getPattern();
-            if (f.getDateRange() != null && f.getDateRange().size() == 2) {
-                start = f.getDateRange().get(0);
-                end = f.getDateRange().get(1);
+        if (filters instanceof FiltersDTO filterDto) {
+            department = filterDto.getDepartment();
+            grade = filterDto.getGrade();
+            pattern = filterDto.getPattern();
+            if (filterDto.getDateRange() != null && filterDto.getDateRange().size() == 2) {
+                start = filterDto.getDateRange().get(0);
+                end = filterDto.getDateRange().get(1);
             }
-        } else if (filters instanceof Map<?, ?> raw) {
-            department = text(raw.get("department"));
-            grade = text(raw.get("grade"));
-            pattern = text(raw.get("pattern"));
-            if (raw.get("dateRange") instanceof List<?> range && range.size() == 2) {
-                start = text(range.get(0));
-                end = text(range.get(1));
+        } else if (filters instanceof Map<?, ?> rawFilters) {
+            department = text(rawFilters.get("department"));
+            grade = text(rawFilters.get("grade"));
+            pattern = text(rawFilters.get("pattern"));
+            if (rawFilters.get("dateRange") instanceof List<?> dateRange && dateRange.size() == 2) {
+                start = text(dateRange.get(0));
+                end = text(dateRange.get(1));
             }
         }
 
@@ -257,32 +264,57 @@ public final class RecordFilter {
     }
 
     /** .1：按 filters{department,dateRange,pattern,grade} 构建（数据域→用户筛选） */
-    public static QueryWrapper<Record> build(String orgId, FiltersDTO f) {
+    public static QueryWrapper<Record> build(String orgId, FiltersDTO filterDto) {
+        return build(orgId, filterDto, RequestUtils.viewAllOrgs());
+    }
+
+    /**
+     * 按「显式机构」构建，不做「管理员看全部」的旁路。
+     *
+     * 给批任务的提交侧预统计用。批任务在提交线程把计划条数算进 total，worker 在后台线程
+     * 按 qc_task/nlp_task 的 org_id 快照重建条件 —— 后台线程里 viewAllOrgs() 恒为 false，
+     * 于是管理员提交时若用 build() 计数，total 会是全库而实际只跑本组，进度与分级汇总
+     * 的分母就对不上（2026-10-05 修）。
+     *
+     * 这里显式按机构限定，让「计划条数」与「实际执行范围」同源；语义与
+     * {@link #build(String, FiltersDTO)} 在 viewAllOrgs=false 时完全一致。
+     *
+     * @param orgId 机构号；为空时按 fail-closed 返回空集（不放行全库）
+     * @param filterDto     用户筛选，可为 null
+     * @return 只含该机构、且已含用户筛选与排序键的查询条件
+     */
+    public static QueryWrapper<Record> buildWithinOrg(String orgId, FiltersDTO filterDto) {
+        return build(orgId, filterDto, false);
+    }
+
+    /** 数据域 → 用户筛选 的共用实现；viewAllOrgs 由调用方显式给定 */
+    private static QueryWrapper<Record> build(String orgId, FiltersDTO filterDto, boolean viewAllOrgs) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
         // 1. 数据域先叠加（必须最先，用户筛选只能在其上收窄）
-        operatorScope(wrapper, orgId);
-        // 2. 再拼用户筛选；f 为 null 表示不限
-        if (f != null) {
-            if (notBlank(f.getDepartment())) {
-                wrapper.eq("department", f.getDepartment().trim());
+        operatorScope(wrapper, orgId, viewAllOrgs);
+        // 2. 再拼用户筛选；filterDto 为 null 表示不限
+        if (filterDto != null) {
+            if (notBlank(filterDto.getDepartment())) {
+                wrapper.eq("department", filterDto.getDepartment().trim());
             }
-            if (notBlank(f.getPattern())) {
-                wrapper.like("pattern", f.getPattern().trim());
+            if (notBlank(filterDto.getPattern())) {
+                wrapper.like("pattern", filterDto.getPattern().trim());
             }
-            if (notBlank(f.getGrade())) {
-                wrapper.eq("grade", f.getGrade().trim());
+            if (notBlank(filterDto.getGrade())) {
+                wrapper.eq("grade", filterDto.getGrade().trim());
             }
             // 3. 时间区间要两端齐全；补全时分秒，保证含首尾两天
-            if (f.getDateRange() != null && f.getDateRange().size() == 2
-                    && notBlank(f.getDateRange().get(0)) && notBlank(f.getDateRange().get(1))) {
-                wrapper.ge("visit_time", f.getDateRange().get(0).trim() + " 00:00:00");
-                wrapper.le("visit_time", f.getDateRange().get(1).trim() + " 23:59:59");
+            if (filterDto.getDateRange() != null && filterDto.getDateRange().size() == 2
+                    && notBlank(filterDto.getDateRange().get(0)) && notBlank(filterDto.getDateRange().get(1))) {
+                wrapper.ge("visit_time", filterDto.getDateRange().get(0).trim() + " 00:00:00");
+                wrapper.le("visit_time", filterDto.getDateRange().get(1).trim() + " 23:59:59");
             }
         }
         // 与 SearchDTO 重载同一个排序键：本工具的两种入参不该给出不同顺序（审查报告 L8）。
         // 注意 FiltersDTO 重载的调用方多是聚合 / 批处理 / 按范围删除，排序对它们无意义，
         // 代价是这些查询多一次按 visit_time 的排序（3.5 万条量级需留意 deleteByFilter 与 clean）。
-        wrapper.orderByDesc("visit_time");
+        // 次级键 id 与 SearchDTO 重载同一理由：分页要稳定
+        wrapper.orderByDesc("visit_time").orderByAsc("id");
         return wrapper;
     }
 

@@ -120,27 +120,27 @@ public class OrgController {
 
     // ----------------------------------------------------------- 所有者（本组织）
 
-    @RequireOrgRole("owner")
+    @RequireOrgRole(value = "owner", pathVar = "id")
     @GetMapping({"/api/orgs/{id}/members", "/api/groups/{id}/members"})
     public Result<List<OrgVOs.MemberInfo>> members(@PathVariable String id) {
         return Result.ok(orgService.members(id));
     }
 
-    @RequireOrgRole("owner")
+    @RequireOrgRole(value = "owner", pathVar = "id")
     @PostMapping({"/api/orgs/{id}/members", "/api/groups/{id}/members"})
     public Result<Void> addMember(@PathVariable String id, @Valid @RequestBody OrgDTOs.AddMemberRequest body) {
         orgService.addMember(id, body.getUserId());
         return Result.ok("已加入", null);
     }
 
-    @RequireOrgRole("owner")
+    @RequireOrgRole(value = "owner", pathVar = "id")
     @DeleteMapping({"/api/orgs/{id}/members/{userId}", "/api/groups/{id}/members/{userId}"})
     public Result<Void> removeMember(@PathVariable String id, @PathVariable String userId) {
         orgService.removeMember(id, userId);
         return Result.ok("已移除", null);
     }
 
-    @RequireOrgRole("owner")
+    @RequireOrgRole(value = "owner", pathVar = "id")
     @PutMapping({"/api/orgs/{id}/members/{userId}/transfer-owner", "/api/groups/{id}/members/{userId}/transfer-owner"})
     public Result<Void> transferOwner(@PathVariable String id, @PathVariable String userId,
                                       @Valid @RequestBody OrgDTOs.TransferOwnerRequest body) {
@@ -153,7 +153,7 @@ public class OrgController {
      *
      * <p>【权限：所有者（本组织）】两个开关独立，null 表示「这一位不改」。</p>
      */
-    @RequireOrgRole("owner")
+    @RequireOrgRole(value = "owner", pathVar = "id")
     @PutMapping({"/api/orgs/{id}/members/{userId}/permissions",
                  "/api/groups/{id}/members/{userId}/permissions"})
     public Result<Void> setPermissions(@PathVariable String id, @PathVariable String userId,
@@ -162,7 +162,7 @@ public class OrgController {
         return Result.ok("权限已更新", null);
     }
 
-    @RequireOrgRole("owner")
+    @RequireOrgRole(value = "owner", pathVar = "id")
     @PostMapping({"/api/orgs/{id}/leave", "/api/groups/{id}/leave"})
     public Result<Void> leave(@PathVariable String id) {
         orgService.leave(id);

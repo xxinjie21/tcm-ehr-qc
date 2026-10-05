@@ -9,5 +9,4 @@ import lombok.Data;
 public class QcCheckDTO {
 
     private String recordId;
-    private Object structuredData;
 }

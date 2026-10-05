@@ -43,9 +43,6 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     @Value("${dictionary.dir:data/dictionaries}")
     private String dictDir;
 
-    /** currentVersion 缓存：内容戳不变则复用，避免批任务逐条重算 */
-    private volatile String cachedVersion;
-    private volatile long cachedStamp = -1;
 
     /**
      * 词典数据目录（配置项 {@code dictionary.dir}，默认 {@code data/dictionaries}）。
@@ -133,54 +130,6 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
      * <p>指纹用「修改时间 + 大小」：本项目改词典只有两条路径（导入、回滚），
      * 都是整文件覆盖，两者都会变；不存在「内容变了而指纹没变」的情形。</p>
      */
-    /**
-     * @deprecated <b>不要用于给结构化数据打版本戳</b>。
-     * 词典真源已入库（批次 8b 起），这里算的是<b>文件</b>的指纹 —— 词典文件自播种后
-     * 就不再变化，这个值从此<b>冻结不变</b>。批次 17 清理时发现三处仍在用它打戳，
-     * 害得「清洗一次就把正确版本覆盖回死值」。正确做法用
-     * {@code DictionaryTermStore.effectiveDictVersion(orgId)} / {@code effectiveTermCount(orgId)}。
-     */
-    @Deprecated
-    @Override
-    public String currentVersion() {
-        try {
-            // 1. 先算指纹（修改时间 + 大小），这一步不读文件内容
-            long stamp = 0;
-            boolean allPresent = true;
-            for (String type : com.tcm.ehr.common.config.EntityTypes.dictKeys()) {
-                Path f = dir().resolve(fileNameOf(type));
-                if (Files.exists(f)) {
-                    stamp = stamp * 31 + Files.getLastModifiedTime(f).toMillis() + Files.size(f);
-                } else {
-                    allPresent = false;
-                }
-            }
-            // 2. 指纹没变且上次算过 → 直接返回缓存，省掉 5 次文件读取
-            if (allPresent && cachedVersion != null && stamp == cachedStamp) {
-                return cachedVersion;
-            }
-            // 3. 指纹变了（或首次）才真读 5 个文件拼串算 MD5
-            StringBuilder sb = new StringBuilder();
-            for (String type : com.tcm.ehr.common.config.EntityTypes.dictKeys()) {
-                Path f = dir().resolve(fileNameOf(type));
-                sb.append(type).append('=');
-                if (Files.exists(f)) {
-                    sb.append(Files.readString(f, StandardCharsets.UTF_8));
-                }
-                sb.append('\n');
-            }
-            String v = RecordUtil.md5Hex(sb.toString()).substring(0, 12);
-            // 4. 连同指纹一起缓存，供下次比对
-            cachedVersion = v;
-            cachedStamp = stamp;
-            return v;
-        } catch (Exception e) {
-            // 5. 算不出来给固定串：版本只用于判断"要不要重算"，不能因为算不出就报错
-            log.warn("[词典] 版本计算失败: {}", e.getMessage());
-            return "unknown";
-        }
-    }
-
     /**
      * 以 UTF-8 读取文本文件的全部内容。
      *
