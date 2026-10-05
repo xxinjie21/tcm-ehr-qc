@@ -59,6 +59,11 @@ public class DictArchiveService {
     @Transactional(rollbackFor = Exception.class)
     public Integer archive(String orgId, String type, List<TermEntry> entries,
                            String proposalId, String operator, String comment) {
+        // 空词典也要能归档：调用方可能拿到 null（该组织该类目一条词都没有的历史状态），
+        // 若直接 entries.size()/for-each 就是空指针 —— 导入成功却报系统异常的另一种成因。
+        if (entries == null) {
+            entries = List.of();
+        }
         String org = norm(orgId);
         int nextNo = nextVersionNo(org, type);
 
@@ -156,7 +161,12 @@ public class DictArchiveService {
                 new QueryWrapper<DictArchiveVersion>()
                         .select("MAX(version_no) AS maxNo")
                         .eq("org_id", org).eq("type", type));
-        if (rows.isEmpty() || rows.get(0).getVersionNo() == null) {
+        // ⚠️ 必须同时判「元素本身为 null」：实测线上报错正是
+        //    Cannot invoke "DictArchiveVersion.getVersionNo()" because the return value
+        //    of "java.util.List.get(int)" is null —— 列表非空但首元素是 null 时，
+        //    原来那句 `rows.get(0).getVersionNo()` 直接空指针，导入因此被报成系统异常
+        //    （词条其实已经导入成功，只是归档没生成）。
+        if (rows.isEmpty() || rows.get(0) == null || rows.get(0).getVersionNo() == null) {
             return 1;
         }
         return rows.get(0).getVersionNo() + 1;

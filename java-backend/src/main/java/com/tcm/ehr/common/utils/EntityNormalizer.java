@@ -201,6 +201,115 @@ public class EntityNormalizer {
         return stat;
     }
 
+    /**
+     * 把误放进 {@code symptoms} 的脉象/舌象实体挪到各自字段（<b>词典驱动，不看词形</b>）。
+     *
+     * <p>为什么用词典命中而不是词形匹配：像「酸软无力」这种真正的症状也含「无力」，
+     * 按词形挪会误伤它（实测确有 50 条「酸软无力」）。判据与中药那段一致 ——
+     * 归一命中词典即视为「本类型术语」，{@link EsTermNormalizer.NormalizeResult#source()} 非空。</p>
+     *
+     * <p>顺序：先试脉象、未命中再试舌象（两次 ES 查询只在确有症状实体时才发生，
+     * 且第二次靠短路避免无谓查询）。命中的实体带着原 content/sourceText 挪过去，
+     * 随后的 {@code normEntities} 会照常给它们打上 normLevel。</p>
+     */
+    private void moveMisplacedPulseTongue(NlpExtractVO vo, String orgId) {
+        if (vo == null || vo.getSymptoms() == null || vo.getSymptoms().isEmpty()) {
+            return;
+        }
+        java.util.List<NlpExtractVO.Entity> kept = new java.util.ArrayList<>();
+        int moved = 0;
+        for (NlpExtractVO.Entity e : vo.getSymptoms()) {
+            if (e == null) {
+                continue;
+            }
+            String raw = rawOf(e.getContent(), e.getSourceText());
+            if (raw != null && !raw.isBlank()) {
+                // 先判「它本身就是症状术语」→ 是就别动（避免把真症状挪走，也避免词典重叠时误判）
+                if (hitsDictionary("symptom", orgId, raw)) {
+                    kept.add(e);
+                    continue;
+                }
+                if (hitsDictionary("pulse", orgId, raw)) {
+                    vo.getPulseList().add(e);
+                    moved++;
+                    continue;
+                }
+                if (hitsDictionary("tongue", orgId, raw)) {
+                    vo.getTongueList().add(e);
+                    moved++;
+                    continue;
+                }
+            }
+            kept.add(e);
+        }
+        if (moved > 0) {
+            vo.setSymptoms(kept);
+            log.info("[归一] 从症状里归位脉象/舌象实体 {} 条（词典命中判定）", moved);
+        }
+    }
+
+    /**
+     * 丢弃单字残词（#6，2026-10-05）。
+     *
+     * <p>实测：症状字段里长度 1 的实体 135 条、病因 50 条，内容是 `双`/`腰`/`失`/`口`/`眼`/`下`/`遇`/`胸`/`心`
+     * 这类截断残字（来自「双下肢水肿」「腰酸」「失眠」等）。它们必然未归一，既拉低归一率，
+     * 又让复核员在列表里看到一堆无意义的字。</p>
+     *
+     * <p>判据：<b>长度为 1 且不在该类型词典里</b>才丢。为什么不是「长度为 1 就丢」——
+     * 词典里确有 5 个单字标准词（如单字术语），一刀切会误删合法术语；
+     * 而「在词典里」的单字能正常归一，本就不该丢。无词典的类型（4 类无词典实体）
+     * 因为没有可依据的词典，按残词处理（实测那几类里同样只有截断字）。</p>
+     */
+    private void dropSingleCharFragments(NlpExtractVO vo, String orgId) {
+        if (vo == null) {
+            return;
+        }
+        int dropped = 0;
+        dropped += dropIn(vo.getSymptoms(), "symptom", orgId);
+        dropped += dropIn(vo.getDiseases(), "disease", orgId);
+        dropped += dropIn(vo.getPatternList(), "pattern", orgId);
+        dropped += dropIn(vo.getTongueList(), "tongue", orgId);
+        dropped += dropIn(vo.getPulseList(), "pulse", orgId);
+        dropped += dropIn(vo.getFormulaList(), "formula", orgId);
+        // 无词典的 3 类：没有可依据的词典，长度 1 一律按残词处理
+        dropped += dropIn(vo.getCauseList(), null, orgId);
+        dropped += dropIn(vo.getTreatmentList(), null, orgId);
+        if (dropped > 0) {
+            log.info("[归一] 丢弃单字残词 {} 条（长度为 1 且不在词典里）", dropped);
+        }
+    }
+
+    /** 在单个列表上执行残词过滤；type 为 null 表示该类型无词典 */
+    private int dropIn(java.util.List<NlpExtractVO.Entity> list, String type, String orgId) {
+        if (list == null || list.isEmpty()) {
+            return 0;
+        }
+        int before = list.size();
+        list.removeIf(e -> {
+            if (e == null) {
+                return true;
+            }
+            String raw = rawOf(e.getContent(), e.getSourceText());
+            if (raw == null || raw.codePointCount(0, raw.length()) != 1) {
+                return false;
+            }
+            return type == null || !hitsDictionary(type, orgId, raw);
+        });
+        return before - list.size();
+    }
+
+    /** 该文本是否命中指定词典（命中 = NormalizeResult.source() 非空，与中药那段同口径） */
+    private boolean hitsDictionary(String type, String orgId, String raw) {
+        try {
+            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
+            return r != null && r.source() != null && !r.source().isBlank();
+        } catch (Exception ex) {
+            // 词典/ES 不可用时**不挪**：宁可少归位，也不能凭猜把症状改成脉象
+            log.warn("[归一] 归位判定失败（type={}）: {}", type, ex.getMessage());
+            return false;
+        }
+    }
+
     /** 把归一后的强类型列表转回 Map 列表再放进 data，保持 Map 的同构约定 */
     private void writeBack(Map<String, Object> data, String key, List<?> typed) {
         data.put(key, objectMapper.convertValue(typed,
@@ -214,6 +323,17 @@ public class EntityNormalizer {
             return new NormStat(0, 0, 0, 0);
         }
         int[] stat = {0, 0, 0, 0};
+
+        // 1.5 归位（2026-10-05 修 #2）：抽取侧有时把脉象/舌象内容打进 symptoms ——
+        //     实测症状字段 4170 条里有 107 条的内容**恰是脉象词典里的标准词**
+        //     （「脉细数」「左尺无力」「脉弦劲有力」「脉浮」）。不归位的话它们会以
+        //     「未归一的症状」计入分母，既拉低症状归一率，也可能影响完整性判定。
+        moveMisplacedPulseTongue(vo, orgId);
+        // 1.6 丢弃单字残词（2026-10-05 修 #6）：实测症状/病因里有 135/50 条长度为 1 的实体
+        //     （`双`50 `腰`34 `失`22 `口`10 `眼`9 …），全是「双下肢水肿」「腰酸」「失眠」这类
+        //     被截断的残字。判据同样是**词典驱动**：长度为 1 **且不在该类型词典里**才丢 ——
+        //     词典里确有 5 个单字标准词，一刀切会误删合法术语（本批数据里这类为 0，但规则要立对）。
+        dropSingleCharFragments(vo, orgId);
 
         // 2. 8 类 Entity 走同一字段→类型映射；无词典的 4 类只回填 sourceText（供前端展示原文）
         vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat, orgId));

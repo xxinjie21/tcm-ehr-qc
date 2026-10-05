@@ -3,7 +3,6 @@ package com.tcm.ehr.common.utils;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,16 +27,15 @@ public final class QcScorer {
      * 优先级最高的一档。规则集为 {@code null} 时回退到内置默认规则。</p>
      *
      * @param data 结构化抽取结果，{@code null} 表示未结构化（标记为缺失）
-     * @param raw 原始病历，{@code null} 时跳过格式规则
+     * @param rawRecord 原始病历，{@code null} 时跳过格式规则
      * @param duplicate 是否与已有病历重复
      * @param rules 质控规则集，可为 {@code null}
      * @return 评分结果（得分、分级、是否严重、扣分明细）
      */
-    public static ScoreResultVO score(Map<String, Object> data, Record raw, boolean duplicate,
+    public static ScoreResultVO score(Map<String, Object> data, Record rawRecord, boolean duplicate,
                                       com.tcm.ehr.common.config.QcRuleSet rules) {
         com.tcm.ehr.common.config.QcRuleSet rs = rules == null ? com.tcm.ehr.common.config.QcRuleSet.defaults() : rules;
         ScoreResultVO vo = new ScoreResultVO();
-        vo.setCheckedAt(LocalDateTime.now().withNano(0));
         List<ScoreResultVO.Deduction> ded = new ArrayList<>();
 
         boolean structuredMissing = data == null;
@@ -49,7 +47,7 @@ public final class QcScorer {
             if (structuredPresent(el.getSource(), data)) {
                 continue;
             }
-            boolean rawHas = rawPresent(el.getFallback(), raw);
+            boolean rawHas = rawPresent(el.getFallback(), rawRecord);
             int points = rawHas ? el.getWeightPartial() : el.getWeightFull();
             if (!rawHas) {
                 fullMissing++;
@@ -67,9 +65,9 @@ public final class QcScorer {
         vo.setLogicConflicts(conflicts);
 
         // 3. 格式
-        if (raw != null) {
+        if (rawRecord != null) {
             for (com.tcm.ehr.common.config.QcRuleSet.FormatRule formatRule : rs.getFormat()) {
-                String value = rawValue(raw, formatRule.getField());
+                String value = rawValue(rawRecord, formatRule.getField());
                 if (value == null) {
                     continue;
                 }
@@ -89,7 +87,16 @@ public final class QcScorer {
                 miss += countUnnormalized(data, type);
             }
             if (miss > 0) {
-                int points = Math.min(st.getCap(), miss * st.getWeightEach());
+                // 分段扣分（2026-10-05 修）：原先 `Math.min(cap, miss * weightEach)` 在未归一数 ≥ cap 后
+        // 恒定扣 cap 分 —— 实测 51.6% 的病历都停在这一档，再糟也不多扣，「未归一」这一项
+        // 因此失去区分度（好病历与差病历同分）。改成：
+        //   前 cap 条：每条 weightEach 分（与原来一致，保护轻微未归一）
+        //   之后：每再满 cap 条，追加 weightEach × cap 分（即每满一档多扣一档）
+        // 口径写成注释里的公式，避免「看起来还在封顶」的误解；档位由既有 weightEach/cap 推导，
+        // 不新增配置项（前端规则表单与 openapi 无需改动）。
+        int points = miss <= st.getCap()
+                ? miss * st.getWeightEach()
+                : st.getWeightEach() * (st.getCap() + (miss - st.getCap()) / st.getCap());
                 ded.add(new ScoreResultVO.Deduction("术语未标准化", "未命中词典",
                         points, "有 " + miss + " 个实体未命中标准词典"));
             }
@@ -118,7 +125,6 @@ public final class QcScorer {
 
         vo.setScore(score);
         vo.setGrade(grade);
-        vo.setSerious(serious);
         vo.setDeductions(ded);
         return vo;
     }
@@ -138,7 +144,7 @@ public final class QcScorer {
     }
 
     /** 按规则集判定核心要素缺失；{@code rules} 为 null 时用内置默认（与 score 一致） */
-    public static Missing missingElements(Map<String, Object> data, Record raw,
+    public static Missing missingElements(Map<String, Object> data, Record rawRecord,
                                           com.tcm.ehr.common.config.QcRuleSet rules) {
         com.tcm.ehr.common.config.QcRuleSet rs =
                 rules == null ? com.tcm.ehr.common.config.QcRuleSet.defaults() : rules;
@@ -151,7 +157,7 @@ public final class QcScorer {
             }
             String name = el.getName();
             // 2. 原始病历里有 → 漏抽（半档）；两边都没有 → 真缺失（全档）
-            if (rawPresent(el.getFallback(), raw)) {
+            if (rawPresent(el.getFallback(), rawRecord)) {
                 partial.add(name);
             } else {
                 full.add(name);
@@ -187,23 +193,23 @@ public final class QcScorer {
         }
     }
 
-    private static boolean structuredPresent(String key, Map<String, Object> data) {
-        // 1. 无 key 或无数据一律视为没抽到
-        if (key == null || data == null) {
+    private static boolean structuredPresent(String structuredKey, Map<String, Object> data) {
+        // 1. 无 structuredKey 或无数据一律视为没抽到
+        if (structuredKey == null || data == null) {
             return false;
         }
         // 2. 只有非空列表才算有记录（空数组等同缺失）
-        return data.get(key) instanceof List<?> list && !list.isEmpty();
+        return data.get(structuredKey) instanceof List<?> list && !list.isEmpty();
     }
 
-    private static boolean rawPresent(List<String> fields, Record raw) {
+    private static boolean rawPresent(List<String> fields, Record rawRecord) {
         // 1. 无回退字段或无原始病历时判为「原始也没写」
-        if (raw == null || fields == null) {
+        if (rawRecord == null || fields == null) {
             return false;
         }
         // 2. 任一字段有值即算原始写了
         for (String field : fields) {
-            String value = rawValue(raw, field);
+            String value = rawValue(rawRecord, field);
             if (value != null) {
                 return true;
             }
@@ -244,7 +250,7 @@ public final class QcScorer {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** 术语类型 → 结构化 key */
+    /** 术语类型 → 结构化 structuredKey */
     private static String keyOf(String type) {
         // 1. 只映射参与标准化判定的 5 类；其余类型不查词典
         return switch (type) {
@@ -259,9 +265,9 @@ public final class QcScorer {
 
     /** 该类型下未命中词典（无 normLevel）的实体数 */
     private static int countUnnormalized(Map<String, Object> data, String type) {
-        String key = keyOf(type);
+        String structuredKey = keyOf(type);
         // 1. 该类型没有对应列表（未抽取）就不计未命中
-        if (key == null || !(data.get(key) instanceof List<?> list)) {
+        if (structuredKey == null || !(data.get(structuredKey) instanceof List<?> list)) {
             return 0;
         }
         // 2. 逐个实体看有没有 normLevel：没有就是没命中词典

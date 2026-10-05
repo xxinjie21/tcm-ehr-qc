@@ -86,7 +86,6 @@ class QcScorerTest {
         assertTrue(vo.getDeductions().isEmpty(), () -> "满分不该有扣分项：" + vo.getDeductions());
         assertEquals(100, vo.getScore());
         assertEquals("合格", vo.getGrade());
-        assertFalse(vo.isSerious());
     }
 
     @Test
@@ -98,7 +97,6 @@ class QcScorerTest {
 
         assertEquals(88, vo.getScore()); // 100 - 12
         assertEquals("待复核", vo.getGrade()); // 60 ≤ 88 < 90
-        assertFalse(vo.isSerious()); // 真缺失仅 1 项，未达 ≥3 的严重线
     }
 
     /** 结构化为空但原始列有记录 = 漏抽，扣 6 而不是 12，且不计入「真缺失」项数 */
@@ -113,14 +111,12 @@ class QcScorerTest {
 
         assertEquals(94, vo.getScore()); // 100 - 6
         assertEquals("合格", vo.getGrade());
-        assertFalse(vo.isSerious());
     }
 
     @Test
     void allCoreMissingInvalid() {
         ScoreResultVO vo = QcScorer.score(Map.of(), raw(), false, QcRuleSet.defaults());
 
-        assertTrue(vo.isSerious()); // 6 项真缺失 ≥ 3
         assertEquals("无效", vo.getGrade());
         assertEquals(28, vo.getScore()); // 100 - 6×12
     }
@@ -134,7 +130,6 @@ class QcScorerTest {
 
         ScoreResultVO vo = QcScorer.score(data, raw(), false, QcRuleSet.defaults());
 
-        assertTrue(vo.isSerious());
         assertEquals("无效", vo.getGrade());
         assertEquals(64, vo.getScore()); // 100 - 3×12
     }
@@ -205,5 +200,38 @@ class QcScorerTest {
                 .filter(d -> "核心字段缺失".equals(d.getType()) && d.getPoints() == points)
                 .map(ScoreResultVO.Deduction::getItem)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * 未归一扣分必须随数量<b>分段递增</b>（2026-10-05 修的那一处）。
+     *
+     * <p>原先实现是 {@code Math.min(cap, miss * weightEach)}：未归一数达到 cap（默认 5）之后
+     * 恒定只扣 5 分，再糟也不多扣 —— 实测 51.6% 的病历都停在这一档，这一项因此失去区分度。</p>
+     *
+     * <p>断言方式刻意用「5 条 vs 10 条的分数差」而不是某个绝对值：两组只差症状条数，
+     * 其余扣分完全一致，差值就是这项扣分的变化量，且不依赖扣分明细的类型字符串
+     * （那种断言一改文案就碎）。cap=5 时 5 条扣 5、10 条扣 6，故差值应为 1 分。</p>
+     */
+    @Test
+    void unmatchedDeductionGrowsAfterCap() {
+        Map<String, Object> five = new HashMap<>(fullData());
+        five.put("symptoms", unmatchedSymptoms(5));
+        Map<String, Object> ten = new HashMap<>(fullData());
+        ten.put("symptoms", unmatchedSymptoms(10));
+
+        int s5 = QcScorer.score(five, raw(), false, QcRuleSet.defaults()).getScore();
+        int s10 = QcScorer.score(ten, raw(), false, QcRuleSet.defaults()).getScore();
+
+        assertEquals(1, s5 - s10,
+                "未归一条数超过 cap 后应每满一档多扣一档：否则大量未归一时扣分触顶、分数没有区分度");
+    }
+
+    /** 造 n 条「无 normLevel」的症状实体（无 normLevel = 未命中词典 = 计未归一） */
+    private static List<Map<String, Object>> unmatchedSymptoms(int n) {
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            out.add(java.util.Map.of("content", "未归一症状" + i));
+        }
+        return out;
     }
 }

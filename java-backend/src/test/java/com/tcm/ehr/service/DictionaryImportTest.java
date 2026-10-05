@@ -69,7 +69,7 @@ class DictionaryImportTest {
 
     /** 构造服务：只注入导入路径依赖的三个协作者 */
     private DictionaryServiceImpl newService() {
-        return new DictionaryServiceImpl(fileService, esIndex, distLock, termStore, new ObjectMapper());
+        return new DictionaryServiceImpl(esIndex, distLock, termStore, new ObjectMapper());
     }
 
     private static MockMultipartFile json(String name, String body) {
@@ -257,5 +257,34 @@ class DictionaryImportTest {
 
         // 3. ES 灌完才承认已同步
         Mockito.verify(termStore).markIndexed(anyString(), Mockito.eq(TYPE), Mockito.anyString());
+    }
+
+    // ---------------------------------------------------------------- #5 自命中别名
+
+    /**
+     * #5（2026-10-05）：表格导入的「别名里写了标准词本身」必须被剔除。
+     *
+     * <p>原先 {@code parseTabularEntries} 直接 {@code new TermEntry(...)}，<b>绕过了
+     * {@code normalize}</b>（JSON 路径是过的），于是 CSV/Excel 导入能把自命中别名写进库，
+     * 归一时自己命中自己。这条测试就是钉住那个入口。</p>
+     */
+    @Test
+    void tabularImport_dropsSelfAlias() throws IOException {
+        // CSV：别名列同时写了标准词本身与一个正常别名；首行以「标准术语」开头会被跳过
+        String csv = "\u6807\u51c6\u672f\u8bed,\u522b\u540d,\u56fd\u6807\u4ee3\u7801\n"
+                + "\u9ad8\u8840\u538b,\u9ad8\u8840\u538b\u3001\u8840\u538b\u9ad8,A01\n";
+        org.springframework.mock.web.MockMultipartFile f =
+                new org.springframework.mock.web.MockMultipartFile("file", "d.csv", "text/csv",
+                        csv.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        service.importDictionary(TYPE, f);
+
+        TermEntry written = capturedWritten().stream()
+                .filter(e -> "\u9ad8\u8840\u538b".equals(e.getStandardTerm()))
+                .findFirst().orElseThrow();
+        org.junit.jupiter.api.Assertions.assertFalse(written.getAliases().contains("\u9ad8\u8840\u538b"),
+                "别名里不能含标准词本身：归一时会自己命中自己");
+        org.junit.jupiter.api.Assertions.assertTrue(written.getAliases().contains("\u8840\u538b\u9ad8"),
+                "正常别名必须保留");
     }
 }

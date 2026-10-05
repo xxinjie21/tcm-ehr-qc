@@ -1,9 +1,9 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.ExcelStreamReader;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
-import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.IDictionaryService;
 import com.tcm.ehr.service.IEsTermIndexService;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +41,6 @@ public class DictionaryServiceImpl implements IDictionaryService {
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
 
 
-    private final IDictionaryFileService fileService;
     private final IEsTermIndexService esTermIndexService;
     private final com.tcm.ehr.common.utils.DistLock distLock;
     private final com.tcm.ehr.service.DictionaryTermStore termStore;
@@ -334,25 +333,47 @@ if (matched) {
             }
             String code = row[2] == null || row[2].isBlank() ? null : row[2].trim();
             // 3. 缺省来源按词典类型填，避免每行都让上传者填一遍
-            ok.add(new TermEntry(standard, aliases, defaultSource(type), code));
+            // #5（2026-10-05）：表格路径原先直接 new TermEntry，绕过了 normalize ——
+            // 于是「别名里写了标准词本身」会原样入库，归一时自己命中自己（词表数据缺陷的入口）。
+            ok.add(normalize(new TermEntry(standard, aliases, defaultSource(type), code)));
         }
         return ok;
     }
 
-    /** 读 Excel 全部行（POI），空单元格补空串以保持列位 */
+    /**
+     * 读 Excel 全部行（取前 3 列，空单元格补 null 以保持列位）。
+     *
+     * <p>`.xlsx` 走 SAX 流式（{@link ExcelStreamReader}）：内存里只留当前一行，不再整份载入 ——
+     * 原先的 50MB 体积闸门只是把 OOM 阈值推后，没改变「内存 ≈ 解压后体积」这个事实。
+     * 两条路径的取值口径已由 {@code ExcelStreamReaderTest} 逐行逐列比对锁住。</p>
+     *
+     * <p>`.xls`（HSSF）没有事件式 API，保留 POI 全量载入 + 体积闸门，这是有意取舍。</p>
+     */
     private List<String[]> readExcelRows(MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
+        // 1. xlsx：流式逐个工作表事件回调
+        if (fileName(file).endsWith(".xlsx")) {
+            ExcelStreamReader.forEachXlsxRow(file.getInputStream(), 3, (rowNum, cells) -> {
+                // 1.1 首行是表头就跳过
+                if (rowNum == 0 && isHeaderRow(cells)) {
+                    return;
+                }
+                // 1.2 三列全空的行直接丢，避免尾部空行混进失败清单
+                if (cells[0] != null || cells[1] != null || cells[2] != null) {
+                    rows.add(cells);
+                }
+            });
+            return rows;
+        }
+        // 2. xls：全量载入（无流式 API）
         try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = wb.getSheetAt(0);
-            // 1. 只读第一个工作表，逐行取前三列
             for (Row r : sheet) {
-                // 2. 首行是表头就跳过
                 if (r.getRowNum() == 0 && isHeaderRow(r)) continue;
                 String[] arr = new String[3];
                 arr[0] = cellText(r.getCell(0));
                 arr[1] = cellText(r.getCell(1));
                 arr[2] = cellText(r.getCell(2));
-                // 3. 三列全空的行直接丢，避免尾部空行混进失败清单
                 if (arr[0] != null || arr[1] != null || arr[2] != null) rows.add(arr);
             }
         }
@@ -404,12 +425,67 @@ if (matched) {
     // 历史版本列表改为 GET /api/dictionary/archives。
 
     @Override
-    public Map<String, Object> reindex(String type) throws IOException {
-        // 只重建「当前组织这一层」：基础层与其它组织不在此动，避免让它们进入重建空窗
-        String orgId = RequestUtils.currentOrgId();
+    public Map<String, Object> reindex(String type, String org) throws IOException {
+        // 1. 参数展开：type 空 = 全部类型；org 空 = 当前组织，org=* = 全部组织
+        List<String> types = (type == null || type.isBlank())
+                ? new ArrayList<>(com.tcm.ehr.common.utils.TermTypes.ALL)
+                : List.of(type);
+        List<String> orgs = resolveReindexOrgs(org);
+
+        // 2. 逐个 (type, org) 重放：单点失败不中断整批 —— 全量重放正是给「索引大面积落后」
+        //    用的，一条失败就整体中止会让人反复试；失败项列进 failures 由调用方决定重试
+        List<Map<String, Object>> results = new ArrayList<>();
+        List<Map<String, Object>> failures = new ArrayList<>();
+        long entries = 0;
+        for (String t : types) {
+            for (String o : orgs) {
+                try {
+                    Map<String, Object> one = reindexOne(t, o);
+                    results.add(one);
+                    Object n = one.get("entries");
+                    entries += n instanceof Number num ? num.longValue() : 0L;
+                } catch (Exception e) {
+                    log.warn("[词典重建] ({}, {}) 失败：{}", t, o, e.getMessage());
+                    Map<String, Object> f = new LinkedHashMap<>();
+                    f.put("type", t);
+                    f.put("orgId", o);
+                    f.put("error", String.valueOf(e.getMessage()));
+                    failures.add(f);
+                }
+            }
+        }
+
+        // 3. 汇总；保留单点视图的键（type/orgId/entries/version）在只有一对时直接可见
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("types", types);
+        out.put("orgs", orgs);
+        out.put("pairs", types.size() * orgs.size());
+        out.put("entries", entries);
+        out.put("results", results);
+        out.put("failures", failures);
+        if (results.size() == 1) {
+            out.putAll(results.get(0));
+        }
+        return out;
+    }
+
+    /** 解析目标组织：空 = 当前组织；{@code *} = 词典里出现过的全部组织 */
+    private List<String> resolveReindexOrgs(String org) {
+        if (org == null || org.isBlank()) {
+            return List.of(RequestUtils.currentOrgId());
+        }
+        String trimmed = org.trim();
+        if (!"*".equals(trimmed)) {
+            return List.of(trimmed);
+        }
+        return termStore.listOrgs();
+    }
+
+    /** 重建单个 (type, org)：灌成功才 markIndexed */
+    private Map<String, Object> reindexOne(String type, String orgId) throws IOException {
         List<TermEntry> entries = termStore.read(orgId, type);
         String version = termStore.contentVersion(entries);
-        // 同样走跨实例互斥：与其它实例的导入 / 启动对账互斥
+        // 走跨实例互斥：与其它实例的导入 / 启动对账互斥
         distLock.runLocked(com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, orgId),
                 () -> {
                     try {
@@ -437,7 +513,17 @@ if (matched) {
         // 2. 来源与代码以旧条目优先：已核过的出处不该被一次导入覆盖成空
         String source = oldE.getSource() == null || oldE.getSource().isBlank() ? newE.getSource() : oldE.getSource();
         String code = oldE.getCode() == null || oldE.getCode().isBlank() ? newE.getCode() : oldE.getCode();
-        return new TermEntry(oldE.getStandardTerm(), new ArrayList<>(aliases), source, code);
+        // #5（2026-10-05）：合并也要剔除「标准词本身」—— 否则历史脏数据（或经合并不经过
+        // normalize 的路径）会一直留在库里，归一时自己命中自己；合并是每次导入都会走的地方，
+        // 在这里清等于「下次导入该词条时自动修复」。
+        String std = oldE.getStandardTerm();
+        List<String> cleaned = new ArrayList<>();
+        for (String a : aliases) {
+            if (a != null && !a.equals(std) && !cleaned.contains(a)) {
+                cleaned.add(a);
+            }
+        }
+        return new TermEntry(std, cleaned, source, code);
     }
 
     private String defaultSource(String type) {
@@ -460,10 +546,19 @@ case "formula" -> "中医方剂大辞典";
         return name == null ? "" : name.toLowerCase();
     }
 
-    /** 判断是否表头行（首行且含"标准术语"或"别名"字样） */
-    private boolean isHeaderRow(Row r) {
-        String first = cellText(r.getCell(0));
+    /**
+     * 判断是否表头行（首行且含"标准术语"或"standardTerm"字样）。
+     *
+     * <p>流式与全量两条路径共用这一条判定 —— 表头跳过若在两边各写一份，迟早会出现
+     * 「xlsx 导入多了一条表头词条、xls 没有」这类只在某种格式下复现的怪事。</p>
+     */
+    private boolean isHeaderRow(String[] cells) {
+        String first = cells.length > 0 ? cells[0] : null;
         return first != null && (first.contains("标准术语") || first.equalsIgnoreCase("standardTerm"));
+    }
+
+    private boolean isHeaderRow(Row r) {
+        return isHeaderRow(new String[]{cellText(r.getCell(0))});
     }
 
     private String cellText(Cell cell) {

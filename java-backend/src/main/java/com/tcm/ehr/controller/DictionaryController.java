@@ -3,6 +3,7 @@ package com.tcm.ehr.controller;
 import com.tcm.ehr.common.annotation.RequireOrgRole;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
+import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.PageSizeGuard;
 import com.tcm.ehr.common.utils.RequestUtils;
@@ -18,6 +19,7 @@ import com.tcm.ehr.service.DictProposalService;
 import com.tcm.ehr.service.IDictionaryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,6 +51,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/dictionary")
+@Slf4j
 @RequiredArgsConstructor
 public class DictionaryController {
 
@@ -57,6 +60,8 @@ public class DictionaryController {
     private final DictArchiveService archiveService;
     private final com.tcm.ehr.service.IDictionaryLintService lintService;
     private final OperationLogger operationLogger;
+    /** 词典写门槛要查 DB 里的成员授权位（注解只能看 JWT 里的 role），故不用注解 */
+    private final com.tcm.ehr.service.IOrgPermissionService orgPermission;
 
     /**
      * 校验术语类型，非法返回 null（调用方据此回 4001）。
@@ -75,6 +80,21 @@ public class DictionaryController {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         return null;
+    }
+
+    /**
+     * 词典写门槛：管理员 / 组织所有者 / 被授权成员（批次 6 工作项 4）。
+     *
+     * 与 {@code QcController.requireRuleWrite} 同构：不做成注解，因为它要查 DB 里的
+     * organization_members.can_write_dictionary，注解只能看 JWT 里的 role。
+     *
+     * ⚠️ 基础层（org_id=''）不在此列 —— 它影响所有组织，只允许管理员直写，见 /import。
+     */
+    private void requireDictWrite() {
+        if (RequestUtils.isAdmin() || orgPermission.canWriteDictionary(RequestUtils.currentUserId())) {
+            return;
+        }
+        throw new ForbiddenException("无权修改本组织的词典（需管理员、组织所有者或被授权成员）");
     }
 
     // ================================================================ 查询
@@ -203,12 +223,10 @@ public class DictionaryController {
      * 自动生成归档版本并计入 5 份限额。
      *
      *
-     * target=base 写基础层（org_id=''，全局通用词库，
-     *
-     * 与组织层的归档限额独立）；缺省或 target=org 写当前组织。
+     * 【权限：管理员 / 所有者 / 授权成员】组织层（缺省或 target=org）走三档门槛；
+     * target=base 写基础层，影响所有组织，仍限管理员。
      * 刻意不开放任意 orgId 入参 —— 否则就是「管理员可写任意组织词库」的越权面。
      */
-    @RequireRole(roles = {"管理员"})
     @PostMapping("/import")
     public ResponseEntity<Result<ImportResultVO>> importDict(
             @RequestParam("file") MultipartFile file,
@@ -222,15 +240,39 @@ public class DictionaryController {
         if (target != null && !base && !"org".equalsIgnoreCase(target)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "target 只能为 base 或 org"));
         }
+        if (base) {
+            // 基础层是各组织共用的系统基线：放开给「被授权成员」会变成「一个人改所有人的词库」
+            if (!RequestUtils.isAdmin()) {
+                throw new ForbiddenException("基础层词典仅管理员可导入");
+            }
+        } else {
+            requireDictWrite();
+        }
         String orgId = base ? "" : RequestUtils.currentOrgId();
         ImportResultVO vo = dictionaryService.importDictionary(type, file, orgId);
-        // 直写同样纳入归档体系：生成快照并执行 5 份限额
-        int versionNo = archiveService.archive(orgId, type,
-                dictionaryService.currentTerms(orgId, type), null,
-                RequestUtils.currentUsername(), "管理员直写导入");
-        vo.setArchiveVersion(versionNo);
-        operationLogger.log("词典导入", type + (base ? "(基础层)" : ""),
-                "成功" + vo.getImported() + "条，失败" + vo.getFailed() + "条，归档 v" + versionNo);
+        // ⚠️ 到这里导入**已经提交**（词条进库 + ES 重建 + 版本已记）。后面的归档与审计
+        //    都只是随后的记账动作，失败不能把整个请求变成 500 —— 那会让用户以为导入没成，
+        //    而实际已经生效（重试还会再合并一次）；静默丢弃又会让归档体系与词典内容对不上
+        //    （5 份限额与回滚历史错位）。故各自兜住：成功照常 200，原因写进返回体，栈入日志。
+        Integer versionNo = null;
+        try {
+            // 直写同样纳入归档体系：生成快照并执行 5 份限额
+            versionNo = archiveService.archive(orgId, type,
+                    dictionaryService.currentTerms(orgId, type), null,
+                    RequestUtils.currentUsername(), "管理员直写导入");
+            vo.setArchiveVersion(versionNo);
+        } catch (Exception e) {
+            // 完整栈入日志：这条路径此前只回一个追踪码，排障时拿不到栈
+            log.error("[词典] {} (org={}) 导入已成功，但归档版本生成失败：{}", type, orgId, e.getMessage(), e);
+            vo.setArchiveWarning("导入已成功，但归档版本生成失败：" + e.getMessage());
+        }
+        try {
+            operationLogger.log("词典导入", type + (base ? "(基础层)" : ""),
+                    "成功" + vo.getImported() + "条，失败" + vo.getFailed() + "条，归档 "
+                            + (versionNo == null ? "失败" : "v" + versionNo));
+        } catch (Exception e) {
+            log.warn("[词典] {} (org={}) 导入审计日志写入失败：{}", type, orgId, e.getMessage(), e);
+        }
         return ResponseEntity.ok(Result.ok(vo));
     }
 
@@ -275,7 +317,10 @@ public class DictionaryController {
         }
         boolean isOwner = RequestUtils.isOrgOwner();
         DictProposalDTOs.ProposalQuery query = new DictProposalDTOs.ProposalQuery();
-        query.setOrgId(isOwner ? null : RequestUtils.currentOrgId());
+        // 组织条件必填，不再有「owner 看全库」：看全库等于把别组提案的完整词条快照
+        // 交出去。组长看「本组 + 基础层」，成员只看自己提交的
+        query.setOrgId(RequestUtils.currentOrgId());
+        query.setIncludeBaseLayer(isOwner);
         query.setStatus(status);
         query.setType(type);
         query.setIsOwner(isOwner);
@@ -326,10 +371,11 @@ public class DictionaryController {
      * 审核提案：通过则合并进基线并生成归档版本；拒绝则作废并安排 7 天后清理快照。
      *
      *
-     * 【权限：仅组织所有者】
+     * 【权限：管理员 / 所有者 / 授权成员】不挂 RequireOrgRole：本路由的 {id} 是提案号，
+     * 不是机构 id，无法做路径机构比对。权限与归属都由 service 判 ——
+     * 管理员可审任意提案（含基础层），其余需「本组织提案 + can_write_dictionary」。
      *
      */
-    @RequireOrgRole("owner")
     @PostMapping("/proposals/{id}/audit")
     public ResponseEntity<Result<DictProposalVO>> audit(
             @PathVariable("id") String id,
@@ -339,7 +385,7 @@ public class DictionaryController {
             return ResponseEntity.badRequest().body(Result.error(4001, "拒绝时必须填写理由"));
         }
         DictProposalVO vo = proposalService.audit(id, approve, body.getComment(),
-                RequestUtils.currentUsername(), true);
+                RequestUtils.currentUsername());
         operationLogger.log(approve ? "提案合并" : "提案驳回", id, body.getComment());
         return ResponseEntity.ok(Result.ok(approve ? "已通过并合并入基线" : "已驳回", vo));
     }
@@ -368,14 +414,16 @@ public class DictionaryController {
      * 基于历史归档版本生成一份新提案（不直接还原基线）。
      *
      *
-     * 【权限：仅组织所有者】回滚走提案是为了不绕过审核；生成后仍需再走一次审核流程。
+     * 【权限：管理员 / 所有者 / 授权成员】回滚走提案是为了不绕过审核；生成后仍需再走一次审核流程。
      *
      */
-    @RequireOrgRole("owner")
     @PostMapping("/archives/{versionNo}/rollback")
     public ResponseEntity<Result<DictProposalVO>> rollbackTo(
             @PathVariable("versionNo") int versionNo,
             @RequestParam("type") String type) {
+        // 回滚只生成本组织的提案，与「本组织词典可写」同一门槛；
+        // 不挂 @RequireOrgRole：本路由的路径变量是版本号，没有机构 id 可比对
+        requireDictWrite();
         ResponseEntity<Result<String>> bad = badType(type);
         if (bad != null) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
@@ -387,21 +435,23 @@ public class DictionaryController {
     }
 
     /**
-     * 强制重建当前组织某一类词典的 ES 索引（不落库、不改词条）。
+     * 强制重建 ES 索引（不落库、不改词条）。
      *
      *
      * 【权限：仅管理员】用于「库里词条正确、但索引落后」的自愈。
+     * type 省略 = 全部类型；org 省略 = 当前组织，org=* = 词典里出现过的全部组织（灾难恢复）。
      *
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/reindex")
-    public ResponseEntity<Result<Map<String, Object>>> reindex(@RequestParam("type") String type)
-            throws IOException {
-        ResponseEntity<Result<String>> bad = badType(type);
-        if (bad != null) {
+    public ResponseEntity<Result<Map<String, Object>>> reindex(
+            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "org", required = false) String org) throws IOException {
+        // type 可空（= 全部类型），故不能用 badType 直接挡空；只校验「填了就必须合法」
+        if (type != null && !type.isBlank() && !TermTypes.ALL.contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
-        return ResponseEntity.ok(Result.ok(dictionaryService.reindex(type)));
+        return ResponseEntity.ok(Result.ok(dictionaryService.reindex(type, org)));
     }
 
     // ================================================================ 内部

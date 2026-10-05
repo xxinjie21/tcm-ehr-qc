@@ -84,7 +84,8 @@ public final class QcRuleDescriber {
                 typeLabels.add(labelOf(type));
             }
             out.add("术语（" + String.join("/", typeLabels)
-                    + "）未命中标准词典的，每个扣 " + st.getWeightEach() + " 分，最多扣 " + st.getCap() + " 分。");
+                    + "）未命中标准词典的：" + st.getWeightEach() + " 分/个，最多先扣 " + st.getCap() + " 个的量；"
+                + "再每满 " + st.getCap() + " 个追加一档（避免大量未归一时扣分触顶、分数失去区分度）。");
         } else {
             // 关闭也要说明，否则用户以为漏配了规则
             out.add("术语标准化：已关闭（不参与评分）。");
