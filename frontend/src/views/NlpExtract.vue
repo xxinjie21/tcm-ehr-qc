@@ -966,7 +966,7 @@ onBeforeUnmount(stopPoll)
 .ns-legend {
   margin-top: var(--sp-2);
   padding-top: var(--sp-2);
-  border-top: 1px dashed #ece8dc;
+  border-top: 1px dashed var(--line-soft);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1014,7 +1014,7 @@ onBeforeUnmount(stopPoll)
   flex-wrap: wrap;
   margin-top: var(--sp-2);
   padding-top: var(--sp-2);
-  border-top: 1px dashed #ece8dc;
+  border-top: 1px dashed var(--line-soft);
   font-size: 12.5px;
 }
 .nt-in { color: var(--text-sub); }
@@ -1113,8 +1113,8 @@ onBeforeUnmount(stopPoll)
 .bp-hd { font-size: 12.5px; color: var(--text); margin-bottom: var(--sp-2); }
 .bp-hd b { color: var(--ink); }
 .bp-sub { margin-top: var(--sp-2); font-size: 12px; color: var(--text-sub); }
-.batch-failures { margin-top: 14px; border-top: 1px dashed #ece8dc; padding-top: var(--sp-3); }
-.batch-list { margin-top: var(--sp-4); border-top: 1px dashed #ece8dc; padding-top: var(--sp-3); }
+.batch-failures { margin-top: 14px; border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
+.batch-list { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
 .bf-hd { font-size: 12.5px; color: var(--text-sub); margin-bottom: var(--sp-2); }
 /* 截断提示：用的是次要色而不是警示色 —— 列表被截断是正常上限行为，不是错误 */
 .bf-trunc { margin-left: var(--sp-2); color: var(--ochre); }
