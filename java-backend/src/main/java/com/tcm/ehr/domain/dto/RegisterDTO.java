@@ -50,9 +50,9 @@ public class RegisterDTO {
     /**
      * 可选：同时申请创建课题组。
      *
-     * <p>不带 → 只注册，账号进「待分配池」（{@code status=pending}），等组长拉人。
-     * 带 → 建 {@code pending} 组 + 本人成为首任组长（待管理员审批），
-     * 并置 {@code has_pending_group=1} 使其从待分配池隐藏（避免被别的组长先拉走）。</p>
+     * <p><b>本段已过期并于 2026-10-05 校正</b>：现实现「注册即 {@code active}、无审核、无待分配池」。
+     * 组织由用户自助创建（创建者即 owner），不存在 {@code pending} 组与管理员审批；
+     * 历史遗留的「待分配池 / 首任组长审批」描述已不再适用。</p>
      */
     @Valid
     private CreateGroup createGroup;
