@@ -328,8 +328,10 @@
           <div v-if="batchTasks.length" class="batch-list">
             <div class="bf-hd">
               最近任务（最多 {{ taskListLimit }} 条）<span v-if="taskListTruncated" class="bf-trunc">已省略更早的任务</span>
+              <!-- 批次4：长任务要能一眼找到「哪些批次出过错」，不必逐条看状态 -->
+              <el-checkbox v-model="onlyFailedTasks" size="small" style="margin-left: var(--sp-3)">只看有失败的</el-checkbox>
             </div>
-            <el-table :data="batchTasks" border size="small" max-height="260">
+            <el-table :data="onlyFailedTasks ? batchTasks.filter((t) => t.failed > 0) : batchTasks" border size="small" max-height="260">
               <el-table-column label="提交时间" width="170">
                 <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
               </el-table-column>
@@ -382,6 +384,8 @@ import { confirmBox } from '@/utils/confirm'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 const activeTab = ref('single')
+// 批次4：批量任务列表的「只看有失败的」开关（报告 §2.11 第 3 行：长任务要能下钻到失败）
+const onlyFailedTasks = ref(false)
 
 // P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
 const loadedAt = ref(new Date().toLocaleString())
