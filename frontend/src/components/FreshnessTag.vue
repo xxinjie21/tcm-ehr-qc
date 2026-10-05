@@ -38,11 +38,11 @@ defineProps({
 }
 .fresh-tag .k { color: var(--text-sub); }
 .fresh-tag.stale {
-  color: var(--el-color-danger);
-  background: var(--el-color-danger);
-  border: 1px solid var(--el-color-danger);
+  color: var(--ochre);
+  background: var(--ochre-surface);
+  border: 1px solid var(--ochre-light);
   border-radius: 4px;
   padding: 1px 6px;
 }
-.fresh-tag .why { color: var(--el-color-danger); }
+.fresh-tag .why { color: var(--ochre); }
 </style>
