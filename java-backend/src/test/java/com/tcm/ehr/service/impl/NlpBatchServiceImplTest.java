@@ -3,15 +3,21 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.PythonNlpClient;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.NlpTask;
+import com.tcm.ehr.domain.vo.NlpTasksVO;
 import com.tcm.ehr.mapper.NlpTaskMapper;
+import com.tcm.ehr.mapper.NlpTaskItemMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IDictionaryFileService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
@@ -20,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -125,8 +132,8 @@ class NlpBatchServiceImplTest {
         when(nlpClient.isEnabled()).thenReturn(true);
 
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
-                mock(RecordMapper.class), nlpClient, mock(EntityNormalizer.class),
-                mock(IDictionaryFileService.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient, mock(EntityNormalizer.class),
+                mock(com.tcm.ehr.service.DictionaryTermStore.class),
                 new ObjectMapper());
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
@@ -134,6 +141,109 @@ class NlpBatchServiceImplTest {
         assertTrue(e.getMessage().contains("已有解析任务"), e.getMessage());
         // 防重命中时应就地拒绝：除防重那次查表外，不该再有任何写库动作
         verify(taskMapper, Mockito.never()).insert(Mockito.any(NlpTask.class));
+    }
+
+    // ------------------------------------------------- B1：导入后自动解析的组织标记
+
+    /**
+     * B1 根因：{@code submitIds} 以前不打组织标记，而 worker 的 {@code runByIds} 会再按
+     * {@code org_id} 筛一遍（fail-closed）—— {@code org_id} 为 NULL 时恒不成立，筛出空集，
+     * 任务「跑完 0 条还落 COMPLETED」，列表 / get / cancel 又都按 org 过滤，
+     * 于是用户看到的是「开关打开了、提示已提交，却一条都没解析、任务列表里也找不到」。
+     */
+    @Test
+    void submitIdsStampsOrgId() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_ORG_ID, "org-A");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        try {
+            NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
+            PythonNlpClient nlpClient = mock(PythonNlpClient.class);
+            when(nlpClient.isEnabled()).thenReturn(true);
+            // workers 未初始化（@PostConstruct 不在单测里跑），故入队后不会有 worker 真的开跑
+            com.tcm.ehr.mapper.NlpTaskItemMapper itemMapper =
+                    mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class);
+            NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
+                    mock(RecordMapper.class), itemMapper, nlpClient, mock(EntityNormalizer.class),
+                    mock(com.tcm.ehr.service.DictionaryTermStore.class), new ObjectMapper());
+
+            svc.submitIds(List.of("r-1", "r-2"), "tester");
+
+            ArgumentCaptor<NlpTask> captor = ArgumentCaptor.forClass(NlpTask.class);
+            verify(taskMapper).insert(captor.capture());
+            assertEquals("org-A", captor.getValue().getOrgId(),
+                    "任务必须带组织标记，否则 worker 会静默跑 0 条并落成「已完成」");
+            assertEquals(2, captor.getValue().getTotal());
+
+            // 批次 16 #3：ID 集合必须落库（含 seq 与初始状态）——
+            // 否则进程重启后 worker 读不到待处理 ID，任务会永远停在「进行中」
+            org.mockito.ArgumentCaptor<com.tcm.ehr.domain.po.NlpTaskItem> itemCaptor =
+                    org.mockito.ArgumentCaptor.forClass(com.tcm.ehr.domain.po.NlpTaskItem.class);
+            verify(itemMapper, Mockito.times(2)).insert(itemCaptor.capture());
+            java.util.List<com.tcm.ehr.domain.po.NlpTaskItem> items = itemCaptor.getAllValues();
+            assertEquals(java.util.List.of("r-1", "r-2"),
+                    items.stream().map(com.tcm.ehr.domain.po.NlpTaskItem::getRecordId).toList(),
+                    "两条待处理病历都要落库，且保持提交顺序");
+            assertEquals(java.util.List.of(0, 1),
+                    items.stream().map(com.tcm.ehr.domain.po.NlpTaskItem::getSeq).toList(),
+                    "seq 从 0 起：进度游标按它推进，不能靠主键顺序");
+            assertEquals(com.tcm.ehr.domain.po.NlpTaskItem.PENDING, items.get(0).getStatus());
+            assertEquals(captor.getValue().getId(), items.get(0).getTaskId(), "明细必须挂在刚创建的任务上");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    // ------------------------------------------------- 批次 13 #3：列表截断信号
+
+    /**
+     * 列表原先写死 {@code LIMIT 50} 且不带任何截断信号，页面只能自己写一句
+     * 「最多显示最近 50 条」当标题 —— 不足 50 条时这句话本身就是错的，真被截断时
+     * 也看不出「还有更早的没返回」。这里锁两条：恰好到上限**不算**截断（靠多取一条
+     * 精确判定，不是拿 {@code size == 50} 猜），超出一条才置 truncated。
+     */
+    @Test
+    void listMarksTruncatedOnlyWhenBeyondLimit() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_ORG_ID, "org-A");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        try {
+            // 1. 恰好 50 条：不截断，原样返回 50 条
+            NlpTaskMapper exact = mock(NlpTaskMapper.class);
+            when(exact.selectList(any())).thenReturn(tasks(50));
+            NlpTasksVO voExact = newService(exact).list();
+            assertEquals(50, voExact.getTasks().size());
+            assertFalse(voExact.isTruncated(), "恰好到上限不算截断");
+            assertEquals(50, voExact.getLimit());
+
+            // 2. 51 条（多取的那一条）：截断为真，但只回上限条数
+            NlpTaskMapper over = mock(NlpTaskMapper.class);
+            when(over.selectList(any())).thenReturn(tasks(51));
+            NlpTasksVO voOver = newService(over).list();
+            assertEquals(50, voOver.getTasks().size(), "只能回上限条数");
+            assertTrue(voOver.isTruncated(), "多出一条即说明还有更早的任务没返回");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    private static NlpBatchServiceImpl newService(NlpTaskMapper taskMapper) {
+        PythonNlpClient nlpClient = mock(PythonNlpClient.class);
+        when(nlpClient.isEnabled()).thenReturn(true);
+        return new NlpBatchServiceImpl(taskMapper, mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient,
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                new ObjectMapper());
+    }
+
+    private static List<NlpTask> tasks(int n) {
+        List<NlpTask> out = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            NlpTask t = new NlpTask();
+            t.setId("t-" + i);
+            t.setStatus(NlpTask.COMPLETED);
+            out.add(t);
+        }
+        return out;
     }
 
     /**
@@ -146,8 +256,8 @@ class NlpBatchServiceImplTest {
         when(taskMapper.update(any(), any())).thenReturn(2);
 
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
-                mock(RecordMapper.class), mock(PythonNlpClient.class), mock(EntityNormalizer.class),
-                mock(IDictionaryFileService.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(RecordMapper.class), mock(NlpTaskItemMapper.class), mock(PythonNlpClient.class), mock(EntityNormalizer.class),
+                mock(com.tcm.ehr.service.DictionaryTermStore.class),
                 new ObjectMapper());
         // workers 为 null 时 shutdown() 会提前返回，所以得给一个真池子
         ReflectionTestUtils.setField(svc, "workers", Executors.newSingleThreadExecutor());
@@ -168,5 +278,36 @@ class NlpBatchServiceImplTest {
         assertTrue(where.contains("status"), "where 应带 status 条件：" + where);
         assertTrue(bound.contains(NlpTask.INTERRUPTED), "set 应标记为已中断：" + bound);
         assertTrue(bound.contains(NlpTask.QUEUED), "where 应筛选排队中的任务：" + where + " / " + bound);
+    }
+
+    /**
+     * 批次 16 #3：断点读取的两条性质 —— 只读 PENDING、按 seq 排序。
+     *
+     * <p>为什么用「捕获查询条件」而不是查真库：单测不连库；而这两条性质恰恰是
+     * <b>查询条件</b>决定的（漏了 status 过滤 → 跑完的重跑一遍；漏了 seq 排序 →
+     * 游标顺序漂移）。把条件钉住，就等于把「重启后从断点继续」这条能力钉住。</p>
+     */
+    @Test
+    void pendingIdsQueryOnlyReadsPendingAndOrdersBySeq() {
+        com.tcm.ehr.mapper.NlpTaskItemMapper itemMapper =
+                mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class);
+        when(itemMapper.selectList(any())).thenReturn(new java.util.ArrayList<>());
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
+                mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                new ObjectMapper());
+
+        svc.pendingIdsFor("t-1");
+
+        org.mockito.ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.Wrapper<
+                com.tcm.ehr.domain.po.NlpTaskItem>> captor =
+                org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(itemMapper).selectList(captor.capture());
+        String sql = captor.getValue().getSqlSegment();
+        assertTrue(sql.contains("status"),
+                "必须按 status 过滤：只读 PENDING，否则跑完的会被重跑一遍（重复抽取覆盖结构化数据）");
+        assertTrue(sql.toLowerCase().contains("order by"),
+                "必须按 seq 排序：游标顺序不能依赖主键（批量插入下主键顺序与提交顺序不一致）");
+        assertTrue(sql.contains("seq"), "排序字段必须是 seq");
     }
 }

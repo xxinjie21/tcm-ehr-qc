@@ -15,12 +15,14 @@ import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.NlpBatchDTO;
 import com.tcm.ehr.domain.po.NlpTask;
+import com.tcm.ehr.domain.po.NlpTaskItem;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.NlpTaskVO;
+import com.tcm.ehr.domain.vo.NlpTasksVO;
 import com.tcm.ehr.mapper.NlpTaskMapper;
+import com.tcm.ehr.mapper.NlpTaskItemMapper;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.service.INlpBatchService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -67,12 +69,15 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private static final int PAGE_SIZE = 200;
     private static final int PROGRESS_EVERY = 25;
     private static final int MAX_FAILURES = 500;
+    /** 「最近任务」列表的上限；超出时回 truncated=true，别让页面把这一页当全部 */
+    private static final int LIST_LIMIT = 50;
 
     private final NlpTaskMapper taskMapper;
     private final RecordMapper recordMapper;
+    /** 批次 16 工作项 3：待处理病历明细（ID 集合落库，重启不丢） */
+    private final NlpTaskItemMapper nlpTaskItemMapper;
     private final PythonNlpClient nlpClient;
     private final EntityNormalizer entityNormalizer;
-    private final IDictionaryFileService dictionaryFileService;
     /** 词典状态（版本 / 词条数）：归一打点要用「真正生效的那版词典」，不是词典还在文件时代留下的冻结哈希 */
     private final com.tcm.ehr.service.DictionaryTermStore termStore;
     private final ObjectMapper objectMapper;
@@ -83,9 +88,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
     /** 运行中任务的取消位 */
     /**
-     * 已请求取消的任务 ID（<b>仅本进程可见，非权威</b>）。
+     * 已请求取消的任务 ID（仅本进程可见，不是跨实例的权威）。
      *
-     * <p>权威是 {@code nlp_task.cancel_requested} 列，见 {@link #isCancelRequested(String)}。</p>
+     * 跨实例权威是 nlp_task.cancel_requested 列，见 {@link #isCancelRequested(String)}；
+     * 该列由 cancel() 的运行中分支写入 —— 只置本集合的话，重启或换实例取消都无效。
      */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
     /**
@@ -99,7 +105,6 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 多实例部署时这里必须改为落库，否则 B 实例取不到 A 实例提交的任务范围。
      * 见批次 16。</p>
      */
-    private final Map<String, List<String>> idBatches = new ConcurrentHashMap<>();
 
     private volatile boolean running;
     private ExecutorService workers;
@@ -240,7 +245,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setFailed(0);
         t.setFiltersJson(writeJsonStrict(objectMapper, filters));
         t.setCreatedBy(createdBy);
-        // 提交线程捕获组快照，供 worker 重建 RecordFilter（ a7 6.3 缺点 13）
+        // 提交线程捕获组快照，供 worker 重建 RecordFilter（§ 6.3 缺点 13）
         t.setOrgId(RequestUtils.currentOrgId());
         t.setFailureList("[]");
         t.setFailureTruncated(false);
@@ -283,13 +288,51 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setSuccess(0);
         t.setFailed(0);
         t.setCreatedBy(createdBy);
+        // 4. 组织标记必须在这里打上（B1 根因）：worker 的 runByIds 会再按 org_id 筛一遍
+        //    （fail-closed），不打的话 org_id 为 NULL，而「org_id = NULL」恒不成立 →
+        //    ids 变空集、跑 0 条、且因 running 仍为 true 落成 COMPLETED；列表/get/cancel
+        //    又都按 org 过滤，任务在界面上完全不出现。用户视角就是
+        //    「开关打开了、提示已提交，可一条都没解析、任务列表里也找不到」。
+        //    本方法全仓只有一个调用点（RecordServiceImpl 的导入后自动解析），且是请求线程，
+        //    所以这里取当前组织即可。
+        t.setOrgId(RequestUtils.currentOrgId());
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
         taskMapper.insert(t);
 
-        // 4. ID 集合只留在内存（重启后任务标中断、不会续跑），再入队
-        idBatches.put(t.getId(), new ArrayList<>(ids));
+        // 5. ID 集合只留在内存（重启后任务标中断、不会续跑），再入队
+        // 批次 16 #3：ID 集合落库 —— 原先只放内存，进程重启即丢，
+        // 表现为「任务显示进行中、重启后再也不推进」。这里先把明细写下来；
+        // 读取路径下一轮切到本表（此轮**只写不读**，行为与之前完全一致，便于分步验证）。
+        // 与任务插入同一事务：否则会出现「任务在、ID 丢了」，那正是要修的形态。
+        java.time.LocalDateTime now = java.time.LocalDateTime.now().withNano(0);
+        int seq = 0;
+        for (String recordId : ids) {
+            NlpTaskItem item = new NlpTaskItem();
+            item.setTaskId(t.getId());
+            item.setRecordId(recordId);
+            item.setSeq(seq++);
+            item.setStatus(NlpTaskItem.PENDING);
+            item.setCreateTime(now);
+            item.setUpdateTime(now);
+            nlpTaskItemMapper.insert(item);
+        }
+        // 保留策略（批次 16 #3）：明细是「一行一条病历」，一次 500 条的导入就是 500 行 ——
+        // 不清理会只增不减。这里在提交路径顺带清掉 30 天前的明细（不引入调度器：
+        // 提交是低频写操作，够用；且按时间清理是幂等的）。任务主表 nlp_task 不动，
+        // 历史任务的进度与失败清单仍在，只是明细（用于重启续跑）过期后不再保留。
+        try {
+            java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().withNano(0).minusDays(30);
+            int pruned = nlpTaskItemMapper.delete(new QueryWrapper<NlpTaskItem>()
+                    .lt("create_time", cutoff));
+            if (pruned > 0) {
+                log.info("[批解析] 清理 30 天前的任务明细 {} 行（保留策略）", pruned);
+            }
+        } catch (Exception e) {
+            // 清理失败不能挡住提交
+            log.warn("[批解析] 清理过期任务明细失败（不影响提交）: {}", e.getMessage());
+        }
         queue.offer(t.getId());
         log.info("[批解析] 已提交按ID任务 {}：计划 {} 条", t.getId(), ids.size());
         return toVO(t, false);
@@ -338,33 +381,46 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             t.setStatus(NlpTask.CANCELLED);
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             taskMapper.updateById(t);
-        } else if (NlpTask.RUNNING.equals(t.getStatus())) {
-            // 3. 运行中：不能直接改状态（worker 还会覆写），只置取消位让它自己收尾
+            // 内存取消位一并置：worker 可能已 poll 到该任务、还没读到状态
             cancelFlags.add(id);
+        } else if (NlpTask.RUNNING.equals(t.getStatus())) {
+            // 3. 运行中：不能直接改状态（worker 还会覆写），取消位必须同时落内存与库。
+            //    只置内存的话，worker 的 isCancelRequested 永远读到 0，
+            //    跨实例与重启后的取消都会静默失效。
+            cancelFlags.add(id);
+            taskMapper.update(null, new UpdateWrapper<NlpTask>()
+                    .eq("id", id)
+                    .set("cancel_requested", 1));
         }
         return toVO(t, false);
     }
 
     /**
-     * 列出最近任务（最多 50 条，按创建时间倒序），只读。
+     * 列出最近任务（最多 {@value #LIST_LIMIT} 条，按创建时间倒序），只读。
      *
      * <p>返回项不含失败明细，需要明细请用 {@link #get(String)}。</p>
      *
-     * @return 任务进度视图列表
+     * @return 任务列表 + 截断标记（多取一条精确判定，不靠 size == 上限猜）
      */
     @Override
-    public List<NlpTaskVO> list() {
-        // 1. 按创建时间倒序取本组最近 50 条
+    public NlpTasksVO list() {
+        // 1. 按创建时间倒序取本组最近 N+1 条
         //    § 6.3 缺点 9：不能看到别组的批量解析任务列表
         List<NlpTask> tasks = taskMapper.selectList(new QueryWrapper<NlpTask>()
                 .eq("org_id", RequestUtils.currentOrgId())
-                .orderByDesc("create_time").last("LIMIT 50"));
-        // 2. 不带失败明细：列表页不需要，明细走 get(id)
+                .orderByDesc("create_time").last("LIMIT " + (LIST_LIMIT + 1)));
+        // 2. 精确判截断：恰好 N 条不算截断，N+1 条才是
+        boolean truncated = tasks.size() > LIST_LIMIT;
+        // 3. 不带失败明细：列表页不需要，明细走 get(id)
         List<NlpTaskVO> out = new ArrayList<>();
-        for (NlpTask t : tasks) {
-            out.add(toVO(t, false));
+        for (int i = 0; i < Math.min(tasks.size(), LIST_LIMIT); i++) {
+            out.add(toVO(tasks.get(i), false));
         }
-        return out;
+        NlpTasksVO vo = new NlpTasksVO();
+        vo.setTasks(out);
+        vo.setTruncated(truncated);
+        vo.setLimit(LIST_LIMIT);
+        return vo;
     }
 
     // ------------------------------------------------------------------ 执行
@@ -373,12 +429,24 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 取出任务；已取消或已不存在直接清理内存态了事
         NlpTask t = taskMapper.selectById(id);
         if (t == null || NlpTask.CANCELLED.equals(t.getStatus())) {
-            idBatches.remove(id);
             return;
         }
-        List<String> idSource = idBatches.get(id);
+        // 批次 16 #3：ID 集合改为从明细表读 —— 内存那份在进程重启后是空的，
+        // 任务会永远停在「进行中」。读不到（本次部署前提交的旧任务，或历史数据）再回落到内存，
+        // 这样切换本身不会让任何在跑的任务断掉。
+        // ⚠️ 只有「按 ID 集合提交」的任务才有明细；**筛选型任务本来就没有明细**（也不该有）。
+        //    若无条件去读明细，筛选型任务会读回空集合 → 被下面的空集合守卫直接收尾，
+        //    表现为「任务 COMPLETED、0 处理 0 成功」——静默不干活（实测 15:41 那次）。
+        //    判据用「该任务有没有明细行」：有 → ID 型，读 PENDING 续跑；没有 → 返回 null 走筛选路径。
+        //    这与原实现的语义一致（内存里取不到 id 时为 null → runByFilter）。
+        boolean hasItems = nlpTaskItemMapper.selectCount(
+                new QueryWrapper<NlpTaskItem>().eq("task_id", id)) > 0;
+        List<String> idSource = hasItems ? pendingIdsFor(id) : null;
 
         // 2. 标记运行中并记录开始时间（此刻起进度才对外可见）
+        //    先清掉取消位再落库：t 是取任务时的快照，直接 updateById 会把
+        //    cancel_requested=0 写回，抹掉这一步之间刚到达的取消请求
+        t.setCancelRequested(null);
         t.setStatus(NlpTask.RUNNING);
         t.setStartedAt(LocalDateTime.now().withNano(0));
         taskMapper.updateById(t);
@@ -388,20 +456,58 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         boolean[] truncated = {false};
         int[] processed = {0};
         boolean cancelled = false;
+        boolean failed = false;
         try {
             cancelled = idSource != null
                     ? runByIds(id, idSource, t, failures, truncated, processed)
                     : runByFilter(id, t, failures, truncated, processed);
+        } catch (Exception e) {
+            // 执行期异常必须落 FAILED，且不能指望 workerLoop 的 markFailed：
+            // 它的 satisfiesGroup 读的是请求上下文，worker 线程里恒为空 → 每次直接 return
+            failed = true;
+            log.error("[批解析] 任务 {} 执行异常，落 FAILED", id, e);
         } finally {
             // 4. 无论正常跑完、取消还是异常，都要在这里落终态，否则任务会永远停在"运行中"
-            t.setStatus(endStatus(running, cancelled, t.getDone(), t.getTotal()));
+            t.setStatus(failed ? NlpTask.FAILED
+                    : endStatus(running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
             persistProgress(t, failures, truncated[0]);
+            // 批次 16 #3：任务**真正跑完**时，把该任务剩下的待处理明细批量标为 DONE。
+            // 否则重启后会把已处理过的再跑一遍（至少一次语义 → 重复抽取会覆盖同一份结构化数据）。
+            // 取消 / 中断 / 失败时**刻意保持 PENDING** —— 那正是「重启后从断点继续」的依据。
+            if (NlpTask.COMPLETED.equals(t.getStatus())) {
+                try {
+                    nlpTaskItemMapper.update(null, new UpdateWrapper<NlpTaskItem>()
+                            .eq("task_id", id)
+                            .eq("status", NlpTaskItem.PENDING)
+                            .set("status", NlpTaskItem.DONE));
+                } catch (Exception e) {
+                    // 标记失败不影响任务结论：最多是重启后重跑一遍（回到至少一次）
+                    log.warn("[批解析] 任务 {} 标记明细完成态失败: {}", id, e.getMessage());
+                }
+            }
             cancelFlags.remove(id);
-            idBatches.remove(id);
             log.info("[批解析] 任务 {} 结束：{}，成功 {}，失败 {}", id, t.getStatus(), t.getSuccess(), t.getFailed());
         }
+    }
+
+    /**
+     * 取该任务**尚未处理**的病历 ID（按提交顺序）。
+     *
+     * <p>批次 16 #3 的核心：ID 集合落库后，重启也能从这里读回断点。
+     * 两条性质缺一不可，且都被测试钉住：
+     * ① <b>只读 {@code PENDING}</b> —— 跑完的（{@code DONE}）不能再跑一遍，否则重复抽取会覆盖
+     *    同一份结构化数据；
+     * ② <b>按 {@code seq} 排序</b> —— 进度游标按提交顺序推进，不能靠主键（批量插入下主键顺序
+     *    与提交顺序不保证一致）。</p>
+     */
+    List<String> pendingIdsFor(String taskId) {
+        return nlpTaskItemMapper.selectList(new QueryWrapper<NlpTaskItem>()
+                        .eq("task_id", taskId)
+                        .eq("status", NlpTaskItem.PENDING)
+                        .orderByAsc("seq"))
+                .stream().map(NlpTaskItem::getRecordId).toList();
     }
 
     /** 按筛选范围分页处理；返回是否被取消 */
@@ -421,9 +527,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             if (list.isEmpty()) {
                 break;
             }
-            // 3. 逐条处理
+            // 3. 逐条处理：内存取消位逐条查；库里的每 PROGRESS_EVERY 条查一次 ——
+            //    逐条查库在 3.5 万条量级就是 3.5 万次查询
             for (Record r : list) {
-                if (cancelFlags.contains(id) || isCancelRequested(id)) {
+                if (cancelFlags.contains(id)
+                        || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
                     return true;
                 }
                 if (processed[0] >= limit) {
@@ -443,9 +551,28 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 按记录ID集合分块处理（导入后自动解析用）；返回是否被取消 */
     private boolean runByIds(String id, List<String> ids, NlpTask t, List<NlpTaskVO.Failure> failures,
                              boolean[] truncated, int[] processed) {
-        // 0. § 6.3 缺点 11：导入时的 id 集合是本组的，但 task 里只有
+        // 0. 组织为空 = 处理范围无法确定：直接抛，由 run() 的 catch 落 FAILED。
+        //    不能继续往下走 —— 下面那句是 eq("org_id", t.getOrgId())，org_id 为 NULL 时
+        //    恒不成立，筛出空集，任务会「跑完 0 条还落 COMPLETED」，看起来像成功。
+        //    历史（submitIds 未打组织标记时期）留下的 org_id IS NULL 任务重新执行时，
+        //    也必须显式失败，否则这个静默形态会一直藏着。
+        if (t.getOrgId() == null || t.getOrgId().isBlank()) {
+            failures.add(new NlpTaskVO.Failure("(任务)", "任务缺少组织标记，无法确定处理范围，已中止"));
+            throw new IllegalStateException("nlp_task 缺少 org_id，无法按机构筛选待处理病历");
+        }
+        // 1. § 6.3 缺点 11：导入时的 id 集合是本组的，但 task 里只有
         //    本组快照。为保险再筛一次：重新按 org_id 限定，
         //    避免任何路径把别组 id 混进来。
+        // ⚠️ 空集合绝不能进 IN：MySQL 的 `IN ()` 是语法错误（实测报
+        //    `SELECT id FROM records WHERE (org_id = ? AND id IN ()) LIMIT 0`）。
+        //    走到这里说明该任务当前没有待处理项 —— 批次 16 #3 之后这一点变得**可达**：
+        //    worker 从 nlp_task_items 读 PENDING，若明细全部已标 DONE（重跑/重启后再取到同一任务），
+        //    读回来的就是空列表；而先前内存兜底取不到时返回 null、会走 runByFilter，于是从没暴露。
+        //    这里直接返回「未被取消」：由调用方按 done/total 落终态，任务优雅收尾而不是报错。
+        if (ids == null || ids.isEmpty()) {
+            log.info("[批解析] 任务 {} 的明细均已完成，无需重跑（ID 型任务）", id);
+            return false;
+        }
         ids = recordMapper.selectList(new QueryWrapper<Record>()
                 .select("id").eq("org_id", t.getOrgId()).in("id", ids)
                 .last("LIMIT " + ids.size()))
@@ -457,10 +584,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 return true;
             }
             List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
-            // 3. 一次批量取回该块，再逐条处理
+            // 3. 一次批量取回该块，再逐条处理（库里的取消位同样每 PROGRESS_EVERY 条查一次）
             List<Record> list = recordMapper.selectBatchIds(chunk);
             for (Record r : list) {
-                if (cancelFlags.contains(id) || isCancelRequested(id)) {
+                if (cancelFlags.contains(id)
+                        || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
                     return true;
                 }
                 step(id, r, t, failures, truncated, processed);
@@ -561,6 +689,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 失败明细与截断标记一起落库，进度和明细始终同一条记录
         t.setFailureList(writeJson(failures));
         t.setFailureTruncated(truncated);
+        // 2. 不把库里的取消位写回：t 是任务开始时的快照，updateById 会带上
+        //    cancel_requested=0，抹掉并发取消。置 null 后 NOT_NULL 策略会跳过该列
+        t.setCancelRequested(null);
         taskMapper.updateById(t);
     }
 

@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.NlpTaskVO;
+import com.tcm.ehr.domain.vo.NlpTasksVO;
 import com.tcm.ehr.service.INlpBatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -144,12 +145,13 @@ public class NlpController {
     /**
      * 查询最近的批量解析任务。
      *
-     * <p>【权限：登录即可】固定返回最近 50 条，不含失败明细。</p>
+     * <p>【权限：登录即可】最多返回 {@code limit} 条（默认 50），不含失败明细；
+     * 真被截断时 {@code truncated = true}，页面据此说明「更早的任务已省略」。</p>
      *
-     * @return 任务列表（按提交时间倒序）
+     * @return 任务列表（按提交时间倒序）+ 截断标记 + 上限条数
      */
     @GetMapping("/extract/batch")
-    public Result<List<NlpTaskVO>> batchList() {
+    public Result<NlpTasksVO> batchList() {
         return Result.ok(nlpBatchService.list());
     }
 }

@@ -144,6 +144,23 @@ CREATE TABLE IF NOT EXISTS nlp_task (
   INDEX idx_nlp_task_org (org_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='NLP批量解析任务表';
 
+-- 批次 16 #3：NLP 批任务的明细（ID 集合落库，支持重启后从断点续跑）
+-- 与 nlp_task 同库；一行一条病历，含 seq 游标与处理状态。
+CREATE TABLE IF NOT EXISTS nlp_task_items (
+  id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+  task_id     VARCHAR(64)  NOT NULL                COMMENT '所属任务（nlp_task.id）',
+  record_id   VARCHAR(64)  NOT NULL                COMMENT '待处理病历（records.id）',
+  seq         INT          NOT NULL                COMMENT '提交顺序（0 起），进度游标按它推进',
+  status      VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / DONE / FAILED',
+  reason      VARCHAR(255)     NULL                COMMENT '失败原因（仅在 FAILED 时写）',
+  create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '入队时间',
+  update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '状态变更时间',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_task_record (task_id, record_id),
+  KEY idx_task_status_seq (task_id, status, seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量解析任务的记录 ID 集合与逐条状态（批次 16 工作项 3）';
+
+
 CREATE TABLE IF NOT EXISTS qc_task (
   id VARCHAR(36) PRIMARY KEY COMMENT '任务ID(UUID)',
   status VARCHAR(20) NOT NULL COMMENT '状态：QUEUED/RUNNING/COMPLETED/CANCELLED/INTERRUPTED/FAILED',
