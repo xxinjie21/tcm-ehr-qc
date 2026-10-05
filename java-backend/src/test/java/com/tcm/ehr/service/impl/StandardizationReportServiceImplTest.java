@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +46,20 @@ class StandardizationReportServiceImplTest {
         // 甲类词典质量依赖真实词表，不在本测试范围
         DictionaryTermStore termStore = mock(DictionaryTermStore.class);
         when(termStore.readEffective(any(), any())).thenReturn(List.of());
+        // 批次12（12d）：未归一/覆盖/归一率/评分与质控四段已改走库内聚合，这里给替身返回值。
+        // selectCoverage 返回 List —— 不 stub 会拿到 null，for-each 直接 NPE（接线时踩过一次）。
+        when(recordMapper.selectCoverage(any(), anyBoolean(), any(), any())).thenReturn(List.of());
+        java.util.Map<String, Object> agg = new java.util.HashMap<>();
+        agg.put("totalAll", 1);
+        agg.put("total", 1);
+        agg.put("scored", 1);
+        agg.put("avgScore", 95.0);
+        agg.put("minScore", 95);
+        agg.put("maxScore", 95);
+        agg.put("capped", 1);
+        agg.put("qcScored", 1);
+        agg.put("lastScoredAt", java.time.LocalDateTime.of(2026, 10, 5, 16, 7, 29));
+        when(recordMapper.selectScoreAndQc(any(), anyBoolean(), any(), any())).thenReturn(agg);
         svc = new StandardizationReportServiceImpl(recordMapper, termStore,
                 new tools.jackson.databind.ObjectMapper());
 
