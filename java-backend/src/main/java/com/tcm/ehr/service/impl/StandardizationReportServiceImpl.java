@@ -80,10 +80,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setDictQuality(dictQuality());
         vo.setCrossTypeDuplicates(crossTypeDuplicates());
         // 乙类：病历相关，必须先按数据域收窄，否则登录即可的接口会读到跨组织数据
-        List<Record> all = recordsInDomain();
-        List<Record> records = filterByVisitTime(all, start, end);
-        vo.setRange(rangeOf(all, records, start, end));
-        // 批次12（12d）：时间边界统一在此算好，供后面各段（按月/覆盖/未归一）共用
+        // 批次12（12d）：报告全部八段都已改走库内聚合，这里不再需要把整表拉进 JVM。
+        // 原先的 recordsInDomain() 取数 + filterByVisitTime 过滤是纯浪费：3.5 万行查出来、
+        // 传进 JVM，然后没有任何消费者（八个消费方逐个迁移后留下的空壳）。
+        // 区间口径没有丢：rangeOf/byMonth/coverage/unmatched 都由 SQL 承担同样的时间边界。
+        vo.setRange(rangeOf(start, end));
+        // 批次12（12d）：时间边界统一在此算好，供后面各段（按月/覆盖/未归一/评分质控）共用
         java.time.LocalDateTime from = null;
         java.time.LocalDateTime to = null;
         if (notBlankDate(start) && notBlankDate(end)) {
@@ -96,7 +98,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setNormalizable(normalizableRate(from, to));
         vo.setScore(scoreDistribution(from, to));
         vo.setQc(qcCoverage(from, to));
-        vo.setDataset(datasetShape(records, from, to));
+        vo.setDataset(datasetShape(from, to));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         return vo;
@@ -138,8 +140,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return s != null && !s.isBlank();
     }
 
-    private StandardizationReportVO.TimeRange rangeOf(List<Record> all, List<Record> picked,
-                                                     String start, String end) {
+    private StandardizationReportVO.TimeRange rangeOf(String start, String end) {
         StandardizationReportVO.TimeRange r = new StandardizationReportVO.TimeRange();
         // 只有两端都给、过滤真正生效时才回显区间。
         // 只给一端时过滤没生效，若还回显「2024-01-01 ~ 不限」，界面会显示成一个
@@ -524,8 +525,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /** 数据集形态：模板塌缩度决定这批数据能不能代表真实病历 */
-    private StandardizationReportVO.DatasetShape datasetShape(List<Record> records,
-                                                              java.time.LocalDateTime from,
+    private StandardizationReportVO.DatasetShape datasetShape(java.time.LocalDateTime from,
                                                               java.time.LocalDateTime to) {
         // 批次12（12d）：三个字段改由库内聚合给出（见 RecordMapper.selectRangeAndDataset）——
         // recordCount=记录数、templates=主诉模板数（去掉病程月数后去重）、colloquial=含口语化未归一症状的记录数。
