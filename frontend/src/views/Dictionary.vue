@@ -287,6 +287,16 @@
               title="与当前基线完全一致"
               description="提案内容与小组基线相同，合并后不会产生实际变化。"
             />
+            <!-- 批次8：把「词典层差分」换算成「病历层影响」——用户真正关心的是这个 -->
+            <el-alert
+              v-if="diff && !diff.noDiff && mergeImpact.total > 0"
+              type="success" :closable="false" show-icon
+              title="合并后预计改善的归一结果"
+              :description="`本次新增的术语中，有 ${mergeImpact.hit.length} 个此前是未归一词：`
+                + mergeImpact.hit.slice(0, 3).map((h) => `「${h.term}」${h.count} 条`).join('、')
+                + (mergeImpact.hit.length > 3 ? ' 等' : '')
+                + `，合计 ${mergeImpact.total} 条病历的归一结果会变化（重跑解析后生效）。`"
+            />
           </div>
 
           <!-- 可编辑态：整份提案的术语行（默认不显示，避免一屏铺满输入框） -->
@@ -379,11 +389,40 @@ import {
   getTerms, exportBaseline, submitProposal, listProposals,
   proposalDiff, auditProposal, listArchives, rollbackArchive, updateProposalTerms
 } from '@/api/dictionary'
+import { getStandardizationReport } from '@/api/stats'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES_WIDE } from '@/utils/constants'
 
 const userStore = useUserStore()
+
+// ===== 批次8：合并影响面 =====
+// 报告要的是「合并后会影响哪些病历的归一结果」。后端差分只到词典层（added/modified/removed），
+// 没有病历级影响，因此这里用标准化报告里**批次2 外露的 unmatched.top**（词表缺口高频实体的
+// 「原文 → 次数」）与本次新增术语求交：命中的就是「合并后会被归上」的那批未归一实体。
+// 只加载一次并缓存 —— 报告接口较重，不该每点一条提案就跑一遍。
+const unmatchedTop = ref({})
+const unmatchedTopLoaded = ref(false)
+const loadUnmatchedTopOnce = async () => {
+  if (unmatchedTopLoaded.value) return
+  unmatchedTopLoaded.value = true
+  try {
+    const res = await getStandardizationReport()
+    unmatchedTop.value = res.data?.unmatched?.top || {}
+  } catch {
+    unmatchedTop.value = {} // 拿不到就不展示影响面，绝不编数字
+  }
+}
+const mergeImpact = computed(() => {
+  const top = unmatchedTop.value || {}
+  const hit = []
+  for (const t of diff.value?.added || []) {
+    const n = top[t.standardTerm]
+    if (n) hit.push({ term: t.standardTerm, count: n })
+  }
+  hit.sort((a, b) => b.count - a.count)
+  return { hit, total: hit.reduce((a, c) => a + c.count, 0) }
+})
 
 /**
  * 术语类型的中文标签（与后端 TermTypes.ALL 同源）。
@@ -758,6 +797,7 @@ const selectProposal = async (row) => {
   try {
     const res = await proposalDiff(row.id)
     diff.value = res.data || null
+    loadUnmatchedTopOnce() // 批次8：影响面数据（只加载一次）
   } catch {
     diff.value = null
   }
