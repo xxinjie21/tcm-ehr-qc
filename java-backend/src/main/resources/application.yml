@@ -111,7 +111,11 @@ llm:
   api-key: ""                 # provider=openai 时必填；留空则该通道降级（不影响启动）
   model: ""                   # 留空用通道默认模型；ollama 例 qwen2.5:7b，openai 例 gpt-4o-mini
   temperature: 0.2
-  timeout: 60000              # 毫秒
+  # 批次15 · 15.2：按场景下调到 20s 级。四个用途（AI 解读 / 助手 / 复核意见 / 对话）都是
+  # **交互式**的 —— 用户在页面上等结果，60s 的等待已经等同于「卡住了」：他既不知道该不该刷新，
+  # 也不知道还要等多久。20s 后走规则兜底（见本块上方注释）比让他干等 60s 更有用。
+  # 这是配置项，模型慢（如本地小显卡跑大模型）时改回大值即可，不需要动代码。
+  timeout: 20000              # 毫秒
   config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化（重启回显）；api-key 不落盘
 
 # 操作日志：§七 L2 起只入库（operation_log 表），不再落文件，故无 log.* 配置项。
