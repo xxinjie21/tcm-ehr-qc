@@ -84,8 +84,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             "inspection", "pulse", "tongue", "physicalExam", "pattern", "prescription",
             "followUp", "treatmentEffect", "department", "doctorId", "visitTime");
     private static final int MAX_FILES = 20;
-    /** 删除分块大小（先删 review_tasks 再删 records，避免一次 IN 过大） */
-    private static final int DELETE_CHUNK = 500;
 
     /** 21 列表头中文名 → 字段标识 已随批次 13 · 13.3 搬到 {@link ExcelHeaderFields} */
 
