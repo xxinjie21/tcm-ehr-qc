@@ -805,11 +805,11 @@ onMounted(() => {
   content: '▾ ';
 }
 .raw-panel summary:hover {
-  background: #faf8f1;
+  background: var(--surface-sub);
 }
 .raw-bd {
   padding: var(--sp-1) 20px var(--sp-4);
-  border-top: 1px solid #eee9dd;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 .raw-grid {
   display: grid;
@@ -855,7 +855,7 @@ onMounted(() => {
 .panel-hd {
   margin: 0;
   padding: 10px var(--sp-4);
-  border-bottom: 1px solid #eee9dd;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   font-size: 14px;
   font-weight: bold;
   display: flex;
@@ -875,8 +875,8 @@ onMounted(() => {
   color: var(--ochre);
 }
 .panel-hd.hd-right {
-  border-bottom-color: #d9e3dc;
-  background: #f2f6f3;
+  border-bottom-color: var(--el-color-primary-light-8);
+  background: var(--el-color-primary-light-9);
   color: var(--ink-mid);
 }
 .mini-tag {
@@ -902,7 +902,7 @@ onMounted(() => {
 }
 /* 修正过的字段整行高亮，与原型一致 */
 .field-row.fixed {
-  background: #f2f6f3;
+  background: var(--el-color-primary-light-9);
   border-radius: 2px;
   padding-left: var(--sp-2);
   padding-right: var(--sp-2);
