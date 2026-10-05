@@ -338,4 +338,47 @@ class NlpBatchServiceImplTest {
         assertFalse(!failed && !cancelled && 0 == 0 && 0 > 0, "总数 0 的任务不适用该判据（本来就没事可做）");
         assertFalse(!failed && cancelled && done == 0 && total > 0, "被取消的任务已有自己的终态，不走该判据");
     }
+
+    /**
+     * P0-2：任务分流的唯一判据必须可辨「筛选型（无明细）」与「ID 型（有明细）」。
+     *
+     * <p>这条判据就是 2026-10-05 静默回归的所在：筛选型任务没有明细，若无条件读明细
+     * 会得到空集合 → 被判「已处理完」→ 500 条任务 `COMPLETED · 已处理 0`（一行没跑）。</p>
+     */
+    @Test
+    void filterTaskWithoutItemsMustNotBeTreatedAsIdTask() {
+        com.tcm.ehr.mapper.NlpTaskItemMapper itemMapper =
+                mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class);
+        when(itemMapper.selectCount(any())).thenReturn(0L);   // 筛选型：没有明细行
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
+                mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                new ObjectMapper());
+
+        assertFalse(svc.hasTaskItems("t-filter"),
+                "没有明细行 ⇒ 必须判为筛选型（走 runByFilter），否则会被空集合守卫收尾、静默不干活");
+    }
+
+    @Test
+    void idTaskWithItemsIsRecognizedAndReadInSeqOrder() {
+        com.tcm.ehr.mapper.NlpTaskItemMapper itemMapper =
+                mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class);
+        when(itemMapper.selectCount(any())).thenReturn(500L);  // ID 型：有 500 行明细
+        when(itemMapper.selectList(any())).thenReturn(new java.util.ArrayList<>());
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
+                mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                new ObjectMapper());
+
+        assertTrue(svc.hasTaskItems("t-id"), "有明细行 ⇒ ID 型，应读 PENDING 续跑");
+        svc.pendingIdsFor("t-id");
+
+        org.mockito.ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.Wrapper<
+                com.tcm.ehr.domain.po.NlpTaskItem>> cap =
+                org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(itemMapper).selectList(cap.capture());
+        String sql = cap.getValue().getSqlSegment();
+        assertTrue(sql.contains("status"), "只读 PENDING：否则跑完的会被重跑一遍");
+        assertTrue(sql.toLowerCase().contains("order by") && sql.contains("seq"), "按 seq 排序推进游标");
+    }
 }

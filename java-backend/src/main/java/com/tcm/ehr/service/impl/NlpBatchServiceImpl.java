@@ -439,9 +439,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         //    表现为「任务 COMPLETED、0 处理 0 成功」——静默不干活（实测 15:41 那次）。
         //    判据用「该任务有没有明细行」：有 → ID 型，读 PENDING 续跑；没有 → 返回 null 走筛选路径。
         //    这与原实现的语义一致（内存里取不到 id 时为 null → runByFilter）。
-        boolean hasItems = nlpTaskItemMapper.selectCount(
-                new QueryWrapper<NlpTaskItem>().eq("task_id", id)) > 0;
-        List<String> idSource = hasItems ? pendingIdsFor(id) : null;
+        List<String> idSource = hasTaskItems(id) ? pendingIdsFor(id) : null;
 
         // 2. 标记运行中并记录开始时间（此刻起进度才对外可见）
         //    先清掉取消位再落库：t 是取任务时的快照，直接 updateById 会把
@@ -516,6 +514,21 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * ② <b>按 {@code seq} 排序</b> —— 进度游标按提交顺序推进，不能靠主键（批量插入下主键顺序
      *    与提交顺序不保证一致）。</p>
      */
+    /**
+     * 该任务是否**按 ID 集合提交**（＝有没有明细行）。
+     *
+     * <p>这是任务分流的唯一判据，也是 2026-10-05 那次静默回归的所在：筛选型任务**本来就没有明细**，
+     * 若无条件去读明细会得到空集合，进而被判成「已处理完」而直接收尾（表现为 500 条任务
+     * `COMPLETED · 已处理 0`）。抽出成独立方法是为了让它能被同步测试钉住 —— 线程里的流程难测，
+     * 但「判据本身」好测，而会犯错的恰恰是判据。</p>
+     *
+     * @return true = ID 型（读 PENDING 续跑）；false = 筛选型（走 runByFilter）
+     */
+    boolean hasTaskItems(String taskId) {
+        return nlpTaskItemMapper.selectCount(
+                new QueryWrapper<NlpTaskItem>().eq("task_id", taskId)) > 0;
+    }
+
     List<String> pendingIdsFor(String taskId) {
         return nlpTaskItemMapper.selectList(new QueryWrapper<NlpTaskItem>()
                         .eq("task_id", taskId)
