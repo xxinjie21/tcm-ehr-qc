@@ -66,6 +66,8 @@ class StandardizationReportServiceImplTest {
         agg2.put("templates", 1);
         agg2.put("colloquial", 1);
         when(recordMapper.selectRangeAndDataset(any(), anyBoolean(), any(), any())).thenReturn(agg2);
+        // 按月分组也改走库内聚合；默认给空列表，需要按月断言的用例自行覆盖
+        when(recordMapper.selectByMonth(any(), anyBoolean(), any(), any())).thenReturn(List.of());
         svc = new StandardizationReportServiceImpl(recordMapper, termStore,
                 new tools.jackson.databind.ObjectMapper());
 

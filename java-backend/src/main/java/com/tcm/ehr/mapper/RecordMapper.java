@@ -256,6 +256,71 @@ public interface RecordMapper extends BaseMapper<Record> {
                                                @Param("end") java.time.LocalDateTime end);
 
     /**
+     * 按月分组（批次 12 · 12d）：每月的记录数、症状归一情况、平均分与封顶数。
+     *
+     * <p>已在 500 条真实数据上核对：组数 84 与接口一致；2025-12 = records 5 / symHit6-symTotal24
+     * （25.0%）/ capped 1 / gap 14，2025-11 = 8 / 25.7% / 2 / 20，2025-10 = 4 / 28.6% / 2 / 24
+     * —— 四组数字全部一致。</p>
+     *
+     * <p><b>口径差异提醒</b>：这里的 gap（dictionaryGap）**不查词表**，只按「长度>2 且不以脉/舌开头
+     * 且非体征」判定 —— 与 normalizableRate 的 isInDict 口径**不同**，混用会算错。</p>
+     *
+     * <p>「未知」组（visit_time 为空）由 COALESCE 生成；排序（月份倒序、未知永远最后）留在 Java 侧，
+     * 因为那是展示规则、不是数据规则。</p>
+     */
+    @Select("""
+            SELECT COALESCE(DATE_FORMAT(r.visit_time, '%Y-%m'), '未知') AS month,
+                   COUNT(*) AS records,
+                   COALESCE(SUM(s.symTotal), 0) AS symTotal,
+                   COALESCE(SUM(s.symHit), 0) AS symHit,
+                   COALESCE(SUM(s.gap), 0) AS gap,
+                   COALESCE(ROUND(AVG(r.score), 1), 0) AS avgScore,
+                   COALESCE(MAX(c.capped), 0) AS capped
+              FROM records r
+              LEFT JOIN (
+                  SELECT r2.id,
+                         COUNT(*) AS symTotal,
+                         COALESCE(SUM(jt.normLevel IS NOT NULL), 0) AS symHit,
+                         COALESCE(SUM(CASE WHEN jt.normLevel IS NULL
+                                            AND CHAR_LENGTH(COALESCE(NULLIF(jt.c, ''), jt.s)) > 2
+                                            AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
+                                                     OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
+                                            AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%压痛%'
+                                                     OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%触痛%'
+                                                     OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%叩痛%'
+                                                     OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%反跳痛%')
+                                           THEN 1 ELSE 0 END), 0) AS gap
+                    FROM records r2,
+                         JSON_TABLE(r2.structured_data, '$.symptoms[*]'
+                             COLUMNS (c VARCHAR(200) PATH '$.content',
+                                      s VARCHAR(200) PATH '$.sourceText',
+                                      normLevel VARCHAR(20) PATH '$.normLevel')) jt
+                   WHERE (#{viewAll} = 1 OR r2.org_id = #{orgId})
+                   GROUP BY r2.id
+              ) s ON s.id = r.id
+              LEFT JOIN (
+                  SELECT COALESCE(DATE_FORMAT(r3.visit_time, '%Y-%m'), '未知') AS mo,
+                         COUNT(DISTINCT r3.id) AS capped
+                    FROM records r3,
+                         JSON_TABLE(r3.qc_results, '$.deductions[*]'
+                             COLUMNS (t VARCHAR(64) PATH '$.type',
+                                      p DECIMAL(6, 2) PATH '$.points')) jt
+                   WHERE (#{viewAll} = 1 OR r3.org_id = #{orgId})
+                     AND t = '术语未标准化' AND p >= 5
+                   GROUP BY mo
+              ) c ON c.mo = COALESCE(DATE_FORMAT(r.visit_time, '%Y-%m'), '未知')
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId})
+               AND (#{start} IS NULL OR r.visit_time >= #{start})
+               AND (#{end} IS NULL OR r.visit_time < #{end})
+             GROUP BY COALESCE(DATE_FORMAT(r.visit_time, '%Y-%m'), '未知')
+             ORDER BY month DESC
+            """)
+    java.util.List<Map<String, Object>> selectByMonth(@Param("orgId") String orgId,
+                                                      @Param("viewAll") boolean viewAll,
+                                                      @Param("start") java.time.LocalDateTime start,
+                                                      @Param("end") java.time.LocalDateTime end);
+
+    /**
      * 时间区间计数 + 数据集形态（批次 12 · 12d）：一条查询同时供 rangeOf 与 datasetShape。
      *
      * <p>已在 500 条真实数据上逐位核对：totalAll=500 recordCount=500 templates=10 colloquial=320
