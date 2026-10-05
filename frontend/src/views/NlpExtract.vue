@@ -936,6 +936,11 @@ onBeforeUnmount(stopPoll)
   gap: var(--sp-4);
   align-items: start;
 }
+/* 批次3 收尾（2026-10-05）：右栏顶部是标签行「单条解析 / 批量解析」，左栏顶部是卡片标题条 ——
+   两者高度不同，直接并排时左栏会明显「高出一截」（1264×569 实拍对比可见：左卡起 y≈105，右卡起 y≈150）。
+   这里让左栏下移一个标签行的高度，使两栏内容同线起点。
+   45px 为实拍测量值；只此一处，若调整 Element 标签主题需同步改这里。 */
+.split > .pane:first-child { margin-top: 45px; }
 .pane { min-width: 0; }
 .pane-hd { font-size: 13px; font-weight: bold; color: var(--ink); margin-bottom: var(--sp-2); }
 .src-note { font-size: 11.5px; color: var(--ink-mid); margin-left: var(--sp-2); }
