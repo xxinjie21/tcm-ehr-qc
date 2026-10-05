@@ -369,6 +369,7 @@ import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import { usePagedList } from '@/composables/usePagedList'
+import { useUrlFilters } from '@/composables/useUrlFilters'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -404,6 +405,10 @@ const { list: rows, total, loading: listLoading, failed: listFailed, load: loadR
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   clearOnFailure: false
 })
+
+// 对标 E5「可分享视图」：筛选与分页同步到 URL。
+// 本函数在 setup 阶段同步还原条件，因此下面 onMounted 的首次加载会自动带上它们。
+useUrlFilters(query, page, pageSize)
 
 // 查询病历列表（分页 / 筛选 / 重试共用）：传数字即跳到该页
 const search = async (p) => {
