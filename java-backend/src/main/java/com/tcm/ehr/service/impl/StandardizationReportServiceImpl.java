@@ -97,7 +97,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setNormalizable(normalizableRate(from, to));
         vo.setScore(scoreDistribution(from, to));
         vo.setQc(qcCoverage(from, to));
-        vo.setDataset(datasetShape(records));
+        vo.setDataset(datasetShape(records, from, to));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         return vo;
@@ -148,9 +148,24 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         boolean applied = notBlankDate(start) && notBlankDate(end);
         r.setStart(applied ? start : null);
         r.setEnd(applied ? end : null);
-        r.setRecords(picked.size());
-        r.setExcluded(all.size() - picked.size());
+        // 批次12（12d）：两个计数改由库内聚合给出（见 RecordMapper.selectRangeAndDataset），
+        // 与 datasetShape 共用同一条查询。区间口径在此按 filterByVisitTime 的同一规则解析：
+        // 只有两端都给才下推边界，只给一端一律传 null —— 测试直接断言这两个参数。
+        java.time.LocalDateTime from = applied ? LocalDate.parse(start).atStartOfDay() : null;
+        java.time.LocalDateTime to = applied ? LocalDate.parse(end).plusDays(1).atStartOfDay() : null;
+        Map<String, Object> row = reportDatasetAggregate(from, to);
+        r.setRecords(num(row.get("recordCount")));
+        // 「被排除」= 全库数 - 区间内数；无区间时两者相等，恒为 0
+        r.setExcluded(Math.max(0, num(row.get("totalAll")) - num(row.get("recordCount"))));
         return r;
+    }
+
+    /** 区间计数与数据集形态共用一条聚合（批次12·12d），避免同一批数据查两遍 */
+    private Map<String, Object> reportDatasetAggregate(java.time.LocalDateTime from,
+                                                       java.time.LocalDateTime to) {
+        Map<String, Object> row = recordMapper.selectRangeAndDataset(
+                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), from, to);
+        return row == null ? Map.of() : row;
     }
 
     /**
@@ -539,23 +554,16 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /** 数据集形态：模板塌缩度决定这批数据能不能代表真实病历 */
-    private StandardizationReportVO.DatasetShape datasetShape(List<Record> records) {
+    private StandardizationReportVO.DatasetShape datasetShape(List<Record> records,
+                                                              java.time.LocalDateTime from,
+                                                              java.time.LocalDateTime to) {
+        // 批次12（12d）：三个字段改由库内聚合给出（见 RecordMapper.selectRangeAndDataset）——
+        // recordCount=记录数、templates=主诉模板数（去掉病程月数后去重）、colloquial=含口语化未归一症状的记录数。
         StandardizationReportVO.DatasetShape s = new StandardizationReportVO.DatasetShape();
-        s.setRecordCount(records.size());
-        Set<String> chiefTemplates = new HashSet<>();
-        int colloquial = 0;
-        for (Record r : records) {
-            String chief = r.getChiefComplaint();
-            if (chief != null && !chief.isBlank()) {
-                // 主诉里的病程月数每条不同，去掉数字才能看出模板数
-                chiefTemplates.add(chief.replaceAll("\\d+", "N"));
-            }
-            if (hasColloquialUnmatchedSymptom(r)) {
-                colloquial++;
-            }
-        }
-        s.setChiefComplaintTemplates(chiefTemplates.size());
-        s.setRecordsWithColloquialSymptom(colloquial);
+        Map<String, Object> row = reportDatasetAggregate(from, to);
+        s.setRecordCount(num(row.get("recordCount")));
+        s.setChiefComplaintTemplates(num(row.get("templates")));
+        s.setRecordsWithColloquialSymptom(num(row.get("colloquial")));
         return s;
     }
 
