@@ -305,6 +305,12 @@ const handleSubmit = async () => {
         failures: res.data?.failures ?? []
       }
       ElMessage.success(res.msg || '已导入并生效')
+      // P1-6：导入成功但「归档版本生成失败」时，后端会回 archiveWarning（含真实原因）——
+      // 此前**界面从不显示它**（全仓搜不到该字段），用户以为一切正常：后端已如实报出，价值却没到达用户。
+      // 用警告消息（固定位置、可关闭、停留久一点）确保可见，而不是塞进下方可能不在视野内的结果区。
+      if (res.data?.archiveWarning) {
+        ElMessage.warning({ message: res.data.archiveWarning, duration: 8000, showClose: true })
+      }
       } else {
         const res = await parseDictFile(form, type.value)
         const terms = res.data?.terms ?? []
