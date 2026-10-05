@@ -16,6 +16,8 @@
         </el-select>
         <el-button size="small" @click="load()">刷新</el-button>
         <span class="tip">超时仅视觉提醒、不自动流转；点击「进入复核」在下方展开对照</span>
+        <!-- 批次9：worklist 入口 —— 复核员真正关心的是「现在必须处理哪几条」 -->
+        <el-checkbox v-model="overdueOnly" size="small" @change="loadTasks(1)">只看超期未复核</el-checkbox>
         <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
       </div>
 
@@ -335,6 +337,9 @@ const fmt = (t) => (t ? fmtDateTime(t,'minute') : '—')
 
 // ===== ① 任务列表 =====
 const status = ref('待复核')
+// 批次9：worklist「只需我处理」—— 只看已超期且仍待复核的任务。过滤在服务端做（overdueOnly），
+// 不是在前端筛当前页：否则用户看到一片干净、其它页却还有超期任务，等于状态撒谎。
+const overdueOnly = ref(false)
 // P5.2：因关联病历已删而跳过的任务数
 const skippedMissing = ref(0)
 const page = ref(1)
@@ -342,7 +347,7 @@ const pageSize = ref(10)
 // 列表骨架统一走 usePagedList：本页按原口径「失败只由拦截器提示 —— 不清空已有行、
 // 也不置失败标记」，故 clearOnFailure / trackFailure 都关掉
 const { list: rows, total, loading, load: loadTasks } = usePagedList({
-  fetcher: () => listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value }),
+  fetcher: () => listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value, overdueOnly: overdueOnly.value }),
   extract: (res) => ({ list: res.data?.tasks, total: res.data?.total }),
   onLoaded: (res) => { skippedMissing.value = res.data?.skippedMissing || 0 },
   clearOnFailure: false,
