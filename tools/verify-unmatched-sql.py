@@ -29,10 +29,10 @@ CLASS_EXPR = "COALESCE(NULLIF(jt.c, ''), jt.s)"
 BREAKDOWN = """
 SELECT
   COUNT(*) AS total,
-  COALESCE(SUM(CASE WHEN {e} REGEXP '压痛|触痛|叩痛|反跳痛' THEN 1 ELSE 0 END), 0) AS physicalSign,
-  COALESCE(SUM(CASE WHEN NOT ({e} REGEXP '压痛|触痛|叩痛|反跳痛') AND ({e} LIKE '脉%' OR {e} LIKE '舌%') THEN 1 ELSE 0 END), 0) AS misrouted,
-  COALESCE(SUM(CASE WHEN NOT ({e} REGEXP '压痛|触痛|叩痛|反跳痛') AND NOT ({e} LIKE '脉%' OR {e} LIKE '舌%') AND CHAR_LENGTH({e}) <= 2 THEN 1 ELSE 0 END), 0) AS fragment,
-  COALESCE(SUM(CASE WHEN NOT ({e} REGEXP '压痛|触痛|叩痛|反跳痛') AND NOT ({e} LIKE '脉%' OR {e} LIKE '舌%') AND CHAR_LENGTH({e}) > 2 THEN 1 ELSE 0 END), 0) AS dictionaryGap
+  COALESCE(SUM(CASE WHEN {e} LIKE '%压痛%' OR {e} LIKE '%触痛%' OR {e} LIKE '%叩痛%' OR {e} LIKE '%反跳痛%' THEN 1 ELSE 0 END), 0) AS physicalSign,
+  COALESCE(SUM(CASE WHEN NOT ({e} LIKE '%压痛%' OR {e} LIKE '%触痛%' OR {e} LIKE '%叩痛%' OR {e} LIKE '%反跳痛%') AND ({e} LIKE '脉%' OR {e} LIKE '舌%') THEN 1 ELSE 0 END), 0) AS misrouted,
+  COALESCE(SUM(CASE WHEN NOT ({e} LIKE '%压痛%' OR {e} LIKE '%触痛%' OR {e} LIKE '%叩痛%' OR {e} LIKE '%反跳痛%') AND NOT ({e} LIKE '脉%' OR {e} LIKE '舌%') AND CHAR_LENGTH({e}) <= 2 THEN 1 ELSE 0 END), 0) AS fragment,
+  COALESCE(SUM(CASE WHEN NOT ({e} LIKE '%压痛%' OR {e} LIKE '%触痛%' OR {e} LIKE '%叩痛%' OR {e} LIKE '%反跳痛%') AND NOT ({e} LIKE '脉%' OR {e} LIKE '舌%') AND CHAR_LENGTH({e}) > 2 THEN 1 ELSE 0 END), 0) AS dictionaryGap
 FROM records r, JSON_TABLE(r.structured_data, '$.symptoms[*]'
   COLUMNS (c VARCHAR(200) PATH '$.content', s VARCHAR(200) PATH '$.sourceText', normLevel VARCHAR(20) PATH '$.normLevel')) jt
 WHERE r.org_id = '{org}' AND jt.normLevel IS NULL;
@@ -43,7 +43,7 @@ SELECT {e} AS content, COUNT(*) AS n
 FROM records r, JSON_TABLE(r.structured_data, '$.symptoms[*]'
   COLUMNS (c VARCHAR(200) PATH '$.content', s VARCHAR(200) PATH '$.sourceText', normLevel VARCHAR(20) PATH '$.normLevel')) jt
 WHERE r.org_id = '{org}' AND jt.normLevel IS NULL
-  AND NOT ({e} REGEXP '压痛|触痛|叩痛|反跳痛')
+  AND NOT ({e} LIKE '%压痛%' OR {e} LIKE '%触痛%' OR {e} LIKE '%叩痛%' OR {e} LIKE '%反跳痛%')
   AND NOT ({e} LIKE '脉%' OR {e} LIKE '舌%')
   AND CHAR_LENGTH({e}) > 2
 GROUP BY content ORDER BY n DESC LIMIT 15;
@@ -75,12 +75,16 @@ def fixture_check():
           "{\"content\":\"双\",\"sourceText\":\"双\"},"
           "{\"content\":\"脉细数\",\"sourceText\":\"脉细数\"},"
           "{\"content\":\"腹部压痛\",\"sourceText\":\"腹部压痛\"},"
+          "{\"content\":\"脉压痛\",\"sourceText\":\"脉压痛\"},"
           "{\"content\":\"神疲乏力\",\"sourceText\":\"神疲乏力\"},"
           "{\"content\":\"发热\",\"sourceText\":\"发热\",\"normLevel\":1}]}',95,'合格');" % FIXTURE_ORG)
     got = num_rows(BREAKDOWN.format(e=CLASS_EXPR, org=FIXTURE_ORG))
-    exp = {"total": 4, "physicalSign": 1, "misrouted": 1, "fragment": 1, "dictionaryGap": 1}
+    # 「脉压痛」以脉开头、又含压痛 —— 判定顺序要求它归体征（修复方向是分类路由而非抽取截断）；
+    # 「脉细数」则是真正的分类错放。两者同时在夹具里，所以 misrouted 应为 1、physicalSign 应为 2。
+    # （注意：不能照抄 Java 那三个用例的数字 —— 它们的输入集与这里不同。）
+    exp = {"total": 5, "physicalSign": 2, "misrouted": 1, "fragment": 1, "dictionaryGap": 1}
     ok = got == exp
-    print("  [OK] ⑤ 规则夹具：双→碎片 · 脉细数→错放 · 腹部压痛→体征 · 神疲乏力→缺口 · 发热已归一不计"
+    print("  [OK] ⑤ 规则夹具：双→碎片 · 脉细数→错放 · 腹部/脉压痛→体征 · 神疲乏力→缺口 · 发热不计"
           if ok else "  [FAIL] ⑤ 规则夹具不符：期望 %s 实际 %s" % (exp, got))
     _, rows = mysql(TOP.format(e=CLASS_EXPR, org=FIXTURE_ORG))
     top = {r[0]: int(r[1]) for r in rows}

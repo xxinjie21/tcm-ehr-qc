@@ -86,18 +86,18 @@ public interface RecordMapper extends BaseMapper<Record> {
     @Select("""
             SELECT
                 COUNT(*) AS total,
-                COALESCE(SUM(CASE WHEN COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛'
+                COALESCE(SUM(CASE WHEN COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%压痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%触痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%叩痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%反跳痛%'
                                   THEN 1 ELSE 0 END), 0) AS physicalSign,
-                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛')
+                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%压痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%触痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%叩痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%反跳痛%')
                                    AND (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
                                         OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
                                   THEN 1 ELSE 0 END), 0) AS misrouted,
-                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛')
+                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%压痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%触痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%叩痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%反跳痛%')
                                    AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
                                             OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
                                    AND CHAR_LENGTH(COALESCE(NULLIF(jt.c, ''), jt.s)) <= 2
                                   THEN 1 ELSE 0 END), 0) AS fragment,
-                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛')
+                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%压痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%触痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%叩痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%反跳痛%')
                                    AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
                                             OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
                                    AND CHAR_LENGTH(COALESCE(NULLIF(jt.c, ''), jt.s)) > 2

@@ -93,49 +93,14 @@ class StandardizationReportServiceImplTest {
         when(recordMapper.selectList(any())).thenReturn(new ArrayList<>(List.of(records)));
     }
 
-    @Test
-    @DisplayName("未归一实体被拆成四类，且 dictionaryGap 只归词表侧")
-    void unmatchedSplitIntoFourBuckets() {
-        givenRecords("{\"symptoms\":["
-                + entity("双", "双", false) + ","                    // 碎片（1 字，无主）
-                + entity("脉细数", "脉细数", false) + ","            // 分类错放
-                + entity("腹部压痛", "腹部压痛", false) + ","        // 体征错放
-                + entity("神疲乏力", "神疲乏力", false) + ","        // 词表缺口
-                + entity("发热", "发热", true) + "]}");               // 已归一，不计入
-
-        StandardizationReportVO.UnmatchedBreakdown b = svc.report().getUnmatched();
-
-        assertEquals(4, b.getTotal(), "只统计未归一的 4 条，已归一的发热不计入");
-        assertEquals(1, b.getFragment(), "「双」孤字 → 抽取碎片");
-        assertEquals(1, b.getMisrouted(), "「脉细数」以脉开头 → 分类错放");
-        assertEquals(1, b.getPhysicalSign(), "「腹部压痛」含压痛 → 体征错放");
-        assertEquals(1, b.getDictionaryGap(), "「神疲乏力」是标准词但词表没有 → 词表缺口");
-    }
-
-    @Test
-    @DisplayName("两字体征「压痛」归体征错放，不因字少被误判成抽取碎片")
-    void twoCharPhysicalSignIsNotFragment() {
-        // 「压痛」只有 2 个字，按「长度 ≤ 2 = 碎片」判会归错责：
-        // 它其实被完整抽出来了，只是放错了数组，该修的是分类路由而非抽取截断
-        givenRecords("{\"symptoms\":[" + entity("压痛", "压痛", false) + "]}");
-
-        StandardizationReportVO.UnmatchedBreakdown b = svc.report().getUnmatched();
-
-        assertEquals(1, b.getPhysicalSign(), "「压痛」是具名体征，应归体征错放");
-        assertEquals(0, b.getFragment(), "不应因字少被误判成抽取碎片");
-    }
-
-    @Test
-    @DisplayName("体征优先于脉/舌判定（压痛不会被误归为分类错放）")
-    void physicalSignBeatsMisroute() {
-        givenRecords("{\"symptoms\":["
-                + entity("脉压痛", "脉压痛", false) + "]}");
-
-        StandardizationReportVO.UnmatchedBreakdown b = svc.report().getUnmatched();
-
-        assertEquals(1, b.getPhysicalSign(), "含「压痛」应归体征错放");
-        assertEquals(0, b.getMisrouted(), "不应同时计入分类错放");
-    }
+    // 说明（批次12 · 12d）：原先这里有三个用例，锁的是**未归一的分类规则**本身 ——
+    //   unmatchedSplitIntoFourBuckets（四类拆分）·
+    //   twoCharPhysicalSignIsNotFragment（两字体征「压痛」不因字少被误判成碎片）·
+    //   physicalSignBeatsMisroute（「脉压痛」归体征而非分类错放）。
+    // 分类逻辑已搬到库里用 JSON_TABLE 做（见 RecordMapper.selectUnmatchedBreakdown），
+    // 这三个断言必然失效。规则没有失去覆盖：同样的输入已搬进 tools/verify-unmatched-sql.py
+    // 的「规则夹具」段，用**与生产同一条 SQL** 对真库断言（含「脉压痛」那条判定顺序）。
+    // 本测试类其余用例（时间维度、归一率、封顶率等）不受影响，继续保留。
 
     @Test
     @DisplayName("可归一实体归一率：词表里没有的标准词不进分母")
