@@ -104,38 +104,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return vo;
     }
 
-    /**
-     * 按接诊时间过滤。
-     *
-     *
-     * 必须上下界同时给才生效，只给一端按「未给」处理 ——
-     *
-     * 与 StatsController 的区间口径一致。只给一端会被理解成「从某时到最新」，
-     * 那不是用户的意思；而如果只给一端就悄悄生效，用户看到记录数变少却找不到原因。
-     */
-    private List<Record> filterByVisitTime(List<Record> all, String start, String end) {
-        // 两个条件同时成立才过滤：早前写成「任一非空即过滤」，
-        // 结果只给 start 时返回 131 条（应为全部 500），与注释和既有口径都不符
-        if (!notBlankDate(start) || !notBlankDate(end)) {
-            return all;
-        }
-        LocalDate from = LocalDate.parse(start);
-        LocalDate to = LocalDate.parse(end).plusDays(1);
-        List<Record> out = new ArrayList<>();
-        for (Record r : all) {
-            LocalDateTime t = r.getVisitTime();
-            if (t == null) {
-                continue;
-            }
-            LocalDate d = t.toLocalDate();
-            if (d.isBefore(from) || !d.isBefore(to)) {
-                continue;
-            }
-            out.add(r);
-        }
-        return out;
-    }
-
     private boolean notBlankDate(String s) {
         return s != null && !s.isBlank();
     }
@@ -281,12 +249,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     // ------------------------------------------------------------ 乙类 · 数据集覆盖
-
-    /** 数据域内的病历（管理员看全部，其余只看本组织） */
-    private List<Record> recordsInDomain() {
-        return recordMapper.selectList(RecordFilter.build(
-                RecordFilter.domainOrgId(), new com.tcm.ehr.domain.dto.FiltersDTO()));
-    }
 
     /** 各类实体：抽取数 / 已归一数（批次12·12d：计数改走库内聚合，标签与过期判定仍在 Java 侧） */
     private List<StandardizationReportVO.TypeCoverage> coverage(java.time.LocalDateTime from,
