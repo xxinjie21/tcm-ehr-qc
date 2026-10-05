@@ -476,12 +476,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 log.error("[批解析] 任务 {} 未处理任何记录（0/{}），判为异常终止："
                         + "请检查任务分流与明细读取，不要据此认为已完成", id, t.getTotal());
             }
-            // P0-1（修正）：0 处理不属于「系统失败」，而是「没跑起来」——
-            // 用既有的 INTERRUPTED 表达（NlpTask 已定义该状态，无需改表/改枚举）；
-            // 真正的执行异常仍落 FAILED。两者都不能显示为「完成」。
-            t.setStatus(failed ? NlpTask.FAILED
-                    : nothingDone ? NlpTask.INTERRUPTED
-                    : endStatus(running, cancelled, t.getDone(), t.getTotal()));
+            // P0-1/P0-2：终态选择抽成 terminalStatus（可同步测试的四态纯逻辑）
+            t.setStatus(terminalStatus(failed, nothingDone, running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
             persistProgress(t, failures, truncated[0]);
@@ -535,6 +531,31 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                         .eq("status", NlpTaskItem.PENDING)
                         .orderByAsc("seq"))
                 .stream().map(NlpTaskItem::getRecordId).toList();
+    }
+
+    /**
+     * 终态选择（P0-1/P0-2，2026-10-05 抽出以便同步测试）。
+     *
+     * <p>四种终态互斥且都不许撒谎：</p>
+     * <ul>
+     *   <li>执行期抛异常 → {@code FAILED}</li>
+     *   <li><b>一条都没处理（done=0 且 total&gt;0）→ {@code INTERRUPTED}</b>：这是 2026-10-05 实测到的事故
+     *       （500 条筛选型任务 0 处理却 COMPLETED，界面说完成、数据是空的，用户无法自查）</li>
+     *   <li>取消 → {@code CANCELLED}</li>
+     *   <li>其余按完成度判定（{@link #endStatus}）</li>
+     * </ul>
+     * <p>抽成方法的原因：线程里的流程难测，但「终态怎么选」是可同步断言、可变异验证的纯逻辑 ——
+     * 而会犯错、且犯错了用户看不出来的，恰恰是它。</p>
+     */
+    String terminalStatus(boolean failed, boolean nothingDone, boolean running,
+                          boolean cancelled, int done, int total) {
+        if (failed) {
+            return NlpTask.FAILED;
+        }
+        if (nothingDone) {
+            return NlpTask.INTERRUPTED;
+        }
+        return endStatus(running, cancelled, done, total);
     }
 
     /** 按筛选范围分页处理；返回是否被取消 */

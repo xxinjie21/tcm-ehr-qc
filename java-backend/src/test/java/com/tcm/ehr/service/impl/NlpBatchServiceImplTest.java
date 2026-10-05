@@ -381,4 +381,36 @@ class NlpBatchServiceImplTest {
         assertTrue(sql.contains("status"), "只读 PENDING：否则跑完的会被重跑一遍");
         assertTrue(sql.toLowerCase().contains("order by") && sql.contains("seq"), "按 seq 排序推进游标");
     }
+
+    /**
+     * P0-2 收尾：四种终态互相排斥且都不许撒谎（调用生产代码，不抄一份判据）。
+     *
+     * <p>覆盖：执行异常 → FAILED · 0 处理 → INTERRUPTED · 取消 → CANCELLED · 正常完成 → 非上面三者。</p>
+     */
+    @Test
+    void terminalStatusNeverLiesAcrossFourOutcomes() {
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
+                mock(RecordMapper.class), mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class),
+                mock(PythonNlpClient.class), mock(EntityNormalizer.class),
+                mock(com.tcm.ehr.service.DictionaryTermStore.class), new ObjectMapper());
+
+        // ① 执行异常
+        assertEquals(com.tcm.ehr.domain.po.NlpTask.FAILED,
+                svc.terminalStatus(true, false, false, false, 3, 500),
+                "执行期异常必须落 FAILED");
+        // ② 0 处理（那次实测事故的形态）——优先于取消/完成判定
+        assertEquals(com.tcm.ehr.domain.po.NlpTask.INTERRUPTED,
+                svc.terminalStatus(false, true, false, false, 0, 500),
+                "0 处理 + 总数 500 ⇒ INTERRUPTED，绝不可是 COMPLETED");
+        // ③ 取消
+        assertEquals(com.tcm.ehr.domain.po.NlpTask.CANCELLED,
+                svc.terminalStatus(false, false, false, true, 120, 500),
+                "取消有自己的终态");
+        // ④ 正常完成：不得被前三者误判
+        String normal = svc.terminalStatus(false, false, false, false, 500, 500);
+        assertFalse(java.util.Set.of(com.tcm.ehr.domain.po.NlpTask.INTERRUPTED,
+                com.tcm.ehr.domain.po.NlpTask.FAILED,
+                com.tcm.ehr.domain.po.NlpTask.CANCELLED).contains(normal),
+                "正常完成不得被前三种终态误判，实际=" + normal);
+    }
 }
