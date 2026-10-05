@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class RecordServiceImplTest {
 
-    /** 与 RecordServiceImpl.DT 同形；断言归一结果必须能被它解析，否则等于白归一 */
+    /** 与 ExcelCellParser 的输出格式同形；断言归一结果必须能被它解析，否则等于白归一 */
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Test
@@ -62,14 +62,14 @@ class RecordServiceImplTest {
     void unparsableValueFailsParseInsteadOfGuessing() {
         // 认不出来时原样返回，由调用侧的 parse 抛错并落到 null；
         // 关键是「不能悄悄给出一个错误的时间」——那比缺接诊时间更难发现
-        String got = RecordServiceImpl.normalizeDateTime("不详");
+        String got = ExcelCellParser.normalizeDateTime("不详");
         assertThrows(DateTimeParseException.class, () -> LocalDateTime.parse(got, DT),
                 "认不出来的值必须让 parse 抛错，不能归一成一个看似合法的时间");
     }
 
     /** 归一结果既要等于期望串，也要能被标准格式解析（只对字符串不够，白归一也会通过） */
     private static void assertNormalized(String raw, String expected) {
-        String got = RecordServiceImpl.normalizeDateTime(raw);
+        String got = ExcelCellParser.normalizeDateTime(raw);
         assertEquals(expected, got, "归一结果不对：" + raw);
         LocalDateTime.parse(got, DT);
     }

@@ -120,10 +120,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         HEADER_FIELD = java.util.Collections.unmodifiableMap(header);
     }
 
-    private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
     /** 「接诊时间」列里的纯数字紧凑串：8 位到日 / 12 位到分 / 14 位到秒 */
-    private static final Pattern COMPACT_DT = Pattern.compile("\\d{8}|\\d{12}|\\d{14}");
 
     /** 导入告警里最多列几条「接诊时间」解析失败样例；全列出来会把日志刷爆 */
     private static final int VISIT_TIME_WARN_SAMPLE_MAX = 10;
@@ -303,7 +300,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             // 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
             for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
-                if (row == null || TextUtil.isBlank(cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
+                if (row == null || TextUtil.isBlank(ExcelCellParser.cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
                     continue;
                 }
                 summary.setTotal(summary.getTotal() + 1);
@@ -317,7 +314,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                     // 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕。
                     // 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、
                     // 日期范围筛选、去重哈希同时悄悄退化（2026-09-28 的实际故障）
-                    String rawVisit = cellText(row.getCell(colIndex.get("visitTime")));
+                    String rawVisit = ExcelCellParser.cellText(row.getCell(colIndex.get("visitTime")));
                     if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
                         visitTimeWarn[0]++;
                         if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
@@ -621,7 +618,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         Map<String, Integer> idx = new HashMap<>();
         // 1. 逐列取表头文本，空列跳过
         for (Cell cell : header) {
-            String text = cellText(cell);
+            String text = ExcelCellParser.cellText(cell);
             if (TextUtil.isBlank(text)) {
                 continue;
             }
@@ -654,12 +651,12 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return new RowAccess() {
             @Override
             public String text(int col) {
-                return cellText(row.getCell(col));
+                return ExcelCellParser.cellText(row.getCell(col));
             }
 
             @Override
             public LocalDateTime dateTime(int col) {
-                return parseDateTime(row.getCell(col));
+                return ExcelCellParser.parseDateTime(row.getCell(col));
             }
         };
     }
@@ -688,7 +685,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                     return null;
                 }
                 try {
-                    return LocalDateTime.parse(normalizeDateTime(s), DT);
+                    return LocalDateTime.parse(ExcelCellParser.normalizeDateTime(s), ExcelCellParser.formatter());
                 } catch (Exception e) {
                     return null;
                 }
@@ -848,108 +845,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
     }
 
-    /** 接诊时间：支持 Excel 日期数值、紧凑数字串与常见字符串格式；认不出来给 null */
-    private LocalDateTime parseDateTime(Cell cell) {
-        // 1. 空单元格给 null
-        if (cell == null || cell.getCellType() == CellType.BLANK) {
-            return null;
-        }
-        // 2. Excel 真正的日期型单元格直接取值，避开时区与格式转换
-        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
-            return cell.getLocalDateTimeCellValue();
-        }
-        // 3. 其余按文本处理
-        String s = cellText(cell);
-        if (TextUtil.isBlank(s)) {
-            return null;
-        }
-        try {
-            // 4. 先归一为标准格式，再统一解析
-            return LocalDateTime.parse(normalizeDateTime(s), DT);
-        } catch (Exception e) {
-            // 5. 格式不认识给 null：宁可缺接诊时间，也不要让整行导入失败
-            return null;
-        }
-    }
-
     /**
-     * 把「接诊时间」单元格文本归一为 {@code yyyy-MM-dd HH:mm:ss}。
-     *
-     * <p>导入源这一列是 14 位紧凑数字串（{@code 20221224090613}），单元格类型为数值、
-     * 格式为 General —— 既不是日期格式、也不含分隔符。只按 {@code yyyy-MM-dd HH:mm:ss}
-     * 硬解析会全部落到 null，表现为列表「接诊时间」整列空白。这里统一收口五类写法：</p>
-     *
-     * <ul>
-     * <li>纯数字紧凑串 8 / 12 / 14 位：{@code 20221224} / {@code 202212240906} / {@code 20221224090613}</li>
-     * <li>中文年月日：{@code 2022年12月24日}</li>
-     * <li>斜杠与点分隔：{@code 2022/12/24} / {@code 2022.12.24}</li>
-     * <li>缺省部分：只到日补 {@code 00:00:00}，只到分补 {@code :00}</li>
-     * <li>多余部分：ISO 的 {@code T} 换成空格，小数秒与时区后缀截掉</li>
-     * </ul>
-     *
-     * <p>认不出来的原样返回，由调用侧的 {@code LocalDateTime.parse} 抛错并落到 null。</p>
+     * 接诊时间解析、单元格取文本等「Excel 单元格 → 值」的逻辑，已随批次 13 · 13.3
+     * 搬到 {@link ExcelCellParser}（它不碰数据库、也不含业务规则，是内聚的一小块）。
      */
-    static String normalizeDateTime(String raw) {
-        // 1. 去首尾空白、ISO 的 T 换空格、连续空白压成一个
-        String s = raw.trim().replace('T', ' ').replaceAll("\\s+", " ");
-        // 2. 纯数字紧凑串：8 位到日 / 12 位到分 / 14 位到秒
-        if (COMPACT_DT.matcher(s).matches()) {
-            String date = s.substring(0, 4) + "-" + s.substring(4, 6) + "-" + s.substring(6, 8);
-            String hourMinute = s.length() >= 12 ? s.substring(8, 10) + ":" + s.substring(10, 12) : "00:00";
-            String second = s.length() == 14 ? s.substring(12, 14) : "00";
-            return date + " " + hourMinute + ":" + second;
-        }
-        // 3. 以第一个空格拆日期段与时间段
-        int sp = s.indexOf(' ');
-        String date = sp < 0 ? s : s.substring(0, sp);
-        String time = sp < 0 ? "" : s.substring(sp + 1);
-        // 4. 日期段：中文年月日与斜杠点都换成短横，再把月日补成两位
-        date = padDate(date.replace("年", "-").replace("月", "-").replace("日", "")
-                .replace('/', '-').replace('.', '-'));
-        // 5. 时间段：按冒号拆成 时:分:秒，逐段补零、缺段补 00，多余部分（小数秒/时区）截掉
-        String[] t = time.isEmpty() ? new String[0] : time.split(":");
-        String hh = t.length > 0 ? pad2(t[0]) : "00";
-        String mm = t.length > 1 ? pad2(t[1]) : "00";
-        String ss = t.length > 2 ? pad2(t[2].length() > 2 ? t[2].substring(0, 2) : t[2]) : "00";
-        return date + " " + hh + ":" + mm + ":" + ss;
-    }
 
-    /** 日期段补零：{@code 2022-1-2} → {@code 2022-01-02}；不是三段或年份不足四位则原样返回 */
-    private static String padDate(String date) {
-        String[] p = date.split("-");
-        if (p.length != 3 || p[0].length() != 4) {
-            return date;
-        }
-        return p[0] + "-" + pad2(p[1]) + "-" + pad2(p[2]);
-    }
-
-    /** 一位数补成两位，其余原样；非数字留给后续 parse 抛错兜住 */
-    private static String pad2(String v) {
-        return v.length() == 1 ? "0" + v : v;
-    }
-
-    /** 单元格取文本：按显示格式取值，数字/日期型统一转字符串 */
-    private String cellText(Cell cell) {
-        // 1. 空单元格给 null
-        if (cell == null) {
-            return null;
-        }
-        // 2. 按单元格类型取值
-        return switch (cell.getCellType()) {
-            case STRING -> {
-                String v = cell.getStringCellValue();
-                yield v == null || v.isBlank() ? null : v.trim();
-            }
-            case NUMERIC -> {
-                double d = cell.getNumericCellValue();
-                if (d == Math.floor(d) && !Double.isInfinite(d)) {
-                    yield String.valueOf((long) d);
-                }
-                yield String.valueOf(d);
-            }
-            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            case FORMULA -> cell.getCellFormula();
-            default -> null;
-        };
-    }
 }
