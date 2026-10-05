@@ -5,8 +5,10 @@ spring:
   # 数据源（连接 Docker 中的 windows-mysql 容器，宿主机端口3306）
   datasource:
     url: jdbc:mysql://localhost:3306/tcm_ehr?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: "123456"
+    username: ${DB_USERNAME:root}
+    # 批次17 · 17.2：口令改环境变量注入。冒号后是**本地 docker 容器**（windows-mysql）的口令，
+    # 保留它是为了「本地默认可用」——拉下代码就能起；生产用 DB_PASSWORD 覆盖，仓库里不留生产口令。
+    password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
     # §八 C1：不配 hikari 段时用 Hikari 默认的 maximum-pool-size=10，那是当前唯一的
     # 并发硬瓶颈（Tomcat 200 线程、Redis 共享连接都够）。多课题组 R2 要给**每个请求**
@@ -26,7 +28,8 @@ spring:
     redis:
       host: localhost
       port: 6379
-      password: "123456"
+      # 批次17 · 17.2：同数据源口径 —— 本地 docker（windows-redis）默认值保留，生产用 REDIS_PASSWORD 覆盖
+      password: ${REDIS_PASSWORD:123456}
       database: 0
       timeout: 5000
 
