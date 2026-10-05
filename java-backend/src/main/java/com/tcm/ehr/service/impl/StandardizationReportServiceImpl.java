@@ -90,6 +90,11 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setDataset(datasetShape(records));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        // 批次14 · 对标 A5：数字的血缘 —— 本报告出自哪一版词典。
+        // 与 generatedAt 配对：「按什么算的」+「什么时候算的」才是可追溯的；
+        // 只给时间的话，换过词表后数字变了也说不清是哪一版造成的。
+        vo.setSourceVersion(termStore.effectiveDictVersion(
+                com.tcm.ehr.common.utils.RequestUtils.currentOrgId()));
         return vo;
     }
 

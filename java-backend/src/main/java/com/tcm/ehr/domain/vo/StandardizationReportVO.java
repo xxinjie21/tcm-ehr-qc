@@ -63,6 +63,14 @@ public class StandardizationReportVO {
     private String disclaimer;
 
     /** 报告生成时间（yyyy-MM-dd HH:mm） */
+    /**
+     * 本报告出自哪一版词典（批次14 · 对标 A5「派生数字可回溯血缘」）。
+     *
+     * <p>与 {@link #generatedAt} 配对：前者答「按什么算的」，后者答「什么时候算的」。
+     * 换过词表之后归一率会变，没有这一项就只能猜变化的原因。</p>
+     */
+    private String sourceVersion;
+
     private String generatedAt;
 
     /** 本次统计的时间范围（按接诊时间 visit_time） */

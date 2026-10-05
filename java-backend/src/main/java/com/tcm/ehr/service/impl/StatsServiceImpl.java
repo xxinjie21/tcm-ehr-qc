@@ -80,6 +80,11 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
                 : Math.round(vo.getQualifiedCount() * 1000.0 / vo.getTotalRecords()) / 10.0);
         vo.setPendingReviewCount(num(row.get("pendingReviewCount")));
         vo.setInvalidCount(num(row.get("invalidCount")));
+        // 3. 血缘与新鲜度（对标 A5/A3）：数字出自哪一版词典、什么时候算的。
+        //    同一响应里同时给出两者，前端才能在下钻时回答「换词表前后为什么变了」。
+        vo.setSourceVersion(termStore.effectiveDictVersion(domainOrgId()));
+        vo.setGeneratedAt(java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         return vo;
     }
 
