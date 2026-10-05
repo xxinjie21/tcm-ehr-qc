@@ -750,9 +750,9 @@ const pollTask = async (id) => {
 // 质控评分计算：二次确认后提交异步任务，轮询进度直到终态
 const handleRecompute = async () => {
   if (!(await confirmBox(
-      '将按质控规则重算当前筛选范围内病历的评分与分级（覆盖现有分数），确认？',
+      `将按质控规则重算当前筛选范围内 ${precheckTotal.value} 条病历的评分与分级（覆盖现有分数），确认？`,
       '质控评分计算',
-      { type: 'warning', confirmButtonText: '确认重算', cancelButtonText: '取消' }))) {
+      { type: 'warning', confirmButtonText: `确认重算 ${precheckTotal.value} 条`, cancelButtonText: '取消' }))) {
     return
   }
   // 2. 置重算态：按钮进入 loading，避免重复触发
