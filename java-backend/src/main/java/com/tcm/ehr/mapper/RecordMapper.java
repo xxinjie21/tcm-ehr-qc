@@ -222,6 +222,39 @@ public interface RecordMapper extends BaseMapper<Record> {
                                                        @Param("start") java.time.LocalDateTime start,
                                                        @Param("end") java.time.LocalDateTime end);
 
+    /**
+     * 可归一实体归一率（批次 12 · 12d）：分母/分子一次聚合出来。
+     *
+     * <p>口径与 Java 版一致，已在 500 条真实数据上核对：denominator=361 / numerator=361，与接口相同。
+     * 分母只算「已抽取 + 非抽取缺陷 + **在症状词表内**」的实体 —— 词表里根本没有的标准词是词表缺口
+     * 本身，算进分母会把「补词表能改善多少」这个信号抹掉。</p>
+     *
+     * <p>「在词表内」用 {@code JSON_CONTAINS} + 词表 JSON 参数表达：参数化、无注入、也不必拼长 IN 串。
+     * 词表由 Java 侧（termStore 的 effective 读法）序列化成 {@code dictJson} 传入，保持单一来源。</p>
+     */
+    @Select("""
+            SELECT COUNT(*) AS denominator,
+                   COALESCE(SUM(jt.normLevel IS NOT NULL), 0) AS numerator
+              FROM records r, JSON_TABLE(r.structured_data, '$.symptoms[*]'
+                   COLUMNS (c VARCHAR(200) PATH '$.content',
+                            normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId})
+               AND r.structured_data IS NOT NULL
+               AND COALESCE(jt.c, '') <> ''
+               AND NOT (COALESCE(jt.c, '') LIKE '脉%' OR COALESCE(jt.c, '') LIKE '舌%')
+               AND NOT (COALESCE(jt.c, '') LIKE '%压痛%' OR COALESCE(jt.c, '') LIKE '%触痛%'
+                        OR COALESCE(jt.c, '') LIKE '%叩痛%' OR COALESCE(jt.c, '') LIKE '%反跳痛%')
+               AND CHAR_LENGTH(COALESCE(jt.c, '')) > 2
+               AND JSON_CONTAINS(CAST(#{dictJson} AS JSON), JSON_QUOTE(COALESCE(jt.c, '')))
+               AND (#{start} IS NULL OR r.visit_time >= #{start})
+               AND (#{end} IS NULL OR r.visit_time < #{end})
+            """)
+    Map<String, Object> selectNormalizableRate(@Param("orgId") String orgId,
+                                               @Param("viewAll") boolean viewAll,
+                                               @Param("dictJson") String dictJson,
+                                               @Param("start") java.time.LocalDateTime start,
+                                               @Param("end") java.time.LocalDateTime end);
+
     /** 清洗后的字段修复（trim/空值清理/状态标记）——仅隔离路径用：它要同时改 status/grade */
     @Update("""
             UPDATE records

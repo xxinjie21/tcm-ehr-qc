@@ -94,7 +94,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         }
         vo.setCoverage(coverage(from, to));
         vo.setUnmatched(unmatched(from, to));
-        vo.setNormalizable(normalizableRate(records, new HashSet<>(symptomTerms())));
+        vo.setNormalizable(normalizableRate(from, to));
         vo.setScore(scoreDistribution(records));
         vo.setQc(qcCoverage(records));
         vo.setDataset(datasetShape(records));
@@ -405,32 +405,25 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      *
      * （如 神疲乏力）是词表缺口本身，算进分母会把「补词表能改善多少」这个信号抹掉。
      */
-    private StandardizationReportVO.NormalizableRate normalizableRate(List<Record> records, Set<String> symptomDict) {
+    private StandardizationReportVO.NormalizableRate normalizableRate(java.time.LocalDateTime from,
+                                                                     java.time.LocalDateTime to) {
+        // 批次12（12d）：分子分母改由库内一次聚合算出（见 RecordMapper.selectNormalizableRate）。
+        // 「在词表内」这条用 JSON_CONTAINS + 词表 JSON 参数表达 —— 参数化、无注入、不必拼长 IN 串。
+        // 词表仍走 symptomTerms()（与原先调用点同一个有效词表口径），单一来源、不在 SQL 里另抄一份。
         StandardizationReportVO.NormalizableRate r = new StandardizationReportVO.NormalizableRate();
-        for (Record rec : records) {
-            Map<String, Object> sd = structured(rec);
-            if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
-                continue;
-            }
-            for (Object item : list) {
-                if (!(item instanceof Map<?, ?> m)) {
-                    continue;
-                }
-                String content = str(m.get("content"));
-                if (content.isEmpty()) {
-                    continue;
-                }
-                boolean defect = startsWithAny(content, MISROUTED_PREFIX)
-                        || containsAny(content, PHYSICAL_SIGN)
-                        || content.length() <= FRAGMENT_MAX_LEN;
-                if (defect || !isInDict(content, symptomDict)) {
-                    continue;
-                }
-                r.setDenominator(r.getDenominator() + 1);
-                if (m.get("normLevel") != null) {
-                    r.setNumerator(r.getNumerator() + 1);
-                }
-            }
+        String dictJson;
+        try {
+            dictJson = objectMapper.writeValueAsString(symptomTerms());
+        } catch (Exception e) {
+            // 词表序列化失败时按空词表算（分母 0），并留告警；不编造数字
+            log.warn("[报告] 症状词表序列化失败，归一率按空词表计算：{}", e.getMessage());
+            dictJson = "[]";
+        }
+        Map<String, Object> row = recordMapper.selectNormalizableRate(
+                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), dictJson, from, to);
+        if (row != null) {
+            r.setDenominator(num(row.get("denominator")));
+            r.setNumerator(num(row.get("numerator")));
         }
         return r;
     }
