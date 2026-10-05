@@ -468,7 +468,17 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             log.error("[批解析] 任务 {} 执行异常，落 FAILED", id, e);
         } finally {
             // 4. 无论正常跑完、取消还是异常，都要在这里落终态，否则任务会永远停在"运行中"
-            t.setStatus(failed ? NlpTask.FAILED
+            // P0-1（2026-10-05）：**不许静默报完成** —— 一条都没处理（done=0）却有个总数（total>0），
+            // 说明分流或明细读取出过问题（实测过一次：500 条筛选型任务 0 处理却 COMPLETED）。
+            // 这种状态下「全部成功」是假的：界面上会显示完成，而数据是空的。
+            // 这里判为 FAILED（现有状态里最接近真实的一个），并打明确日志；
+            // 完整的四态化（全部成功/部分失败/无待处理/已取消，含前端文案）仍留在 P0-1 后续。
+            boolean nothingDone = !failed && !cancelled && t.getDone() == 0 && t.getTotal() > 0;
+            if (nothingDone) {
+                log.error("[批解析] 任务 {} 未处理任何记录（0/{}），判为异常终止："
+                        + "请检查任务分流与明细读取，不要据此认为已完成", id, t.getTotal());
+            }
+            t.setStatus(failed || nothingDone ? NlpTask.FAILED
                     : endStatus(running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);

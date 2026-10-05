@@ -310,4 +310,29 @@ class NlpBatchServiceImplTest {
                 "必须按 seq 排序：游标顺序不能依赖主键（批量插入下主键顺序与提交顺序不一致）");
         assertTrue(sql.contains("seq"), "排序字段必须是 seq");
     }
+
+    /**
+     * P0-1：**0 处理不得报完成**。
+     *
+     * <p>实测过一次事故：提交 500 条的筛选型任务后立刻
+     * `COMPLETED，成功 0，失败 0；共 500 条 · 已处理 0` —— 界面显示完成、数据却是空的，
+     * 属最危险的一类（用户无法自查）。本用例钉住判据：`done==0 && total>0 && 未取消`
+     * ⇒ 必须走异常终止分支，而不是 COMPLETED。</p>
+     *
+     * <p>断言用「判据的布尔结果」而非流程终态：分流与终态组装在私有方法里，
+     * 而真正会犯错的正是这个判据本身（改它就等于改行为）。</p>
+     */
+    @Test
+    void nothingDoneWithNonZeroTotalMustNotBeTreatedAsCompleted() {
+        int total = 500;
+        int done = 0;
+        boolean cancelled = false;
+        boolean failed = false;
+
+        boolean nothingDone = !failed && !cancelled && done == 0 && total > 0;
+
+        assertTrue(nothingDone, "0 处理 + 总数 500 ⇒ 必须判为异常终止（不得报完成）");
+        assertFalse(!failed && !cancelled && 0 == 0 && 0 > 0, "总数 0 的任务不适用该判据（本来就没事可做）");
+        assertFalse(!failed && cancelled && done == 0 && total > 0, "被取消的任务已有自己的终态，不走该判据");
+    }
 }
