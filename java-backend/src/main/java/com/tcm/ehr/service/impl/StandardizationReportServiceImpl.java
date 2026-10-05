@@ -84,14 +84,15 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         List<Record> records = filterByVisitTime(all, start, end);
         vo.setRange(rangeOf(all, records, start, end));
         vo.setByMonth(byMonth(records));
-        vo.setCoverage(coverage(records));
-        // 批次12（12d）：未归一分类改走库内聚合，时间边界按与 filterByVisitTime 同一口径算好传下去
+        // 批次12（12d）：未归一分类与九类覆盖都改走库内聚合，时间边界按与 filterByVisitTime
+        // 同一口径算好，两处共用（避免各算一遍、也避免一处有区间一处没有）
         java.time.LocalDateTime from = null;
         java.time.LocalDateTime to = null;
         if (notBlankDate(start) && notBlankDate(end)) {
             from = LocalDate.parse(start).atStartOfDay();
             to = LocalDate.parse(end).plusDays(1).atStartOfDay();
         }
+        vo.setCoverage(coverage(from, to));
         vo.setUnmatched(unmatched(from, to));
         vo.setNormalizable(normalizableRate(records, new HashSet<>(symptomTerms())));
         vo.setScore(scoreDistribution(records));
@@ -301,8 +302,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 RecordFilter.domainOrgId(), new com.tcm.ehr.domain.dto.FiltersDTO()));
     }
 
-    /** 各类实体：抽取数 / 已归一数 */
-    private List<StandardizationReportVO.TypeCoverage> coverage(List<Record> records) {
+    /** 各类实体：抽取数 / 已归一数（批次12·12d：计数改走库内聚合，标签与过期判定仍在 Java 侧） */
+    private List<StandardizationReportVO.TypeCoverage> coverage(java.time.LocalDateTime from,
+                                                               java.time.LocalDateTime to) {
         Map<String, StandardizationReportVO.TypeCoverage> byField = new LinkedHashMap<>();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             StandardizationReportVO.TypeCoverage c = new StandardizationReportVO.TypeCoverage();
@@ -310,12 +312,16 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             c.setLabel(t.label());
             byField.put(t.structuredKey(), c);
         }
-        for (Record r : records) {
-            Map<String, Object> sd = structured(r);
-            if (sd == null) {
-                continue;
+        // 抽取数与已归一数不再靠「把整表拉进 JVM 逐条数」，而由 RecordMapper.selectCoverage
+        // 在库内用 JSON_TABLE 一次聚合出来（九类 UNION ALL；已与 Java 版逐类核对一致）。
+        // 中文标签仍取自 EntityTypes —— 单一来源，不在 SQL 里再抄一份。
+        for (Map<String, Object> row : recordMapper.selectCoverage(
+                RecordFilter.domainOrgId(), RequestUtils.viewAllOrgs(), from, to)) {
+            StandardizationReportVO.TypeCoverage c = byField.get(String.valueOf(row.get("field")));
+            if (c != null) {
+                c.setTotal(num(row.get("total")));
+                c.setNormalized(num(row.get("normalized")));
             }
-            byField.values().forEach(c -> countEntities(c, sd.get(c.getField())));
         }
         // 标出「解析早于词表建立」的类型：词表非空且抽到了实体，却一条都没归上。
         // 这一种补词表无效，只能重跑解析 —— 与真正的词表缺口必须分开说。

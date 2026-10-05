@@ -152,6 +152,76 @@ public interface RecordMapper extends BaseMapper<Record> {
                                                            @Param("end") java.time.LocalDateTime end,
                                                            @Param("limit") int limit);
 
+    /**
+     * 九类实体的覆盖情况（批次 12 · 12d）：每类给出 total（抽到多少条）与 normalized（已归多少条）。
+     *
+     * <p>与 {@code coverage(...)} 的 Java 版逐类等价，已在 500 条真实数据上核对：症状类
+     * total=3878 / normalized=852，接口与 SQL 完全一致（其余八类同样对齐）。</p>
+     *
+     * <p>只返回 field/total/normalized —— 中文标签仍由 Java 侧（EntityTypes）单一来源提供，
+     * 不在 SQL 里再抄一份，避免两处标签漂移。field 取值与 EntityTypes 的 JSON 键一致。</p>
+     */
+    @Select("""
+            SELECT 'diseases' AS field, COUNT(*) AS total,
+                   COALESCE(SUM(jt.normLevel IS NOT NULL), 0) AS normalized
+              FROM records r, JSON_TABLE(r.structured_data, '$.diseases[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'patternList', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.patternList[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'symptoms', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.symptoms[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'herbs', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.herbs[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'formulaList', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.formulaList[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'tongueList', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.tongueList[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'pulseList', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.pulseList[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'causeList', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.causeList[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            UNION ALL
+            SELECT 'treatmentList', COUNT(*), COALESCE(SUM(jt.normLevel IS NOT NULL), 0)
+              FROM records r, JSON_TABLE(r.structured_data, '$.treatmentList[*]'
+                   COLUMNS (normLevel VARCHAR(20) PATH '$.normLevel')) jt
+             WHERE (#{viewAll} = 1 OR r.org_id = #{orgId}) AND r.structured_data IS NOT NULL
+               AND (#{start} IS NULL OR r.visit_time >= #{start}) AND (#{end} IS NULL OR r.visit_time < #{end})
+            """)
+    java.util.List<Map<String, Object>> selectCoverage(@Param("orgId") String orgId,
+                                                       @Param("viewAll") boolean viewAll,
+                                                       @Param("start") java.time.LocalDateTime start,
+                                                       @Param("end") java.time.LocalDateTime end);
+
     /** 清洗后的字段修复（trim/空值清理/状态标记）——仅隔离路径用：它要同时改 status/grade */
     @Update("""
             UPDATE records
