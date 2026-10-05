@@ -116,8 +116,10 @@ public class RecordController {
         }
         // 2. 只改结构化数据；带原始字段的冲突由 service 抛 IllegalArgumentException（400）
         recordService.updateRecord(recordId, body);
-        // 3. 留痕：改了什么病历必须可查
-        operationLogger.log("病历修改", recordId, "更新结构化数据");
+        // 3. 留痕：改了什么病历必须可查。
+        //    对标 D3：带上对象标识，这样病历详情页才能查出「这条病历被谁改过」，
+        //    而不是让人去审计页翻「病历修改」再肉眼比对 detail。
+        operationLogger.logOnObject("病历修改", recordId, "更新结构化数据", "record", recordId);
         return Result.ok("修改成功", null);
     }
 

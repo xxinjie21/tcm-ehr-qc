@@ -29,6 +29,15 @@ public class OperationLog {
     private String role;
     /** 操作类型（数据清洗/数据集导出/词典导入/词典回滚/人工复核/批量重算） */
     private String action;
+    /**
+     * 对象类型（对标 D3）：如 {@code record}。与 {@link #objectId} 成对使用。
+     *
+     * <p>可为 null，且**批量操作应当为 null**：批量重算/数据清洗没有单一对象，
+     * 给它编一个假对象只会让「按对象查历史」查出错误的结果。</p>
+     */
+    private String objectType;
+    /** 对象 ID（对标 D3），如病历 ID；与 {@link #objectType} 成对 */
+    private String objectId;
     /** 操作对象（筛选范围/文件名/词典类型/病历ID） */
     private String target;
     /** 操作明细 */

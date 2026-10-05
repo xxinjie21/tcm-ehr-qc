@@ -34,6 +34,10 @@ public class OperationLogger {
     private static final int MAX_ROLE = 20;
     private static final int MAX_ACTION = 50;
     private static final int MAX_TARGET = 255;
+    /** 与库列 object_type 对齐 */
+    private static final int MAX_OBJECT_TYPE = 32;
+    /** 与库列 object_id 对齐 */
+    private static final int MAX_OBJECT_ID = 64;
 
     private final OperationLogMapper operationLogMapper;
 
@@ -66,7 +70,7 @@ public class OperationLogger {
     public void log(String action, String target, String detail, String operator, String role) {
         // 同步任务（如导入 / 清洗）由本重载走请求线程，组从 RequestUtils 取；
         // 异步任务（批量重算）用 6 参重载显式传组快照
-        groupLog(action, target, detail, operator, role, RequestUtils.currentOrgId());
+        groupLog(action, target, detail, operator, role, RequestUtils.currentOrgId(), null, null);
     }
 
     /**
@@ -85,19 +89,50 @@ public class OperationLogger {
      * @param orgId  操作时所属组（可为空串，等价于无组）
      */
     public void log(String action, String target, String detail, String operator, String role, String orgId) {
-        groupLog(action, target, detail, operator, role, orgId);
+        groupLog(action, target, detail, operator, role, orgId, null, null);
     }
 
-    private void groupLog(String action, String target, String detail, String operator, String role, String orgId) {
+    /**
+     * 记录一条**对象级**操作（对标 D3「活动流 / 变更审计」）。
+     *
+     * <p>为什么单独一个方法名而不是再加一个 {@code log} 重载：它的参数表
+     * （action/target/detail/objectType/objectId）与既有的
+     * {@code log(action,target,detail,operator,role)} **同为 5 个 String** ——
+     * 同名会直接撞签名，编译器不会给我们第二次机会。</p>
+     *
+     * <p>对象标识的作用：让「这条病历被谁改过、改了什么」可以被**查出来**，
+     * 而不是靠人翻「病历修改」这类操作再肉眼比对 detail（实测加这两列之前，
+     * 全库 0 条日志提到任何病历 ID）。</p>
+     *
+     * @param action     操作类型
+     * @param target     操作对象文本，可为 null
+     * @param detail     操作明细，可为 null
+     * @param objectType 对象类型，如 {@code record}
+     * @param objectId   对象 ID；objectType 为空时本参数一并忽略（避免出现"有 ID 没类型"的半截数据）
+     */
+    public void logOnObject(String action, String target, String detail,
+                            String objectType, String objectId) {
+        groupLog(action, target, detail, RequestUtils.currentUsername(), RequestUtils.currentRole(),
+                RequestUtils.currentOrgId(), objectType, objectId);
+    }
+
+    private void groupLog(String action, String target, String detail, String operator, String role, String orgId,
+                          String objectType, String objectId) {
         // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，不截断会让同一操作在不同出口相差 1 秒
         LocalDateTime now = LocalDateTime.now().withNano(0);
         insertDb(now, operator, role, action, target, detail,
-                orgId == null || orgId.isBlank() ? null : orgId.trim());
+                orgId == null || orgId.isBlank() ? null : orgId.trim(),
+                // 对象标识成对使用：只有类型没 ID（或反之）一律视为没有对象，不写半截数据
+                objectType == null || objectType.isBlank() || objectId == null || objectId.isBlank()
+                        ? null : objectType.trim(),
+                objectType == null || objectType.isBlank() || objectId == null || objectId.isBlank()
+                        ? null : objectId.trim());
     }
 
     /** 入库（审计页唯一数据源）；失败仅告警，不阻塞业务 */
     private void insertDb(LocalDateTime now, String operator, String role,
-                          String action, String target, String detail, String orgId) {
+                          String action, String target, String detail, String orgId,
+                          String objectType, String objectId) {
         try {
             // 1. 各字段按列宽截断：超长会撞库列长度限制
             OperationLog row = new OperationLog();
@@ -105,6 +140,8 @@ public class OperationLogger {
             row.setOperator(cut(operator, MAX_OPERATOR));
             row.setRole(cut(role, MAX_ROLE));
             row.setAction(cut(action, MAX_ACTION));
+            row.setObjectType(cut(objectType, MAX_OBJECT_TYPE));
+            row.setObjectId(cut(objectId, MAX_OBJECT_ID));
             row.setTarget(cut(target, MAX_TARGET));
             row.setOrgId(orgId);
             // 2. 明细列不截断（TEXT 列），只去首尾空白
