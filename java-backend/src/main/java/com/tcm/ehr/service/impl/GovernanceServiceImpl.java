@@ -155,7 +155,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 // 只有真改了结论才写 status/grade；常规路径不碰这两列，
                 // 否则会把清洗开始时的旧快照盖到并发质控/复核的新结论上
                 baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, status, grade);
-            } else {
+            } else if (repaired > 0) {
+                // 批次12 · 12c：**按需写**。
+                // repaired 是「四个字段里 trim 后与原值不同」的个数；为 0 说明库里存的就是 trim 后的值，
+                // 这条 UPDATE 什么都不会改。原实现对每一行都发一次 UPDATE —— 3.5 万条实测 443 秒，
+                // 而返回体显示 cleared/deduped/isolated 全为 0，即绝大多数行本来就无需改动。
+                // 跳过它们不改变任何数据（同样不做 trim 之外的填充），只是不再白写。
                 baseMapper.updateCleanFieldsWithoutStatus(r.getId(), gender, age, pattern, prescription);
             }
 
