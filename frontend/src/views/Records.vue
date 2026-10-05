@@ -124,7 +124,7 @@
             本次导入失败，请根据上方提示排查后重试（上一次结果已清除）。
           </div>
 
-          <div v-if="summary" class="result">
+          <div v-if="summary" ref="resultBlock" class="result">
             <div class="result-hd">导入结果</div>
             <div class="stats">
               <div class="stat-item"><div class="num">{{ summary.total }}</div><div class="lbl">有效数据行</div></div>
@@ -208,7 +208,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
@@ -465,6 +465,7 @@ const fileList = ref([])
 const autoExtract = ref(false)
 const importing = ref(false)
 const summary = ref(null)
+const resultBlock = ref(null)  // M19：导入结果块，导入后滚入视野
 const importFailed = ref(false)
 // 逐文件分批上传的进度：后端导入是同步接口，拿不到中间 taskId，
 // 因此按「文件」粒度推进度 —— 既真实可取消，也避免单次超大请求
@@ -530,6 +531,8 @@ const handleImport = async () => {
       if (one.failures.length) failures.push(...one.failures)
     }
     // 8. 汇总本次统计，供结果区展示
+    // M19：导入结果块在表单/表格下方，1366×768 下落在首屏外 —— 导入完成后把它滚入视野
+    nextTick(() => resultBlock.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
     summary.value = {
       total: progress.success + progress.failed,
       success: progress.success,
