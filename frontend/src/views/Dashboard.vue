@@ -30,12 +30,18 @@
 
     <!-- 只遮数据区：筛选条保持可交互，避免整页白屏 -->
     <div v-loading="loading" element-loading-text="数据加载中…">
-      <!-- 4 张指标卡；tone 决定数字配色（green 达标 / ochre 待办 / red 异常） -->
+      <!-- 4 张指标卡；tone 决定数字配色（green 达标 / ochre 待办 / red 异常）。
+           对标 E3「一个指标只出现一次且可下钻」：卡片即入口 —— 点了带上对应筛选去列表页，
+           而筛选能落在 URL 上（对标 E5），所以下钻后的页面是可刷新、可分享的。 -->
       <div class="stats">
-        <StatCard label="病历总数" :value="overview.totalRecords" icon="record" />
-        <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate" />
-        <StatCard label="待复核" :value="overview.pendingReviewCount" tone="ochre" icon="pending" />
-        <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid" />
+        <StatCard label="病历总数" :value="overview.totalRecords" icon="record"
+          clickable @click="drill('')" />
+        <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate"
+          clickable @click="drill('合格')" />
+        <StatCard label="待复核" :value="overview.pendingReviewCount" tone="ochre" icon="pending"
+          clickable @click="router.push('/review')" />
+        <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid"
+          clickable @click="drill('无效')" />
       </div>
 
       <!-- 对标 A5：数字的血缘与新鲜度。放在指标卡**正下方** —— 文档写的是「数字旁」，
@@ -115,6 +121,18 @@ import { governanceStats } from '@/api/governance'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+
+/**
+ * 指标下钻（对标 E3）：带上对应筛选跳到病历数据页。
+ *
+ * <p>筛选写进 URL 而不是页面内部状态 —— 病历数据页已接入 useUrlFilters（对标 E5），
+ * 所以下钻后的视图可以刷新、可以发给同事，而不是只有当前这次点击有效。</p>
+ *
+ * @param {string} grade 空串=不限；否则为 '合格' / '无效'
+ */
+const drill = (grade) => {
+  router.push(grade ? { path: '/records', query: { grade } } : { path: '/records' })
+}
 const userStore = useUserStore()
 
 // 科室选项取自后端，与站内其他筛选器同一数据源

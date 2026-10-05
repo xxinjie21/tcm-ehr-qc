@@ -1,9 +1,20 @@
 <template>
-  <div class="stat" :class="tone">
+  <!-- 对标 E3：指标即入口。clickable 时整卡可点（并支持键盘 Enter/Space），
+       否则保持纯展示 —— 不是所有用到 StatCard 的地方都有下钻目标。 -->
+  <div
+    class="stat"
+    :class="[tone, { clickable }]"
+    :role="clickable ? 'button' : null"
+    :tabindex="clickable ? 0 : null"
+    @keydown.enter="clickable && $emit('click', $event)"
+    @keydown.space.prevent="clickable && $emit('click', $event)"
+  >
     <div class="num">{{ display }}<small v-if="suffix">{{ suffix }}</small></div>
     <div class="lbl">
       <span class="ico" v-html="iconSvg" />
       {{ label }}
+      <!-- 可下钻时给一个极轻的提示：让人知道"这个数字能点" -->
+      <span v-if="clickable" class="drill" aria-hidden="true">›</span>
     </div>
   </div>
 </template>
@@ -17,7 +28,9 @@ const props = defineProps({
   value: { type: [Number, String], required: true },
   tone: { type: String, default: '' },
   suffix: { type: String, default: '' },
-  icon: { type: String, default: '' }
+  icon: { type: String, default: '' },
+  /** 是否可点击下钻（对标 E3）。true 时整卡可点、可 Tab 聚焦、支持 Enter/Space */
+  clickable: { type: Boolean, default: false }
 })
 
 // 细线单色图标（内联SVG，24 viewBox，stroke=currentColor）
@@ -86,5 +99,24 @@ const display = computed(() =>
 }
 .stat.red .num {
   color: var(--danger);
+}
+/* 对标 E3：可下钻的卡片给出可点的视觉与键盘焦点。
+   hover 只加边框与轻微阴影，不做位移 —— 指标卡并排，位移会让整行抖一下。 */
+.stat.clickable {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.stat.clickable:hover {
+  border-color: var(--line-soft);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
+}
+.stat.clickable:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 1px;
+}
+.stat .drill {
+  margin-left: 2px;
+  color: var(--text-sub);
+  opacity: 0.7;
 }
 </style>
