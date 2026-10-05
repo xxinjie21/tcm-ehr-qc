@@ -836,7 +836,7 @@ onMounted(() => {
 .trunc-hint {
   background: var(--ochre-surface);
   border: 1px solid #ecd9b0;
-  color: #96714f;
+  color: var(--ochre);
   border-radius: 6px;
   padding: 6px var(--sp-3);
   font-size: 12.5px;
