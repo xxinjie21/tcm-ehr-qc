@@ -19,6 +19,6 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 body {
   font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  background-color: var(--paper, #f5f3ed);
+  background-color: var(--paper, var(--paper));
 }
 </style>

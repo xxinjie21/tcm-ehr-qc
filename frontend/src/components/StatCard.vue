@@ -85,6 +85,6 @@ const display = computed(() =>
   color: var(--ochre);
 }
 .stat.red .num {
-  color: #a04335;
+  color: var(--danger);
 }
 </style>

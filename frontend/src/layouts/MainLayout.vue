@@ -261,7 +261,7 @@ const handleLogout = async () => {
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 2px;
   font-size: var(--fs-sm);
-  color: #dbe4de;          /* 徽标比用户名弱一档，与 --surface(#fff) 区分 */
+  color: #dbe4de;          /* 徽标比用户名弱一档，与 --surface(var(--surface)) 区分 */
 }
 .logout {
   color: #d8dfd9;

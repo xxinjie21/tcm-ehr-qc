@@ -619,7 +619,7 @@ onMounted(() => {
 /* ===== 清洗结果（中部） ===== */
 .clean-result {
   margin-top: var(--sp-5);
-  border-top: 1px dashed #ece8dc;
+  border-top: 1px dashed var(--line-soft);
   padding-top: var(--sp-4);
 }
 .result-hd {
@@ -687,7 +687,7 @@ label,
 }
 .preview-box {
   margin-top: var(--sp-4);
-  border-top: 1px dashed #ece8dc;
+  border-top: 1px dashed var(--line-soft);
   padding-top: var(--sp-3);
 }
 .preview-hd {
