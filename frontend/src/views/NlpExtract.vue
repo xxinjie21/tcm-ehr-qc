@@ -833,9 +833,12 @@ const submitBatch = async () => {
   submitting.value = true
   try {
     // 5. 提交异步任务并提示计划条数
+    //    批次5：带幂等键。用户的一次「开始」= 一个键；网关/代理重放同一个请求时会沿用同一个键，
+    //    服务端据此返回同一条任务，不会又建一条。用户再主动点一次属于新意图，故本函数每次执行都新生成。
     const res = await submitNlpBatch({
       filters: { ...batchFilters },
-      limit: batchMode.value === 'limit' ? batchLimit.value : 0
+      limit: batchMode.value === 'limit' ? batchLimit.value : 0,
+      requestKey: crypto.randomUUID()
     })
     ElMessage.success(`已提交，计划 ${res.data.total} 条`)
     // 6. 把新任务设为当前任务并开始轮询进度
