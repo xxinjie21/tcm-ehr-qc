@@ -535,18 +535,13 @@ if (matched) {
     }
 
     private String defaultSource(String type) {
-        // 按词典类型给出权威出处；未登记的类型给空串（让词条由上传者自行标注）
-        return switch (type) {
-            case "disease" -> "中医临床诊疗术语 疾病";
-            case "pattern" -> "中医病证分类与代码 GB/T 15657-2021";
-            case "symptom" -> "中医临床诊疗术语 症状";
-            case "herb" -> "中国药典2025年版";
-case "formula" -> "中医方剂大辞典";
-                case "tongue" -> "中医诊断学 舌象";
-                case "pulse" -> "中医诊断学 脉象";
-                case "treatment" -> "GB/T 16751.3-2023 治法";
-                default -> "";
-        };
+        // 批次14 · 14.1：「标准来源」这张表已搬进 EntityTypes（standardRef），这里改为查目录。
+        // 理由：它是纯数据，留在远处的结果是「新增词典类型要记得改两处」，而漏改**不会有编译错误**
+        // —— 新类型的词条会静默地没有出处标注。搬进目录后，加类型只改 EntityTypes 一处。
+        // 未登记的类型或未标出处的类型给空串（让词条由上传者自行标注），与搬走前行为一致。
+        com.tcm.ehr.common.config.EntityTypes.EntityType t =
+                com.tcm.ehr.common.config.EntityTypes.byKey(type);
+        return t == null || t.standardRef() == null ? "" : t.standardRef();
     }
 
     private String fileName(MultipartFile file) {
