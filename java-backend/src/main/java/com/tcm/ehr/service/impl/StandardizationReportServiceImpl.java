@@ -83,15 +83,14 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         List<Record> all = recordsInDomain();
         List<Record> records = filterByVisitTime(all, start, end);
         vo.setRange(rangeOf(all, records, start, end));
-        vo.setByMonth(byMonth(records));
-        // 批次12（12d）：未归一分类与九类覆盖都改走库内聚合，时间边界按与 filterByVisitTime
-        // 同一口径算好，两处共用（避免各算一遍、也避免一处有区间一处没有）
+        // 批次12（12d）：时间边界统一在此算好，供后面各段（按月/覆盖/未归一）共用
         java.time.LocalDateTime from = null;
         java.time.LocalDateTime to = null;
         if (notBlankDate(start) && notBlankDate(end)) {
             from = LocalDate.parse(start).atStartOfDay();
             to = LocalDate.parse(end).plusDays(1).atStartOfDay();
         }
+        vo.setByMonth(byMonth(from, to));
         vo.setCoverage(coverage(from, to));
         vo.setUnmatched(unmatched(from, to));
         vo.setNormalizable(normalizableRate(from, to));
@@ -177,54 +176,25 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 按月才能看出「哪些月份已经吃到新词表、哪些还没」。没有 visitTime 的病历
      * 归入「未知」一组，不静默丢弃。
      */
-    private List<StandardizationReportVO.MonthlyBucket> byMonth(List<Record> records) {
-        Map<String, List<Record>> groups = new LinkedHashMap<>();
-        for (Record r : records) {
-            String key = r.getVisitTime() == null
-                    ? "未知"
-                    : YearMonth.from(r.getVisitTime()).toString();
-            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
-        }
+    private List<StandardizationReportVO.MonthlyBucket> byMonth(java.time.LocalDateTime from,
+                                                               java.time.LocalDateTime to) {
+        // 批次12（12d）：按月分桶与月内统计改由库内聚合给出（见 RecordMapper.selectByMonth）。
+        // 口径提醒：gap 按「长度>2 且不以脉/舌开头且非体征」统计，**不查词表** ——
+        // 与 normalizableRate 的 isInDict 口径不同，混用会算错。
         List<StandardizationReportVO.MonthlyBucket> out = new ArrayList<>();
-        for (Map.Entry<String, List<Record>> en : groups.entrySet()) {
-            List<Record> rs = en.getValue();
+        for (Map<String, Object> row : recordMapper.selectByMonth(
+                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), from, to)) {
             StandardizationReportVO.MonthlyBucket b = new StandardizationReportVO.MonthlyBucket();
-            b.setMonth(en.getKey());
-            b.setRecords(rs.size());
-
-            int symTotal = 0;
-            int symHit = 0;
-            for (Record r : rs) {
-                Map<String, Object> sd = structured(r);
-                if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
-                    continue;
-                }
-                for (Object o : list) {
-                    if (!(o instanceof Map<?, ?> m)) {
-                        continue;
-                    }
-                    symTotal++;
-                    if (m.get("normLevel") != null) {
-                        symHit++;
-                    } else {
-                        String content = str(m.get("content"));
-                        if (content.isEmpty()) {
-                            content = str(m.get("sourceText"));
-                        }
-                        if (normalizableTerm(content)) {
-                            b.setDictionaryGap(b.getDictionaryGap() + 1);
-                        }
-                    }
-                }
-            }
-            b.setSymptomRate(symTotal == 0 ? null : pct(symHit, symTotal));
-
-            StandardizationReportVO.ScoreDistribution sd2 = scoreDistribution(rs);
-            b.setAvgScore(sd2.getAvg());
-            b.setCapped(sd2.getCapped());
+            b.setMonth(String.valueOf(row.get("month")));
+            b.setRecords(num(row.get("records")));
+            int symTotal = num(row.get("symTotal"));
+            b.setSymptomRate(symTotal == 0 ? null : pct(num(row.get("symHit")), symTotal));
+            b.setDictionaryGap(num(row.get("gap")));
+            b.setAvgScore(row.get("avgScore") instanceof Number n ? n.doubleValue() : 0.0);
+            b.setCapped(num(row.get("capped")));
             out.add(b);
         }
-        // 「未知」永远排最后；其余按月份倒序（最近的在最前）
+        // 「未知」永远排最后；其余按月份倒序（最近的在最前）—— 展示规则留在 Java 侧
         out.sort(Comparator.comparing((StandardizationReportVO.MonthlyBucket b) -> b.getMonth())
                 .reversed());
         out.sort(Comparator.comparing(b -> "未知".equals(b.getMonth())));
