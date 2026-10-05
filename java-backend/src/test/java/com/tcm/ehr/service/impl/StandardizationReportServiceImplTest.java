@@ -174,6 +174,11 @@ class StandardizationReportServiceImplTest {
                 recordAt("b", "2024-06-20 09:00:00"),
                 recordAt("c", "2025-01-10 09:00:00"));
 
+        // 批次12（12d）：区间计数现由库内聚合给出 —— 替身给出「全库 3 条、区间内 2 条」
+        when(recordMapper.selectRangeAndDataset(any(), anyBoolean(), any(), any()))
+                .thenReturn(java.util.Map.of("totalAll", 3, "recordCount", 2,
+                        "templates", 1, "colloquial", 0));
+
         StandardizationReportVO vo = svc.report("2024-01-01", "2024-12-31");
 
         assertEquals(2, vo.getRange().getRecords(), "只应保留 2024 年的两条");
@@ -188,6 +193,10 @@ class StandardizationReportServiceImplTest {
         givenTimedRecords(
                 recordAt("a", "2024-03-15 09:00:00"),
                 recordAt("b", "2025-01-10 09:00:00"));
+
+        when(recordMapper.selectRangeAndDataset(any(), anyBoolean(), any(), any()))
+                .thenReturn(java.util.Map.of("totalAll", 2, "recordCount", 2,
+                        "templates", 1, "colloquial", 0));
 
         // 只给 start：若被当成有效过滤，会只剩 2024 之后的部分；
         // 项目口径（与 StatsController 一致）是「两端同时给才生效」
@@ -206,6 +215,11 @@ class StandardizationReportServiceImplTest {
                 recordAt("a", "2024-03-15 09:00:00"),
                 recordAt("b", "2024-03-20 09:00:00"),
                 recordAt("c", "2024-04-10 09:00:00"));
+
+        // 批次12（12d）：总数来自库内聚合，替身与下面 byMonth 的求和（3）保持一致
+        when(recordMapper.selectRangeAndDataset(any(), anyBoolean(), any(), any()))
+                .thenReturn(java.util.Map.of("totalAll", 3, "recordCount", 3,
+                        "templates", 1, "colloquial", 0));
 
         StandardizationReportVO vo = svc.report(null, null);
 
