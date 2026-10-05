@@ -57,6 +57,31 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     private final RestHighLevelClient client;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 召回结果缓存（批次 12 · 12b 的「同批 LRU」）。
+     *
+     * <p>键 = {@code type|org|input}。同一次解析里同一个术语会被反复归一（一个症状会出现在很多份
+     * 病历里），每次都发一次 ES 往返；缓存后重复术语只查一次。</p>
+     *
+     * <p><b>失效必须做对</b>：词表重建会改变召回结果，所以 {@link #rebuild} 一开始就清空整个缓存
+     * —— 否则重建后仍命中旧结果，表现就是「改了词表却看不到变化」的脏读，正是 12g 要避免的那一类。
+     * 上限固定（LRU 逐出），避免长跑进程里无界增长。</p>
+     */
+    private static final int RECALL_CACHE_MAX = 4096;
+
+    private static final java.util.Map<String, List<TermEntry>> RECALL_CACHE =
+            java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, List<TermEntry>> eldest) {
+                    return size() > RECALL_CACHE_MAX;
+                }
+            });
+
+    /** 清空召回缓存（词表重建后必须调用；包级可见以便测试直接清） */
+    static void clearRecallCache() {
+        RECALL_CACHE.clear();
+    }
+
     @Override
     public String indexName(String type) {
         return INDEX_PREFIX + type;
@@ -90,6 +115,11 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     public void rebuild(String type, String orgId, List<TermEntry> entries, String version) throws IOException {
         String index = indexName(type);
         String org = normalizeOrg(orgId);
+        // 词表要变了 ⇒ 先清召回缓存：否则重建完仍命中旧结果（见 RECALL_CACHE 注释）。
+        // 放在最前面而不是最后：重建期间本来就有检索空窗（接口 javadoc 已声明调用方需容忍
+        // index_not_found），此时缓存为空与「空窗」是同一状态，不会更糟；
+        // 若放在最后，并发读有可能在清空之后又把旧结果写回来。
+        clearRecallCache();
 
         // ⚠️ 不能只判「索引存在」就复用：从旧版本升级时，索引是旧代码建的 ——
         //    它的 mapping 里没有 org_id（或 org_id 被动态映射成了 text）。
@@ -154,6 +184,13 @@ doc.put("standard_term", e.getStandardTerm());
             return List.of();
         }
         String org = normalizeOrg(orgId);
+        // 同批 LRU（批次 12 · 12b）：同术语重复归一不再打 ES。命中即返回，缓存里存的是
+        // List.copyOf 的不可变副本 —— 否则调用方改了返回列表就把缓存内容也改了。
+        String cacheKey = type + "|" + org + "|" + input;
+        List<TermEntry> cached = RECALL_CACHE.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
         // _source 白名单必须与写入侧（bulk 的 doc.put）逐字段对齐：
         // 少一个 code，toEntry 里的 src.get("code") 就永远是 null，
         // 表现为「词典页有编码、归一结果没有 normCode」，且不报错
@@ -168,7 +205,9 @@ doc.put("standard_term", e.getStandardTerm());
             candidates.add(toEntry(hit.getSourceAsMap()));
         }
         log.debug("[ES] {} 召回 {} 条候选（org_id='{}', input={}）", indexName(type), candidates.size(), org, input);
-        return candidates;
+        List<TermEntry> immutable = List.copyOf(candidates);
+        RECALL_CACHE.put(cacheKey, immutable);
+        return immutable;
     }
 
     /** 累计 ES 检索请求数（批次 12 · 12b 打点）：单条 search = +1，批量 msearch 整批 = +1 */
