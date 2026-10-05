@@ -85,7 +85,14 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setRange(rangeOf(all, records, start, end));
         vo.setByMonth(byMonth(records));
         vo.setCoverage(coverage(records));
-        vo.setUnmatched(unmatched(records, new HashSet<>(symptomTerms())));
+        // 批次12（12d）：未归一分类改走库内聚合，时间边界按与 filterByVisitTime 同一口径算好传下去
+        java.time.LocalDateTime from = null;
+        java.time.LocalDateTime to = null;
+        if (notBlankDate(start) && notBlankDate(end)) {
+            from = LocalDate.parse(start).atStartOfDay();
+            to = LocalDate.parse(end).plusDays(1).atStartOfDay();
+        }
+        vo.setUnmatched(unmatched(from, to));
         vo.setNormalizable(normalizableRate(records, new HashSet<>(symptomTerms())));
         vo.setScore(scoreDistribution(records));
         vo.setQc(qcCoverage(records));
@@ -351,49 +358,37 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 若先按「长度 ≤ 2 = 抽取碎片」判，它会被归到碎片里 —— 但它其实是被完整抽出来的，
      * 只是被放错了数组。归错责会让修复方向跑偏（去改抽取截断，而不是改分类路由）。
      */
-    private StandardizationReportVO.UnmatchedBreakdown unmatched(List<Record> records, Set<String> symptomDict) {
+    private StandardizationReportVO.UnmatchedBreakdown unmatched(java.time.LocalDateTime from,
+                                                                java.time.LocalDateTime to) {
+        // 批次12（12d）：改用库内 JSON_TABLE 聚合。此前是「把整表拉进 JVM、逐条解析 JSON、
+        // 在 Java 里分类」——3.5 万条时这是本接口最重的一段（整接口 3.5~6.2 秒，见 docs/性能基线实测.md）。
+        // 等价性不再由 mock 单测保证（被 mock 的正是这里删掉的 Java 分类），而由
+        // tools/verify-unmatched-sql.py 对真实库校验：分项自洽 + TOP 明细 + 规则夹具。
         StandardizationReportVO.UnmatchedBreakdown b = new StandardizationReportVO.UnmatchedBreakdown();
-        // 批次2：同一次遍历内累积「词表缺口」项的次数（键=实体原文），不额外扫库
-        java.util.Map<String, Integer> gapCount = new java.util.LinkedHashMap<>();
-        for (Record r : records) {
-            Map<String, Object> sd = structured(r);
-            if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
-                continue;
-            }
-            for (Object item : list) {
-                if (!(item instanceof Map<?, ?> m) || m.get("normLevel") != null) {
-                    continue;
-                }
-                String content = str(m.get("content"));
-                if (content.isEmpty()) {
-                    content = str(m.get("sourceText"));
-                }
-                b.setTotal(b.getTotal() + 1);
-                // ① 具名错放优先：含体征关键字，或以脉/舌开头
-                boolean namedMisroute = containsAny(content, PHYSICAL_SIGN)
-                        || startsWithAny(content, MISROUTED_PREFIX);
-                if (namedMisroute) {
-                    if (containsAny(content, PHYSICAL_SIGN)) {
-                        b.setPhysicalSign(b.getPhysicalSign() + 1);
-                    } else {
-                        b.setMisrouted(b.getMisrouted() + 1);
-                    }
-                } else if (content.length() <= FRAGMENT_MAX_LEN) {
-                    // ② 剩下的短词才是抽取碎片
-                    b.setFragment(b.getFragment() + 1);
-                } else {
-                    // ③ 多为标准词但词表没有 → 词表侧
-                    b.setDictionaryGap(b.getDictionaryGap() + 1);
-                    gapCount.merge(content, 1, Integer::sum);
-                }
+        String orgId = RequestUtils.currentOrgId();
+        boolean viewAll = RequestUtils.viewAllOrgs();
+        Map<String, Object> row = recordMapper.selectUnmatchedBreakdown(orgId, viewAll, from, to);
+        if (row != null) {
+            b.setTotal(num(row.get("total")));
+            b.setPhysicalSign(num(row.get("physicalSign")));
+            b.setMisrouted(num(row.get("misrouted")));
+            b.setFragment(num(row.get("fragment")));
+            b.setDictionaryGap(num(row.get("dictionaryGap")));
+        }
+        // 列表也守卫：mapper 契约上返回空列表，但测试替身可能给 null
+        java.util.List<Map<String, Object>> tops =
+                recordMapper.selectUnmatchedTop(orgId, viewAll, from, to, 15);
+        if (tops != null) {
+            for (Map<String, Object> t : tops) {
+                b.getTop().put(String.valueOf(t.get("content")), num(t.get("n")));
             }
         }
-        // 批次2：按次数降序装入（LinkedHashMap 保序），前端直接渲染为可行动清单
-        gapCount.entrySet().stream()
-                .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
-                .limit(15)
-                .forEach(e -> b.getTop().put(e.getKey(), e.getValue()));
         return b;
+    }
+
+    /** 聚合值 MySQL 给的是 Long/BigDecimal，统一按 Number 取整，避免 ClassCastException */
+    private static int num(Object v) {
+        return v instanceof Number n ? n.intValue() : 0;
     }
 
     /**
