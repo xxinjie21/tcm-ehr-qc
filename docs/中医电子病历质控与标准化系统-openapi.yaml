@@ -1121,10 +1121,11 @@ components:
     # ========== 质控 DTO / VO ==========
     QcCheckDTO:
       type: object
-      description: 事前质控检查请求（入参）
+      description: 事前质控检查请求（入参）：只传病历 id，结构化数据由服务端按 id 读取。原先还允许调用方直接传 structuredData 覆盖库里的值，但全仓无调用方使用（前端两处都是 qcScore(recordId)），2026-10-05 收敛为单字段
       properties:
-        structuredData:
-          $ref: '#/components/schemas/StructuredData'
+        recordId:
+          type: string
+          description: 待评分的病历 id
     QcCheckVO:
       type: object
       description: 质控检查响应（出参）
@@ -2244,10 +2245,10 @@ paths:
       tags:
         - NLP抽取
       summary: 批量解析任务列表
-      description: 【权限：登录即可】最近 50 条任务（按提交时间倒序）
+      description: 【权限：登录即可】最近任务（按提交时间倒序，最多 limit 条）。真被截断时 truncated=true —— 页面据此说明「更早的任务已省略」，不要把它当全部
       responses:
         '200':
-          description: 任务列表
+          description: 任务列表（最多 limit 条，超出时 truncated=true）
           content:
             application/json:
               schema:
@@ -2257,9 +2258,19 @@ paths:
                     type: integer
                     example: 200
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/NlpTaskVO'
+                    type: object
+                    description: 任务列表 + 截断标记 + 上限条数
+                    properties:
+                      tasks:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/NlpTaskVO'
+                      truncated:
+                        type: boolean
+                        description: true = 还有更早的任务没返回，页面应说明「更早的已省略」
+                      limit:
+                        type: integer
+                        example: 50
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -2703,7 +2714,7 @@ paths:
       tags:
         - 质控
       summary: 批量重算任务列表
-      description: 【权限：登录即可】最近 50 条（按提交时间倒序，包含分级汇总与失败明细）
+      description: 【权限：登录即可】数据域：只返回当前组织的任务。最近 50 条（按提交时间倒序，包含分级汇总与失败明细）
       responses:
         '200':
           description: 任务列表
@@ -2719,7 +2730,7 @@ paths:
       tags:
         - 质控
       summary: 提交质控批量重算任务（异步）
-      description: "【权限：登录即可】§七 L5 起改为**异步**：提交后立即返回 taskId，由后台 worker（并发 1）执行，可关页面、靠 GET 轮询进度。⚠️ **破坏性变更**：原同步接口返回分级汇总，现只返回任务状态；分级汇总改由 `GET /api/qc/score/batch/{id}` 获取。任务会覆盖既有分数（records.qc_results）并同步复核任务状态；范围超单次上限（qc.batch.max-records，默认 40000）或已有任务在排队/运行中时返回 400。"
+      description: "【权限：登录即可】§七 L5 起改为**异步**：提交后立即返回 taskId，由后台 worker（并发 1）执行，可关页面、靠 GET 轮询进度。⚠️ **破坏性变更**：原同步接口返回分级汇总，现只返回任务状态；分级汇总改由 `GET /api/qc/score/batch/{id}` 获取。任务会覆盖既有分数（records.qc_results）并同步复核任务状态；范围超单次上限（qc.batch.max-records，默认 40000）或本组织已有任务在排队/运行中时返回 400（防重按组织计算，跨组织互不阻塞）。"
       requestBody:
         required: false
         content:
@@ -2764,7 +2775,7 @@ paths:
       tags:
         - 质控
       summary: 查询质控批量重算任务进度
-      description: "【权限：登录即可】返回进度与分级汇总（qualified / pendingReview / invalid），含失败明细。前端 2s 轮询本接口直到 status 进入终态。"
+      description: "【权限：登录即可】返回进度与分级汇总（qualified / pendingReview / invalid），含失败明细。前端 2s 轮询本接口直到 status 进入终态。数据域：任务不属于当前组织时返回 404（不区分「不存在」与「无权查看」）。"
       parameters:
         - name: id
           in: path
@@ -2850,7 +2861,7 @@ paths:
       tags:
         - 质控
       summary: 取消质控批量重算任务
-      description: "【权限：登录即可】排队中的任务直接置为已取消；运行中的置取消位，由 worker 在分页边界退出并落库。"
+      description: "【权限：登录即可】排队中的任务直接置为已取消；运行中的置取消位，由 worker 在分页边界退出并落库。数据域：任务不属于当前组织时返回 403（写操作按「不许」报，不按「不存在」）。"
       parameters:
         - name: id
           in: path
@@ -2882,6 +2893,12 @@ paths:
                         description: 计划处理条数
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 任务不属于当前组织
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '404':
           description: 任务不存在
           content:
@@ -3073,7 +3090,7 @@ paths:
       tags:
         - 词典管理
       summary: 术语库导入
-      description: 【权限：仅管理员】上传术语文件（Excel .xlsx/.xls、CSV、JSON），解析校验后写入术语库文件，写入前自动备份旧文件
+      description: 【权限：管理员 / 所有者 / 授权成员】上传术语文件（Excel .xlsx/.xls、CSV、JSON），解析校验后写入术语库，写入前自动备份旧文件。组织层（缺省或 target=org）走三档门槛并生成归档版本；target=base 写基础层，影响所有组织，仍限管理员
       requestBody:
         required: true
         content:
@@ -3203,7 +3220,7 @@ paths:
       tags:
         - 词典管理
       summary: 提案列表
-      description: 【权限：登录即可】普通成员只看到自己提交的提案；组织所有者看到全组提案。查询时顺带惰性清理已驳回且过期的提案快照（提案主记录永久保留）。type 可选，用于跟随词典页的类型筛选；省略则返回全部类型
+      description: 【权限：登录即可】普通成员只看到自己提交的提案；组织所有者看到本组织提案与基础层提案。查询时顺带惰性清理已驳回且过期的提案快照（提案主记录永久保留）。type 可选，用于跟随词典页的类型筛选；省略则返回全部类型
       parameters:
         - name: status
           in: query
@@ -3384,7 +3401,7 @@ paths:
       tags:
         - 词典管理
       summary: 审核提案
-      description: 【权限：所有者（本组织）】通过则整快照替换基线、重建该组织 ES 索引并生成归档版本；拒绝则填理由作废，快照 7 天后惰性清理（主记录永久保留）。已审核过的提案不能重复审核
+      description: 【权限：管理员 / 所有者 / 授权成员】通过则整快照替换基线、重建该组织 ES 索引并生成归档版本；拒绝则填理由作废，快照 7 天后惰性清理（主记录永久保留）。已审核过的提案不能重复审核。归属不按路径判定（{id} 是提案号），改由服务端按提案自身的 org_id 判定：管理员可审任意提案（含基础层），组织所有者只能审本组织的提案
       parameters:
         - name: id
           in: path
@@ -3471,7 +3488,7 @@ paths:
       tags:
         - 词典管理
       summary: 基于归档版本生成回滚提案
-      description: 【权限：所有者（本组织）】读取该版本快照自动生成一份<b>新提案</b>，仍需走审核流程后才会合并（不直接还原基线，避免绕过审核）。回滚完成后同样生成新的归档版本并计入 5 份限额
+      description: 【权限：管理员 / 所有者 / 授权成员】读取该版本快照自动生成一份<b>新提案</b>，仍需走审核流程后才会合并（不直接还原基线，避免绕过审核）。回滚完成后同样生成新的归档版本并计入 5 份限额
       parameters:
         - name: versionNo
           in: path
@@ -3512,12 +3529,13 @@ s/schemas/DictionaryTermsVO'
     post:
       tags:
         - 词典管理
-      summary: 重建当前组织的词典索引
-      description: 【权限：仅管理员】强制重建<b>当前组织</b>某一类词典的 ES 索引（不落库、不改词条）。用于「库里词条正确但索引落后」的自愈，不必重启服务。只重建当前组织这一层：基础层与其它组织不连带处理（那会让它们同时进入重建空窗、归一返回 503）
+      summary: 重建词典索引（可按类型/组织重放）
+      description: 【权限：仅管理员】强制重建 ES 索引（不落库、不改词条）。用于「库里词条正确但索引落后」的自愈，不必重启服务。默认只重建<b>当前组织 + 指定类型</b>：基础层与其它组织不连带处理（那会让它们同时进入重建空窗、归一返回 503）；显式传参才做全量重放 —— 那是「索引大面积丢失」时的灾难恢复入口（逐对串行 + 跨实例互斥，单对失败不中断整批，失败项列在 failures）
       parameters:
         - name: type
           in: query
-          required: true
+          required: false
+          description: 术语类型；省略 = 全部类型
           schema:
             type: string
             enum:
@@ -3529,6 +3547,12 @@ s/schemas/DictionaryTermsVO'
               - tongue
               - pulse
               - treatment
+        - name: org
+          in: query
+          required: false
+          description: 组织号；省略 = 当前组织；`*` = 词典里出现过的全部组织
+          schema:
+            type: string
       responses:
         '200':
           description: 重建完成
@@ -4089,7 +4113,7 @@ s/schemas/DictionaryTermsVO'
       tags:
         - 组织
       summary: 我的组织
-      description: 【权限：登录即可】返回我的组 / 组内角色 / 审批中申请；无组时给引导
+      description: 【权限：登录即可】返回我的组织 / 我在组织内的角色；无组织时给引导
       responses:
         '200':
           description: OK
@@ -4417,6 +4441,45 @@ s/schemas/DictionaryTermsVO'
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/orgs/{id}/members/{userId}/permissions:
+    put:
+      tags:
+        - 组织
+      summary: 授予/回收成员的写开关
+      description: 【权限：所有者（本组织）】两个开关独立，省略某一位表示「这一位不改」；路径 id 必须等于当前组
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 组织ID
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          description: 用户ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                canWriteDictionary:
+                  type: boolean
+                  description: 词典写授权；省略表示不改这一位
+                canWriteQcRules:
+                  type: boolean
+                  description: 质控规则写授权；省略表示不改这一位
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/orgs/{id}/leave:
     post:
       tags:
@@ -4443,7 +4506,7 @@ s/schemas/DictionaryTermsVO'
       tags:
         - 组织
       summary: 我的组织
-      description: 【权限：登录即可】返回我的组 / 组内角色 / 审批中申请；无组时给引导
+      description: 【权限：登录即可】返回我的组织 / 我在组织内的角色；无组织时给引导
       responses:
         '200':
           description: OK
@@ -4629,6 +4692,45 @@ s/schemas/DictionaryTermsVO'
                 newOwnerUserId:
                   type: string
                   description: 新所有者用户ID
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/groups/{id}/members/{userId}/permissions:
+    put:
+      tags:
+        - 组织
+      summary: 授予/回收成员的写开关（旧路径别名）
+      description: 【权限：所有者（本组织）】与 /api/orgs/{id}/members/{userId}/permissions 同一实现；两个开关独立，省略某一位表示「这一位不改」；路径 id 必须等于当前组
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 组织ID
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          description: 用户ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                canWriteDictionary:
+                  type: boolean
+                  description: 词典写授权；省略表示不改这一位
+                canWriteQcRules:
+                  type: boolean
+                  description: 质控规则写授权；省略表示不改这一位
       responses:
         '200':
           description: OK
