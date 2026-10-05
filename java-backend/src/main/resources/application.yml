@@ -90,7 +90,15 @@ server:
 
 # JWT配置
 jwt:
-  secret: tcm-ehr-qc-jwt-secret-key-2026-course-design
+  # 批次17 · 17.1：改为环境变量注入 —— 生产用 `JWT_SECRET` 覆盖即可，不必改本文件，
+  # 这也是「轮换不需要动仓库」的前提。轮换工具见 tools/rotate-jwt-secret.py（默认演练）。
+  #
+  # ⚠️ 如实说明：冒号后仍保留了一个**开发用**默认值，所以本条**尚未**满足
+  #    「全仓无明文固定 secret」这条验收。之所以没直接写成 ${JWT_SECRET:}：
+  #    那样没设环境变量时启动会直接失败，对本地开发/演示是硬中断。
+  #    要真正满足验收，需要「去掉默认值 + 读到空值时启动即报错（并提示怎么生成）+ 
+  #    在 src/test/resources 给测试一份默认值」三步一起做，那是独立的一次改动。
+  secret: ${JWT_SECRET:tcm-ehr-qc-jwt-secret-key-2026-course-design}
   expire-hours: 24
 
 # NLP 抽取：Java 经 PythonNlpClient 转发到独立的 Python 服务
