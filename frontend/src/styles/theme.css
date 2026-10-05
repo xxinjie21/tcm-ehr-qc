@@ -232,3 +232,10 @@ aside :focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/* P2-16（2026-10-05）：补「浅暖分隔线」token。
+   依据：全前端硬编码色普查中 #ece8dc 出现 13 次（最大单点），
+   属反复使用的同一语义（表格/卡片的浅分隔线），此前无对应 token 可用。 */
+:root {
+  --line-soft: #ece8dc;
+}
