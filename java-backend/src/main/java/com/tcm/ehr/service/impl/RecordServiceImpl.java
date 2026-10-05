@@ -276,7 +276,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 }
                 summary.setTotal(summary.getTotal() + 1);
                 try {
-                    Record r = mapRow(rowAccess(row), colIndex);
+                    Record r = mapRow(ExcelRowReader.of(row), colIndex);
                     if (TextUtil.isBlank(r.getOutpatientNo())) {
                         throw new IllegalArgumentException("门诊号为空");
                     }
@@ -602,76 +602,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         return idx;
     }
 
-    /**
-     * 「一行怎么取值」的抽象：POI 全量读与 SAX 流式读共用同一套 21 列映射。
-     *
-     * <p>抽它的理由：两条路径的<b>取值口径</b>必须一致（字符串 trim、数值整数不带 .0、
-     * 日期按类型或文本解析）。若各写一份映射，迟早出现「xlsx 导入少一列、xls 正常」
-     * 这类只在某种格式下复现的问题。</p>
-     */
-    private interface RowAccess {
-        /** 按列号取文本（与 {@link #cellText} 同口径） */
-        String text(int col);
-
-        /** 按列号取接诊时间（与 {@link #parseDateTime} 同口径） */
-        LocalDateTime dateTime(int col);
-    }
-
-    /** POI 行适配器 */
-    private RowAccess rowAccess(Row row) {
-        return new RowAccess() {
-            @Override
-            public String text(int col) {
-                return ExcelCellParser.cellText(row.getCell(col));
-            }
-
-            @Override
-            public LocalDateTime dateTime(int col) {
-                return ExcelCellParser.parseDateTime(row.getCell(col));
-            }
-        };
-    }
-
-    /** 流式行适配器：RawCell 同时带原始值与「是不是日期」，日期列因此不会退化成文本 */
-    private static RowAccess rowAccess(List<ExcelRawStreamReader.RawCell> cells) {
-        return new RowAccess() {
-            @Override
-            public String text(int col) {
-                ExcelRawStreamReader.RawCell c = find(col);
-                return c == null ? null : c.text();
-            }
-
-            @Override
-            public LocalDateTime dateTime(int col) {
-                ExcelRawStreamReader.RawCell c = find(col);
-                if (c == null) {
-                    return null;
-                }
-                // 与 parseDateTime 同口径：真日期型直接取值；其余按文本归一后解析
-                if (c.dateFormatted()) {
-                    return ExcelRawStreamReader.localDateTime(c);
-                }
-                String s = c.text();
-                if (TextUtil.isBlank(s)) {
-                    return null;
-                }
-                try {
-                    return LocalDateTime.parse(ExcelCellParser.normalizeDateTime(s), ExcelCellParser.formatter());
-                } catch (Exception e) {
-                    return null;
-                }
-            }
-
-            private ExcelRawStreamReader.RawCell find(int col) {
-                for (ExcelRawStreamReader.RawCell c : cells) {
-                    if (c.col() == col) {
-                        return c;
-                    }
-                }
-                return null;
-            }
-        };
-    }
 
     /** 流式读 .xlsx：表头为首行，逐行回调直接走同一套映射 */
     private void parseXlsxStreaming(MultipartFile file, String filename, ImportSummaryVO summary,
@@ -713,7 +643,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 return;
             }
             // 与 POI 路径共用同一段逐行处理
-            processRow(rowAccess(cells), rowNum, colIndex[0], filename, summary, batchRegNos,
+            processRow(ExcelRowReader.of(cells), rowNum, colIndex[0], filename, summary, batchRegNos,
                     parsedRows, visitTimeWarn, visitTimeWarnSamples);
         });
     }
@@ -734,7 +664,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     }
 
     /** 逐行映射与记账（POI 与流式两条路径共用） */
-    private void processRow(RowAccess row, int rowNum, Map<String, Integer> colIndex, String filename,
+    private void processRow(ExcelRowReader.RowAccess row, int rowNum, Map<String, Integer> colIndex, String filename,
                             ImportSummaryVO summary, Set<String> batchRegNos, List<Object[]> parsedRows,
                             int[] visitTimeWarn, List<String> visitTimeWarnSamples) {
         if (TextUtil.isBlank(row.text(colIndex.getOrDefault("registrationNo", -1)))) {
@@ -764,7 +694,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     }
 
     /** 数据行 → 病历实体：按表头索引逐字段取值，缺列一律 null */
-    private Record mapRow(RowAccess row, Map<String, Integer> idx) {
+    private Record mapRow(ExcelRowReader.RowAccess row, Map<String, Integer> idx) {
         Record r = new Record();
         // 1. 文本列按表头索引逐字段取，缺列由 get() 兜成 null
         r.setRegistrationNo(get(row, idx, "registrationNo"));
@@ -797,7 +727,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     }
 
     /** 按字段标识取单元格文本；该列在表头里不存在时返回 null */
-    private String get(RowAccess row, Map<String, Integer> idx, String field) {
+    private String get(ExcelRowReader.RowAccess row, Map<String, Integer> idx, String field) {
         // 1. 表头里没这列就返回 null，调用侧不必判存在性
         Integer c = idx.get(field);
         return c == null ? null : row.text(c);
