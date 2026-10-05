@@ -81,23 +81,18 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     @Transactional(rollbackFor = Exception.class)
     @Override
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters) {
-        List<Record> records;
-        if (recordIds != null && !recordIds.isEmpty()) {
-            // § 6.3 缺点 2：按 ID 批量取不能用了 selectBatchIds 之后
-            // 不再校验——“把别组的 id 传进来清洗”会直接成立。
-            // 改成先按本组过滤后再取，取不到的忽略（不报错：
-            // 一个 id 是否属于本组属于授权问题，不属于业务错误）。
-            records = baseMapper.selectList(RecordFilter
-                    .build(RequestUtils.currentOrgId(), new FiltersDTO())
-                    .in("id", recordIds));
-        } else {
-            records = baseMapper.selectList(
-                    com.tcm.ehr.common.utils.RecordFilter.build(
-                            RequestUtils.currentOrgId(), filters));
-        }
+        // 批次12 · 12c（第二步）：由「整批载入」改为**惰性分页**。
+        // 原实现把 3.5 万行一次读进内存，每行还带 1.3KB 的 structured_data（合计 43.8MB）——
+        // 这是清洗的堆占用来源。下面保持 for-each 写法**一行不改**，只把数据源换成按页拉取。
+        QueryWrapper<Record> wrapper = recordIds != null && !recordIds.isEmpty()
+                ? RecordFilter.build(RequestUtils.currentOrgId(), new FiltersDTO()).in("id", recordIds)
+                : com.tcm.ehr.common.utils.RecordFilter.build(RequestUtils.currentOrgId(), filters);
+        Iterable<Record> records = pagedRecords(wrapper);
 
         CleanResultVO vo = new CleanResultVO();
-        vo.setTotal(records.size());
+        // total 单独查一次：逐页再算总数是浪费（分页时已关闭 searchCount）。
+        // 注意 selectCount 返回 Long，不能 (int) 直接强转，须 intValue()。
+        vo.setTotal(baseMapper.selectCount(wrapper).intValue());
 
         Set<String> seenTextHash = new HashSet<>();
         for (Record r : records) {
@@ -210,6 +205,48 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         log.info("[清洗] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
                 vo.getTotal(), vo.getDeduped(), vo.getRepaired(), vo.getIsolated(), vo.getNormalized());
         return vo;
+    }
+
+    /** 清洗分页大小：单页驻留多少行。1000 足够摊薄每页一次查询的开销，又不会让堆占用重新长起来 */
+    private static final int CLEAN_PAGE_SIZE = 1000;
+
+    /**
+     * 惰性分页取病历（批次12 · 12c 的「流式」那一半）。
+     *
+     * <p>3.5 万行的堆占用从「一次全驻留」降到「一页」。依赖 {@code MybatisPlusConfig} 里已注册的
+     * {@code PaginationInnerInterceptor(MYSQL)}；没有它 {@code selectPage} 会忽略分页一次返回全部。</p>
+     *
+     * <p><b>注意</b>：本迭代器把「取完」定义为**取到空页**。替身若每次都返回同一条非空页，
+     * 迭代器会一直认为还有数据 —— 测试里要「第一次给一条、第二次给空页」。</p>
+     */
+    private Iterable<Record> pagedRecords(QueryWrapper<Record> wrapper) {
+        return () -> new java.util.Iterator<Record>() {
+            private int page = 1;
+            private java.util.Iterator<Record> current = java.util.Collections.emptyIterator();
+
+            @Override
+            public boolean hasNext() {
+                while (!current.hasNext()) {
+                    com.baomidou.mybatisplus.extension.plugins.pagination.Page<Record> p =
+                            new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page++, CLEAN_PAGE_SIZE);
+                    p.setSearchCount(false);
+                    List<Record> rows = baseMapper.selectPage(p, wrapper).getRecords();
+                    if (rows.isEmpty()) {
+                        return false;
+                    }
+                    current = rows.iterator();
+                }
+                return true;
+            }
+
+            @Override
+            public Record next() {
+                if (!hasNext()) {
+                    throw new java.util.NoSuchElementException();
+                }
+                return current.next();
+            }
+        };
     }
 
     /** 判断是否为可解析的 JSON（隔离脏数据用；不可解析即视为"无法修复"） */

@@ -46,6 +46,13 @@ class GovernanceCleanContractTest {
         return r;
     }
 
+    private static com.baomidou.mybatisplus.extension.plugins.pagination.Page<Record> pageOf(List<Record> rows) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<Record> p =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 1000);
+        p.setRecords(rows);
+        return p;
+    }
+
     private GovernanceServiceImpl service(RecordMapper mapper) {
         GovernanceServiceImpl svc = new GovernanceServiceImpl(
                 mock(EsTermNormalizer.class), new ObjectMapper(),
@@ -58,7 +65,12 @@ class GovernanceCleanContractTest {
     @Test
     void cleanKeepsGradeAndRewritesTextHash() {
         RecordMapper mapper = mock(RecordMapper.class);
-        when(mapper.selectList(any())).thenReturn(List.of(cleanableRecord()));
+        // 批次12 · 12c：clean 由「整批 selectList」改为「惰性分页 selectPage + 单独 selectCount」。
+        // ⚠️ 分页把「取完」定义为取到空页 ⇒ selectPage 要「第一次给一条、第二次给空页」；
+        // 若每次都给同一条，迭代器永远认为还有数据，测试会死循环。
+        when(mapper.selectCount(any())).thenReturn(1L);
+        when(mapper.selectPage(any(), any()))
+                .thenReturn(pageOf(List.of(cleanableRecord())), pageOf(List.of()));
 
         CleanResultVO vo = service(mapper).clean(List.of("r-1"), null);
 
