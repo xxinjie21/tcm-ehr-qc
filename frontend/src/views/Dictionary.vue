@@ -50,9 +50,10 @@
         <el-tag size="small" :type="scopeTagType" effect="plain">{{ scopeLabel }}</el-tag>
         <span class="tip">{{ scopeTip }}</span>
       </div>
-      <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动，页面本身不出现滚动条。
+      <!-- 高度随分页大小联动（表头 32 + 每行 32 × 当前页大小 + 余量）：表格内部滚动、页面本身不出现滚动条，
+           但不会再出现「选了 20 条/页却只能看到 10 行」的错配（M23，2026-10-05 校正）。
            每页条数可调（20~200），故按可视行数固定高度，超出的行在表格内部滚动 -->
-<el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" max-height="360">
+<el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" :max-height="termsTableHeight">
           <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
           <el-table-column prop="standardTerm" label="标准术语" width="220" />
         <el-table-column label="别名">
@@ -444,6 +445,10 @@ const termsFailed = ref(false)
 // 分页：page 从 1 起，size 为每页条数，total 为命中总数（驱动 el-pagination 算总页数）
 const page = ref(1)
 const size = ref(20)
+
+// M23：术语表高度跟随分页大小（表头 32 + 行高 32 × 当前页 + 余量 8），
+// 让「选了多少条/页就能一眼看到多少行」，同时保留「页面本身不出现滚动条」的原设计。
+const termsTableHeight = computed(() => 32 + (size.value || 10) * 32 + 8)
 const total = ref(0)
 
 // 查询当前类型下的术语（关键字命中标准词或别名）
