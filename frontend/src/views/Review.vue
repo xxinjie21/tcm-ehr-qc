@@ -819,7 +819,7 @@ onMounted(() => {
 .raw-item {
   display: flex;
   padding: var(--sp-2) 0;
-  border-bottom: 1px dashed #ece8dc;
+  border-bottom: 1px dashed var(--line-soft);
   font-size: 13px;
 }
 .raw-item.full {
@@ -895,7 +895,7 @@ onMounted(() => {
   align-items: flex-start;
   min-height: 40px;
   padding: var(--sp-2) 0;
-  border-bottom: 1px dashed #ece8dc;
+  border-bottom: 1px dashed var(--line-soft);
 }
 .field-row:last-of-type {
   border-bottom: none;
