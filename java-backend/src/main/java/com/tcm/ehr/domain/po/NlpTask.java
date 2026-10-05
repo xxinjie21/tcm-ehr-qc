@@ -38,6 +38,13 @@ public class NlpTask {
      * {@code RecordFilter}；否则数据域过滤会退化成「不过滤 = 全库」。</p>
      */
     private String orgId;
+    /**
+     * 幂等键（批次 5）：客户端在一次提交动作里生成，网络重试 / 重复点击沿用同一个值。
+     *
+     * <p>与 {@code (org_id, request_key)} 唯一索引配对使用：撞键时服务层查回既有任务原样返回，
+     * 不新建也不重跑 —— 于是「手抖点了两下」与「请求被网关重放」都只会留下一条任务。</p>
+     */
+    private String requestKey;
 
     /**
      * 是否已请求取消（1=是）。批次 4 加的列，批次 9 真正用起来。

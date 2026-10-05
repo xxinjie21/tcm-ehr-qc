@@ -217,6 +217,18 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (!nlpClient.isEnabled()) {
             throw new IllegalArgumentException("抽取服务未开启（nlp.enabled=false），无法执行批量解析");
         }
+        // 1.05 幂等（批次 5）：同一 request_key 的重放直接返回既有任务，不新建、不重跑。
+        //      必须放在下面那道「已有任务在排队/运行」防重**之前** —— 否则重试会撞上防重而报错，
+        //      而正确语义是「这就是我刚才那次提交，把它还给我」。
+        String requestKey = dto == null ? null : dto.getRequestKey();
+        if (requestKey != null && !requestKey.isBlank()) {
+            requestKey = requestKey.trim();
+            NlpTask existed = findTaskByRequestKey(RequestUtils.currentOrgId(), requestKey);
+            if (existed != null) {
+                log.info("[批解析] 幂等命中：key={} 复用任务 {}", requestKey, existed.getId());
+                return toVO(existed, false);
+            }
+        }
         // 1.1 防重：与质控侧同一口径（查表判 QUEUED/RUNNING）。
         //     解析侧原先完全没有这道门，重复点击会起多个并发任务同时压 Python 服务，
         //     且后提交的任务会让先提交的进度互相覆写。
@@ -250,12 +262,38 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
-        taskMapper.insert(t);
+        t.setRequestKey(requestKey);
+        try {
+            taskMapper.insert(t);
+        } catch (org.springframework.dao.DuplicateKeyException dup) {
+            // 并发同键：另一线程刚插入成功 ⇒ 查回那条任务返回，绝不重跑
+            NlpTask existed = findTaskByRequestKey(t.getOrgId(), requestKey);
+            if (existed != null) {
+                log.info("[批解析] 并发同键：key={} 复用任务 {}", requestKey, existed.getId());
+                return toVO(existed, false);
+            }
+            throw dup;
+        }
 
         // 4. 入队后立即返回，由工作线程异步消费
         queue.offer(t.getId());
         log.info("[批解析] 已提交任务 {}：计划 {} 条", t.getId(), total);
         return toVO(t, false);
+    }
+
+    /**
+     * 按 (组织, 幂等键) 查任务（批次 5）。
+     *
+     * <p>orgId 为空时直接返回 null：早于组织标记的任务 org_id 为 NULL，不该被别的组织命中。</p>
+     */
+    private NlpTask findTaskByRequestKey(String orgId, String requestKey) {
+        if (orgId == null || requestKey == null) {
+            return null;
+        }
+        return taskMapper.selectOne(new QueryWrapper<NlpTask>()
+                .eq("org_id", orgId)
+                .eq("request_key", requestKey)
+                .last("LIMIT 1"));
     }
 
     /**
