@@ -223,9 +223,10 @@
         <div class="misc-grid">
                     <FreshnessTag :time="report?.generatedAt" :stale="hasStaleRows"
                         reason="部分病历的解析早于词表，需重跑" />
-          <!-- 对标 A5：数字的血缘。紧挨刷新时间放 —— 一个答「什么时候算的」，一个答「按哪一版词表算的」；
-               换过词表后归一率会变，只有时间的话说不清变化是哪一版造成的。 -->
-          <div><span>词典版本</span><b>{{ report?.sourceVersion || '—' }}</b></div>
+          <!-- 对标 A5 的口径见后端 StandardizationReportVO.sourceVersion：
+               本页**刻意不展示**它 —— 这页的读者是质控科业务用户（见文件头设计取向），
+               而它的值是一串 type:hash 拼接（8 类各一段），属于技术口径，按要求"只在本文件内部使用"。
+               后端字段保留：工程师排查「换词表前后数字变化」时仍可取到。 -->
           <div>
             <span>质控完成</span>
             <b>{{ qcScored }} / {{ qcTotal }}{{ qcLast ? `（${qcLast}）` : '' }}</b>
