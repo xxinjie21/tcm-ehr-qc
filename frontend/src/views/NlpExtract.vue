@@ -1,5 +1,5 @@
 <template>
-  <div class="split">
+  <div class="split split-picker">
     <!-- ① 选择病历：看板式列表，常驻可见-->
     <div class="pane">
     <PanelCard title="选择病历">
@@ -107,7 +107,11 @@
             </template>
           </div>
 
-          <div class="split">
+          <!-- 原文与结果**左右并排**：这一页的核心动作就是「对着原文核实体」，
+               上下排会把两者推到两屏之外，用户得来回滚 —— 比输入框窄更难受。
+               输入框窄的问题不在这一层，而在外层（挑病历的列表原本比工作区还宽），
+               已由 .split-picker 把宽度让给工作区。 -->
+          <div class="split split-compare">
             <!-- 原文：按字段模块化，可单独修改-->
             <div class="pane">
               <div class="pane-hd">原文（按字段模块化，可单独修改）</div>
@@ -943,6 +947,19 @@ onBeforeUnmount(stopPoll)
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   gap: var(--sp-4);
   align-items: start;
+}
+/* 外层是「左＝选择病历（挑一份就够）／右＝工作区（改原文 + 看结果）」。
+   原来是 1.25fr : 1fr —— 挑病历的列表反而比干活的工作区宽，优先级是反的；
+   多层分栏叠起来后工作区只剩不到四成屏宽，长文本字段逐字换行。
+   这里把宽度让给工作区，列表给一个能看全登记号 + 日期的下限即可。 */
+.split-picker {
+  grid-template-columns: minmax(300px, 0.7fr) minmax(0, 1.7fr);
+}
+/* 内层「原文 / 抽取结果」保持**左右并排**（这是本页的核心：对着原文核实体）。
+   比例给原文略多（1.15 : 1）：原文里长文本字段多，实体侧是标签云，同样宽度下原文更吃紧。
+   原先的问题不是"该不该左右"，而是外层没给工作区足够宽 —— 见 .split-picker。 */
+.split-compare {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 }
 /* 批次3 收尾（2026-10-05）：右栏顶部是标签行「单条解析 / 批量解析」，左栏顶部是卡片标题条 ——
    两者高度不同，直接并排时左栏会明显「高出一截」（1264×569 实拍对比可见：左卡起 y≈105，右卡起 y≈150）。
