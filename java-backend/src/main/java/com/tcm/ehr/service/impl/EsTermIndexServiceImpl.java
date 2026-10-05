@@ -171,6 +171,63 @@ doc.put("standard_term", e.getStandardTerm());
         return candidates;
     }
 
+    /** 累计 ES 检索请求数（批次 12 · 12b 打点）：单条 search = +1，批量 msearch 整批 = +1 */
+    private static final java.util.concurrent.atomic.AtomicLong SEARCH_REQUESTS =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    @Override
+    public java.util.Map<String, List<TermEntry>> searchBatch(String type, String orgId, List<String> inputs,
+                                                              int maxCandidates) throws IOException {
+        java.util.Map<String, List<TermEntry>> out = new LinkedHashMap<>();
+        if (inputs == null || inputs.isEmpty()) {
+            return out;
+        }
+        String org = normalizeOrg(orgId);
+        // 1. 去重（同批 LRU 的第一层）：同一批里同术语只查一次；空白项直接给空结果
+        List<String> asked = new ArrayList<>();
+        for (String in : inputs) {
+            if (in == null || in.isBlank()) {
+                out.put(in == null ? "" : in, List.of());
+                continue;
+            }
+            if (!out.containsKey(in) && !asked.contains(in)) {
+                asked.add(in);
+            }
+        }
+        if (asked.isEmpty()) {
+            return out;
+        }
+        // 2. 一次 _msearch：子查询与单条 search 逐字相同 ⇒ 结果与逐个查一致（结构上成立，非对账）
+        org.elasticsearch.action.search.MultiSearchRequest req =
+                new org.elasticsearch.action.search.MultiSearchRequest();
+        for (String in : asked) {
+            SearchSourceBuilder source = new SearchSourceBuilder()
+                    .size(maxCandidates)
+                    .query(recallQuery(org, in))
+                    .fetchSource(new String[]{"standard_term", "aliases", "source", "code", "org_id"}, null);
+            req.add(new SearchRequest(indexName(type)).source(source));
+        }
+        SEARCH_REQUESTS.addAndGet(1);
+        org.elasticsearch.action.search.MultiSearchResponse resp = client.msearch(req, RequestOptions.DEFAULT);
+        org.elasticsearch.action.search.MultiSearchResponse.Item[] items = resp.getResponses();
+        for (int i = 0; i < asked.size(); i++) {
+            List<TermEntry> candidates = new ArrayList<>();
+            if (i < items.length && !items[i].isFailure() && items[i].getResponse() != null) {
+                for (SearchHit hit : items[i].getResponse().getHits().getHits()) {
+                    candidates.add(toEntry(hit.getSourceAsMap()));
+                }
+            }
+            out.put(asked.get(i), candidates);
+        }
+        log.debug("[ES] {} 批量召回 {} 个术语（1 次 msearch，org_id='{}'）", indexName(type), asked.size(), org);
+        return out;
+    }
+
+    @Override
+    public long searchRequestCount() {
+        return SEARCH_REQUESTS.get();
+    }
+
     @Override
     public boolean schemaCompatible(String type) throws IOException {
         return exists(type) && hasCompatibleMapping(type);

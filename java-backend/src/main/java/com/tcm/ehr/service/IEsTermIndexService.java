@@ -95,6 +95,28 @@ public interface IEsTermIndexService {
      */
     List<TermEntry> search(String type, String orgId, String input, int maxCandidates) throws IOException;
 
+    /**
+     * 批量召回（批次 12 · 12b）：一次 ES 往返查多个术语。
+     *
+     * <p>用 ES 的 {@code _msearch} 而不是手写 {@code bool.should}：msearch 的每个子查询与
+     * {@link #search} 逐字相同、响应按提交顺序返回，因此<b>结果与逐个查逐条一致</b>是结构上成立的，
+     * 而不是靠对账；手写 should 则无法把命中归属回输入。</p>
+     *
+     * <p>入参里的重复项与空白项由实现负责处理（重复只查一次、空白直接给空结果），
+     * 返回的 Map 对每个去重后的输入都给一个键（无命中给空列表，不返回 null）。</p>
+     *
+     * @param type          术语类型
+     * @param orgId         当前组织；会同查 {@code org_id = ''}（基础层）
+     * @param inputs        待查术语（可含重复与空白）
+     * @param maxCandidates 每个术语的召回上限
+     * @return 输入 → 候选词条（按 ES 相关度排序）；无命中为空列表
+     */
+    java.util.Map<String, List<TermEntry>> searchBatch(String type, String orgId, List<String> inputs,
+                                                       int maxCandidates) throws IOException;
+
+    /** 累计已发出的 ES 检索请求数（批次 12 · 12b 的「请求数下降」打点；重启后归零） */
+    long searchRequestCount();
+
     /** 向后兼容：默认只查基础层（逐步淘汰） */
     default List<TermEntry> search(String type, String input, int maxCandidates) throws IOException {
         return search(type, "", input, maxCandidates);
