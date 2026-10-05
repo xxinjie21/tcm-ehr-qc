@@ -736,7 +736,7 @@ onMounted(handleSearch)
 .up-title em { color: var(--ink-mid); font-style: normal; font-weight: bold; }
 .up-sub { font-size: 12px; color: var(--text-sub); margin-top: var(--sp-1); }
 .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
-.result { margin-top: var(--sp-4); border-top: 1px dashed #ece8dc; padding-top: 14px; }
+.result { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: 14px; }
 .import-failed {
   margin-top: 14px;
   padding: var(--sp-2) var(--sp-3);
