@@ -204,7 +204,7 @@
         <!-- 体验修复（2026-10-05）：此前页面没有任何「本页不自动刷新」的说明，
              用户不知道报告何时更新、该点哪个按钮才生效。 -->
         <div style="margin-bottom:8px; padding:8px 10px; font-size:12px; line-height:1.7;
-                    color:#33322e; background:#f3ecdf; border-left:3px solid #96714f; border-radius:4px;">
+                    color:var(--text); background:var(--ochre-light); border-left:3px solid var(--ochre); border-radius:4px;">
           <b>本页不会自动刷新。</b>怎么让它更新：
           <b>补了词表</b> → 点「重跑『解析 + 质控』」（新词表只对重跑过解析的病历生效）；
           <b>只改质控规则</b> → 点「立即重跑质控」即可；
