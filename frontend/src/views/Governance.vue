@@ -282,11 +282,23 @@ const clean = reactive({ loading: false, result: null })
 // 执行数据清洗：先二次确认（文案明确「只标记不删除、不补医生未写内容」），
 // 再按当前 filters 提交；成功后写入分步结果与三级命中分布，并刷新顶部统计
 const handleClean = async () => {
-  // 1. 先二次确认，文案写明「只标记不删除、不补医生未写内容」
+  // 1. 先取「本次会处理多少条」，再弹确认：数据清洗是会对范围内病历成批写入的操作，
+  //    用户点之前必须知道影响面（批次6）。条数走既有预览接口，不新增后端；
+  //    取不到（网络/权限）不阻断清洗，确认文案退化为只讲范围，绝不假装「0 条」。
+  let affected = 0
+  try {
+    const pv = await previewDataset(buildPayload())
+    affected = pv.data?.total || 0
+  } catch {
+    affected = 0
+  }
+  // 2. 二次确认，文案写明「只标记不删除、不补医生未写内容」，并带上影响条数
   if (!(await confirmBox(
-      `将对「${scopeText.value}」范围内的病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`,
+      affected > 0
+        ? `将对「${scopeText.value}」范围内的 ${affected} 条病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`
+        : `将对「${scopeText.value}」范围内的病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`,
       '数据清洗',
-      { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }))) {
+      { type: 'warning', confirmButtonText: affected > 0 ? `确认清洗 ${affected} 条` : '确认执行', cancelButtonText: '取消' }))) {
     return
   }
   // 3. 置清洗中状态
