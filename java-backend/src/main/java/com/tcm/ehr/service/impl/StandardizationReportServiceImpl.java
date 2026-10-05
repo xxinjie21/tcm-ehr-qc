@@ -74,6 +74,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     @Override
     public StandardizationReportVO report(String start, String end) {
+        // 批次12（12d）：清掉上一次请求的解析缓存（Tomcat 线程池会复用线程）
+        structuredMemo.get().clear();
         StandardizationReportVO vo = new StandardizationReportVO();
         vo.setDictQuality(dictQuality());
         vo.setCrossTypeDuplicates(crossTypeDuplicates());
@@ -552,12 +554,38 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return terms;
     }
 
+    /**
+     * 同一条病历的结构化数据，在**一次请求内**只解析一次（批次 12 · 12d）。
+     *
+     * <p>{@code report()} 里 coverage / unmatched / normalizableRate 三个消费者都要这份 Map，
+     * 此前各自调用本方法 ⇒ 同一条 JSON 被 parse 三遍。3.5 万条时该接口实测 3.5~6.2 秒
+     * （见 docs/性能基线实测.md），三份解析开销都压在这条路径上。</p>
+     *
+     * <p>用 ThreadLocal：请求线程各自一份，天然并发安全；{@code report()} 入口先 clear()，
+     * 避免 Tomcat 线程复用读到上次请求的残留。用 IdentityHashMap：{@code Record} 未重写
+     * equals/hashCode，按引用比较既正确又最快。</p>
+     */
+    /**
+     * 解析缓存必须是 {@code static final}：Mockito 用 Objenesis 绕过构造造实例时
+     * **实例字段初始化器不会执行**，实例级 ThreadLocal 会是 null ⇒ NPE。
+     * 静态初始化器一定会跑；每线程一份、请求入口 clear()，语义与实例级等价。
+     */
+    private static final ThreadLocal<Map<Record, Map<String, Object>>> structuredMemo =
+            ThreadLocal.withInitial(java.util.IdentityHashMap::new);
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> structured(Record r) {
         if (r.getStructuredData() == null || r.getStructuredData().isBlank()) {
             return null;
         }
-        return parseJson(r.getStructuredData());
+        Map<Record, Map<String, Object>> memo = structuredMemo.get();
+        Map<String, Object> hit = memo.get(r);
+        if (hit != null) {
+            return hit;
+        }
+        Map<String, Object> parsed = parseJson(r.getStructuredData());
+        memo.put(r, parsed);
+        return parsed;
     }
 
     @SuppressWarnings("unchecked")
