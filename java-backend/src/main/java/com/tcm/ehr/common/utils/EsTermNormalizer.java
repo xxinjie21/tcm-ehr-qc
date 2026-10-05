@@ -55,6 +55,28 @@ public class EsTermNormalizer {
 
     private final IEsTermIndexService esTermIndexService;
 
+    /**
+     * 预热召回缓存（批次12 · 12b）：把一批术语一次问完 ES。
+     *
+     * <p>12b 的问题是「逐术语往返」：同一次解析里同一个术语会被反复归一，每次都发一次 ES 往返。
+     * 调用方在逐条归一**之前**调一次本方法，{@code searchBatch} 会用 {@code _msearch} 一次往返
+     * 查完这批术语，并**把结果写进与单条 search 完全相同的缓存键** ——
+     * 于是随后的逐条归一全部命中缓存，不再逐个往返。</p>
+     *
+     * <p>只预热、不改判定：命中与否仍由三级规则与 Dice 阈值决定。
+     * 预取失败不影响正确性（逐条归一照常走 ES），所以这里只记 debug 日志。</p>
+     */
+    public void prefetch(String type, String orgId, List<String> raws) {
+        if (raws == null || raws.isEmpty()) {
+            return;
+        }
+        try {
+            esTermIndexService.searchBatch(type, orgId == null ? "" : orgId, raws, RECALL_SIZE);
+        } catch (Exception e) {
+            log.debug("[归一] 预取失败（不影响逐条归一）：{}", e.getMessage());
+        }
+    }
+
     @Value("${elasticsearch.score-threshold:0.8}")
     private double scoreThreshold;
 

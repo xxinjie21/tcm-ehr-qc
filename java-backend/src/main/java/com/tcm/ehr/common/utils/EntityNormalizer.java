@@ -323,12 +323,69 @@ public class EntityNormalizer {
                 }));
     }
 
+    /**
+     * 预取召回（批次12 · 12b）：在逐条归一**之前**，把本次要归一的术语按类型一次批量问 ES。
+     *
+     * <p>不改判定、只预热：{@code EsTermNormalizer.prefetch} 走 {@code _msearch} 一次往返，
+     * 并把结果写进与单条 search 相同的缓存键，随后的逐条归一因此全部命中缓存。</p>
+     *
+     * <p>类型 key 由 structuredKey 反查 {@link com.tcm.ehr.common.config.EntityTypes} 得到 ——
+     * 复用那一份登记，不在本类里再写一张「字段名→类型」的表。</p>
+     */
+    private void prefetchRecall(NlpExtractVO vo, String orgId) {
+        java.util.Map<String, java.util.LinkedHashSet<String>> byStructuredKey = new java.util.LinkedHashMap<>();
+        collectRaws(byStructuredKey, "diseases", vo.getDiseases());
+        collectRaws(byStructuredKey, "symptoms", vo.getSymptoms());
+        collectRaws(byStructuredKey, "tongueList", vo.getTongueList());
+        collectRaws(byStructuredKey, "pulseList", vo.getPulseList());
+        collectRaws(byStructuredKey, "patternList", vo.getPatternList());
+        collectRaws(byStructuredKey, "causeList", vo.getCauseList());
+        collectRaws(byStructuredKey, "treatmentList", vo.getTreatmentList());
+        collectRaws(byStructuredKey, "formulaList", vo.getFormulaList());
+        // 中药是另一种 VO 类型：归一目标是 name 而不是 content（与下方第 3 步同口径）
+        if (vo.getHerbs() != null) {
+            for (NlpExtractVO.Herb h : vo.getHerbs()) {
+                String raw = rawOf(h.getName(), h.getSourceText());
+                if (raw != null && !raw.isBlank()) {
+                    byStructuredKey.computeIfAbsent("herbs", k -> new java.util.LinkedHashSet<>()).add(raw);
+                }
+            }
+        }
+        byStructuredKey.forEach((structuredKey, raws) -> {
+            com.tcm.ehr.common.config.EntityTypes.EntityType t =
+                    com.tcm.ehr.common.config.EntityTypes.dictTypeByStructuredKey(structuredKey);
+            if (t != null) {
+                termNormalizer.prefetch(t.key(), orgId, new java.util.ArrayList<>(raws));
+            }
+        });
+    }
+
+    /** 把某一类实体的原文收进待预取的集合（同一批里去重） */
+    private void collectRaws(java.util.Map<String, java.util.LinkedHashSet<String>> byStructuredKey,
+                             String structuredKey, List<NlpExtractVO.Entity> list) {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        java.util.LinkedHashSet<String> raws =
+                byStructuredKey.computeIfAbsent(structuredKey, k -> new java.util.LinkedHashSet<>());
+        for (NlpExtractVO.Entity e : list) {
+            String raw = rawOf(e.getContent(), e.getSourceText());
+            if (raw != null && !raw.isBlank()) {
+                raws.add(raw);
+            }
+        }
+    }
+
     public NormStat normalize(NlpExtractVO vo, String orgId) {
         // 1. 没抽取出东西就不做归一
         if (vo == null) {
             return new NormStat(0, 0, 0, 0);
         }
         int[] stat = {0, 0, 0, 0};
+
+        // 1.4 预取召回（批次12 · 12b）：归位与丢弃都会改动列表，所以放在它们**之后**、
+        //     逐条归一**之前** —— 这样预取的正是最终要归一的那些术语，且只发一次 ES 往返。
+        prefetchRecall(vo, orgId);
 
         // 1.5 归位（2026-10-05 修 #2）：抽取侧有时把脉象/舌象内容打进 symptoms ——
         //     实测症状字段 4170 条里有 107 条的内容**恰是脉象词典里的标准词**
