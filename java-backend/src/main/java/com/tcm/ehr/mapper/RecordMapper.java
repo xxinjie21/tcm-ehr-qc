@@ -118,6 +118,40 @@ public interface RecordMapper extends BaseMapper<Record> {
                                                  @Param("start") java.time.LocalDateTime start,
                                                  @Param("end") java.time.LocalDateTime end);
 
+    /**
+     * 词表缺口 TOP-N（批次 12 · 12d）：与 {@link #selectUnmatchedBreakdown} 同一套分类规则，
+     * 只取「词表缺口」那一类，按出现次数降序 —— 这是批次 2 给前端「先补哪几个词」用的数据。
+     *
+     * <p>规则必须与上面那段逐字一致，否则会出现「分项说缺口 2736 条、明细只列到几十条」的错位。
+     * 体征判定同样用 {@code LIKE '%压痛%'} 系列而非正则：忠实对应 Java 的 contains 子串语义，
+     * 也避开中文字符集下的正则坑。</p>
+     */
+    @Select("""
+            SELECT COALESCE(NULLIF(jt.c, ''), jt.s) AS content, COUNT(*) AS n
+            FROM records r,
+                 JSON_TABLE(r.structured_data, '$.symptoms[*]'
+                     COLUMNS (c VARCHAR(200) PATH '$.content',
+                              s VARCHAR(200) PATH '$.sourceText',
+                              normLevel VARCHAR(20) PATH '$.normLevel')) jt
+            WHERE (#{viewAll} = 1 OR r.org_id = #{orgId})
+              AND r.structured_data IS NOT NULL
+              AND jt.normLevel IS NULL
+              AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%压痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%触痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%叩痛%' OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '%反跳痛%')
+              AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
+                       OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
+              AND CHAR_LENGTH(COALESCE(NULLIF(jt.c, ''), jt.s)) > 2
+              AND (#{start} IS NULL OR r.visit_time >= #{start})
+              AND (#{end} IS NULL OR r.visit_time < #{end})
+            GROUP BY content
+            ORDER BY n DESC
+            LIMIT #{limit}
+            """)
+    java.util.List<Map<String, Object>> selectUnmatchedTop(@Param("orgId") String orgId,
+                                                           @Param("viewAll") boolean viewAll,
+                                                           @Param("start") java.time.LocalDateTime start,
+                                                           @Param("end") java.time.LocalDateTime end,
+                                                           @Param("limit") int limit);
+
     /** 清洗后的字段修复（trim/空值清理/状态标记）——仅隔离路径用：它要同时改 status/grade */
     @Update("""
             UPDATE records
