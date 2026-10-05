@@ -23,6 +23,7 @@ import subprocess
 import sys
 
 SIGN = ["压痛", "触痛", "叩痛", "反跳痛"]
+FIXTURE_ORG = "bench-fixture"
 CLASS_EXPR = "COALESCE(NULLIF(jt.c, ''), jt.s)"
 
 BREAKDOWN = """
@@ -55,7 +56,41 @@ def mysql(sql):
                        input=sql.encode("utf-8"), capture_output=True)
     out = p.stdout.decode("utf-8", "replace")
     rows = [ln.split("\t") for ln in out.strip().splitlines() if ln.strip()]
-    return rows[0], rows[1:]  # header, rows
+    if not rows:
+        # INSERT/DELETE 没有结果集：返回空而不是抛 IndexError（夹具段就踩过这个坑）
+        return [], []
+    return rows[0], rows[1:]
+
+
+def num_rows(sql):
+    head, rows = mysql(sql)
+    return {} if not rows else {k: int(v) for k, v in zip(head, rows[0])}
+
+
+def fixture_check():
+    """规则夹具：用与生产同一条 SQL 断言分类规则（替代被删除的三个 Java 用例）。"""
+    mysql("DELETE FROM records WHERE org_id='%s';" % FIXTURE_ORG)
+    mysql("INSERT INTO records (id, org_id, structured_data, score, grade) VALUES "
+          "('fx-1','%s','{\"symptoms\":["
+          "{\"content\":\"双\",\"sourceText\":\"双\"},"
+          "{\"content\":\"脉细数\",\"sourceText\":\"脉细数\"},"
+          "{\"content\":\"腹部压痛\",\"sourceText\":\"腹部压痛\"},"
+          "{\"content\":\"神疲乏力\",\"sourceText\":\"神疲乏力\"},"
+          "{\"content\":\"发热\",\"sourceText\":\"发热\",\"normLevel\":1}]}',95,'合格');" % FIXTURE_ORG)
+    got = num_rows(BREAKDOWN.format(e=CLASS_EXPR, org=FIXTURE_ORG))
+    exp = {"total": 4, "physicalSign": 1, "misrouted": 1, "fragment": 1, "dictionaryGap": 1}
+    ok = got == exp
+    print("  [OK] ⑤ 规则夹具：双→碎片 · 脉细数→错放 · 腹部压痛→体征 · 神疲乏力→缺口 · 发热已归一不计"
+          if ok else "  [FAIL] ⑤ 规则夹具不符：期望 %s 实际 %s" % (exp, got))
+    _, rows = mysql(TOP.format(e=CLASS_EXPR, org=FIXTURE_ORG))
+    top = {r[0]: int(r[1]) for r in rows}
+    if top == {"神疲乏力": 1}:
+        print("  [OK] ⑥ 夹具 TOP：只有「神疲乏力」入榜（体征/错放/碎片都被排除）")
+    else:
+        print("  [FAIL] ⑥ 夹具 TOP 不符：%s" % top)
+        ok = False
+    mysql("DELETE FROM records WHERE org_id='%s';" % FIXTURE_ORG)
+    return ok
 
 
 def main():
@@ -102,6 +137,8 @@ def main():
         print("  [OK] ③ TOP 之和 %d <= dictionaryGap %d" % (tot, nums["dictionaryGap"]))
     if rows2:
         print("      TOP3：" + "、".join("%s(%s)" % (r[0], r[1]) for r in rows2[:3]))
+
+    ok = fixture_check() and ok
 
     if args.api:
         try:
