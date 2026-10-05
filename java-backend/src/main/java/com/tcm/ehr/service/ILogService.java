@@ -23,6 +23,20 @@ public interface ILogService {
     Map<String, Object> page(String action, String keyword, int page, int size);
 
     /**
+     * 按对象查该对象的活动流（对标 D3）。
+     *
+     * <p>与 {@link #page} 同一套可见范围（成员只见本组织、看全部的组织不加 operator 限制），
+     * 只额外按 object_type + object_id 精确过滤 —— 这是「这条病历被谁改过」的查询入口。</p>
+     *
+     * @param objectType 对象类型，如 record
+     * @param objectId   对象 ID
+     * @param page       页码，从 1 开始
+     * @param size       每页条数
+     * @return total=总条数；list=当前页记录（按时间倒序）
+     */
+    Map<String, Object> pageByObject(String objectType, String objectId, int page, int size);
+
+    /**
      * 操作类型去重值，供筛选下拉动态渲染。
      *
      * @return 库中出现过的操作类型

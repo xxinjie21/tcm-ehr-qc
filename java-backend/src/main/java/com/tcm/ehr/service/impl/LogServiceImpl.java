@@ -59,6 +59,28 @@ public class LogServiceImpl implements ILogService {
     }
 
     /**
+     * 按对象查活动流（对标 D3）。
+     *
+     * <p><b>刻意复用 {@link #buildWrapper}</b>：它带着三档可见范围（成员只见本组织的日志）。
+     * 新入口若图省事自己拼一个 wrapper，就会绕开数据域 —— 这类回归最危险，
+     * 因为功能看起来完全正常，只是多了不该看到的行。</p>
+     */
+    @Override
+    public Map<String, Object> pageByObject(String objectType, String objectId, int page, int size) {
+        QueryWrapper<OperationLog> w = buildWrapper(null, null)
+                .eq("object_type", objectType == null ? null : objectType.trim())
+                .eq("object_id", objectId == null ? null : objectId.trim())
+                .orderByDesc("log_time");
+        Page<OperationLog> p = baseMapper.selectPage(
+                new Page<>(Math.max(page, 1), Math.max(size, 1)), w);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", p.getTotal());
+        fillOrgNames(p.getRecords());
+        result.put("list", p.getRecords());
+        return result;
+    }
+
+    /**
      * 取全部操作类型，供筛选下拉框使用。
      *
      * @return 去重后的操作类型列表

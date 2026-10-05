@@ -51,6 +51,28 @@ public class LogController {
     }
 
     /**
+     * 按对象查活动流（对标 D3）：病历详情页的「活动 / 历史」用它。
+     *
+     * <p>【权限：登录即可】可见范围与 {@code GET /api/logs} 完全一致（同一套 buildWrapper），
+     * 只额外按对象精确过滤 —— 不能因为「是按 ID 查」就绕过数据域。</p>
+     *
+     * @param objectType 对象类型，如 record（必填）
+     * @param objectId   对象 ID（必填）
+     * @return total / list（按时间倒序）
+     */
+    @GetMapping("/by-object")
+    public Result<Map<String, Object>> byObject(@RequestParam String objectType,
+                                                @RequestParam String objectId,
+                                                @RequestParam(defaultValue = "1") int page,
+                                                @RequestParam(defaultValue = "20") int pageSize) {
+        if (objectType.isBlank() || objectId.isBlank()) {
+            throw new IllegalArgumentException("缺少对象标识");
+        }
+        return Result.ok(logService.pageByObject(objectType, objectId, page,
+                PageSizeGuard.clamp(pageSize)));
+    }
+
+    /**
      * 查询操作类型选项。
      *
      * <p>【权限：登录即可】取库中出现过的值（同三档），前端据此渲染下拉，避免写死清单与调用点漂移。</p>
