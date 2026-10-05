@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS review_tasks (
   issue_type VARCHAR(50) COMMENT '问题类型（缺失字段/逻辑冲突/评分不达标）',
   score INT COMMENT '当前评分',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-  deadline_time DATETIME COMMENT '复核截止时间（创建时间+7个工作日）',
+  deadline_time DATETIME COMMENT '复核截止时间（创建时间+7个自然日 —— 原写「工作日」有误，2026-10-05 校正；实现按自然日算）',
   reviewed_by VARCHAR(50) COMMENT '复核人用户名',
   completed_time DATETIME COMMENT '复核完成时间',
   is_obsolete TINYINT NOT NULL DEFAULT 0 COMMENT '作废标记：病历重新评分后不再是待复核则置1（查询/统计/看板统一过滤 is_obsolete=0）',
