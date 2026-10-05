@@ -497,12 +497,29 @@ onMounted(() => {
   border-radius: 6px;
   padding: 14px var(--sp-5);
   margin-bottom: 20px;
+  /* 批次16 · 16.4：筛选区压成一行。
+     原先 .scope-row（「当前范围」那行）带 margin-top:10px，**永远另起一行** —— 控件本身
+     在 1366 下是放得下的（约 700px），是这一行让整块筛选区占到 2~3 行，把下面的流程区
+     挤出首屏。改成横向：左筛选、右「当前范围」；窄屏（≤1560）由 flex-wrap 自动换行，
+     不裁切、也不硬挤成一行。 */
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
 }
 .scope-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 10px;
+  margin-top: 0;
+}
+/* 窄屏（1366 这一档）：缩小间距，让筛选与「当前范围」仍尽量同行 */
+@media (max-width: 1560px) {
+  .scope-bar {
+    gap: var(--sp-3);
+    padding: 12px var(--sp-4);
+  }
 }
 .scope-tip { font-size: var(--fs-base); color: var(--text-sub); }
 .scope-tip b { color: var(--ink); }
