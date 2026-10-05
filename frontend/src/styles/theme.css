@@ -130,6 +130,20 @@ body {
   font-size: var(--fs-base);
 }
 
+/* ===== 表格操作列：把「链接式」按钮的命中区补到 ≥24px（批次 16 · 16.3）=====
+   各列表页的操作列普遍是 <el-button link size="small">：纯文字、没有内边距。
+   视觉上轻是想要的，但命中区只有文字本身高（约 16~18px），触控板与手指都容易点空。
+   这里**只加纵向内边距**把命中区抬到 24px 以上，字号与颜色一律不动 ——
+   观感不变、手感变好，这正是 16.3「点击目标 ≥24px 高（表格操作列）」要的东西。
+   不用 min-height 单顶：那会让文字贴顶、行内基线跑掉；配合 inline-flex 居中才稳。 */
+.el-table .el-button.is-link {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* ===== 标签（原型 tag 风格：小圆角方标签） ===== */
 .el-tag {
   border-radius: 2px;
