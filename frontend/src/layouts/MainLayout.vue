@@ -8,7 +8,9 @@
         中医电子病历质控与标准化系统<em>TCM EHR Quality Control &amp; Standardization</em>
       </div>
       <div class="user">
-        <!-- 导入 LLM：仅管理员可见；配置含三方通道密钥，属系统级设置 -->
+        <!-- 导入 LLM（菜单项「我的 LLM」）：**对所有登录用户开放，不按角色隐藏** ——
+     配置已改为「每个用户一份」（后端写 user_llm_config 自己那一行，管理员也只改自己的），
+     若按管理员隐藏，普通用户就没有入口配自己的模型。校正于 2026-10-05（原注释写「仅管理员可见」已过期）。 -->
         <el-button link class="llm-entry" @click="llmVisible = true">
           导入 LLM
         </el-button>
@@ -68,7 +70,7 @@
     <!-- 全局 AI 助手悬浮窗-->
     <AiAssistant />
 
-    <!-- LLM 运行时配置；属「短平快的一次性配置」，按  口径用弹窗 -->
+    <!-- LLM 运行时配置；属「短平快的一次性配置」，按「短平快的一次性配置」的既有口径用弹窗 -->
     <LlmConfigDialog v-model="llmVisible" />
   </div>
 </template>
