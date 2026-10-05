@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS records (
   INDEX idx_status (status),
   INDEX idx_grade (grade),
   INDEX idx_department_visit_time (department, visit_time),
+  INDEX idx_records_visit_time (visit_time),
   text_hash CHAR(32) NULL COMMENT '21 字段 MD5；NULL = 不参与唯一约束',
   UNIQUE KEY uk_records_org_text_hash (org_id, text_hash),
   INDEX idx_records_org (org_id)
