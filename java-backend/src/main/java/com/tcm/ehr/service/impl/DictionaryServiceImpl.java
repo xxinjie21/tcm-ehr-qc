@@ -39,6 +39,9 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     /** 单个词典文件大小上限（字节）。与 Spring multipart.max-file-size 同值（50MB） */
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
+    /** 单次导入的词条数上限。文件大小上限挡不住「行数极多的小文件」：
+     *  合并进内存、逐条 merge、再整表替换 + 重建该组织 ES 索引，代价随行数线性上升。 */
+    static final int MAX_ROWS = 50000;
 
 
     private final IEsTermIndexService esTermIndexService;
@@ -200,6 +203,11 @@ if (matched) {
         //    （归档版本是「合并后」的快照而非「写前」备份），ES 重建失败的补偿
         //    直接用内存里的 previous 回退。
         // 3. 落库（同一事务里更新内容版本，避免「词条换了、版本没换」而跳过重建）
+        // P1-9：行数上限 —— 在**落库前**兜住，并把「拆开导入」的下一步直接写给用户
+        if (entries.size() > MAX_ROWS) {
+            throw new IllegalArgumentException(
+                    "词条数 " + entries.size() + " 超过单次上限 " + MAX_ROWS + " 条，请拆分后分批导入");
+        }
         String contentVersion = termStore.replace(orgId, type, entries);
         // 5. 只重建「本组织」在 ES 里的文档；失败则退回库内容，绝不谎报已同步
         try {
