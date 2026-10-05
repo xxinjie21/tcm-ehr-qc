@@ -221,6 +221,18 @@ public class QcBatchServiceImpl implements IQcBatchService {
         // 数据域快照：阶段 2 后 RecordFilter 取的是 orgId 而不是 role
         String orgId = RequestUtils.currentOrgId();
 
+        // 1.5 幂等（批次 5）：同一 request_key 的重放直接返回既有任务。
+        //     放在 GET_LOCK **之前** —— 重放不是并发冲突，不该去抢锁，更不该被「已有任务在跑」拒绝。
+        String requestKey = dto == null ? null : dto.getRequestKey();
+        if (requestKey != null && !requestKey.isBlank()) {
+            requestKey = requestKey.trim();
+            QcTask existed = findTaskByRequestKey(orgId, requestKey);
+            if (existed != null) {
+                log.info("[批重算] 幂等命中：key={} 复用任务 {}", requestKey, existed.getId());
+                return toVO(existed, false);
+            }
+        }
+
         // 2. 防重：「查有没有活跃任务」+「插队」必须原子，否则并发双提交会双双入库
         //    （两个任务同时跑，进度互相覆写）。
         //    ⚠️ 互斥用 DB 的 GET_LOCK 而不是 JVM 锁：synchronized 在多实例下静默失效 ——
@@ -249,6 +261,21 @@ public class QcBatchServiceImpl implements IQcBatchService {
                 log.warn("[批重算] 释放提交锁失败: {}", e.getMessage());
             }
         }
+    }
+
+    /**
+     * 按 (组织, 幂等键) 查任务（批次 5）。
+     *
+     * <p>orgId 为空直接返回 null：org_id 为 NULL 的历史任务不该被任何组织按键命中。</p>
+     */
+    private QcTask findTaskByRequestKey(String orgId, String requestKey) {
+        if (orgId == null || requestKey == null) {
+            return null;
+        }
+        return taskMapper.selectOne(new QueryWrapper<QcTask>()
+                .eq("org_id", orgId)
+                .eq("request_key", requestKey)
+                .last("LIMIT 1"));
     }
 
     /** 查重通过后真正落库的那一段（被提交互斥包住） */
@@ -283,7 +310,20 @@ public class QcBatchServiceImpl implements IQcBatchService {
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
-        taskMapper.insert(t);
+        // 批次5：幂等键落库（空白视同未提供，与前置检查同一口径）
+        String rk = dto == null ? null : dto.getRequestKey();
+        t.setRequestKey(rk == null || rk.isBlank() ? null : rk.trim());
+        try {
+            taskMapper.insert(t);
+        } catch (org.springframework.dao.DuplicateKeyException dup) {
+            // 并发同键：另一提交刚插入成功 ⇒ 查回那条任务返回，绝不重跑
+            QcTask existed = findTaskByRequestKey(orgId, t.getRequestKey());
+            if (existed != null) {
+                log.info("[批重算] 并发同键：key={} 复用任务 {}", t.getRequestKey(), existed.getId());
+                return toVO(existed, false);
+            }
+            throw dup;
+        }
 
         // 5. 入队后立即返回，由工作线程异步消费
         queue.offer(t.getId());
