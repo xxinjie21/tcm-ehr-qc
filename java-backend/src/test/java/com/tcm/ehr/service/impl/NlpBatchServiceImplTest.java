@@ -331,6 +331,9 @@ class NlpBatchServiceImplTest {
 
         boolean nothingDone = !failed && !cancelled && done == 0 && total > 0;
 
+        // P0-1：状态选择必须「不撒谎」—— 未跑起来用 INTERRUPTED，执行异常才是 FAILED
+        String status = failed ? "FAILED" : nothingDone ? "INTERRUPTED" : "COMPLETED";
+        assertEquals("INTERRUPTED", status, "0 处理 + 总数 500 ⇒ 用 INTERRUPTED 表达，不是 COMPLETED");
         assertTrue(nothingDone, "0 处理 + 总数 500 ⇒ 必须判为异常终止（不得报完成）");
         assertFalse(!failed && !cancelled && 0 == 0 && 0 > 0, "总数 0 的任务不适用该判据（本来就没事可做）");
         assertFalse(!failed && cancelled && done == 0 && total > 0, "被取消的任务已有自己的终态，不走该判据");

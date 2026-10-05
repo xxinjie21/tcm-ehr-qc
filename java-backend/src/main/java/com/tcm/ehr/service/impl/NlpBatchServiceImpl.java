@@ -478,7 +478,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 log.error("[批解析] 任务 {} 未处理任何记录（0/{}），判为异常终止："
                         + "请检查任务分流与明细读取，不要据此认为已完成", id, t.getTotal());
             }
-            t.setStatus(failed || nothingDone ? NlpTask.FAILED
+            // P0-1（修正）：0 处理不属于「系统失败」，而是「没跑起来」——
+            // 用既有的 INTERRUPTED 表达（NlpTask 已定义该状态，无需改表/改枚举）；
+            // 真正的执行异常仍落 FAILED。两者都不能显示为「完成」。
+            t.setStatus(failed ? NlpTask.FAILED
+                    : nothingDone ? NlpTask.INTERRUPTED
                     : endStatus(running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
