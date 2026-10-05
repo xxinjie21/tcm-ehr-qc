@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS nlp_task (
   failed INT NOT NULL DEFAULT 0 COMMENT '失败条数',
   current_label VARCHAR(255) COMMENT '当前处理的病历标识',
   filters_json TEXT COMMENT '筛选范围(JSON)',
+  request_key VARCHAR(64) NULL COMMENT '幂等键（批次5；同组织内唯一，NULL 不参与唯一性）',
   created_by VARCHAR(50) COMMENT '提交人用户名',
   failure_list JSON COMMENT '失败清单(仅存前500条)',
   failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
@@ -141,6 +142,7 @@ CREATE TABLE IF NOT EXISTS nlp_task (
   INDEX idx_create_time (create_time),
   -- 取消位落库：工作线程读本列判断，不再依赖内存 Set（重启即失）
   cancel_requested TINYINT NOT NULL DEFAULT 0 COMMENT '1=已请求取消',
+  UNIQUE KEY uk_nlp_task_req (org_id, request_key),
   INDEX idx_nlp_task_org (org_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='NLP批量解析任务表';
 
