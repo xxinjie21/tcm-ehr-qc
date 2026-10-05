@@ -353,7 +353,7 @@
 <script setup>
 // 单条 / 批量 NLP 结构化解析页：上方病历列表点行载入原文，下方「单条解析」「批量解析」两个 Tab。
 // 单条：原文按字段模块化可逐项改，抽取后展示归一结果、可写回该病历结构化数据（覆盖原有）；
-// 批量：仅管理员可见，走后端异步任务，提交后可关页面、靠轮询刷新进度。归一只认 ES 词典，索引不可用即整体失败。
+// 批量：后端异步任务（提交后可关页面、靠轮询刷新进度）；权限为「登录即可」——nlp 域 5 个端点皆 LOGIN，本页无任何管理员守卫（原注释写「仅管理员可见」有误，2026-10-05 校正）。归一只认 ES 词典，索引不可用即整体失败。
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import RecordTable from '@/components/RecordTable.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
