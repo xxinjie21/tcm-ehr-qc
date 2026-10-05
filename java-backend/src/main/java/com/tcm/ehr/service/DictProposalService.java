@@ -104,6 +104,14 @@ static final int MIN_SHRINK_RATIO_PERCENT = 80;
 @Transactional(rollbackFor = Exception.class)
 public DictProposalVO submit(String orgId, String type, List<TermEntry> terms, String submitUserId) {
         String org = norm(orgId);
+        // M1（2026-10-05）：**「没有组织」不等于「要写基础层」** —— norm 把空 orgId 归一成 ""，
+        // 而 "" 正是基础层（org_id=''）的约定，于是无组织用户的提案会落进各组织共用的系统基线。
+        // 原先只在**审核**环节拦（requireAuditable：「基础层提案仅管理员可审核」），
+        // 提交环节没拦：提案能建出来、只是合不进去 —— 这正是报告 M1 说的「无组用户可向基础层提交提案」。
+        // 这里与 /import?target=base、审核处保持**同一口径**：基础层只允许管理员。
+        if (org.isEmpty() && !RequestUtils.isAdmin()) {
+            throw new ForbiddenException("基础层提案仅管理员可提交");
+        }
         // 1. 先查上限再建快照 —— 顺序反了就是「先写完再发现有超限」
         Long pending = proposalMapper.selectCount(new QueryWrapper<DictProposal>()
                 .eq("org_id", org).eq("type", type).eq("status", DictProposal.PENDING));
