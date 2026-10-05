@@ -25,7 +25,18 @@
     @row-click="(row, col, e) => $emit('row-click', row, col, e)"
   >
     <el-table-column v-if="selectable" type="selection" width="46" />
-    <el-table-column prop="id" label="病历ID" width="320" show-overflow-tooltip />
+    <!-- 病历 ID 是 36 字符的 UUID：常态下没人读它，却固定吃掉 320px，
+         把「摘要」挤到只剩半行可见（结构化解析页实拍可见：ID 完整、摘要被截）。
+         这里只做长度收敛 —— 常态显示前 8 位（支持场景足以口头报出），悬停给全文。
+         数据侧另有更可读的 registrationNo / outpatientNo，但它们各有语义（挂号号 / 门诊号），
+         不适合冒充「病历 ID」，故不在此处替换。 -->
+    <el-table-column label="病历ID" width="120">
+      <template #default="{ row }">
+        <el-tooltip :content="row.id || '—'" placement="top">
+          <span>{{ (row.id || '—').slice(0, 8) }}</span>
+        </el-tooltip>
+      </template>
+    </el-table-column>
     <el-table-column prop="summary" label="摘要" min-width="240" show-overflow-tooltip />
     <!-- 评分与分级成对：分级是结论、评分是量值，只给分级看不出差多少分 -->
     <el-table-column label="评分" width="80" align="center">
