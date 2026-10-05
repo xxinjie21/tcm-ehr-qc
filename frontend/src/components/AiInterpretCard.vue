@@ -281,7 +281,7 @@ watch(() => props.recordId, () => {
   font-size: 11.5px;
   color: var(--text-sub);
   text-align: right;
-  border-top: 1px dashed #ece8dc;
+  border-top: 1px dashed var(--line-soft);
   padding-top: var(--sp-2);
 }
 .aii-tip {
