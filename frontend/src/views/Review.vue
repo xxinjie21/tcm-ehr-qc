@@ -279,7 +279,7 @@ import TermInput from '@/components/TermInput.vue'
 import { listReviewTasks } from '@/api/review'
 import { usePagedList } from '@/composables/usePagedList'
 import { getRawRecord, submitReview } from '@/api/records'
-import { aiReview } from '@/api/ai'
+import { aiReview, runAiAsync } from '@/api/ai'
 import { qcScore, getQcRules } from '@/api/qc'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { fieldsWithWide } from '@/utils/recordFields'
@@ -608,10 +608,12 @@ const openReview = async (row) => {
     // 任务列表已带 structuredData，但以病历详情为准（列表数据可能滞后）
     fillEditors(raw.data?.structuredData)
     try {
-      // 5. 异步取 AI 预检建议，失败不影响复核（仅提示以扣分明细为准）
-      const ai = await aiReview({ recordId: row.recordId })
-      aiAnswer.value = ai.data?.answer || ''
-      aiSource.value = ai.data?.source || ''
+      // 5. 取 AI 预检建议，失败不影响复核（仅提示以扣分明细为准）。
+      //    走异步路（15.1）：提交拿任务号再轮询，生成期间不占请求线程；
+      //    返回的是 reply 本体（不是 axios 响应）。
+      const ai = await runAiAsync('review', { recordId: row.recordId })
+      aiAnswer.value = ai?.answer || ''
+      aiSource.value = ai?.source || ''
     } catch {
       aiAnswer.value = '（AI 预检不可用，请以左侧扣分明细为准）'
     }

@@ -91,7 +91,7 @@
 // LLM 未启用时仍出规则部分，由标题旁的来源标签标明。
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { aiInterpret } from '@/api/ai'
+import { aiInterpret, runAiAsync } from '@/api/ai'
 import { LEVEL_TINY } from '@/utils/structured'
 
 const props = defineProps({
@@ -114,12 +114,14 @@ const run = async () => {
   loading.value = true
   result.value = null
   try {
-    // 骨架屏至少展示 1 秒（模拟分析过程），与请求并行
+    // 骨架屏至少展示 1 秒（模拟分析过程），与请求并行。
+    // 请求走异步路（15.1）：提交拿任务号再轮询，LLM 生成期间不占请求线程；
+    // runAiAsync 返回的是 reply 本体（不是 axios 响应），所以下面直接用 res。
     const [res] = await Promise.all([
-      aiInterpret({ recordId: props.recordId }),
+      runAiAsync('interpret', { recordId: props.recordId }),
       new Promise((r) => setTimeout(r, 1000))
     ])
-    result.value = res.data
+    result.value = res
   } catch {
     // 拦截器已提示
   } finally {

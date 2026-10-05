@@ -42,7 +42,13 @@
                 <span v-if="m.source" class="msg-src">{{ m.source === 'rule' ? '规则回答（LLM 未启用）' : 'AI 回答' }}</span>
               </template>
             </div>
-            <div v-if="loading" class="msg ai loading">正在思考…</div>
+            <!-- 15.2：生成期间告知用户不必守在这里。措辞必须准确 ——
+                 本组件挂在 MainLayout 上，系统内切页面不会卸载它，任务照常在跑；
+                 但关闭标签页会丢任务号（任务号刻意不持久化：AI 结论与组织数据域绑定，
+                 跨会话保留有泄露风险）。所以只说「可切换页面」，不说「可关掉页面」。 -->
+            <div v-if="loading" class="msg ai loading">
+              正在生成…可以在系统内切换到其它页面，稍后回到助手即可看到结果（请不要关闭标签页）
+            </div>
           </template>
         </div>
 
@@ -84,7 +90,7 @@
 // 提问带上「当前打开的病历」与近期上文（追问），由后端决定用规则还是 LLM 回答。
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
-import { aiChat } from '@/api/ai'
+import { aiChat, runAiAsync } from '@/api/ai'
 import { useAiContextStore } from '@/stores/ai'
 
 // 跨组件读取「当前打开的病历」，作为提问上下文
@@ -263,16 +269,18 @@ const ask = async (preset) => {
   loading.value = true
   scrollBottom()
   try {
-    // 3. 带上当前病历与近期上文；后端据 source 决定回答来自规则还是模型
-    const res = await aiChat({
+    // 3. 带上当前病历与近期上文；后端据 source 决定回答来自规则还是模型。
+    //    走异步路（15.1）：长回答不再占请求线程，用户此刻离开页面、回来再问也不影响；
+    //    这一次的结论通过轮询取回，返回的就是 reply 本体（不是 axios 响应）。
+    const res = await runAiAsync('chat', {
       question: q,
       recordId: aiStore.activeRecord?.id || '',
       history: historyText()
     })
     messages.value.push({
       role: 'ai',
-      text: res.data?.answer || '（无回答）',
-      source: res.data?.source || ''
+      text: res?.answer || '（无回答）',
+      source: res?.source || ''
     })
   } catch {
     // 拦截器已提示
