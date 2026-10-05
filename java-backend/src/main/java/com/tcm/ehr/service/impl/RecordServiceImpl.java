@@ -83,8 +83,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             "westernDiagnosis", "tcmDiagnosis", "presentIllness", "chiefComplaint", "selfReport",
             "inspection", "pulse", "tongue", "physicalExam", "pattern", "prescription",
             "followUp", "treatmentEffect", "department", "doctorId", "visitTime");
-
-    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
     private static final int MAX_FILES = 20;
     /** 删除分块大小（先删 review_tasks 再删 records，避免一次 IN 过大） */
     private static final int DELETE_CHUNK = 500;
@@ -138,7 +136,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
         // 4. 逐文件处理（P3.4：单文件解析抽到 parseFile）
         for (MultipartFile file : files) {
-            parseFile(file, summary, parsedRows, batchRegNos, visitTimeWarn, visitTimeWarnSamples);
+            ExcelSheetImporter.importFile(file, summary, parsedRows, batchRegNos, visitTimeWarn, visitTimeWarnSamples);
         }
 
         // 「接诊时间」解析失败不阻断导入，但必须留痕：只写日志、不改接口与摘要，
@@ -212,93 +210,6 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         log.info("[病历导入] task={} 文件={} 行={} 成功={} 失败={}",
                 taskId, files.length, summary.getTotal(), summary.getSuccess(), summary.getFailed());
         return vo;
-    }
-
-    /**
-     * 解析单个上传文件（P3.4 从 importRecords 抽出）：文件级校验 → 表头校验 → 逐行映射。
-     *
-     * <p>文件级问题（空 / 超限 / 后缀不符 / 缺表头 / 缺必需列）记失败并返回；
-     * 行级问题记失败明细；成功的行列进 {@code parsedRows} 并累积待查重登记号。
-     * 「接诊时间」有值却解析不出的行照旧入库，仅计数留痕（见调用侧 warn）。</p>
-     *
-     * @param visitTimeWarn 长度 1 的计数容器（跨文件累加）
-     */
-    private void parseFile(MultipartFile file, ImportSummaryVO summary, List<Object[]> parsedRows,
-                           Set<String> batchRegNos, int[] visitTimeWarn, List<String> visitTimeWarnSamples) {
-        String filename = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
-        if (file.isEmpty()) {
-            summary.setFailed(summary.getFailed() + 1);
-            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "文件为空"));
-            return;
-        }
-        if (file.getSize() > MAX_FILE_BYTES) {
-            summary.setFailed(summary.getFailed() + 1);
-            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "单文件超过 50MB"));
-            return;
-        }
-        String lower = filename.toLowerCase();
-        if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls")) {
-            summary.setFailed(summary.getFailed() + 1);
-            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "仅支持 .xlsx / .xls"));
-            return;
-        }
-        if (lower.endsWith(".xlsx")) {
-            try {
-                ExcelSheetImporter.parseXlsxStreaming(file, filename, summary, batchRegNos, parsedRows,
-                        visitTimeWarn, visitTimeWarnSamples);
-            } catch (Exception e) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "解析失败：" + e.getMessage()));
-            }
-            return;
-        }
-
-        try (InputStream in = file.getInputStream(); Workbook wb = WorkbookFactory.create(in)) {
-            Sheet sheet = wb.getSheetAt(0);
-            Row header = sheet.getRow(sheet.getFirstRowNum());
-            if (header == null) {
-                summary.setFailed(summary.getFailed() + 1);
-                summary.getFailures().add(new ImportSummaryVO.Failure(filename, "缺少表头"));
-                return;
-            }
-            Map<String, Integer> colIndex = ExcelSheetImporter.buildHeaderIndex(header);
-            if (!ExcelSheetImporter.checkRequiredColumns(colIndex, summary, filename)) {
-                return;
-            }
-            // 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
-            for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
-                Row row = sheet.getRow(i);
-                if (row == null || TextUtil.isBlank(ExcelCellParser.cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
-                    continue;
-                }
-                summary.setTotal(summary.getTotal() + 1);
-                try {
-                    Record r = ExcelSheetImporter.mapRow(ExcelRowReader.of(row), colIndex);
-                    if (TextUtil.isBlank(r.getOutpatientNo())) {
-                        throw new IllegalArgumentException("门诊号为空");
-                    }
-                    batchRegNos.add(r.getRegistrationNo());
-                    parsedRows.add(new Object[]{r, filename});
-                    // 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕。
-                    // 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、
-                    // 日期范围筛选、去重哈希同时悄悄退化（2026-09-28 的实际故障）
-                    String rawVisit = ExcelCellParser.cellText(row.getCell(colIndex.get("visitTime")));
-                    if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
-                        visitTimeWarn[0]++;
-                        if (visitTimeWarnSamples.size() < ExcelSheetImporter.VISIT_TIME_WARN_SAMPLE_MAX) {
-                            visitTimeWarnSamples.add("第 " + (i + 1) + " 行「" + rawVisit + "」");
-                        }
-                    }
-                } catch (Exception e) {
-                    summary.setFailed(summary.getFailed() + 1);
-                    summary.getFailures().add(new ImportSummaryVO.Failure(filename,
-                            "第 " + (i + 1) + " 行：" + e.getMessage()));
-                }
-            }
-        } catch (Exception e) {
-            summary.setFailed(summary.getFailed() + 1);
-            summary.getFailures().add(new ImportSummaryVO.Failure(filename, "解析失败：" + e.getMessage()));
-        }
     }
 
     /** 逐行去重（库内哈希 + 批内哈希双查）后收进待插入列表；重复记失败明细（P3.4 从 importRecords 抽出） */
