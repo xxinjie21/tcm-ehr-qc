@@ -215,6 +215,7 @@ import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
 import FreshnessTag from '@/components/FreshnessTag.vue'
 import { usePagedList } from '@/composables/usePagedList'
+import { useUrlFilters } from '@/composables/useUrlFilters'
 import RecordTable from '@/components/RecordTable.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -289,6 +290,12 @@ const {
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   clearOnFailure: false
 })
+
+// 对标 E5「可分享视图」：筛选与分页同步到 URL（刷新 / 分享保留视图）。
+// 放在这里而不是 onMounted 里：本函数在 setup 阶段**同步**还原 URL 里的条件，
+// 所以第 696 行那句 onMounted(handleSearch) 会自动带上它们 —— 不需要额外再接一次加载
+//（再接一次就是发两次请求）。
+useUrlFilters(query, page, pageSize)
 
 // 查询列表：翻页 / 改筛选 / 重试共用同一入口
 const handleSearch = () => loadList()
