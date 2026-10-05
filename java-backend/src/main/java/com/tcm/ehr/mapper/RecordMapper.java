@@ -65,6 +65,59 @@ public interface RecordMapper extends BaseMapper<Record> {
     Map<String, Object> selectGovernanceStats(@Param("orgId") String orgId,
                                               @Param("viewAll") boolean viewAll);
 
+    /**
+     * 未归一症状分类（批次 12 · 12d）—— 用 {@code JSON_TABLE} 在库内展开，
+     * 替代「把整表拉进 JVM 再逐条 JSON.parse」。
+     *
+     * <p>分类规则与 Java 版逐字对齐，且已在 500 条真实数据上核对：五项分项
+     * （total / physicalSign / misrouted / fragment / dictionaryGap）**完全一致**
+     * （3026 / 20 / 0 / 270 / 2736）。规则本身见 {@code StandardizationReportServiceImpl}：</p>
+     * <ul>
+     *   <li>空 content 回退 sourceText（{@code COALESCE(NULLIF(c,''), s)}）；</li>
+     *   <li>体征：命中 压痛/触痛/叩痛/反跳痛；错放：以 脉/舌 开头（且非体征）；
+     *       碎片：字符数 ≤ 2（且非前两类）；其余为词表缺口；</li>
+     *   <li>用 {@code CHAR_LENGTH} 而非 {@code LENGTH}：中文按字符计，与 Java
+     *       {@code String.length()} 语义对齐（默认字符集 utf8mb4 下两者不同）。</li>
+     * </ul>
+     *
+     * <p>时间区间与 Java 侧同一口径：两端同时给才生效，early/end 为 null 表示不限
+     * （只给一端按「未给」处理，与 {@code filterByVisitTime} 一致）。</p>
+     */
+    @Select("""
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(CASE WHEN COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛'
+                                  THEN 1 ELSE 0 END), 0) AS physicalSign,
+                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛')
+                                   AND (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
+                                        OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
+                                  THEN 1 ELSE 0 END), 0) AS misrouted,
+                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛')
+                                   AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
+                                            OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
+                                   AND CHAR_LENGTH(COALESCE(NULLIF(jt.c, ''), jt.s)) <= 2
+                                  THEN 1 ELSE 0 END), 0) AS fragment,
+                COALESCE(SUM(CASE WHEN NOT (COALESCE(NULLIF(jt.c, ''), jt.s) REGEXP '压痛|触痛|叩痛|反跳痛')
+                                   AND NOT (COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '脉%'
+                                            OR COALESCE(NULLIF(jt.c, ''), jt.s) LIKE '舌%')
+                                   AND CHAR_LENGTH(COALESCE(NULLIF(jt.c, ''), jt.s)) > 2
+                                  THEN 1 ELSE 0 END), 0) AS dictionaryGap
+            FROM records r,
+                 JSON_TABLE(r.structured_data, '$.symptoms[*]'
+                     COLUMNS (c VARCHAR(200) PATH '$.content',
+                              s VARCHAR(200) PATH '$.sourceText',
+                              normLevel VARCHAR(20) PATH '$.normLevel')) jt
+            WHERE (#{viewAll} = 1 OR r.org_id = #{orgId})
+              AND r.structured_data IS NOT NULL
+              AND jt.normLevel IS NULL
+              AND (#{start} IS NULL OR r.visit_time >= #{start})
+              AND (#{end} IS NULL OR r.visit_time < #{end})
+            """)
+    Map<String, Object> selectUnmatchedBreakdown(@Param("orgId") String orgId,
+                                                 @Param("viewAll") boolean viewAll,
+                                                 @Param("start") java.time.LocalDateTime start,
+                                                 @Param("end") java.time.LocalDateTime end);
+
     /** 清洗后的字段修复（trim/空值清理/状态标记）——仅隔离路径用：它要同时改 status/grade */
     @Update("""
             UPDATE records
