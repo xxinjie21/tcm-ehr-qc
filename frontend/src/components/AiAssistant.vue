@@ -404,7 +404,7 @@ onBeforeUnmount(() => {
   font-size: 11.5px;
   color: var(--text-sub, #8a8578);
   background: var(--ink-light, #eef3ee);
-  border-bottom: 1px solid #ece8dc;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 /* 预设问题：胶囊按钮换行排列 */
@@ -413,7 +413,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 6px;
   padding: 10px var(--sp-3);
-  border-bottom: 1px solid #ece8dc;
+  border-bottom: 1px solid var(--line-soft);
 }
 .cmd {
   font-size: 11.5px;
@@ -464,7 +464,7 @@ onBeforeUnmount(() => {
   display: flex;
   gap: var(--sp-2);
   padding: 10px var(--sp-3);
-  border-top: 1px solid #ece8dc;
+  border-top: 1px solid var(--line-soft);
   background: var(--surface);
 }
 
