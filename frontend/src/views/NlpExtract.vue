@@ -1,6 +1,7 @@
 <template>
-  <div>
+  <div class="split">
     <!-- ① 选择病历：看板式列表，常驻可见-->
+    <div class="pane">
     <PanelCard title="选择病历">
       <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
       <RangeFilter v-model="query" />
@@ -41,6 +42,8 @@
         @size-change="handleSizeChange"
       />
     </PanelCard>
+    </div>
+    <div class="pane">
 
     <el-tabs v-model="activeTab" class="nlp-tabs">
       <!-- ============ 单条解析 ============ -->
@@ -348,6 +351,7 @@
         </PanelCard>
       </el-tab-pane>
     </el-tabs>
+    </div>
   </div>
 </template>
 
