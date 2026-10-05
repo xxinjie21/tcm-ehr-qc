@@ -223,6 +223,9 @@
         <div class="misc-grid">
                     <FreshnessTag :time="report?.generatedAt" :stale="hasStaleRows"
                         reason="部分病历的解析早于词表，需重跑" />
+          <!-- 对标 A5：数字的血缘。紧挨刷新时间放 —— 一个答「什么时候算的」，一个答「按哪一版词表算的」；
+               换过词表后归一率会变，只有时间的话说不清变化是哪一版造成的。 -->
+          <div><span>词典版本</span><b>{{ report?.sourceVersion || '—' }}</b></div>
           <div>
             <span>质控完成</span>
             <b>{{ qcScored }} / {{ qcTotal }}{{ qcLast ? `（${qcLast}）` : '' }}</b>

@@ -38,6 +38,13 @@
         <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid" />
       </div>
 
+      <!-- 对标 A5：数字的血缘与新鲜度。放在指标卡**正下方** —— 文档写的是「数字旁」，
+           放到页面底部就只是装饰；换过词表后数字会变，这里回答「按哪一版算的」。 -->
+      <p v-if="overview.sourceVersion" class="lineage">
+        数字口径：词典版本 <code>{{ overview.sourceVersion }}</code>
+        <template v-if="overview.generatedAt"> · 生成于 {{ overview.generatedAt }}</template>
+      </p>
+
       <!-- 质控趋势（跨整行） -->
       <PanelCard title="质控趋势（按月）" class="mb">
         <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
@@ -444,4 +451,15 @@ onBeforeUnmount(() => {
 }
 /* P5.2：趋势截断提示 */
 .trend-trunc { margin: var(--sp-2) 0 0; font-size: var(--fs-md); color: var(--text-sub); }
+/* 对标 A5：指标卡下方的血缘行。刻意做得比正文轻 —— 它是下钻入口，不该和指标抢注意力 */
+.lineage {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
+}
+
+.lineage code {
+  font-family: var(--font-mono, monospace);
+  color: var(--text-main);
+}
 </style>
