@@ -536,106 +536,34 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     @Transactional(rollbackFor = Exception.class)
     @Override
     public DeleteRecordsVO deleteRecords(DeleteRecordsDTO dto) {
-        // 1. 没选 id 直接拒：空删会静默"成功"，用户以为删掉了
-        if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
-            throw new IllegalArgumentException("未选择要操作的病历");
-        }
-        // 2. 先按数据域筛出可访问的 id：请求体里的 id 不可信，别组的必须剔除
-        List<String> accessible = filterAccessibleIds(dto.getIds());
-        // 3. 交给同一段删除逻辑（事务已加在本方法上）
-        return doDelete(accessible);
+        // 批次13 · 13.3：删除逻辑抽到 RecordDeleter（防误删守卫、数据域过滤、分块、外键顺序都在那边）。
+        // 事务仍留在本方法上：加在被调用方或私有方法上不经过代理，等于没加。
+        return deleter().deleteByIds(dto);
     }
 
     /**
-     * 按当前数据域筛出可访问的病历 id，供按 ID 删除做前置过滤。
+     * 取删除器。
      *
-     * 本方法存在的唯一理由：按 ID 删除与按范围删除必须同一口径。按范围删除经
-     * RecordFilter.build 天然带数据域，而按 ID 删除的 id 来自请求体，少了这一步
-     * 就能删掉别组病历（连带其 review_tasks）。
-     *
-     * 不可访问的 id 直接剔除、不报错：一条 id 属不属于本组是授权问题，不是业务错误，
-     * 与数据清洗按 ID 取数的处理方式一致。
-     *
-     * 分块查询的原因：ids 由请求体给出、没有数量上限，一次 IN 太长会拖慢 SQL，
-     * 故与删除共用 DELETE_CHUNK。
-     *
-     * 管理员处于「看全部」时 RecordFilter 不加组织条件，故管理员仍可跨组删 ——
-     * 这是《开发指南》九章的既定设计，不是本方法的漏洞；验收须用非管理员身份。
-     *
-     * @param ids 请求体里的病历 id，允许重复与不可访问项
-     * @return 当前数据域内真实存在的 id（可能为空）
+     * <p>用继承来的 {@code baseMapper} **字段**而不是 {@code getBaseMapper()}：后者在 mapper 为 null 时
+     * 自己就抛 MybatisPlusException，而那会让「防误删守卫先于任何 mapper 访问」这条设计失效
+     * （守卫用例期望 IllegalArgumentException，实测拿到的是 MybatisPlusException）。读字段不抛异常，
+     * 守卫得以在真正需要 mapper 之前先判并拒绝。</p>
      */
-    private List<String> filterAccessibleIds(List<String> ids) {
-        List<String> accessible = new ArrayList<>();
-        for (int i = 0; i < ids.size(); i += DELETE_CHUNK) {
-            List<String> chunk = ids.subList(i, Math.min(i + DELETE_CHUNK, ids.size()));
-            List<Record> rows = baseMapper.selectList(RecordFilter
-                    .build(RequestUtils.currentOrgId(), new FiltersDTO())
-                    .select("id")
-                    .in("id", chunk));
-            for (Record row : rows) {
-                accessible.add(row.getId());
-            }
-        }
-        return accessible;
+    private RecordDeleter deleter() {
+        return new RecordDeleter(baseMapper, reviewTaskMapper);
     }
 
     /**
-     * 按筛选范围删除。
+     * 按当前数据域筛出可访问的病历 id、分块删除、以及「是否有筛选条件」的判定，
+     * 都已随批次 13 · 13.3 一起搬到 {@link RecordDeleter}。
      *
-     * <p>事务横跨「按范围取 id + 分块删」，保证 {@code review_tasks} 与 {@code records} 一起回滚。</p>
-     *
-     * <p>ponytail: 整批一个事务，3.5 万条时锁范围偏大、时长也长；当前演示库 500 条无感。
-     * 真到全库量级，应改成「先算 id、再分批各自提交」，并配合单次删除上限。</p>
+     * <p>保留这两个入口在此类，是因为它们是 {@code IRecordService} 的接口方法，
+     * 而且事务必须加在这里的 public 方法上（见上）。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
     public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
-        // 1. 必须至少有一个筛选条件，否则就是「删全库」
-        if (!hasAnyFilter(filters)) {
-            throw new IllegalArgumentException("请至少设置一个筛选条件，避免误删全库");
-        }
-        // 2. 只取 id 列，不取整行数据
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
-        List<Record> rows = baseMapper.selectList(wrapper.select("id"));
-        List<String> ids = rows.stream().map(Record::getId).toList();
-        // 3. 走同一段删除逻辑
-        return doDelete(ids);
-    }
-
-    /**
-     * 实际删除：先清外键依赖（review_tasks.record_id → records.id），再分块删病历，避免外键约束报错。
-     */
-    private DeleteRecordsVO doDelete(List<String> ids) {
-        DeleteRecordsVO vo = new DeleteRecordsVO();
-        // 1. 空集合按删 0 条返回
-        if (ids == null || ids.isEmpty()) {
-            vo.setDeletedCount(0);
-            return vo;
-        }
-        // 2. 分块删：一条 IN 塞几万个 id 会让 SQL 慢到超时
-        int deleted = 0;
-        for (int i = 0; i < ids.size(); i += DELETE_CHUNK) {
-            List<String> chunk = ids.subList(i, Math.min(i + DELETE_CHUNK, ids.size()));
-            // 3. 顺序不能反：先删子表再删主表，反了会撞外键
-            reviewTaskMapper.delete(new QueryWrapper<com.tcm.ehr.domain.po.ReviewTask>().in("record_id", chunk));
-            deleted += baseMapper.deleteBatchIds(chunk);
-        }
-        vo.setDeletedCount(deleted);
-        return vo;
-    }
-
-    /** 范围条件是否至少有一个（部门/证候/分级任一非空，或时间区间两端齐全） */
-    private boolean hasAnyFilter(FiltersDTO f) {
-        // 1. 没有条件对象就没有任何筛选
-        if (f == null) {
-            return false;
-        }
-        // 2. 时间区间要两端都有才算一个条件，缺一端会变成"从某时到最新"这种误删口径
-        boolean range = f.getDateRange() != null && f.getDateRange().size() == 2
-                && !TextUtil.isBlank(f.getDateRange().get(0)) && !TextUtil.isBlank(f.getDateRange().get(1));
-        // 3. 任一维度非空即算有筛选
-        return !TextUtil.isBlank(f.getDepartment()) || !TextUtil.isBlank(f.getPattern()) || !TextUtil.isBlank(f.getGrade()) || range;
+        return deleter().deleteByFilter(filters);
     }
 
     /**
