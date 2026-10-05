@@ -331,8 +331,8 @@ onBeforeUnmount(() => {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 1px solid #2f4639;
-  background: var(--ink, #2f4639);
+  border: 1px solid var(--ink);
+  background: var(--ink, var(--ink));
   color: #e9e3d2;
   cursor: grab;
   display: flex;
@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
   touch-action: none;
 }
 .aii-ball:hover { transform: translateY(-2px); }
-.aii-ball.open { background: #3d5a4c; }
+.aii-ball.open { background: var(--ink-mid); }
 .aii-ball svg { width: 24px; height: 24px; }
 
 /* 面板：锚在球上方 60px（留出球的空位），固定尺寸但受视口上限约束 */
@@ -356,7 +356,7 @@ onBeforeUnmount(() => {
   height: 480px;
   max-width: 94vw;
   max-height: 76vh;
-  background: #fbfaf6;
+  background: var(--el-table-header-bg-color);
   border: 1px solid var(--line, #e4dfd2);
   border-radius: 6px;
   box-shadow: 0 8px 28px rgba(47, 70, 57, 0.18);
@@ -370,7 +370,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--sp-2);
   padding: 10px 14px;
-  background: var(--ink, #2f4639);
+  background: var(--ink, var(--ink));
   color: #f1ede0;
   cursor: grab;
   touch-action: none;
@@ -417,7 +417,7 @@ onBeforeUnmount(() => {
 }
 .cmd {
   font-size: 11.5px;
-  color: var(--ink, #2f4639);
+  color: var(--ink, var(--ink));
   background: var(--surface);
   border: 1px solid var(--line, #e4dfd2);
   border-radius: 6px;
@@ -440,13 +440,13 @@ onBeforeUnmount(() => {
 /* 用户消息靠右留白，与 AI 消息一眼分开 */
 .msg.user {
   background: var(--ink-light, #eef3ee);
-  color: var(--ink, #2f4639);
+  color: var(--ink, var(--ink));
   margin-left: 40px;
 }
 .msg.ai {
   background: var(--surface);
   border: 1px solid var(--line, #e4dfd2);
-  color: var(--ink, #2f4639);
+  color: var(--ink, var(--ink));
 }
 .msg.ai p { margin: 0 0 var(--sp-1); }
 .msg.ai p:last-child { margin-bottom: 0; }
