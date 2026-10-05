@@ -1,4 +1,4 @@
-﻿﻿openapi: 3.0.3
+﻿openapi: 3.0.3
 info:
   title: 中医电子病历质控与标准化系统
   description: |
@@ -2144,7 +2144,7 @@ paths:
                     type: object
                     nullable: true
         '400':
-          description: 原始字段不允许修改（code=1007）
+          description: 原始字段不允许修改（服务端按统一错误结构返回；**具体 code 以实现为准** —— 原文档写的 code=1007 全仓不存在，已于 2026-10-05 删除该断言）
           content:
             application/json:
               schema:
