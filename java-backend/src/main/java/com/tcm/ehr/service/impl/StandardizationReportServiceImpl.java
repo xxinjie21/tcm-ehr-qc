@@ -74,41 +74,63 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     @Override
     public StandardizationReportVO report(String start, String end) {
-        // 批次12（12d）：清掉上一次请求的解析缓存（Tomcat 线程池会复用线程）
-        structuredMemo.get().clear();
         StandardizationReportVO vo = new StandardizationReportVO();
         vo.setDictQuality(dictQuality());
         vo.setCrossTypeDuplicates(crossTypeDuplicates());
         // 乙类：病历相关，必须先按数据域收窄，否则登录即可的接口会读到跨组织数据
-        // 批次12（12d）：报告全部八段都已改走库内聚合，这里不再需要把整表拉进 JVM。
-        // 原先的 recordsInDomain() 取数 + filterByVisitTime 过滤是纯浪费：3.5 万行查出来、
-        // 传进 JVM，然后没有任何消费者（八个消费方逐个迁移后留下的空壳）。
-        // 区间口径没有丢：rangeOf/byMonth/coverage/unmatched 都由 SQL 承担同样的时间边界。
-        vo.setRange(rangeOf(start, end));
-        // 批次12（12d）：时间边界统一在此算好，供后面各段（按月/覆盖/未归一/评分质控）共用
-        java.time.LocalDateTime from = null;
-        java.time.LocalDateTime to = null;
-        if (notBlankDate(start) && notBlankDate(end)) {
-            from = LocalDate.parse(start).atStartOfDay();
-            to = LocalDate.parse(end).plusDays(1).atStartOfDay();
-        }
-        vo.setByMonth(byMonth(from, to));
-        vo.setCoverage(coverage(from, to));
-        vo.setUnmatched(unmatched(from, to));
-        vo.setNormalizable(normalizableRate(from, to));
-        vo.setScore(scoreDistribution(from, to));
-        vo.setQc(qcCoverage(from, to));
-        vo.setDataset(datasetShape(from, to));
+        List<Record> all = recordsInDomain();
+        List<Record> records = filterByVisitTime(all, start, end);
+        vo.setRange(rangeOf(all, records, start, end));
+        vo.setByMonth(byMonth(records));
+        vo.setCoverage(coverage(records));
+        vo.setUnmatched(unmatched(records, new HashSet<>(symptomTerms())));
+        vo.setNormalizable(normalizableRate(records, new HashSet<>(symptomTerms())));
+        vo.setScore(scoreDistribution(records));
+        vo.setQc(qcCoverage(records));
+        vo.setDataset(datasetShape(records));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         return vo;
+    }
+
+    /**
+     * 按接诊时间过滤。
+     *
+     *
+     * 必须上下界同时给才生效，只给一端按「未给」处理 ——
+     *
+     * 与 StatsController 的区间口径一致。只给一端会被理解成「从某时到最新」，
+     * 那不是用户的意思；而如果只给一端就悄悄生效，用户看到记录数变少却找不到原因。
+     */
+    private List<Record> filterByVisitTime(List<Record> all, String start, String end) {
+        // 两个条件同时成立才过滤：早前写成「任一非空即过滤」，
+        // 结果只给 start 时返回 131 条（应为全部 500），与注释和既有口径都不符
+        if (!notBlankDate(start) || !notBlankDate(end)) {
+            return all;
+        }
+        LocalDate from = LocalDate.parse(start);
+        LocalDate to = LocalDate.parse(end).plusDays(1);
+        List<Record> out = new ArrayList<>();
+        for (Record r : all) {
+            LocalDateTime t = r.getVisitTime();
+            if (t == null) {
+                continue;
+            }
+            LocalDate d = t.toLocalDate();
+            if (d.isBefore(from) || !d.isBefore(to)) {
+                continue;
+            }
+            out.add(r);
+        }
+        return out;
     }
 
     private boolean notBlankDate(String s) {
         return s != null && !s.isBlank();
     }
 
-    private StandardizationReportVO.TimeRange rangeOf(String start, String end) {
+    private StandardizationReportVO.TimeRange rangeOf(List<Record> all, List<Record> picked,
+                                                     String start, String end) {
         StandardizationReportVO.TimeRange r = new StandardizationReportVO.TimeRange();
         // 只有两端都给、过滤真正生效时才回显区间。
         // 只给一端时过滤没生效，若还回显「2024-01-01 ~ 不限」，界面会显示成一个
@@ -116,24 +138,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         boolean applied = notBlankDate(start) && notBlankDate(end);
         r.setStart(applied ? start : null);
         r.setEnd(applied ? end : null);
-        // 批次12（12d）：两个计数改由库内聚合给出（见 RecordMapper.selectRangeAndDataset），
-        // 与 datasetShape 共用同一条查询。区间口径在此按 filterByVisitTime 的同一规则解析：
-        // 只有两端都给才下推边界，只给一端一律传 null —— 测试直接断言这两个参数。
-        java.time.LocalDateTime from = applied ? LocalDate.parse(start).atStartOfDay() : null;
-        java.time.LocalDateTime to = applied ? LocalDate.parse(end).plusDays(1).atStartOfDay() : null;
-        Map<String, Object> row = reportDatasetAggregate(from, to);
-        r.setRecords(num(row.get("recordCount")));
-        // 「被排除」= 全库数 - 区间内数；无区间时两者相等，恒为 0
-        r.setExcluded(Math.max(0, num(row.get("totalAll")) - num(row.get("recordCount"))));
+        r.setRecords(picked.size());
+        r.setExcluded(all.size() - picked.size());
         return r;
-    }
-
-    /** 区间计数与数据集形态共用一条聚合（批次12·12d），避免同一批数据查两遍 */
-    private Map<String, Object> reportDatasetAggregate(java.time.LocalDateTime from,
-                                                       java.time.LocalDateTime to) {
-        Map<String, Object> row = recordMapper.selectRangeAndDataset(
-                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), from, to);
-        return row == null ? Map.of() : row;
     }
 
     /**
@@ -145,25 +152,54 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 按月才能看出「哪些月份已经吃到新词表、哪些还没」。没有 visitTime 的病历
      * 归入「未知」一组，不静默丢弃。
      */
-    private List<StandardizationReportVO.MonthlyBucket> byMonth(java.time.LocalDateTime from,
-                                                               java.time.LocalDateTime to) {
-        // 批次12（12d）：按月分桶与月内统计改由库内聚合给出（见 RecordMapper.selectByMonth）。
-        // 口径提醒：gap 按「长度>2 且不以脉/舌开头且非体征」统计，**不查词表** ——
-        // 与 normalizableRate 的 isInDict 口径不同，混用会算错。
+    private List<StandardizationReportVO.MonthlyBucket> byMonth(List<Record> records) {
+        Map<String, List<Record>> groups = new LinkedHashMap<>();
+        for (Record r : records) {
+            String key = r.getVisitTime() == null
+                    ? "未知"
+                    : YearMonth.from(r.getVisitTime()).toString();
+            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
+        }
         List<StandardizationReportVO.MonthlyBucket> out = new ArrayList<>();
-        for (Map<String, Object> row : recordMapper.selectByMonth(
-                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), from, to)) {
+        for (Map.Entry<String, List<Record>> en : groups.entrySet()) {
+            List<Record> rs = en.getValue();
             StandardizationReportVO.MonthlyBucket b = new StandardizationReportVO.MonthlyBucket();
-            b.setMonth(String.valueOf(row.get("month")));
-            b.setRecords(num(row.get("records")));
-            int symTotal = num(row.get("symTotal"));
-            b.setSymptomRate(symTotal == 0 ? null : pct(num(row.get("symHit")), symTotal));
-            b.setDictionaryGap(num(row.get("gap")));
-            b.setAvgScore(row.get("avgScore") instanceof Number n ? n.doubleValue() : 0.0);
-            b.setCapped(num(row.get("capped")));
+            b.setMonth(en.getKey());
+            b.setRecords(rs.size());
+
+            int symTotal = 0;
+            int symHit = 0;
+            for (Record r : rs) {
+                Map<String, Object> sd = structured(r);
+                if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
+                    continue;
+                }
+                for (Object o : list) {
+                    if (!(o instanceof Map<?, ?> m)) {
+                        continue;
+                    }
+                    symTotal++;
+                    if (m.get("normLevel") != null) {
+                        symHit++;
+                    } else {
+                        String content = str(m.get("content"));
+                        if (content.isEmpty()) {
+                            content = str(m.get("sourceText"));
+                        }
+                        if (normalizableTerm(content)) {
+                            b.setDictionaryGap(b.getDictionaryGap() + 1);
+                        }
+                    }
+                }
+            }
+            b.setSymptomRate(symTotal == 0 ? null : pct(symHit, symTotal));
+
+            StandardizationReportVO.ScoreDistribution sd2 = scoreDistribution(rs);
+            b.setAvgScore(sd2.getAvg());
+            b.setCapped(sd2.getCapped());
             out.add(b);
         }
-        // 「未知」永远排最后；其余按月份倒序（最近的在最前）—— 展示规则留在 Java 侧
+        // 「未知」永远排最后；其余按月份倒序（最近的在最前）
         out.sort(Comparator.comparing((StandardizationReportVO.MonthlyBucket b) -> b.getMonth())
                 .reversed());
         out.sort(Comparator.comparing(b -> "未知".equals(b.getMonth())));
@@ -250,9 +286,14 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     // ------------------------------------------------------------ 乙类 · 数据集覆盖
 
-    /** 各类实体：抽取数 / 已归一数（批次12·12d：计数改走库内聚合，标签与过期判定仍在 Java 侧） */
-    private List<StandardizationReportVO.TypeCoverage> coverage(java.time.LocalDateTime from,
-                                                               java.time.LocalDateTime to) {
+    /** 数据域内的病历（管理员看全部，其余只看本组织） */
+    private List<Record> recordsInDomain() {
+        return recordMapper.selectList(RecordFilter.build(
+                RecordFilter.domainOrgId(), new com.tcm.ehr.domain.dto.FiltersDTO()));
+    }
+
+    /** 各类实体：抽取数 / 已归一数 */
+    private List<StandardizationReportVO.TypeCoverage> coverage(List<Record> records) {
         Map<String, StandardizationReportVO.TypeCoverage> byField = new LinkedHashMap<>();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             StandardizationReportVO.TypeCoverage c = new StandardizationReportVO.TypeCoverage();
@@ -260,16 +301,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             c.setLabel(t.label());
             byField.put(t.structuredKey(), c);
         }
-        // 抽取数与已归一数不再靠「把整表拉进 JVM 逐条数」，而由 RecordMapper.selectCoverage
-        // 在库内用 JSON_TABLE 一次聚合出来（九类 UNION ALL；已与 Java 版逐类核对一致）。
-        // 中文标签仍取自 EntityTypes —— 单一来源，不在 SQL 里再抄一份。
-        for (Map<String, Object> row : recordMapper.selectCoverage(
-                RecordFilter.domainOrgId(), RequestUtils.viewAllOrgs(), from, to)) {
-            StandardizationReportVO.TypeCoverage c = byField.get(String.valueOf(row.get("field")));
-            if (c != null) {
-                c.setTotal(num(row.get("total")));
-                c.setNormalized(num(row.get("normalized")));
+        for (Record r : records) {
+            Map<String, Object> sd = structured(r);
+            if (sd == null) {
+                continue;
             }
+            byField.values().forEach(c -> countEntities(c, sd.get(c.getField())));
         }
         // 标出「解析早于词表建立」的类型：词表非空且抽到了实体，却一条都没归上。
         // 这一种补词表无效，只能重跑解析 —— 与真正的词表缺口必须分开说。
@@ -312,37 +349,49 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 若先按「长度 ≤ 2 = 抽取碎片」判，它会被归到碎片里 —— 但它其实是被完整抽出来的，
      * 只是被放错了数组。归错责会让修复方向跑偏（去改抽取截断，而不是改分类路由）。
      */
-    private StandardizationReportVO.UnmatchedBreakdown unmatched(java.time.LocalDateTime from,
-                                                                java.time.LocalDateTime to) {
-        // 批次12（12d）：改用库内 JSON_TABLE 聚合。此前是「把整表拉进 JVM、逐条解析 JSON、
-        // 在 Java 里分类」——3.5 万条时这是本接口最重的一段（整接口 3.5~6.2 秒，见 docs/性能基线实测.md）。
-        // 等价性不再由 mock 单测保证（被 mock 的正是这里删掉的 Java 分类），而由
-        // tools/verify-unmatched-sql.py 对真实库校验：分项自洽 + TOP 明细 + 规则夹具。
+    private StandardizationReportVO.UnmatchedBreakdown unmatched(List<Record> records, Set<String> symptomDict) {
         StandardizationReportVO.UnmatchedBreakdown b = new StandardizationReportVO.UnmatchedBreakdown();
-        String orgId = RequestUtils.currentOrgId();
-        boolean viewAll = RequestUtils.viewAllOrgs();
-        Map<String, Object> row = recordMapper.selectUnmatchedBreakdown(orgId, viewAll, from, to);
-        if (row != null) {
-            b.setTotal(num(row.get("total")));
-            b.setPhysicalSign(num(row.get("physicalSign")));
-            b.setMisrouted(num(row.get("misrouted")));
-            b.setFragment(num(row.get("fragment")));
-            b.setDictionaryGap(num(row.get("dictionaryGap")));
-        }
-        // 列表也守卫：mapper 契约上返回空列表，但测试替身可能给 null
-        java.util.List<Map<String, Object>> tops =
-                recordMapper.selectUnmatchedTop(orgId, viewAll, from, to, 15);
-        if (tops != null) {
-            for (Map<String, Object> t : tops) {
-                b.getTop().put(String.valueOf(t.get("content")), num(t.get("n")));
+        // 批次2：同一次遍历内累积「词表缺口」项的次数（键=实体原文），不额外扫库
+        java.util.Map<String, Integer> gapCount = new java.util.LinkedHashMap<>();
+        for (Record r : records) {
+            Map<String, Object> sd = structured(r);
+            if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
+                continue;
+            }
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> m) || m.get("normLevel") != null) {
+                    continue;
+                }
+                String content = str(m.get("content"));
+                if (content.isEmpty()) {
+                    content = str(m.get("sourceText"));
+                }
+                b.setTotal(b.getTotal() + 1);
+                // ① 具名错放优先：含体征关键字，或以脉/舌开头
+                boolean namedMisroute = containsAny(content, PHYSICAL_SIGN)
+                        || startsWithAny(content, MISROUTED_PREFIX);
+                if (namedMisroute) {
+                    if (containsAny(content, PHYSICAL_SIGN)) {
+                        b.setPhysicalSign(b.getPhysicalSign() + 1);
+                    } else {
+                        b.setMisrouted(b.getMisrouted() + 1);
+                    }
+                } else if (content.length() <= FRAGMENT_MAX_LEN) {
+                    // ② 剩下的短词才是抽取碎片
+                    b.setFragment(b.getFragment() + 1);
+                } else {
+                    // ③ 多为标准词但词表没有 → 词表侧
+                    b.setDictionaryGap(b.getDictionaryGap() + 1);
+                    gapCount.merge(content, 1, Integer::sum);
+                }
             }
         }
+        // 批次2：按次数降序装入（LinkedHashMap 保序），前端直接渲染为可行动清单
+        gapCount.entrySet().stream()
+                .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
+                .limit(15)
+                .forEach(e -> b.getTop().put(e.getKey(), e.getValue()));
         return b;
-    }
-
-    /** 聚合值 MySQL 给的是 Long/BigDecimal，统一按 Number 取整，避免 ClassCastException */
-    private static int num(Object v) {
-        return v instanceof Number n ? n.intValue() : 0;
     }
 
     /**
@@ -353,73 +402,34 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      *
      * （如 神疲乏力）是词表缺口本身，算进分母会把「补词表能改善多少」这个信号抹掉。
      */
-    private StandardizationReportVO.NormalizableRate normalizableRate(java.time.LocalDateTime from,
-                                                                     java.time.LocalDateTime to) {
-        // 批次12（12d）：分子分母改由库内一次聚合算出（见 RecordMapper.selectNormalizableRate）。
-        // 「在词表内」这条用 JSON_CONTAINS + 词表 JSON 参数表达 —— 参数化、无注入、不必拼长 IN 串。
-        // 词表仍走 symptomTerms()（与原先调用点同一个有效词表口径），单一来源、不在 SQL 里另抄一份。
+    private StandardizationReportVO.NormalizableRate normalizableRate(List<Record> records, Set<String> symptomDict) {
         StandardizationReportVO.NormalizableRate r = new StandardizationReportVO.NormalizableRate();
-        String dictJson;
-        try {
-            dictJson = objectMapper.writeValueAsString(symptomTerms());
-        } catch (Exception e) {
-            // 词表序列化失败时按空词表算（分母 0），并留告警；不编造数字
-            log.warn("[报告] 症状词表序列化失败，归一率按空词表计算：{}", e.getMessage());
-            dictJson = "[]";
-        }
-        Map<String, Object> row = recordMapper.selectNormalizableRate(
-                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), dictJson, from, to);
-        if (row != null) {
-            r.setDenominator(num(row.get("denominator")));
-            r.setNumerator(num(row.get("numerator")));
+        for (Record rec : records) {
+            Map<String, Object> sd = structured(rec);
+            if (sd == null || !(sd.get("symptoms") instanceof List<?> list)) {
+                continue;
+            }
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> m)) {
+                    continue;
+                }
+                String content = str(m.get("content"));
+                if (content.isEmpty()) {
+                    continue;
+                }
+                boolean defect = startsWithAny(content, MISROUTED_PREFIX)
+                        || containsAny(content, PHYSICAL_SIGN)
+                        || content.length() <= FRAGMENT_MAX_LEN;
+                if (defect || !isInDict(content, symptomDict)) {
+                    continue;
+                }
+                r.setDenominator(r.getDenominator() + 1);
+                if (m.get("normLevel") != null) {
+                    r.setNumerator(r.getNumerator() + 1);
+                }
+            }
         }
         return r;
-    }
-
-    /** 评分分布（批次12·12d，report 用）：走库内聚合，见 RecordMapper.selectScoreAndQc */
-    private StandardizationReportVO.ScoreDistribution scoreDistribution(java.time.LocalDateTime from,
-                                                                       java.time.LocalDateTime to) {
-        StandardizationReportVO.ScoreDistribution d = new StandardizationReportVO.ScoreDistribution();
-        Map<String, Object> row = reportAggregates(from, to);
-        // 口径与下面的 List 版一致：total 与 avg 都基于「有分数的记录」
-        d.setTotal(num(row.get("total")));
-        d.setMin(num(row.get("minScore")));
-        d.setMax(num(row.get("maxScore")));
-        d.setCapped(num(row.get("capped")));
-        d.setAvg(row.get("avgScore") instanceof Number n ? n.doubleValue() : 0.0);
-        return d;
-    }
-
-    /**
-     * 质控完成度（批次12·12d，report 用）：走库内聚合。
-     *
-     * <p>total 用**全部记录数**（totalAll），scored 用「qc_results.score 与 records.score 一致」的数
-     * —— 与下面的 List 版口径一致；两处计数不同，别合并成一个。</p>
-     */
-    private StandardizationReportVO.QcCoverage qcCoverage(java.time.LocalDateTime from,
-                                                         java.time.LocalDateTime to) {
-        StandardizationReportVO.QcCoverage c = new StandardizationReportVO.QcCoverage();
-        Map<String, Object> row = reportAggregates(from, to);
-        int totalAll = num(row.get("totalAll"));
-        int scored = num(row.get("qcScored"));
-        c.setTotal(totalAll);
-        c.setScored(scored);
-        c.setComplete(totalAll > 0 && scored == totalAll);
-        Object last = row.get("lastScoredAt");
-        if (last != null) {
-            // 库里是 DATETIME，取出可能是 Timestamp/LocalDateTime —— 统一转成同一格式
-            java.time.LocalDateTime ldt = last instanceof java.time.LocalDateTime l
-                    ? l : java.time.LocalDateTime.parse(String.valueOf(last).replace(' ', 'T'));
-            c.setLastScoredAt(ldt.withNano(0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        }
-        return c;
-    }
-
-    /** 评分分布与质控完成度共用一条聚合（批次12·12d），避免同一批数据算两遍 */
-    private Map<String, Object> reportAggregates(java.time.LocalDateTime from, java.time.LocalDateTime to) {
-        Map<String, Object> row = recordMapper.selectScoreAndQc(
-                RequestUtils.currentOrgId(), RequestUtils.viewAllOrgs(), from, to);
-        return row == null ? Map.of() : row;
     }
 
     /** 质控分数分布与封顶率；封顶率高说明评分失去区分度 */
@@ -487,15 +497,23 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /** 数据集形态：模板塌缩度决定这批数据能不能代表真实病历 */
-    private StandardizationReportVO.DatasetShape datasetShape(java.time.LocalDateTime from,
-                                                              java.time.LocalDateTime to) {
-        // 批次12（12d）：三个字段改由库内聚合给出（见 RecordMapper.selectRangeAndDataset）——
-        // recordCount=记录数、templates=主诉模板数（去掉病程月数后去重）、colloquial=含口语化未归一症状的记录数。
+    private StandardizationReportVO.DatasetShape datasetShape(List<Record> records) {
         StandardizationReportVO.DatasetShape s = new StandardizationReportVO.DatasetShape();
-        Map<String, Object> row = reportDatasetAggregate(from, to);
-        s.setRecordCount(num(row.get("recordCount")));
-        s.setChiefComplaintTemplates(num(row.get("templates")));
-        s.setRecordsWithColloquialSymptom(num(row.get("colloquial")));
+        s.setRecordCount(records.size());
+        Set<String> chiefTemplates = new HashSet<>();
+        int colloquial = 0;
+        for (Record r : records) {
+            String chief = r.getChiefComplaint();
+            if (chief != null && !chief.isBlank()) {
+                // 主诉里的病程月数每条不同，去掉数字才能看出模板数
+                chiefTemplates.add(chief.replaceAll("\\d+", "N"));
+            }
+            if (hasColloquialUnmatchedSymptom(r)) {
+                colloquial++;
+            }
+        }
+        s.setChiefComplaintTemplates(chiefTemplates.size());
+        s.setRecordsWithColloquialSymptom(colloquial);
         return s;
     }
 
@@ -534,38 +552,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return terms;
     }
 
-    /**
-     * 同一条病历的结构化数据，在**一次请求内**只解析一次（批次 12 · 12d）。
-     *
-     * <p>{@code report()} 里 coverage / unmatched / normalizableRate 三个消费者都要这份 Map，
-     * 此前各自调用本方法 ⇒ 同一条 JSON 被 parse 三遍。3.5 万条时该接口实测 3.5~6.2 秒
-     * （见 docs/性能基线实测.md），三份解析开销都压在这条路径上。</p>
-     *
-     * <p>用 ThreadLocal：请求线程各自一份，天然并发安全；{@code report()} 入口先 clear()，
-     * 避免 Tomcat 线程复用读到上次请求的残留。用 IdentityHashMap：{@code Record} 未重写
-     * equals/hashCode，按引用比较既正确又最快。</p>
-     */
-    /**
-     * 解析缓存必须是 {@code static final}：Mockito 用 Objenesis 绕过构造造实例时
-     * **实例字段初始化器不会执行**，实例级 ThreadLocal 会是 null ⇒ NPE。
-     * 静态初始化器一定会跑；每线程一份、请求入口 clear()，语义与实例级等价。
-     */
-    private static final ThreadLocal<Map<Record, Map<String, Object>>> structuredMemo =
-            ThreadLocal.withInitial(java.util.IdentityHashMap::new);
-
     @SuppressWarnings("unchecked")
     private Map<String, Object> structured(Record r) {
         if (r.getStructuredData() == null || r.getStructuredData().isBlank()) {
             return null;
         }
-        Map<Record, Map<String, Object>> memo = structuredMemo.get();
-        Map<String, Object> hit = memo.get(r);
-        if (hit != null) {
-            return hit;
-        }
-        Map<String, Object> parsed = parseJson(r.getStructuredData());
-        memo.put(r, parsed);
-        return parsed;
+        return parseJson(r.getStructuredData());
     }
 
     @SuppressWarnings("unchecked")
