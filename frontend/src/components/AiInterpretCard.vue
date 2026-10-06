@@ -114,13 +114,12 @@ const run = async () => {
   loading.value = true
   result.value = null
   try {
-    // 骨架屏至少展示 1 秒（模拟分析过程），与请求并行。
     // 请求走异步路（15.1）：提交拿任务号再轮询，LLM 生成期间不占请求线程；
     // runAiAsync 返回的是 reply 本体（不是 axios 响应），所以下面直接用 res。
-    const [res] = await Promise.all([
-      runAiAsync('interpret', { recordId: props.recordId }),
-      new Promise((r) => setTimeout(r, 1000))
-    ])
+    // ⚠️ 这里原先还有一个 new Promise(r => setTimeout(r, 1000))，注释写着「骨架屏至少展示 1 秒
+    //    （模拟分析过程）」。那 1 秒是**凭空加的等待**：解读本来就要等模型，再叠一秒等于让用户
+    //    白等；而且「模拟分析过程」这个说法本身就是在演 —— 骨架屏该跟真实请求走。
+    const res = await runAiAsync('interpret', { recordId: props.recordId })
     result.value = res
   } catch {
     // 拦截器已提示
