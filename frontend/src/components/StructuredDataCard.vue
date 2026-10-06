@@ -61,7 +61,12 @@
                   </div>
                 </div>
               </template>
-              <span class="sd-item">
+              <!-- 28.17：locatable 时整条实体可点，向上抛 locate，由页面在原文区定位/高亮 -->
+              <span
+                class="sd-item"
+                :class="{ clickable: locatable }"
+                @click="locatable && $emit('locate', locateText(sec, it))"
+              >
                 <template v-if="sec.key === 'herbs'">
                   <b>{{ it.name }}</b><span v-if="it.dosage" class="dosage">{{ it.dosage }}</span>
                 </template>
@@ -106,8 +111,18 @@ import { useNlpStatus } from '@/composables/useNlpStatus'
 import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, LEVEL_UNMATCHED, entityName, pct } from '@/utils/structured'
 
 const props = defineProps({
-  data: { type: [String, Object], default: null }
+  data: { type: [String, Object], default: null },
+  /**
+   * 28.17：是否允许点击实体定位原文。默认 false —— 同一张卡片还被病历详情弹窗
+   * 等处复用，那些场景没有可定位的原文区，开启只会给一个点了没反应的交互。
+   */
+  locatable: { type: Boolean, default: false }
 })
+
+// 28.17：点击实体时抛出的定位关键词。优先用 sourceText（归一前原文，才是原文里真实存在的串），
+// 没有就退回标准词名 —— 未归一实体的 content 本身通常就是原文。
+const emit = defineEmits(['locate'])
+const locateText = (sec, it) => String(it.sourceText || entityName(sec, it) || '')
 
 const sections = ENTITY_SECTIONS
 
@@ -339,6 +354,8 @@ const levelDesc = (level, raw, name) => {
   color: var(--ink);
 }
 .sd-item .src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: 6px; }
+.sd-item.clickable { cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.sd-item.clickable:hover { border-color: var(--ink-mid); box-shadow: 0 1px 4px rgba(47, 70, 57, 0.12); }
 .sd-item .dosage { color: var(--ochre); margin-left: var(--sp-1); }
 .sd-item .tag {
   font-style: normal;

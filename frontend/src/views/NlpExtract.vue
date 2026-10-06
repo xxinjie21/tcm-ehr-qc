@@ -143,6 +143,7 @@
                    autosize 的 minRows 给 —— Element 的 autosize 会写行内
                    style="height:…px"，CSS 里的 min-height 会被它压掉。 -->
               <el-form
+                ref="fieldFormRef"
                 class="compact-form field-form"
                 label-width="68px"
                 size="large"
@@ -150,7 +151,13 @@
                 <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
                   <div class="group-hd">{{ g.title }}</div>
                   <div class="form-grid">
-                    <el-form-item v-for="f in groupFields(g)" :key="f.key" :label="f.label" :class="{ wide: f.wide }">
+                    <el-form-item
+                      v-for="f in groupFields(g)"
+                      :key="f.key"
+                      :label="f.label"
+                      :data-field="f.key"
+                      :class="{ wide: f.wide, 'src-hit': hitKey === f.key }"
+                    >
                       <el-input
                         v-model="fields[f.key]"
                         :type="f.multi ? 'textarea' : 'text'"
@@ -164,9 +171,18 @@
               </el-form>
 
               <!-- 整段文本只读对照：抽取请求就是这段拼接结果-->
-              <details class="composed-panel">
+              <details
+                class="composed-panel"
+                :open="composedOpen"
+                @toggle="composedOpen = $event.target.open"
+              >
                 <summary class="composed-hd">整段文本（只读对照）</summary>
-                <div class="composed">{{ composedText || '（当前无内容）' }}</div>
+                <div class="composed">
+                  <template v-if="composedParts.length">
+                    <template v-for="(p, i) in composedParts" :key="i"><mark v-if="p.hit" class="hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template>
+                  </template>
+                  <template v-else>（当前无内容）</template>
+                </div>
               </details>
 
               <div class="actions pane-actions">
@@ -235,7 +251,8 @@
                 </div>
               </div>
 
-              <StructuredDataCard v-if="result" :data="result" />
+              <!-- 28.17：点击结果里的实体，左侧原文区定位到对应字段并高亮原文片段 -->
+              <StructuredDataCard v-if="result" :data="result" locatable @locate="locateSourceText" />
               <!-- 28.13：空态补行动引导 —— 此前只有「尚未抽取」四个字，
                    用户不知道该在哪一步、做什么，空白区又占满一屏 -->
               <EmptyState v-else text="尚未抽取">
@@ -398,7 +415,7 @@ import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import FreshnessTag from '@/components/FreshnessTag.vue'
 import RecordTable from '@/components/RecordTable.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
-import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, reactive, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import { usePagedList } from '@/composables/usePagedList'
@@ -528,6 +545,60 @@ const composedText = computed(() => ALL_KEYS
   .map((s) => String(s).trim())
   .join('。'))
 
+// 28.17：原文 ↔ 结构化结果联动定位。点结果里的实体 → 找到含该原文串的字段并滚动高亮，
+// 同时在「整段文本」里把命中的原文片段标记出来，4 秒后自动消退。
+const fieldFormRef = ref(null)
+const hitKey = ref('')
+const hitText = ref('')
+const composedOpen = ref(false)
+let hitTimer = null
+
+const clearHit = () => {
+  clearTimeout(hitTimer)
+  hitKey.value = ''
+  hitText.value = ''
+  composedOpen.value = false
+}
+
+// 命中片段切分：没有 hitText 时整段返回，命中处包成 { hit: true } 供模板画 <mark>
+const composedParts = computed(() => {
+  const t = composedText.value
+  const needle = hitText.value
+  if (!t) return []
+  if (!needle) return [{ text: t, hit: false }]
+  const parts = []
+  let idx = 0
+  for (;;) {
+    const at = t.indexOf(needle, idx)
+    if (at < 0) {
+      parts.push({ text: t.slice(idx), hit: false })
+      break
+    }
+    if (at > idx) parts.push({ text: t.slice(idx, at), hit: false })
+    parts.push({ text: t.slice(at, at + needle.length), hit: true })
+    idx = at + needle.length
+  }
+  return parts.filter((p) => p.text)
+})
+
+// 从结果卡片点实体进来：原文串可能同时出现在多个字段，取第一个命中的滚动过去
+const locateSourceText = (raw) => {
+  const needle = String(raw || '').trim()
+  if (!needle) return
+  hitText.value = needle
+  hitKey.value = ALL_KEYS.find((k) => String(fields[k] || '').includes(needle)) || ''
+  composedOpen.value = true
+  nextTick(() => {
+    if (!hitKey.value) return
+    const el = fieldFormRef.value && fieldFormRef.value.$el
+      ? fieldFormRef.value.$el.querySelector('[data-field="' + hitKey.value + '"]')
+      : null
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+  clearTimeout(hitTimer)
+  hitTimer = setTimeout(clearHit, 4000)
+}
+
 const text = ref('')
 const result = ref(null)
 const extracting = ref(false)
@@ -550,7 +621,8 @@ const canSave = computed(() => !!recordId.value && !!result.value && !resultEmpt
 const loadRecord = async (row) => {
   // 1. 无有效行号直接返回，避免拿空 id 发请求
   if (!row?.id) return
-  // 2. 进入加载态
+  // 2. 进入加载态；先清掉上一份病历的定位高亮，避免高亮残留到新病历
+  clearHit()
   listLoading.value = true
   try {
     // 3. 拉取该病历原文，缺字段统一兜底为空
@@ -590,6 +662,7 @@ const closeDetail = () => {
   result.value = null
   extractError.value = ''
   text.value = ''
+  clearHit()
 }
 
 // 执行抽取：请求体是字段拼接文本；整体失败（如术语索引不可用 503）时就地留痕并清空旧结果，
@@ -1148,6 +1221,12 @@ onBeforeUnmount(stopPoll)
 .form-grid :deep(.el-form-item) { margin-bottom: 6px; }
 .form-grid :deep(.el-form-item__label) { font-size: var(--fs-sm); color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
 .field-form { margin-bottom: 6px; }
+/* 28.17：点结果实体后命中的字段高亮，与下方原文片段标记同一色系 */
+.form-grid :deep(.el-form-item.src-hit) {
+  background: var(--ochre-light);
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--ochre);
+}
 /* 整段文本只读对照：默认收起，不占填写区版面 */
 .composed-panel {
   border: 1px solid var(--line);
@@ -1189,6 +1268,14 @@ onBeforeUnmount(stopPoll)
      记为「第九轮改回同页展开」时漏掉的这处）。同页展开即可，页面自身滚动。 */
   white-space: pre-wrap;
   margin-bottom: 10px;
+}
+/* 28.17：整段文本里被点中的原文片段标记 */
+.composed mark.hit {
+  background: var(--ochre-light);
+  color: var(--ochre);
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 2px;
 }
 :deep(.row-active) td { background: var(--ink-light) !important; }
 
