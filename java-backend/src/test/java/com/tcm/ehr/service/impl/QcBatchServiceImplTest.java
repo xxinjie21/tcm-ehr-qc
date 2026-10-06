@@ -2,9 +2,12 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.tcm.ehr.common.config.QcRuleStore;
+import com.tcm.ehr.common.exception.ConcurrentOperationException;
+import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.QcTask;
+import com.tcm.ehr.mapper.DbLockMapper;
 import com.tcm.ehr.mapper.QcTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -46,13 +49,16 @@ class QcBatchServiceImplTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    /** 提交互斥统一走 DistLock → DbLockMapper（批次 26.2）。默认打桩成「拿到锁」 */
+    private DbLockMapper dbLockMapper;
+
     private QcBatchServiceImpl newService(QcTaskMapper taskMapper, RecordMapper recordMapper,
                                           OperationLogger operationLogger) {
-        // 提交互斥：默认打桩「拿到锁」，否则 acquireLock 返回 null，submit 会被当成并发冲突拒掉
-        when(taskMapper.acquireLock(any(), anyInt())).thenReturn(1);
-        when(taskMapper.releaseLock(any())).thenReturn(1);
+        dbLockMapper = mock(DbLockMapper.class);
+        when(dbLockMapper.acquire(any(), anyInt())).thenReturn(1);
+        when(dbLockMapper.release(any())).thenReturn(1);
         return new QcBatchServiceImpl(taskMapper, recordMapper, mock(QcServiceImpl.class),
-                mock(QcRuleStore.class), operationLogger, new ObjectMapper());
+                mock(QcRuleStore.class), operationLogger, new ObjectMapper(), new DistLock(dbLockMapper));
     }
 
     // ------------------------------------------------------------------ 收尾状态
@@ -188,15 +194,15 @@ class QcBatchServiceImplTest {
         QcBatchServiceImpl svc = newService(taskMapper, mock(RecordMapper.class), mock(OperationLogger.class));
         // 必须在 newService 之后覆盖 —— 它默认把锁打桩成「拿到了」
         // 桩改成「没拿到锁」—— 这正是多实例并发提交时的情形
-        when(taskMapper.acquireLock(any(), anyInt())).thenReturn(0);
+        when(dbLockMapper.acquire(any(), anyInt())).thenReturn(0);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        ConcurrentOperationException ex = assertThrows(ConcurrentOperationException.class,
                 () -> svc.submit(null));
-        assertTrue(ex.getMessage().contains("正在提交"));
+        assertTrue(ex.getMessage().contains("稍后重试"), ex.getMessage());
         // 关键：没拿到锁就绝不能继续插任务，否则又变回 check-then-act
         org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).insert(any(QcTask.class));
         // 也没拿到锁，自然不该去释放
-        org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).releaseLock(any());
+        org.mockito.Mockito.verify(dbLockMapper, org.mockito.Mockito.never()).release(any());
     }
 
     @Test
@@ -211,7 +217,7 @@ class QcBatchServiceImplTest {
                 () -> svc.submit(null));
         assertTrue(ex.getMessage().contains("排队或运行中"));
         // finally 必须释放，否则这一次异常会把之后所有提交都堵死
-        verify(taskMapper).releaseLock(any());
+        verify(dbLockMapper).release(any());
         org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).insert(any(QcTask.class));
     }
 

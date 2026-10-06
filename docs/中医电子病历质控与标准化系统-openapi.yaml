@@ -2362,6 +2362,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: 非管理员
+        '409':
+          description: 已有另一个提交正在进行（拿不到提交互斥锁，由另一实例持锁）。本次没有新建任何任务，稍后重试即可（code=409）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'
     get:
@@ -2922,6 +2928,12 @@ paths:
                 $ref: '#/components/schemas/ErrorVO'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: 已有另一个提交正在进行（拿不到提交互斥锁，由另一实例持锁）。本次没有新建任何任务，稍后重试即可（code=409）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'
 

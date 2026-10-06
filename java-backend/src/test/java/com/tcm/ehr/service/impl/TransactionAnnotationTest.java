@@ -51,6 +51,20 @@ class TransactionAnnotationTest {
     }
 
     /**
+     * 批次 26.2：批任务提交要在事务里跑，锁的释放才会被推迟到提交之后。
+     *
+     * <p>不加事务时 {@code DistLock} 会在临界区一结束就放锁（此时行还不可见），
+     * 并发读会读到「没有活跃任务」的空窗，于是双双入库 —— 正是这次要修的东西。</p>
+     */
+    @Test
+    void batchSubmitIsTransactional() throws NoSuchMethodException {
+        assertTransactional(QcBatchServiceImpl.class, "submit",
+                com.tcm.ehr.domain.dto.QcBatchDTO.class);
+        assertTransactional(NlpBatchServiceImpl.class, "submit",
+                com.tcm.ehr.domain.dto.NlpBatchDTO.class, String.class);
+    }
+
+    /**
      * 单条质控：先写 records 再 upsert review_tasks，两段写必须同生共死。
      *
      * <p>{@code getMethod} 只返回 public 方法 —— 若有人把可见性改回包级，

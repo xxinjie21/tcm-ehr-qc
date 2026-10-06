@@ -4,6 +4,8 @@ import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.mapper.DbLockMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -93,6 +95,47 @@ class DistLockTest {
         when(mapper.release(anyString())).thenThrow(new RuntimeException("redis-like down"));
 
         assertEquals("ok", new DistLock(mapper).runLocked("k", () -> "ok"));
+    }
+
+    @Test
+    @DisplayName("事务内：放锁推迟到 afterCompletion（在事务里提前放锁，并发会读到未提交的空结果）")
+    void releaseDeferredUntilAfterCompletionInsideTransaction() {
+        DbLockMapper mapper = mock(DbLockMapper.class);
+        when(mapper.acquire(anyString(), anyInt())).thenReturn(1);
+        when(mapper.release(anyString())).thenReturn(1);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertEquals("ok", new DistLock(mapper).runLocked("k", () -> "ok"));
+            // 临界区结束、事务尚未提交：此时绝不能放锁
+            verify(mapper, never()).release(anyString());
+            // 事务提交 → afterCompletion 才释放（且落在同一事务连接上）
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
+            verify(mapper).release("k");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("afterCommit：无事务立即执行；有事务推迟到提交后（入队不能早于行可见）")
+    void afterCommitDefersUntilCommitOnlyInsideTransaction() {
+        AtomicInteger ran = new AtomicInteger();
+
+        DistLock.afterCommit(ran::incrementAndGet);
+        assertEquals(1, ran.get(), "无事务上下文应立即执行");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            DistLock.afterCommit(ran::incrementAndGet);
+            assertEquals(1, ran.get(), "有事务上下文时不能立即执行");
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+            assertEquals(2, ran.get(), "提交后才执行");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.ehr.common.config.QcRuleSet;
 import com.tcm.ehr.common.config.QcRuleStore;
+import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
@@ -26,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -82,8 +84,6 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
     /** 提交互斥锁名：跨实例只允许一个「查重 + 入队」同时进行 */
     private static final String SUBMIT_LOCK = "tcm:qc_batch:submit";
-    /** 取锁等待秒数；拿不到就拒绝，不做无锁提交 */
-    private static final int SUBMIT_LOCK_WAIT_SECONDS = 3;
 
     private final QcTaskMapper taskMapper;
     private final RecordMapper recordMapper;
@@ -91,6 +91,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
     private final QcRuleStore ruleStore;
     private final OperationLogger operationLogger;
     private final ObjectMapper objectMapper;
+    /** 批次 26.2：提交互斥统一走 DistLock（事务感知释放） */
+    private final DistLock distLock;
 
     @Value("${qc.batch.concurrency:1}")
     private int concurrency;
@@ -211,8 +213,10 @@ public class QcBatchServiceImpl implements IQcBatchService {
      * @param dto 批量请求（filters），可为 null（表示不限）
      * @return 新任务的进度视图（无失败明细）
      * @throws IllegalArgumentException 超出单次上限、或已有任务在排队/运行中时抛出
+     * @throws com.tcm.ehr.common.exception.ConcurrentOperationException 拿不到提交锁（另一提交正在进行）
      */
     @Override
+    @Transactional
     public QcTaskVO submit(QcBatchDTO dto) {
         FiltersDTO filters = dto == null ? null : dto.getFilters();
         // 1. 在提交线程取操作人与角色（worker 拿不到，必须现在捕获）
@@ -235,15 +239,12 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
         // 2. 防重：「查有没有活跃任务」+「插队」必须原子，否则并发双提交会双双入库
         //    （两个任务同时跑，进度互相覆写）。
-        //    ⚠️ 互斥用 DB 的 GET_LOCK 而不是 JVM 锁：synchronized 在多实例下静默失效 ——
+        //    ⚠️ 互斥用 DB 命名锁而不是 JVM 锁：synchronized 在多实例下静默失效 ——
         //    不报错、只是不互斥，是最难查的一类 bug。拿不到锁就当并发冲突拒绝，
         //    绝不「没锁也继续」—— 那正是原来 check-then-act 的老问题。
-        String lockName = SUBMIT_LOCK;
-        Integer locked = taskMapper.acquireLock(lockName, SUBMIT_LOCK_WAIT_SECONDS);
-        if (locked == null || locked != 1) {
-            throw new IllegalArgumentException("有另一个重算任务正在提交，请稍后重试");
-        }
-        try {
+        //    批次 26.2：统一走 DistLock —— 它在事务内把放锁推迟到提交之后，且与取锁共用
+        //    同一条事务连接（命名锁是连接级的，自己 GET_LOCK/RELEASE_LOCK 会漏锁）。
+        return distLock.runLocked(SUBMIT_LOCK, () -> {
             // 防重按组织算：任务是组织级的，A 组排队不该挡住 B 组提交
             Long active = taskMapper.selectCount(new QueryWrapper<QcTask>()
                     .eq("org_id", orgId)
@@ -252,15 +253,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
                 throw new IllegalArgumentException("已有重算任务在排队或运行中，请等它结束或先取消");
             }
             return insertTask(dto, filters, orgId, operator, role);
-        } finally {
-            // 必须在 finally 释放：抛异常时锁不会自动释放，不释放会卡住后续所有提交
-            try {
-                taskMapper.releaseLock(lockName);
-            } catch (Exception e) {
-                // 释放失败只记录：连接归还时 MySQL 会自动释放本连接持有的命名锁
-                log.warn("[批重算] 释放提交锁失败: {}", e.getMessage());
-            }
-        }
+        });
     }
 
     /**
@@ -325,8 +318,9 @@ public class QcBatchServiceImpl implements IQcBatchService {
             throw dup;
         }
 
-        // 5. 入队后立即返回，由工作线程异步消费
-        queue.offer(t.getId());
+        // 5. 入队后立即返回，由工作线程异步消费。
+        //    批次 26.2：入队推迟到事务提交之后（行可见才投递），否则 worker 可能先于提交取到 id
+        DistLock.afterCommit(() -> queue.offer(t.getId()));
         operationLogger.log("批量重算", RecordFilter.describe(filters), "提交任务，计划 " + total + " 条", operator, role);
         log.info("[批重算] 已提交任务 {}：计划 {} 条", t.getId(), total);
         return toVO(t, false);

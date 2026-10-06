@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.ehr.common.exception.TermIndexUnavailableException;
+import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.NlpTextComposer;
 import com.tcm.ehr.common.utils.PythonNlpClient;
@@ -30,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -71,6 +73,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private static final int MAX_FAILURES = 500;
     /** 「最近任务」列表的上限；超出时回 truncated=true，别让页面把这一页当全部 */
     private static final int LIST_LIMIT = 50;
+    /** 提交互斥锁名：跨实例只允许一个「查重 + 入队」同时进行 */
+    private static final String SUBMIT_LOCK = "tcm:nlp_batch:submit";
 
     private final NlpTaskMapper taskMapper;
     private final RecordMapper recordMapper;
@@ -81,6 +85,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 词典状态（版本 / 词条数）：归一打点要用「真正生效的那版词典」，不是词典还在文件时代留下的冻结哈希 */
     private final com.tcm.ehr.service.DictionaryTermStore termStore;
     private final ObjectMapper objectMapper;
+    /** 批次 26.2：提交互斥统一走 DistLock（事务感知释放） */
+    private final DistLock distLock;
 
     @Value("${nlp.batch.concurrency:2}")
     private int concurrency;
@@ -210,8 +216,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * @param createdBy 提交人
      * @return 新任务的进度视图（无失败明细）
      * @throws IllegalArgumentException 抽取服务未开启或筛选条件无法序列化时抛出
+     * @throws com.tcm.ehr.common.exception.ConcurrentOperationException 拿不到提交锁（另一提交正在进行）
      */
     @Override
+    @Transactional
     public NlpTaskVO submit(NlpBatchDTO dto, String createdBy) {
         // 1. 前置校验：没开抽取就不要排任务，避免整批必然失败
         if (!nlpClient.isEnabled()) {
@@ -229,56 +237,62 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 return toVO(existed, false);
             }
         }
-        // 1.1 防重：与质控侧同一口径（查表判 QUEUED/RUNNING）。
-        //     解析侧原先完全没有这道门，重复点击会起多个并发任务同时压 Python 服务，
-        //     且后提交的任务会让先提交的进度互相覆写。
-        //     ⚠️ 本步仍是 check-then-act（与 QcBatchServiceImpl.submit 同样），
-        //     彻底原子化在批次 9 统一处理，本批只补上缺失的门。
-        Long active = taskMapper.selectCount(new QueryWrapper<NlpTask>()
-                .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED)));
-        if (active != null && active > 0) {
-            throw new IllegalArgumentException("已有解析任务在排队或运行中，请等它结束或先取消");
-        }
-        FiltersDTO filters = dto == null ? null : dto.getFilters();
-        int limit = dto == null || dto.getLimit() == null ? 0 : dto.getLimit();
+        final String idempotencyKey = requestKey;
+        final FiltersDTO filters = dto == null ? null : dto.getFilters();
+        final int limit = dto == null || dto.getLimit() == null ? 0 : dto.getLimit();
+        final String orgId = RequestUtils.currentOrgId();
 
-        // 2. 统计计划条数：limit 大于 0 时以它封顶
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
-        long count = recordMapper.selectCount(wrapper);
-        int total = limit > 0 ? (int) Math.min(count, limit) : (int) count;
-
-        // 3. 任务落库为排队态；筛选条件严格序列化，失败宁可拒绝也不让任务退化成全库扫描
-        NlpTask t = new NlpTask();
-        t.setId(UUID.randomUUID().toString());
-        t.setStatus(NlpTask.QUEUED);
-        t.setTotal(total);
-        t.setDone(0);
-        t.setSuccess(0);
-        t.setFailed(0);
-        t.setFiltersJson(writeJsonStrict(objectMapper, filters));
-        t.setCreatedBy(createdBy);
-        // 提交线程捕获组快照，供 worker 重建 RecordFilter（§ 6.3 缺点 13）
-        t.setOrgId(RequestUtils.currentOrgId());
-        t.setFailureList("[]");
-        t.setFailureTruncated(false);
-        t.setCreateTime(LocalDateTime.now().withNano(0));
-        t.setRequestKey(requestKey);
-        try {
-            taskMapper.insert(t);
-        } catch (org.springframework.dao.DuplicateKeyException dup) {
-            // 并发同键：另一线程刚插入成功 ⇒ 查回那条任务返回，绝不重跑
-            NlpTask existed = findTaskByRequestKey(t.getOrgId(), requestKey);
-            if (existed != null) {
-                log.info("[批解析] 并发同键：key={} 复用任务 {}", requestKey, existed.getId());
-                return toVO(existed, false);
+        // 1.1 防重：「查有没有活跃任务」+「统计」+「插队」必须原子，否则并发双提交会双双入库
+        //     （多个任务同时跑，进度互相覆写，还一起压 Python 服务）。
+        //     ⚠️ 互斥必须落在 DB 命名锁上：JVM 锁在多实例下静默失效 —— 不报错、只是不互斥。
+        //     批次 26.2：统一走 DistLock —— 它在事务内把放锁推迟到提交之后，且与取锁共用
+        //     同一条事务连接（命名锁是连接级的，自己 GET_LOCK/RELEASE_LOCK 会漏锁）。
+        return distLock.runLocked(SUBMIT_LOCK, () -> {
+            Long active = taskMapper.selectCount(new QueryWrapper<NlpTask>()
+                    .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED)));
+            if (active != null && active > 0) {
+                throw new IllegalArgumentException("已有解析任务在排队或运行中，请等它结束或先取消");
             }
-            throw dup;
-        }
 
-        // 4. 入队后立即返回，由工作线程异步消费
-        queue.offer(t.getId());
-        log.info("[批解析] 已提交任务 {}：计划 {} 条", t.getId(), total);
-        return toVO(t, false);
+            // 2. 统计计划条数：limit 大于 0 时以它封顶
+            QueryWrapper<Record> wrapper = RecordFilter.build(orgId, filters);
+            long count = recordMapper.selectCount(wrapper);
+            int total = limit > 0 ? (int) Math.min(count, limit) : (int) count;
+
+            // 3. 任务落库为排队态；筛选条件严格序列化，失败宁可拒绝也不让任务退化成全库扫描
+            NlpTask t = new NlpTask();
+            t.setId(UUID.randomUUID().toString());
+            t.setStatus(NlpTask.QUEUED);
+            t.setTotal(total);
+            t.setDone(0);
+            t.setSuccess(0);
+            t.setFailed(0);
+            t.setFiltersJson(writeJsonStrict(objectMapper, filters));
+            t.setCreatedBy(createdBy);
+            // 提交线程捕获组快照，供 worker 重建 RecordFilter（§ 6.3 缺点 13）
+            t.setOrgId(orgId);
+            t.setFailureList("[]");
+            t.setFailureTruncated(false);
+            t.setCreateTime(LocalDateTime.now().withNano(0));
+            t.setRequestKey(idempotencyKey);
+            try {
+                taskMapper.insert(t);
+            } catch (org.springframework.dao.DuplicateKeyException dup) {
+                // 并发同键：另一线程刚插入成功 ⇒ 查回那条任务返回，绝不重跑
+                NlpTask existed = findTaskByRequestKey(t.getOrgId(), idempotencyKey);
+                if (existed != null) {
+                    log.info("[批解析] 并发同键：key={} 复用任务 {}", idempotencyKey, existed.getId());
+                    return toVO(existed, false);
+                }
+                throw dup;
+            }
+
+            // 4. 入队后立即返回，由工作线程异步消费。
+            //    批次 26.2：入队推迟到事务提交之后（行可见才投递），否则 worker 可能先于提交取到 id
+            DistLock.afterCommit(() -> queue.offer(t.getId()));
+            log.info("[批解析] 已提交任务 {}：计划 {} 条", t.getId(), total);
+            return toVO(t, false);
+        });
     }
 
     /**

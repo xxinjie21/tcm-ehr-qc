@@ -2,6 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
+import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.common.utils.RequestUtils;
@@ -11,6 +12,7 @@ import com.tcm.ehr.domain.po.NlpTaskItem;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.NlpTaskVO;
+import com.tcm.ehr.mapper.DbLockMapper;
 import com.tcm.ehr.mapper.NlpTaskItemMapper;
 import com.tcm.ehr.mapper.NlpTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -260,6 +262,17 @@ class NlpBatchIntegrationTest {
         @Bean
         public ObjectMapper objectMapper() {
             return new ObjectMapper();
+        }
+
+        /**
+         * 批次 26.2：提交互斥改成构造器注入的 DistLock。
+         *
+         * <p>本测试只走 {@code submitIds}（导入后自动解析路径），不经过 {@code submit} 的命名锁，
+         * 所以直接注入真实 DistLock 即可 —— H2 没有 {@code GET_LOCK}，但这条路径不会调到它。</p>
+         */
+        @Bean
+        public DistLock distLock(DbLockMapper dbLockMapper) {
+            return new DistLock(dbLockMapper);
         }
     }
 }
