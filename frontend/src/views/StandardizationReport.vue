@@ -91,6 +91,10 @@
       </div>
     </div>
 
+    <!-- 28.22：归一率与缺词的图形视图。原先这两项只在下方收起区的 el-table 里，
+         业务用户要先展开、再逐行读才知道短板在哪。 -->
+    <StandardizationCharts :coverage="report?.coverage || []" :unmatched="report?.unmatched || {}" />
+
     <!-- 第二屏：待办清单。这是本页最有价值的部分 ——
          把「多少条未归一」翻译成「该做什么、归谁、值多少」。 -->
     <PanelCard title="建议的下一步">
@@ -167,6 +171,7 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StandardizationDetails from '@/components/StandardizationDetails.vue'
+import StandardizationCharts from '@/components/StandardizationCharts.vue'
 import { getStandardizationReport, exportStandardizationReport } from '@/api/stats'
 import { submitNlpBatch as submitExtractBatch, getNlpBatchProgress, listNlpBatch } from '@/api/nlp'
 import { recomputeQc as submitQcBatch, getQcBatch, listQcBatch } from '@/api/qc'
