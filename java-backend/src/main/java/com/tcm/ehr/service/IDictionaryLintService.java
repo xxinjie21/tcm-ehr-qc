@@ -38,4 +38,16 @@ public interface IDictionaryLintService {
     default DictionaryLintVO lintParsed(String type, List<TermEntry> entries) {
         return lint(type, entries);
     }
+
+    /**
+     * 体检一份词表，<b>失败时返回一份空结论而不抛</b>。
+     *
+     * <p>体检只是「提醒」：如果它自己抛异常就把整个解析带崩，用户连文件内容都看不到 ——
+     * 那是本末倒置。兜底放在服务层而非 Controller，后者只负责编排、不做异常兜底。</p>
+     *
+     * @param type    术语类型
+     * @param entries 待体检的词条
+     * @return 体检结论；内部出错时返回只带 total 的空结论
+     */
+    DictionaryLintVO lintSafely(String type, List<TermEntry> entries);
 }

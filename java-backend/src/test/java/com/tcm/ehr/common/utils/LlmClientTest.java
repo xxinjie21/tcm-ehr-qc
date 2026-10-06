@@ -21,9 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * LlmClient 降级契约测试（纯对象构造，不加载 Spring 容器、不联网、不需要任何 api-key）。
  *
- * <p>锁定三条硬约束：<b>配置缺失/非法只降级不抛异常</b>（不阻塞主流程）、
- * <b>llm.enabled=false 时完全不装配模型</b>，以及 <b>运行时覆盖立即生效</b>（UX-68，无需重启）。
- * 前两条一旦被破坏，要么主流程被 LLM 拖死，要么重演「缺 api-key 导致整个上下文启动失败」。</p>
+ * <p>锁定两条硬约束：<b>配置缺失/非法只降级不抛异常</b>（不阻塞主流程）、
+ * <b>llm.enabled=false 时完全不装配模型</b>。一旦被破坏，要么主流程被 LLM 拖死，
+ * 要么重演「缺 api-key 导致整个上下文启动失败」。</p>
  */
 class LlmClientTest {
 
@@ -31,13 +31,8 @@ class LlmClientTest {
      * 每个用例一个**唯一且尚不存在**的配置文件路径。
      *
      * <p>必须隔离：{@link LlmConfigStore} 构造时会读 {@code llm.configFile} 并用其中的非密钥字段
-     * 覆盖 yml 基线，而 {@code update()} 又会把配置<b>写回</b>该文件。默认路径是
-     * {@code data/llm-config.json} —— 这是开发机上的真实运行时配置（且被 .gitignore 忽略），
-     * 用它会让断言变成「看本机文件内容」，跑完还会污染用户的配置。</p>
-     *
-     * <p>目录用 {@link TempDir}（每次运行新建、跑完删除）而不是固定的 {@code target/} 子目录：
-     * 只要路径在同一台机器上跨运行可复用，后一次运行就会读到前一次 {@code update()} 写下的
-     * {@code enabled=true}，断言随之翻车 —— 这个顺序依赖踩过一次。</p>
+     * 覆盖 yml 基线。默认路径是 {@code data/llm-config.json} —— 这是开发机上的真实运行时配置
+     * （且被 .gitignore 忽略），用它会让断言变成「看本机文件内容」。</p>
      */
     @TempDir
     static Path configDir;
@@ -63,21 +58,6 @@ class LlmClientTest {
     /** 存储层测试替身：按内存 Map 模拟 user_llm_config（不碰数据库） */
     private static UserLlmConfigMapper emptyUserMapper() {
         return org.mockito.Mockito.mock(UserLlmConfigMapper.class);
-    }
-
-    /**
-     * 清理本测试写出的配置文件。
-     *
-     * <p>{@code LlmConfigStore.update()} 会把配置写盘，而构造时又会读它 ——
-     * 不清理的话，第二次跑时基线已被上一次的结果污染，
-     * 「基线未开启 → 运行时覆盖为开启」这类用例会在重跑时失败。</p>
-     */
-    @org.junit.jupiter.api.BeforeEach
-    void cleanConfigFile() {
-        java.io.File f = new java.io.File("target/no-such-llm-config-client-test.json");
-        if (f.exists() && !f.delete()) {
-            throw new IllegalStateException("清理残留的 LLM 配置文件失败");
-        }
     }
 
     private static LlmClient clientOf(LlmProperties p) {
@@ -136,35 +116,6 @@ class LlmClientTest {
 
         assertTrue(client.isAvailable(), "装配不依赖网络，应仍可用");
         assertDoesNotThrow(() -> assertNull(client.chat("你好"), "连不上 Ollama 应降级返回 null"));
-    }
-
-    // ------------------------------------------------------------------ UX-68 运行时覆盖
-
-    /** 基线关闭 → 运行时覆盖为开启：立即生效，无需重启 */
-    @Test
-    void runtimeOverride_takesEffectWithoutRestart() {
-        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper(), emptyUserMapper(), cipher());
-        LlmClient client = new LlmClient(store);
-
-        assertFalse(client.isAvailable(), "覆盖前应为关闭态");
-        assertFalse(client.isEnabled(), "覆盖前 isEnabled 应为 false");
-
-        store.update(new LlmConfig(true, "ollama", "", "", "", 0.2D, 60000));
-
-        assertTrue(client.isEnabled(), "覆盖后 isEnabled 应为 true");
-        assertTrue(client.isAvailable(), "运行时覆盖后应重新装配并可用，无需重启");
-    }
-
-    /** 覆盖为非法参数：仍只降级，不得抛（否则保存动作会把接口打 500） */
-    @Test
-    void runtimeOverrideWithIllegalProvider_shouldDegradeInsteadOfThrowing() {
-        LlmConfigStore store = new LlmConfigStore(props(false, "ollama"), new ObjectMapper(), emptyUserMapper(), cipher());
-        LlmClient client = new LlmClient(store);
-
-        store.update(new LlmConfig(true, "not-a-provider", "", "", "", null, 0));
-
-        assertDoesNotThrow(client::isAvailable, "覆盖成非法 provider 不应抛异常");
-        assertFalse(client.isAvailable(), "非法 provider 应判为不可用");
     }
 
     /**

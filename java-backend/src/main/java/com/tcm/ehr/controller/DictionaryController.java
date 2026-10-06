@@ -19,7 +19,6 @@ import com.tcm.ehr.service.IDictProposalService;
 import com.tcm.ehr.service.IDictionaryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,7 +50,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/dictionary")
-@Slf4j
 @RequiredArgsConstructor
 public class DictionaryController {
 
@@ -193,25 +191,7 @@ public class DictionaryController {
                 "terms", terms,
                 "failures", parsed.failures,
                 // 体检是纯计算，失败不该拦住「看看文件里有什么」，故降级为空结果
-                "lint", safeLint(type, parsed.terms))));
-    }
-
-    /**
-     * 体检失败不阻断解析。
-     *
-     *
-     * 体检只是「提醒」，如果它自己抛异常就把整个解析带崩，用户连文件内容都看不到 ——
-     *
-     * 那是本末倒置。所以这里兜住并返回一份空结论，让用户至少能下载/查看解析结果。
-     */
-    private Object safeLint(String type, List<TermEntry> terms) {
-        try {
-            return lintService.lint(type, terms);
-        } catch (Exception e) {
-            com.tcm.ehr.domain.vo.DictionaryLintVO empty = new com.tcm.ehr.domain.vo.DictionaryLintVO();
-            empty.setTotal(terms == null ? 0 : terms.size());
-            return empty;
-        }
+                "lint", lintService.lintSafely(type, parsed.terms))));
     }
 
     /**
@@ -253,26 +233,16 @@ public class DictionaryController {
         // ⚠️ 到这里导入**已经提交**（词条进库 + ES 重建 + 版本已记）。后面的归档与审计
         //    都只是随后的记账动作，失败不能把整个请求变成 500 —— 那会让用户以为导入没成，
         //    而实际已经生效（重试还会再合并一次）；静默丢弃又会让归档体系与词典内容对不上
-        //    （5 份限额与回滚历史错位）。故各自兜住：成功照常 200，原因写进返回体，栈入日志。
-        Integer versionNo = null;
-        try {
-            // 直写同样纳入归档体系：生成快照并执行 5 份限额
-            versionNo = archiveService.archive(orgId, type,
-                    dictionaryService.currentTerms(orgId, type), null,
-                    RequestUtils.currentUsername(), "管理员直写导入");
-            vo.setArchiveVersion(versionNo);
-        } catch (Exception e) {
-            // 完整栈入日志：这条路径此前只回一个追踪码，排障时拿不到栈
-            log.error("[词典] {} (org={}) 导入已成功，但归档版本生成失败：{}", type, orgId, e.getMessage(), e);
-            vo.setArchiveWarning("导入已成功，但归档版本生成失败：" + e.getMessage());
-        }
-        try {
-            operationLogger.log("词典导入", type + (base ? "(基础层)" : ""),
-                    "成功" + vo.getImported() + "条，失败" + vo.getFailed() + "条，归档 "
-                            + (versionNo == null ? "失败" : "v" + versionNo));
-        } catch (Exception e) {
-            log.warn("[词典] {} (org={}) 导入审计日志写入失败：{}", type, orgId, e.getMessage(), e);
-        }
+        //    （5 份限额与回滚历史错位）。故归档失败由服务层收敛成警告返回，成功照常 200。
+        IDictArchiveService.ArchiveOutcome outcome = archiveService.archiveQuietly(orgId, type,
+                dictionaryService.currentTerms(orgId, type), null,
+                RequestUtils.currentUsername(), "管理员直写导入");
+        vo.setArchiveVersion(outcome.versionNo());
+        vo.setArchiveWarning(outcome.warning());
+        // OperationLogger 内部已兜住入库失败（只 warn 不抛），这里不再多一层死防御
+        operationLogger.log("词典导入", type + (base ? "(基础层)" : ""),
+                "成功" + vo.getImported() + "条，失败" + vo.getFailed() + "条，归档 "
+                        + (outcome.versionNo() == null ? "失败" : "v" + outcome.versionNo()));
         return ResponseEntity.ok(Result.ok(vo));
     }
 

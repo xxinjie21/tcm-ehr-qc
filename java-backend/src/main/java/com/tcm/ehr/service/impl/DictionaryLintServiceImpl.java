@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.DictionaryLintVO;
 import com.tcm.ehr.service.IDictionaryLintService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import java.util.regex.Pattern;
  * 其余几项是「大概率是整理时的疏忽」，只警告不拦。
  *
  */
+@Slf4j
 @Service
 public class DictionaryLintServiceImpl implements IDictionaryLintService {
 
@@ -80,6 +82,18 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
         all.sort((a, b) -> Integer.compare(b.getCount(), a.getCount()));
         vo.setTopIssues(new ArrayList<>(all.subList(0, Math.min(TOP_N, all.size()))));
         return vo;
+    }
+
+    @Override
+    public DictionaryLintVO lintSafely(String type, List<TermEntry> entries) {
+        try {
+            return lint(type, entries);
+        } catch (Exception e) {
+            log.warn("[词典] 词表体检失败（按空结论返回）: {}", e.getMessage(), e);
+            DictionaryLintVO empty = new DictionaryLintVO();
+            empty.setTotal(entries == null ? 0 : entries.size());
+            return empty;
+        }
     }
 
     // ------------------------------------------------------------ 检查项

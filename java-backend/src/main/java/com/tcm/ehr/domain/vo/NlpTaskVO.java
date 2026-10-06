@@ -1,30 +1,22 @@
 package com.tcm.ehr.domain.vo;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * NLP 批量解析任务视图。
+ * NLP 批量解析任务视图。公共字段见 {@link AbstractTaskVO}。
  */
 @Data
-public class NlpTaskVO {
+@EqualsAndHashCode(callSuper = true)
+public class NlpTaskVO extends AbstractTaskVO {
 
-    /** 任务ID */
-    private String id;
-    /** QUEUED / RUNNING / COMPLETED / CANCELLED / INTERRUPTED / FAILED */
-    private String status;
     private int total;
     private int done;
     private int success;
     private int failed;
-    private String current;
-    private String createdBy;
-    private LocalDateTime createTime;
-    private LocalDateTime startedAt;
-    private LocalDateTime finishedAt;
     /** 失败清单是否被截断（仅保留前 500 条） */
     private boolean failureTruncated;
     /** 失败清单（label=病历标识，reason=原因） */

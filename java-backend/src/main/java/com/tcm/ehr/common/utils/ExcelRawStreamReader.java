@@ -22,8 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Excel 流式读的<b>第二档</b>：保留单元格的「类型 + 原始值」，而不是只给格式化文本
- * （对照 {@link ExcelStreamReader}）。
+ * Excel 流式读的<b>第二档</b>：保留单元格的「类型 + 原始值」，而不是只给格式化文本。
  *
  * <p><b>为什么必须有这一档</b>：{@code DataFormatter} 会把大数写成科学计数法。实测证据：
  * 病历导入「接诊时间」列的真实来源是 14 位紧凑数字串（{@code 20221224090613}，类型数值、
@@ -57,9 +56,14 @@ public final class ExcelRawStreamReader {
                           LocalDateTime dateTime) {
     }
 
-    /** 逐行回调：{@code rowNum} 为 <b>0 基</b>行号（与 {@link ExcelStreamReader} 同一口径） */
+    /** 逐行回调：{@code rowNum} 为 <b>0 基</b>行号（与既有 POI 全量读的 {@code cellText} 同一口径） */
     public interface RowHandler {
         void row(int rowNum, List<RawCell> cells);
+    }
+
+    /** 只关心前 {@code cols} 列文本时的逐行回调：{@code cells} 定长，空位为 null */
+    public interface TextRowHandler {
+        void row(int rowNum, String[] cells);
     }
 
     /**
@@ -98,6 +102,31 @@ public final class ExcelRawStreamReader {
             // 临时文件必须删：上传侧已有 50MB 体积闸门，但仍不该在磁盘上留残留
             Files.deleteIfExists(tmp);
         }
+    }
+
+    /**
+     * 便捷重载：只取前 {@code cols} 列的<b>文本</b>（词典导入这类纯文本表用）。
+     *
+     * <p>取值口径与既有 POI 全量读的 {@code cellText} 一致：字符串给原文并 trim、
+     * 数值给「整数不带 .0」的十进制串、布尔 / 错误 / 空单元格给 null；缺的列补 null，
+     * 返回数组长度恒为 {@code cols}。</p>
+     *
+     * <p>与已删除的格式化文本读取器的差别：这里不过 {@code DataFormatter}，
+     * 大数不会变成科学计数法 —— 这正是把两档合并成本类的理由。</p>
+     */
+    public static void forEachXlsxRow(InputStream in, int cols, TextRowHandler handler) throws IOException {
+        forEachXlsxRow(in, (rowNum, cells) -> {
+            String[] out = new String[cols];
+            for (RawCell c : cells) {
+                int col = c.col();
+                if (col < 0 || col >= cols || c.text() == null) {
+                    continue;
+                }
+                String text = c.text().trim();
+                out[col] = text.isEmpty() ? null : text;
+            }
+            handler.row(rowNum, out);
+        });
     }
 
     /** 把数值按既有 cellText 的口径转成文本：整数不带 .0，小数保留 */

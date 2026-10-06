@@ -1,6 +1,5 @@
 package com.tcm.ehr.common.config;
 
-import com.tcm.ehr.common.utils.AtomicJsonWriter;
 import com.tcm.ehr.common.utils.LlmSecretCipher;
 import com.tcm.ehr.common.utils.VersionedCache;
 import com.tcm.ehr.domain.po.UserLlmConfig;
@@ -13,7 +12,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -34,7 +32,6 @@ import java.util.Map;
 @Component
 public class LlmConfigStore {
 
-    private final LlmProperties props;
     private final ObjectMapper mapper;
     /** 用户私有配置（每人一行，含加密密钥） */
     private final UserLlmConfigMapper userMapper;
@@ -62,7 +59,6 @@ public class LlmConfigStore {
 
     public LlmConfigStore(LlmProperties props, ObjectMapper mapper,
                           UserLlmConfigMapper userMapper, LlmSecretCipher cipher) {
-        this.props = props;
         this.mapper = mapper;
         this.userMapper = userMapper;
         this.cipher = cipher;
@@ -179,22 +175,9 @@ public class LlmConfigStore {
         return snapshot.config();
     }
 
-    /** 配置版本号；每次覆盖自增 */
+    /** 配置版本号；每次保存个人配置自增（见 {@link #saveFor}） */
     public long version() {
         return snapshot.version();
-    }
-
-    /** 覆盖运行时配置：更新内存、推进版本、并把非密钥字段落盘 */
-    public LlmConfig update(LlmConfig next) {
-        // 1. 配置与版本一次性发布（见 Snapshot 的注释：分两步写会露出混搭的中间态）
-        Snapshot prev = snapshot;
-        long v = prev.version() + 1;
-        snapshot = new Snapshot(next, v);
-        // 2. 非密钥字段落盘（api-key 只留在内存）
-        persist(next);
-        log.info("[LLM] 运行时配置已更新(v{})：enabled={}，provider={}，model={}（非密钥字段已落盘）",
-                v, next.enabled(), next.provider(), next.model());
-        return get();
     }
 
     // ------------------------------------------------------------------ 内部
@@ -235,21 +218,4 @@ public class LlmConfigStore {
         }
     }
 
-    /** 落盘非密钥字段（api-key 绝不写入） */
-    private void persist(LlmConfig c) {
-        // 1. 只列非密钥字段——这个 map 是落盘内容的唯一来源，别顺手把密钥加进来
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("enabled", c.enabled());
-        m.put("provider", c.provider());
-        m.put("baseUrl", c.baseUrl());
-        m.put("model", c.model());
-        m.put("temperature", c.temperature());
-        m.put("timeout", c.timeout());
-        try {
-            // 2. 原子写：先写临时文件再 move，避免半截 JSON 让下次启动静默回退默认
-            AtomicJsonWriter.write(mapper, Paths.get(props.getConfigFile()), m);
-        } catch (Exception e) {
-            log.warn("[LLM] 运行时配置落盘失败（本次仅在内存生效）: {}", e.getMessage());
-        }
-    }
 }

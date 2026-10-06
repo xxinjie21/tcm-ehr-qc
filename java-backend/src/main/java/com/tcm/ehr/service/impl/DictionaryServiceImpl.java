@@ -2,7 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
-import com.tcm.ehr.common.utils.ExcelStreamReader;
+import com.tcm.ehr.common.utils.ExcelRawStreamReader;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
@@ -356,9 +356,9 @@ if (matched) {
     /**
      * 读 Excel 全部行（取前 3 列，空单元格补 null 以保持列位）。
      *
-     * `.xlsx` 走 SAX 流式（{@link ExcelStreamReader}）：内存里只留当前一行，不再整份载入 ——
+     * `.xlsx` 走 SAX 流式（{@link ExcelRawStreamReader}）：内存里只留当前一行，不再整份载入 ——
      * 原先的 50MB 体积闸门只是把 OOM 阈值推后，没改变「内存 ≈ 解压后体积」这个事实。
-     * 两条路径的取值口径已由 ExcelStreamReaderTest 逐行逐列比对锁住。
+     * 取值口径已由 ExcelRawStreamReaderTest 逐行逐列比对锁住。
      *
      * `.xls`（HSSF）没有事件式 API，保留 POI 全量载入 + 体积闸门，这是有意取舍。
      */
@@ -366,7 +366,7 @@ if (matched) {
         List<String[]> rows = new ArrayList<>();
         // 1. xlsx：流式逐个工作表事件回调
         if (fileName(file).endsWith(".xlsx")) {
-            ExcelStreamReader.forEachXlsxRow(file.getInputStream(), 3, (rowNum, cells) -> {
+            ExcelRawStreamReader.forEachXlsxRow(file.getInputStream(), 3, (rowNum, cells) -> {
                 // 1.1 首行是表头就跳过
                 if (rowNum == 0 && isHeaderRow(cells)) {
                     return;

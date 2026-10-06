@@ -1,8 +1,11 @@
 package com.tcm.ehr.common.utils;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
@@ -152,5 +155,114 @@ class ExcelRawStreamReaderTest {
         assertEquals(2, ExcelRawStreamReader.columnIndex("C7"));
         assertEquals(26, ExcelRawStreamReader.columnIndex("AA1"));
         assertEquals(-1, ExcelRawStreamReader.columnIndex("1"));
+    }
+
+    // ---- 文本重载（原 ExcelStreamReader 的职责，2026-10 合并进本类） ----
+
+    /** 造一份 .xlsx：表头 + 中文词条 + 空别名 + 整数代码 + 小数代码 + 全空行 */
+    private static byte[] sampleXlsx() throws Exception {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("词典");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("标准术语");
+            header.createCell(1).setCellValue("别名");
+            header.createCell(2).setCellValue("国标代码");
+
+            Row r1 = sheet.createRow(1);
+            r1.createCell(0).setCellValue("  肝郁气滞  "); // 带空白：应被 trim
+            r1.createCell(1).setCellValue("肝气郁结、肝郁");
+            r1.createCell(2).setCellValue(301);
+
+            Row r2 = sheet.createRow(2);
+            r2.createCell(0).setCellValue("脾虚湿困");
+            // 别名列留空（不写单元格）：应为 null
+            r2.createCell(2).setCellValue(3.01);
+
+            sheet.createRow(3); // 三列全空的行：调用方按全 null 丢弃
+
+            wb.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    /** 文本重载的逐行回调收成列表（与 DictionaryServiceImpl 一样的用法） */
+    private static List<String[]> viaText(byte[] bytes) throws Exception {
+        List<String[]> rows = new ArrayList<>();
+        ExcelRawStreamReader.forEachXlsxRow(new ByteArrayInputStream(bytes), 3, (rowNum, cells) -> {
+            if (rowNum == 0) {
+                return; // 表头跳过
+            }
+            if (cells[0] != null || cells[1] != null || cells[2] != null) {
+                rows.add(cells);
+            }
+        });
+        return rows;
+    }
+
+    /** 既有 POI 全量读的口径（DictionaryServiceImpl.cellText 的语义复刻） */
+    private static List<String[]> viaPoi(byte[] bytes) throws Exception {
+        List<String[]> rows = new ArrayList<>();
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
+            Sheet sheet = wb.getSheetAt(0);
+            for (Row r : sheet) {
+                if (r.getRowNum() == 0) {
+                    continue;
+                }
+                String[] arr = new String[3];
+                for (int i = 0; i < 3; i++) {
+                    arr[i] = cellText(r.getCell(i));
+                }
+                if (arr[0] != null || arr[1] != null || arr[2] != null) {
+                    rows.add(arr);
+                }
+            }
+        }
+        return rows;
+    }
+
+    private static String cellText(Cell cell) {
+        if (cell == null) {
+            return null;
+        }
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> {
+                double d = cell.getNumericCellValue();
+                yield d == Math.floor(d) && !Double.isInfinite(d) ? String.valueOf((long) d) : String.valueOf(d);
+            }
+            case FORMULA -> cell.toString().trim();
+            default -> null;
+        };
+    }
+
+    /**
+     * 文本重载与既有 POI 全量读<b>逐行逐列等价</b>：口径漂了只会「导进去的词条莫名多/少」，
+     * 不会报错 —— 只能靠比对钉住。
+     */
+    @Test
+    void textOverloadMatchesPoiRows() throws Exception {
+        byte[] bytes = sampleXlsx();
+        List<String[]> text = viaText(bytes);
+        List<String[]> poi = viaPoi(bytes);
+        assertEquals(poi.size(), text.size(), () -> "行数不同：POI=" + poi.size() + " SAX=" + text.size());
+        for (int i = 0; i < poi.size(); i++) {
+            for (int c = 0; c < 3; c++) {
+                final int ri = i;
+                final int ci = c;
+                assertEquals(poi.get(i)[c], text.get(i)[c], () -> "第 " + ri + " 行第 " + ci + " 列不同");
+            }
+        }
+    }
+
+    @Test
+    void textOverloadTrimsAndKeepsNumberShape() throws Exception {
+        List<String[]> rows = viaText(sampleXlsx());
+        assertEquals(2, rows.size(), "三列全空的行必须被丢弃");
+        assertEquals("肝郁气滞", rows.get(0)[0], "字符串必须 trim");
+        assertEquals("肝气郁结、肝郁", rows.get(0)[1]);
+        assertEquals("301", rows.get(0)[2], "整数不能带 .0");
+        assertEquals("脾虚湿困", rows.get(1)[0]);
+        assertNull(rows.get(1)[1], "空单元格必须是 null 而不是空串");
+        assertEquals("3.01", rows.get(1)[2], "小数要原样保留");
     }
 }

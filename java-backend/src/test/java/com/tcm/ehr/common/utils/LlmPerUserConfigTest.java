@@ -12,7 +12,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.File;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * LLM 配置「每人一份 + 密钥加密」的契约测试（批次 8a）。
  *
- * <p>锁三件事：①密钥不以明文落库；②A 的配置不会流到 B；③没有自有配置的用户跟随基线变化。</p>
+ * <p>锁三件事：①密钥不以明文落库；②A 的配置不会流到 B；③没有自有配置的用户回落到基线。</p>
  */
 class LlmPerUserConfigTest {
 
@@ -68,9 +67,8 @@ class LlmPerUserConfigTest {
     /**
      * 本测试专用的配置文件路径。
      *
-     * <p>必须指向一个<b>专属且不存在</b>的文件：{@code LlmConfigStore} 构造时会读它并覆盖基线，
-     * 而 {@code update()} 又会把它写出来。若多个测试共用同一个路径，前一个测试留下的文件
-     * 会让后一个测试的「基线未开启」前提失效 —— 表现为「第一次跑过、第二次跑挂」。</p>
+     * <p>指向一个<b>专属且不存在</b>的文件：{@code LlmConfigStore} 构造时会读它并覆盖基线，
+     * 若多个测试共用同一个路径，可能读到别的测试留下的内容。</p>
      */
     private static final String LLM_CONFIG_FILE = "target/no-such-llm-config-peruser-test.json";
 
@@ -80,11 +78,6 @@ class LlmPerUserConfigTest {
 
     @BeforeEach
     void setUp() {
-        // 清掉上一次跑残留的配置文件，保证「基线 = 测试设定的 props」这个前提
-        java.io.File f = new java.io.File(LLM_CONFIG_FILE);
-        if (f.exists() && !f.delete()) {
-            throw new IllegalStateException("清理残留的 LLM 配置文件失败: " + LLM_CONFIG_FILE);
-        }
         userMapper = newUserMapper();
         cipher = new LlmSecretCipher(KEY_A);
         LlmProperties p = new LlmProperties();
@@ -180,16 +173,5 @@ class LlmPerUserConfigTest {
 
         assertEquals("sk-first", store.getFor("u-c").apiKey(), "空密钥不得覆盖已有密文");
         assertEquals("m2", store.getFor("u-c").model());
-    }
-
-    /** 基线改了，无自有配置的用户要跟着变 —— 版本串必须含基线版本，否则命中旧缓存 */
-    @Test
-    void baselineChangeIsVisibleToUsersWithoutOwnConfig() {
-        loginAs("u-none");
-        assertFalse(store.getFor("u-none").enabled(), "前置：基线未开启");
-
-        store.update(new LlmConfig(true, "ollama", "", "", "", 0.2D, 60000));
-
-        assertTrue(store.getFor("u-none").enabled(), "基线变化必须对无自有配置的用户生效");
     }
 }

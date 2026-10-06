@@ -27,8 +27,6 @@ import java.util.Map;
  */
 public final class RecordFilter {
 
-    public static final String ROLE_ADMIN = "管理员";
-
     /**
      * fail-closed 用的不可能值、与 {@code records.id} 的 UUID 不可能相等。
      * 它不是"这个 id 不存在"的东西，而是一个<b>不可能被任何导入数据命中</b>的值。

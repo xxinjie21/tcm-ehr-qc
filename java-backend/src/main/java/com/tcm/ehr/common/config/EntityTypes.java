@@ -126,8 +126,8 @@ public final class EntityTypes {
     /** 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/治法，顺序稳定） */
     public static Set<String> dictKeys() {
         // 从 9 类里筛出**有词典的 8 类**并取 key；LinkedHashSet 保住 order。
-        // ⚠️ 别把这里读成「计分也用 8 类」：质控计分只认 QcScorer.keyOf() 里硬编码的 5 类
-        // （疾病/证候/症状/中药/方剂），舌象/脉象/治法落 default → 按 0 条未命中处理。
+        // ⚠️ 别把这里读成「计分也用 8 类」：QcScorer.keyOf() 只认本类中 countsUnnormalized=true
+        // 的 5 类（疾病/证候/症状/中药/方剂），舌象/脉象/治法落 null → 按 0 条未命中处理。
         // 口径差异是有意的（见本类头部说明与《多批次实施计划》批次 20）。
         Set<String> out = new LinkedHashSet<>();
         for (EntityType t : BY_KEY.values()) {

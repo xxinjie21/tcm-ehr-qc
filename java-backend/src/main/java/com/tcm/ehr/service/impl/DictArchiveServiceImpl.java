@@ -96,6 +96,19 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
         return nextNo;
     }
 
+    @Override
+    public ArchiveOutcome archiveQuietly(String orgId, String type, List<TermEntry> entries,
+                                         String proposalId, String operator, String comment) {
+        try {
+            return ArchiveOutcome.ok(archive(orgId, type, entries, proposalId, operator, comment));
+        } catch (Exception e) {
+            // 完整栈入日志：这条路径此前只回一个追踪码，排障时拿不到栈
+            log.error("[词典] {} (org={}) 导入已成功，但归档版本生成失败：{}",
+                    type, orgId, e.getMessage(), e);
+            return ArchiveOutcome.failed("导入已成功，但归档版本生成失败：" + e.getMessage());
+        }
+    }
+
     /**
      * 归档列表（版本倒序），含「快照是否还在」与词条数。
      *

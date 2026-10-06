@@ -171,14 +171,12 @@ public class QcRuleSet {
         r.consistency.add(rule("肾阴亏虚-方剂", "pattern", List.of("肾阴亏虚", "虚阳上亢"),
                 "formula", List.of("知柏地黄丸")));
 
-        // 2. 术语标准化：覆盖全部 5 类词典类型，每处 1 分、封顶 5 分
-        // ⚠️ 此处用 `EntityTypes.dictKeys()`（5 类：disease/pattern/symptom/herb/formula，
-        // **含方剂、不含舌象／脉象**），与《开发指南与待办》中「核心要素 6 项（含舌象／
-        // 脉象、不含方剂）」的口径**相反** —— 两处说的是不同东西，此处如实登记，避免
-        // 后来人按文档去「修正」它。
-        // 为什么不能改成显式 6 项：舌象／脉象实体没有 normLevel（QcScorer 按未归一计），
-        // 纳入后每条病历会立刻扣满 5 分；而「脉象词典不该加」又把出口堵死 → 两件事互锁。
-        // 详见《AI执行计划》§九 9.1 / 9.2 第 ② 步（该步只加注释，不改行为）。
+        // 2. 术语标准化：elementTypes 取 EntityTypes.dictKeys()（批次 20 起有词典的 8 类：
+        // 疾病/证候/症状/中药/方剂/舌象/脉象/治法），每处 1 分、封顶 5 分。
+        // ⚠️ 这 8 类不等于「未归一扣分计 8 类」：QcScorer.keyOf() 只给 EntityTypes 中
+        // countsUnnormalized=true 的 5 类（疾病/证候/症状/中药/方剂）映射 structuredKey，
+        // 舌象/脉象/治法落 null → 不计未归一扣分（政策，见 EntityTypes 构造 javadoc）。
+        // 两处说的是不同东西，别按「8 类就该有 8 处扣分」去改。
         r.standardization.setEnabled(true);
         r.standardization.setElementTypes(new ArrayList<>(EntityTypes.dictKeys()));
         r.standardization.setWeightEach(1);
