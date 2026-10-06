@@ -90,128 +90,13 @@
     </PanelCard>
 
     <!-- 规则配置（管理员 / 所有者 / 被授权成员）：句子清单 + 就地编辑，保存即生效 -->
-    <el-dialog v-model="rulesVisible" title="规则配置（改完点保存即生效）" width="min(1000px, 96vw)" top="4vh">
-      <!-- 句子式编辑器：每段就是一句可读的话，直接在句子里改数字 / 选项，不暴露 JSON -->
-      <div v-if="form.rules" class="rc">
-        <div class="rc-tip">下面就是当前生效的规则，直接在句子里改即可。</div>
-
-        <div class="rc-hd">① 病历应有这些要素（完整性）</div>
-        <div class="rc-line">
-          病历应有
-          <el-select v-model="form.elementNames" multiple filterable collapse-tags size="small" style="min-width: 320px">
-            <el-option v-for="e in catalogElements" :key="e.name" :label="e.name" :value="e.name" />
-          </el-select>
-          ；完全缺失每项扣
-          <el-input-number v-model="form.fullWeight" size="small" :min="0" :controls="false" />
-          分，仅有原始记录每项扣
-          <el-input-number v-model="form.partialWeight" size="small" :min="0" :controls="false" />
-          分。
-        </div>
-
-        <div class="rc-hd">② 格式检查（勾选即可，无需填写规则）</div>
-        <div class="rc-flow">
-          <div v-for="t in catalogFormats" :key="t.field" class="rc-fmt" :class="{ on: !!fmtOf(t.field) }">
-            <el-checkbox :model-value="!!fmtOf(t.field)" @change="(v) => toggleFormat(t, v)" />
-            <span class="rc-fmt-l">{{ t.label }}</span>
-            <template v-if="fmtOf(t.field)">
-              不合规扣
-              <el-input-number
-                :model-value="fmtOf(t.field).weight"
-                size="small"
-                :min="0"
-                :controls="false"
-                @update:model-value="(v) => setFmtWeight(t.field, v)"
-              />
-              分
-            </template>
-          </div>
-        </div>
-        <div v-for="(f, i) in customFormats" :key="f.uid" class="rc-line">
-          【{{ f.label || f.field }}】不合规扣
-          <el-input-number v-model="f.weight" size="small" :min="0" :controls="false" />
-          分
-          <el-button link type="danger" @click="removeCustomFormat(i)">删</el-button>
-        </div>
-
-        <div class="rc-hd">③ 一致性规则（触发类型 → 期望类型，期望值取自词典）</div>
-        <div v-for="(c, i) in form.consistency" :key="c.uid" class="rc-block">
-          <div class="rc-line">
-            若
-            <el-select v-model="c.triggerType" filterable size="small" style="width: 120px">
-              <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
-            </el-select>
-            含
-            <!-- 用 el-select-v2（虚拟滚动）：证候词典已 2080 条，普通 el-select 一次挂载
-                 2000+ 个 el-option 会卡。allow-create 已移除 —— 候选表完整后从列表选即可，
-                 避免敲入词典外的错词导致一致性规则永不匹配。
-                 候选改为**远程检索**（remote + remote-method）：原先为喂一个下拉
-                 一次性把五类词典全量拉进内存（≈3589 个 option），现在展开才取前 50 条。 -->
-            <el-select-v2
-              v-model="c.triggerValues"
-              :options="termOptionsOf(c.triggerType).options.value"
-              :remote-method="termOptionsOf(c.triggerType).search"
-              :loading="termOptionsOf(c.triggerType).loading.value"
-              :visible-change="(v) => v && termOptionsOf(c.triggerType).preload()"
-              :remote-show-suffix="false"
-              multiple filterable remote collapse-tags size="small" style="min-width: 220px"
-              placeholder="从词典中选（可输入搜索）"
-            />
-          </div>
-          <div class="rc-line">
-            则
-            <el-select v-model="c.expectType" filterable size="small" style="width: 120px">
-              <el-option v-for="t in catalogElements" :key="t.typeKey || t.source" :label="t.name" :value="t.typeKey || t.source" />
-            </el-select>
-            应为
-            <el-select-v2
-              v-model="c.expectValues"
-              :options="termOptionsOf(c.expectType).options.value"
-              :remote-method="termOptionsOf(c.expectType).search"
-              :loading="termOptionsOf(c.expectType).loading.value"
-              :visible-change="(v) => v && termOptionsOf(c.expectType).preload()"
-              :remote-show-suffix="false"
-              multiple filterable remote collapse-tags size="small" style="min-width: 220px"
-              placeholder="从词典中选（可输入搜索）"
-            />
-            冲突扣
-            <el-input-number v-model="c.weight" size="small" :min="0" :controls="false" />
-            分
-            <el-button link type="danger" @click="form.consistency.splice(i, 1)">删</el-button>
-          </div>
-        </div>
-        <el-button size="small" @click="addConsistency">+ 添加一致性规则</el-button>
-
-        <div class="rc-hd">④ 其它</div>
-        <div class="rc-line">
-          <el-switch v-model="form.rules.standardization.enabled" />
-          术语标准化：未命中词典的每个扣
-          <el-input-number v-model="form.rules.standardization.weightEach" size="small" :min="0" :controls="false" />
-          分；未归一条数超过
-          <el-input-number v-model="form.rules.standardization.cap" size="small" :min="0" :controls="false" />
-          后按档累加（每满该条数再加扣一档，<b>不再封顶</b>，避免大量未归一时分数失去区分度）。
-          保存即生效；已评过的病历需重跑质控才会更新。
-        </div>
-        <div class="rc-line">
-          重复病历扣
-          <el-input-number v-model="form.rules.duplicateWeight" size="small" :min="0" :controls="false" />
-          分。
-        </div>
-        <div class="rc-line">
-          合格线
-          <el-input-number v-model="form.rules.thresholds.qualified" size="small" :min="0" :max="100" :controls="false" />
-          分；无效线
-          <el-input-number v-model="form.rules.thresholds.invalid" size="small" :min="0" :max="100" :controls="false" />
-          分；核心真缺失
-          <el-input-number v-model="form.rules.thresholds.seriousFullMissing" size="small" :min="1" :controls="false" />
-          项判无效。
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="resetRules">恢复默认</el-button>
-        <el-button @click="rulesVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingRules" @click="saveRules">保存并生效</el-button>
-      </template>
-    </el-dialog>
+    <QcRulesDialog
+      v-model="rulesVisible"
+      :rules="rules"
+      :catalog-elements="catalogElements"
+      :catalog-formats="catalogFormats"
+      @saved="applyRules"
+    />
 
     <!-- 本范围扣分构成：范围内各病历扣分明细聚合 -->
     <PanelCard title="本范围扣分构成">
@@ -289,56 +174,11 @@
       />
     </PanelCard>
 
-    <!-- 扣分明细弹窗：评分/分级 + 评分构成瀑布 + 扣分明细表 -->
-    <el-dialog
+    <QcDeductionDialog
       v-model="detailVisible"
-      title="规则预检单（扣分明细）"
-      width="min(1080px, 94vw)"
-      top="7vh"
-    >
-      <!-- 弹窗内容单栏：评分 / 分级 → 评分构成瀑布 → 扣分明细表 -->
-      <div v-if="detail">
-        <div class="ded-col">
-          <el-descriptions :column="2" border size="small">
-            <el-descriptions-item label="评分">{{ detail.score }}</el-descriptions-item>
-            <el-descriptions-item label="分级">{{ detail.grade }}</el-descriptions-item>
-          </el-descriptions>
-
-          <!-- 评分构成瀑布：100 分起逐项扣到最终分，一眼看分扣在哪 -->
-          <div class="sd-title">评分构成（100 分起，逐项扣）</div>
-          <div class="wf">
-            <div class="wf-item"><span class="wf-l">总分</span><b class="wf-num">100</b></div>
-            <div v-for="(d, i) in detail.deductions" :key="i" class="wf-item">
-              <span class="wf-l">{{ d.type }} · {{ d.item }}</span>
-              <b class="wf-num neg">-{{ d.points }}</b>
-            </div>
-            <div class="wf-item end">
-              <span class="wf-l">最终得分</span>
-              <b class="wf-num">{{ detail.score }}</b>
-              <span class="wf-grade" :class="gradeClass(detail.grade)">{{ detail.grade }}</span>
-            </div>
-          </div>
-          <div class="wf-note">
-            合格线 {{ qualifiedText }} 分
-            <template v-if="distanceToQualified != null">，距合格线还差 {{ distanceToQualified }} 分</template>
-          </div>
-
-          <div class="sd-title">扣分明细（合计 -{{ detailTotal }} 分）</div>
-          <el-table :data="detail.deductions" border size="small" max-height="340">
-            <el-table-column prop="type" label="类型" width="110" />
-            <el-table-column prop="item" label="项" width="90" />
-            <el-table-column prop="points" label="扣分" width="70">
-              <template #default="{ row }">-{{ row.points }}</template>
-            </el-table-column>
-            <el-table-column prop="reason" label="原因" show-overflow-tooltip />
-            <template #empty><div class="ok">无扣分项</div></template>
-          </el-table>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="closeDetail">关闭</el-button>
-      </template>
-    </el-dialog>
+      :detail="detail"
+      :qualified="qualified"
+    />
   </div>
 </template>
 
@@ -348,22 +188,22 @@
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useTermOptions } from '@/composables/useTermOptions'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
 import { usePagedList } from '@/composables/usePagedList'
 import { useUrlFilters } from '@/composables/useUrlFilters'
 import RecordTable from '@/components/RecordTable.vue'
+import QcRulesDialog from '@/components/QcRulesDialog.vue'
+import QcDeductionDialog from '@/components/QcDeductionDialog.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { recomputeQc, getQcBatch, cancelQcBatch, qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
+import { recomputeQc, getQcBatch, cancelQcBatch, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 import { GRADE_OK } from '@/utils/grade'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
-import { gradeClass as gradeClassOf, THRESHOLD_PLACEHOLDER } from '@/utils/grade'
 
 // 规则写入口按 admin / owner / 授权成员 三档判定（与后端 qc/rules 写接口一致）
 const userStore = useUserStore()
@@ -403,16 +243,6 @@ const loadRules = async () => {
 // 那个 90 是后端出厂默认值的拷贝，管理员改过合格线后，等待期里界面会按 90
 // 算出「距合格线还差 N 分」，与服务端结论矛盾。
 const qualified = computed(() => rules.value?.thresholds?.qualified ?? null)
-// 分级 → 样式类：读 utils/grade.js 的唯一副本，不再在本页另写一份映射
-const gradeClass = gradeClassOf
-
-// 阈值未就绪时统一显示「—」，也算不出「距合格线还差多少」
-const qualifiedText = computed(() =>
-  qualified.value == null ? THRESHOLD_PLACEHOLDER : qualified.value
-)
-const distanceToQualified = computed(() =>
-  qualified.value == null ? null : Math.max(0, qualified.value - (detail.value?.score ?? 0))
-)
 
 // 拉取当前范围的扣分聚合（按类型、按项、分级分布）
 const loadDedStats = async () => {
@@ -453,213 +283,22 @@ const params = () => {
   }
 }
 
-// ===== 规则配置（有写权限者）：句子清单 + 就地编辑 =====
-// 规则配置弹窗状态
+// ===== 规则配置（有写权限者）=====
+// 弹窗本体抽为 components/QcRulesDialog.vue：本页只负责打开，以及保存后刷新标准摘要
 const rulesVisible = ref(false)
-const savingRules = ref(false)
-// 各词典类型的标准词（供一致性"期望值"下拉，仅从词典选）
-// 编辑用的表单副本：由 rules 克隆而来，保存时才组装回写服务端
-const form = reactive({
-  rules: null,
-  elementNames: [],
-  fullWeight: 12,
-  partialWeight: 6,
-  format: [],
-  consistency: []
-})
-// 深拷贝：避免编辑时直接改动 rules（取消后 rules 必须保持原样）
-const clone = (o) => JSON.parse(JSON.stringify(o))
-// 可编辑行的稳定主键：v-for 不用下标做 key，删中间行后其余行的 DOM / 输入框不会错位。
-// 只在本弹窗内唯一即可，用自增序号而非 randomUUID —— 非安全上下文（如局域网 http）下
-// crypto.randomUUID 可能不存在
-let uidSeq = 0
-const nextUid = () => 'u' + ++uidSeq
-// 取某词典类型的下拉选项（el-select-v2 的 {label,value} 结构）；未加载时返回空数组
-// 每类词典一个取数器（composable 内部有模块级缓存，同一类型的多个下拉共用一份，
-// 不会重复打同一接口）。模板里用 termOptionsOf(type) 取。
-const TERM_OPTION_HOLDERS = {}
-
-// 取某词典类型的候选取数器；type 为空时给一个「永不请求」的空壳，
-// 避免在下拉类型还没选时就去拉「未知类型」的词典
-const termOptionsOf = (type) => {
-  const key = type || '__none__'
-  if (!TERM_OPTION_HOLDERS[key]) {
-    TERM_OPTION_HOLDERS[key] = useTermOptions(() => type || 'disease')
-  }
-  return TERM_OPTION_HOLDERS[key]
-}
-
-// 打开规则配置：把当前规则克隆进表单，并确保词典候选已就绪
+// 打开规则配置：规则尚未加载时先补拉一次，保证弹窗有内容可编辑
 const openRules = async () => {
-  // 1. 规则尚未加载时先补拉一次，保证弹窗有内容可编辑
   if (!rules.value) {
     await loadRules()
   }
-  // 2. 深拷贝一份进表单：编辑期间不动生效中的 rules，取消即可原样丢弃
-  const r = clone(rules.value || {})
-  // 3. 回填完整性要素：名称清单 + 完全缺失 / 未结构化两档权重
-  const els = r.completeness?.elements || []
-  form.elementNames = els.map((e) => e.name)
-  form.fullWeight = els[0]?.weightFull ?? 12
-  form.partialWeight = els[0]?.weightPartial ?? 6
-  // 4. 回填格式规则，补齐字段默认值以便直接编辑
-  form.format = (r.format || []).map((f) => ({
-    uid: nextUid(), field: f.field, type: f.type || 'regex', expr: f.expr || '', values: f.values || [],
-    label: f.label, weight: f.weight ?? 5, reason: f.reason
-  }))
-  // 5. 回填一致性规则，同样补齐默认值
-  form.consistency = (r.consistency || []).map((c) => ({
-    uid: nextUid(),
-    name: c.name,
-    triggerType: c.triggerType || 'pattern',
-    triggerValues: c.triggerValues || [],
-    expectType: c.expectType || 'herb',
-    expectValues: c.expectValues || [],
-    weight: c.weight ?? 10
-  }))
-  // 6. 回填标准化 / 重复扣分 / 分级阈值
-  //    ⚠️ 这里**不许再写业务数字**：原先写成 `r.thresholds || { qualified: 90, invalid: 60,
-  //    seriousFullMissing: 3 }`、`weightEach: 1, cap: 5`、`duplicateWeight ?? 5`。
-  //    后端正常都会下发这些值，所以那些字面量平时是死分支；一旦真走到（后端漏字段 /
-  //    版本不齐），表单会显示一套「后端没说过」的数字，用户一保存就把它们写进本组织规则 ——
-  //    静默改口径。故缺失时退到本页已从后端取到的生效规则，仍无则留空让用户看见。
-  form.rules = {
-    standardization: r.standardization || rules.value?.standardization || null,
-    duplicateWeight: r.duplicateWeight ?? rules.value?.duplicateWeight ?? null,
-    thresholds: r.thresholds || rules.value?.thresholds || null
-  }
-  // 7. 打开弹窗，并预热词典候选（供「期望值」下拉）
   rulesVisible.value = true
-  // 词典候选改为「展开下拉时按需预载」（见 useTermOptions），不再在此全量拉取
 }
-
-// 按 field 查一条格式规则
-// 格式：模板勾选即用（无需写正则）；非模板项作为历史自定义规则展示
-// 格式规则按 field 建索引：fmtOf 在模板里每行调 3 次，
-// 原来是每次都 Array.find 一遍 form.format，行数一多就是 N×3×M。
-const fmtMap = computed(() => {
-  const map = new Map()
-  for (const f of form.format) map.set(f.field, f)
-  return map
-})
-const fmtOf = (field) => fmtMap.value.get(field)
-// 非模板格式规则（历史遗留或手工添加）：不在 catalogFormats 目录里的项，单独列出供编辑
-const customFormats = computed(() => form.format.filter((f) => !catalogFormats.value.some((t) => t.field === f.field)))
-// 勾选 / 取消格式模板：勾选即按模板补一条规则，取消则移除
-const toggleFormat = (t, on) => {
-  if (on) {
-    if (!fmtOf(t.field)) {
-      form.format.push({
-        uid: nextUid(),
-        field: t.field, type: t.type || 'regex', expr: t.expr || '', values: clone(t.values || []),
-        label: t.label, weight: t.weight ?? 5, reason: t.reason
-      })
-    }
-  } else {
-    const i = form.format.findIndex((f) => f.field === t.field)
-    if (i >= 0) form.format.splice(i, 1)
-  }
-}
-// 修改某条格式规则的扣分权重
-const setFmtWeight = (field, v) => {
-  const f = fmtOf(field)
-  if (f) f.weight = v
-}
-// 删除非模板的历史自定义格式规则（入参是 customFormats 的下标，需换算回 form.format）
-const removeCustomFormat = (i) => {
-  const target = customFormats.value[i]
-  const idx = form.format.indexOf(target)
-  if (idx >= 0) form.format.splice(idx, 1)
-}
-// 新增一条空白的一致性规则
-const addConsistency = () => {
-  form.consistency.push({
-    uid: nextUid(),
-    name: '自定义规则', triggerType: 'pattern', triggerValues: [],
-    expectType: 'herb', expectValues: [], weight: 10
-  })
-}
-
-// 保存规则：把表单组装成后端结构后提交，成功后就地刷新页面上的标准与说明
-const saveRules = async () => {
-  // 1. 置保存态：按钮转圈，避免重复提交
-  savingRules.value = true
-  try {
-    // 2. 组装完整性要素：按目录补齐来源与兜底别名，权重取表单统一值
-    const payload = buildRulesPayload()
-    // 5. 提交后端，成功后就地刷新标准与说明，无需重进页面
-    const res = await updateQcRules(payload)
-    applyRules(res)
-    // 6. 提示并收起弹窗
-    ElMessage.success('规则已保存并生效')
-    rulesVisible.value = false
-  } catch {
-    // 拦截器已提示
-  } finally {
-    // 无论成败都复位保存态，否则按钮会一直转圈
-    savingRules.value = false
-  }
-}
-
-// 组装保存用的规则 payload（P3.4 从 saveRules 抽出）
-const buildRulesPayload = () => {
-  const elements = form.elementNames.map((name) => {
-    const preset = catalogElements.value.find((e) => e.name === name) || {}
-    return {
-      name,
-      source: preset.source || name,
-      fallback: preset.fallback || [],
-      weightFull: form.fullWeight,
-      weightPartial: form.partialWeight
-    }
-  })
-  const consistency = form.consistency
-    .filter((c) => (c.triggerValues || []).length && (c.expectValues || []).length)
-    .map((c) => ({
-      name: c.name || '自定义规则',
-      triggerType: c.triggerType,
-      triggerValues: c.triggerValues,
-      expectType: c.expectType,
-      expectValues: c.expectValues,
-      weight: c.weight
-    }))
-  return {
-    completeness: { elements },
-    format: form.format.map(({ uid, ...f }) => f),
-    consistency,
-    standardization: clone(form.rules.standardization),
-    duplicateWeight: form.rules.duplicateWeight,
-    thresholds: clone(form.rules.thresholds)
-  }
-}
-
-// 保存成功后就地刷新标准与说明（P3.4 从 saveRules 抽出）
+// 保存 / 恢复默认成功后就地刷新标准与说明（无需重进页面）
 const applyRules = (res) => {
   rules.value = res.data?.rules || rules.value
   descriptions.value = res.data?.descriptions || descriptions.value
   ruleWarnings.value = res.data?.warnings || []
 }
-
-// 恢复默认规则：二次确认后调后端重置
-const resetRules = async () => {
-  if (!(await confirmBox('确定恢复默认质控规则吗？当前自定义规则将被覆盖。', '恢复默认', { type: 'warning' }))) {
-    return
-  }
-  try {
-    // 2. 调后端恢复默认规则
-    const res = await resetQcRules()
-    // 3. 就地刷新规则、说明与告警
-    rules.value = res.data?.rules || null
-    descriptions.value = res.data?.descriptions || []
-    ruleWarnings.value = res.data?.warnings || []
-    // 4. 提示成功并收起弹窗
-    ElMessage.success('已恢复默认规则')
-    rulesVisible.value = false
-  } catch {
-    // 拦截器已提示
-  }
-}
-
 // ===== 预检列表 / 扣分明细 =====
 // 分级不再单独持有：统一由上方「范围查询」的 filters.grade 驱动，
 // 否则同一页会出现两个互不相干的分级口径
@@ -843,12 +482,6 @@ onBeforeUnmount(stopPoll)
 const detail = ref(null)
 const detailVisible = ref(false)
 
-// 扣分合计：弹窗里直接给出，省得用户在长表里自己加
-// 扣分合计：两栏弹窗里直接给出，省得用户在长表里自己加
-const detailTotal = computed(() =>
-  (detail.value?.deductions || []).reduce((s, d) => s + (d.points || 0), 0)
-)
-
 // 打开扣分明细：按病历 ID 单独取一次评分结果
 const openDetail = async (recordId) => {
   try {
@@ -864,9 +497,6 @@ const openDetail = async (recordId) => {
 }
 
 // 只收起弹窗、不清 detail，避免关闭动画期间内容闪空
-const closeDetail = () => {
-  detailVisible.value = false
-}
 
 // 进页面：规则 + 预检列表 + 扣分构成并行拉取
 onMounted(() => {
@@ -904,20 +534,6 @@ onMounted(() => {
 .precheck-bar > span:first-child {
   font-size: var(--fs-base);
   color: var(--text-sub);
-}
-/* 弹窗内的小节标题 */
-.sd-title {
-  font-size: var(--fs-base);
-  font-weight: bold;
-  color: var(--ink);
-  margin: 14px 0 var(--sp-2);
-}
-/* 扣分明细弹窗的内容列 */
-.ded-col {
-  min-width: 0;
-}
-.ded-col .sd-title:first-child {
-  margin-top: 0;
 }
 /* 「无扣分项」等正向文案 */
 .ok {
@@ -1060,68 +676,6 @@ onMounted(() => {
   color: var(--ink);
 }
 
-/* ===== 评分构成瀑布（弹窗内） ===== */
-.wf {
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 6px 10px;
-  margin-bottom: var(--sp-2);
-  background: var(--paper);
-}
-/* 瀑布单行：标签 + 数值（扣分用 danger） */
-.wf-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 3px 0;
-  font-size: var(--fs-md);
-}
-.wf-item .wf-l {
-  flex: 1 1 auto;
-  color: var(--ink);
-}
-.wf-item .wf-num {
-  flex: 0 0 auto;
-  color: var(--ink);
-}
-.wf-item .wf-num.neg {
-  color: var(--danger);
-}
-.wf-item.end {
-  border-top: 1px solid var(--line);
-  margin-top: var(--sp-1);
-  padding-top: 6px;
-}
-/* P4.11：最终得分要突出扫读，字号比扣分项（默认）放大一档加粗 */
-.wf-item.end .wf-num {
-  font-size: 17px;
-  font-weight: 700;
-}
-/* 最终得分旁的分级胶囊 */
-.wf-grade {
-  font-size: var(--fs-sm);
-  padding: 1px var(--sp-2);
-  border-radius: 6px;
-}
-.wf-grade.is-ok {
-  background: var(--ink-light);
-  color: var(--ink);
-}
-.wf-grade.is-mid {
-  background: var(--ochre-light);
-  color: #8a6a44;
-}
-.wf-grade.is-bad {
-  background: var(--danger-surface);
-  color: #8a3d33;
-}
-/* 合格线说明 */
-.wf-note {
-  font-size: var(--fs-sm);
-  color: var(--text-sub);
-  margin-bottom: 10px;
-}
-
 /* ===== 规则配置弹窗 ===== */
 .hd-action {
   margin-left: var(--sp-3);
@@ -1170,80 +724,6 @@ onMounted(() => {
 .std-detail {
   margin-top: var(--sp-2);
   border-top: 1px dashed var(--line);
-}
-/* 格式模板勾选 */
-.rc-flow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-/* 格式模板胶囊：勾选态（.on）加深边框与底色 */
-.rc-fmt {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--sp-1) var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  font-size: var(--fs-md);
-  color: var(--text-sub);
-}
-.rc-fmt.on {
-  border-color: var(--ink-mid);
-  background: var(--ink-light);
-  color: var(--ink);
-}
-.rc-fmt-l {
-  font-weight: bold;
-}
-/* 规则配置弹窗主体：超 72vh 内部滚动，页脚按钮始终可见 */
-.rc {
-  max-height: 72vh;
-  overflow-y: auto;
-}
-/* 弹窗顶部说明 */
-.rc-tip {
-  font-size: var(--fs-sm);
-  color: var(--text-sub);
-  margin-bottom: 6px;
-}
-/* 句子式编辑行：文字与控件同行排布，窄屏换行 */
-.rc-line {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  margin: var(--sp-2) 0;
-  font-size: var(--fs-md);
-  color: var(--ink);
-  line-height: 2;
-}
-/* 一致性规则卡片 */
-.rc-block {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px var(--sp-3);
-  margin-bottom: var(--sp-2);
-  background: var(--paper);
-}
-/* ①②③④ 分段标题 */
-.rc-hd {
-  margin: var(--sp-4) 0 var(--sp-2);
-  font-size: var(--fs-base);
-  font-weight: bold;
-  color: var(--ink);
-  border-left: 3px solid var(--ink-mid);
-  padding-left: var(--sp-2);
-}
-/* 预留的行式布局：当前模板用的是 .rc-line，本类暂无引用 */
-.rc-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: var(--sp-2);
-  font-size: var(--fs-md);
-  color: var(--ink);
 }
 /* 28.12：预检列表的缺陷行（分级非「合格」）整行浅赭石底。
    RecordTable 是本组件的子组件，行 DOM 在其内部，故用 :deep 穿透。 */
