@@ -1298,9 +1298,6 @@ components:
         overdue:
           type: boolean
           description: 是否已超截止时间（计算属性，仅视觉提醒，不自动流转）
-        structuredData:
-          $ref: '#/components/schemas/StructuredData'
-          description: 已存储的NLP结构化抽取结果，供复核页左侧对照展示（免单独请求）
     ReviewTasksVO:
       type: object
       description: 复核任务列表（出参）

@@ -614,7 +614,7 @@ const openReview = async (row) => {
     // 4. 落原文与扣分明细，并回填修正框
     record.value = raw.data
     precheck.value = sr.data
-    // 任务列表已带 structuredData，但以病历详情为准（列表数据可能滞后）
+    // 列表不再内联 structuredData（P5.3），一律以病历详情为准
     fillEditors(raw.data?.structuredData)
     try {
       // 5. 取 AI 预检建议，失败不影响复核（仅提示以扣分明细为准）。

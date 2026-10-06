@@ -22,6 +22,4 @@ public class ReviewTaskVO {
     private LocalDateTime deadlineTime;
     /** 是否已超截止时间（计算属性，仅视觉提醒） */
     private boolean overdue;
-    /** 已存储的 NLP 结构化数据（对象），供左侧对照 */
-    private Object structuredData;
 }
