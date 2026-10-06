@@ -11,22 +11,25 @@
           <div class="actions">
             <el-button type="primary" :loading="searching" @click="handleSearch">查 询</el-button>
             <el-button :disabled="searching" @click="resetFilters">重置</el-button>
-            <el-button
-              type="danger"
-              plain
-              :disabled="searching || !selectedIds.length"
-              @click="handleBatchDelete"
-            >批量删除{{ selectedIds.length ? `（${selectedIds.length}）` : '' }}</el-button>
-            <el-button
-              type="danger"
-              :disabled="searching || !hasFilter"
-              @click="handleRangeDelete"
-            >删除范围内病历</el-button>
-            <!-- 禁用态下 title 不弹出，所以把前置条件写成常驻说明 -->
-            <span class="tip-inline">
-              {{ searching ? '正在查询…' : (hasFilter ? '删除上方范围内全部匹配病历' : '需先设置筛选范围') }}
-            </span>
+            <!-- 28.19-06：危险操作与主操作分离。
+                 查询/重置留在左侧主操作区；两个删除动作收进右侧独立的 danger 区
+                 （分隔线隔开、纯色 --danger、不右侧对齐前不误点）。 -->
             <span class="tip-inline">共 {{ total }} 条</span>
+            <span class="danger-zone">
+              <span class="danger-note">
+                {{ searching ? '正在查询…' : (hasFilter ? '删除范围内全部匹配病历' : '需先设置筛选范围') }}
+              </span>
+              <el-button
+                type="danger"
+                :disabled="searching || !selectedIds.length"
+                @click="handleBatchDelete"
+              >批量删除{{ selectedIds.length ? `（${selectedIds.length}）` : '' }}</el-button>
+              <el-button
+                type="danger"
+                :disabled="searching || !hasFilter"
+                @click="handleRangeDelete"
+              >删除范围内病历</el-button>
+            </span>
           </div>
 
           <RecordTable
@@ -747,7 +750,20 @@ onMounted(async () => {
 .up-title { font-size: var(--fs-base); color: var(--ink); }
 .up-title em { color: var(--ink-mid); font-style: normal; font-weight: bold; }
 .up-sub { font-size: var(--fs-xs); color: var(--text-sub); margin-top: var(--sp-1); }
-.actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
+.actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* 28.19-06：右侧 danger 区 —— 与左侧主操作/统计信息用分隔线隔开，并推到行尾 */
+.danger-zone {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--line);
+}
+.danger-note {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
 .result { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: 14px; }
 .import-failed {
   margin-top: 14px;

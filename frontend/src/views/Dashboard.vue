@@ -389,9 +389,12 @@ onBeforeUnmount(() => {
   color: var(--text-sub);
   margin-top: 2px;
 }
-/* 指标卡一行等宽排列 */
+/* 28.19-08：描述性指标统一等宽栅格。
+   原先用 flex + flex:1，最后一张卡被剩余空间拉伸、与其余卡不等宽；
+   改成 auto-fit 等分栅格，宽屏各占一份，窄屏自动收列。 */
 .stats {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--sp-3);
   margin-bottom: 10px;
 }

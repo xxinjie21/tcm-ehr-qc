@@ -49,6 +49,26 @@
   --fs-title: 16px;    /* 卡片/区块标题、强调数值 */
   --fs-page: 20px;     /* 页面标题 */
   --fs-xl: 24px;       /* 大号指标：看板/统计卡的关键数字 */
+
+  /* ===== 控件高度三档（28.19-05）=====
+     全站控件高度只此三档，与 Element Plus 的 small / default / large 一一对应：
+       24px 表格行内与次级按钮（small）
+       32px 工具条、筛选、普通表单（default）
+       40px 病历录入等需要宽松命中区的主表单（large）
+     table 操作列的 link 按钮此前命中区只有 16~18px（已在 16.3 用 min-height:24px 修正），
+     现由下面三条 EP 变量统一收口，页面里不再单独写控件高度。 */
+  --ctl-h-sm: 24px;
+  --ctl-h-md: 32px;
+  --ctl-h-lg: 40px;
+  --el-component-size-small: var(--ctl-h-sm);
+  --el-component-size: var(--ctl-h-md);
+  --el-component-size-large: var(--ctl-h-lg);
+
+  /* ===== 层级阴影（28.19-12）=====
+     卡片层级继续靠 1px 描边（宣纸质感，见 10.7），高度差只给浮层与弹窗各一档阴影。
+     两档都用墨绿的透明投影而非中性黑，落在宣纸底上不发灰。 */
+  --shadow-pop: 0 2px 8px rgba(47, 70, 57, 0.12);
+  --shadow-dialog: 0 8px 28px rgba(47, 70, 57, 0.18);
 }
 
 /* ===== 字重基线（批次 11）=====
@@ -168,6 +188,23 @@ body {
 /* ===== 弹窗/消息圆角统一收紧 ===== */
 .el-dialog {
   border-radius: 6px;
+}
+
+/* 28.19-12：浮层与弹窗各加一档阴影表达层级（卡片保持描边，不加阴影）。
+   Element Plus 自带的浮层阴影是按冷灰调的，落在宣纸底上偏脏；这里统一换成
+   墨绿透明投影。!important 是必要的：EP 的 .el-popper.is-light 等选择器
+   特异性高于本条，且组件样式由 unplugin 按需注入、加载顺序不稳定。 */
+.el-popper,
+.el-select__popper,
+.el-select-dropdown,
+.el-dropdown-menu,
+.el-picker-panel {
+  box-shadow: var(--shadow-pop) !important;
+}
+.el-dialog,
+.el-message-box,
+.el-drawer {
+  box-shadow: var(--shadow-dialog);
 }
 .el-message {
   border-radius: 2px;

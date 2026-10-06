@@ -13,7 +13,10 @@
     <div v-if="form.rules" class="rc">
       <div class="rc-tip">下面就是当前生效的规则，直接在句子里改即可。</div>
 
-      <div class="rc-hd">① 病历应有这些要素（完整性）</div>
+      <div class="rc-hd">
+        ① 病历应有这些要素（完整性）
+        <el-tooltip placement="top" content="「完全缺失」指整项没有记录；「仅有原始记录」指未结构化，无法直接用于质控。"><span class="rc-info" tabindex="0" aria-label="完整性扣分口径">ⓘ</span></el-tooltip>
+      </div>
       <div class="rc-line">
         病历应有
         <el-select v-model="form.elementNames" multiple filterable collapse-tags size="small" style="min-width: 320px">
@@ -26,7 +29,10 @@
         分。
       </div>
 
-      <div class="rc-hd">② 格式检查（勾选即可，无需填写规则）</div>
+      <div class="rc-hd">
+        ② 格式检查
+        <el-tooltip placement="top" content="勾选即启用该项检查；不合规按填写的分值扣分，无需另写规则。"><span class="rc-info" tabindex="0" aria-label="格式检查说明">ⓘ</span></el-tooltip>
+      </div>
       <div class="rc-flow">
         <div v-for="t in catalogFormats" :key="t.field" class="rc-fmt" :class="{ on: !!fmtOf(t.field) }">
           <el-checkbox :model-value="!!fmtOf(t.field)" @change="(v) => toggleFormat(t, v)" />
@@ -51,7 +57,10 @@
         <el-button link type="danger" @click="removeCustomFormat(i)">删</el-button>
       </div>
 
-      <div class="rc-hd">③ 一致性规则（触发类型 → 期望类型，期望值取自词典）</div>
+      <div class="rc-hd">
+        ③ 一致性规则
+        <el-tooltip placement="top" content="若病历的「触发类型」命中你选定的取值，而「期望类型」字段的取值不在期望集合里，则按对冲扣分。期望值取自词典。"><span class="rc-info" tabindex="0" aria-label="一致性规则说明">ⓘ</span></el-tooltip>
+      </div>
       <div v-for="(c, i) in form.consistency" :key="c.uid" class="rc-block">
         <div class="rc-line">
           若
@@ -106,8 +115,8 @@
         <el-input-number v-model="form.rules.standardization.weightEach" size="small" :min="0" :controls="false" />
         分；未归一条数超过
         <el-input-number v-model="form.rules.standardization.cap" size="small" :min="0" :controls="false" />
-        后按档累加（每满该条数再加扣一档，<b>不再封顶</b>，避免大量未归一时分数失去区分度）。
-        保存即生效；已评过的病历需重跑质控才会更新。
+        后按档累加
+        <el-tooltip placement="top" content="每满该条数再加扣一档，不封顶 —— 避免大量未归一时分数失去区分度。保存即生效；已评过的病历需重跑质控才会更新。"><span class="rc-info" tabindex="0" aria-label="术语标准化扣分说明">ⓘ</span></el-tooltip>
       </div>
       <div class="rc-line">
         重复病历扣
@@ -352,6 +361,16 @@ const resetRules = async () => {
   font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 6px;
+}
+/* 28.19-10：长说明下沉到 ⓘ —— 标题与句子里只留结论，机制/口径走 tooltip。
+   tabindex 让键盘也能聚焦触发（EP tooltip 默认 hover，focus 亦可显示）。 */
+.rc-info {
+  color: var(--ochre);
+  cursor: help;
+  font-size: var(--fs-xs);
+  margin-left: 4px;
+  vertical-align: middle;
+  outline: none;
 }
 /* 句子式编辑行：文字与控件同行排布，窄屏换行 */
 .rc-line {

@@ -43,7 +43,10 @@
           <div class="owner-actions">
             <el-button type="primary" size="small" @click="loadMembers">刷新成员</el-button>
             <el-button size="small" @click="addDialog = true">按用户名拉人</el-button>
-            <el-button size="small" type="danger" plain :loading="leaving" @click="doLeave">退出组织</el-button>
+            <!-- 28.19-06：退出组织是破坏性操作，右置并加分隔线，与左侧管理操作分开 -->
+            <span class="danger-zone">
+              <el-button size="small" type="danger" :loading="leaving" @click="doLeave">退出组织</el-button>
+            </span>
           </div>
           <el-table v-loading="membersLoading" element-loading-text="正在读取成员…" :data="members" border stripe style="margin-top: var(--sp-3)">
             <el-table-column prop="username" label="用户名" min-width="120" />
@@ -365,6 +368,12 @@ onMounted(loadMyOrg)
   display: flex;
   gap: var(--sp-2);
   align-items: center;
+}
+/* 28.19-06：破坏性操作右置并用分隔线隔开 */
+.danger-zone {
+  margin-left: auto;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--line);
 }
 .member-note {
   margin-top: var(--sp-4);
