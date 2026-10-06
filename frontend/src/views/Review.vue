@@ -290,7 +290,7 @@ onMounted(() => {
   min-height: calc(100% - 34px);
 }
 /* P5.2：跳过已删病历的提示 */
-.skip-hint { margin-top: var(--sp-2); font-size: var(--fs-md); color: var(--text-sub); }
+.skip-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); }
 /* 28.13：空态引导文案，居中并限制行宽 */
-.empty-hint { max-width: 380px; margin: 0 auto var(--sp-2); font-size: var(--fs-sm); color: var(--text-sub); line-height: 1.8; }
+.empty-hint { max-width: 380px; margin: 0 auto var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.8; }
 </style>

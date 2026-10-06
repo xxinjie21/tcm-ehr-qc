@@ -92,7 +92,7 @@ const FIELDS = fieldsWithWide([
 .tab-count {
   display: inline-block;
   margin-left: 4px;
-  padding: 0 6px;
+  padding: 0 var(--sp-2);
   border-radius: 8px;
   font-size: var(--fs-xs);
   background: var(--line-soft);
@@ -114,7 +114,7 @@ const FIELDS = fieldsWithWide([
 }
 /* 栏标题：小字次级色，只作分区提示 */
 .col-hd {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: var(--sp-2);
 }

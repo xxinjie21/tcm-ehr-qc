@@ -36,9 +36,9 @@ defineProps({
 }
 .panel-hd {
   margin: 0;
-  padding: 10px var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   display: flex;

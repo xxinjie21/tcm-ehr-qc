@@ -297,12 +297,12 @@ const levelDesc = (level, raw, name) => {
 .sd-meta-t { margin-left: var(--sp-1); }
 .sd-manual {
   margin-top: var(--sp-2);
-  padding: 6px 10px;
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--ochre);
   border-radius: 4px;
   background: var(--ochre-surface, var(--ochre-light));
   color: var(--text);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 .sd-manual strong {
   margin-right: var(--sp-2);
@@ -316,13 +316,13 @@ const levelDesc = (level, raw, name) => {
    用危险色系是因为它说明这份数据不完整，而不是一条中性元信息 */
 .sd-degrade {
   margin-top: var(--sp-2);
-  padding: 6px 10px;
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid #e3c3bb;
   border-left: 3px solid var(--danger);
   border-radius: 4px;
   background: var(--danger-surface);
   color: #8a3d33;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
 }
 .sd-degrade strong {
@@ -350,7 +350,7 @@ const levelDesc = (level, raw, name) => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: var(--sp-1) 10px;
+  padding: var(--sp-1) var(--sp-3);
   color: var(--ink);
 }
 .sd-item .src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: 6px; }
@@ -370,7 +370,7 @@ const levelDesc = (level, raw, name) => {
 .sd-item .tag.lv {
   background: transparent;
   border: 1px solid currentColor;
-  padding: 0 3px;
+  padding: 0 var(--sp-1);
 }
 .sd-item .tag.lv0 { color: var(--text-sub); }
 .sd-item .tag.lv1 { color: var(--ink-mid); }
@@ -381,7 +381,7 @@ const levelDesc = (level, raw, name) => {
 .empty-hint {
   max-width: 420px;
   margin: 2px auto 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -394,7 +394,7 @@ const levelDesc = (level, raw, name) => {
 
 <!-- 非 scoped：el-tooltip 的内容被 teleport 到 body，scoped 选择器命中不到，必须用全局块 -->
 <style>
-.el-popper .tp { max-width: 340px; font-size: var(--fs-sm); line-height: 1.7; }
+.el-popper .tp { max-width: 340px; font-size: var(--fs-xs); line-height: 1.7; }
 .el-popper .tp-hd { font-weight: bold; margin-bottom: var(--sp-1); color: #2b2b2b; }
 .el-popper .tp-row { display: flex; gap: var(--sp-2); }
 .el-popper .tp-k { flex: 0 0 62px; color: #8a8578; }

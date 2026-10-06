@@ -331,7 +331,7 @@ const resetRules = async () => {
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: 6px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .rc-fmt.on {
@@ -349,7 +349,7 @@ const resetRules = async () => {
 }
 /* 弹窗顶部说明 */
 .rc-tip {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 6px;
 }
@@ -360,7 +360,7 @@ const resetRules = async () => {
   gap: var(--sp-2);
   flex-wrap: wrap;
   margin: var(--sp-2) 0;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink);
   line-height: 2;
 }
@@ -368,7 +368,7 @@ const resetRules = async () => {
 .rc-block {
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 6px var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-2);
   background: var(--paper);
 }
@@ -388,7 +388,7 @@ const resetRules = async () => {
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: var(--sp-2);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink);
 }
 </style>

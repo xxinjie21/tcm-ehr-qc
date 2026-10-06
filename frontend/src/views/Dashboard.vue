@@ -364,13 +364,13 @@ onBeforeUnmount(() => {
   color: var(--text-sub);
   border: 1px solid var(--line);
   border-radius: 2px;
-  padding: 0 5px;
+  padding: 0 var(--sp-1);
   margin-left: var(--sp-1);
 }
 /* 待办数字：大号；有待办时（.warn）转 ochre */
 .todo-num {
   display: block;
-  font-size: 22px;
+  font-size: var(--fs-xl);
   font-weight: bold;
   color: var(--ink);
   line-height: 1.2;
@@ -378,7 +378,7 @@ onBeforeUnmount(() => {
 .todo.warn .todo-num { color: var(--ochre); }
 .todo-lbl {
   display: block;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-top: 2px;
 }
@@ -422,7 +422,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 /* 科室名固定宽度右对齐，过长省略（完整名放 title） */
 .rate-name {
@@ -465,6 +465,6 @@ onBeforeUnmount(() => {
   }
 }
 /* P5.2：趋势截断提示 */
-.trend-trunc { margin: var(--sp-2) 0 0; font-size: var(--fs-md); color: var(--text-sub); }
+.trend-trunc { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-sub); }
 /* 对标 A5：指标卡下方的血缘行。刻意做得比正文轻 —— 它是下钻入口，不该和指标抢注意力 */
 </style>

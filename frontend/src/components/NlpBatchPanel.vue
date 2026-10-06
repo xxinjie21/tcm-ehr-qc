@@ -322,26 +322,26 @@ onBeforeUnmount(stopPoll)
 .actions { margin-top: var(--sp-3); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .batch-filter {
   margin: 14px 0 var(--sp-1);
-  padding: var(--sp-3) 14px;
+  padding: var(--sp-3) var(--sp-4);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.bf-title { font-size: var(--fs-md); color: var(--text-sub); margin-bottom: var(--sp-2); }
+.bf-title { font-size: var(--fs-xs); color: var(--text-sub); margin-bottom: var(--sp-2); }
 .batch-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 var(--sp-1); }
 .batch-progress {
   margin-top: 14px;
-  padding: 10px 14px;
+  padding: var(--sp-3) var(--sp-4);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.bp-hd { font-size: var(--fs-md); color: var(--text); margin-bottom: var(--sp-2); }
+.bp-hd { font-size: var(--fs-xs); color: var(--text); margin-bottom: var(--sp-2); }
 .bp-hd b { color: var(--ink); }
-.bp-sub { margin-top: var(--sp-2); font-size: var(--fs-sm); color: var(--text-sub); }
+.bp-sub { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); }
 .batch-failures { margin-top: 14px; border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
 .batch-list { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
-.bf-hd { font-size: var(--fs-md); color: var(--text-sub); margin-bottom: var(--sp-2); }
+.bf-hd { font-size: var(--fs-xs); color: var(--text-sub); margin-bottom: var(--sp-2); }
 /* 截断提示：用的是次要色而不是警示色 —— 列表被截断是正常上限行为，不是错误 */
 .bf-trunc { margin-left: var(--sp-2); color: var(--ochre); }
 </style>

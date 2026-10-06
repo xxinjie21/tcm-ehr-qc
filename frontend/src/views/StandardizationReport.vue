@@ -803,18 +803,18 @@ function onVisibilityChange() {
   border-radius: 50%;
   background: var(--ochre);
   color: var(--surface);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 700;
 }
 .gate-body { flex: 1 1 auto; min-width: 0; }
 .gate-title {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 2px;
 }
 .gate-desc {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -834,13 +834,13 @@ function onVisibilityChange() {
 }
 .gp-label {
   flex: 0 0 auto;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   white-space: nowrap;
 }
 .gate-note {
   margin-top: var(--sp-2);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -860,7 +860,7 @@ function onVisibilityChange() {
   margin-bottom: var(--sp-3);
   background: var(--surface-sub);
   border-radius: 4px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -872,7 +872,7 @@ function onVisibilityChange() {
   border-radius: 50%;
   background: var(--text-sub);
   color: var(--surface);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 /* 结论条：一句话把「该做什么」说清 */
@@ -900,7 +900,7 @@ function onVisibilityChange() {
   line-height: 20px;
   text-align: center;
   border-radius: 50%;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--surface);
   background: var(--ink-mid);
@@ -908,7 +908,7 @@ function onVisibilityChange() {
 .headline.warn .hl-icon { background: var(--ochre); }
 .headline.ok .hl-icon { background: var(--success, #3a7d44); }
 .hl-title {
-  font-size: 15px;
+  font-size: var(--fs-title);
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 2px;
@@ -936,19 +936,19 @@ function onVisibilityChange() {
 .kpi.warn { border-left: 3px solid var(--ochre); }
 .kpi.ok { border-left: 3px solid var(--success, #3a7d44); }
 .kpi-label {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 2px;
 }
 .kpi-value {
-  font-size: 21px;
+  font-size: var(--fs-xl);
   font-weight: 600;
   color: var(--ink);
   line-height: 1.3;
 }
 .kpi-note {
   margin-top: 4px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.6;
   color: var(--text-sub);
 }
@@ -974,18 +974,18 @@ function onVisibilityChange() {
   border-radius: 50%;
   background: var(--ink-mid);
   color: var(--surface);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 .todo-body { flex: 1 1 auto; min-width: 0; }
 .todo-title {
-  font-size: 13.5px;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 2px;
 }
 .todo-desc {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }

@@ -29,7 +29,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 30px 20px var(--sp-5);
+  padding: 32px 20px var(--sp-5);
   /* 宣纸底 + 极淡墨点纹理（内联 SVG，非 CSS 渐变） */
   background-color: var(--paper);
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='0.9' fill='%232f4639' fill-opacity='0.05'/></svg>");
@@ -74,7 +74,7 @@
   opacity: 0.5;
 }
 .auth-brand h2 {
-  font-size: 21px;
+  font-size: var(--fs-xl);
   line-height: 1.6;
   color: var(--ink);
   letter-spacing: 2px;
@@ -108,7 +108,7 @@
   letter-spacing: 1px;
 }
 .auth-form .hint {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin: var(--sp-2) 0 var(--sp-5);
 }
@@ -118,7 +118,7 @@
   margin-bottom: var(--sp-4);
 }
 .auth-form .el-form-item__label {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   letter-spacing: 0.5px;
   padding-bottom: var(--sp-1);
@@ -131,7 +131,7 @@
 }
 .auth-switch {
   margin-top: var(--sp-4);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .auth-switch a {
@@ -146,7 +146,7 @@
   margin-top: auto;
   padding-top: 20px;
   border-top: 1px dashed var(--line);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   line-height: 2;
 }
@@ -164,7 +164,7 @@
   border-left: 3px solid var(--ochre);
   background: var(--ochre-light);
   padding: var(--sp-2) var(--sp-3);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: #6b5a44;
   margin: 0 0 var(--sp-4);
 }

@@ -60,10 +60,10 @@ const display = computed(() =>
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px var(--sp-4);
+  padding: var(--sp-4) var(--sp-4);
 }
 .stat .num {
-  font-size: 24px;
+  font-size: var(--fs-xl);
   font-weight: bold;
   color: var(--ink);
   line-height: 1.2;
@@ -76,7 +76,7 @@ const display = computed(() =>
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-top: 2px;
 }

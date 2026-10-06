@@ -377,7 +377,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 10px 14px;
+  padding: var(--sp-3) var(--sp-4);
   background: var(--ink, var(--ink));
   color: #f1ede0;
   cursor: grab;
@@ -391,7 +391,7 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: #9bb7a4;
 }
-.aii-title { font-size: 13.5px; font-weight: bold; }
+.aii-title { font-size: var(--fs-base); font-weight: bold; }
 .aii-sub { font-size: var(--fs-xs); color: #c9b99a; margin-left: 2px; }
 /* 「清空」「收起」用无底透明按钮，避免在深色标题栏上抢视觉 */
 .aii-clear,
@@ -402,8 +402,8 @@ onBeforeUnmount(() => {
   cursor: pointer;
   line-height: 1;
 }
-.aii-clear { margin-left: auto; font-size: var(--fs-sm); }
-.aii-close { font-size: 18px; }
+.aii-clear { margin-left: auto; font-size: var(--fs-xs); }
+.aii-close { font-size: var(--fs-page); }
 .aii-clear:hover, .aii-close:hover { color: var(--surface); }
 
 /* 可查范围提示条：浅色底与上方标题栏区分 */
@@ -420,7 +420,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 10px var(--sp-3);
+  padding: var(--sp-3) var(--sp-3);
   border-bottom: 1px solid var(--line-soft);
 }
 .cmd {
@@ -429,7 +429,7 @@ onBeforeUnmount(() => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 3px 10px;
+  padding: var(--sp-1) var(--sp-3);
   cursor: pointer;
 }
 .cmd:hover { background: var(--ink-light); }
@@ -440,11 +440,11 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   padding: var(--sp-3);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
 }
 .aii-empty { color: var(--text-sub); }
-.msg { border-radius: 6px; padding: var(--sp-2) 10px; margin-bottom: 10px; word-break: break-word; }
+.msg { border-radius: 6px; padding: var(--sp-2) var(--sp-3); margin-bottom: 10px; word-break: break-word; }
 /* 用户消息靠右留白，与 AI 消息一眼分开 */
 .msg.user {
   background: var(--ink-light);
@@ -471,7 +471,7 @@ onBeforeUnmount(() => {
 .aii-input {
   display: flex;
   gap: var(--sp-2);
-  padding: 10px var(--sp-3);
+  padding: var(--sp-3) var(--sp-3);
   border-top: 1px solid var(--line-soft);
   background: var(--surface);
 }

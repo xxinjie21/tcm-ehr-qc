@@ -253,7 +253,7 @@ async function handleSave() {
   border: 1px solid var(--line);
   border-left: 3px solid var(--ochre);
   background: var(--ochre-light);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.8;
   color: #6b5a44;
 }
@@ -264,7 +264,7 @@ async function handleSave() {
   border: 1px solid var(--danger);
   border-left: 3px solid var(--danger);
   background: var(--danger-surface);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.8;
   color: var(--danger);
 }
@@ -302,7 +302,7 @@ async function handleSave() {
 }
 /* 栏标题：下边框与内容分隔 */
 .col-hd {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   font-weight: bold;
   color: var(--ink);
   padding-bottom: 6px;
@@ -314,7 +314,7 @@ async function handleSave() {
   margin-bottom: 14px;
 }
 .llm-form :deep(.el-form-item__label) {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   padding-bottom: 2px;
   line-height: 1.6;
@@ -339,7 +339,7 @@ async function handleSave() {
   margin-top: 2px;
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.8;
   word-break: break-all;
 }

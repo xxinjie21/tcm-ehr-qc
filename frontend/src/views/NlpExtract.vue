@@ -749,8 +749,8 @@ onMounted(() => {
   background: var(--ink-light);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: var(--sp-2) 14px;
-  font-size: var(--fs-md);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 14px;
 }
@@ -799,7 +799,7 @@ onMounted(() => {
 .src-note { font-size: var(--fs-xs); color: var(--ink-mid); margin-left: var(--sp-2); }
 .src-note.warn { color: var(--danger); }
 .norm-note {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -816,7 +816,7 @@ onMounted(() => {
 }
 /* 归一汇总（第九轮）：把命中数、未命中数、走 ES 还是内存摊开 */
 .norm-stat {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -857,7 +857,7 @@ onMounted(() => {
   border-radius: 6px;
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-3);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.8;
   color: #8a3d33;
 }
@@ -871,12 +871,12 @@ onMounted(() => {
 /* 术语归一试算：词典直查，不依赖 NLP 服务 */
 .norm-tool {
   margin-top: var(--sp-3);
-  padding: 10px var(--sp-3);
+  padding: var(--sp-3) var(--sp-3);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.nt-hd { font-size: var(--fs-sm); color: var(--text-sub); margin-bottom: var(--sp-2); }
+.nt-hd { font-size: var(--fs-xs); color: var(--text-sub); margin-bottom: var(--sp-2); }
 .nt-row { display: flex; gap: var(--sp-2); align-items: center; }
 .nt-result {
   display: flex;
@@ -886,7 +886,7 @@ onMounted(() => {
   margin-top: var(--sp-2);
   padding-top: var(--sp-2);
   border-top: 1px dashed var(--line-soft);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 .nt-in { color: var(--text-sub); }
 .nt-arrow { color: #c9c3b4; }
@@ -895,7 +895,7 @@ onMounted(() => {
 .nt-src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: auto; }
 .nt-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.7; }
 /* 28.13：空态引导文案，居中但不喧宾夺主 */
-.empty-hint { max-width: 360px; margin: 0 auto; font-size: var(--fs-sm); color: var(--text-sub); line-height: 1.8; }
+.empty-hint { max-width: 360px; margin: 0 auto; font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.8; }
 
 /* 原文模块化字段；分区常显 + 3 列栅格：
    wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。
@@ -905,9 +905,9 @@ onMounted(() => {
 .form-group { margin-bottom: var(--sp-1); }
 .group-hd {
   position: relative;
-  padding: 3px 0 var(--sp-1) var(--sp-2);
+  padding: var(--sp-1) 0 var(--sp-1) var(--sp-2);
   margin-bottom: 6px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: bold;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
@@ -922,7 +922,7 @@ onMounted(() => {
   background: var(--ink-mid);
 }
 .form-grid :deep(.el-form-item) { margin-bottom: 6px; }
-.form-grid :deep(.el-form-item__label) { font-size: var(--fs-sm); color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
+.form-grid :deep(.el-form-item__label) { font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
 .field-form { margin-bottom: 6px; }
 /* 28.17：点结果实体后命中的字段高亮，与下方原文片段标记同一色系 */
 .form-grid :deep(.el-form-item.src-hit) {
@@ -941,7 +941,7 @@ onMounted(() => {
   cursor: pointer;
   list-style: none;
   padding: var(--sp-2) 0;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink-mid);
 }
 .composed-hd::-webkit-details-marker { display: none; }
@@ -961,8 +961,8 @@ onMounted(() => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px var(--sp-3);
-  font-size: var(--fs-md);
+  padding: var(--sp-3) var(--sp-3);
+  font-size: var(--fs-xs);
   line-height: 1.9;
   color: var(--text);
   /* 批次16 · 16.5：去掉框内滚动。
@@ -978,7 +978,7 @@ onMounted(() => {
   color: var(--ochre);
   font-weight: 600;
   border-radius: 3px;
-  padding: 0 2px;
+  padding: 0 var(--sp-1);
 }
 :deep(.row-active) td { background: var(--ink-light) !important; }
 

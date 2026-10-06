@@ -520,8 +520,8 @@ onMounted(() => {
   border: 1px solid #ecd9b0;
   color: var(--ochre);
   border-radius: 6px;
-  padding: 6px var(--sp-3);
-  font-size: var(--fs-md);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-xs);
   margin-bottom: var(--sp-2);
 }
 /* 预检列表上方说明行 */
@@ -539,7 +539,7 @@ onMounted(() => {
 .ok {
   padding: var(--sp-2);
   color: var(--ink-mid);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 /* 面板内二级标题（左竖线） */
 .sub-hd {
@@ -575,9 +575,9 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 6px 0;
+  padding: var(--sp-2) 0;
   border-bottom: 1px dashed var(--line);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 .std-dim .sd-name {
   font-weight: bold;
@@ -594,9 +594,9 @@ onMounted(() => {
   font-weight: bold;
 }
 .std-grade {
-  padding: 6px 10px;
+  padding: var(--sp-2) var(--sp-3);
   border-radius: 4px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   margin-bottom: 6px;
 }
 .std-grade.ok {
@@ -615,13 +615,13 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 6px 10px;
+  padding: var(--sp-2) var(--sp-3);
   margin-bottom: 6px;
   border: 1px solid var(--line);
   border-left: 3px solid var(--ink-mid);
   border-radius: 4px;
   background: var(--paper);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink);
 }
 .rule-card.tongue {
@@ -639,7 +639,7 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   margin-bottom: 6px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 .dist-row .dr-l {
   flex: 0 0 130px;
@@ -669,8 +669,8 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .grade-chips .gc {
-  font-size: var(--fs-md);
-  padding: 3px 10px;
+  font-size: var(--fs-xs);
+  padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--ink);
@@ -682,10 +682,10 @@ onMounted(() => {
 }
 /* 折叠区内的单条规则说明 */
 .std-desc {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.9;
   color: var(--ink);
-  padding: 2px 0;
+  padding: var(--sp-1) 0;
 }
 /* 标准：紧凑一行一项（标签 + 值） */
 .std-grid {
@@ -698,7 +698,7 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.8;
 }
 .st-k {
@@ -714,7 +714,7 @@ onMounted(() => {
   display: inline-block;
   margin: 0 6px 2px 0;
   padding: 0 var(--sp-2);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--ink-light);

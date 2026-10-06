@@ -444,13 +444,13 @@ const handleSubmit = async () => {
   border-radius: 4px;
 }
 .rh-title {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 2px;
 }
 .rh-desc {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -462,11 +462,11 @@ const handleSubmit = async () => {
   margin-top: var(--sp-2);
 }
 .rh-link {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--link, #2b6cb0);
 }
 .rh-skip {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 /* 步骤条：序号圆点 + 标题 + 说明，降低「不知道下一步做什么」的成本 */
@@ -489,7 +489,7 @@ const handleSubmit = async () => {
   border-radius: 50%;
   background: var(--ink-mid);
   color: var(--surface);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 .step-body {
@@ -497,13 +497,13 @@ const handleSubmit = async () => {
   min-width: 0;
 }
 .step-t {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 2px;
 }
 .step-d {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   line-height: 1.7;
   margin-bottom: var(--sp-2);
@@ -557,19 +557,19 @@ const handleSubmit = async () => {
   color: var(--ink);
 }
 .lint-count {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .lint-terms {
   margin-top: 4px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text);
   word-break: break-all;
 }
 .lint-advice {
   margin-top: 4px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -589,12 +589,12 @@ const handleSubmit = async () => {
 }
 .sample-tb {
   border-collapse: collapse;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 .sample-tb th,
 .sample-tb td {
   border: 1px solid var(--line);
-  padding: 5px 12px;
+  padding: var(--sp-1) var(--sp-3);
   text-align: left;
 }
 .sample-tb th {
@@ -606,7 +606,7 @@ const handleSubmit = async () => {
   padding: var(--sp-3);
   background: var(--surface-sub);
   border-radius: 4px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   overflow-x: auto;
 }

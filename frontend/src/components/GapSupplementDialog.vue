@@ -213,7 +213,7 @@ async function doGapProposal() {
 /* 25.13 一键补词 */
 .gap-lead {
   margin: 0 0 var(--sp-3);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -236,12 +236,12 @@ async function doGapProposal() {
 }
 .gap-target-label {
   flex: 0 0 auto;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .gap-note {
   margin: var(--sp-3) 0 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
   word-break: break-all;

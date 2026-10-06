@@ -621,7 +621,7 @@ onMounted(() => {
 /* 批次 22：国标编码用等宽字体，便于逐字符核对（编码错一位就查不出来了） */
 .code-cell {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 /* 类型 tab：激活态与下划线改用主题墨色，替换 Element Plus 默认蓝 */
@@ -657,7 +657,7 @@ onMounted(() => {
 .hdr-info {
   color: var(--text-sub);
   cursor: help;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 
 /* 词典作用域提示条：与查询区同一行基线，标签 + 说明一行排开 */
@@ -679,7 +679,7 @@ onMounted(() => {
   color: var(--text);
 }
 .upload-tip .sub {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-top: var(--sp-1);
 }
@@ -687,7 +687,7 @@ onMounted(() => {
    位置在 import-actions 内，不再落在上传热区*/
 .fmt-detail {
   margin-top: 10px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .fmt-detail summary {
@@ -707,7 +707,7 @@ onMounted(() => {
 }
 .fmt-body {
   margin-top: 6px;
-  padding: var(--sp-2) 10px;
+  padding: var(--sp-2) var(--sp-3);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -739,9 +739,9 @@ onMounted(() => {
 .ded-item {
   background: var(--ochre-light);
   border-radius: 2px;
-  padding: 6px var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   margin-bottom: 6px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 
 /* ===== 批次17：个人词典 / 提案 / 归档 ===== */
@@ -753,7 +753,7 @@ onMounted(() => {
 }
 .rv-meta {
   margin-top: var(--sp-2);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .rv-dirty {
@@ -784,7 +784,7 @@ onMounted(() => {
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface-sub);
   border-radius: 4px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .dg-item b {
@@ -798,7 +798,7 @@ onMounted(() => {
   margin-bottom: var(--sp-3);
 }
 .dh-label {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 

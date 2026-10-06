@@ -501,7 +501,7 @@ onMounted(() => {
   flex-wrap: wrap;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
   margin-bottom: 20px;
   display: flex;
   gap: var(--sp-5);
@@ -511,14 +511,14 @@ onMounted(() => {
   color: var(--text-sub);
 }
 .gs b {
-  font-size: 22px;
+  font-size: var(--fs-xl);
   color: var(--ink);
   margin-right: 6px;
 }
 /* 统计失败提示*/
 .gs-fail {
   margin-left: auto;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--danger);
 }
 
@@ -527,7 +527,7 @@ onMounted(() => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
   margin-bottom: 20px;
   /* 批次16 · 16.4：筛选区压成一行。
      原先 .scope-row（「当前范围」那行）带 margin-top:10px，**永远另起一行** —— 控件本身
@@ -550,7 +550,7 @@ onMounted(() => {
 @media (max-width: 1560px) {
   .scope-bar {
     gap: var(--sp-3);
-    padding: 12px var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
   }
 }
 .scope-tip { font-size: var(--fs-base); color: var(--text-sub); }
@@ -562,8 +562,8 @@ onMounted(() => {
   background: var(--ink-light);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 10px 14px;
-  font-size: var(--fs-md);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-xs);
   color: var(--ink-mid);
   line-height: 1.7;
   margin-bottom: var(--sp-4);
@@ -591,7 +591,7 @@ onMounted(() => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px var(--sp-3);
+  padding: var(--sp-4) var(--sp-3);
   text-align: center;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -605,7 +605,7 @@ onMounted(() => {
   border-radius: 50%;
   background: var(--ink-mid);
   color: var(--surface);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-base);
   font-weight: bold;
   line-height: 30px;
   margin: 0 auto var(--sp-2);
@@ -618,7 +618,7 @@ onMounted(() => {
 /* 每步的一句话解释：卡内常显，不再收进折叠区 */
 .step-desc {
   margin-top: 6px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.6;
   color: var(--text-sub);
 }
@@ -654,7 +654,7 @@ onMounted(() => {
 }
 .clean-error-sub {
   margin-top: 2px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 
@@ -679,16 +679,16 @@ onMounted(() => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px var(--sp-4);
+  padding: var(--sp-4) var(--sp-4);
   text-align: center;
 }
 .stat-item .num {
-  font-size: 22px;
+  font-size: var(--fs-xl);
   font-weight: bold;
   color: var(--ink);
 }
 .stat-item .lbl {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-top: var(--sp-1);
 }
@@ -705,8 +705,8 @@ onMounted(() => {
   font-size: var(--fs-base);
   color: var(--ink);
 }
-.level-dist .ld-lbl { color: var(--text-sub); font-size: var(--fs-md); }
-.level-dist .ld { padding: 2px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.level-dist .ld-lbl { color: var(--text-sub); font-size: var(--fs-xs); }
+.level-dist .ld { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .level-dist .ld.exact { color: var(--ink-mid); }
 .level-dist .ld.contain { color: var(--ochre); }
 .level-dist .ld.fuzzy { color: var(--danger); }
@@ -723,7 +723,7 @@ onMounted(() => {
 label,
 .field-lbl {
   display: block;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 3px;
 }

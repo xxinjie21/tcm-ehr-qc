@@ -89,7 +89,7 @@
         </template>
         <!-- 体验修复（2026-10-05）：此前页面没有任何「本页不自动刷新」的说明，
              用户不知道报告何时更新、该点哪个按钮才生效。 -->
-        <div style="margin-bottom:8px; padding:8px 10px; font-size: var(--fs-sm); line-height:1.7;
+        <div style="margin-bottom:8px; padding:var(--sp-2) var(--sp-3); font-size: var(--fs-xs); line-height:1.7;
                     color:var(--text); background:var(--ochre-light); border-left:3px solid var(--ochre); border-radius:4px;">
           <b>本页不会自动刷新。</b>怎么让它更新：
           <b>补了词表</b> → 点「重跑『解析 + 质控』」（新词表只对重跑过解析的病历生效）；
@@ -136,11 +136,11 @@ defineProps({
 <style scoped>
 /* 明细折叠 */
 .detail { margin-bottom: var(--sp-3); }
-.ct { font-size: 13.5px; font-weight: 600; color: var(--ink); }
-.ct-sub { margin-left: var(--sp-2); font-size: var(--fs-sm); color: var(--text-sub); font-weight: 400; }
+.ct { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+.ct-sub { margin-left: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); font-weight: 400; }
 .detail-note {
   margin-top: var(--sp-2);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub);
 }
@@ -148,7 +148,7 @@ defineProps({
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--sp-2) var(--sp-4);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 .misc-grid span { color: var(--text-sub); margin-right: 6px; }
 .misc-grid b { color: var(--ink); font-weight: 600; }
@@ -156,11 +156,11 @@ defineProps({
 /* 「解析早于词表」标记：这一种补词表无效，得重跑解析，所以要显式标出来 */
 .stale-tag {
   display: inline-block;
-  padding: 1px 6px;
+  padding: var(--sp-1) var(--sp-2);
   border-radius: 3px;
   background: var(--ochre-surface);
   color: var(--ochre);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 </style>

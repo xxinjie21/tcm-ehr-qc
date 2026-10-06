@@ -142,7 +142,7 @@ watch(() => props.recordId, () => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px var(--sp-4);
+  padding: var(--sp-4) var(--sp-4);
 }
 /* 标题行：标题 + 来源标签 + 右侧按钮 */
 .aii-hd {
@@ -152,7 +152,7 @@ watch(() => props.recordId, () => {
   margin-bottom: 10px;
 }
 .aii-title {
-  font-size: 13.5px;
+  font-size: var(--fs-base);
   font-weight: bold;
   color: var(--ink);
   border-left: 3px solid var(--ink-mid);
@@ -201,18 +201,18 @@ watch(() => props.recordId, () => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: var(--sp-2) 10px;
+  padding: var(--sp-2) var(--sp-3);
   display: flex;
   gap: var(--sp-2);
 }
 /* flex-shrink:0 保证标签不被长文本挤窄 */
 .sum-item .sum-key {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   flex-shrink: 0;
 }
 .sum-item span {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink);
   word-break: break-all;
 }
@@ -224,7 +224,7 @@ watch(() => props.recordId, () => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px var(--sp-3);
+  padding: var(--sp-3) var(--sp-3);
   margin-bottom: var(--sp-3);
 }
 /* 四块规则结论：两列网格 */
@@ -237,17 +237,17 @@ watch(() => props.recordId, () => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px var(--sp-3);
+  padding: var(--sp-3) var(--sp-3);
 }
 .blk-title {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   font-weight: bold;
   color: var(--ink);
   margin-bottom: var(--sp-2);
 }
 /* 「无缺项 / 无提示」时的正向文案，用次级色与警示标签区分 */
 .blk-ok {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink-mid);
 }
 .chips {
@@ -258,7 +258,7 @@ watch(() => props.recordId, () => {
 /* 描边标签：用于归一命中分档；实心感留给「怎么来的」类标签 */
 .chip {
   font-size: var(--fs-xs);
-  padding: 2px var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
   border-radius: 2px;
   border: 1px solid var(--line);
   background: var(--paper);
@@ -272,7 +272,7 @@ watch(() => props.recordId, () => {
 .hints {
   margin: 0;
   padding-left: var(--sp-4);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink);
   line-height: 1.8;
 }
@@ -286,7 +286,7 @@ watch(() => props.recordId, () => {
   padding-top: var(--sp-2);
 }
 .aii-tip {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 /* 窄屏（<1200px）摘要与结论块由两列塌成一列 */

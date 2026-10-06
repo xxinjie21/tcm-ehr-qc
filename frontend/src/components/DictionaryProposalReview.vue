@@ -483,14 +483,14 @@ defineExpose({
 .rv-diff-hd.mod { border-left-color: var(--ochre); color: var(--ochre); }
 .rv-diff-hd.del { border-left-color: var(--danger); color: var(--danger); }
 .rv-diff-row {
-  padding: 3px var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
   font-size: var(--fs-base);
   border-bottom: 1px solid var(--line);
 }
 .rv-diff-al {
   margin-left: var(--sp-2);
   color: var(--text-sub);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
 }
 
 /* ===== 提案审核：主从布局 ===== */

@@ -45,7 +45,7 @@ defineEmits(['search', 'reset'])
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 10px var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
   margin-bottom: 14px;
   display: flex;
   flex-wrap: wrap;
@@ -62,7 +62,7 @@ defineEmits(['search', 'reset'])
 /* 标签压在各自控件上方（block + 下间距），与 align-items:flex-end 配合对齐控件底边 */
 .filter label {
   display: block;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 3px;
 }

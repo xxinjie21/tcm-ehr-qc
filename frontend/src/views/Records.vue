@@ -723,7 +723,7 @@ onMounted(async () => {
 }
 .tip { line-height: 1.7; margin-bottom: 14px; }
 .tip-inline {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .import-auto {
@@ -732,21 +732,21 @@ onMounted(async () => {
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: var(--sp-3);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--ink);
 }
 .import-auto .tip {
   margin: 0;
 }
 .uploader :deep(.el-upload-dragger) {
-  padding: var(--sp-5) 10px;
+  padding: var(--sp-5) var(--sp-3);
   border: 1px dashed var(--line);
   background: var(--paper);
 }
 .up-inner { text-align: center; }
-.up-title { font-size: 13.5px; color: var(--ink); }
+.up-title { font-size: var(--fs-base); color: var(--ink); }
 .up-title em { color: var(--ink-mid); font-style: normal; font-weight: bold; }
-.up-sub { font-size: var(--fs-sm); color: var(--text-sub); margin-top: var(--sp-1); }
+.up-sub { font-size: var(--fs-xs); color: var(--text-sub); margin-top: var(--sp-1); }
 .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
 .result { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: 14px; }
 .import-failed {
@@ -755,19 +755,19 @@ onMounted(async () => {
   background: var(--danger-surface);
   border: 1px solid #e3c3bb;
   border-radius: 4px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--danger);
 }
 /* 逐文件导入进度*/
 .import-progress {
   margin-top: 14px;
-  padding: 10px 14px;
+  padding: var(--sp-3) var(--sp-4);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
 }
 .ip-hd {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text);
   margin-bottom: var(--sp-2);
 }
@@ -776,14 +776,14 @@ onMounted(async () => {
 }
 .ip-sub {
   margin-top: var(--sp-2);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .result-hd { font-size: var(--fs-base); font-weight: bold; color: var(--ink); margin-bottom: var(--sp-3); }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: var(--sp-3) var(--sp-4); text-align: center; }
-.stat-item .num { font-size: 22px; font-weight: bold; color: var(--ink); }
-.stat-item .lbl { font-size: var(--fs-sm); color: var(--text-sub); margin-top: var(--sp-1); }
+.stat-item .num { font-size: var(--fs-xl); font-weight: bold; color: var(--ink); }
+.stat-item .lbl { font-size: var(--fs-xs); color: var(--text-sub); margin-top: var(--sp-1); }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.red .num { color: var(--danger); }
 /* 多列栅格：3 列时 21 字段压到约 11 行，常规屏幕一屏可填完。
@@ -802,7 +802,7 @@ onMounted(async () => {
   margin-bottom: 6px;
 }
 .form-grid :deep(.el-form-item__label) {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   line-height: 1.5;
   padding-bottom: 0;
 }
@@ -812,9 +812,9 @@ onMounted(async () => {
 }
 .group-hd {
   position: relative;
-  padding: 3px 0 var(--sp-1) var(--sp-2);
+  padding: var(--sp-1) 0 var(--sp-1) var(--sp-2);
   margin-bottom: 6px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: bold;
   color: var(--ink);
   border-bottom: 1px solid var(--line);

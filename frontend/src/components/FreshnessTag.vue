@@ -33,7 +33,7 @@ defineProps({
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--ink-mid);
 }
 .fresh-tag .k { color: var(--text-sub); }
@@ -42,7 +42,7 @@ defineProps({
   background: var(--ochre-surface);
   border: 1px solid var(--ochre-light);
   border-radius: 4px;
-  padding: 1px 6px;
+  padding: var(--sp-1) var(--sp-2);
 }
 .fresh-tag .why { color: var(--ochre); }
 </style>

@@ -204,7 +204,7 @@ const handleLogout = async () => {
   left: -9999px;
   top: 0;
   z-index: 2000;
-  padding: var(--sp-2) 14px;
+  padding: var(--sp-2) var(--sp-4);
   background: var(--ink);
   color: var(--surface);
   text-decoration: none;
@@ -231,7 +231,7 @@ const handleLogout = async () => {
   font-style: normal;
   color: #c9b99a;
   margin-left: var(--sp-2);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
 }
 .topbar .user {
   margin-left: auto;
@@ -260,10 +260,10 @@ const handleLogout = async () => {
   white-space: nowrap;
 }
 .user-role {
-  padding: 1px 6px;
+  padding: var(--sp-1) var(--sp-2);
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 2px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: #dbe4de;          /* 徽标比用户名弱一档，与 --surface(var(--surface)) 区分 */
 }
 .logout {
@@ -297,7 +297,7 @@ aside {
   padding: var(--sp-3) var(--sp-4);
   color: var(--el-text-color-regular);
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: var(--fs-base);
   border-left: 3px solid transparent;
 }
 .menu a:hover {
@@ -311,8 +311,8 @@ aside {
   font-weight: bold;
 }
 .menu .sec {
-  padding: 14px var(--sp-4) var(--sp-1);
-  font-size: var(--fs-sm);
+  padding: var(--sp-4) var(--sp-4) var(--sp-1);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 
@@ -355,7 +355,7 @@ main > * {
   align-items: center;
   gap: 6px;
   margin-bottom: var(--sp-3);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
 }
 .crumb-item:last-child {

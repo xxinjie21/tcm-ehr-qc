@@ -100,13 +100,13 @@ const detailTotal = computed(() =>
 .ok {
   padding: var(--sp-2);
   color: var(--ink-mid);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xs);
 }
 /* ===== 评分构成瀑布 ===== */
 .wf {
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 6px 10px;
+  padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-2);
   background: var(--paper);
 }
@@ -115,8 +115,8 @@ const detailTotal = computed(() =>
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 3px 0;
-  font-size: var(--fs-md);
+  padding: var(--sp-1) 0;
+  font-size: var(--fs-xs);
 }
 .wf-item .wf-l {
   flex: 1 1 auto;
@@ -136,13 +136,13 @@ const detailTotal = computed(() =>
 }
 /* P4.11：最终得分要突出扫读，字号比扣分项（默认）放大一档加粗 */
 .wf-item.end .wf-num {
-  font-size: 17px;
+  font-size: var(--fs-title);
   font-weight: 700;
 }
 /* 最终得分旁的分级胶囊 */
 .wf-grade {
-  font-size: var(--fs-sm);
-  padding: 1px var(--sp-2);
+  font-size: var(--fs-xs);
+  padding: var(--sp-1) var(--sp-2);
   border-radius: 6px;
 }
 .wf-grade.is-ok {
@@ -159,7 +159,7 @@ const detailTotal = computed(() =>
 }
 /* 合格线说明 */
 .wf-note {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 10px;
 }
