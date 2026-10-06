@@ -697,6 +697,29 @@ components:
                                     type: string
                                   reason:
                                     type: string
+    QcBatchDTO:
+      type: object
+      description: 批量质控评分重算请求（入参）；不设 filters = 全库
+      properties:
+        filters:
+          type: object
+          description: 数据范围过滤条件（科室 / 时间区间 / 证候 / 分级）；不设条件 = 全部病历
+          properties:
+            department:
+              type: string
+            dateRange:
+              type: array
+              description: '[开始日期, 结束日期]（yyyy-MM-dd）'
+              items:
+                type: string
+            pattern:
+              type: string
+            grade:
+              type: string
+              description: 合格 / 待复核 / 无效
+        requestKey:
+          type: string
+          description: 幂等键（可空）；撞 (org_id, request_key) 唯一索引时返回既有任务，不新建也不重跑
     SearchDTO:
       type: object
       description: 多条件查询请求（入参）
@@ -1802,6 +1825,67 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/OperationLogVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/logs/by-object:
+    get:
+      tags:
+        - 日志
+      summary: 按对象查活动流
+      description: 【权限：登录即可】（§七 L7 三档；对标 D3）可见范围与 GET /api/logs 完全一致（同一套 buildWrapper），只额外按对象精确过滤 —— 不能因为「是按 ID 查」就绕过数据域。病历详情页的「活动 / 历史」页签用它
+      parameters:
+        - name: objectType
+          in: query
+          required: true
+          description: 对象类型，如 record
+          schema:
+            type: string
+        - name: objectId
+          in: query
+          required: true
+          description: 对象 ID
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 分页结果 {list, total}（按时间倒序）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      list:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/OperationLogVO'
+        '400':
+          description: objectType 或 objectId 为空（code=400）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -3175,7 +3259,17 @@ paths:
                     type: integer
                     example: 200
                   data:
-                    $ref: '#/component
+                    $ref: '#/components/schemas/DictionaryTermsVO'
+        '400':
+          description: 术语类型非法（code=4001）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/dictionary/baseline/export:
     get:
       tags:
@@ -3514,7 +3608,6 @@ paths:
                     example: 200
                   data:
                     $ref: '#/components/schemas/DictProposal'
-s/schemas/DictionaryTermsVO'
         '400':
           description: 术语类型非法（code=4001）
           content:
@@ -3856,6 +3949,103 @@ s/schemas/DictionaryTermsVO'
                       type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/ai/async/{kind}:
+    post:
+      tags:
+        - AI助手
+      summary: 异步提交 AI 生成
+      description: |
+        【权限：登录即可】（批次 15 · 15.1）与三个同步接口同一套校验，只是把「等 LLM 生成」搬到专用线程池：
+        请求线程立即返回 202 + 任务号，前端轮询 GET /api/ai/async/{taskId}，用户可离开页面再回来取结果。
+        同步接口保留不动（向后兼容）。kind=interpret/review 需 recordId；kind=chat 需 question。
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          description: AI 动作
+          schema:
+            type: string
+            enum: [interpret, chat, review]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiQueryDTO'
+            example:
+              recordId: 3f2a1b0c-...
+      responses:
+        '202':
+          description: 已受理，data={taskId}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+        '400':
+          description: kind 不在 interpret/chat/review 内；或非 chat 缺 recordId、chat 缺 question（code=400）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/ai/async/{taskId}:
+    get:
+      tags:
+        - AI助手
+      summary: 查异步任务结果
+      description: |
+        【权限：登录即可】（批次 15 · 15.1）任务不存在、已过期、或不属于调用者，一律返回同一个 404 ——
+        不区分「不存在」与「不是你的」，否则任务号可以被用来探测。超时（超过 120 秒仍在 RUNNING）收敛为 FAILED。
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 任务快照 data={state, reply, error}；state=RUNNING 时 reply 为 null，FAILED 时 error 有值
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      state:
+                        type: string
+                        enum: [RUNNING, DONE, FAILED]
+                      reply:
+                        $ref: '#/components/schemas/AiReplyVO'
+                      error:
+                        type: string
+                        nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 任务不存在 / 已过期 / 不属于调用者（code=1006）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'
   /api/ai/interpret:
