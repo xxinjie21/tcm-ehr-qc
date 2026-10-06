@@ -109,8 +109,10 @@ class DictionaryControllerDiffTest {
 
         ResponseEntity<?> res = controller.diff("p1");
 
-        assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode(),
-                "非提交者不得查看他人提案内容");
+        // 25.8：HTTP 状态码必须与业务码一致。此前是 400 配 code=403，
+        // 前端按状态码分流时会把「无权」当参数错误，提示与跳转都会走错分支
+        assertEquals(HttpStatus.FORBIDDEN, res.getStatusCode(),
+                "非提交者不得查看他人提案内容（且必须是 403，不是 400）");
     }
 
     @Test

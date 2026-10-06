@@ -80,7 +80,10 @@ CREATE TABLE IF NOT EXISTS records (
   INDEX idx_records_visit_time (visit_time),
   text_hash CHAR(32) NULL COMMENT '21 字段 MD5；NULL = 不参与唯一约束',
   UNIQUE KEY uk_records_org_text_hash (org_id, text_hash),
-  INDEX idx_records_org (org_id)
+  INDEX idx_records_org (org_id),
+  -- 25.4：列表/导出/统计普遍是「org_id 等值（数据域）+ visit_time 范围或排序」，
+  -- 两个单列索引同时存在时 MySQL 只能选其一，另一维回表过滤；复合索引才两维都走
+  INDEX idx_records_org_visit_time (org_id, visit_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='病历表';
 
 CREATE TABLE IF NOT EXISTS review_tasks (

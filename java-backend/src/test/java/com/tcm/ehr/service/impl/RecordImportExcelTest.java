@@ -26,10 +26,13 @@ import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -167,5 +170,41 @@ class RecordImportExcelTest {
 
         assertEquals(LocalDateTime.of(2022, 12, 24, 9, 6, 13), r.getVisitTime(),
                 "紧凑数字日期时间必须解析出来，否则列表接诊时间整列空白");
+    }
+
+    /**
+     * 25.2：单次导入的行数上限。
+     *
+     * 上限必须是跨文件累计的 —— 只按文件卡的话，20 个文件就把上限放大 20 倍。
+     * 这里锁三件事：未到上限放行、恰好到上限拦下并留下文件级失败、拦下后不再产出待入库病历。
+     * 第 3 条尤其重要：如果只拦「入库」却仍把行解析出来，调用方会拿到一份
+     * 「total 很大但一行没入库」的自相矛盾摘要。
+     */
+    @Test
+    void stopsImportWhenRowLimitReached() throws Exception {
+        // 1. 未到上限：不拦，也不留失败明细
+        ImportSummaryVO below = new ImportSummaryVO();
+        below.setTotal(ExcelSheetImporter.MAX_ROWS - 1);
+        assertFalse(ExcelSheetImporter.rowLimitReached(below, "records.xlsx"));
+        assertEquals(0, below.getFailed());
+
+        // 2. 恰好到上限（total 只计入带登记号的行）：拦下 + 一条文件级失败，文案要说清下一步
+        ImportSummaryVO at = new ImportSummaryVO();
+        at.setTotal(ExcelSheetImporter.MAX_ROWS);
+        assertTrue(ExcelSheetImporter.rowLimitReached(at, "records.xlsx"));
+        assertEquals(1, at.getFailed());
+        String reason = at.getFailures().get(0).getReason();
+        assertTrue(reason.contains("上限") && reason.contains("拆分"), reason);
+
+        // 3. 已到上限：后续文件连读表都不做
+        String[] data = {"REG-9", "OP-9", "男", "45", "2", "x", "y", "z", "a", "b", "c", "d", "e", "f",
+                "g", "h", "i", "j", "中医内科", "D-9", "20221224090613"};
+        List<Object[]> parsed = new ArrayList<>();
+        ImportSummaryVO summary = new ImportSummaryVO();
+        summary.setTotal(ExcelSheetImporter.MAX_ROWS);
+        ExcelSheetImporter.importFile(xlsx(new String[][]{HEADER, data}), summary, parsed,
+                new HashSet<>(), new int[]{0}, new ArrayList<>());
+        assertTrue(parsed.isEmpty(), "到上限后不应再产出待入库病历");
+        assertEquals(1, summary.getFailed(), "每个被拦下的文件记一条文件级失败");
     }
 }

@@ -347,7 +347,9 @@ public class DictionaryController {
         }
         boolean canSee = RequestUtils.isOrgOwner() || p.getSubmitUserId().equals(RequestUtils.currentUsername());
         if (!canSee) {
-            return ResponseEntity.badRequest().body(Result.error(403, "无权查看该提案"));
+            // 25.8：状态码与业务码不一致是孤例 —— HTTP 层也必须是 403，
+            // 否则前端按状态码分流时会把「无权」当参数错误处理（提示与跳转都会错）
+            return ResponseEntity.status(403).body(Result.error(403, "无权查看该提案"));
         }
         return ResponseEntity.ok(Result.ok(proposalService.diff(id)));
     }

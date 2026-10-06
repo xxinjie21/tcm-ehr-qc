@@ -1947,7 +1947,8 @@ paths:
       description: |
         【权限：登录即可】
         批量上传病历Excel文件（.xlsx），校验格式并创建导入任务。
-        约束：单文件最大50MB，单次最多20个文件。
+        约束：单文件最大50MB，单次最多20个文件；单次导入合计最多 50000 行（跨文件累计，超出后不再导入，
+        剩余行以文件级失败列在 failures 中，已解析成功的行照常入库 —— 不做静默截断）。
         autoExtract=true 且后端已开启抽取时，导入完成后自动投递后台结构化解析任务（返回 autoExtractTaskId）。
       requestBody:
         required: true
@@ -3462,6 +3463,10 @@ paths:
                     example: 200
                   data:
                     $ref: '#/components/schemas/DictProposalDiff'
+        '400':
+          description: 提案不存在
+        '403':
+          description: 无权查看该提案（仅提交者本人与组织所有者可看）
   /api/dictionary/proposals/{id}/terms:
     put:
       tags:

@@ -33,6 +33,38 @@ final class ExcelSheetImporter {
     /** 单文件上限；放在这里而不是服务类里，因为它属于「读文件」这件事本身 */
     static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
 
+    /**
+     * 单次导入的行数上限（**跨文件累计**，批次 25 · 25.2，与 26.3 合并评估）。
+     *
+     * <p>为什么体积闸门不够：xlsx 是压缩包，50MB 完全可能是数百万行的纯文本表，
+     * 而解析结果在 saveBatch 之前全部驻留内存。实测过 20 万行就会先撞 POI 的单记录上限，
+     * 真实数据集 35355 份（计划 §9 的 27.11）则要能一次进来 —— 故取 50000，
+     * 与词典导入 {@code DictionaryServiceImpl.MAX_ROWS} 同口径。</p>
+     *
+     * <p>注：HTTP 层 {@code spring.servlet.multipart.max-request-size=50MB} 已经把
+     * 「20 × 50MB ≈ 1GB」这条输入路径封死，26.3 的真正边界是行数而非总字节；
+     * POI 自带的 {@code ZipSecureFile.minInflateRatio}（默认 0.01）已覆盖 zip 膨胀。</p>
+     */
+    static final int MAX_ROWS = 50000;
+
+    /**
+     * 是否已达行数上限；到达即记一条**文件级**失败并返回 true。
+     *
+     * <p>两条读法（POI 全量读、SAX 流式读）与跨文件入口都调它，口径只此一份。
+     * 记成文件级失败而不是行级，是因为这不是「某一行有问题」，而是「这个文件不再继续读」，
+     * 与「文件为空 / 单文件超过 50MB」同类；也绝不静默截断 —— 静默截断会让用户
+     * 以为整份文件都进来了。</p>
+     */
+    static boolean rowLimitReached(ImportSummaryVO summary, String filename) {
+        if (summary.getTotal() < MAX_ROWS) {
+            return false;
+        }
+        summary.setFailed(summary.getFailed() + 1);
+        summary.getFailures().add(new ImportSummaryVO.Failure(filename,
+                "已达单次导入上限 " + MAX_ROWS + " 行，本文件剩余行未导入，请拆分后分批导入"));
+        return true;
+    }
+
     private ExcelSheetImporter() {
     }
 
@@ -67,6 +99,10 @@ final class ExcelSheetImporter {
             summary.getFailures().add(new ImportSummaryVO.Failure(filename, "仅支持 .xlsx / .xls"));
             return;
         }
+        // 25.2：本请求累计行数已到上限 —— 后续文件连读表都不做（读表本身就有成本）
+        if (rowLimitReached(summary, filename)) {
+            return;
+        }
         if (lower.endsWith(".xlsx")) {
             try {
                 parseXlsxStreaming(file, filename, summary, batchRegNos, parsedRows,
@@ -93,6 +129,10 @@ final class ExcelSheetImporter {
             }
             // 逐行映射：登记号为空的行跳过，缺门诊号或映射失败记入失败明细
             for (int i = header.getRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
+                // 25.2：到上限就停下。已解析的行照常入库，剩余行以文件级失败如实告知
+                if (rowLimitReached(summary, filename)) {
+                    break;
+                }
                 Row row = sheet.getRow(i);
                 if (row == null || TextUtil.isBlank(ExcelCellParser.cellText(row.getCell(colIndex.getOrDefault("registrationNo", -1))))) {
                     continue;
@@ -182,6 +222,11 @@ final class ExcelSheetImporter {
                 return;
             }
             if (colIndex[0] == null) {
+                return;
+            }
+            // 25.2：到上限就中止整份文件的后续行（用 abort 跳出 SAX 回调，与表头失败同一手法）
+            if (rowLimitReached(summary, filename)) {
+                abort[0] = new IllegalStateException("abort");
                 return;
             }
             // 与 POI 路径共用同一段逐行处理
