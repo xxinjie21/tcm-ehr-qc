@@ -730,6 +730,12 @@ const stopPoll = () => {
 
 // 进度轮询：2s 一次（与 NlpExtract 的批量解析同频率），终态自动停
 const pollTask = async (id) => {
+  // P4.8 同款（NlpExtract.vue:780）：页面不可见时不发请求，但仍把定时器续上 ——
+  // 后台标签页每 2s 打一次接口纯属浪费；直接 return 会让轮询永久停摆，故重排而非丢弃
+  if (document.visibilityState !== 'visible') {
+    pollTimer = setTimeout(() => pollTask(id), 2000)
+    return
+  }
   try {
     const res = await getQcBatch(id)
     const t = res.data || {}
