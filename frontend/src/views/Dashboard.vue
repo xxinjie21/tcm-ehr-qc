@@ -241,7 +241,10 @@ const renderDist = () => {
     yAxis: { type: 'value', splitLine: { lineStyle: { color: '#efebe1' } } },
     series: [{
       type: 'bar', barWidth: '46%',
-      data: d.map((b) => b.count),
+      // 28.21：0 值档位单独弱化，避免与「有数据」的档位在视觉上同一观感
+      data: d.map((b) => b.count === 0
+        ? { value: 0, itemStyle: { color: 'rgba(77,107,88,0.18)' } }
+        : b.count),
       itemStyle: { color: '#4d6b58', borderRadius: [2, 2, 0, 0] }
     }]
   })

@@ -292,9 +292,12 @@ public class DictionaryController {
         if (bad != null) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
+        List<TermEntry> terms = toTerms(body.getTerms());
         DictProposalVO vo = proposalService.submit(
                 RequestUtils.currentOrgId(), body.getType(),
-                toTerms(body.getTerms()), RequestUtils.currentUsername());
+                terms, RequestUtils.currentUsername());
+        operationLogger.log("提案提交", body.getType(),
+                "提案 " + vo.getId() + " 共 " + terms.size() + " 条，待审核");
         return ResponseEntity.ok(Result.ok("提案已提交，等待组长审核", vo));
     }
 

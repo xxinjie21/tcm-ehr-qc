@@ -29,7 +29,7 @@
     <el-tabs v-model="tab" class="dict-tabs">
 
     <el-tab-pane label="小组基线" name="baseline">
-    <PanelCard :title="`小组基线（${typeLabel}）`">
+    <PanelCard :title="`小组基线（${typeLabel(typeKey.value)}）`">
       <div class="search-row">
         <!-- 只给 placeholder 的搜索框没有无障碍名称，补 aria-label
              （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
@@ -404,7 +404,7 @@
 // 词典管理页：类型切换会同时刷新「术语查询」与「版本回滚」两块数据。
 // 导入只有一条路径 —— Excel / CSV / JSON 覆盖入库（导入前自动备份）。
 import { ref, computed, watch, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import {
@@ -764,11 +764,20 @@ const diff = ref(null)
 const doAudit = async (row, approve) => {
   let comment = ''
   if (!approve) {
-    comment = window.prompt('请填写拒绝理由（会一并记入提案，供提交人查看）')
-    if (comment === null) return
-    if (!comment.trim()) {
-      ElMessage.warning('拒绝时必须填写理由')
-      return
+    try {
+      // 28.5：改用 ElMessageBox.prompt —— window.prompt 是原生弹窗，样式与全站脱节、在部分浏览器会被拦截
+      const { value } = await ElMessageBox.prompt(
+        '请填写拒绝理由（会一并记入提案，供提交人查看）',
+        '驳回提案',
+        {
+          confirmButtonText: '驳回',
+          cancelButtonText: '取消',
+          inputType: 'textarea',
+          inputValidator: (v) => (v && v.trim() ? true : '拒绝时必须填写理由')
+        })
+      comment = value
+    } catch {
+      return // 取消 / 关闭弹窗
     }
   } else if (!(await confirmBox('通过后将整份提案内容替换当前基线，并生成一份归档版本。确定？',
     '审核通过', { type: 'warning' }))) {
