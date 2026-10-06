@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 /**
  * 全局异常出口：把各类异常统一转成 {@link Result} 错误体。
  *
- * <p>状态码与业务错误码的分工：HTTP 状态表达"哪一类失败"，{@code code} 表达"具体原因"，
- * 前端据此提示用户；缺省都回 500 会把客户端错误说成系统故障，所以参数类异常一律落 400。</p>
+ * 状态码与业务错误码的分工：HTTP 状态表达"哪一类失败"，code 表达"具体原因"，
+ * 前端据此提示用户；缺省都回 500 会把客户端错误说成系统故障，所以参数类异常一律落 400。
  */
 @Slf4j
 @RestControllerAdvice
@@ -71,8 +71,8 @@ public class GlobalExceptionHandler {
     /**
      * 通用业务异常（P3.6 下沉）：异常自带业务码与 HTTP 状态。
      *
-     * <p>替代 Controller 里手拼 {@code ResponseEntity.badRequest().body(Result.error(...))}
-     * 的错误体，让错误码/状态只在本处出口、外部可统一审计。</p>
+     * 替代 Controller 里手拼 ResponseEntity.badRequest().body(Result.error(...))
+     * 的错误体，让错误码/状态只在本处出口、外部可统一审计。
      *
      * @param e 携带 code / message / status
      * @return HTTP 状态取自异常 + 异常自带业务码
@@ -96,7 +96,7 @@ public class GlobalExceptionHandler {
     /**
      * LLM 连通性探测失败。
      *
-     * <p>上游模型服务不可达或鉴权失败属网关侧故障，与参数错误区分；消息在抛出前已脱敏，可直接展示。</p>
+     * 上游模型服务不可达或鉴权失败属网关侧故障，与参数错误区分；消息在抛出前已脱敏，可直接展示。
      *
      * @param e 已脱敏的失败原因
      * @return HTTP 502 + code=1009
@@ -109,8 +109,8 @@ public class GlobalExceptionHandler {
     /**
      * 术语索引不可用。
      *
-     * <p>归一只认 ES 索引、没有内存兜底，这条路径必须显式报错：按"未命中"处理会把服务故障
-     * 显示成"词典里没这个词"。</p>
+     * 归一只认 ES 索引、没有内存兜底，这条路径必须显式报错：按"未命中"处理会把服务故障
+     * 显示成"词典里没这个词"。
      *
      * @param e 索引不可用的原因
      * @return HTTP 503 + code=1010
@@ -119,6 +119,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleTermIndexUnavailable(TermIndexUnavailableException e) {
         log.error("[全局异常] 术语索引不可用: {}", e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Result.error(1010, e.getMessage()));
+    }
+
+    /**
+     * 服务未就绪（缺少必要配置，如未配 TCM_LLM_ENC_KEY）。
+     *
+     * 消息写明要配什么，是用户唯一能照着做的信息，故必须回显；落兜底只会给追踪码。
+     *
+     * @param e 携带可展示的提示文案
+     * @return HTTP 503 + code=1011
+     */
+    @ExceptionHandler(ServiceNotReadyException.class)
+    public ResponseEntity<Result<Void>> handleServiceNotReady(ServiceNotReadyException e) {
+        log.error("[全局异常] 服务未就绪: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Result.error(1011, e.getMessage()));
     }
 
     /**
@@ -135,8 +149,8 @@ public class GlobalExceptionHandler {
     /**
      * 请求体字段校验失败（@Valid）。
      *
-     * <p>单条错误直接用校验消息原文（已含中文字段说明）；多条才补字段名并全部返回，
-     * 否则用户无法判断是哪一项出错。</p>
+     * 单条错误直接用校验消息原文（已含中文字段说明）；多条才补字段名并全部返回，
+     * 否则用户无法判断是哪一项出错。
      *
      * @param e 校验失败异常
      * @return HTTP 400 + code=400，消息为全部校验问题
@@ -167,7 +181,7 @@ public class GlobalExceptionHandler {
     /**
      * 请求体缺失或 JSON 格式错误。
      *
-     * <p>空 body / 坏 JSON 属客户端错误，落到兜底分支会被说成系统异常。</p>
+     * 空 body / 坏 JSON 属客户端错误，落到兜底分支会被说成系统异常。
      *
      * @param e 解析失败异常
      * @return HTTP 400 + code=400
@@ -227,7 +241,7 @@ public class GlobalExceptionHandler {
     /**
      * multipart 请求缺少文件部件。
      *
-     * <p>该异常不是 {@link MultipartException} 子类，必须单独捕获。</p>
+     * 该异常不是 {@link MultipartException} 子类，必须单独捕获。
      *
      * @param e 缺失的部件名
      * @return HTTP 400 + code=400
@@ -241,7 +255,7 @@ public class GlobalExceptionHandler {
     /**
      * 路由未匹配。
      *
-     * <p>落兜底分支会被说成"系统异常"，掩盖真实的 404。</p>
+     * 落兜底分支会被说成"系统异常"，掩盖真实的 404。
      *
      * @param e 未命中路由的异常
      * @return HTTP 404 + code=404
@@ -254,7 +268,7 @@ public class GlobalExceptionHandler {
     /**
      * 请求方法不支持（如对只读端点发 POST）。
      *
-     * <p>落兜底分支会被说成"系统异常"，前端也无法区分"接口不存在"与"方法用错"。</p>
+     * 落兜底分支会被说成"系统异常"，前端也无法区分"接口不存在"与"方法用错"。
      *
      * @param e 方法不支持异常
      * @return HTTP 405 + code=405
@@ -278,10 +292,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 方法级参数校验失败（{@code @RequestParam} 上的约束，如 {@code @Min} 分页下限）。
+     * 方法级参数校验失败（@RequestParam 上的约束，如 @Min 分页下限）。
      *
-     * <p>与 {@link MethodArgumentNotValidException}（请求体 Bean Validation）分开处理：
-     * 后者取 {@code BindingResult} 的字段错误，本类只能从异常里取路径。</p>
+     * 与 {@link MethodArgumentNotValidException}（请求体 Bean Validation）分开处理：
+     * 后者取 BindingResult 的字段错误，本类只能从异常里取路径。
      *
      * @param e 约束校验异常
      * @return HTTP 400 + code=400
@@ -294,8 +308,8 @@ public class GlobalExceptionHandler {
     /**
      * 表单/查询参数绑定失败（类型转换不合法等）。
      *
-     * <p>与 {@link MethodArgumentNotValidException} 同源但不同类：前者带 {@code BindingResult}，
-     * 本类只带一条消息。</p>
+     * 与 {@link MethodArgumentNotValidException} 同源但不同类：前者带 BindingResult，
+     * 本类只带一条消息。
      *
      * @param e 绑定异常
      * @return HTTP 400 + code=400
@@ -312,8 +326,8 @@ public class GlobalExceptionHandler {
     /**
      * 数据完整性约束冲突（唯一键 / 外键 / 非空）。
      *
-     * <p>典型触发：并发撞唯一索引。直接落 500 会把"数据重复"说成"系统故障"，
-     * 故落 409 并在日志里保留根因。</p>
+     * 典型触发：并发撞唯一索引。直接落 500 会把"数据重复"说成"系统故障"，
+     * 故落 409 并在日志里保留根因。
      *
      * @param e 完整性异常
      * @return HTTP 409 + code=409
@@ -326,9 +340,24 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 并发互斥未获锁（同一操作正在进行）。
+     *
+     * 不是系统故障：用户只需稍后重试；落兜底 500 会让前端提示「系统异常（追踪码 …）」，
+     * 把一句可操作的话说成故障，用户也不会知道「稍后重试」就是正解。
+     *
+     * @param e 携带可展示的提示文案
+     * @return HTTP 409 + code=409
+     */
+    @ExceptionHandler(ConcurrentOperationException.class)
+    public ResponseEntity<Result<Void>> handleConcurrentOperation(ConcurrentOperationException e) {
+        log.warn("[全局异常] 并发互斥未获锁: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Result.error(409, e.getMessage()));
+    }
+
+    /**
      * 兜底异常。
      *
-     * <p>响应带一个追踪码，与日志中的 trace 一致，用户可复制给管理员定位；追踪码不含业务信息。</p>
+     * 响应带一个追踪码，与日志中的 trace 一致，用户可复制给管理员定位；追踪码不含业务信息。
      *
      * @param e 未归类的异常
      * @return HTTP 500 + code=500，消息含追踪码

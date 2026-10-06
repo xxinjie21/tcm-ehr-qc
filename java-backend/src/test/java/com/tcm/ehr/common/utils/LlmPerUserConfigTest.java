@@ -131,13 +131,21 @@ class LlmPerUserConfigTest {
         assertEquals("", other.decrypt(cipherText));
     }
 
-    /** 未配置加密密钥时：不阻塞启动，但拒绝保存（绝不能明文落库） */
+    /**
+     * 未配置加密密钥时：不阻塞启动，但拒绝保存（绝不能明文落库）。
+     *
+     * 25.1：这类「服务未就绪」由 IllegalStateException 改为 ServiceNotReadyException
+     * （HTTP 503 + code=1011），不再被兜底成 500；文案必须点名缺失的环境变量，
+     * 否则使用者只知道「失败」却不知道要做什么。
+     */
     @Test
     void withoutKeySavingSecretIsRejectedNotDowngradedToPlain() {
         LlmSecretCipher none = new LlmSecretCipher("");
         assertFalse(none.available());
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+        com.tcm.ehr.common.exception.ServiceNotReadyException e = org.junit.jupiter.api.Assertions.assertThrows(
+                com.tcm.ehr.common.exception.ServiceNotReadyException.class,
                 () -> none.encrypt("sk-secret"));
+        assertTrue(e.getMessage().contains("TCM_LLM_ENC_KEY"), e.getMessage());
     }
 
     // ------------------------------------------------------------------ 每人一份

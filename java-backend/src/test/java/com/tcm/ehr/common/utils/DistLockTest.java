@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.mapper.DbLockMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,8 +23,8 @@ import static org.mockito.Mockito.when;
 /**
  * 跨实例互斥的契约（批次 16）。
  *
- * <p>最要紧的一条是<b>拿不到锁不放行</b>：写成「拿不到就继续」等于没有锁，
- * 而且只在高并发时发作 —— 这种 bug 现场几乎无法复现。</p>
+ * 最要紧的一条是拿不到锁不放行：写成「拿不到就继续」等于没有锁，
+ * 而且只在高并发时发作 —— 这种 bug 现场几乎无法复现。
  */
 class DistLockTest {
 
@@ -47,11 +48,13 @@ class DistLockTest {
         when(mapper.acquire(anyString(), anyInt())).thenReturn(0);
         AtomicInteger entered = new AtomicInteger();
 
-        assertThrows(IllegalStateException.class,
+        ConcurrentOperationException thrown = assertThrows(ConcurrentOperationException.class,
                 () -> new DistLock(mapper).runLocked("k", () -> {
                     entered.incrementAndGet();
                     return "x";
                 }));
+        // 文案要能被前端直接展示（批次 25 工作项 1：不再落兜底 500 的「系统异常（追踪码 …）」）
+        assertTrue(thrown.getMessage().contains("请稍后重试"), "锁冲突文案丢了：前端只会看到追踪码");
 
         assertEquals(0, entered.get(), "没拿到锁却进入了临界区 = 等于没有锁");
         verify(mapper, never()).release(anyString());
@@ -63,7 +66,7 @@ class DistLockTest {
         DbLockMapper mapper = mock(DbLockMapper.class);
         when(mapper.acquire(anyString(), anyInt())).thenReturn(null);
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(ConcurrentOperationException.class,
                 () -> new DistLock(mapper).runLocked("k", () -> "x"));
     }
 

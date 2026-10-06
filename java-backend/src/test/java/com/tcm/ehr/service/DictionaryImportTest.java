@@ -287,4 +287,30 @@ class DictionaryImportTest {
         org.junit.jupiter.api.Assertions.assertTrue(written.getAliases().contains("\u8840\u538b\u9ad8"),
                 "正常别名必须保留");
     }
+
+    // ---------------------------------------------------------------- 跨实例锁冲突（25.1）
+
+    /**
+     * 导入时拿不到跨实例锁：不得走 compensateFailedRebuild 里那把无锁 rebuild，
+     * 只把库内容退回导入前，并把 409 语义的 ConcurrentOperationException 原样抛出。
+     *
+     * 背景：原实现 catch (Exception) 会把锁冲突一并吞掉，改抛 IOException
+     * （文案还误称「ES 重建失败」，HTTP 500），25.1 想要的 409 从未到达使用者。
+     */
+    @Test
+    void import_lockConflict_shouldRollBackLibraryAndRethrow() {
+        // acquire 返回 null = 没拿到锁（另一实例正持锁）
+        com.tcm.ehr.mapper.DbLockMapper busy = Mockito.mock(com.tcm.ehr.mapper.DbLockMapper.class);
+        Mockito.when(busy.acquire(Mockito.anyString(), Mockito.anyInt())).thenReturn(null);
+        DictionaryServiceImpl locked = new DictionaryServiceImpl(esIndex,
+                new com.tcm.ehr.common.utils.DistLock(busy), termStore, new ObjectMapper());
+
+        assertThrows(com.tcm.ehr.common.exception.ConcurrentOperationException.class,
+                () -> locked.importDictionary(TYPE, json("d.json", "[{\"standardTerm\":\"喉痹\"}]")));
+
+        // 库内容退回导入前（previous 为空列表），ES 一次都不能碰，也不得记已同步
+        Mockito.verify(termStore).replace(anyString(), Mockito.eq(TYPE), Mockito.eq(List.of()));
+        Mockito.verifyNoInteractions(esIndex);
+        Mockito.verify(termStore, Mockito.never()).markIndexed(anyString(), anyString(), anyString());
+    }
 }

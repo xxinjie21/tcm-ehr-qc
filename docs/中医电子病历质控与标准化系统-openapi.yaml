@@ -3207,6 +3207,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+        '409':
+          description: 同一「类型+组织」的词典重建正在进行（由另一实例持锁）。本次导入已把库内容退回导入前、ES 未被改动（code=409），稍后重试即可
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
   /api/dictionary/terms:
     get:
       tags:
@@ -3526,6 +3532,12 @@ paths:
                     example: 200
                   data:
                     $ref: '#/components/schemas/DictProposal'
+        '409':
+          description: 该「类型+组织」的合并重建正由另一实例进行（跨实例互斥未拿到锁），提案状态未变，稍后重试（code=409）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
   /api/dictionary/archives:
     get:
       tags:
@@ -3675,6 +3687,14 @@ paths:
         '400':
           description: 术语类型非法
 
+        '409':
+          description: 该「类型+组织」的 ES 重建正由另一实例进行（跨实例互斥未拿到锁）：单对重放会跳过该对并列入 failures，其它对继续处理（code=409）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/stats:
     post:
       tags:
@@ -4250,6 +4270,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          description: 服务端未配置密钥加密口令（环境变量 TCM_LLM_ENC_KEY 为空），无法加密保存 API Key（code=1011）。配置该环境变量后重试；此时配置未做任何修改
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'
   /api/llm/test:

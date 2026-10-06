@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -29,9 +30,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 全局异常出口的「客户端错误不得回 500」契约测试。
  *
- * <p>这两类异常都继承 {@code jakarta.servlet.ServletException}，原先会落进
- * {@code @ExceptionHandler(Exception.class)} 兜底，客户端拿到的是 500「系统异常」——
- * 既掩盖真实原因，也让前端无法区分「接口不存在」与「服务出错」。</p>
+ * 这两类异常都继承 jakarta.servlet.ServletException，原先会落进
+ * @ExceptionHandler(Exception.class) 兜底，客户端拿到的是 500「系统异常」——
+ * 既掩盖真实原因，也让前端无法区分「接口不存在」与「服务出错」。
  */
 class GlobalExceptionHandlerTest {
 
@@ -133,5 +134,29 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(401, resp.getStatusCode().value());
         assertEquals(401, resp.getBody().getCode());
+    }
+
+    // ------------------------------------------------ 批次 25 工作项 1：状态类异常不再落兜底 500
+
+    /** 并发互斥未获锁 -> 409 + 原文案（原先落兜底 500，用户只看到「系统异常（追踪码 …）」） */
+    @Test
+    void concurrentOperation_shouldBe409() {
+        ResponseEntity<Result<Void>> resp = handler.handleConcurrentOperation(
+                new ConcurrentOperationException("有另一个相同操作正在进行，请稍后重试"));
+
+        assertEquals(409, resp.getStatusCode().value());
+        assertEquals(409, resp.getBody().getCode());
+        assertEquals("有另一个相同操作正在进行，请稍后重试", resp.getBody().getMsg());
+    }
+
+    /** 未配置加密密钥 -> 503 + code=1011，且回显「该配什么」（兜底分支只会给追踪码） */
+    @Test
+    void serviceNotReady_shouldBe503WithActionableMessage() {
+        ResponseEntity<Result<Void>> resp = handler.handleServiceNotReady(
+                new ServiceNotReadyException("未配置 LLM 加密密钥，无法保存密钥（请联系管理员配置 TCM_LLM_ENC_KEY）"));
+
+        assertEquals(503, resp.getStatusCode().value());
+        assertEquals(1011, resp.getBody().getCode());
+        assertTrue(resp.getBody().getMsg().contains("TCM_LLM_ENC_KEY"));
     }
 }

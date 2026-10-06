@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.config;
 
+import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.service.DictionaryTermStore;
@@ -21,8 +22,8 @@ import java.util.List;
  * 1. 验证Redis/ES连接
  * 2. 加载data/dictionaries/*.json -> ES索引重建（术语库"提前内置"）
  *
- * <p>2026-09-23 起不再往内存里塞一份词典缓存 —— 归一改为只认 ES 索引，
- * 加载只做「文件 -> ES」这一步。</p>
+ * 2026-09-23 起不再往内存里塞一份词典缓存 —— 归一改为只认 ES 索引，
+ * 加载只做「文件 -> ES」这一步。
  */
 @Slf4j
 @Component
@@ -40,8 +41,8 @@ public class DataInitializationListener implements ApplicationRunner {
     /**
      * 启动后依次做四件事：探 Redis、探 ES、打印数据源、把词典 JSON 重建进 ES 索引。
      *
-     * <p>探活失败一律只记日志、不让启动失败 —— ES / Redis 不可用时系统仍能起来，
-     * 由归一相关接口返回 503 说明原因（见类注释）。</p>
+     * 探活失败一律只记日志、不让启动失败 —— ES / Redis 不可用时系统仍能起来，
+     * 由归一相关接口返回 503 说明原因（见类注释）。
      *
      * @param args 启动参数，此处未使用
      */
@@ -79,16 +80,16 @@ public class DataInitializationListener implements ApplicationRunner {
     }
 
     /**
-     * 词典启动对账：<b>播种基础层</b> → <b>逐个 (类型, 组织) 比对版本</b> → 落后才重建。
+     * 词典启动对账：播种基础层 → 逐个 (类型, 组织) 比对版本 → 落后才重建。
      *
-     * <p>为什么先播种：词典源已从 JSON 文件改为 {@code dictionary_terms}。若不做这一步，
-     * 库里 {@code org_id=''} 基础层是空的，词典页会一片空白、归一全部落空 ——
+     * 为什么先播种：词典源已从 JSON 文件改为 dictionary_terms。若不做这一步，
+     * 库里 org_id='' 基础层是空的，词典页会一片空白、归一全部落空 ——
      * 而文件里的词还在，只是没人读它了。判定「尚未播种」用「基础层该类型行数为 0」，
-     * 不看版本号：文件里已被人删空的类型也该保持空。</p>
+     * 不看版本号：文件里已被人删空的类型也该保持空。
      *
-     * <p>为什么逐组织对账：ES 的 {@code _meta.version} 是索引级的，分不清组织。
-     * 权威是 {@code dictionary_versions.indexed_version} —— 只有它追上 {@code version}
-     * 才算该组织已同步；灌失败不更新它，下次启动自然还会重建。</p>
+     * 为什么逐组织对账：ES 的 _meta.version 是索引级的，分不清组织。
+     * 权威是 dictionary_versions.indexed_version —— 只有它追上 version
+     * 才算该组织已同步；灌失败不更新它，下次启动自然还会重建。
      */
     private void loadDictionaries() {
         for (String type : TermTypes.ALL) {
@@ -157,7 +158,7 @@ public class DataInitializationListener implements ApplicationRunner {
                         }
                         return null;
                     });
-        } catch (IllegalStateException e) {
+        } catch (ConcurrentOperationException e) {
             log.info("[词典] {} (org='{}') 重建被其它实例占用，本次跳过: {}", type, orgId, e.getMessage());
             return;
         }

@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.exception.ServiceNotReadyException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -14,18 +15,18 @@ import java.util.Base64;
 /**
  * LLM 密钥的落库加密（AES-256-GCM）。
  *
- * <p><b>为什么必须加密落库</b>：配置改成「每个用户一份」后，密钥会跟着每个用户
- * 落进数据库。裸存意味着「拿到库就能拿到所有人的三方密钥」。</p>
+ * 为什么必须加密落库：配置改成「每个用户一份」后，密钥会跟着每个用户
+ * 落进数据库。裸存意味着「拿到库就能拿到所有人的三方密钥」。
  *
- * <p><b>为什么用 GCM 而不是 CBC</b>：GCM 带认证标签，密文被改动会在解密时报错，
- * 而不是悄悄解出一段垃圾明文。</p>
+ * 为什么用 GCM 而不是 CBC：GCM 带认证标签，密文被改动会在解密时报错，
+ * 而不是悄悄解出一段垃圾明文。
  *
- * <p><b>密钥来源</b>：环境变量 {@code TCM_LLM_ENC_KEY}（32 字节 Base64）优先，
- * 其次配置项 {@code llm.crypto-key}；两者都没有时 {@link #available()} 为 false，
- * 此时<b>不阻塞启动</b>，只是无法解密已有密文（按「未配置密钥」处理）。</p>
+ * 密钥来源：环境变量 TCM_LLM_ENC_KEY（32 字节 Base64）优先，
+ * 其次配置项 llm.crypto-key；两者都没有时 {@link #available()} 为 false，
+ * 此时不阻塞启动，只是无法解密已有密文（按「未配置密钥」处理）。
  *
- * <p><b>换密钥的代价</b>：GCM 密文绑定密钥，换密钥后旧密文解不开。此时
- * {@link #decrypt} 返回空串并告警一次，用户重新填一次密钥即可恢复。</p>
+ * 换密钥的代价：GCM 密文绑定密钥，换密钥后旧密文解不开。此时
+ * {@link #decrypt} 返回空串并告警一次，用户重新填一次密钥即可恢复。
  */
 @Slf4j
 @Component
@@ -79,14 +80,14 @@ public class LlmSecretCipher {
      * 加密明文。
      *
      * @param plain 明文密钥；空串/null 视为「未配置」，返回 null
-     * @return Base64(IV ‖ 密文 ‖ tag)；未配置返回 null；未就绪抛 IllegalStateException
+     * @return Base64(IV ‖ 密文 ‖ tag)；未配置返回 null；未就绪抛 {@link ServiceNotReadyException}（503 + code=1011，消息可展示）
      */
     public String encrypt(String plain) {
         if (plain == null || plain.isEmpty()) {
             return null;
         }
         if (!available) {
-            throw new IllegalStateException("未配置 LLM 加密密钥，无法保存密钥（请联系管理员配置 TCM_LLM_ENC_KEY）");
+            throw new ServiceNotReadyException("未配置 LLM 加密密钥，无法保存密钥（请联系管理员配置 TCM_LLM_ENC_KEY）");
         }
         try {
             // 1. 每次都用新 IV：IV 复用会让相同明文产生相同密文，可被比对出密钥是否相同

@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.common.utils.ExcelStreamReader;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -52,21 +53,17 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 术语查询：读词典 JSON，按关键字对标准词与别名做包含匹配。
      *
-     *
      * 每次调用都直接读文件 —— 本方法只服务三处：术语词典页列表 / 输入联想 /
      *
      * 质控规则「期望值」下拉，都是低频请求，5 类词条合计三千余条、读文件代价可忽略。
      *
-     *
      * 两种返回模式（由 page 决定）：
      *
-     * 
      *   - page <= 0（不分页）：返回全部命中词条。供质控规则下拉与
      *       输入联想使用 —— 两者都需要完整候选集才能选到任意术语。
      *   - page > 0（分页）：只返回第 page 页（每页 size 条），
      *       供术语词典页翻页浏览。分页切片对越界做了双向夹取，页码超出范围返回空列表
      *       而非抛异常（subList 越界会抛 IndexOutOfBounds）。
-     * 
      *
      * @param type    词典类型
      * @param keyword 搜索关键字，可为空（表示不过滤）
@@ -119,11 +116,9 @@ if (matched) {
     /**
      * 词典导入：解析上传文件 -> 与现有词典合并去重 -> 备份 -> 覆盖写文件 -> 全量重建 ES 索引。
      *
-     *
      * 按扩展名分流：JSON 走直传解析，Excel/CSV 走表格解析。合并以标准术语为键，
      *
      * 同词条合并别名并保留已有的 source / code。
-     *
      *
      * 索引重建失败会触发补偿：把文件退回导入前版本并尽力重建旧索引，之后仍抛异常 ——
      *
@@ -159,7 +154,6 @@ if (matched) {
 
     /**
      * 导入到指定组织层（批次 17）。
-     *
      *
      * 原实现固定用 currentOrgId()，管理员无法写基础层；这里把落库目标
      *
@@ -223,6 +217,19 @@ if (matched) {
                         return null;
                     });
             termStore.markIndexed(orgId, type, contentVersion);
+        } catch (ConcurrentOperationException lockConflict) {
+            // 拿不到跨实例锁：ES 从未被本请求碰过，只需把库内容退回导入前。
+            // 不得走 compensateFailedRebuild —— 那里不带锁就重建索引，会和持锁实例交错，
+            // 正是这把锁要防的场景。原样抛出，由全局出口映射为 409 与可操作文案。
+            log.warn("[词典] {} (org={}) 有并发重建正在进行，已退回库内容: {}",
+                    type, orgId, lockConflict.getMessage());
+            try {
+                termStore.replace(orgId, type, previous);
+            } catch (Exception rollbackError) {
+                log.error("[词典] {} (org={}) 并发冲突回退失败，库内容已变更且未记为已同步，"
+                        + "下次启动对账会重建: {}", type, orgId, rollbackError.getMessage());
+            }
+            throw lockConflict;
         } catch (Exception e) {
             // DB 已改而 ES 没跟上 → 归一结果与词典页会长期不一致。退回库内容并尽力恢复索引。
             log.error("[词典] {} (org={}) ES 重建失败，回退库内容并尝试恢复索引: {}",
@@ -249,11 +256,9 @@ if (matched) {
     /**
      * ES 重建失败后的补偿：把库内容退回导入前的版本，再尽力把索引也建回旧版本。
      *
-     *
      * 两步都可能再失败 —— 那时只记日志，不掩盖最初的异常（调用方会把它抛出去）。
      *
      * 无备份（首次导入、本组织原先没有词条）时用 previous 写回，通常是空列表。
-     *
      *
      * 关键：补偿路径不会把失败的那个版本记为已同步。记了就等于谎报，
      *
@@ -350,11 +355,11 @@ if (matched) {
     /**
      * 读 Excel 全部行（取前 3 列，空单元格补 null 以保持列位）。
      *
-     * <p>`.xlsx` 走 SAX 流式（{@link ExcelStreamReader}）：内存里只留当前一行，不再整份载入 ——
+     * `.xlsx` 走 SAX 流式（{@link ExcelStreamReader}）：内存里只留当前一行，不再整份载入 ——
      * 原先的 50MB 体积闸门只是把 OOM 阈值推后，没改变「内存 ≈ 解压后体积」这个事实。
-     * 两条路径的取值口径已由 {@code ExcelStreamReaderTest} 逐行逐列比对锁住。</p>
+     * 两条路径的取值口径已由 ExcelStreamReaderTest 逐行逐列比对锁住。
      *
-     * <p>`.xls`（HSSF）没有事件式 API，保留 POI 全量载入 + 体积闸门，这是有意取舍。</p>
+     * `.xls`（HSSF）没有事件式 API，保留 POI 全量载入 + 体积闸门，这是有意取舍。
      */
     private List<String[]> readExcelRows(MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
@@ -551,8 +556,8 @@ if (matched) {
     /**
      * 判断是否表头行（首行且含"标准术语"或"standardTerm"字样）。
      *
-     * <p>流式与全量两条路径共用这一条判定 —— 表头跳过若在两边各写一份，迟早会出现
-     * 「xlsx 导入多了一条表头词条、xls 没有」这类只在某种格式下复现的怪事。</p>
+     * 流式与全量两条路径共用这一条判定 —— 表头跳过若在两边各写一份，迟早会出现
+     * 「xlsx 导入多了一条表头词条、xls 没有」这类只在某种格式下复现的怪事。
      */
     private boolean isHeaderRow(String[] cells) {
         String first = cells.length > 0 ? cells[0] : null;
@@ -566,9 +571,9 @@ if (matched) {
     /**
      * 单元格取文本 —— **委托给全仓唯一实现** {@link ExcelCellParser#cellText(Cell)}。
      *
-     * <p>原本这里自己写了一份，与病历导入那份在 BOOLEAN 与 FORMULA 上并不一致：
+     * 原本这里自己写了一份，与病历导入那份在 BOOLEAN 与 FORMULA 上并不一致：
      * 同一个 .xlsx 从词典页导入和从病历页导入会读出不同文本。两份合一后，
-     * 词典侧原先的两条要求（整数不带 .0、国标代码保留 3.01 这种小数）由该实现原样满足。</p>
+     * 词典侧原先的两条要求（整数不带 .0、国标代码保留 3.01 这种小数）由该实现原样满足。
      */
     private String cellText(Cell cell) {
         return ExcelCellParser.cellText(cell);
