@@ -82,7 +82,10 @@
               </template>
             </el-table-column>
             <template #empty>
-              <EmptyState :failed="membersFailed" :loading="membersLoading"
+              <!-- 403 不是「加载失败」：成员名单接口是 owner-only，给「重试」按钮等于骗用户 -->
+              <EmptyState v-if="membersForbidden" :loading="membersLoading"
+                          text="仅组织所有者可查看成员名单" />
+              <EmptyState v-else :failed="membersFailed" :loading="membersLoading"
                           text="该组织暂无成员" @retry="loadMembers" />
             </template>
           </el-table>
@@ -170,6 +173,9 @@ const data = ref({ org: null, myRole: null })
 // 共享 EmptyState 依赖它决定给不给「重试」入口
 const orgFailed = ref(false)
 const membersFailed = ref(false)
+// 403 单列一格：「无权限」与「加载失败」不是一回事 —— 前者重试多少次都不会成功，
+// 给重试入口就是骗用户（共享 EmptyState 的 failed 态必然带重试按钮）。
+const membersForbidden = ref(false)
 const members = ref([])
 const membersLoading = ref(false)
 const leaving = ref(false)
@@ -191,7 +197,9 @@ const loadMyOrg = async () => {
     data.value = res.data || {}
     // ⚠️ 原来只有「刷新成员」按钮会拉成员 —— onMounted 只调 loadMyOrg，
     // 于是进页面成员表是空的，得手动点一次才出数据。这里跟着拉一次。
-    if (data.value.org) {
+    // 成员名单接口是 owner-only（后端 @RequireOrgRole("owner")）：非所有者进来先别调，
+    // 否则成员每次打开本页都会吃一条「无权限」提示，而页面上压根没有成员表可看。
+    if (data.value.org && data.value.myRole === 'owner') {
       await loadMembers()
     }
   } catch {
@@ -206,12 +214,17 @@ const loadMembers = async () => {
   if (!data.value.org) return
   membersLoading.value = true
   membersFailed.value = false
+  membersForbidden.value = false
   try {
     const res = await listMembers(data.value.org.id)
     members.value = res.data || []
-  } catch {
-    // 拦截器已提示
-    membersFailed.value = true
+  } catch (e) {
+    // 拦截器已提示；403 是权限问题（不是网络/服务故障），单独落一格
+    if (e?.response?.status === 403) {
+      membersForbidden.value = true
+    } else {
+      membersFailed.value = true
+    }
   } finally {
     membersLoading.value = false
   }
