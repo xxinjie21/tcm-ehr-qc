@@ -24,8 +24,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -80,14 +78,19 @@ public class LlmClient {
      *
      * <p><b>为什么设上限</b>：每个 {@code ChatClient} 内部持有 HTTP 客户端与连接池，
      * 按用户无限增长等于把内存泄漏进来。</p>
+     *
+     * <p><b>为什么用 {@link VersionedCache} 而不是自己继承 LinkedHashMap</b>（批次14 审核）：
+     * ①「有界 + LRU 逐出」这件事全仓已有 owner，再写一份就是两套逐出口径；
+     * ②**更要紧的是线程安全** —— {@code resolve()} 跑在请求线程上，而
+     * {@code LinkedHashMap(accessOrder=true)} 的 {@code get} 会改动内部访问序链表，
+     * 并发 get/put 不加锁可能丢项、甚至死循环。VersionedCache 的读写都是 synchronized。</p>
+     *
+     * <p>键里已经带了配置版本（{@code userId|版本}），所以不需要版本比对那一套，用它的两段式接口：
+     * {@code getIfPresent} → <b>锁外</b>装配 → {@code put}。装配必须在锁外，
+     * 因为 {@code ChatClient.builder(...).build()} 会建 HTTP 连接池，是慢操作。</p>
      */
     private static final int CLIENT_CACHE_MAX = 20;
-    private final Map<String, ChatClient> clients = new LinkedHashMap<>(16, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, ChatClient> eldest) {
-            return size() > CLIENT_CACHE_MAX;
-        }
-    };
+    private final VersionedCache<ChatClient> clients = new VersionedCache<>(CLIENT_CACHE_MAX);
 
     /** 记录「已经试过但装配失败」的 key，避免坏配置被反复重试 */
     private final Set<String> failedKeys = ConcurrentHashMap.newKeySet();
@@ -229,7 +232,7 @@ public class LlmClient {
         }
         String key = userId + "|" + configStore.versionFor(userId);
         // 3. 配置没变就复用已装配的
-        ChatClient hit = clients.get(key);
+        ChatClient hit = clients.getIfPresent(key);
         if (hit != null) {
             return hit;
         }
