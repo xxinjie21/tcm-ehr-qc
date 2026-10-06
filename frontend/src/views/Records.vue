@@ -210,6 +210,7 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
@@ -290,6 +291,11 @@ const {
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   clearOnFailure: false
 })
+
+// 28.7：审计页按对象跳转过来时带 recordId。必须在 useUrlFilters **之前**读取 ——
+// 它的 write() 只保留自己认知的 state 键，会把 recordId 这类未知键从 query 里抹掉。
+const route = useRoute()
+const deepLinkRecordId = typeof route.query.recordId === 'string' ? route.query.recordId : ''
 
 // 对标 E5「可分享视图」：筛选与分页同步到 URL（刷新 / 分享保留视图）。
 // 放在这里而不是 onMounted 里：本函数在 setup 阶段**同步**还原 URL 里的条件，
@@ -700,7 +706,11 @@ const handleCreate = async () => {
   }
 }
 
-onMounted(handleSearch)
+onMounted(async () => {
+  await handleSearch()
+  // 列表加载失败也照常打开详情：openDetail 走单条回查，不依赖列表
+  if (deepLinkRecordId) openDetail(deepLinkRecordId)
+})
 </script>
 
 <style scoped>

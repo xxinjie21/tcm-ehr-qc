@@ -23,6 +23,15 @@ public final class OrgVOs {
         private OrgInfo org;
         /** owner=所有者 / member=成员 / null=无组织 */
         private String myRole;
+        /**
+         * 当前成员的词典写授权位（成员级；管理员 / 所有者天然拥有，见前端 getter）。
+         *
+         * <p>28.20：登录快照会过期（owner 改权限 / 移除成员后本机 localStorage 仍是旧的），
+         * 前端进主框架时据此接口重取一次，刷新后即生效。</p>
+         */
+        private boolean canWriteDictionary;
+        /** 当前成员的质控规则写授权位（同 {@link #canWriteDictionary}） */
+        private boolean canWriteQcRules;
     }
 
     /** 组织概要（列表 / 我的组织共用） */

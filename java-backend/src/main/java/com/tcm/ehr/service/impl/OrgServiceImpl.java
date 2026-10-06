@@ -98,6 +98,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             if (g != null) {
                 vo.setOrg(toOrgInfo(g, false));
                 vo.setMyRole(m.getRole());
+                // 28.20：原始授权位（owner / 管理员由前端 getter 另行放行）
+                vo.setCanWriteDictionary(Integer.valueOf(1).equals(m.getCanWriteDictionary()));
+                vo.setCanWriteQcRules(Integer.valueOf(1).equals(m.getCanWriteQcRules()));
             }
         }
         return vo;

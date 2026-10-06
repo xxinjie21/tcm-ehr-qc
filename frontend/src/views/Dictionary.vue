@@ -365,7 +365,10 @@
       <div class="rv-row">
         <el-button size="small" :loading="archivesLoading" @click="loadArchives">刷新归档</el-button>
         <span class="tip">
-          每次基线合并后自动留一份快照；每个类型最多保留最近 5 份快照，版本元信息永久保留。
+          每次基线合并后自动留一份快照；每个类型最多保留最近 {{ MAX_SNAPSHOTS }} 份快照，版本元信息永久保留。
+          <template v-if="archives.length">
+            当前可用快照 <b>{{ snapshotCount }}</b> / {{ MAX_SNAPSHOTS }} 份<template v-if="archiveFull">，已达上限</template>。
+          </template>
         </span>
       </div>
       <el-table :data="archives" border size="small" max-height="220" style="margin-top: var(--sp-3)"
@@ -381,7 +384,10 @@
         <el-table-column prop="comment" label="备注" min-width="140" show-overflow-tooltip />
         <el-table-column label="快照" width="100">
           <template #default="{ row }">
-            <el-tag v-if="row.snapshotPresent" size="small" type="success" effect="plain">可用</el-tag>
+            <el-tooltip v-if="willBePurged(row)" content="快照已达 5 份上限，下一次基线合并会清理这一份（版本元信息保留）">
+              <el-tag size="small" type="warning" effect="plain">将被清理</el-tag>
+            </el-tooltip>
+            <el-tag v-else-if="row.snapshotPresent" size="small" type="success" effect="plain">可用</el-tag>
             <el-tooltip v-else content="快照已被 5 份限额清理，仅保留版本元信息，无法用于回滚">
               <el-tag size="small" type="info" effect="plain">已清理</el-tag>
             </el-tooltip>
@@ -779,9 +785,15 @@ const doAudit = async (row, approve) => {
     } catch {
       return // 取消 / 关闭弹窗
     }
-  } else if (!(await confirmBox('通过后将整份提案内容替换当前基线，并生成一份归档版本。确定？',
-    '审核通过', { type: 'warning' }))) {
-    return
+  } else {
+    // 28.6：满 5 份时提前告知「通过后会清理最早快照」，别让用户事后才发现丢了旧版本
+    const extra = archiveFull.value
+      ? '注意：快照已达 5 份上限，通过后会清理最早一份快照（版本元信息保留）。'
+      : ''
+    if (!(await confirmBox('通过后将整份提案内容替换当前基线，并生成一份归档版本。' + extra + '确定？',
+      '审核通过', { type: 'warning' }))) {
+      return
+    }
   }
   try {
     await auditProposal(row.id, { approve, comment })
@@ -796,6 +808,16 @@ const doAudit = async (row, approve) => {
 // ---- 归档版本 ----
 const archives = ref([])
 const archivesLoading = ref(false)
+// 与后端 DictArchiveServiceImpl.MAX_SNAPSHOT_VERSIONS 对齐：超过即清理「最早且有快照」的那一份
+const MAX_SNAPSHOTS = 5
+const snapshotCount = computed(() => archives.value.filter((a) => a.snapshotPresent).length)
+const archiveFull = computed(() => snapshotCount.value >= MAX_SNAPSHOTS)
+// 下一次合并会清理的最老快照（only meaningful when archiveFull）
+const oldestSnapshotVersionNo = computed(() => archives.value
+  .filter((a) => a.snapshotPresent)
+  .reduce((min, a) => (min === null || Number(a.versionNo) < Number(min) ? a.versionNo : min), null))
+const willBePurged = (row) =>
+  archiveFull.value && row.snapshotPresent && row.versionNo === oldestSnapshotVersionNo.value
 const loadArchives = async () => {
   archivesLoading.value = true
   try {

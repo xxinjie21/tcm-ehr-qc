@@ -18,6 +18,17 @@
         >
           {{ recomputeButtonText }}
         </el-button>
+        <!-- 28.3：cancelQcBatch 后端早已就绪，前端却一直没入口 ——
+             一旦提交就只剩等，想停只能刷新页面（任务仍在后台跑）。
+             只在运行中出现，避免常态多一个永远点不到的按钮 -->
+        <el-button
+          v-if="isActiveTask(recomputeProgress)"
+          size="small"
+          :loading="cancelling"
+          @click="handleCancelRecompute"
+        >
+          取消重算
+        </el-button>
         <span class="tip">范围对本页各块同时生效；「质控评分计算」按当前范围重算评分与分级</span>
       </div>
     </PanelCard>
@@ -345,7 +356,7 @@ import { useUrlFilters } from '@/composables/useUrlFilters'
 import RecordTable from '@/components/RecordTable.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { recomputeQc, getQcBatch, qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
+import { recomputeQc, getQcBatch, cancelQcBatch, qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
 import { searchRecords } from '@/api/records'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
@@ -705,6 +716,8 @@ const resetFilters = () => {
 // 重算已从「同步等结果」改为「提交拿 taskId → 2s 轮询进度 → 终态提示分级汇总」。
 // 同步跑 40000 条会把请求挂到超时，用户关页面任务也还在跑；异步后可以离开再回来。
 const recomputing = ref(false)
+// 取消请求在途：按钮进入 loading，避免连点发出第二次 cancel
+const cancelling = ref(false)
 // 当前任务进度：{ done, total, status, ... }，用于按钮上的进度文案
 const recomputeProgress = ref(null)
 // 轮询句柄；null 表示当前没有在轮询
@@ -790,6 +803,30 @@ const handleRecompute = async () => {
   } finally {
     // 4. 按钮立刻解锁：进度由 recomputeProgress 单独表达，不该让按钮一直转圈
     recomputing.value = false
+  }
+}
+
+// 取消重算：只发取消信号，不自己把状态改成 CANCELLED ——
+// 终态以服务端轮询结果为准，避免本地先行乐观更新后与真实状态分叉。
+const handleCancelRecompute = async () => {
+  const t = recomputeProgress.value
+  if (!isActiveTask(t)) return
+  if (!(await confirmBox(
+      '取消后已处理完的病历会保留结果，剩余病历不再重算。确认取消？',
+      '取消重算',
+      { type: 'warning', confirmButtonText: '取消重算', cancelButtonText: '继续计算' }))) {
+    return
+  }
+  cancelling.value = true
+  try {
+    await cancelQcBatch(t.id)
+    ElMessage.info('已请求取消，正在收敛…')
+    // 轮询若已停（失败分支）则重新接上，否则等下一次 2s 轮询拿到 CANCELLED 终态
+    if (!pollTimer) pollTask(t.id)
+  } catch {
+    // 拦截器已提示（任务已结束 / 无权取消）
+  } finally {
+    cancelling.value = false
   }
 }
 

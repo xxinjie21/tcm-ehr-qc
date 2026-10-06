@@ -4422,10 +4422,36 @@ paths:
       tags:
         - 组织
       summary: 我的组织
-      description: 【权限：登录即可】返回我的组织 / 我在组织内的角色；无组织时给引导
+      description: 【权限：登录即可】返回我的组织 / 我在组织内的角色与写授权位；无组织时给引导
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      org:
+                        type: object
+                        nullable: true
+                      myRole:
+                        type: string
+                        nullable: true
+                        description: owner=所有者 / member=成员 / null=无组织
+                      canWriteDictionary:
+                        type: boolean
+                        description: 成员级词典写授权位（管理员 / 所有者天然拥有）
+                      canWriteQcRules:
+                        type: boolean
+                        description: 成员级质控规则写授权位（同上）
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -4815,10 +4841,36 @@ paths:
       tags:
         - 组织
       summary: 我的组织
-      description: 【权限：登录即可】返回我的组织 / 我在组织内的角色；无组织时给引导
+      description: 【权限：登录即可】返回我的组织 / 我在组织内的角色与写授权位；无组织时给引导
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      org:
+                        type: object
+                        nullable: true
+                      myRole:
+                        type: string
+                        nullable: true
+                        description: owner=所有者 / member=成员 / null=无组织
+                      canWriteDictionary:
+                        type: boolean
+                        description: 成员级词典写授权位（管理员 / 所有者天然拥有）
+                      canWriteQcRules:
+                        type: boolean
+                        description: 成员级质控规则写授权位（同上）
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':

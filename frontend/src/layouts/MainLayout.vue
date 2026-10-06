@@ -77,7 +77,7 @@
 
 <script setup>
 import { logout as logoutApi } from '@/api/auth'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AiAssistant from '@/components/AiAssistant.vue'
@@ -86,6 +86,9 @@ import LlmConfigDialog from '@/components/LlmConfigDialog.vue'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+
+// 28.20：登录时的权限快照会过期（owner 改权限 / 移除成员后），进主框架时重取一次
+onMounted(() => userStore.refreshOrg())
 
 // 菜单项全量定义；实际渲染项由登录返回的 menus 过滤，
 // 未开发页面显示占位页

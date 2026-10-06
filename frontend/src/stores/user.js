@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getMyOrg } from '@/api/org'
 
 /**
  * 登录态（阶段2 起带组织上下文）。
@@ -58,6 +59,29 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('pendingGroup', this.pendingGroup ? '1' : '0')
       localStorage.setItem('canWriteDictionary', this.canWriteDictionary ? '1' : '0')
       localStorage.setItem('canWriteQcRules', this.canWriteQcRules ? '1' : '0')
+    },
+    /**
+     * 28.20：向服务端重取组织上下文与两个写授权位。
+     *
+     * <p>登录时把权限快照进了 localStorage，owner 之后改你的权限 / 把你移出组织，
+     * 本机在重新登录前一直显示旧状态 —— 连刷新页面也不行。进主框架时调一次即可让刷新生效。
+     * 纯体验修正，不是鉴权：失败（含无 token）就保持原状，服务端每请求仍会重新解析组织。</p>
+     */
+    async refreshOrg() {
+      try {
+        const res = await getMyOrg()
+        const data = res.data || {}
+        this.orgId = data.org?.id || ''
+        this.orgRole = data.myRole || ''
+        this.canWriteDictionary = !!data.canWriteDictionary
+        this.canWriteQcRules = !!data.canWriteQcRules
+        localStorage.setItem('orgId', this.orgId)
+        localStorage.setItem('orgRole', this.orgRole)
+        localStorage.setItem('canWriteDictionary', this.canWriteDictionary ? '1' : '0')
+        localStorage.setItem('canWriteQcRules', this.canWriteQcRules ? '1' : '0')
+      } catch {
+        // 保持登录时的快照
+      }
     },
     logout() {
       this.token = ''

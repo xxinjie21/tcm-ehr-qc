@@ -2,6 +2,7 @@ package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.annotation.RequireOrgRole;
 import com.tcm.ehr.common.annotation.RequireRole;
+import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.domain.dto.OrgDTOs;
@@ -39,6 +40,9 @@ import java.util.List;
 public class OrgController {
 
     private final IOrgService orgService;
+
+    // 28.2：组织 / 权限三条写路径此前完全没有审计日志（全后端 6 个写入方不含它们）
+    private final OperationLogger operationLogger;
 
     /** 我的组织（所有者 / 成员 / 未加入组织，统一入口） */
     @GetMapping({"/api/my-org", "/api/my-group"})
@@ -137,6 +141,7 @@ public class OrgController {
     @DeleteMapping({"/api/orgs/{id}/members/{userId}", "/api/groups/{id}/members/{userId}"})
     public Result<Void> removeMember(@PathVariable String id, @PathVariable String userId) {
         orgService.removeMember(id, userId);
+        operationLogger.log("移除成员", id, "移除成员 " + userId);
         return Result.ok("已移除", null);
     }
 
@@ -145,6 +150,7 @@ public class OrgController {
     public Result<Void> transferOwner(@PathVariable String id, @PathVariable String userId,
                                       @Valid @RequestBody OrgDTOs.TransferOwnerRequest body) {
         orgService.transferOwner(id, body.getNewOwnerUserId());
+        operationLogger.log("转让所有权", id, "新所有者 " + body.getNewOwnerUserId());
         return Result.ok("所有者已转让", null);
     }
 
@@ -159,6 +165,9 @@ public class OrgController {
     public Result<Void> setPermissions(@PathVariable String id, @PathVariable String userId,
                                       @Valid @RequestBody OrgDTOs.SetPermissionsRequest body) {
         orgService.setPermissions(id, userId, body.getCanWriteDictionary(), body.getCanWriteQcRules());
+        operationLogger.log("权限变更", id,
+                "成员 " + userId + " 词典写 " + switchFlag(body.getCanWriteDictionary())
+                        + "、质控规则写 " + switchFlag(body.getCanWriteQcRules()));
         return Result.ok("权限已更新", null);
     }
 
@@ -167,5 +176,10 @@ public class OrgController {
     public Result<Void> leave(@PathVariable String id) {
         orgService.leave(id);
         return Result.ok("已退出组织", null);
+    }
+
+    /** 权限开关的审计措辞：null 表示「这一位不改」，不能写成「关」 */
+    private static String switchFlag(Boolean v) {
+        return v == null ? "不变" : (v ? "开" : "关");
     }
 }

@@ -25,7 +25,8 @@
       <!-- 可见范围说明：三档口径不同，不写清楚用户会以为「日志少了」 -->
       <p class="scope-tip">{{ scopeTip }}</p>
 
-      <el-table v-loading="loading" element-loading-text="正在读取操作日志…" :data="logs" border stripe max-height="520" style="margin-top: var(--sp-3)">
+      <!-- 28.7：整行可点，跳转到关联对象（objectType/objectId 早已入库，此前只是没渲染） -->
+      <el-table v-loading="loading" element-loading-text="正在读取操作日志…" :data="logs" border stripe max-height="520" style="margin-top: var(--sp-3)" @row-click="onRowClick">
         <el-table-column label="操作时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.logTime) }}</template>
         </el-table-column>
@@ -41,6 +42,20 @@
           </template>
         </el-table-column>
         <el-table-column prop="target" label="操作对象" width="200" show-overflow-tooltip />
+        <el-table-column label="关联对象" width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-button
+              v-if="row.objectType && row.objectId"
+              link
+              type="primary"
+              size="small"
+              @click.stop="openObject(row)"
+            >
+              {{ row.objectType }} · {{ row.objectId }}
+            </el-button>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="detail" label="详情" min-width="240" show-overflow-tooltip />
         <!-- 空态分两种：确实没日志 vs 加载失败（后者才给「重试」入口） -->
         <template #empty>
@@ -71,6 +86,8 @@
 // 对外只提供两个入口 —— 查询/分页（只读）与导出 CSV。
 // 日志只增不删（§七 L3）：日志删除功能已删，清理只能由运维人工归档。
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { usePagedList } from '@/composables/usePagedList'
@@ -139,6 +156,19 @@ const { list: logs, total, loading, failed: logFailed, load: loadLogs } = usePag
 
 // 操作类型 → el-tag 配色；未登记的走默认色
 const tagType = (action) => TAG_TYPES[action] || 'primary'
+
+// 关联对象跳转：目前唯一写入对象标识的是病历（RecordController.logOnObject），
+// 其余类型先如实告知「暂不支持」，不做一个点了没反应的按钮。
+const router = useRouter()
+const openObject = (row) => {
+  if (!row.objectType || !row.objectId) return
+  if (row.objectType === 'record') {
+    router.push({ path: '/records', query: { recordId: row.objectId } })
+    return
+  }
+  ElMessage.info(`暂不支持跳转到 ${row.objectType} 对象`)
+}
+const onRowClick = (row) => openObject(row)
 
 // 对标 E5「可分享视图」：本页把 page/pageSize 放在 query 里，所以组合式传 null、
 // 由它认 state 上的这两个键；defaults 明确 1/10 是默认值，免得链接里出现 ?page=1。
