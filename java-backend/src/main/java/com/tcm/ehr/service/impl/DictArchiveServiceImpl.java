@@ -1,6 +1,7 @@
-package com.tcm.ehr.service;
+package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.service.IDictArchiveService;
 import com.tcm.ehr.domain.po.DictArchiveTerm;
 import com.tcm.ehr.domain.po.DictArchiveVersion;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -34,7 +35,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DictArchiveService {
+public class DictArchiveServiceImpl implements IDictArchiveService {
 
     /** 每组每 type 保留的归档快照份数 */
     public static final int MAX_SNAPSHOT_VERSIONS = 5;

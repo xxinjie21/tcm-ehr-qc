@@ -43,7 +43,7 @@ class RecordServiceImplSearchTest {
                 new tools.jackson.databind.ObjectMapper(),   // 真实解析器：_meta 判定要真的解析 JSON
                 mock(com.tcm.ehr.service.INlpBatchService.class),
                 mock(com.tcm.ehr.mapper.ReviewTaskMapper.class),
-                mock(com.tcm.ehr.service.DictionaryTermStore.class));
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class));
         for (Class<?> c = s.getClass(); c != null; c = c.getSuperclass()) {
             try {
                 Field f = c.getDeclaredField("baseMapper");

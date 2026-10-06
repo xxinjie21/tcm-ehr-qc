@@ -76,7 +76,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     private final com.tcm.ehr.service.INlpBatchService nlpBatchService;
     private final com.tcm.ehr.mapper.ReviewTaskMapper reviewTaskMapper;
     /** 写回结构化数据时打词典版本戳（与解析链路同口径，保证可追溯） */
-    private final com.tcm.ehr.service.DictionaryTermStore termStore;
+    private final com.tcm.ehr.service.IDictionaryTermStore termStore;
 
     /** 原始 21 字段（禁止通过修改接口变更，命中即 400） */
     private static final Set<String> ORIGINAL_FIELDS = Set.of(

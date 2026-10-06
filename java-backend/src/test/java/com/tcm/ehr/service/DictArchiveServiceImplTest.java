@@ -5,6 +5,7 @@ import com.tcm.ehr.domain.po.DictArchiveVersion;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.mapper.DictArchiveTermMapper;
 import com.tcm.ehr.mapper.DictArchiveVersionMapper;
+import com.tcm.ehr.service.impl.DictArchiveServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,16 +34,16 @@ import static org.mockito.Mockito.when;
  * ② 基础层（{@code org_id=''}）与各组织层<b>独立计数</b> —— 混算会让基础层的归档
  * 把组织层的挤掉，或反过来。</p>
  */
-class DictArchiveServiceTest {
+class DictArchiveServiceImplTest {
 
     private DictArchiveVersionMapper versionMapper;
     private DictArchiveTermMapper termMapper;
-    private DictArchiveService svc;
+    private IDictArchiveService svc;
 
     private void setUp() {
         versionMapper = mock(DictArchiveVersionMapper.class);
         termMapper = mock(DictArchiveTermMapper.class);
-        svc = new DictArchiveService(versionMapper, termMapper,
+        svc = new DictArchiveServiceImpl(versionMapper, termMapper,
                 new tools.jackson.databind.ObjectMapper());
     }
 

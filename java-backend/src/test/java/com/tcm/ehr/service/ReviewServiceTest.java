@@ -16,8 +16,9 @@ import com.tcm.ehr.domain.vo.ReviewTasksVO;
 import com.tcm.ehr.mapper.QcRuleMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
+import com.tcm.ehr.service.IReviewWriteService;
 import com.tcm.ehr.service.impl.ReviewServiceImpl;
-import com.tcm.ehr.service.impl.ReviewWriteService;
+import com.tcm.ehr.service.impl.ReviewWriteServiceImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,7 +82,7 @@ class ReviewServiceTest {
         QcRuleStore ruleStore = new QcRuleStore(new ObjectMapper(),
                 org.mockito.Mockito.mock(QcRuleMapper.class));
         // 复核写库段自批次 26.4 起是独立 Bean（事务落点），入口只做归一后委托
-        ReviewWriteService writeService = new ReviewWriteService(recordMapper, reviewTaskMapper,
+        IReviewWriteService writeService = new ReviewWriteServiceImpl(recordMapper, reviewTaskMapper,
                 new ObjectMapper(), ruleStore);
         service = new ReviewServiceImpl(recordMapper,
                 new EntityNormalizer(termNormalizer, new ObjectMapper()), writeService);
@@ -278,7 +279,7 @@ class ReviewServiceTest {
         EntityNormalizer failing = Mockito.mock(EntityNormalizer.class);
         Mockito.doThrow(new IllegalStateException("ES 不可用"))
                 .when(failing).normalizeMap(Mockito.anyMap(), Mockito.anyString());
-        ReviewWriteService write = new ReviewWriteService(recordMapper, reviewTaskMapper,
+        IReviewWriteService write = new ReviewWriteServiceImpl(recordMapper, reviewTaskMapper,
                 new ObjectMapper(), new QcRuleStore(new ObjectMapper(), Mockito.mock(QcRuleMapper.class)));
         ReviewServiceImpl svc = new ReviewServiceImpl(recordMapper, failing, write);
 

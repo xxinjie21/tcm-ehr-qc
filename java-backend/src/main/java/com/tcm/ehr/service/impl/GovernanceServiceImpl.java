@@ -49,7 +49,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     private final EsTermNormalizer termNormalizer;
     private final ObjectMapper objectMapper;
-    private final com.tcm.ehr.service.DictionaryTermStore termStore;
+    private final com.tcm.ehr.service.IDictionaryTermStore termStore;
     /** 隔离病历时要同步作废它的待复核任务，否则它会继续挂在复核页待办里 */
     private final com.tcm.ehr.mapper.ReviewTaskMapper reviewTaskMapper;
 
@@ -277,7 +277,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             // 2. 中药走另一套：name 归一 + 剂量单位小写（P3.4 拆出）
             normalizeHerbs(data, stat);
             // 3. 打上词典版本再写库：归一结果与当时词典版本必须成对
-            //    ⚠️ 版本源换成 DictionaryTermStore：原先用
+            //    ⚠️ 版本源换成 IDictionaryTermStore：原先用
             //    dictionaryFileService.currentVersion()（词典还在文件时代的文件哈希），
             //    批次 8b 词典入库后它已冻结 —— 清洗一次就把正确的版本戳覆盖回那个死值。
             String json = StructuredDataMeta.stamp(objectMapper, objectMapper.writeValueAsString(data),

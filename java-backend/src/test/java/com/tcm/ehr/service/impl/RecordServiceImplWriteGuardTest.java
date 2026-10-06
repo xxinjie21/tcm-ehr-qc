@@ -38,7 +38,7 @@ class RecordServiceImplWriteGuardTest {
                 mock(tools.jackson.databind.ObjectMapper.class),
                 mock(com.tcm.ehr.service.INlpBatchService.class),
                 mock(com.tcm.ehr.mapper.ReviewTaskMapper.class),
-                mock(com.tcm.ehr.service.DictionaryTermStore.class));
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class));
         injectBaseMapper(s, mapper);
         return s;
     }

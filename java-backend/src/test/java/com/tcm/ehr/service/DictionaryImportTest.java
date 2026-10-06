@@ -2,7 +2,7 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.impl.DictionaryServiceImpl;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Row;
@@ -44,7 +44,7 @@ class DictionaryImportTest {
 
     private IDictionaryFileService fileService;
     private IEsTermIndexService esIndex;
-    private DictionaryTermStore termStore;
+    private IDictionaryTermStore termStore;
     private com.tcm.ehr.common.utils.DistLock distLock;
     private DictionaryServiceImpl service;
 
@@ -57,7 +57,7 @@ class DictionaryImportTest {
         com.tcm.ehr.mapper.DbLockMapper lockMapper = Mockito.mock(com.tcm.ehr.mapper.DbLockMapper.class);
         Mockito.when(lockMapper.acquire(Mockito.anyString(), Mockito.anyInt())).thenReturn(1);
         distLock = new com.tcm.ehr.common.utils.DistLock(lockMapper);
-        termStore = Mockito.mock(DictionaryTermStore.class);
+        termStore = Mockito.mock(IDictionaryTermStore.class);
         // 本组织原有词条为空（备份机制已随 dictionary_backups 表废弃）
         when(termStore.read(anyString(), anyString())).thenReturn(List.of());
         // replace 返回内容版本，代码会拿它当 rebuild/markIndexed 的入参

@@ -21,6 +21,7 @@ import com.tcm.ehr.domain.vo.QcTaskVO;
 import com.tcm.ehr.mapper.QcTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IQcBatchService;
+import com.tcm.ehr.service.IQcService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -87,7 +88,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
     private final QcTaskMapper taskMapper;
     private final RecordMapper recordMapper;
-    private final QcServiceImpl qcService;
+    private final IQcService qcService;
     private final QcRuleStore ruleStore;
     private final OperationLogger operationLogger;
     private final ObjectMapper objectMapper;

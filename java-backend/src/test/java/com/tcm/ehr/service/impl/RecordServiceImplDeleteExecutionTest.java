@@ -45,7 +45,7 @@ class RecordServiceImplDeleteExecutionTest {
                 mock(tools.jackson.databind.ObjectMapper.class),
                 mock(com.tcm.ehr.service.INlpBatchService.class),
                 reviewTaskMapper,
-                mock(com.tcm.ehr.service.DictionaryTermStore.class));
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class));
         for (Class<?> c = s.getClass(); c != null; c = c.getSuperclass()) {
             try {
                 Field f = c.getDeclaredField("baseMapper");

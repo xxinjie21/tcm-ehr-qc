@@ -16,7 +16,7 @@ import com.tcm.ehr.mapper.DbLockMapper;
 import com.tcm.ehr.mapper.NlpTaskItemMapper;
 import com.tcm.ehr.mapper.NlpTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,7 +63,7 @@ import static org.mockito.Mockito.when;
  * 这里只装配被测链路需要的最小上下文：H2（MODE=MySQL）+ 三个 Mapper + 一个真实例。</p>
  *
  * <p><b>外部依赖全部换成 mock</b>：抽取服务（PythonNlpClient）、归一（EntityNormalizer）、
- * 词典版本（DictionaryTermStore）都不是本链路的被测对象，网络与 ES 依赖会引入不确定性。</p>
+ * 词典版本（IDictionaryTermStore）都不是本链路的被测对象，网络与 ES 依赖会引入不确定性。</p>
  */
 @SpringJUnitConfig(NlpBatchIntegrationTest.TestConfig.class)
 class NlpBatchIntegrationTest {
@@ -97,7 +97,7 @@ class NlpBatchIntegrationTest {
     private EntityNormalizer entityNormalizer;
 
     @MockitoBean
-    private DictionaryTermStore termStore;
+    private IDictionaryTermStore termStore;
 
     @BeforeEach
     void setUp() {

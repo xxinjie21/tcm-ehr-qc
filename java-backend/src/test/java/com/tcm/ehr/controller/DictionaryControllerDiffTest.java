@@ -4,8 +4,8 @@ import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.vo.DictProposalDiffVO;
-import com.tcm.ehr.service.DictArchiveService;
-import com.tcm.ehr.service.DictProposalService;
+import com.tcm.ehr.service.IDictArchiveService;
+import com.tcm.ehr.service.IDictProposalService;
 import com.tcm.ehr.service.IDictionaryService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,16 +45,16 @@ class DictionaryControllerDiffTest {
     private static final String USER_ID = "u-1001";      // JWT subject
     private static final String USERNAME = "alice";      // 登录名 —— 提案里存的是它
 
-    private DictProposalService proposalService;
+    private IDictProposalService proposalService;
     private DictionaryController controller;
 
     @BeforeEach
     void setUp() {
-        proposalService = mock(DictProposalService.class);
+        proposalService = mock(IDictProposalService.class);
         controller = new DictionaryController(
                 mock(IDictionaryService.class),
                 proposalService,
-                mock(DictArchiveService.class),
+                mock(IDictArchiveService.class),
                 // 批次 21 起 controller 多一个词表体检依赖（/parse 用它出 lint 结论）
                 mock(com.tcm.ehr.service.IDictionaryLintService.class),
                 mock(OperationLogger.class),

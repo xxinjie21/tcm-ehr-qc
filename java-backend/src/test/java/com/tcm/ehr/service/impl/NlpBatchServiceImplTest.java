@@ -140,7 +140,7 @@ class NlpBatchServiceImplTest {
         when(dbLockMapper.release(any())).thenReturn(1);
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient, mock(EntityNormalizer.class),
-                mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(), new DistLock(dbLockMapper));
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
@@ -164,7 +164,7 @@ class NlpBatchServiceImplTest {
 
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient, mock(EntityNormalizer.class),
-                mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(), new DistLock(dbLockMapper));
 
         assertThrows(ConcurrentOperationException.class,
@@ -198,7 +198,7 @@ class NlpBatchServiceImplTest {
             when(dbLockMapper.release(any())).thenReturn(1);
             NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                     mock(RecordMapper.class), itemMapper, nlpClient, mock(EntityNormalizer.class),
-                    mock(com.tcm.ehr.service.DictionaryTermStore.class), new ObjectMapper(),
+                    mock(com.tcm.ehr.service.IDictionaryTermStore.class), new ObjectMapper(),
                     new DistLock(dbLockMapper));
 
             svc.submitIds(List.of("r-1", "r-2"), "tester");
@@ -265,7 +265,7 @@ class NlpBatchServiceImplTest {
         PythonNlpClient nlpClient = mock(PythonNlpClient.class);
         when(nlpClient.isEnabled()).thenReturn(true);
         return new NlpBatchServiceImpl(taskMapper, mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient,
-                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
                 new DistLock(mock(DbLockMapper.class)));
     }
@@ -292,7 +292,7 @@ class NlpBatchServiceImplTest {
 
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), mock(NlpTaskItemMapper.class), mock(PythonNlpClient.class), mock(EntityNormalizer.class),
-                mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
                 new DistLock(mock(DbLockMapper.class)));
         // workers 为 null 时 shutdown() 会提前返回，所以得给一个真池子
@@ -330,7 +330,7 @@ class NlpBatchServiceImplTest {
         when(itemMapper.selectList(any())).thenReturn(new java.util.ArrayList<>());
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
                 mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
-                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
                 new DistLock(mock(DbLockMapper.class)));
 
@@ -389,7 +389,7 @@ class NlpBatchServiceImplTest {
         when(itemMapper.selectCount(any())).thenReturn(0L);   // 筛选型：没有明细行
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
                 mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
-                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
                 new DistLock(mock(DbLockMapper.class)));
 
@@ -405,7 +405,7 @@ class NlpBatchServiceImplTest {
         when(itemMapper.selectList(any())).thenReturn(new java.util.ArrayList<>());
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
                 mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
-                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.DictionaryTermStore.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
                 new DistLock(mock(DbLockMapper.class)));
 
@@ -431,7 +431,7 @@ class NlpBatchServiceImplTest {
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
                 mock(RecordMapper.class), mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class),
                 mock(PythonNlpClient.class), mock(EntityNormalizer.class),
-                mock(com.tcm.ehr.service.DictionaryTermStore.class), new ObjectMapper(),
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class), new ObjectMapper(),
                 new DistLock(mock(DbLockMapper.class)));
 
         // ① 执行异常
@@ -462,8 +462,8 @@ class NlpBatchServiceImplTest {
      */
     @Test
     void dictMetaQueriesDictionaryOncePerBatch() {
-        com.tcm.ehr.service.DictionaryTermStore store =
-                mock(com.tcm.ehr.service.DictionaryTermStore.class);
+        com.tcm.ehr.service.IDictionaryTermStore store =
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class);
         when(store.effectiveDictVersion("org-1")).thenReturn("v9");
         when(store.effectiveTermCount("org-1")).thenReturn(42);
 
@@ -484,8 +484,8 @@ class NlpBatchServiceImplTest {
      */
     @Test
     void dictMetaDoesNotQueryWhenNeverUsed() {
-        com.tcm.ehr.service.DictionaryTermStore store =
-                mock(com.tcm.ehr.service.DictionaryTermStore.class);
+        com.tcm.ehr.service.IDictionaryTermStore store =
+                mock(com.tcm.ehr.service.IDictionaryTermStore.class);
         new NlpBatchServiceImpl.DictMeta(store, "org-1");
         Mockito.verifyNoInteractions(store);
     }

@@ -2,7 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -37,7 +37,7 @@ class RecordServiceImplUpdateStampTest {
 
     private static final String DICT_VERSION = "dict-v-9";
 
-    private static RecordServiceImpl svc(RecordMapper mapper, DictionaryTermStore termStore) {
+    private static RecordServiceImpl svc(RecordMapper mapper, IDictionaryTermStore termStore) {
         RecordServiceImpl s = new RecordServiceImpl(
                 new tools.jackson.databind.ObjectMapper(),   // 用真实序列化器：本用例要验的就是落库内容
                 mock(com.tcm.ehr.service.INlpBatchService.class),
@@ -77,7 +77,7 @@ class RecordServiceImplUpdateStampTest {
     @DisplayName("写回成功 ⇒ 落库的 JSON 带当前词典版本戳（说得出依据哪一版词典）")
     void stampsDictionaryVersionOnWrite() {
         RecordMapper mapper = mock(RecordMapper.class);
-        DictionaryTermStore termStore = mock(DictionaryTermStore.class);
+        IDictionaryTermStore termStore = mock(IDictionaryTermStore.class);
         when(mapper.selectById(any())).thenReturn(accessibleRecord());
         when(termStore.effectiveDictVersion(anyString())).thenReturn(DICT_VERSION);
         when(termStore.effectiveTermCount(anyString())).thenReturn(72);
@@ -105,7 +105,7 @@ class RecordServiceImplUpdateStampTest {
         context();
         try {
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                    () -> svc(mapper, mock(DictionaryTermStore.class))
+                    () -> svc(mapper, mock(IDictionaryTermStore.class))
                             .updateRecord("r1", Map.of("somethingElse", "x")));
             assertEquals("未提供结构化数据", ex.getMessage());
             verify(mapper, org.mockito.Mockito.never()).updateStructuredData(anyString(), anyString());
@@ -122,7 +122,7 @@ class RecordServiceImplUpdateStampTest {
         context();
         try {
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                    () -> svc(mapper, mock(DictionaryTermStore.class)).updateRecord("r1", null));
+                    () -> svc(mapper, mock(IDictionaryTermStore.class)).updateRecord("r1", null));
             assertEquals("未提供结构化数据", ex.getMessage());
             assertFalse(false);
         } finally {

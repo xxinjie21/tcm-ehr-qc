@@ -7,7 +7,7 @@ import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.StandardizationReportVO;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.IStandardizationReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +57,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             + "不代表真实病历上的准确率；甲类（标准符合度）才是词表质量的目标口径。";
 
     private final com.tcm.ehr.mapper.RecordMapper recordMapper;
-    private final DictionaryTermStore termStore;
+    private final IDictionaryTermStore termStore;
     /** 与 StatsServiceImpl 同一个注入实例，不另建 —— 每次 new ObjectMapper 会有可观的初始化开销 */
     private final tools.jackson.databind.ObjectMapper objectMapper;
 

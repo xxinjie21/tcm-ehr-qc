@@ -5,7 +5,7 @@ import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.ImportTaskVO;
 import com.tcm.ehr.domain.vo.ImportSummaryVO;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -64,7 +64,7 @@ class RecordImportExcelTest {
         // 库里没有同哈希的病历（去重查询走的是 selectList）
         when(recordMapper.selectList(any())).thenReturn(new ArrayList<>());
 
-        DictionaryTermStore termStore = mock(DictionaryTermStore.class);
+        IDictionaryTermStore termStore = mock(IDictionaryTermStore.class);
         svc = spy(new RecordServiceImpl(new ObjectMapper(), null, null, termStore));
         // baseMapper 来自 ServiceImpl 父类，构造器不接，只能反射塞进去
         ReflectionTestUtils.setField(svc, "baseMapper", recordMapper);

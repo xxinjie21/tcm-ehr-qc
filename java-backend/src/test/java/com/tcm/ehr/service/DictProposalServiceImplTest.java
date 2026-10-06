@@ -13,6 +13,7 @@ import com.tcm.ehr.mapper.DictArchiveTermMapper;
 import com.tcm.ehr.mapper.DictArchiveVersionMapper;
 import com.tcm.ehr.mapper.DictProposalMapper;
 import com.tcm.ehr.mapper.DictProposalTermMapper;
+import com.tcm.ehr.service.impl.DictProposalServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,24 +50,24 @@ import static org.mockito.Mockito.when;
  * ② 待审上限必须先查再建 —— 顺序反了就是「先写完快照再发现有超限」；
  * ③ 回滚必须生成提案而不是直接改基线 —— 直接改就绕过了审核。
  */
-class DictProposalServiceTest {
+class DictProposalServiceImplTest {
 
     private DictProposalMapper proposalMapper;
     private DictProposalTermMapper termMapper;
-    private DictionaryTermStore termStore;
-    private DictArchiveService archiveService;
+    private IDictionaryTermStore termStore;
+    private IDictArchiveService archiveService;
     private IEsTermIndexService esIndexService;
     private DistLock distLock;
     /** 批次 6 工作项 4 起 audit 会消费词典写授权位，故本类要能控制它的返回值 */
     private IOrgPermissionService orgPermission;
-    private DictProposalService svc;
+    private IDictProposalService svc;
 
     @BeforeEach
     void setUp() {
         proposalMapper = mock(DictProposalMapper.class);
         termMapper = mock(DictProposalTermMapper.class);
-        termStore = mock(DictionaryTermStore.class);
-        archiveService = mock(DictArchiveService.class);
+        termStore = mock(IDictionaryTermStore.class);
+        archiveService = mock(IDictArchiveService.class);
         esIndexService = mock(IEsTermIndexService.class);
         // 锁：直接执行临界区（本类测的是「临界区里做了什么」，互斥本身由 DistLockTest 负责）
         distLock = mock(DistLock.class);
@@ -79,7 +80,7 @@ class DictProposalServiceTest {
 
         when(termStore.replace(anyString(), anyString(), any())).thenReturn("v-new");
         orgPermission = mock(IOrgPermissionService.class);
-        svc = new DictProposalService(proposalMapper, termMapper, termStore,
+        svc = new DictProposalServiceImpl(proposalMapper, termMapper, termStore,
                 archiveService, esIndexService, new tools.jackson.databind.ObjectMapper(), distLock,
                 orgPermission);
         // 默认按管理员绑定：audit 现在会按提案自身的 org_id 判归属，管理员可审任意提案

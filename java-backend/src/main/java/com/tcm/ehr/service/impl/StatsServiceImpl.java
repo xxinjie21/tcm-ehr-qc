@@ -44,7 +44,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     private final ObjectMapper objectMapper;
     // 词典真源（批次8b）：统计必须与归一读同一处，否则看板数字和实际生效词典对不上
-    private final com.tcm.ehr.service.DictionaryTermStore termStore;
+    private final com.tcm.ehr.service.IDictionaryTermStore termStore;
 
     /**
      * 查询可选科室列表，只读。

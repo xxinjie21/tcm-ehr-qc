@@ -4,6 +4,7 @@ import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.DictionaryVersion;
 import com.tcm.ehr.mapper.DictionaryTermMapper;
 import com.tcm.ehr.mapper.DictionaryVersionMapper;
+import com.tcm.ehr.service.impl.DictionaryTermStoreImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -28,11 +29,11 @@ import static org.mockito.Mockito.when;
  * <p>同时锁住**不脏读**：写路径（{@code replace}）必须让版本缓存失效，
  * 失效之后的下一次读要重新查库。</p>
  */
-class DictionaryTermStoreVersionCacheTest {
+class DictionaryTermStoreImplVersionCacheTest {
 
-    private static DictionaryTermStore svc(DictionaryTermMapper termMapper,
+    private static IDictionaryTermStore svc(DictionaryTermMapper termMapper,
                                            DictionaryVersionMapper versionMapper) {
-        return new DictionaryTermStore(termMapper, versionMapper,
+        return new DictionaryTermStoreImpl(termMapper, versionMapper,
                 new tools.jackson.databind.ObjectMapper());
     }
 
@@ -58,7 +59,7 @@ class DictionaryTermStoreVersionCacheTest {
         when(versionMapper.selectMaps(any())).thenReturn(List.of());
         when(termMapper.selectList(any())).thenReturn(List.of());
 
-        DictionaryTermStore store = svc(termMapper, versionMapper);
+        IDictionaryTermStore store = svc(termMapper, versionMapper);
         store.readEffective("org-A", "symptom");
         int afterFirst = versionCalls(versionMapper);
         assertTrue(afterFirst > 0, "第一次读必须真的查过版本（前置条件）");
@@ -84,7 +85,7 @@ class DictionaryTermStoreVersionCacheTest {
         // 注意：replace 传的是空列表 ⇒ 不会 insert，因此这里不 stub insert
         //（BaseMapper.insert 有重载，any() 会有歧义；不 stub 也就回避了这件事）
 
-        DictionaryTermStore store = svc(termMapper, versionMapper);
+        IDictionaryTermStore store = svc(termMapper, versionMapper);
         store.readEffective("org-A", "symptom");
         int afterRead = versionCalls(versionMapper);
 
@@ -107,7 +108,7 @@ class DictionaryTermStoreVersionCacheTest {
         when(versionMapper.selectMaps(any())).thenReturn(List.of());
         when(termMapper.selectList(any())).thenReturn(List.of());
 
-        DictionaryTermStore store = svc(termMapper, versionMapper);
+        IDictionaryTermStore store = svc(termMapper, versionMapper);
         store.readEffective("org-A", "symptom");
         int afterFirst = versionCalls(versionMapper);
 
@@ -144,7 +145,7 @@ class DictionaryTermStoreVersionCacheTest {
         when(termMapper.selectList(any())).thenReturn(List.of(oldRow), List.of(newRow));
         when(termMapper.delete(any())).thenReturn(0);
 
-        DictionaryTermStore store = svc(termMapper, versionMapper);
+        IDictionaryTermStore store = svc(termMapper, versionMapper);
         assertEquals("旧", store.readEffective("", "symptom").get(0).getStandardTerm(),
                 "前置：第一次读装载旧词条");
 

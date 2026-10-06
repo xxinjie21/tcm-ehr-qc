@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,7 +71,7 @@ class RecordOriginalFieldsReadOnlyTest {
         when(recordMapper.selectById("r-1")).thenReturn(existing);
 
         // termStore 用来给写回的结构化数据打词典版本戳（与解析链路同口径）
-        DictionaryTermStore termStore = mock(DictionaryTermStore.class);
+        IDictionaryTermStore termStore = mock(IDictionaryTermStore.class);
         when(termStore.effectiveDictVersion(anyString())).thenReturn("v-test");
         when(termStore.effectiveTermCount(anyString())).thenReturn(0);
         svc = new RecordServiceImpl(new ObjectMapper(), null, null, termStore);

@@ -43,8 +43,8 @@ class GlobalExceptionHandlerTest {
     void missingFilePart_shouldBe400() throws Exception {
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(
                         new DictionaryController(Mockito.mock(IDictionaryService.class),
-                                Mockito.mock(com.tcm.ehr.service.DictProposalService.class),
-                                Mockito.mock(com.tcm.ehr.service.DictArchiveService.class),
+                                Mockito.mock(com.tcm.ehr.service.IDictProposalService.class),
+                                Mockito.mock(com.tcm.ehr.service.IDictArchiveService.class),
                                 // 批次 21 起 controller 多一个词表体检依赖
                                 Mockito.mock(com.tcm.ehr.service.IDictionaryLintService.class),
                                 Mockito.mock(OperationLogger.class),

@@ -4,7 +4,7 @@ import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.StandardizationReportVO;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +43,7 @@ class StandardizationReportServiceImplTest {
         recordMapper = mock(RecordMapper.class);
         // 词表读路径 mock 成空，让本测试专注乙类的四类拆分；
         // 甲类词典质量依赖真实词表，不在本测试范围
-        DictionaryTermStore termStore = mock(DictionaryTermStore.class);
+        IDictionaryTermStore termStore = mock(IDictionaryTermStore.class);
         when(termStore.readEffective(any(), any())).thenReturn(List.of());
         svc = new StandardizationReportServiceImpl(recordMapper, termStore,
                 new tools.jackson.databind.ObjectMapper());

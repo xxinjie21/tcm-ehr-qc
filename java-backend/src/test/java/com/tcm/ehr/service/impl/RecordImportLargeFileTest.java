@@ -4,7 +4,7 @@ import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.ImportTaskVO;
 import com.tcm.ehr.mapper.RecordMapper;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
@@ -65,7 +65,7 @@ class RecordImportLargeFileTest {
     void setUp() {
         RecordMapper recordMapper = mock(RecordMapper.class);
         when(recordMapper.selectList(any())).thenReturn(new ArrayList<>());
-        svc = spy(new RecordServiceImpl(new ObjectMapper(), null, null, mock(DictionaryTermStore.class)));
+        svc = spy(new RecordServiceImpl(new ObjectMapper(), null, null, mock(IDictionaryTermStore.class)));
         ReflectionTestUtils.setField(svc, "baseMapper", recordMapper);
         doReturn(true).when(svc).saveBatch(any());
 

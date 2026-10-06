@@ -47,7 +47,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
 
     private final IEsTermIndexService esTermIndexService;
     private final com.tcm.ehr.common.utils.DistLock distLock;
-    private final com.tcm.ehr.service.DictionaryTermStore termStore;
+    private final com.tcm.ehr.service.IDictionaryTermStore termStore;
     private final ObjectMapper objectMapper;
 
     @Override

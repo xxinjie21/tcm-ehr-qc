@@ -15,6 +15,7 @@ import com.tcm.ehr.domain.vo.ReviewTasksVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
 import com.tcm.ehr.service.IReviewService;
+import com.tcm.ehr.service.IReviewWriteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,7 +36,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
 
     private final RecordMapper recordMapper;
     private final EntityNormalizer entityNormalizer;
-    private final ReviewWriteService reviewWriteService;
+    private final IReviewWriteService reviewWriteService;
 
     /**
      * 分页查询复核任务列表，只读。
@@ -114,7 +115,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
      * <p>归一先于事务：{@code normalizeMap} 要走 ES，若和写库同处一个 {@code @Transactional}，
      * ES 一慢就会一直占着数据库连接。这里在事务外归一，失败即抛（ES 不可用 → 503）
      * 且一个字节都没写 —— 与原先版本「整单回滚」的用户可见语义一致。
-     * 事务内的校验与三段写库见 {@link ReviewWriteService#review}。</p>
+     * 事务内的校验与三段写库见 {@link IReviewWriteService#review}。</p>
      *
      * <p>归一是为了复核员新输入的词带上 {@code normLevel}：不加的话
      * {@code QcScorer.countUnnormalized} 会把「无 normLevel」算作未标准化，

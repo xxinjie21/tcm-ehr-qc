@@ -14,8 +14,8 @@ import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.DictProposalDiffVO;
 import com.tcm.ehr.domain.vo.DictProposalVO;
 import com.tcm.ehr.domain.vo.ImportResultVO;
-import com.tcm.ehr.service.DictArchiveService;
-import com.tcm.ehr.service.DictProposalService;
+import com.tcm.ehr.service.IDictArchiveService;
+import com.tcm.ehr.service.IDictProposalService;
 import com.tcm.ehr.service.IDictionaryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -56,8 +56,8 @@ import java.util.Map;
 public class DictionaryController {
 
     private final IDictionaryService dictionaryService;
-    private final DictProposalService proposalService;
-    private final DictArchiveService archiveService;
+    private final IDictProposalService proposalService;
+    private final IDictArchiveService archiveService;
     private final com.tcm.ehr.service.IDictionaryLintService lintService;
     private final OperationLogger operationLogger;
     /** 词典写门槛要查 DB 里的成员授权位（注解只能看 JWT 里的 role），故不用注解 */

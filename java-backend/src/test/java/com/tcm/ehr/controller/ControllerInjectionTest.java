@@ -24,9 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 注入实现类，换实现、加测试替身都要回改 Controller，接口层就退化成一层空转——
  * 那还不如当初别建（这正是批次 26.c 曾提议删接口、最终决定保留的取舍）。</p>
  *
- * <p>范围说明：只禁 {@code *ServiceImpl}/ {@code service.impl} 包的实现类。{@code DictProposalService}
- * 与 {@code DictArchiveService} 是 {@code service} 包下的<b>具体工具类</b>（无对应接口），
- * 按现行约定可以注入，不在本测试的禁止之列。</p>
+ * <p>范围说明：凡字段类型位于 {@code com.tcm.ehr.service} 包（含 {@code service.impl} 子包）者，
+ * 都必须是接口。{@code service} 包下已无「无接口的具体工具类」——批次 26 已为
+ * {@code DictProposalService} / {@code DictArchiveService} / {@code DictionaryTermStore} /
+ * {@code ReviewWriteService} 补齐 {@code I*Service} 接口。</p>
  */
 class ControllerInjectionTest {
 
@@ -52,11 +53,10 @@ class ControllerInjectionTest {
         for (Class<?> controller : controllers) {
             for (Field field : controller.getDeclaredFields()) {
                 Class<?> type = field.getType();
-                boolean isServiceImpl = !type.isInterface()
-                        && (type.getName().startsWith("com.tcm.ehr.service.impl.")
-                            || type.getSimpleName().endsWith("ServiceImpl"));
-                assertFalse(isServiceImpl,
-                        controller.getSimpleName() + "." + field.getName() + " 注入了实现类 "
+                boolean isServiceDependency = type.getPackage() != null
+                        && type.getPackage().getName().startsWith("com.tcm.ehr.service");
+                assertFalse(isServiceDependency && !type.isInterface(),
+                        controller.getSimpleName() + "." + field.getName() + " 注入了服务实现类 "
                                 + type.getSimpleName()
                                 + "：Controller 必须依赖 I*Service 接口，否则换实现/加测试替身都要回改 Controller");
             }

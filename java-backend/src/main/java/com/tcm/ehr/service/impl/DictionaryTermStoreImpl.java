@@ -1,6 +1,7 @@
-package com.tcm.ehr.service;
+package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.DictionaryVersion;
@@ -39,10 +40,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DictionaryTermStore {
-
-    /** 基础层组织号：空串，不用 null（null 在唯一索引里互不相等，挡不住重复） */
-    public static final String BASE_ORG = "";
+public class DictionaryTermStoreImpl implements IDictionaryTermStore {
 
     private final DictionaryTermMapper termMapper;
     private final DictionaryVersionMapper versionMapper;

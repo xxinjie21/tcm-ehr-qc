@@ -9,9 +9,12 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.DeductionStatsVO;
 import com.tcm.ehr.domain.vo.LogicCheckVO;
+import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcCheckVO;
 import com.tcm.ehr.domain.vo.QcRulesVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
+
+import java.util.Set;
 
 /**
  * 质控服务：事前检查、逻辑一致性、单条评分，以及评分规则的维护与扣分聚合。
@@ -46,6 +49,17 @@ public interface IQcService extends IService<Record> {
      * @return score=得分；grade=分级；deductions=扣分明细
      */
     ScoreResultVO score(QcScoreDTO dto);
+
+    /**
+     * 单条处理：评分 + 回写 + upsertReviewTask + 分级计数，供批量 worker 复用。
+     *
+     * @param r        已载入的病历
+     * @param result   批量结果累计器
+     * @param seenHash 已处理内容指纹集合（防同内容重复计分）
+     * @param rules    本次批量使用的规则集
+     * @throws Exception 单条处理的异常由调用方决定是否计入失败清单
+     */
+    void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception;
 
     /**
      * 读取当前生效规则。

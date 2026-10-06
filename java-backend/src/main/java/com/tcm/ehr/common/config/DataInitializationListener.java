@@ -3,7 +3,7 @@ package com.tcm.ehr.common.config;
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.common.config.EntityTypes;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.IEsTermIndexService;
 import com.tcm.ehr.domain.po.TermEntry;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +33,7 @@ public class DataInitializationListener implements ApplicationRunner {
     private final StringRedisTemplate redisTemplate;
     private final IDictionaryFileService fileService;
     private final IEsTermIndexService esTermIndexService;
-    private final com.tcm.ehr.service.DictionaryTermStore termStore;
+    private final com.tcm.ehr.service.IDictionaryTermStore termStore;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
     private final com.tcm.ehr.common.utils.DistLock distLock;
     private final RestHighLevelClient esClient;
@@ -104,7 +104,7 @@ public class DataInitializationListener implements ApplicationRunner {
 
     /** 基础层该类型为空且文件里有词时，把文件内容播种进 {@code dictionary_terms} */
     private void seedBaseIfEmpty(String type) {
-        if (!termStore.read(DictionaryTermStore.BASE_ORG, type).isEmpty()) {
+        if (!termStore.read(IDictionaryTermStore.BASE_ORG, type).isEmpty()) {
             return;
         }
         List<TermEntry> fromFile;
@@ -117,15 +117,15 @@ public class DataInitializationListener implements ApplicationRunner {
         if (fromFile.isEmpty()) {
             return;
         }
-        String version = termStore.replace(DictionaryTermStore.BASE_ORG, type, fromFile);
+        String version = termStore.replace(IDictionaryTermStore.BASE_ORG, type, fromFile);
         log.info("[词典] {} 基础层播种 {} 条（来源：词典文件，版本 {}）", type, fromFile.size(), version);
     }
 
     /** 基础层 + 所有有词条的组织，逐个比对版本对账 */
     private void reconcileOne(String type) throws java.io.IOException {
-        reconcileLayer(type, DictionaryTermStore.BASE_ORG);
+        reconcileLayer(type, IDictionaryTermStore.BASE_ORG);
         for (String orgId : orgsWithTerms(type)) {
-            if (!DictionaryTermStore.BASE_ORG.equals(orgId)) {
+            if (!IDictionaryTermStore.BASE_ORG.equals(orgId)) {
                 reconcileLayer(type, orgId);
             }
         }

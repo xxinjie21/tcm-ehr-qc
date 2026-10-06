@@ -83,7 +83,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private final PythonNlpClient nlpClient;
     private final EntityNormalizer entityNormalizer;
     /** 词典状态（版本 / 词条数）：归一打点要用「真正生效的那版词典」，不是词典还在文件时代留下的冻结哈希 */
-    private final com.tcm.ehr.service.DictionaryTermStore termStore;
+    private final com.tcm.ehr.service.IDictionaryTermStore termStore;
     private final ObjectMapper objectMapper;
     /** 批次 26.2：提交互斥统一走 DistLock（事务感知释放） */
     private final DistLock distLock;
@@ -786,13 +786,13 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 但这条缓存行为好测，而漏掉它正是要修的东西。</p>
      */
     static final class DictMeta {
-        private final com.tcm.ehr.service.DictionaryTermStore store;
+        private final com.tcm.ehr.service.IDictionaryTermStore store;
         private final String orgId;
         private String version;
         private int termCount;
         private boolean loaded;
 
-        DictMeta(com.tcm.ehr.service.DictionaryTermStore store, String orgId) {
+        DictMeta(com.tcm.ehr.service.IDictionaryTermStore store, String orgId) {
             this.store = store;
             this.orgId = orgId;
         }

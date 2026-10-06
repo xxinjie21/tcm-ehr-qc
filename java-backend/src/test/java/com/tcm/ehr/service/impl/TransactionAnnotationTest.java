@@ -6,6 +6,7 @@ import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.QcBatchResultVO;
+import com.tcm.ehr.service.IReviewWriteService;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,12 +48,12 @@ class TransactionAnnotationTest {
     /**
      * 复核会写结构化数据 + 评分 + 任务状态，中途失败会让分数与任务状态对不上。
      *
-     * <p>批次 26.4：事务落在 {@link ReviewWriteService} —— 它独占「读改写」时段，
+     * <p>批次 26.4：事务落在 {@link IReviewWriteService} —— 它独占「读改写」时段，
      * 而归一（走 ES）被特意留在事务外。</p>
      */
     @Test
     void reviewWriteIsTransactional() throws NoSuchMethodException {
-        assertTransactional(ReviewWriteService.class, "review", String.class, ReviewDTO.class);
+        assertTransactional(ReviewWriteServiceImpl.class, "review", String.class, ReviewDTO.class);
     }
 
     /**

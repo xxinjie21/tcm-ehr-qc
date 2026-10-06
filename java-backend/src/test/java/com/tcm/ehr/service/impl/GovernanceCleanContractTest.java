@@ -5,7 +5,7 @@ import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CleanResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
-import com.tcm.ehr.service.DictionaryTermStore;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.IDictionaryFileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -56,7 +56,7 @@ class GovernanceCleanContractTest {
     private GovernanceServiceImpl service(RecordMapper mapper) {
         GovernanceServiceImpl svc = new GovernanceServiceImpl(
                 mock(EsTermNormalizer.class), new ObjectMapper(),
-                mock(DictionaryTermStore.class),
+                mock(IDictionaryTermStore.class),
                 mock(ReviewTaskMapper.class));
         ReflectionTestUtils.setField(svc, "baseMapper", mapper);
         return svc;

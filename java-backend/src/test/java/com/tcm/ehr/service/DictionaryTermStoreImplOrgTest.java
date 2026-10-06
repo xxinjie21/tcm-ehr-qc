@@ -3,6 +3,7 @@ package com.tcm.ehr.service;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.mapper.DictionaryTermMapper;
 import com.tcm.ehr.mapper.DictionaryVersionMapper;
+import com.tcm.ehr.service.impl.DictionaryTermStoreImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -24,10 +25,10 @@ import static org.mockito.Mockito.when;
  * 硬测只会测到自己写的 fake。组织隔离真正的守门人是
  * {@code EsOrgKeyTest}（ES 侧的 org_id 过滤与文档 id）与集成层的归一验收。</p>
  */
-class DictionaryTermStoreOrgTest {
+class DictionaryTermStoreImplOrgTest {
 
-    private static DictionaryTermStore newStore() {
-        return new DictionaryTermStore(
+    private static IDictionaryTermStore newStore() {
+        return new DictionaryTermStoreImpl(
                 mock(DictionaryTermMapper.class),
                 mock(DictionaryVersionMapper.class),
                 new ObjectMapper());
@@ -36,7 +37,7 @@ class DictionaryTermStoreOrgTest {
     @Test
     @DisplayName("内容版本：同一份词条换个导入顺序，版本必须不变")
     void contentVersionIsOrderIndependent() {
-        DictionaryTermStore store = newStore();
+        IDictionaryTermStore store = newStore();
         List<TermEntry> a = List.of(
                 new TermEntry("甘草", List.of("国老"), "药典"),
                 new TermEntry("人参", List.of("上党人参"), "药典"));
@@ -50,7 +51,7 @@ class DictionaryTermStoreOrgTest {
     @Test
     @DisplayName("内容版本：词条增减必须改变版本")
     void contentVersionChangesWithContent() {
-        DictionaryTermStore store = newStore();
+        IDictionaryTermStore store = newStore();
         List<TermEntry> one = List.of(new TermEntry("甘草", List.of(), "药典"));
         List<TermEntry> two = List.of(
                 new TermEntry("甘草", List.of(), "药典"),
@@ -64,7 +65,7 @@ class DictionaryTermStoreOrgTest {
     void noVersionRowMeansNotSynced() {
         DictionaryVersionMapper vm = mock(DictionaryVersionMapper.class);
         when(vm.selectOne(any())).thenReturn(null);
-        DictionaryTermStore store = new DictionaryTermStore(
+        IDictionaryTermStore store = new DictionaryTermStoreImpl(
                 mock(DictionaryTermMapper.class),
                 vm, new ObjectMapper());
 
@@ -82,7 +83,7 @@ class DictionaryTermStoreOrgTest {
         row.setVersion("v2");
         row.setIndexedVersion("v1");
         when(vm.selectOne(any())).thenReturn(row);
-        DictionaryTermStore store = new DictionaryTermStore(
+        IDictionaryTermStore store = new DictionaryTermStoreImpl(
                 mock(DictionaryTermMapper.class),
                 vm, new ObjectMapper());
 

@@ -1,10 +1,14 @@
-package com.tcm.ehr.service;
+package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.RequestUtils;
+import com.tcm.ehr.service.IDictArchiveService;
+import com.tcm.ehr.service.IDictProposalService;
+import com.tcm.ehr.service.IDictionaryTermStore;
+import com.tcm.ehr.service.IEsTermIndexService;
 import com.tcm.ehr.domain.dto.DictProposalDTOs;
 import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.po.DictProposalTerm;
@@ -47,7 +51,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DictProposalService {
+public class DictProposalServiceImpl implements IDictProposalService {
 
     /** 同一 (org,type) 最多同时存在的待审提案数 */
     public static final int MAX_PENDING = 5;
@@ -57,8 +61,8 @@ public class DictProposalService {
 
     private final DictProposalMapper proposalMapper;
     private final DictProposalTermMapper termMapper;
-    private final DictionaryTermStore termStore;
-    private final DictArchiveService archiveService;
+    private final IDictionaryTermStore termStore;
+    private final IDictArchiveService archiveService;
     private final IEsTermIndexService esIndexService;
     private final ObjectMapper objectMapper;
     private final DistLock distLock;

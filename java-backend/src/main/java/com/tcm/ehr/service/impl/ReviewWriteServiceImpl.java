@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import com.tcm.ehr.service.IReviewWriteService;
 import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.common.exception.ForbiddenException;
@@ -42,7 +43,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ReviewWriteService {
+public class ReviewWriteServiceImpl implements IReviewWriteService {
 
     private final RecordMapper recordMapper;
     private final ReviewTaskMapper reviewTaskMapper;
