@@ -44,6 +44,13 @@
           clickable @click="drill('无效')" />
       </div>
 
+      <!-- 28.18：指标口径提示 —— 页面上有三个「率/数」，不写清怎么算、算哪些病历，
+           用户看到与列表页对不上的数字时无从判断谁错。 -->
+      <p class="stats-note">
+        口径：三张指标卡取<b>全部病历</b>，不受上方筛选影响；合格率 = 质控分级为「合格」的病历占比，
+        「无效数据」为质控判定无有效内容的病历。待办条的数字与指标卡同一口径；下方图表区间随筛选变化。
+      </p>
+
       <!-- 质控趋势（跨整行） -->
       <PanelCard title="质控趋势（按月）" class="mb">
         <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
@@ -466,5 +473,17 @@ onBeforeUnmount(() => {
 }
 /* P5.2：趋势截断提示 */
 .trend-trunc { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-sub); }
+/* 28.18：指标口径说明 —— 灰底浅字，与卡片区分开，不抢指标数字的注意力 */
+.stats-note {
+  margin: 0 0 10px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--ink-light);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--text-sub);
+}
+.stats-note b { color: var(--ink); }
 /* 对标 A5：指标卡下方的血缘行。刻意做得比正文轻 —— 它是下钻入口，不该和指标抢注意力 */
 </style>

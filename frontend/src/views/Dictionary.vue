@@ -114,7 +114,7 @@
         v-model:page-size="size"
         :page-sizes="PAGE_SIZES_WIDE"
         :total="total"
-        layout="total, sizes, prev, pager, next"
+        layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="loadTerms(false)"
         @size-change="handleSizeChange"

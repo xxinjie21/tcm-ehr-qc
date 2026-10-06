@@ -30,17 +30,38 @@
 
       <div class="flow-wrapper">
         <div v-for="(s, i) in STEPS" :key="s.title" class="flow-step">
-          <div class="step-card">
+          <!-- 28.18：步骤卡从 div 改 button —— 点开看「这步具体做什么、结果在哪看」，
+               键盘可 Tab 聚焦、Enter/Space 触发（原生 button 行为） -->
+          <button
+            type="button"
+            class="step-card"
+            :class="{ active: activeStep === i }"
+            :aria-expanded="activeStep === i"
+            @click="activeStep = activeStep === i ? -1 : i"
+          >
             <div class="step-num">{{ i + 1 }}</div>
             <div class="step-title">{{ s.title }}</div>
             <!-- 还原每步解释： 收敛过度，5 步说明全收进折叠区后
                  步骤卡只剩序号与标题，用户看不出每步到底做什么 -->
             <div class="step-desc">{{ s.desc }}</div>
-          </div>
+          </button>
           <!-- 末步留占位箭头，保证 5 张卡片等宽-->
           <div class="step-arrow" :class="{ ghost: i === STEPS.length - 1 }" aria-hidden="true">→</div>
         </div>
       </div>
+
+      <!-- 28.18：点开的步骤详述；再点同一张卡或「收起」关闭 -->
+      <transition name="step-fade">
+        <div v-if="activeStepInfo" class="step-detail">
+          <div class="sd-hd">
+            <span class="sd-num">{{ activeStep + 1 }}</span>
+            <b>{{ activeStepInfo.title }}</b>
+            <button type="button" class="sd-close" @click="activeStep = -1">收起</button>
+          </div>
+          <p class="sd-desc">{{ activeStepInfo.detail }}</p>
+          <p class="sd-where">结果看这里：{{ activeStepInfo.where }}</p>
+        </div>
+      </transition>
 
       <div class="clean-actions">
         <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
@@ -178,6 +199,23 @@
         导出的文件与上方预览里出现的手机号、身份证号都会自动打码。
       </div>
 
+      <!-- 28.18：导出历史 —— 导出是一次性动作，之前导过什么、用的什么范围，
+           页面一关就没了。这里只在本机 localStorage 记元数据 + 当时的筛选载荷
+           （不存病历数据本身），方便按同一口径重导。 -->
+      <div v-if="exportHistory.length" class="export-history">
+        <div class="eh-hd">最近导出（本机记录，最多 10 条）</div>
+        <ul class="eh-list">
+          <li v-for="(h, i) in exportHistory" :key="h.at + '-' + i">
+            <span class="eh-time">{{ h.at }}</span>
+            <span class="eh-fmt">{{ h.format.toUpperCase() }}</span>
+            <span class="eh-scope" :title="h.scope">{{ h.scope }}</span>
+            <el-button link type="primary" size="small" :disabled="exporting" @click="reExport(h)">
+              重新导出
+            </el-button>
+          </li>
+        </ul>
+      </div>
+
       <div v-if="preview.result" class="preview-box">
         <div class="preview-hd">
           <span>预览：共 {{ preview.result.total }} 条合格病历（样本前10条，点击行查看完整详情）</span>
@@ -255,13 +293,29 @@ import { LEVEL_TINY } from '@/utils/structured'
 
 const aiStore = useAiContextStore()
 
+// 28.18：每步补 detail（点开看的详述）与 where（结果落在结果区哪一项），
+// 步骤卡据此从「只能看」变成「可点开」。
 const STEPS = [
-  { title: '去重', desc: '重复病历只标记，不删除' },
-  { title: '字段清理', desc: '只去多余空格，不改内容' },
-  { title: '空值规整', desc: '仅有空格等空白字符的字段记一次规整' },
-  { title: '脏数据隔离', desc: '无法修复的病历标记为无效' },
-  { title: '术语归一', desc: '把「咽喉痛」这类写法统一成标准术语' }
+  { title: '去重', desc: '重复病历只标记，不删除',
+    detail: '按登记号等 21 个字段完全一致判定为重复；重复病历只打标记、不删除，后续统计仍以去重后的口径计算。',
+    where: '清洗结果「去重」项' },
+  { title: '字段清理', desc: '只去多余空格，不改内容',
+    detail: '只规整字段内多余空格与全半角差异，不填充医生未书写的内容，也不改写已有文字。',
+    where: '清洗结果「字段清理」项' },
+  { title: '空值规整', desc: '仅有空格等空白字符的字段记一次规整',
+    detail: '一个字段若只含空格、换行等空白字符，统一记为空并计数，避免「看起来有值、实际无内容」。',
+    where: '清洗结果「空值规整」项' },
+  { title: '脏数据隔离', desc: '无法修复的病历标记为无效',
+    detail: '缺关键字段且无法修复的病历标记为无效并隔离归档，不参与合格率等统计；隔离不等于删除。',
+    where: '清洗结果「隔离归档」项' },
+  { title: '术语归一', desc: '把「咽喉痛」这类写法统一成标准术语',
+    detail: '按最新词典把主诉、诊断等术语统一为标准写法；被人工修改过的病历按「人工成果优先」跳过归一。',
+    where: '清洗结果「术语归一命中」与三级命中分布' }
 ]
+
+// 当前点开的步骤序号（-1 = 未展开）；一次只展开一个
+const activeStep = ref(-1)
+const activeStepInfo = computed(() => (activeStep.value >= 0 ? STEPS[activeStep.value] : null))
 
 const stats = reactive({ qualified: 0, pendingGovern: 0, governedCount: 0 })
 const statsLoading = ref(false)
@@ -363,6 +417,25 @@ const exporting = ref(false)
 // 导出文件名去重序号：Date.now() 是毫秒级，同一毫秒内连点两次导出仍会同名
 let exportSeq = 0
 
+// 28.18：导出历史（本机 localStorage 元数据，最多 10 条）。存的是元数据 + 当时的筛选载荷，
+// 不含导出内容本身；解析失败/被用户清掉都退回空列表，不阻塞导出主流程。
+const EXPORT_HISTORY_KEY = 'tcm:exportHistory'
+const exportHistory = ref([])
+const loadExportHistory = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(EXPORT_HISTORY_KEY) || '[]')
+    exportHistory.value = Array.isArray(raw) ? raw : []
+  } catch { exportHistory.value = [] }
+}
+const pushExportHistory = (payload) => {
+  exportHistory.value = [
+    { at: new Date().toLocaleString(), format: format.value, scope: scopeText.value, payload },
+    ...exportHistory.value
+  ].slice(0, 10)
+  try { localStorage.setItem(EXPORT_HISTORY_KEY, JSON.stringify(exportHistory.value)) }
+  catch { /* 存不下（隐私模式/配额满）就只在本次会话内保留 */ }
+}
+
 // 组装预览 / 导出共用的请求体：只带后端约定的 department / dateRange / pattern 三个维度，
 // 刻意不含 grade —— 分级只作用于数据清洗，导出恒为质控合格病历
 const buildPayload = () => ({
@@ -450,34 +523,57 @@ const handlePreview = async () => {
   }
 }
 
-// 导出下载：后端成功回文件流、失败回 JSON，故先判别 blob 类型 ——
-// 是 JSON 就解析 msg 报错，否则才落盘保存，避免把一段错误 JSON 当数据集下载下来
+// 导出并落盘：后端成功回文件流、失败回 JSON，故先判别 blob 类型 ——
+// 是 JSON 就解析 msg 报错，否则才落盘保存，避免把一段错误 JSON 当数据集下载下来。
+// 返回 true 表示确实下载成功（供历史记录与提示区分成败）。
+const exportAndSave = async (payload, ext) => {
+  const blob = await exportDataset(payload)
+  // 失败回的是 JSON → 解析出 msg 报错，不落盘
+  if (blob && blob.type && blob.type.includes('application/json')) {
+    const text = await blob.text()
+    let msg = '导出失败'
+    try {
+      msg = JSON.parse(text).msg || msg
+    // 解析不出就沿用默认文案
+    } catch { /* keep default */ }
+    ElMessage.error(msg)
+    return false
+  }
+  // 确认是文件流才落盘；文件名带毫秒 + 递增序号，避免同一毫秒内两次导出同名
+  saveBlob(blob, `tcm_ehr_dataset_${Date.now()}_${exportSeq++}.${ext}`)
+  return true
+}
+
+// 导出下载
 const handleExport = async () => {
   // 1. 置导出中状态
   exporting.value = true
   try {
-    // 2. 请求导出：后端成功回文件流、失败回 JSON
-    const blob = await exportDataset(buildPayload())
-    // 3. 失败回的是 JSON → 解析出 msg 报错，避免把错误 JSON 当数据集存下来
-    if (blob && blob.type && blob.type.includes('application/json')) {
-      const text = await blob.text()
-      let msg = '导出失败'
-      try {
-        msg = JSON.parse(text).msg || msg
-      // 解析不出就沿用默认文案
-      } catch { /* keep default */ }
-      // 4. 提示错误并结束，不落盘
-      ElMessage.error(msg)
-      return
+    // 2. 固定住本次载荷（成功后才入历史），避免后续筛选变化影响记录
+    const payload = buildPayload()
+    // 3. 导出成功后提示并记入历史
+    if (await exportAndSave(payload, format.value)) {
+      ElMessage.success('导出成功')
+      pushExportHistory(payload)
     }
-    // 5. 确认是文件流才落盘保存；文件名带毫秒 + 递增序号，避免同一毫秒内两次导出得到同名文件
-    saveBlob(blob, `tcm_ehr_dataset_${Date.now()}_${exportSeq++}.${format.value}`)
-    // 6. 提示导出成功
-    ElMessage.success('导出成功')
-  // 7. 失败由响应拦截器统一提示
+  // 4. 失败由响应拦截器统一提示
   } catch {
     // 拦截器已提示
-  // 8. 无论成败都关掉导出中状态
+  // 5. 无论成败都关掉导出中状态
+  } finally {
+    exporting.value = false
+  }
+}
+
+// 按历史记录用同一范围与格式重导
+const reExport = async (entry) => {
+  exporting.value = true
+  try {
+    if (await exportAndSave(entry.payload, entry.format)) {
+      ElMessage.success('已按历史记录重新导出')
+    }
+  } catch {
+    // 拦截器已提示
   } finally {
     exporting.value = false
   }
@@ -490,6 +586,7 @@ const { departments, reload: loadDepartments } = useDepartments()
 onMounted(() => {
   loadStats()
   loadDepartments()
+  loadExportHistory()
 })
 </script>
 
@@ -593,12 +690,66 @@ onMounted(() => {
   border-radius: 6px;
   padding: var(--sp-4) var(--sp-3);
   text-align: center;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  /* 28.18：div → button 后的重置，保持原卡片观感 */
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  width: 100%;
 }
 .step-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 3px 10px rgba(47, 70, 57, 0.12);
 }
+.step-card.active {
+  border-color: var(--ochre);
+  box-shadow: 0 0 0 1px var(--ochre) inset;
+}
+/* 28.18：点开的步骤详述 */
+.step-detail {
+  margin-top: var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ochre);
+  border-radius: 6px;
+  padding: var(--sp-2) var(--sp-3);
+}
+.sd-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+.sd-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink-mid);
+  color: var(--surface);
+  font-size: var(--fs-xs);
+  line-height: 20px;
+  text-align: center;
+}
+.sd-close {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--text-sub);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  padding: 0;
+}
+.sd-close:hover { color: var(--ink); }
+.sd-desc, .sd-where {
+  margin: 6px 0 0;
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-sub);
+}
+.sd-where { color: var(--ink-mid); }
+.step-fade-enter-active, .step-fade-leave-active { transition: opacity 0.15s ease; }
+.step-fade-enter-from, .step-fade-leave-to { opacity: 0; }
 .step-num {
   width: 30px;
   height: 30px;
@@ -726,6 +877,42 @@ label,
   font-size: var(--fs-xs);
   color: var(--text-sub);
   margin-bottom: 3px;
+}
+/* 28.18：导出历史列表 */
+.export-history {
+  margin-top: var(--sp-3);
+  border-top: 1px dashed var(--line-soft);
+  padding-top: var(--sp-2);
+}
+.eh-hd {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  margin-bottom: var(--sp-1);
+}
+.eh-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.eh-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 3px 0;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+.eh-time { min-width: 150px; }
+.eh-fmt {
+  min-width: 42px;
+  font-weight: bold;
+  color: var(--ink-mid);
+}
+.eh-scope {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .preview-box {
   margin-top: var(--sp-4);

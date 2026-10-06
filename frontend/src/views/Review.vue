@@ -1,5 +1,15 @@
 <template>
   <div class="review-page">
+    <!-- 28.18：复核页统计卡 —— 原来这一屏只有「状态下拉」，进来看不出待办总量与超期压力。
+         卡片可点：点了直接切到对应筛选（沿用看板「指标即入口」的口径）。 -->
+    <div class="rv-stats">
+      <StatCard label="待复核任务" :value="reviewStats.pending" icon="pending" tone="ochre"
+        clickable @click="filterBy('pending')" />
+      <StatCard label="超时未复核" :value="reviewStats.overdue" icon="invalid" tone="red"
+        clickable @click="filterBy('overdue')" />
+      <StatCard label="已完成复核" :value="reviewStats.done" icon="rate" tone="green"
+        clickable @click="filterBy('done')" />
+    </div>
     <!-- ① 待复核任务列表 -->
     <!-- 两个页签：「待复核任务」是复核主入口（原有内容一字未改）；
          「全部病历」让复核员也能像在病历数据页那样浏览全部病历，并展开同一套对照面板。 -->
@@ -73,7 +83,7 @@
         v-model:page-size="pageSize"
         :page-sizes="PAGE_SIZES_STANDARD"
         :total="total"
-        layout="total, sizes, prev, pager, next"
+        layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="load"
         @size-change="handleSizeChange"
@@ -113,7 +123,7 @@
           v-model:page-size="allPageSize"
           :page-sizes="PAGE_SIZES_STANDARD"
           :total="allTotal"
-          layout="total, sizes, prev, pager, next"
+          layout="total, sizes, prev, pager, next, jumper"
           style="margin-top: var(--sp-3); justify-content: flex-end"
           @current-change="loadAllRecords"
           @size-change="handleAllSizeChange"
@@ -127,7 +137,7 @@
       ref="detailRef"
       @opened="onDetailOpened"
       @closed="activeTaskId = null"
-      @submitted="load()"
+      @submitted="onSubmitted"
     />
   </div>
 </template>
@@ -148,6 +158,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import FreshnessTag from '@/components/FreshnessTag.vue'
 import { searchRecords } from '@/api/records'
 import ReviewDetailPanel from '@/components/ReviewDetailPanel.vue'
+import StatCard from '@/components/StatCard.vue'
 
 // 时间格式化：去掉 T、截到分钟；空值返回「—」，避免列表里出现 Invalid Date
 const fmt = (t) => (t ? fmtDateTime(t,'minute') : '—')
@@ -228,6 +239,32 @@ const handleSizeChange = () => {
 // 超时任务整行标红（样式见 .row-overdue），只做视觉提醒、不自动流转
 const rowClass = ({ row }) => (row.overdue ? 'row-overdue' : '')
 
+// ===== 28.18 复核概览统计 =====
+// 三个数由三次 pageSize=1 的列表查询得到（后端按 status/overdueOnly 过滤后的 total）：
+// 复用既有接口、不新增后端端点；pageSize=1 只取 total，代价可忽略。
+const reviewStats = reactive({ pending: 0, done: 0, overdue: 0 })
+const loadReviewStats = async () => {
+  try {
+    const [p, d, o] = await Promise.all([
+      listReviewTasks({ page: 1, pageSize: 1, status: '待复核', overdueOnly: false }),
+      listReviewTasks({ page: 1, pageSize: 1, status: '已完成', overdueOnly: false }),
+      listReviewTasks({ page: 1, pageSize: 1, status: '待复核', overdueOnly: true })
+    ])
+    reviewStats.pending = p.data?.total ?? 0
+    reviewStats.done = d.data?.total ?? 0
+    reviewStats.overdue = o.data?.total ?? 0
+  } catch { /* 拦截器已提示；统计失败不影响任务列表本身 */ }
+}
+
+// 点统计卡 = 切到任务页签 + 套用对应筛选（与下拉框同一套状态，URL 分享仍然有效）
+const filterBy = (kind) => {
+  activeTab.value = 'tasks'
+  if (kind === 'done') { status.value = '已完成'; overdueOnly.value = false }
+  else if (kind === 'overdue') { status.value = '待复核'; overdueOnly.value = true }
+  else { status.value = '待复核'; overdueOnly.value = false }
+  load(1)
+}
+
 // ===== 详情面板桥接（复核详情已抽为 ReviewDetailPanel）=====
 const detailRef = ref(null)
 const activeTaskId = ref(null)
@@ -246,6 +283,12 @@ const openReviewFromRecords = (row) => {
   openReview({ recordId: row.id, score: row.score, taskId: null, fromRecords: true })
 }
 
+// 提交裁决后：任务列表与概览统计都要重取（状态可能由待复核变已完成）
+const onSubmitted = () => {
+  load()
+  loadReviewStats()
+}
+
 // 切到「全部病历」时才加载：进页面就查会白付一次请求（大多数人先看任务）
 watch(activeTab, (tab) => {
   if (tab === 'records' && allRows.value.length === 0) {
@@ -255,12 +298,23 @@ watch(activeTab, (tab) => {
 
 onMounted(() => {
   load(1)
+  loadReviewStats()
 })
 </script>
 
 <style scoped>
 .rv-tabs :deep(.el-tabs__header) {
   margin-bottom: var(--sp-3);
+}
+/* 28.18：三张概览卡等宽排一行（窄屏换行） */
+.rv-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-3);
+  margin-bottom: 10px;
+}
+@media (max-width: 900px) {
+  .rv-stats { grid-template-columns: 1fr; }
 }
 .rv-bar {
   display: flex;

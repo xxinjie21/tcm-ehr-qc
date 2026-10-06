@@ -8,6 +8,57 @@
         中医电子病历质控与标准化系统<em>TCM EHR Quality Control &amp; Standardization</em>
       </div>
       <div class="user">
+        <!-- 28.18 全局通知中心：顶栏铃铛，把「待复核 / 待清洗 / 无效数据」三类待办聚到一处。
+             数据取自各页已有的概览接口，不做轮询（进主框架取一次；进详情页由各页自己刷新）。
+             已读状态按 id（key:数量）存 localStorage —— 数量变化就是一条新通知，徽标会重新亮起。 -->
+        <el-popover
+          v-model:visible="noticeVisible"
+          placement="bottom-end"
+          :width="320"
+          trigger="click"
+          @show="markNoticesRead"
+        >
+          <template #reference>
+            <el-badge :value="unreadNotices.length" :hidden="!unreadNotices.length" :max="9">
+              <button
+                type="button"
+                class="notice-btn"
+                :aria-label="unreadNotices.length ? `通知，${unreadNotices.length} 条未读` : '通知，无未读'"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path
+                    d="M12 3.5a4.5 4.5 0 0 0-4.5 4.5v3.1l-1.3 2.4a.6.6 0 0 0 .5.9h10.6a.6.6 0 0 0 .5-.9l-1.3-2.4V8A4.5 4.5 0 0 0 12 3.5Z"
+                    fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"
+                  />
+                  <path
+                    d="M9.7 16.9a2.3 2.3 0 0 0 4.6 0"
+                    fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                  />
+                </svg>
+              </button>
+            </el-badge>
+          </template>
+          <div class="notice-list">
+            <div class="nt-hd">待办通知</div>
+            <template v-if="notices.length">
+              <button
+                v-for="n in notices"
+                :key="n.id"
+                type="button"
+                class="nt-item"
+                @click="goNotice(n)"
+              >
+                <span class="nt-dot" :class="n.key" aria-hidden="true"></span>
+                <span class="nt-body">
+                  <span class="nt-title">{{ n.title }}</span>
+                  <span class="nt-desc">{{ n.desc }}</span>
+                </span>
+                <span class="nt-go" aria-hidden="true">›</span>
+              </button>
+            </template>
+            <div v-else class="nt-empty">暂无待办通知</div>
+          </div>
+        </el-popover>
         <!-- 导入 LLM（菜单项「我的 LLM」）：**对所有登录用户开放，不按角色隐藏** ——
      配置已改为「每个用户一份」（后端写 user_llm_config 自己那一行，管理员也只改自己的），
      若按管理员隐藏，普通用户就没有入口配自己的模型。校正于 2026-10-05（原注释写「仅管理员可见」已过期）。 -->
@@ -77,6 +128,8 @@
 
 <script setup>
 import { logout as logoutApi } from '@/api/auth'
+import { getOverview } from '@/api/stats'
+import { governanceStats } from '@/api/governance'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -88,7 +141,10 @@ const router = useRouter()
 const userStore = useUserStore()
 
 // 28.20：登录时的权限快照会过期（owner 改权限 / 移除成员后），进主框架时重取一次
-onMounted(() => userStore.refreshOrg())
+onMounted(() => {
+  userStore.refreshOrg()
+  loadNotices()
+})
 
 // 菜单项全量定义；实际渲染项由登录返回的 menus 过滤，
 // 未开发页面显示占位页
@@ -177,6 +233,99 @@ const roleLabel = computed(() => {
 })
 const llmVisible = ref(false)
 
+// ===== 28.18 全局通知中心 =====
+// 通知条目由概览接口实时推导，id 带上数量：数量一变就是新通知，徽标自动重新亮起。
+// 只列真有待办的三类；数量为 0 不制造噪音。
+const noticeVisible = ref(false)
+const notices = ref([])
+const NOTICE_READ_KEY = 'tcm:noticeRead'
+const readNoticeIds = ref([])
+const unreadNotices = computed(() => notices.value.filter((n) => !readNoticeIds.value.includes(n.id)))
+
+const loadReadNoticeIds = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(NOTICE_READ_KEY) || '[]')
+    readNoticeIds.value = Array.isArray(raw) ? raw : []
+  } catch {
+    readNoticeIds.value = []
+  }
+}
+
+// 打开铃铛即视为已读（通知不做逐条已读交互，避免为三类聚合指标过度设计）
+const markNoticesRead = () => {
+  const ids = notices.value.map((n) => n.id)
+  if (!ids.length) return
+  readNoticeIds.value = [...new Set([...readNoticeIds.value, ...ids])].slice(-50)
+  try {
+    localStorage.setItem(NOTICE_READ_KEY, JSON.stringify(readNoticeIds.value))
+  } catch {
+    // 存不下（隐私模式/配额满）就只在本次会话内生效
+  }
+}
+
+// 概览数据：待复核 / 无效数据对所有用户可见；待清洗仅管理员可读（后端限制）
+const loadNotices = async () => {
+  loadReadNoticeIds()
+  const list = []
+  try {
+    const res = await getOverview()
+    const pendingReview = res.data?.pendingReviewCount || 0
+    const invalid = res.data?.invalidCount || 0
+    if (pendingReview > 0) {
+      list.push({
+        key: 'review',
+        count: pendingReview,
+        title: `${pendingReview} 份病历待复核`,
+        desc: '质控已判定需要人工确认，点击进入人工复核',
+        path: '/review'
+      })
+    }
+    if (invalid > 0) {
+      list.push({
+        key: 'invalid',
+        count: invalid,
+        title: `${invalid} 份病历判定无效`,
+        desc: '质控判定无有效内容，点击在病历数据中筛选查看',
+        path: '/records',
+        query: { grade: '无效' }
+      })
+    }
+  } catch {
+    // 拦截器已提示；通知失败不该影响主框架使用
+  }
+  // 待清洗：非管理员后端会拒绝，用 try 兜住，静默跳过
+  if (isAdmin.value) {
+    try {
+      const g = await governanceStats()
+      const pendingGovern = g.data?.pendingGovern || 0
+      if (pendingGovern > 0) {
+        list.push({
+          key: 'govern',
+          count: pendingGovern,
+          title: `${pendingGovern} 份病历待清洗`,
+          desc: '点击进入清洗与导出，按步骤执行数据清洗',
+          path: '/governance'
+        })
+      }
+    } catch {
+      // 后端限制或失败：不展示该类通知
+    }
+  }
+  notices.value = list.map((n) => ({ ...n, id: `${n.key}:${n.count}` }))
+}
+
+const goNotice = (n) => {
+  noticeVisible.value = false
+  // 已经在目标页时 router.push 不会重新触发页面加载，这里补一次强制刷新
+  const target = { path: n.path, query: n.query }
+  if (route.path === n.path) {
+    router.replace({ query: n.query || {} })
+    window.location.reload()
+    return
+  }
+  router.push(target)
+}
+
 // 退出登录：先让服务端作废令牌，再清本地状态并跳回登录页
 // ⚠️ 顺序不能反：本地先清了就拿不到 token，服务端无法作废；
 // 而服务端不通知的话，那张 JWT 在 24h 内仍有效，复制到别的浏览器照样能调接口。
@@ -248,6 +397,91 @@ const handleLogout = async () => {
 }
 .llm-entry:hover {
   color: var(--surface);
+}
+/* 通知铃铛：顶栏深色底上的图标按钮，与 llm-entry 同一浅色处理 */
+.notice-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #d8dfd9;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.notice-btn:hover,
+.notice-btn:focus-visible {
+  color: var(--surface);
+  background: rgba(255, 255, 255, 0.14);
+}
+/* 通知面板（el-popover 内容在 body 下，但 popover 内容随组件渲染，scoped 仍生效） */
+.notice-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.nt-hd {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: var(--sp-1);
+}
+.nt-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2);
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.nt-item:hover {
+  background: var(--ink-light);
+}
+.nt-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--ink-mid);
+}
+.nt-dot.review { background: var(--ochre); }
+.nt-dot.invalid { background: var(--danger); }
+.nt-body {
+  flex: 1;
+  min-width: 0;
+}
+.nt-title {
+  display: block;
+  font-size: var(--fs-base);
+  color: var(--ink);
+  line-height: 1.4;
+}
+.nt-desc {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+  line-height: 1.4;
+}
+.nt-go {
+  flex: none;
+  color: var(--text-sub);
+  font-size: var(--fs-base);
+}
+.nt-empty {
+  padding: var(--sp-3) 0;
+  text-align: center;
+  color: var(--text-sub);
+  font-size: var(--fs-base);
 }
 /* 顶栏是深色底（.topbar background: var(--ink)），所以这里必须用浅色 ——
    之前按浅底习惯写了 color: var(--ink)，等于深绿字压深绿底，用户完全看不清。 */

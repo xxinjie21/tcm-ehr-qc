@@ -146,7 +146,8 @@
 
     <div class="foot">
       <el-button size="small" :loading="exporting" @click="handleExport">导出 CSV</el-button>
-      <span class="tip">导出全部明细指标，便于存档或与他人核对口径</span>
+      <el-button size="small" @click="handlePrint">打印 / 导出 PDF</el-button>
+      <span class="tip">CSV 导出全部明细指标；PDF 走浏览器打印，可在打印对话框里选「另存为 PDF」</span>
     </div>
 
     <!-- 25.13 一键补词 -->
@@ -162,7 +163,7 @@
 //   ② 把「多少条没归一」翻译成「该做什么、归谁管」；
 //   ③ 明细默认收起，需要时再展开。
 // 技术口径（甲类/乙类、normLevel、可归一实体）只在本文件内部使用，不出现在界面上。
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StandardizationDetails from '@/components/StandardizationDetails.vue'
@@ -754,6 +755,16 @@ const handleExport = async () => {
   }
 }
 
+// 打印 / 另存 PDF（28.18）：走浏览器打印，不新增依赖。
+// 不用后端生成：pom.xml 里的 pdfbox 从未被使用，且 PDFBox 标准字体不含 CJK，
+// 中文报告要额外嵌入字体文件，成本远高于让用户在打印对话框里「另存为 PDF」。
+// 页面级交互控件由本文件 scoped 的 @media print 隐藏，顶栏/侧栏由 theme.css 统一隐藏。
+const handlePrint = () => {
+  // 先让打印态样式生效（隐藏按钮会改变布局），下一帧再唤起打印对话框，
+  // 否则打印预览可能拿到隐藏前的布局
+  nextTick(() => window.print())
+}
+
 // ---- 25.13 一键补词 ----
 
 /** 打开补词对话框：候选词交给子组件，父页只负责显示与传词 */
@@ -999,5 +1010,18 @@ function onVisibilityChange() {
   display: flex;
   gap: var(--sp-2);
   align-items: center;
+}
+
+/* 28.18：打印 / 另存 PDF 时只留报告内容 —— 隐藏各操作按钮与筛选控件，
+   避免打印稿里出现点不动的按钮和「刷新」这类无意义元素。 */
+@media print {
+  .foot,
+  .gate-ops {
+    display: none !important;
+  }
+  .time-row :deep(.el-button),
+  .todo-list :deep(.el-button) {
+    display: none !important;
+  }
 }
 </style>

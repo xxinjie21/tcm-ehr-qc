@@ -167,7 +167,7 @@
         v-model:page-size="precheckSize"
         :page-sizes="PAGE_SIZES_STANDARD"
         :total="precheckTotal"
-        layout="total, sizes, prev, pager, next"
+        layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="loadPrecheck"
         @size-change="handleSizeChange"

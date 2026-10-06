@@ -91,7 +91,7 @@
         v-model:page-size="query.pageSize"
         :page-sizes="PAGE_SIZES_STANDARD"
         :total="total"
-        layout="total, sizes, prev, pager, next"
+        layout="total, sizes, prev, pager, next, jumper"
         style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="loadLogs"
         @size-change="handleSizeChange"

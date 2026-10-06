@@ -306,3 +306,31 @@ aside :focus-visible,
 
    处理约定：新增页面时优先复用现有 token；确需新色请先在此登记并补充 token，
    不要直接写死十六进制（否则这份清单会重新变长）。 */
+
+/* 28.18：打印 / 另存 PDF。报告页的「打印 / 导出 PDF」按钮走浏览器打印 ——
+   后端虽声明了 pdfbox 但从未使用，且 PDFBox 标准字体不含 CJK，中文报告要嵌字体，成本高。
+   打印时只留正文：隐藏顶栏、侧栏、AI 浮球与操作区，去掉固定视口高度限制。
+   各页自己的操作按钮（导出/补词/重跑等）在页面内用 scoped 的 @media print 隐藏。 */
+@media print {
+  .topbar,
+  aside,
+  .skip-link,
+  .ai-assistant {
+    display: none !important;
+  }
+  .app-shell,
+  .layout {
+    min-width: 0;
+    height: auto;
+    overflow: visible;
+  }
+  main {
+    height: auto;
+    overflow: visible;
+    background: #fff !important;
+  }
+  /* 卡片在纸上不需要阴影/描边，浅底也更省墨 */
+  .app-shell {
+    background: #fff;
+  }
+}
