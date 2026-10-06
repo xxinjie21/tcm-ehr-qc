@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>本类还打通了后续测试都要用的一条链路：<b>把 mock 的 baseMapper 反射注入到
  * ServiceImpl 的 protected 字段</b>。其余 5 个公开方法的测试都依赖它
- * （见 docs/批次13-拆类前置-测试缺口清单.md）。</p>
+ * （批次 13 的覆盖表已随该批次完成归档，见 git 历史）。</p>
  */
 class RecordServiceImplWriteGuardTest {
 
