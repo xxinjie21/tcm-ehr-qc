@@ -25,4 +25,12 @@ public class ReviewDTO {
      */
     @Size(max = 500, message = "复核意见最长 500 字")
     private String comment;
+
+    /**
+     * 读时指纹（批次 25.16）：读详情时从 {@code RawRecordVO.fingerprint} 拿到，提交时原样回传。
+     *
+     * <p>为空表示不校验（兼容旧客户端）；非空且与服务端当前指纹不一致时，复核提交以 409 拒绝，
+     * 避免后提交者静默覆盖先提交者的修正（lost update）。</p>
+     */
+    private String fingerprint;
 }

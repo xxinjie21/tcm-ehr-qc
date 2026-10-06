@@ -1,10 +1,12 @@
 package com.tcm.ehr.service;
 
 import com.tcm.ehr.common.config.QcRuleStore;
+import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordUtil;
+import com.tcm.ehr.common.utils.ReviewTaskUtil;
 import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.po.ReviewTask;
@@ -217,6 +219,47 @@ class ReviewServiceTest {
         ReviewTaskVO first = vo.getTasks().get(0);
         assertEquals("待复核", first.getStatus());
         assertTrue(first.isOverdue());
+    }
+
+    /** 读时指纹对不上：说明有人先改过 → 409，且一个字节都不许写（批次 25.15） */
+    @Test
+    void staleFingerprintIsRejectedWithConflict() {
+        Record r = record("rec-5", false, "桂枝");
+        when(recordMapper.selectById("rec-5")).thenReturn(r);
+        when(reviewTaskMapper.selectList(ArgumentMatchers.any()))
+                .thenReturn(List.of(task("task-5", "rec-5")));
+
+        // 指纹取自「另一个版本」：模拟本次读取之后库里内容已变
+        ReviewDTO dto = new ReviewDTO();
+        dto.setCorrectedData(new ObjectMapper().readValue(structured(false, "附子"), Map.class));
+        dto.setFingerprint(ReviewTaskUtil.fingerprint(structured(true, "肉桂"), 100, "合格"));
+
+        assertThrows(ConcurrentOperationException.class, () -> service.review("rec-5", dto));
+        // 冲突必须发生在写库之前，不能出现「结构数据写了、评分没写」的半截状态
+        Mockito.verify(recordMapper, Mockito.never())
+                .updateStructuredData(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
+        Mockito.verify(recordMapper, Mockito.never())
+                .updateScoreFields(ArgumentMatchers.anyString(), ArgumentMatchers.any(),
+                        ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    /** 指纹一致：正常按修正后的数据复核（不因新增校验而误伤） */
+    @Test
+    void matchingFingerprintPasses() {
+        Record r = record("rec-6", false, "桂枝");
+        when(recordMapper.selectById("rec-6")).thenReturn(r);
+        when(reviewTaskMapper.selectList(ArgumentMatchers.any()))
+                .thenReturn(List.of(task("task-6", "rec-6")));
+
+        ReviewDTO dto = new ReviewDTO();
+        dto.setCorrectedData(new ObjectMapper().readValue(structured(false, "附子"), Map.class));
+        dto.setFingerprint(ReviewTaskUtil.fingerprint(
+                r.getStructuredData(), r.getScore(), r.getGrade()));
+
+        ReviewResultVO vo = service.review("rec-6", dto);
+
+        assertNotNull(vo);
+        assertEquals("已完成", vo.getStatus());
     }
 
     @Test

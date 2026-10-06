@@ -521,7 +521,7 @@ components:
           type: string
     RawRecordVO:
       type: object
-      description: 原始病历查看响应（出参，21个字段）
+      description: 原始病历查看响应（出参：21 个原始字段 + 结构化数据/评分 + 读时指纹）
       properties:
         id:
           type: string
@@ -589,6 +589,21 @@ components:
           type: string
           format: date-time
           description: 接诊时间
+        structuredData:
+          type: string
+          description: 结构化数据 JSON 文本（NLP 抽取/人工修正结果）
+        score:
+          type: integer
+          description: 质控评分（满分 100）
+        grade:
+          type: string
+          description: 分级（合格/待复核/无效）
+        status:
+          type: string
+          description: 状态（pending/reviewing/completed/invalid）
+        fingerprint:
+          type: string
+          description: 读时指纹（SHA-256）；复核提交时原样回传，用于并发写校验（批次 25.15）
     UpdateRecordDTO:
       type: object
       description: 修改病历请求（入参，仅结构化数据，原始字段不可修改）
@@ -1309,6 +1324,9 @@ components:
             - nullable: true
         comment:
           type: string
+        fingerprint:
+          type: string
+          description: 读时指纹（批次 25.16）；为空表示不校验，非空且与当前不一致时以 409 拒绝
     ReviewResultVO:
       type: object
       description: 复核结果（出参）
@@ -2692,6 +2710,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: 病历不存在（code=1006）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '409':
+          description: 读时指纹与当前不一致（该病历已被他人修改或复核，code=409），本次提交未写入任何数据
           content:
             application/json:
               schema:

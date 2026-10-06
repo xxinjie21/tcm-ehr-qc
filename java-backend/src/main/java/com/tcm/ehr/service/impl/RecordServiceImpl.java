@@ -10,6 +10,7 @@ import com.tcm.ehr.common.utils.ExcelRawStreamReader;
 import java.io.IOException;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
+import com.tcm.ehr.common.utils.ReviewTaskUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.CreateRecordDTO;
@@ -343,6 +344,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         vo.setScore(r.getScore());
         vo.setGrade(r.getGrade());
         vo.setStatus(r.getStatus());
+        // 复核提交的乐观并发校验：读时算指纹，提交时比对（批次 25.15）
+        vo.setFingerprint(ReviewTaskUtil.fingerprint(r.getStructuredData(), r.getScore(), r.getGrade()));
         return vo;
     }
 

@@ -667,6 +667,8 @@ const submit = async (withCorrection) => {
     const body = {}
     if (withCorrection) body.correctedData = buildCorrected()
     if (remark.value.trim()) body.comment = remark.value.trim()
+    // 2.1 携带读时指纹：服务端据此拒绝「有人在你读取后改过这条病历」的提交（批次 25.16）
+    if (record.value?.fingerprint) body.fingerprint = record.value.fingerprint
     // 3. 提交复核并回填反馈（状态 / 重评分数 / 提交时间）
     const res = await submitReview(current.value.recordId, body)
     result.value = res.data

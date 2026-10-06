@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
+import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.common.utils.QcScorer;
@@ -153,6 +154,17 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             throw new ResourceNotFoundException(1006, "复核记录不存在或状态已完结");
         }
         ReviewTask task = tasks.get(0);
+
+        // 0. 乐观并发校验（批次 25.15）：提交带回的读时指纹与服务端当前不一致，
+        //    说明在你读取之后有人改过这条病历（复核修正 / 清洗 / 批量解析都会写 structured_data），
+        //    此时继续会让本次人工修正静默覆盖对方的修改 —— 即登记在案的 lost update。
+        //    指纹为空表示调用方不参与校验（兼容旧客户端）；非空必须严格相等。
+        if (dto != null && dto.getFingerprint() != null && !dto.getFingerprint().isBlank()) {
+            String current = ReviewTaskUtil.fingerprint(r.getStructuredData(), r.getScore(), r.getGrade());
+            if (!current.equals(dto.getFingerprint())) {
+                throw new ConcurrentOperationException("该病历已被其他人修改或复核，请刷新后重试");
+            }
+        }
 
         // 1. 人工修正（可选）：合并 correctedData 回写 structured_data
         if (dto != null && dto.getCorrectedData() != null) {
