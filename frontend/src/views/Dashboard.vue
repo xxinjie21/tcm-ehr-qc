@@ -1,5 +1,5 @@
 <template>
-  <!-- 首页看板：只留 4 块 —— 待办快捷条 + 4 张指标卡 + 质控趋势 + 评分分布/科室合格率 -->
+  <!-- 首页看板：只留 4 块 —— 待办快捷条 + 3 张指标卡 + 质控趋势 + 评分分布/科室合格率 -->
   <div>
     <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilters" />
 
@@ -30,7 +30,9 @@
 
     <!-- 只遮数据区：筛选条保持可交互，避免整页白屏 -->
     <div v-loading="loading" element-loading-text="数据加载中…">
-      <!-- 4 张指标卡；tone 决定数字配色（green 达标 / ochre 待办 / red 异常）。
+      <!-- 3 张指标卡；tone 决定数字配色（green 达标 / ochre 待办 / red 异常）。
+           「待复核」不在这一排 —— 那个数字只出现在上方待办条（25.6：同一屏一次即可，
+           两处都有会让看板与待办条各说一个数、对不上时无从判断谁对）。
            对标 E3「一个指标只出现一次且可下钻」：卡片即入口 —— 点了带上对应筛选去列表页，
            而筛选能落在 URL 上（对标 E5），所以下钻后的页面是可刷新、可分享的。 -->
       <div class="stats">
@@ -38,8 +40,6 @@
           clickable @click="drill('')" />
         <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate"
           clickable @click="drill('合格')" />
-        <StatCard label="待复核" :value="overview.pendingReviewCount" tone="ochre" icon="pending"
-          clickable @click="router.push('/review')" />
         <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid"
           clickable @click="drill('无效')" />
       </div>
@@ -320,7 +320,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 待办快捷条：三列等宽网格；当前只放 2 张卡（病历总数卡已移除），第 3 列留空 */
+/* 待办快捷条：两列等宽网格，放 2 张待办卡（病历总数卡已移除 —— 它没有动作语义、
+   数字也与指标卡重复）。「待复核」只在这里给数字，指标卡不再重复。 */
 .todo-bar {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

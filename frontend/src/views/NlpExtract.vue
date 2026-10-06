@@ -728,7 +728,12 @@ const statusText = (t) => {
     case 'RUNNING': return `进行中 ${t.done}/${t.total} · 成功 ${t.success} 失败 ${t.failed}`
     case 'COMPLETED': return `已完成：成功 ${t.success}，失败 ${t.failed}`
     case 'CANCELLED': return `已取消（已处理 ${t.done}，剩余未处理）`
-    case 'INTERRUPTED': return '已中断（服务重启），可重跑'
+    // 25.5：INTERRUPTED 有两个来源，不能一律归因「服务重启」——
+    // 后端 nothingDone（total>0 却 0 处理）也落这个状态，那是分流/明细读取异常，
+    // 是一起真事故（500 条筛选任务 0 处理），说成「重启」会把用户引到错误方向。
+    case 'INTERRUPTED': return t.total > 0 && (t.done || 0) === 0
+      ? '异常中断（一条都没处理，请重跑；若重复出现请联系管理员）'
+      : '已中断（服务重启），可重跑'
     case 'FAILED': return '失败'
     default: return t.status
   }
