@@ -168,6 +168,95 @@ def collect_backend():
     return out
 
 
+def openapi_structure_errors():
+    """契约文档自身的机械自洽：YAML 可解析 + 每个 $ref 有定义且没被折叠/错位。
+
+    ⚠️ 为什么这两条必须进来（都是本脚本按行正则**扫不出来**的）：
+      1) 2026-10-03 的 23d4b149 在补 8 个接口时，把
+         `$ref: '#/components/schemas/DictionaryTermsVO'` 劈成两半（头片段留在原行、
+         尾片段成了顶格孤儿行），此后整份 openapi 一直是**非法 YAML**，
+         而本脚本照报「0 差异」—— 契约文档连续 3 天无法被任何解析器读取。
+      2) `/api/qc/score/batch` 的 requestBody 引 `QcBatchDTO`，而该 schema 从未定义；
+         悬空引用同样一条都报不出来。
+
+    ⚠️ 只做「劈开的两半是否在同一行」的正则判断是不够的：YAML 的**单引号标量可以跨行折叠**，
+    `$ref: '#/component` + 换行 + `s/schemas/X'` 依然能解析成功，只是值变成了
+    `#/component s/schemas/X`（带空格）—— 正则找不到 `#/components/` 也就当它不存在。
+    所以这里以**解析结果为准**：把解析树里所有 $ref 拿出来，逐个要求「形如
+    #/components/<段>/<名>」且目标存在。另外把文本里 `$ref:` 的出现次数与解析到的个数对账，
+    作为「引用被折叠/缩进吞掉」的兜底（折叠成合法标量时两边相等，靠上面的解析检查兜住）。
+
+    ⚠️ 能力边界（别把它当万能）：把 `$ref:` 改写成别的键名属于语义改动，
+    机械校验看不出来；这里只保证「引用写得出来、指得到」。
+
+    只报告、不改文件。缺 PyYAML 时退回纯正则的悬空检查并提示（不给校验脚本引入硬依赖）。
+    """
+    text = io.open(OPENAPI, encoding="utf-8-sig").read()
+    errs = []
+    try:
+        import yaml
+    except ImportError:
+        print("[提示] 未安装 PyYAML，openapi 只做正则悬空检查（pip install pyyaml 可全量校验）")
+        return _regex_dangling_refs(text, errs)
+
+    try:
+        doc = yaml.safe_load(text)
+    except Exception as e:  # 解析器异常类型随实现而变，一律当契约损坏
+        errs.append("openapi 不是合法 YAML：" + str(e).split("\n")[0])
+        return errs
+
+    refs = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k == "$ref" and isinstance(v, str):
+                    refs.append(v)
+                else:
+                    walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(doc)
+    for r in sorted(set(refs)):
+        parts = r.split("/")
+        ok = (r.startswith("#/components/") and len(parts) == 4 and all(parts[1:]))
+        if ok:
+            cur = doc
+            for seg in parts[1:]:
+                if not isinstance(cur, dict) or seg not in cur:
+                    ok = False
+                    break
+                cur = cur[seg]
+        if not ok:
+            errs.append(f"$ref 无法解析：{r!r}")
+
+    seen = len(re.findall(r"\$ref:", text))
+    if seen != len(refs):
+        errs.append(
+            f"$ref 计数不符：文本 {seen} 处、解析到 {len(refs)} 处"
+            "（多出的引用被折叠进标量或错位到别的层级）"
+        )
+    return errs
+
+
+def _regex_dangling_refs(text, errs):
+    """无 PyYAML 时的退路：只查 `#/components/schemas/X` 的 X 有没有定义。"""
+    i = text.find("\n  schemas:")
+    if i < 0:
+        errs.append("openapi 缺少 components.schemas 段")
+        return errs
+    body = text[i + 1:]
+    top = re.search(r"^\S", body, re.M)
+    schemas = body[:top.start()] if top else body
+    defined = set(re.findall(r"^    ([A-Za-z0-9_.-]+):\s*$", schemas, re.M))
+    for name in sorted(set(re.findall(r"#/components/schemas/([A-Za-z0-9_.-]+)", text))):
+        if name not in defined:
+            errs.append(f"$ref 悬空：#/components/schemas/{name} 未定义")
+    return errs
+
+
 def main():
     be = collect_backend()
     diff = []
@@ -186,6 +275,9 @@ def main():
     missing = missing_in_backend(be)
     for path, method in sorted(missing):
         diff.append(f"{method.upper():6} {path:<46} openapi=已声明   backend=缺失")
+
+    # 契约文档自身的机械自洽（理由见 openapi_structure_errors 的注释）
+    diff.extend(openapi_structure_errors())
 
     print(f"[校验] 后端 {method_count(be)} 个方法；差异 " + ("无" if not diff else f"{len(diff)} 处"))
     for d in diff:
