@@ -45,6 +45,28 @@
     </div>
     <div class="pane">
 
+    <!-- 服务状态预报（25.7）：加载时先探一次，用户点「执行抽取」之前就知道这次抽不抽得出东西
+         —— 原先只能先点、拿到空结果再猜。已有抽取结果时不显示：结果自带的 emptyReason
+         说的是抽取那一刻的真相，比事后探测更准。两个 Tab 都受服务状态影响，故放在标签之上。 -->
+    <div v-if="probeHint" class="nlp-off nlp-probe">
+      <span class="np-text">
+        <template v-if="probeHint === 'DISABLED'">
+          自动抽取功能<b>当前没有开启</b>，现在点「执行抽取」只会得到空结果；
+          开启由系统管理员在服务端完成，页面上无法自助打开。
+        </template>
+        <template v-else-if="probeHint === 'SERVICE_UNREACHABLE'">
+          <b>抽取服务当前连不上</b>，现在点「执行抽取」只会得到空结果；
+          请联系系统管理员恢复抽取服务，或先用下方「术语归一试算」直接查词典。
+        </template>
+        <template v-else>
+          抽取服务在跑，但<b>模型没有加载成功</b>，现在抽取只有规则兜底
+          （舌象、脉象、病因、治法），识别出的要素会明显偏少。
+        </template>
+      </span>
+      <!-- 探测结论是「此刻」的：服务恢复了但页面还是旧结论时，用户需要能手动再问一次 -->
+      <el-button link type="primary" :loading="nlpProbing" @click="probeNlp(true)">重新探测</el-button>
+    </div>
+
     <el-tabs v-model="activeTab" class="nlp-tabs">
       <!-- ============ 单条解析 ============ -->
       <el-tab-pane label="单条解析" name="single">
@@ -374,6 +396,7 @@ import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import { usePagedList } from '@/composables/usePagedList'
 import { useUrlFilters } from '@/composables/useUrlFilters'
+import { useNlpStatus } from '@/composables/useNlpStatus'
 import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
@@ -387,6 +410,10 @@ import { MULTI_AUTOSIZE } from '@/utils/recordFields'
 import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
 import { confirmBox } from '@/utils/confirm'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
+
+// 抽取服务状态（25.7）：模块级单例探测，与下方结构化数据卡片共用同一次探测结果。
+// 页面加载时先探一次，用户点「执行抽取」之前就能看到「这次抽不抽得出东西」。
+const { status: nlpStatus, loading: nlpProbing, probeNlp } = useNlpStatus()
 
 const activeTab = ref('single')
 // 批次4：批量任务列表的「只看有失败的」开关（报告 §2.11 第 3 行：长任务要能下钻到失败）
@@ -618,6 +645,17 @@ const emptyReason = computed(() => {
   if (!r || !resultEmpty.value) return ''
   if (r.unavailableReason) return r.unavailableReason
   return r.modelAvailable ? 'NO_ENTITY' : 'UNKNOWN'
+})
+
+/**
+ * 服务状态横幅（25.7）：只在「还没有抽取结果、且探测到服务降级」时出现。
+ *
+ * <p>已有 result 时不显示：结果自带的 emptyReason 说的是抽取那一刻的真相，比事后探测更准；
+ * 两条同时出现会出现「上方说连不上、下方结果又说摘到了要素」的自相矛盾。</p>
+ */
+const probeHint = computed(() => {
+  if (result.value) return ''
+  return nlpStatus.value?.unavailableReason || ''
 })
 
 // 结果来源标注：按原因各说一句，避免把「服务连不上」也说成「未开启」
@@ -906,6 +944,8 @@ const viewTask = async (id) => {
 onMounted(() => {
   search(1)
   loadBatchList()
+  // 先探一次服务状态：探测失败（后端连不上）不提示、不阻塞首屏，探测自身也不抛
+  probeNlp()
 })
 
 onBeforeUnmount(stopPoll)
@@ -1039,6 +1079,11 @@ onBeforeUnmount(stopPoll)
   color: #8a3d33;
 }
 .nlp-off b { color: var(--danger); }
+/* 服务状态横幅（25.7）：与「无产出」提示同款配色，区别在它是动手之前的预报；
+   正文用 span 包住，避免 flex 把每段文字拆成独立项而乱换行 */
+.nlp-probe { display: flex; align-items: center; gap: var(--sp-2); }
+.nlp-probe .np-text { flex: 1 1 auto; }
+.nlp-probe .el-button { flex: 0 0 auto; }
 
 /* 术语归一试算：词典直查，不依赖 NLP 服务 */
 .norm-tool {

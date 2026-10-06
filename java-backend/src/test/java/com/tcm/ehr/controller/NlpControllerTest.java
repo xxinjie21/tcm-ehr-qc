@@ -7,6 +7,7 @@ import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
+import com.tcm.ehr.domain.vo.NlpHealthVO;
 import com.tcm.ehr.service.INlpBatchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.eq;
@@ -100,6 +102,24 @@ class NlpControllerTest {
         assertEquals("舌红", out.getTongueList().get(0).getContent());
         assertEquals("舌红", out.getTongueList().get(0).getSourceText());
         assertNull(out.getTongueList().get(0).getNormLevel());
+    }
+
+    @Test
+    void healthPassesProbeResultThrough() {
+        // 探测结论完全由 PythonNlpClient.probe() 判定，Controller 只做转发：
+        // 这里只验证「探测到什么就回什么」，判定口径不在这一层重复实现
+        NlpHealthVO probe = new NlpHealthVO();
+        probe.setEnabled(true);
+        probe.setReachable(true);
+        probe.setModelAvailable(false);
+        probe.setUnavailableReason(NlpExtractVO.REASON_MODEL_MISSING);
+
+        PythonNlpClient client = mock(PythonNlpClient.class);
+        when(client.probe()).thenReturn(probe);
+
+        Result<NlpHealthVO> result = controller(client, null).health();
+        assertEquals(200, result.getCode());
+        assertSame(probe, result.getData());
     }
 
     private NlpExtractVO.Entity entity(String text) {

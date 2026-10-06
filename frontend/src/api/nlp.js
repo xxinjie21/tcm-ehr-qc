@@ -20,6 +20,12 @@ export function cancelNlpBatch(id) {
   return request.post(`/nlp/extract/batch/${id}/cancel`)
 }
 
+// 抽取服务健康探测：只问「开没开、在不在、模型有没有加载」，不发抽取请求。
+// 探测在后端不会失败（最坏回一份「连不上」）；超时给短一点，别让首屏被它拖住。
+export function getNlpHealth() {
+  return request.get('/nlp/health', { timeout: 5000 })
+}
+
 // 批量任务列表（最近 50 条）
 export function listNlpBatch() {
   return request.get('/nlp/extract/batch')

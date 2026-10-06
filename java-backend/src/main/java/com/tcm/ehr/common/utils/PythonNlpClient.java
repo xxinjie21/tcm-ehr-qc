@@ -1,7 +1,9 @@
 package com.tcm.ehr.common.utils;
 
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
+import com.tcm.ehr.domain.vo.NlpHealthVO;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +38,10 @@ public class PythonNlpClient {
 
     @Value("${nlp.enabled:false}")
     private boolean enabled;
+
+    /** 健康探测超时（毫秒）。探测是页面加载时顺带问一句，不能照抽取的 30s 等，默认 2s */
+    @Value("${nlp.probe-timeout:2000}")
+    private int probeTimeoutMs;
 
     public PythonNlpClient(ObjectMapper mapper) {
         this.mapper = mapper;
@@ -108,6 +114,56 @@ public class PythonNlpClient {
             log.warn("[NLP] 调用异常（{}），已降级为空 9 类、modelAvailable=false，术语归一无可归内容: {}",
                     serviceUrl, e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * 探测抽取服务状态（GET {serviceUrl}/health）。
+     *
+     * <p>与 {@link #extract(String)} 的分工：那条路要等模型推理，失败只能回 null；
+     * 这条路只问「在不在、模型有没有加载」，超时短、不写业务日志、**绝不抛异常**，
+     * 页面加载时想调就调。判定口径与 extract 保持一致：开关没开 = 没启用，
+     * HTTP 不通或非 200 = 连不上，通了但 modelAvailable=false = 模型未加载。</p>
+     *
+     * @return 探测结论；任何失败都落成「连不上」，不向上抛
+     */
+    public NlpHealthVO probe() {
+        NlpHealthVO health = new NlpHealthVO();
+        health.setEnabled(enabled);
+        // 1. 开关没开：不必发这次注定失败的 HTTP，原因直接给「未启用」
+        if (!enabled) {
+            health.setUnavailableReason(NlpExtractVO.REASON_DISABLED);
+            return health;
+        }
+        try {
+            // 2. 探测用 GET /health，超时取 probeTimeoutMs（默认 2s）
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(serviceUrl + "/health"))
+                    .timeout(Duration.ofMillis(probeTimeoutMs))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            // 3. 通了但非 200：服务在、但不健康，按连不上处理（与 extract 同口径）
+            if (response.statusCode() != 200) {
+                log.debug("[NLP] 健康探测 HTTP {}（{}），按连不上处理", response.statusCode(), serviceUrl);
+                health.setUnavailableReason(NlpExtractVO.REASON_UNREACHABLE);
+                return health;
+            }
+            health.setReachable(true);
+            // 4. 服务在跑：模型有没有加载由 /health 的 modelAvailable 说了算
+            Map<String, Object> body = mapper.readValue(response.body(),
+                    new TypeReference<Map<String, Object>>() { });
+            boolean modelAvailable = Boolean.TRUE.equals(body.get("modelAvailable"));
+            health.setModelAvailable(modelAvailable);
+            if (!modelAvailable) {
+                health.setUnavailableReason(NlpExtractVO.REASON_MODEL_MISSING);
+            }
+            return health;
+        } catch (Exception e) {
+            // 5. 连不上/超时/响应不是 JSON 都算「连不上」：探测失败不该让页面弹错
+            log.debug("[NLP] 健康探测失败（{}）: {}", serviceUrl, e.getMessage());
+            health.setUnavailableReason(NlpExtractVO.REASON_UNREACHABLE);
+            return health;
         }
     }
 }

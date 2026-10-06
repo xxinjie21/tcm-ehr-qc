@@ -12,6 +12,7 @@ import com.tcm.ehr.domain.dto.NlpBatchDTO;
 import jakarta.validation.Valid;
 import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
+import com.tcm.ehr.domain.vo.NlpHealthVO;
 import com.tcm.ehr.domain.vo.NlpTaskVO;
 import com.tcm.ehr.domain.vo.NlpTasksVO;
 import com.tcm.ehr.service.INlpBatchService;
@@ -89,6 +90,20 @@ public class NlpController {
         log.debug("[NLP] 抽取完成并归一：命中 {} 条（精确 {} / 包含 {} / 模糊 {}）",
                 stat.hit(), stat.exact(), stat.contain(), stat.fuzzy());
         return ResponseEntity.ok(Result.ok(vo));
+    }
+
+    /**
+     * 探测抽取服务是否可用。
+     *
+     * <p>【权限：登录即可】不发抽取请求，只问「开没开、在不在、模型有没有加载」；
+     * 探测本身永不报错，最坏也是一份「连不上」的结论。页面加载时调用一次，
+     * 用户就能在点「执行抽取」之前知道这次抽不抽得出东西，而不是拿到空结果后猜。</p>
+     *
+     * @return enabled / reachable / modelAvailable / unavailableReason（正常为 null）
+     */
+    @GetMapping("/health")
+    public Result<NlpHealthVO> health() {
+        return Result.ok(nlpClient.probe());
     }
 
     // ------------------------------------------------------------------ 批量解析（后台队列）

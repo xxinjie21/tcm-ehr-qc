@@ -974,6 +974,26 @@ components:
             SERVICE_UNREACHABLE=开关已开但抽取服务连不上（未启动 / 中途停止 / 返回非 200 / 调用异常）；
             MODEL_MISSING=服务在跑但模型未加载，本次仅规则兜底（舌象 / 脉象 / 病因 / 治法）。
             前端据此把「为什么没有产出」说准，不再合写成「未开启，或抽取服务暂时不可用」。
+    NlpHealthVO:
+      type: object
+      description: NLP 抽取服务健康探测结果（GET /api/nlp/health）
+      properties:
+        enabled:
+          type: boolean
+          description: 抽取总开关（nlp.enabled）；false 时后面的字段均无意义
+        reachable:
+          type: boolean
+          description: Python 抽取服务是否可达（已启用且 /health 返回 200）
+        modelAvailable:
+          type: boolean
+          description: 模型是否加载成功；服务不可达时为 false
+        unavailableReason:
+          type: string
+          nullable: true
+          enum: [DISABLED, SERVICE_UNREACHABLE, MODEL_MISSING]
+          description: >-
+            降级原因，取值与 NlpExtractVO.unavailableReason 同一套；一切正常为 null。
+            DISABLED=抽取总开关未开启；SERVICE_UNREACHABLE=服务连不上；MODEL_MISSING=服务在跑但模型未加载。
     # ========== LLM 运行时配置 DTO / VO（UX-68） ==========
     LlmConfigDTO:
       type: object
@@ -2426,6 +2446,32 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/nlp/health:
+    get:
+      tags:
+        - NLP抽取
+      summary: 探测抽取服务是否可用
+      description: >-
+        【权限：登录即可】只问「开没开、在不在、模型有没有加载」，不发抽取请求，也不写业务日志。
+        探测本身不会失败：未启用返回 enabled=false + unavailableReason=DISABLED；连不上返回
+        reachable=false + SERVICE_UNREACHABLE；服务在跑但模型未加载返回 modelAvailable=false +
+        MODEL_MISSING；一切正常时 unavailableReason 为 null。解析页在加载时调用一次，
+        让用户在点「执行抽取」之前就知道这次能不能抽出东西，而不是拿到空结果后猜。
+      responses:
+        '200':
+          description: 探测结论
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    $ref: '#/components/schemas/NlpHealthVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/governance/normalize:
     post:
       tags:
