@@ -1237,8 +1237,15 @@ components:
             type: string
     QcScoreDTO:
       type: object
-      description: 终末质控评分请求（入参）
+      description: |
+        终末质控评分请求（入参）。recordId 必填：服务端按其载入病历、再取该病历已存储的结构化
+        数据评分；请求内联的 structuredData 当前不参与评分，仅为契约兼容保留。
+      required:
+        - recordId
       properties:
+        recordId:
+          type: string
+          description: 待评分病历 ID
         structuredData:
           $ref: '#/components/schemas/StructuredData'
         qcResults:
@@ -2524,7 +2531,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/NormalizeVO'
         '400':
-          description: 术语类型非法（type 不在 disease/pattern/symptom/herb/formula 范围）
+          description: 术语类型非法（type 不在疾病/证候/症状/中药/方剂/舌象/脉象/治法八类，code=4001），或未填写术语（Bean Validation 前置，code=400）
           content:
             application/json:
               schema:
@@ -2860,7 +2867,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/QcScoreVO'
         '400':
-          description: structuredData 为空（code=2002）
+          description: recordId 为空（Bean Validation 前置，code=400），或该病历不存在；文案「请提供病历标识，或直接提交已抽取的结构化数据（两者至少给一项）」
           content:
             application/json:
               schema:
