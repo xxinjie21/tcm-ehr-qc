@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.common.utils.ExcelStreamReader;
 import com.tcm.ehr.common.utils.RequestUtils;
@@ -440,7 +441,7 @@ if (matched) {
     public Map<String, Object> reindex(String type, String org) throws IOException {
         // 1. 参数展开：type 空 = 全部类型；org 空 = 当前组织，org=* = 全部组织
         List<String> types = (type == null || type.isBlank())
-                ? new ArrayList<>(com.tcm.ehr.common.utils.TermTypes.ALL)
+                ? new ArrayList<>(EntityTypes.dictKeys())
                 : List.of(type);
         List<String> orgs = resolveReindexOrgs(org);
 

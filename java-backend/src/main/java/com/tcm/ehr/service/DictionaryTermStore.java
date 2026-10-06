@@ -1,7 +1,7 @@
 package com.tcm.ehr.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.tcm.ehr.common.utils.TermTypes;
+import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.DictionaryVersion;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -351,7 +351,7 @@ public class DictionaryTermStore {
         Map<String, String> base = versionsOf(BASE_ORG);
         Map<String, String> own = org.isEmpty() ? Map.of() : versionsOf(org);
         StringBuilder sb = new StringBuilder();
-        for (String type : TermTypes.ALL) {
+        for (String type : EntityTypes.dictKeys()) {
             // 本组织没配这一类就回退基础层 —— 与 readEffective 的回落口径保持一致
             String v = own.getOrDefault(type, base.get(type));
             if (v != null && !v.isBlank()) {
@@ -384,7 +384,7 @@ public class DictionaryTermStore {
         Map<String, Integer> base = countsOf(BASE_ORG);
         Map<String, Integer> own = org.isEmpty() ? Map.of() : countsOf(org);
         int sum = 0;
-        for (String type : TermTypes.ALL) {
+        for (String type : EntityTypes.dictKeys()) {
             Integer n = own.containsKey(type) ? own.get(type) : base.get(type);
             if (n != null) {
                 sum += n;

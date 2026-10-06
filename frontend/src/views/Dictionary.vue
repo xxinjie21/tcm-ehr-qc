@@ -447,7 +447,7 @@ const mergeImpact = computed(() => {
 })
 
 /**
- * 术语类型的中文标签（与后端 TermTypes.ALL 同源）。
+ * 术语类型的中文标签（与后端 EntityTypes.dictKeys() 同源）。
  *
  * <p><b>必须声明在 TYPE_OPTIONS 之前</b>：<code>const</code> 是块级作用域且有 TDZ，
  * 上层在初始化时读到下层的 const 会抛

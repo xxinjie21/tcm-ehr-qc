@@ -2,12 +2,12 @@ package com.tcm.ehr.controller;
 
 import com.tcm.ehr.common.annotation.RequireOrgRole;
 import com.tcm.ehr.common.annotation.RequireRole;
+import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.PageSizeGuard;
 import com.tcm.ehr.common.utils.RequestUtils;
-import com.tcm.ehr.common.utils.TermTypes;
 import com.tcm.ehr.domain.dto.DictProposalDTOs;
 import com.tcm.ehr.domain.po.DictArchiveVersion;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -68,15 +68,15 @@ public class DictionaryController {
      *
      * null 与空白视为「不按类型过滤」并放行。
      *
-     * ⚠️ TermTypes.ALL 是 Set.of(...)，不接受 null，contains(null) 会抛 NPE 变成 500。
-     * 所以参数可空的端点（本类的 type 可选）必须先挡掉 null，
-     * 否则「省略参数」比「传错参数」错得更离谱。
+     * ⚠️ 先挡 null/空白再 contains，是语义需要而非防 NPE：EntityTypes.dictKeys() 返回可含 null 查询的 LinkedHashSet，
+     * 但参数可空的端点（本类的 type 可选）省略 type 表示「不按类型过滤」，
+     * 若直接 contains 就会把「省略参数」判成「传错参数」。
      */
     private static ResponseEntity<Result<String>> badType(String type) {
         if (type == null || type.isBlank()) {
             return null;
         }
-        if (!TermTypes.ALL.contains(type)) {
+        if (!EntityTypes.dictKeys().contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         return null;
@@ -450,7 +450,7 @@ public class DictionaryController {
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "org", required = false) String org) throws IOException {
         // type 可空（= 全部类型），故不能用 badType 直接挡空；只校验「填了就必须合法」
-        if (type != null && !type.isBlank() && !TermTypes.ALL.contains(type)) {
+        if (type != null && !type.isBlank() && !EntityTypes.dictKeys().contains(type)) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
         return ResponseEntity.ok(Result.ok(dictionaryService.reindex(type, org)));

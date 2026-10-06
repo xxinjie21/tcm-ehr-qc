@@ -2,7 +2,7 @@ package com.tcm.ehr.common.config;
 
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.service.IDictionaryFileService;
-import com.tcm.ehr.common.utils.TermTypes;
+import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.service.DictionaryTermStore;
 import com.tcm.ehr.service.IEsTermIndexService;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -92,7 +92,7 @@ public class DataInitializationListener implements ApplicationRunner {
      * 才算该组织已同步；灌失败不更新它，下次启动自然还会重建。
      */
     private void loadDictionaries() {
-        for (String type : TermTypes.ALL) {
+        for (String type : EntityTypes.dictKeys()) {
             try {
                 seedBaseIfEmpty(type);
                 reconcileOne(type);
