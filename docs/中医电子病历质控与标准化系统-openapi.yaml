@@ -24,7 +24,7 @@ info:
     - code: 200成功；400参数非法；401未登录/token失效；403权限不足；404资源不存在；405方法不支持；409数据冲突（唯一键/外键）；415请求内容类型不支持；500服务异常。
     - 登录态：非登录接口需在请求头携带 Authorization: Bearer <token>。
     - 实体识别无结果统一返回空数组 []，禁止返回 null。
-    - 分页统一参数：page（从1开始）、pageSize（单页上限 500，超出按 500 截断，避免一次拉全表）。
+    - 分页统一参数：page（从1开始）、pageSize（单页上限 500，超出按 500 截断，避免一次拉全表）。注意 POST /api/records/search 的入参 body.pageSize 另限 200（见 SearchDTO），超限直接 400 —— 两处上限不同是有意为之。
     - 错误响应统一结构见 ErrorVO（code/msg/data，非 200 时 data 为 null）。
   version: 1.0.0
 servers:
@@ -774,7 +774,9 @@ components:
           example: 1
         pageSize:
           type: integer
+          maximum: 200
           example: 20
+          description: 每页条数，上限 200（超过返回 400）；与查询参数分页的 500 上限不同，此处刻意更小，防止一次拉全表绕过导出权限
     SearchVO:
       type: object
       description: 查询响应（出参）
