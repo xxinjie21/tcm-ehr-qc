@@ -1,9 +1,15 @@
 package com.tcm.ehr.common.config;
 
+import com.tcm.ehr.domain.vo.NlpExtractVO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -83,5 +89,35 @@ class EntityTypesDictionaryRegistrationTest {
     void stillNineTypes() {
         assertEquals(9, EntityTypes.all().size());
         assertEquals(8, EntityTypes.dictKeys().size(), "8 类有词典，病因除外");
+    }
+
+    @Test
+    @DisplayName("dictKeys() 是 all() 的过滤视图，不是与 ALL 并列的第二份清单（批次 25.b）")
+    void dictKeysIsDerivedFromAll() {
+        // 8 与 9 的关系必须是「筛出来的」：若两处各维护一份，新增类型时会静默分叉，
+        // 表现为「目录里有、词典播种/未归一判定却看不到」这类无编译错误的漏改。
+        List<String> expected = EntityTypes.all().stream()
+                .filter(EntityTypes.EntityType::dict)
+                .map(EntityTypes.EntityType::key)
+                .toList();
+        assertEquals(expected, List.copyOf(EntityTypes.dictKeys()));
+        // 有词典 ⇔ 文件名非空；无词典 ⇒ 文件名为 null：dict 标志与 fileName 同生同死。
+        for (EntityTypes.EntityType t : EntityTypes.all()) {
+            assertEquals(t.dict(), t.fileName() != null && !t.fileName().isBlank(),
+                    t.key() + " 的 dict 标志与 fileName 不一致");
+        }
+    }
+
+    @Test
+    @DisplayName("NlpExtractVO 覆盖 ALL 的每一个 structuredKey（加类型必须同时加字段）")
+    void nlpExtractVoExposesEveryStructuredKey() {
+        // 出参是 ALL 的视图：目录加了类型、VO 没加字段，抽取结果就会在响应组装处被丢掉。
+        Set<String> voFields = Arrays.stream(NlpExtractVO.class.getDeclaredFields())
+                .map(Field::getName)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        for (EntityTypes.EntityType t : EntityTypes.all()) {
+            assertTrue(voFields.contains(t.structuredKey()),
+                    "NlpExtractVO 缺少字段 " + t.structuredKey() + "（类型 " + t.key() + "）");
+        }
     }
 }

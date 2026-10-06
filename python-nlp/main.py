@@ -29,7 +29,9 @@ MAX_TEXT_CHARS = 20000
 # NER 的 token 上限；超出部分模型看不到（规则兜底仍用全文，见 _rules）
 NER_MAX_TOKENS = 510
 
-# NER 标签类型 → 结构化字段（来源不映射 9 类，丢弃）
+# NER 标签类型 → 结构化字段（来源不映射 9 类，丢弃）。
+# 这只是「模型能输出的标签集」这一维度的 5 个值，是 EntityTypes.ALL 的过滤视图，
+# 不是结构化字段目录本身 —— 不要把它与 Java 侧字段清单对齐长度（批次 25.b 定案）。
 LABEL_FIELD = {
     "病名": "diseases",
     "症状": "symptoms",
