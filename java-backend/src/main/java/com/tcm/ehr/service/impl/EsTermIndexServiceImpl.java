@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.VersionedCache;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.service.IEsTermIndexService;
 import lombok.RequiredArgsConstructor;
@@ -66,16 +67,21 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      * <p><b>失效必须做对</b>：词表重建会改变召回结果，所以 {@link #rebuild} 一开始就清空整个缓存
      * —— 否则重建后仍命中旧结果，表现就是「改了词表却看不到变化」的脏读，正是 12g 要避免的那一类。
      * 上限固定（LRU 逐出），避免长跑进程里无界增长。</p>
+     *
+     * <p><b>为什么改用 {@link VersionedCache} 而不是自己包一层 LinkedHashMap</b>（批次14 审核）：
+     * 「有界 + LRU 逐出」这件事全仓已有 owner，自己再写一份等于两套逐出口径。
+     * 但**不能**直接换成 {@code VersionedCache.get(key, version, loader)} —— 那个方法把 loader
+     * 放在锁里执行，而本类的装载是一次 ES 网络往返，放进锁里会把并发检索全部串行化（性能回退）。
+     * 所以用它的两段式接口：{@code getIfPresent}（锁内，只读）→ 未命中则在**锁外**查 ES →
+     * {@code put}（锁内，只写）。这与改造前 {@code Collections.synchronizedMap} 的行为一致：
+     * 查 ES 始终在锁外。代价是并发同键可能各查一次（有意的取舍，见 getIfPresent 注释）。</p>
+     *
+     * <p>这里不需要版本串：失效是全量显式清空（{@link #clearRecallCache}，rebuild 时调用），
+     * 而不是靠版本比对。</p>
      */
     private static final int RECALL_CACHE_MAX = 4096;
 
-    private static final java.util.Map<String, List<TermEntry>> RECALL_CACHE =
-            java.util.Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(java.util.Map.Entry<String, List<TermEntry>> eldest) {
-                    return size() > RECALL_CACHE_MAX;
-                }
-            });
+    private static final VersionedCache<List<TermEntry>> RECALL_CACHE = new VersionedCache<>(RECALL_CACHE_MAX);
 
     /** 清空召回缓存（词表重建后必须调用；包级可见以便测试直接清） */
     static void clearRecallCache() {
@@ -187,7 +193,7 @@ doc.put("standard_term", e.getStandardTerm());
         // 同批 LRU（批次 12 · 12b）：同术语重复归一不再打 ES。命中即返回，缓存里存的是
         // List.copyOf 的不可变副本 —— 否则调用方改了返回列表就把缓存内容也改了。
         String cacheKey = type + "|" + org + "|" + input;
-        List<TermEntry> cached = RECALL_CACHE.get(cacheKey);
+        List<TermEntry> cached = RECALL_CACHE.getIfPresent(cacheKey);
         if (cached != null) {
             return cached;
         }
