@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -294,13 +295,16 @@ class NlpBatchServiceImplTest {
     }
 
     /**
-     * {@code @PreDestroy}：还排在队列里、没被 worker 取走的任务没有 finally 可跑，
-     * 必须在这里补标为「已中断」，否则重启后会显示成一条永远「排队中」的僵尸任务。
+     * 批次 16.2：{@code QUEUED} 现在是<b>持久化的「待认领队列」</b>。
+     *
+     * <p>停机<b>不得</b>再把它一刀切标成「已中断」—— 那会让「提交完就滚动发布」变成任务白提交。
+     * 正确行为是原样留在库里，由本实例下次启动或另一个实例认领续跑。</p>
+     *
+     * <p>（旧实现必须补标，因为任务 ID 只活在内存队列里，进程一走就没人认领了。）</p>
      */
     @Test
-    void shutdownMarksQueuedTasksInterrupted() {
+    void shutdownLeavesQueuedTasksForLaterClaim() {
         NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
-        when(taskMapper.update(any(), any())).thenReturn(2);
 
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), mock(NlpTaskItemMapper.class), mock(PythonNlpClient.class), mock(EntityNormalizer.class),
@@ -312,20 +316,62 @@ class NlpBatchServiceImplTest {
 
         svc.shutdown();
 
+        verify(taskMapper, Mockito.never()).update(any(), any());
+    }
+
+    /**
+     * 批次 16.2 的核心：认领必须是「取候选 + <b>带 status 条件</b>的原子更新」。
+     *
+     * <p>取候选不加锁，几个实例查到同一批是常态；互斥全在
+     * {@code UPDATE ... WHERE id=? AND status='QUEUED'} 上 —— 受影响行数为 1 才算抢到，
+     * 为 0 要跳过继续抢下一个。这里让第一个候选抢输（返回 0）、第二个抢赢（返回 1），
+     * 断言返回的是第二个，并且两次更新的条件里都带着 {@code status=QUEUED}。</p>
+     */
+    @Test
+    void claimNextTaskSkipsLostRacesAndUsesStatusConditionalUpdate() {
+        NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
+        NlpTask first = new NlpTask();
+        first.setId("t-a");
+        NlpTask second = new NlpTask();
+        second.setId("t-b");
+        when(taskMapper.selectList(any())).thenReturn(List.of(first, second));
+        when(taskMapper.update(any(), any())).thenReturn(0, 1);
+
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
+                mock(RecordMapper.class), mock(NlpTaskItemMapper.class), mock(PythonNlpClient.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
+                new ObjectMapper(), distLock(true));
+
+        assertEquals("t-b", svc.claimNextTask(), "抢输的候选要跳过，继续抢下一个");
+
         @SuppressWarnings("unchecked")
         ArgumentCaptor<UpdateWrapper<NlpTask>> captor = ArgumentCaptor.forClass(UpdateWrapper.class);
-        verify(taskMapper).update(any(), captor.capture());
+        verify(taskMapper, Mockito.times(2)).update(any(), captor.capture());
         // 断言绑定值而不是比 SQL 字符串。两个坑：
         // ① getSqlSegment() 要先调 —— where 段是惰性 lambda，不渲染就不会把参数放进 paramNameValuePairs；
-        // ② 用 ArrayList 而不是 List.copyOf —— 后者遇 null 直接 NPE，
-        //    而这里 set("current_label", null) 正会绑定一个 null。
-        UpdateWrapper<NlpTask> wrapper = captor.getValue();
-        String where = wrapper.getSqlSegment();
-        List<Object> bound = new ArrayList<>(wrapper.getParamNameValuePairs().values());
+        // ② 用 ArrayList 而不是 List.copyOf —— 后者遇 null 直接 NPE。
+        for (UpdateWrapper<NlpTask> wrapper : captor.getAllValues()) {
+            String sql = wrapper.getSqlSegment();
+            List<Object> bound = new ArrayList<>(wrapper.getParamNameValuePairs().values());
+            assertTrue(sql.contains("status"), "认领更新必须带 status 条件：" + sql);
+            assertTrue(bound.contains(NlpTask.QUEUED), "条件必须是 status=QUEUED（只有排队中才能被认领）：" + bound);
+            assertTrue(bound.contains(NlpTask.RUNNING), "认领成功要置 RUNNING：" + bound);
+        }
+    }
 
-        assertTrue(where.contains("status"), "where 应带 status 条件：" + where);
-        assertTrue(bound.contains(NlpTask.INTERRUPTED), "set 应标记为已中断：" + bound);
-        assertTrue(bound.contains(NlpTask.QUEUED), "where 应筛选排队中的任务：" + where + " / " + bound);
+    /** 没有排队任务时不碰库（认领更新一次都不该发） */
+    @Test
+    void claimNextTaskReturnsNullWhenNothingQueued() {
+        NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
+        when(taskMapper.selectList(any())).thenReturn(new ArrayList<>());
+
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
+                mock(RecordMapper.class), mock(NlpTaskItemMapper.class), mock(PythonNlpClient.class),
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
+                new ObjectMapper(), distLock(true));
+
+        assertNull(svc.claimNextTask());
+        verify(taskMapper, Mockito.never()).update(any(), any());
     }
 
     /**

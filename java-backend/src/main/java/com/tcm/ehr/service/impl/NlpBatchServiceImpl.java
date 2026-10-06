@@ -41,18 +41,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
  * NLP 批量解析任务服务实现。
  *
- * <p><b>生产者-消费者</b>：{@link #queue} 存待跑任务ID，固定 {@code nlp.batch.concurrency}（默认 2）
- * 个工作线程从队列取任务执行；任务与进度写 {@code nlp_task} 表，故前端可提交后离开、轮询进度。</p>
+ * <p><b>DB 轮询认领</b>（批次 16.2）：任务落库为 {@code QUEUED}，固定 {@code nlp.batch.concurrency}
+ * （默认 2）个工作线程各自轮询 {@code nlp_task} 并用「{@code UPDATE ... WHERE status='QUEUED'}」
+ * 的原子性认领（受影响行数为 1 才算拿到）。不引入消息中间件 —— DB 是任务状态的唯一权威，
+ * 多实例下同一任务只会被一个实例跑；前端可提交后离开、轮询进度。</p>
  *
  * <ul>
  * <li>取数走 {@link RecordFilter}（数据域 + 筛选）与分页循环，绝不一次载入全量；</li>
@@ -60,7 +60,8 @@ import java.util.concurrent.TimeUnit;
  * 打词典版本 → 写 {@code records.structured_data}（与单条抽取口径一致）；</li>
  * <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 {@code failure_truncated}；</li>
  * <li>取消：QUEUED 直接置 {@code CANCELLED}；RUNNING 置取消位，工作线程在条/页边界退出；</li>
- * <li>重启（K-c）：{@code RUNNING}/{@code QUEUED} 一律标记 {@code INTERRUPTED}，可重跑。</li>
+ * <li>重启（K-c）：{@code RUNNING} 标记 {@code INTERRUPTED}（无法续跑，可重跑）；
+ * {@code QUEUED} 是持久待认领队列，重启后由任意实例认领续跑，不再清理。</li>
  * </ul>
  */
 @Slf4j
@@ -73,8 +74,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private static final int MAX_FAILURES = 500;
     /** 「最近任务」列表的上限；超出时回 truncated=true，别让页面把这一页当全部 */
     private static final int LIST_LIMIT = 50;
-    /** 提交互斥锁名：跨实例只允许一个「查重 + 入队」同时进行 */
+    /** 提交互斥锁名：跨实例只允许一个「查重 + 入库」同时进行 */
     private static final String SUBMIT_LOCK = "tcm:nlp_batch:submit";
+    /** 无待认领任务时 worker 的轮询间隔（毫秒）；也就是「提交后最长多久开始跑」 */
+    private static final long POLL_INTERVAL_MS = 1000;
+    /** 一次认领扫描最多取几个候选：小批即可，避免一次把本实例的 worker 全占满 */
+    private static final int CLAIM_BATCH = 5;
 
     private final NlpTaskMapper taskMapper;
     private final RecordMapper recordMapper;
@@ -91,8 +96,6 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     @Value("${nlp.batch.concurrency:2}")
     private int concurrency;
 
-    private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
-    /** 运行中任务的取消位 */
     /**
      * 已请求取消的任务 ID（仅本进程可见，不是跨实例的权威）。
      *
@@ -100,17 +103,6 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 该列由 cancel() 的运行中分支写入 —— 只置本集合的话，重启或换实例取消都无效。
      */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
-    /**
-     * 按记录ID集合执行的任务（导入后自动解析）：仅内存持有。
-     * 重启后这些任务被 K-c 标记为 INTERRUPTED、不会续跑，故无需落库占存储。
-     */
-    /**
-     * 「导入后自动解析」的记录 ID 集合（按任务）。
-     *
-     * <p><b>单实例前提</b>：只在内存，重启即失（对应任务已被标 {@code INTERRUPTED}，可重跑）。
-     * 多实例部署时这里必须改为落库，否则 B 实例取不到 A 实例提交的任务范围。
-     * 见批次 16。</p>
-     */
 
     private volatile boolean running;
     private ExecutorService workers;
@@ -119,7 +111,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     @PostConstruct
     void init() {
-        // 1. 重启兜底：上次没跑完的任务无法续跑，统一标为已中断（可重跑）
+        // 1. 重启兜底：上次 RUNNING 的任务无法续跑（本进程的执行栈已丢），标为已中断（可重跑）。
+        //    ⚠️ 批次 16.2 起**不再清理 QUEUED**：它现在是持久化的「待认领队列」，
+        //    留在库里由任意实例认领续跑；一刀切标中断会把正常排队的任务误杀。
+        //    已知残留：多实例滚动重启时，B 实例启动的这一步仍会把 A 实例**正在 RUNNING**
+        //    的任务标中断（对端 worker 收尾会覆写回自己的终态，属瞬态）。彻底解决需要
+        //    owner/heartbeat 列，超出本工作项范围。
         //    ⚠️ 必须兜底：这一步直连 DB，而本方法由 @PostConstruct 触发，
         //    异常会向上抛成 Bean 初始化失败 → 整个应用起不来。
         //    与既有口径一致（ES / Redis 探活失败只告警不阻塞启动）：
@@ -127,7 +124,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         int n = 0;
         try {
             n = taskMapper.update(null, new UpdateWrapper<NlpTask>()
-                    .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED))
+                    .eq("status", NlpTask.RUNNING)
                     .set("status", NlpTask.INTERRUPTED)
                     .set("current_label", null)
                     .set("finished_at", LocalDateTime.now().withNano(0)));
@@ -145,7 +142,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             t.setDaemon(true);
             return t;
         });
-        // 3. 每个线程跑同一个"取任务"循环
+        // 3. 每个线程跑同一个「认领任务」循环
         for (int i = 0; i < threads; i++) {
             workers.submit(this::workerLoop);
         }
@@ -168,29 +165,26 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        // 还排在队列里、没被 worker 取走的任务没有 finally 可跑，在这里补标。
-        // 刻意放在 awaitTermination 之后：否则会被 worker 的收尾覆盖。
-        int queued = taskMapper.update(null, new UpdateWrapper<NlpTask>()
-                .in("status", List.of(NlpTask.QUEUED))
-                .set("status", NlpTask.INTERRUPTED)
-                .set("current_label", null)
-                .set("finished_at", LocalDateTime.now().withNano(0)));
-        if (queued > 0) {
-            log.warn("[批解析] 停机：{} 个排队任务已标记为『已中断』", queued);
-        }
+        // 批次 16.2：停机**不再清理 QUEUED**。它们现在就是「待认领队列」，
+        // 留在库里由本实例下次启动或另一个实例认领续跑；一刀切标中断会让
+        // 「提交完就重启 / 滚动发布」变成任务白提交。
+        // （原先必须补标，是因为任务 ID 只活在内存队列里，进程一走就没人认领了。）
     }
 
     private void workerLoop() {
-        // 1. 常驻轮询取任务：1s 间隔让 running=false 能被及时看到
+        // 1. 常驻轮询认领（批次 16.2）：DB 是任务状态的唯一权威。
+        //    多实例下靠 claimNextTask() 里「UPDATE ... WHERE status='QUEUED'」的原子性互斥，
+        //    同一个任务只会被一个实例 / 线程认领；running=false 也会在轮询间隔内被看到。
         while (running) {
-            String id;
+            String id = null;
             try {
-                id = queue.poll(1, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
+                id = claimNextTask();
+            } catch (Exception e) {
+                // 认领本身失败（DB 抖动）不能让 worker 线程死掉：告警后退避重试
+                log.warn("[批解析] 认领排队任务失败，{}ms 后重试: {}", POLL_INTERVAL_MS, e.getMessage());
             }
             if (id == null) {
+                sleepQuietly(POLL_INTERVAL_MS);
                 continue;
             }
             // 2. 执行任务；兜底异常走标记失败，避免线程静默死掉
@@ -203,14 +197,58 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
+    /**
+     * 从库里认领一个排队中的任务（批次 16.2 的核心）。
+     *
+     * <p>「取候选」故意不加锁：几个 worker / 几个实例查到同一批是常态。
+     * 真正的互斥发生在随后的条件更新上 ——
+     * {@code UPDATE nlp_task SET status='RUNNING', started_at=? WHERE id=? AND status='QUEUED'}，
+     * <b>受影响行数为 1 才算认领成功</b>；为 0 说明已被别人抢先，继续看下一个候选。
+     * 不写 {@code cancel_requested}：认领前后刚到达的取消必须保留，由执行期的取消位读取兜住。</p>
+     *
+     * @return 认领到的任务 ID；当前没有可认领的任务时为 {@code null}
+     */
+    String claimNextTask() {
+        List<NlpTask> candidates = taskMapper.selectList(new QueryWrapper<NlpTask>()
+                .eq("status", NlpTask.QUEUED)
+                .orderByAsc("create_time")
+                .orderByAsc("id")
+                .last("LIMIT " + CLAIM_BATCH));
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        for (NlpTask candidate : candidates) {
+            int claimed = taskMapper.update(null, new UpdateWrapper<NlpTask>()
+                    .eq("id", candidate.getId())
+                    .eq("status", NlpTask.QUEUED)
+                    .set("status", NlpTask.RUNNING)
+                    .set("started_at", now));
+            if (claimed == 1) {
+                log.info("[批解析] 已认领排队任务 {}", candidate.getId());
+                return candidate.getId();
+            }
+        }
+        return null;
+    }
+
+    /** 睡一会儿；被打断时保留中断位尽快返回，让 workerLoop 重新检查 running */
+    private void sleepQuietly(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     // ------------------------------------------------------------------ 对外接口
 
     /**
      * 按筛选范围提交批量解析任务，异步入队后立即返回。
      *
      * <p>先统计范围内病历数作为计划总数（{@code limit > 0} 时取较小值），筛选条件经严格序列化
-     * 落库 —— 序列化失败直接拒绝提交，避免任务静默退化成全库扫描。任务以 QUEUED 状态入库并投入
-     * 队列，由工作线程消费；返回的视图不含失败明细。</p>
+     * 落库 —— 序列化失败直接拒绝提交，避免任务静默退化成全库扫描。任务以 QUEUED 状态入库，
+     * 由工作线程轮询认领（批次 16.2）；返回的视图不含失败明细。</p>
      *
      * @param dto 批量请求（filters + 可选 limit），可为 null
      * @param createdBy 提交人
@@ -287,9 +325,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 throw dup;
             }
 
-            // 4. 入队后立即返回，由工作线程异步消费。
-            //    批次 26.2：入队推迟到事务提交之后（行可见才投递），否则 worker 可能先于提交取到 id
-            DistLock.afterCommit(() -> queue.offer(t.getId()));
+            // 4. 落库后立即返回，由工作线程轮询认领、异步执行。
+            //    批次 16.2：不再有内存投递，故 26.2 那个「推迟到提交后投递」的时序问题
+            //    自然消失 —— 事务未提交时，别的实例与本实例的 worker 都查不到这行。
             log.info("[批解析] 已提交任务 {}：计划 {} 条", t.getId(), total);
             return toVO(t, false);
         });
@@ -385,7 +423,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             // 清理失败不能挡住提交
             log.warn("[批解析] 清理过期任务明细失败（不影响提交）: {}", e.getMessage());
         }
-        queue.offer(t.getId());
+        // 批次 16.2：不再内存投递；任务已落库为 QUEUED，worker 轮询会认领它。
         log.info("[批解析] 已提交按ID任务 {}：计划 {} 条", t.getId(), ids.size());
         return toVO(t, false);
     }
@@ -428,21 +466,37 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (!satisfiesGroup(t)) {
             throw new ForbiddenException("无权操作该任务");
         }
-        // 2. 排队中：还没进 worker，直接落终态
+        // 2. 排队中：还没被任何 worker 认领，用**带状态条件**的原子更新落终态。
+        //    批次 16.2：认领同样是「UPDATE ... WHERE id=? AND status='QUEUED'」，
+        //    这里若沿用无条件的 updateById，会和认领互相覆盖 —— 取消把任务改回 CANCELLED，
+        //    而 worker 已认领、会继续跑并在收尾时覆写终态，取消就静默丢了。
+        boolean claimedByWorker = false;
         if (NlpTask.QUEUED.equals(t.getStatus())) {
-            t.setStatus(NlpTask.CANCELLED);
-            t.setFinishedAt(LocalDateTime.now().withNano(0));
-            taskMapper.updateById(t);
-            // 内存取消位一并置：worker 可能已 poll 到该任务、还没读到状态
-            cancelFlags.add(id);
-        } else if (NlpTask.RUNNING.equals(t.getStatus())) {
-            // 3. 运行中：不能直接改状态（worker 还会覆写），取消位必须同时落内存与库。
-            //    只置内存的话，worker 的 isCancelRequested 永远读到 0，
-            //    跨实例与重启后的取消都会静默失效。
+            int cancelled = taskMapper.update(null, new UpdateWrapper<NlpTask>()
+                    .eq("id", id)
+                    .eq("status", NlpTask.QUEUED)
+                    .set("status", NlpTask.CANCELLED)
+                    .set("finished_at", LocalDateTime.now().withNano(0)));
+            if (cancelled == 1) {
+                t.setStatus(NlpTask.CANCELLED);
+                t.setFinishedAt(LocalDateTime.now().withNano(0));
+                // 内存取消位一并置：本实例 worker 可能刚认领成功、还没读到状态
+                cancelFlags.add(id);
+            } else {
+                // 受影响行数为 0：已被认领（或已进终态）。重读一次再决定走哪个分支
+                t = taskMapper.selectById(id);
+                claimedByWorker = t != null && NlpTask.RUNNING.equals(t.getStatus());
+            }
+        }
+        // 3. 运行中（或刚被认领）：不能直接改状态（worker 还会覆写），取消位必须同时落内存与库。
+        //    只置内存的话，worker 的 isCancelRequested 永远读到 0，
+        //    跨实例与重启后的取消都会静默失效。
+        if (claimedByWorker || NlpTask.RUNNING.equals(t.getStatus())) {
             cancelFlags.add(id);
             taskMapper.update(null, new UpdateWrapper<NlpTask>()
                     .eq("id", id)
                     .set("cancel_requested", 1));
+            t.setCancelRequested(1);
         }
         return toVO(t, false);
     }
