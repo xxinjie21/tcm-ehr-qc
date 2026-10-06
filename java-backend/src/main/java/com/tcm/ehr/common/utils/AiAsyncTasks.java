@@ -12,7 +12,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
@@ -159,11 +158,5 @@ public class AiAsyncTasks {
         } catch (Exception e) {
             return "";
         }
-    }
-
-    /** 供测试与关停使用：等池子停下来 */
-    public void shutdown() throws InterruptedException {
-        pool.shutdown();
-        pool.awaitTermination(5, TimeUnit.SECONDS);
     }
 }
