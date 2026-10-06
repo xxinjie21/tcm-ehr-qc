@@ -33,61 +33,6 @@
       </div>
     </PanelCard>
 
-    <!-- 质控评分标准：直接展示自然语言描述（与规则同源） -->
-    <PanelCard title="质控评分标准">
-      <template #header>
-        <span>质控评分标准</span>
-        <!-- 无写权限时不隐藏按钮，而是禁用并常驻写明原因：
-             藏起来用户只会以为「这页没有这个功能」，永远不知道是权限问题 -->
-        <el-button link type="primary" class="hd-action" :disabled="!canWriteRules" @click="openRules">规则配置</el-button>
-        <span v-if="!canWriteRules" class="tip">需管理员、组织所有者或被授权成员才能改规则</span>
-      </template>
-      <!-- 标准摘要：把当前生效的规则用自然语言摊开，改规则即随之变化（与规则同源） -->
-      <div v-if="rules" class="std-grid">
-        <div class="st">
-          <span class="st-k">病历应包含</span>
-          <span class="st-v">
-            <span v-for="e in rules.completeness.elements" :key="e.name" class="chip">{{ e.name }}</span>
-          </span>
-        </div>
-        <div class="st">
-          <span class="st-k">缺失扣分</span>
-          <span class="st-v">完全缺失 -{{ rules.completeness.elements[0]?.weightFull ?? 12 }} ／ 未结构化 -{{ rules.completeness.elements[0]?.weightPartial ?? 6 }}</span>
-        </div>
-        <div class="st">
-          <span class="st-k">格式</span>
-          <span class="st-v">{{ rules.format.map((f) => f.label || f.field).join('、') || '未配置' }}</span>
-        </div>
-        <div class="st">
-          <span class="st-k">一致性</span>
-          <span class="st-v">{{ rules.consistencySummary || '—' }}</span>
-        </div>
-        <div class="st">
-          <span class="st-k">术语标准化</span>
-          <span class="st-v">{{ rules.standardization.enabled
-            ? ('开 · 未命中词典的每个 -' + rules.standardization.weightEach
-               + '；超过 ' + rules.standardization.cap + ' 个后，每再满 '
-               + rules.standardization.cap + ' 个追加一档（分段扣分，避免大量未归一时触顶、分数失去区分度）')
-            : '已关闭' }}</span>
-        </div>
-        <div class="st">
-          <span class="st-k">重复</span>
-          <span class="st-v">-{{ rules.duplicateWeight }}</span>
-        </div>
-        <div class="st">
-          <span class="st-k">分级</span>
-          <span class="st-v">合格 ≥{{ rules.thresholds.qualified }} ／ 无效 &lt;{{ rules.thresholds.invalid }} 或真缺失 ≥{{ rules.thresholds.seriousFullMissing }}</span>
-        </div>
-      </div>
-      <!-- 完整规则说明收进折叠区：默认只看摘要，需要细节时再展开 -->
-      <el-collapse v-if="descriptions.length" class="std-detail">
-        <el-collapse-item title="查看完整规则说明" name="d">
-          <div v-for="(l, i) in descriptions" :key="i" class="std-desc">· {{ l }}</div>
-        </el-collapse-item>
-      </el-collapse>
-      <div v-if="ruleWarnings.length" class="trunc-hint">规则告警：{{ ruleWarnings.join('；') }}</div>
-      <EmptyState v-if="!rules" text="标准加载中…" :image-size="60" />
-    </PanelCard>
 
     <!-- 规则配置（管理员 / 所有者 / 被授权成员）：句子清单 + 就地编辑，保存即生效 -->
     <QcRulesDialog
@@ -138,9 +83,12 @@
 
     <!-- AI 预检列表：与「病历数据」共用同一套 searchRecords 查询，扣分范围沿用上方筛选 -->
     <PanelCard title="AI 预检列表 / 扣分明细">
-      <div class="precheck-bar">
-        <span class="tip">点击行查看规则扣分明细；扣分范围沿用上方「范围查询」</span>
-      </div>
+      <!-- M20：原「点击行查看…」提示条独占一行（约 40px）。并进卡头后，
+           首条扣分明细在 1366×768 下从 y=776 提前到屏内（标题行本来就有 48px 高） -->
+      <template #header>
+        <span>AI 预检列表 / 扣分明细</span>
+        <span class="tip" style="font-weight: normal">点击行查看规则扣分明细；扣分范围沿用上方「范围查询」</span>
+      </template>
 
       <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动 -->
       <RecordTable
@@ -172,6 +120,71 @@
         @current-change="loadPrecheck"
         @size-change="handleSizeChange"
       />
+    </PanelCard>
+
+    <!-- 质控评分标准（M20 复测 2026-10-06：低频阅读内容 → 移到结果区之后并默认收起）。
+         此前它占首屏 332px（y282~614），把承载结论的「AI 预检列表 / 扣分明细」推到 y≈989、
+         首条扣分 y≈1095（1366×768 视口只有 716px）。收起时摘要行保留关键口径，
+         规则配置入口仍在卡头，不因收起而找不到。 -->
+    <PanelCard title="质控评分标准">
+      <template #header>
+        <span>质控评分标准</span>
+        <!-- 无写权限时不隐藏按钮，而是禁用并常驻写明原因：
+             藏起来用户只会以为「这页没有这个功能」，永远不知道是权限问题 -->
+        <el-button link type="primary" class="hd-action" :disabled="!canWriteRules" @click="openRules">规则配置</el-button>
+        <span v-if="!canWriteRules" class="tip">需管理员、组织所有者或被授权成员才能改规则</span>
+      </template>
+      <details class="std-panel">
+        <summary class="std-sum">
+          <span v-if="rules">合格 ≥ {{ rules.thresholds.qualified }} 分 · 无效 &lt; {{ rules.thresholds.invalid }} 分或真缺失 ≥ {{ rules.thresholds.seriousFullMissing }} · 病历应包含 {{ rules.completeness.elements.length }} 项</span>
+          <span v-else>标准加载中…</span>
+          <span class="tip">展开查看完整评分口径</span>
+        </summary>
+      <div v-if="rules" class="std-grid">
+        <div class="st">
+          <span class="st-k">病历应包含</span>
+          <span class="st-v">
+            <span v-for="e in rules.completeness.elements" :key="e.name" class="chip">{{ e.name }}</span>
+          </span>
+        </div>
+        <div class="st">
+          <span class="st-k">缺失扣分</span>
+          <span class="st-v">完全缺失 -{{ rules.completeness.elements[0]?.weightFull ?? 12 }} ／ 未结构化 -{{ rules.completeness.elements[0]?.weightPartial ?? 6 }}</span>
+        </div>
+        <div class="st">
+          <span class="st-k">格式</span>
+          <span class="st-v">{{ rules.format.map((f) => f.label || f.field).join('、') || '未配置' }}</span>
+        </div>
+        <div class="st">
+          <span class="st-k">一致性</span>
+          <span class="st-v">{{ rules.consistencySummary || '—' }}</span>
+        </div>
+        <div class="st">
+          <span class="st-k">术语标准化</span>
+          <span class="st-v">{{ rules.standardization.enabled
+            ? ('开 · 未命中词典的每个 -' + rules.standardization.weightEach
+               + '；超过 ' + rules.standardization.cap + ' 个后，每再满 '
+               + rules.standardization.cap + ' 个追加一档（分段扣分，避免大量未归一时触顶、分数失去区分度）')
+            : '已关闭' }}</span>
+        </div>
+        <div class="st">
+          <span class="st-k">重复</span>
+          <span class="st-v">-{{ rules.duplicateWeight }}</span>
+        </div>
+        <div class="st">
+          <span class="st-k">分级</span>
+          <span class="st-v">合格 ≥{{ rules.thresholds.qualified }} ／ 无效 &lt;{{ rules.thresholds.invalid }} 或真缺失 ≥{{ rules.thresholds.seriousFullMissing }}</span>
+        </div>
+      </div>
+      <!-- 完整规则说明收进折叠区：默认只看摘要，需要细节时再展开 -->
+      <el-collapse v-if="descriptions.length" class="std-detail">
+        <el-collapse-item title="查看完整规则说明" name="d">
+          <div v-for="(l, i) in descriptions" :key="i" class="std-desc">· {{ l }}</div>
+        </el-collapse-item>
+      </el-collapse>
+      <div v-if="ruleWarnings.length" class="trunc-hint">规则告警：{{ ruleWarnings.join('；') }}</div>
+      <EmptyState v-if="!rules" text="标准加载中…" :image-size="60" />
+      </details>
     </PanelCard>
 
     <QcDeductionDialog
@@ -724,6 +737,38 @@ onMounted(() => {
 .std-detail {
   margin-top: var(--sp-2);
   border-top: 1px dashed var(--line);
+}
+/* M20：评分标准默认收起（低频阅读），摘要行只保留关键口径；
+   展开后 .std-grid 与「完整规则说明」才有内容 —— 展开状态不写死，用户点一次即可 */
+.std-panel {
+  border-top: 1px dashed var(--line);
+  padding-top: var(--sp-2);
+}
+.std-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+.std-sum::-webkit-details-marker {
+  display: none;
+}
+.std-sum::before {
+  content: '▸ ';
+  color: var(--ink-mid);
+}
+.std-panel[open] .std-sum::before {
+  content: '▾ ';
+}
+.std-panel[open] .std-sum {
+  margin-bottom: var(--sp-2);
+}
+.std-sum:hover {
+  color: var(--ink);
 }
 /* 28.12：预检列表的缺陷行（分级非「合格」）整行浅赭石底。
    RecordTable 是本组件的子组件，行 DOM 在其内部，故用 :deep 穿透。 */

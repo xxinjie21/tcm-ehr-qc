@@ -19,8 +19,11 @@
       </section>
 
       <!-- ③ 病历原文对照（可折叠） -->
-      <details v-if="record" class="raw-panel" open>
-        <summary>病历原文对照 · {{ record.registrationNo || record.id }}（{{ patientSummary }}）</summary>
+      <details v-if="record" class="raw-panel">
+        <summary>
+          病历原文对照 · {{ record.registrationNo || record.id }}（{{ patientSummary }}）
+          <span class="raw-hint">默认收起 —— 展开后原文会把下方「人工修正」推到屏外</span>
+        </summary>
         <div class="raw-bd raw-grid">
           <div
             v-for="f in FIELDS"
@@ -571,6 +574,13 @@ defineExpose({ open: openReview, close: closeReview })
 }
 .raw-panel summary:hover {
   background: var(--surface-sub);
+}
+/* M25：原文折叠默认收起后，把「为什么收起」写在标题行，避免被当成排版缺失 */
+.raw-hint {
+  margin-left: var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: normal;
+  color: var(--text-sub);
 }
 .raw-bd {
   padding: var(--sp-1) 20px var(--sp-4);

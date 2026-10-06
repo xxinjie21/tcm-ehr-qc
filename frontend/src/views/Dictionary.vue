@@ -64,9 +64,11 @@
         <el-tag size="small" :type="scopeTagType" effect="plain">{{ scopeLabel }}</el-tag>
         <span class="tip">{{ scopeTip }}</span>
       </div>
-      <!-- 高度随分页大小联动（表头 32 + 每行 32 × 当前页大小 + 余量）：表格内部滚动、页面本身不出现滚动条，
-           但不会再出现「选了 20 条/页却只能看到 10 行」的错配（M23，2026-10-05 校正）。
-           每页条数可调（20~200），故按可视行数固定高度，超出的行在表格内部滚动 -->
+      <!-- 高度随分页大小联动（表头 40 + 每行 40 × 当前页大小 + 余量 8）：
+           固定高度的目的是「选了多少条/页就能看到多少行」——当前页整页铺开，不再有隐藏行。
+           原公式按 32px 估算，而本表未加 size="small"（表头与行高实测均为 40px），
+           于是 20 条/页只放得下 16 行、表格内部仍滚 160px（M23 复测 2026-10-06 未过）。
+           每页条数可调（20~200），行数多时由页面自身滚动 -->
 <el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" :max-height="termsTableHeight">
           <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
           <el-table-column prop="standardTerm" label="标准术语" width="220" />
@@ -333,9 +335,10 @@ const termsFailed = ref(false)
 const page = ref(1)
 const size = ref(20)
 
-// M23：术语表高度跟随分页大小（表头 32 + 行高 32 × 当前页 + 余量 8），
-// 让「选了多少条/页就能一眼看到多少行」，同时保留「页面本身不出现滚动条」的原设计。
-const termsTableHeight = computed(() => 32 + (size.value || 10) * 32 + 8)
+// M23：术语表高度跟随分页大小（表头 40 + 行高 40 × 当前页 + 余量 8）。
+// 行高取本表实际渲染值（该表未加 size="small"）；按 32 估算会让 20 条/页藏 4 行、内滚 160px。
+// 两个加数与 size 同源，任何一个写小都会让 max-height 矮于内容，滚动条就又回来了。
+const termsTableHeight = computed(() => 40 + (size.value || 10) * 40 + 8)
 const total = ref(0)
 
 // 批次 26.17：基线表「别名」「国标编码」两列在当前页常常一条数据都没有，
