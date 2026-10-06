@@ -9,7 +9,6 @@ import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.NlpTask;
 import com.tcm.ehr.domain.vo.NlpTasksVO;
-import com.tcm.ehr.mapper.DbLockMapper;
 import com.tcm.ehr.mapper.NlpTaskMapper;
 import com.tcm.ehr.mapper.NlpTaskItemMapper;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -17,6 +16,8 @@ import com.tcm.ehr.service.IDictionaryFileService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -135,13 +139,10 @@ class NlpBatchServiceImplTest {
         PythonNlpClient nlpClient = mock(PythonNlpClient.class);
         when(nlpClient.isEnabled()).thenReturn(true);
 
-        DbLockMapper dbLockMapper = mock(DbLockMapper.class);
-        when(dbLockMapper.acquire(any(), anyInt())).thenReturn(1);
-        when(dbLockMapper.release(any())).thenReturn(1);
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient, mock(EntityNormalizer.class),
                 mock(com.tcm.ehr.service.IDictionaryTermStore.class),
-                new ObjectMapper(), new DistLock(dbLockMapper));
+                new ObjectMapper(), distLock(true));
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> svc.submit(new com.tcm.ehr.domain.dto.NlpBatchDTO(), "tester"));
@@ -159,13 +160,10 @@ class NlpBatchServiceImplTest {
         NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
         PythonNlpClient nlpClient = mock(PythonNlpClient.class);
         when(nlpClient.isEnabled()).thenReturn(true);
-        DbLockMapper dbLockMapper = mock(DbLockMapper.class);
-        when(dbLockMapper.acquire(any(), anyInt())).thenReturn(0);
-
         NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                 mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient, mock(EntityNormalizer.class),
                 mock(com.tcm.ehr.service.IDictionaryTermStore.class),
-                new ObjectMapper(), new DistLock(dbLockMapper));
+                new ObjectMapper(), distLock(false));
 
         assertThrows(ConcurrentOperationException.class,
                 () -> svc.submit(new com.tcm.ehr.domain.dto.NlpBatchDTO(), "tester"));
@@ -193,13 +191,10 @@ class NlpBatchServiceImplTest {
             // workers 未初始化（@PostConstruct 不在单测里跑），故入队后不会有 worker 真的开跑
             com.tcm.ehr.mapper.NlpTaskItemMapper itemMapper =
                     mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class);
-            DbLockMapper dbLockMapper = mock(DbLockMapper.class);
-            when(dbLockMapper.acquire(any(), anyInt())).thenReturn(1);
-            when(dbLockMapper.release(any())).thenReturn(1);
             NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper,
                     mock(RecordMapper.class), itemMapper, nlpClient, mock(EntityNormalizer.class),
                     mock(com.tcm.ehr.service.IDictionaryTermStore.class), new ObjectMapper(),
-                    new DistLock(dbLockMapper));
+                    distLock(true));
 
             svc.submitIds(List.of("r-1", "r-2"), "tester");
 
@@ -267,7 +262,24 @@ class NlpBatchServiceImplTest {
         return new NlpBatchServiceImpl(taskMapper, mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient,
                 mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
-                new DistLock(mock(DbLockMapper.class)));
+                distLock(true));
+    }
+
+    /**
+     * 锁桩：{@code locked=false} 模拟「Redisson 等 3s 没拿到锁」，此时提交路径必须直接拒绝。
+     * 锁本身的行为由 {@code DistLockTest} 负责，这里只需要一个能进/不能进临界区的 DistLock。
+     */
+    private static DistLock distLock(boolean locked) {
+        RedissonClient client = mock(RedissonClient.class);
+        RLock lock = mock(RLock.class);
+        when(client.getLock(anyString())).thenReturn(lock);
+        try {
+            when(lock.tryLock(anyLong(), any(TimeUnit.class))).thenReturn(locked);
+        } catch (InterruptedException e) {
+            throw new IllegalStateException(e);
+        }
+        when(lock.isHeldByCurrentThread()).thenReturn(true);
+        return new DistLock(client);
     }
 
     private static List<NlpTask> tasks(int n) {
@@ -294,7 +306,7 @@ class NlpBatchServiceImplTest {
                 mock(RecordMapper.class), mock(NlpTaskItemMapper.class), mock(PythonNlpClient.class), mock(EntityNormalizer.class),
                 mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
-                new DistLock(mock(DbLockMapper.class)));
+                distLock(true));
         // workers 为 null 时 shutdown() 会提前返回，所以得给一个真池子
         ReflectionTestUtils.setField(svc, "workers", Executors.newSingleThreadExecutor());
 
@@ -332,7 +344,7 @@ class NlpBatchServiceImplTest {
                 mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
                 mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
-                new DistLock(mock(DbLockMapper.class)));
+                distLock(true));
 
         svc.pendingIdsFor("t-1");
 
@@ -391,7 +403,7 @@ class NlpBatchServiceImplTest {
                 mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
                 mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
-                new DistLock(mock(DbLockMapper.class)));
+                distLock(true));
 
         assertFalse(svc.hasTaskItems("t-filter"),
                 "没有明细行 ⇒ 必须判为筛选型（走 runByFilter），否则会被空集合守卫收尾、静默不干活");
@@ -407,7 +419,7 @@ class NlpBatchServiceImplTest {
                 mock(RecordMapper.class), itemMapper, mock(PythonNlpClient.class),
                 mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
                 new ObjectMapper(),
-                new DistLock(mock(DbLockMapper.class)));
+                distLock(true));
 
         assertTrue(svc.hasTaskItems("t-id"), "有明细行 ⇒ ID 型，应读 PENDING 续跑");
         svc.pendingIdsFor("t-id");
@@ -432,7 +444,7 @@ class NlpBatchServiceImplTest {
                 mock(RecordMapper.class), mock(com.tcm.ehr.mapper.NlpTaskItemMapper.class),
                 mock(PythonNlpClient.class), mock(EntityNormalizer.class),
                 mock(com.tcm.ehr.service.IDictionaryTermStore.class), new ObjectMapper(),
-                new DistLock(mock(DbLockMapper.class)));
+                distLock(true));
 
         // ① 执行异常
         assertEquals(com.tcm.ehr.domain.po.NlpTask.FAILED,

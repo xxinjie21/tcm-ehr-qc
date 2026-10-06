@@ -12,7 +12,6 @@ import com.tcm.ehr.domain.po.NlpTaskItem;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.NlpTaskVO;
-import com.tcm.ehr.mapper.DbLockMapper;
 import com.tcm.ehr.mapper.NlpTaskItemMapper;
 import com.tcm.ehr.mapper.NlpTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -21,6 +20,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.annotation.MapperScan;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -265,14 +266,25 @@ class NlpBatchIntegrationTest {
         }
 
         /**
-         * 批次 26.2：提交互斥改成构造器注入的 DistLock。
+         * 批次 16.1：提交互斥是构造器注入的 DistLock（Redisson）。
          *
-         * <p>本测试只走 {@code submitIds}（导入后自动解析路径），不经过 {@code submit} 的命名锁，
-         * 所以直接注入真实 DistLock 即可 —— H2 没有 {@code GET_LOCK}，但这条路径不会调到它。</p>
+         * <p>本测试只走 {@code submitIds}（导入后自动解析路径），不经过 {@code submit} 的锁，
+         * 所以给一个「永远拿得到锁」的 RLock 替身即可 —— 不需要真的 Redis。</p>
          */
         @Bean
-        public DistLock distLock(DbLockMapper dbLockMapper) {
-            return new DistLock(dbLockMapper);
+        public DistLock distLock() {
+            RedissonClient redisson = org.mockito.Mockito.mock(RedissonClient.class);
+            RLock lock = org.mockito.Mockito.mock(RLock.class);
+            org.mockito.Mockito.when(redisson.getLock(org.mockito.ArgumentMatchers.anyString())).thenReturn(lock);
+            org.mockito.Mockito.when(lock.isHeldByCurrentThread()).thenReturn(true);
+            try {
+                org.mockito.Mockito.when(lock.tryLock(
+                        org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.any(java.util.concurrent.TimeUnit.class))).thenReturn(true);
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+            return new DistLock(redisson);
         }
     }
 }

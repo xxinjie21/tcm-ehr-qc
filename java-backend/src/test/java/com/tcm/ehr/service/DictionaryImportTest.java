@@ -48,15 +48,31 @@ class DictionaryImportTest {
     private com.tcm.ehr.common.utils.DistLock distLock;
     private DictionaryServiceImpl service;
 
+    /**
+     * 锁桩：{@code true}=能拿到锁（直接执行临界区），{@code false}=拿不到（提交路径必须拒绝）。
+     * Lock 自身行为由 {@code DistLockTest} 负责，这里只要一个能进/不能进临界区的 DistLock。
+     */
+    private static com.tcm.ehr.common.utils.DistLock lockStub(boolean locked) {
+        org.redisson.api.RedissonClient client = Mockito.mock(org.redisson.api.RedissonClient.class);
+        org.redisson.api.RLock lock = Mockito.mock(org.redisson.api.RLock.class);
+        Mockito.when(client.getLock(Mockito.anyString())).thenReturn(lock);
+        try {
+            Mockito.when(lock.tryLock(Mockito.anyLong(), Mockito.any(java.util.concurrent.TimeUnit.class)))
+                    .thenReturn(locked);
+        } catch (InterruptedException e) {
+            throw new IllegalStateException(e);
+        }
+        Mockito.when(lock.isHeldByCurrentThread()).thenReturn(true);
+        return new com.tcm.ehr.common.utils.DistLock(client);
+    }
+
     @BeforeEach
     void setUp() throws IOException {
         fileService = Mockito.mock(IDictionaryFileService.class);
         esIndex = Mockito.mock(IEsTermIndexService.class);
-        // 跨实例互斥（批次16）：桩成「拿到锁并直接执行临界区」，
+        // 跨实例互斥（批次16/16.1）：桩成「拿到锁并直接执行临界区」，
         // 让本测试聚焦在导入逻辑本身，不受锁影响
-        com.tcm.ehr.mapper.DbLockMapper lockMapper = Mockito.mock(com.tcm.ehr.mapper.DbLockMapper.class);
-        Mockito.when(lockMapper.acquire(Mockito.anyString(), Mockito.anyInt())).thenReturn(1);
-        distLock = new com.tcm.ehr.common.utils.DistLock(lockMapper);
+        distLock = lockStub(true);
         termStore = Mockito.mock(IDictionaryTermStore.class);
         // 本组织原有词条为空（备份机制已随 dictionary_backups 表废弃）
         when(termStore.read(anyString(), anyString())).thenReturn(List.of());
@@ -299,11 +315,9 @@ class DictionaryImportTest {
      */
     @Test
     void import_lockConflict_shouldRollBackLibraryAndRethrow() {
-        // acquire 返回 null = 没拿到锁（另一实例正持锁）
-        com.tcm.ehr.mapper.DbLockMapper busy = Mockito.mock(com.tcm.ehr.mapper.DbLockMapper.class);
-        Mockito.when(busy.acquire(Mockito.anyString(), Mockito.anyInt())).thenReturn(null);
+        // tryLock 返回 false = 等 3s 没拿到锁（另一实例正持锁）
         DictionaryServiceImpl locked = new DictionaryServiceImpl(esIndex,
-                new com.tcm.ehr.common.utils.DistLock(busy), termStore, new ObjectMapper());
+                lockStub(false), termStore, new ObjectMapper());
 
         assertThrows(com.tcm.ehr.common.exception.ConcurrentOperationException.class,
                 () -> locked.importDictionary(TYPE, json("d.json", "[{\"standardTerm\":\"喉痹\"}]")));

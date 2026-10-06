@@ -1,24 +1,33 @@
 package com.tcm.ehr.common.utils;
 
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
-import com.tcm.ehr.mapper.DbLockMapper;
+import com.tcm.ehr.common.exception.ServiceNotReadyException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.concurrent.TimeUnit;
+
 /**
- * 跨实例互斥（批次 16 工作项 1 的最小实现）。
+ * 跨实例互斥（批次 16.1：Redisson 分布式锁）。
  *
- * 锁粒度按业务 key（如 dict:herb:org-A），不用全局单键 ——
- * 全局单键会让「A 组织导词典」与「B 组织跑质控」互相排队，明明毫无关系。
+ * <p>锁粒度按业务 key（如 dict:herb:org-A），不用全局单键 ——
+ * 全局单键会让「A 组织导词典」与「B 组织跑质控」互相排队，明明毫无关系。</p>
  *
- * 拿不到锁时默认抛异常，不放行：这是本类与「锁拿不到就继续」的写法之间
- * 最要紧的区别 —— 后者等于没有锁，且只在高并发时才发作，极难复现。
+ * <p><b>为什么是 Redis/Redisson</b>：{@code synchronized} / {@code ReentrantLock} 在多实例下
+ * <b>静默失效</b>（不报错、只是不互斥）；上一版用 MySQL 命名锁 {@code GET_LOCK}，
+ * 那是「借 DB 的连接级锁」，语义与连接绑定、跨服务边界不好复用。Redisson 的 RLock 是
+ * 所有实例共享的锁，且自带看门狗续期：不进事务的长临界区也不会因为固定 lease 突然过期。</p>
  *
- * 不引入 Redisson：见 {@link DbLockMapper} 的说明。锁只降冲突概率，
- * 正确性由 DB 唯一键与事务承担。
+ * <p><b>fail-closed</b>：拿不到锁抛 {@link ConcurrentOperationException}；
+ * Redis 本身不可用抛 {@link ServiceNotReadyException}（503）。两者都<b>绝不放行</b> ——
+ * 写成「拿不到锁就继续」等于没有锁，且只在高并发时发作，极难复现。</p>
+ *
+ * <p>锁只降冲突概率，正确性仍由 DB 唯一键与事务承担。</p>
  */
 @Slf4j
 @Component
@@ -28,7 +37,7 @@ public class DistLock {
     /** 拿不到锁时的等待秒数（与批次 9 质控提交一致） */
     private static final int WAIT_SECONDS = 3;
 
-    private final DbLockMapper mapper;
+    private final RedissonClient redisson;
 
     /**
      * 在锁内执行；拿不到锁抛 {@link ConcurrentOperationException}（409 + code=409，可展示）。
@@ -36,24 +45,22 @@ public class DistLock {
      * @param lockName 锁名（建议格式 业务:key）
      * @param body     临界区
      * @throws ConcurrentOperationException 等待超时未拿到锁
+     * @throws ServiceNotReadyException     Redis 不可用（fail-closed，不放行）
      */
     public <T> T runLocked(String lockName, java.util.function.Supplier<T> body) {
-        Integer got = mapper.acquire(lockName, WAIT_SECONDS);
-        if (got == null || got != 1) {
+        RLock lock = redisson.getLock(lockName);
+        if (!tryLock(lock, lockName)) {
             // 绝不放行：并发进入临界区会让 ES 索引出现交错删除 + 灌入的混合状态
             throw new ConcurrentOperationException("有另一个相同操作正在进行，请稍后重试");
         }
-        // MySQL 命名锁是**连接级**的，acquire 与 release 必须落在同一条物理连接上：
-        //  · 事务内两者共用事务连接，且必须等提交/回滚后再释放 —— 若在 finally 里提前放锁，
-        //    并发的「查重 + 插入」会读到尚未提交的空结果，防重形同虚设；
-        //  · 不进事务时两次 mapper 调用可能拿到不同连接，RELEASE_LOCK 释放在别的连接上
-        //    等于没释放（锁泄漏到该连接关闭为止）。
+        // 事务内必须等提交/回滚后再放锁：若在 finally 里提前放锁，并发的
+        // 「查重 + 插入」会读到尚未提交的空结果，防重形同虚设。
         boolean deferred = TransactionSynchronizationManager.isSynchronizationActive();
         if (deferred) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCompletion(int status) {
-                    releaseQuietly(lockName);
+                    unlockQuietly(lock, lockName);
                 }
             });
         }
@@ -61,15 +68,38 @@ public class DistLock {
             return body.get();
         } finally {
             if (!deferred) {
-                releaseQuietly(lockName);
+                unlockQuietly(lock, lockName);
             }
         }
     }
 
-    /** 释放失败只记录：连接最终关闭时 DB 仍会释放它持有的命名锁，不该因放锁失败掩盖业务结果 */
-    private void releaseQuietly(String lockName) {
+    /** 取锁：不传 leaseTime，走 Redisson 看门狗（默认 30s，持有期间自动续期） */
+    private boolean tryLock(RLock lock, String lockName) {
         try {
-            mapper.release(lockName);
+            return lock.tryLock(WAIT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ConcurrentOperationException("等待其它相同操作时被中断，请稍后重试");
+        } catch (RuntimeException e) {
+            // Redis 连接失败 / 命令超时：这是依赖故障，不是「有人正在操作」。
+            // 报 503 + code=1011（消息可展示），同样不放行 —— 没有锁就没有互斥。
+            log.error("[互斥] 锁服务不可用 lock={}: {}", lockName, e.getMessage());
+            throw new ServiceNotReadyException("互斥锁服务（Redis）不可用，请稍后重试");
+        }
+    }
+
+    /**
+     * 释放失败只记录。
+     *
+     * <p>看门狗停止续期后锁会自然过期（默认 30s），不该因放锁失败掩盖业务结果；
+     * 也不能在未持有时硬调 {@code unlock()} —— 那会抛
+     * {@code IllegalMonitorStateException} 把一次成功的业务请求变成 500。</p>
+     */
+    private void unlockQuietly(RLock lock, String lockName) {
+        try {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         } catch (Exception e) {
             log.warn("[互斥] 释放锁失败 lock={}: {}", lockName, e.getMessage());
         }

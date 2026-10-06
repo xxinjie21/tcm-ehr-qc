@@ -227,7 +227,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         String orgId = RequestUtils.currentOrgId();
 
         // 1.5 幂等（批次 5）：同一 request_key 的重放直接返回既有任务。
-        //     放在 GET_LOCK **之前** —— 重放不是并发冲突，不该去抢锁，更不该被「已有任务在跑」拒绝。
+        //     放在抢锁之前 —— 重放不是并发冲突，不该去抢锁，更不该被「已有任务在跑」拒绝。
         String requestKey = dto == null ? null : dto.getRequestKey();
         if (requestKey != null && !requestKey.isBlank()) {
             requestKey = requestKey.trim();
@@ -240,11 +240,11 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
         // 2. 防重：「查有没有活跃任务」+「插队」必须原子，否则并发双提交会双双入库
         //    （两个任务同时跑，进度互相覆写）。
-        //    ⚠️ 互斥用 DB 命名锁而不是 JVM 锁：synchronized 在多实例下静默失效 ——
+        //    ⚠️ 互斥必须跨实例：JVM 锁（synchronized）在多实例下静默失效 ——
         //    不报错、只是不互斥，是最难查的一类 bug。拿不到锁就当并发冲突拒绝，
         //    绝不「没锁也继续」—— 那正是原来 check-then-act 的老问题。
-        //    批次 26.2：统一走 DistLock —— 它在事务内把放锁推迟到提交之后，且与取锁共用
-        //    同一条事务连接（命名锁是连接级的，自己 GET_LOCK/RELEASE_LOCK 会漏锁）。
+        //    批次 16.1：DistLock 用 Redisson 锁；它在事务内把放锁推迟到提交之后
+        //    （否则并发的查重会读到未提交的空结果，防重形同虚设）。
         return distLock.runLocked(SUBMIT_LOCK, () -> {
             // 防重按组织算：任务是组织级的，A 组排队不该挡住 B 组提交
             Long active = taskMapper.selectCount(new QueryWrapper<QcTask>()

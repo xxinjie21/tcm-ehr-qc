@@ -244,9 +244,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
         // 1.1 防重：「查有没有活跃任务」+「统计」+「插队」必须原子，否则并发双提交会双双入库
         //     （多个任务同时跑，进度互相覆写，还一起压 Python 服务）。
-        //     ⚠️ 互斥必须落在 DB 命名锁上：JVM 锁在多实例下静默失效 —— 不报错、只是不互斥。
-        //     批次 26.2：统一走 DistLock —— 它在事务内把放锁推迟到提交之后，且与取锁共用
-        //     同一条事务连接（命名锁是连接级的，自己 GET_LOCK/RELEASE_LOCK 会漏锁）。
+        //     ⚠️ 互斥必须跨实例：JVM 锁（synchronized/ReentrantLock）在多实例下静默失效 ——
+        //     不报错、只是不互斥。批次 16.1：DistLock 用 Redisson 锁；它在事务内把放锁
+        //     推迟到提交之后（否则并发的查重会读到未提交的空结果，防重形同虚设）。
         return distLock.runLocked(SUBMIT_LOCK, () -> {
             Long active = taskMapper.selectCount(new QueryWrapper<NlpTask>()
                     .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED)));

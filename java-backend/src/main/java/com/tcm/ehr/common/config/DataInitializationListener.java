@@ -1,6 +1,7 @@
 package com.tcm.ehr.common.config;
 
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
+import com.tcm.ehr.common.exception.ServiceNotReadyException;
 import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.service.IDictionaryTermStore;
@@ -146,7 +147,7 @@ public class DataInitializationListener implements ApplicationRunner {
         String version = termStore.contentVersion(entries);
         // 跨实例互斥（批次16）：多实例同时启动时，两个实例会同时判定「待重建」并
         // 同时删/建同一索引，交错后索引内容可能是混合状态。
-        // 这里按「类型+组织」加 DB 命名锁；拿不到锁就让本次跳过（下一实例或下次
+        // 这里按「类型+组织」加 Redisson 分布式锁（DistLock）；拿不到锁就让本次跳过（下一实例或下次
         // 启动会补上）—— 启动期抢不到锁不是错误，不该让启动失败。
         try {
             distLock.runLocked(com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, orgId),
@@ -160,6 +161,13 @@ public class DataInitializationListener implements ApplicationRunner {
                     });
         } catch (ConcurrentOperationException e) {
             log.info("[词典] {} (org='{}') 重建被其它实例占用，本次跳过: {}", type, orgId, e.getMessage());
+            return;
+        } catch (ServiceNotReadyException e) {
+            // 启动期 Redis 不可用：与「抢不到锁」同口径 —— 跳过重建而不是让应用起不来。
+            // 这是 fail-closed 的唯一例外场景，但它同样没有在无锁状态下写索引，
+            // 剩下的实例或下次启动会补上。
+            log.warn("[词典] {} (org='{}') 重建跳过：锁服务不可用 -> {}",
+                    type, orgId, e.getMessage());
             return;
         }
         // 只有真灌成功才记已同步

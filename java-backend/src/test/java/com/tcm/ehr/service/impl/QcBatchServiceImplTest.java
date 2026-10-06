@@ -7,12 +7,13 @@ import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.QcTask;
-import com.tcm.ehr.mapper.DbLockMapper;
 import com.tcm.ehr.mapper.QcTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,16 +51,27 @@ class QcBatchServiceImplTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    /** 提交互斥统一走 DistLock → DbLockMapper（批次 26.2）。默认打桩成「拿到锁」 */
-    private DbLockMapper dbLockMapper;
+    /** 提交互斥统一走 DistLock → Redisson RLock（批次 16.1）。默认打桩成「拿到锁」 */
+    private RLock submitLock;
 
     private QcBatchServiceImpl newService(QcTaskMapper taskMapper, RecordMapper recordMapper,
                                           OperationLogger operationLogger) {
-        dbLockMapper = mock(DbLockMapper.class);
-        when(dbLockMapper.acquire(any(), anyInt())).thenReturn(1);
-        when(dbLockMapper.release(any())).thenReturn(1);
+        RedissonClient redisson = mock(RedissonClient.class);
+        submitLock = mock(RLock.class);
+        when(redisson.getLock(anyString())).thenReturn(submitLock);
+        when(submitLock.isHeldByCurrentThread()).thenReturn(true);
+        stubTryLock(true);
         return new QcBatchServiceImpl(taskMapper, recordMapper, mock(QcServiceImpl.class),
-                mock(QcRuleStore.class), operationLogger, new ObjectMapper(), new DistLock(dbLockMapper));
+                mock(QcRuleStore.class), operationLogger, new ObjectMapper(), new DistLock(redisson));
+    }
+
+    /** {@code tryLock(3s)} 的桩：true=拿到锁，false=等待超时（多实例里别人正持锁） */
+    private void stubTryLock(boolean locked) {
+        try {
+            when(submitLock.tryLock(anyLong(), any())).thenReturn(locked);
+        } catch (InterruptedException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ------------------------------------------------------------------ 收尾状态
@@ -193,8 +206,8 @@ class QcBatchServiceImplTest {
         QcTaskMapper taskMapper = mock(QcTaskMapper.class);
         QcBatchServiceImpl svc = newService(taskMapper, mock(RecordMapper.class), mock(OperationLogger.class));
         // 必须在 newService 之后覆盖 —— 它默认把锁打桩成「拿到了」
-        // 桩改成「没拿到锁」—— 这正是多实例并发提交时的情形
-        when(dbLockMapper.acquire(any(), anyInt())).thenReturn(0);
+        // 桩改成「等 3s 没拿到锁」—— 这正是多实例并发提交时的情形
+        stubTryLock(false);
 
         ConcurrentOperationException ex = assertThrows(ConcurrentOperationException.class,
                 () -> svc.submit(null));
@@ -202,7 +215,7 @@ class QcBatchServiceImplTest {
         // 关键：没拿到锁就绝不能继续插任务，否则又变回 check-then-act
         org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).insert(any(QcTask.class));
         // 也没拿到锁，自然不该去释放
-        org.mockito.Mockito.verify(dbLockMapper, org.mockito.Mockito.never()).release(any());
+        org.mockito.Mockito.verify(submitLock, org.mockito.Mockito.never()).unlock();
     }
 
     @Test
@@ -217,7 +230,7 @@ class QcBatchServiceImplTest {
                 () -> svc.submit(null));
         assertTrue(ex.getMessage().contains("排队或运行中"));
         // finally 必须释放，否则这一次异常会把之后所有提交都堵死
-        verify(dbLockMapper).release(any());
+        verify(submitLock).unlock();
         org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).insert(any(QcTask.class));
     }
 

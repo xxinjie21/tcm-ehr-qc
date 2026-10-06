@@ -50,7 +50,7 @@ public class QcTask {
      * 幂等键（批次 5）：客户端在一次提交动作里生成，重放沿用同一个值。
      *
      * <p>与 {@code (org_id, request_key)} 唯一索引配对：撞键时服务层查回既有任务原样返回。
-     * 与 {@code GET_LOCK} 防重互补 —— 锁管「同一瞬间的并发」，本键管「同一次动作的回放」。</p>
+     * 与 {@code DistLock}（Redisson 锁）防重互补 —— 锁管「同一瞬间的并发」，本键管「同一次动作的回放」。</p>
      */
     private String requestKey;
     private String createdBy;
