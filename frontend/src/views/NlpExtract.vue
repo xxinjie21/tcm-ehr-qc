@@ -236,7 +236,14 @@
               </div>
 
               <StructuredDataCard v-if="result" :data="result" />
-              <EmptyState v-else text="尚未抽取" />
+              <!-- 28.13：空态补行动引导 —— 此前只有「尚未抽取」四个字，
+                   用户不知道该在哪一步、做什么，空白区又占满一屏 -->
+              <EmptyState v-else text="尚未抽取">
+                <div class="empty-hint">
+                  先在左侧「选择病历」点一条载入原文，切到「结构化抽取」后点<b>执行抽取</b>；
+                  识别出的要素会在这里按疾病 / 症状 / 证候等 9 类展示，并可逐项归一。
+                </div>
+              </EmptyState>
 
               <!-- 术语归一试算：词典直查，不依赖 Python NLP 服务，
                    让用户在本页就能亲自跑一次归一、看到「原文 → 标准词」 -->
@@ -1111,6 +1118,8 @@ onBeforeUnmount(stopPoll)
 .nt-out.miss { color: var(--danger); }
 .nt-src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: auto; }
 .nt-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.7; }
+/* 28.13：空态引导文案，居中但不喧宾夺主 */
+.empty-hint { max-width: 360px; margin: 0 auto; font-size: var(--fs-sm); color: var(--text-sub); line-height: 1.8; }
 
 /* 原文模块化字段；分区常显 + 3 列栅格：
    wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。

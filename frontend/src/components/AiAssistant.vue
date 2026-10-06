@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
   max-width: 94vw;
   max-height: 76vh;
   background: var(--el-table-header-bg-color);
-  border: 1px solid var(--line, #e4dfd2);
+  border: 1px solid var(--line);
   border-radius: 6px;
   box-shadow: 0 8px 28px rgba(47, 70, 57, 0.18);
   display: flex;
@@ -410,8 +410,8 @@ onBeforeUnmount(() => {
 .aii-scope {
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-xs);
-  color: var(--text-sub, #8a8578);
-  background: var(--ink-light, #eef3ee);
+  color: var(--text-sub);
+  background: var(--ink-light);
   border-bottom: 1px solid var(--line-soft);
 }
 
@@ -427,12 +427,12 @@ onBeforeUnmount(() => {
   font-size: var(--fs-xs);
   color: var(--ink, var(--ink));
   background: var(--surface);
-  border: 1px solid var(--line, #e4dfd2);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 3px 10px;
   cursor: pointer;
 }
-.cmd:hover { background: var(--ink-light, #eef3ee); }
+.cmd:hover { background: var(--ink-light); }
 .cmd:disabled { opacity: 0.6; cursor: default; }
 
 /* 消息区：唯一滚动容器，flex:1 吃掉剩余高度 */
@@ -443,17 +443,17 @@ onBeforeUnmount(() => {
   font-size: var(--fs-md);
   line-height: 1.7;
 }
-.aii-empty { color: var(--text-sub, #8a8578); }
+.aii-empty { color: var(--text-sub); }
 .msg { border-radius: 6px; padding: var(--sp-2) 10px; margin-bottom: 10px; word-break: break-word; }
 /* 用户消息靠右留白，与 AI 消息一眼分开 */
 .msg.user {
-  background: var(--ink-light, #eef3ee);
+  background: var(--ink-light);
   color: var(--ink, var(--ink));
   margin-left: 40px;
 }
 .msg.ai {
   background: var(--surface);
-  border: 1px solid var(--line, #e4dfd2);
+  border: 1px solid var(--line);
   color: var(--ink, var(--ink));
 }
 .msg.ai p { margin: 0 0 var(--sp-1); }
@@ -463,9 +463,9 @@ onBeforeUnmount(() => {
   display: inline-block;
   margin-top: 6px;
   font-size: var(--fs-xs);
-  color: var(--text-sub, #8a8578);
+  color: var(--text-sub);
 }
-.msg.loading { color: var(--text-sub, #8a8578); }
+.msg.loading { color: var(--text-sub); }
 
 /* 输入区固定在面板底部 */
 .aii-input {

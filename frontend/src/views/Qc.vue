@@ -265,6 +265,7 @@
           loading-text="正在预检待复核项…"
           :max-height="360"
           :action-width="120"
+          :row-class-name="precheckRowClass"
         >
           <template #action="{ row }">
             <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
@@ -358,6 +359,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { recomputeQc, getQcBatch, cancelQcBatch, qcScore, getQcRules, getDeductionStats, updateQcRules, resetQcRules } from '@/api/qc'
 import { searchRecords } from '@/api/records'
+import { GRADE_OK } from '@/utils/grade'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
@@ -664,6 +666,10 @@ const resetRules = async () => {
 // 预检列表状态
 const precheckPage = ref(1)
 const precheckSize = ref(10)
+
+// 28.12：预检列表把「非合格」行整行高亮 —— 质控场景就是来找缺陷病历的，
+// 逐行看分级标签不如整行底色来得快。分级名口径来自 utils/grade，不另立标准。
+const precheckRowClass = ({ row }) => (row.grade && row.grade !== GRADE_OK ? 'qc-defect-row' : '')
 // 预检列表加载失败：与「范围内确实没有病历」区分开（三态统一）
 
 // 加载预检列表；传数字即跳到该页
@@ -1238,5 +1244,10 @@ onMounted(() => {
   margin-bottom: var(--sp-2);
   font-size: var(--fs-md);
   color: var(--ink);
+}
+/* 28.12：预检列表的缺陷行（分级非「合格」）整行浅赭石底。
+   RecordTable 是本组件的子组件，行 DOM 在其内部，故用 :deep 穿透。 */
+:deep(.qc-defect-row) > td.el-table__cell {
+  background: var(--ochre-light);
 }
 </style>

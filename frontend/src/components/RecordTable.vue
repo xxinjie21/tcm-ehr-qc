@@ -45,7 +45,14 @@
         <span v-else class="tip">—</span>
       </template>
     </el-table-column>
-    <el-table-column prop="grade" label="分级" width="90" />
+    <!-- 28.12：分级此前是纯文本，与「评分」列（已按档上色）口径不一；
+         分级是结论、评分是量值，结论更该一眼可辨。配色口径沿用 utils/grade.js -->
+    <el-table-column label="分级" width="90" align="center">
+      <template #default="{ row }">
+        <el-tag v-if="row.grade" size="small" effect="plain" :type="gradeTagType(row.grade)">{{ row.grade }}</el-tag>
+        <span v-else class="tip">—</span>
+      </template>
+    </el-table-column>
     <!-- 人工修改标记：该条结构化数据被人工改过（复核修正 / 手工改结构化数据），
          不是模型原样抽的。标出来是为了评估模型准确率时能排除它。 -->
     <el-table-column label="来源" width="86">
@@ -97,6 +104,7 @@
 import { ref } from 'vue'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
+import { gradeTagType } from '@/utils/grade'
 
 defineProps({
   /** 病历行数组（SearchVO.Item[]） */

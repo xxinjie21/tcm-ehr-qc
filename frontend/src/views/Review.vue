@@ -52,7 +52,14 @@
           </template>
         </el-table-column>
         <template #empty>
-          <EmptyState text="暂无复核任务" />
+          <!-- 28.13：空态补行动引导 —— 复核任务不是凭空出现的，说清它从哪来、下一步点哪 -->
+          <EmptyState text="暂无复核任务">
+            <div class="empty-hint">
+              复核任务由质控评分产生：先到「质控校验」页对范围内的病历执行重算，
+              分级为「待复核」的任务会自动出现在这里。
+            </div>
+            <el-button size="small" type="primary" plain @click="$router.push('/qc-check')">去质控校验</el-button>
+          </EmptyState>
         </template>
       </el-table>
 
@@ -1094,4 +1101,6 @@ onMounted(() => {
 }
 /* P5.2：跳过已删病历的提示 */
 .skip-hint { margin-top: var(--sp-2); font-size: var(--fs-md); color: var(--text-sub); }
+/* 28.13：空态引导文案，居中并限制行宽 */
+.empty-hint { max-width: 380px; margin: 0 auto var(--sp-2); font-size: var(--fs-sm); color: var(--text-sub); line-height: 1.8; }
 </style>

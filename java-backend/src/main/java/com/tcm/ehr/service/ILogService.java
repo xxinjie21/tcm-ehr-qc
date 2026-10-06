@@ -16,11 +16,15 @@ public interface ILogService {
      *
      * @param action  操作类型，空表示不限
      * @param keyword 关键字，匹配操作人/对象/详情
+     * @param operator 精确操作人，空表示不限（与三档可见范围叠加，不会越权）
+     * @param startTime 起始时间（含），'yyyy-MM-dd HH:mm:ss'，空表示不限
+     * @param endTime   结束时间（含），同上，空表示不限
      * @param page    页码，从 1 开始
      * @param size    每页条数
      * @return total=总条数；list=当前页记录
      */
-    Map<String, Object> page(String action, String keyword, int page, int size);
+    Map<String, Object> page(String action, String keyword, String operator,
+                             String startTime, String endTime, int page, int size);
 
     /**
      * 按对象查该对象的活动流（对标 D3）。
@@ -48,18 +52,26 @@ public interface ILogService {
      *
      * @param action  操作类型
      * @param keyword 关键字
+     * @param operator 精确操作人，空表示不限
+     * @param startTime 起始时间（含）
+     * @param endTime   结束时间（含）
      * @return 命中的日志记录
      */
-    List<OperationLog> listForExport(String action, String keyword);
+    List<OperationLog> listForExport(String action, String keyword, String operator,
+                                     String startTime, String endTime);
 
     /**
      * 导出为 CSV 文本。
      *
      * @param action  操作类型
      * @param keyword 关键字
+     * @param operator 精确操作人，空表示不限
+     * @param startTime 起始时间（含）
+     * @param endTime   结束时间（含）
      * @return 带 UTF-8 BOM 的 CSV 字节
      */
-    byte[] exportCsv(String action, String keyword);
+    byte[] exportCsv(String action, String keyword, String operator,
+                     String startTime, String endTime);
 
     /**
      * 某操作人最近的 n 条日志，供 AI 助手拼装"我做了什么"上下文。

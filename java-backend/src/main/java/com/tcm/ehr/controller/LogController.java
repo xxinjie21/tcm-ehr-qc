@@ -38,6 +38,9 @@ public class LogController {
      *
      * @param action  操作类型，空表示不限
      * @param keyword 关键字，匹配操作人/对象/详情
+     * @param operator 精确操作人，空表示不限（与三档可见范围叠加，成员传别人名只会得到空集）
+     * @param startTime 起始时间（含），'yyyy-MM-dd HH:mm:ss'
+     * @param endTime   结束时间（含），同上
      * @param page    页码，从 1 开始
      * @param pageSize 每页条数，上限 {@value PageSizeGuard#MAX_PAGE_SIZE}（超出按上限截断，避免 pageSize=999999 一次拉全表）
      * @return total=总条数；list=当前页记录
@@ -45,9 +48,13 @@ public class LogController {
     @GetMapping("")
     public Result<Map<String, Object>> logs(@RequestParam(required = false) String action,
                                             @RequestParam(required = false) String keyword,
+                                            @RequestParam(required = false) String operator,
+                                            @RequestParam(required = false) String startTime,
+                                            @RequestParam(required = false) String endTime,
                                             @RequestParam(defaultValue = "1") int page,
                                             @RequestParam(defaultValue = "10") int pageSize) {
-        return Result.ok(logService.page(action, keyword, page, PageSizeGuard.clamp(pageSize)));
+        return Result.ok(logService.page(action, keyword, operator, startTime, endTime, page,
+                PageSizeGuard.clamp(pageSize)));
     }
 
     /**
@@ -91,12 +98,18 @@ public class LogController {
      *
      * @param action  操作类型，空表示导出全部
      * @param keyword 关键字
+     * @param operator 精确操作人，空表示不限
+     * @param startTime 起始时间（含）
+     * @param endTime   结束时间（含）
      * @return 带 UTF-8 BOM 的 CSV 字节流
      */
     @GetMapping("/export")
     public ResponseEntity<byte[]> export(@RequestParam(required = false) String action,
-                                         @RequestParam(required = false) String keyword) {
-        byte[] content = logService.exportCsv(action, keyword);
+                                         @RequestParam(required = false) String keyword,
+                                         @RequestParam(required = false) String operator,
+                                         @RequestParam(required = false) String startTime,
+                                         @RequestParam(required = false) String endTime) {
+        byte[] content = logService.exportCsv(action, keyword, operator, startTime, endTime);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=audit-logs.csv")
                 .contentType(org.springframework.http.MediaType.parseMediaType("text/csv;charset=UTF-8"))

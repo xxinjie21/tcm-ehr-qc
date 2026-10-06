@@ -14,6 +14,9 @@
   --text: #33322e;         /* 主文本 */
   --text-sub: #726d63;     /* 次文本；对 --paper 4.64:1、对 #fff 5.14:1，满足 WCAG AA 4.5:1 */
   --danger: #a04335;       /* 警示红 */
+  /* 28.9①：成功色此前只有登记（见文件末「语义三对」），没有 token —— StandardizationReport
+     3 处 var(--success, #3a7d44) 恒走 fallback，改 token 不会生效。这里补上定义。 */
+  --success: #3a7d44;      /* 成功色（对 --paper 4.9:1，满足 AA） */
 
   /* ===== 视觉令牌（P4.4/P4.14）=====
      把散落的颜色字面量与间距离格值收敛到令牌；取值与原字面量一致或就近对齐 4/8/12/16/24 五档，
@@ -100,6 +103,9 @@ h1, h2, h3, h4, h5, h6, b, strong {
   --el-text-color-primary: var(--text);
   --el-text-color-regular: #55534c;
   --el-text-color-secondary: var(--text-sub);
+  /* 28.9③：Element Plus 默认 --el-text-color-placeholder:#a8abb2 对白底仅 2.30:1，不过 AA。
+     前文只覆盖了 regular/secondary，漏了 placeholder（disabled 文字引用它，一并对齐）。 */
+  --el-text-color-placeholder: var(--text-sub);
   --el-font-size-base: 13px;
 }
 

@@ -76,7 +76,7 @@ class LogServiceImplTest {
 
     /** 跑一次 page() 并把下发的 wrapper 渲染出来（渲染后参数表才会填充） */
     private QueryWrapper<OperationLog> wrapperAfterPage() {
-        service.page(null, null, 1, 10);
+        service.page(null, null, null, null, null, 1, 10);
         QueryWrapper<OperationLog> w = capturedWrapper;
         assertTrue(w != null, "selectPage 未被调用");
         w.getSqlSegment();
@@ -129,6 +129,22 @@ class LogServiceImplTest {
         assertTrue(w.getParamNameValuePairs().containsValue("nobody"), w.getParamNameValuePairs().toString());
     }
 
+    /** 28.8：独立操作人与时间范围筛选真实下发到 SQL（管理员无三档收窄，只看这两项） */
+    @Test
+    void operatorAndTimeRangeFiltersAreApplied() {
+        loginAs("管理员", "", null, "admin");
+        service.page(null, null, "alice", "2026-01-01 00:00:00", "2026-01-31 23:59:59", 1, 10);
+        QueryWrapper<OperationLog> w = capturedWrapper;
+        assertTrue(w != null, "selectPage 未被调用");
+        String sql = w.getSqlSegment();
+        Map<String, Object> vals = w.getParamNameValuePairs();
+        assertTrue(sql.contains("operator"), "应带独立操作人条件：" + sql);
+        assertTrue(sql.contains("log_time"), "应带时间范围条件：" + sql);
+        assertTrue(vals.containsValue("alice"), vals.toString());
+        assertTrue(vals.containsValue("2026-01-01 00:00:00"), vals.toString());
+        assertTrue(vals.containsValue("2026-01-31 23:59:59"), vals.toString());
+    }
+
     // ------------------------------------------------------------------ 所属组织列
 
     /** 「所属组织」列：org_id 解析成组织名；查不到的给「—」而不是空串 */
@@ -143,7 +159,7 @@ class LogServiceImplTest {
         page.setRecords(List.of(log("g1"), log("g-deleted")));
         when(logMapper.selectPage(any(), any())).thenAnswer(inv -> page);
 
-        Map<String, Object> res = service.page(null, null, 1, 10);
+        Map<String, Object> res = service.page(null, null, null, null, null, 1, 10);
 
         @SuppressWarnings("unchecked")
         List<OperationLog> rows = (List<OperationLog>) res.get("list");
@@ -170,7 +186,7 @@ class LogServiceImplTest {
         when(orgMapper.selectBatchIds(any())).thenReturn(List.of(org));
         when(logMapper.selectList(any())).thenReturn(List.of(log("g1")));
 
-        String csv = new String(service.exportCsv(null, null), StandardCharsets.UTF_8);
+        String csv = new String(service.exportCsv(null, null, null, null, null), StandardCharsets.UTF_8);
 
         assertTrue(csv.contains("所属组织"), csv);
         assertTrue(csv.contains("针灸组"), csv);

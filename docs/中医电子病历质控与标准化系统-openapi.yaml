@@ -1837,6 +1837,24 @@ paths:
           description: 操作人 / 操作对象 / 详情 关键字
           schema:
             type: string
+        - name: operator
+          in: query
+          required: false
+          description: 精确操作人（28.8）；与三档可见范围叠加，成员传他人名只会得到空集
+          schema:
+            type: string
+        - name: startTime
+          in: query
+          required: false
+          description: 起始时间（含），'yyyy-MM-dd HH:mm:ss'
+          schema:
+            type: string
+        - name: endTime
+          in: query
+          required: false
+          description: 结束时间（含），'yyyy-MM-dd HH:mm:ss'
+          schema:
+            type: string
         - name: page
           in: query
           required: false
@@ -1967,6 +1985,35 @@ paths:
         - 日志
       summary: 操作日志导出
       description: 【权限：登录即可】（§七 L7 三档）按筛选条件读 operation_log 表并导出为 CSV（带 UTF-8 BOM）文件流，不套 Result 包装
+      parameters:
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: operator
+          in: query
+          required: false
+          description: 精确操作人（28.8）
+          schema:
+            type: string
+        - name: startTime
+          in: query
+          required: false
+          description: 起始时间（含）
+          schema:
+            type: string
+        - name: endTime
+          in: query
+          required: false
+          description: 结束时间（含）
+          schema:
+            type: string
       responses:
         '200':
           description: 日志文件流

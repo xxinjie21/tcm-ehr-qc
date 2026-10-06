@@ -13,8 +13,27 @@
           aria-label="操作人 / 对象关键字"
           placeholder="操作人 / 对象关键字"
           clearable
-          style="width: 240px"
+          style="width: 200px"
           @keyup.enter="loadLogs"
+        />
+        <!-- 28.8：独立操作人筛选。关键字是模糊三列命中，要「只看某人」时不够用 -->
+        <el-input
+          v-model="query.operator"
+          aria-label="操作人（精确）"
+          placeholder="操作人（精确）"
+          clearable
+          style="width: 140px"
+          @keyup.enter="loadLogs"
+        />
+        <!-- 28.8：时间范围。审计最常见的诉求是「某某时间之后发生过什么」 -->
+        <el-date-picker
+          v-model="dateRange"
+          type="datetimerange"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          range-separator="至"
+          start-placeholder="开始时间"
+          end-placeholder="结束时间"
+          style="width: 360px"
         />
         <el-button type="primary" :loading="loading" @click="loadLogs">查 询</el-button>
         <!-- 导出依赖「日志可用」：加载失败时禁用，避免对空列表做导出 -->
@@ -144,8 +163,19 @@ const auditStamp = () => {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}_${p(d.getMilliseconds())}`
 }
 
-// 查询条件；page / pageSize 直接双向绑定分页组件（与其余列表页与 /api/logs 契约一致）
-const query = reactive({ action: '', keyword: '', page: 1, pageSize: 10 })
+// 查询条件；page / pageSize 直接双向绑定分页组件（与其余列表页与 /api/logs 契约一致）。
+// 28.8：operator 精确匹配、startTime/endTime 闭区间时间范围，随 query 一起进 URL（可分享）。
+const query = reactive({
+  action: '', keyword: '', operator: '', startTime: '', endTime: '', page: 1, pageSize: 10
+})
+// 日期选择器要数组、query 要两个字符串字段；用 computed 双向桥接，避免在 query 里存数组导致 URL 序列化难看
+const dateRange = computed({
+  get: () => (query.startTime && query.endTime ? [query.startTime, query.endTime] : []),
+  set: (v) => {
+    query.startTime = v?.[0] || ''
+    query.endTime = v?.[1] || ''
+  }
+})
 const exporting = ref(false)
 // 列表骨架统一走 usePagedList；本页失败要「清空 + 标记」（不退化成展示编造的日志，
 // 空态据此给重试入口、导出按钮据此禁用），故三个开关都用默认

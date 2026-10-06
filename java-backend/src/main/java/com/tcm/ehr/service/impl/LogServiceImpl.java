@@ -45,10 +45,12 @@ public class LogServiceImpl implements ILogService {
      * @return total=总条数、list=当前页记录
      */
     @Override
-    public Map<String, Object> page(String action, String keyword, int page, int size) {
+    public Map<String, Object> page(String action, String keyword, String operator,
+                                    String startTime, String endTime, int page, int size) {
         // 1. 分页参数兜底为 1（非法分页会让 SQL 报错），条件走统一 wrapper
         Page<OperationLog> p = baseMapper.selectPage(
-                new Page<>(Math.max(page, 1), Math.max(size, 1)), buildWrapper(action, keyword));
+                new Page<>(Math.max(page, 1), Math.max(size, 1)),
+                buildWrapper(action, keyword, operator, startTime, endTime));
         // 2. 固定顺序装 total / list，前端按 key 取
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", p.getTotal());
@@ -67,7 +69,7 @@ public class LogServiceImpl implements ILogService {
      */
     @Override
     public Map<String, Object> pageByObject(String objectType, String objectId, int page, int size) {
-        QueryWrapper<OperationLog> w = buildWrapper(null, null)
+        QueryWrapper<OperationLog> w = buildWrapper(null, null, null, null, null)
                 .eq("object_type", objectType == null ? null : objectType.trim())
                 .eq("object_id", objectId == null ? null : objectId.trim())
                 .orderByDesc("log_time");
@@ -109,8 +111,10 @@ public class LogServiceImpl implements ILogService {
      * @return 命中条件的日志列表
      */
     @Override
-    public List<OperationLog> listForExport(String action, String keyword) {
-        List<OperationLog> rows = baseMapper.selectList(buildWrapper(action, keyword));
+    public List<OperationLog> listForExport(String action, String keyword, String operator,
+                                            String startTime, String endTime) {
+        List<OperationLog> rows = baseMapper.selectList(
+                buildWrapper(action, keyword, operator, startTime, endTime));
         fillOrgNames(rows);
         return rows;
     }
@@ -123,8 +127,9 @@ public class LogServiceImpl implements ILogService {
      * @return 带 UTF-8 BOM 的 CSV 内容
      */
     @Override
-    public byte[] exportCsv(String action, String keyword) {
-        return csvBytes(listForExport(action, keyword));
+    public byte[] exportCsv(String action, String keyword, String operator,
+                            String startTime, String endTime) {
+        return csvBytes(listForExport(action, keyword, operator, startTime, endTime));
     }
 
     /**
@@ -211,25 +216,27 @@ public class LogServiceImpl implements ILogService {
         }
     }
 
-    /** 组装筛选条件：操作类型精确匹配 + 关键字模糊匹配 + §七 L7 的三档可见性范围 */
-    private QueryWrapper<OperationLog> buildWrapper(String action, String keyword) {
+    /** 组装筛选条件：类型 / 关键字 / 操作人 / 时间范围 + §七 L7 的三档可见性范围 */
+    private QueryWrapper<OperationLog> buildWrapper(String action, String keyword,
+                                                    String operator, String startTime,
+                                                    String endTime) {
         QueryWrapper<OperationLog> w = new QueryWrapper<>();
         // 1. §七 L7 四档范围：管理员全部 / 组长本组 /
         //    成员本组织自己 / 无组织自己（一次覆盖 page、listForExport、exportCsv）
         String orgId = RequestUtils.currentOrgId();
-        String operator = RequestUtils.currentUsername();
+        String self = RequestUtils.currentUsername();
         if (RequestUtils.isAdmin()) {
             // 管理员：无条件（看全部）
         } else if (orgId != null && !orgId.isBlank()) {
             w.eq("org_id", orgId);
             if (OrganizationMember.ROLE_MEMBER.equals(RequestUtils.currentOrgRole())) {
                 // 成员：只看自己在本组织内的操作
-                w.eq("operator", operator);
+                w.eq("operator", self);
             }
             // 所有者：本组织全员操作
         } else {
             // 无组织：只能看自己
-            w.eq("operator", operator);
+            w.eq("operator", self);
         }
         // 2. 操作类型精确匹配
         if (action != null && !action.isBlank()) {
@@ -240,7 +247,20 @@ public class LogServiceImpl implements ILogService {
             String k = keyword.trim();
             w.and(q -> q.like("operator", k).or().like("target", k).or().like("detail", k));
         }
-        // 4. 时间倒序
+        // 4. 独立操作人：与三档范围叠加。成员传别人的名字不会越权 ——
+        //    上面已按 operator=自己收窄，这里再 eq 只会得到空集。
+        if (operator != null && !operator.isBlank()) {
+            w.eq("operator", operator.trim());
+        }
+        // 5. 时间范围闭区间。入参是 'YYYY-MM-DD HH:mm:ss'，与 MySQL datetime 可直接比较；
+        //    只给一端也生效（排查「某天之后」这类问题）。
+        if (startTime != null && !startTime.isBlank()) {
+            w.ge("log_time", startTime.trim());
+        }
+        if (endTime != null && !endTime.isBlank()) {
+            w.le("log_time", endTime.trim());
+        }
+        // 6. 时间倒序
         w.orderByDesc("log_time");
         return w;
     }

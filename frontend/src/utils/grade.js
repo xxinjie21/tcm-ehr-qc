@@ -18,7 +18,7 @@
  */
 
 /** 合格 */
-const GRADE_OK = '合格'
+export const GRADE_OK = '合格'
 /** 待复核 */
 const GRADE_REVIEW = '待复核'
 /** 无效 */
@@ -28,6 +28,13 @@ const GRADE_INVALID = '无效'
 const GRADE_CLASS = {
   [GRADE_OK]: 'is-ok',
   [GRADE_INVALID]: 'is-bad'
+}
+
+/** 分级名 → el-tag 的 type（28.12：列表里分级要能一眼分辨，配色口径仍只此一份） */
+const GRADE_TAG = {
+  [GRADE_OK]: 'success',
+  [GRADE_REVIEW]: 'warning',
+  [GRADE_INVALID]: 'danger'
 }
 
 /** 分级名 → 处置建议。与分级名分开：建议会随流程变化，不该混进名称里。 */
@@ -61,6 +68,16 @@ export function gradeOf(score, thresholds) {
  */
 export function gradeClass(grade) {
   return GRADE_CLASS[grade] || 'is-mid'
+}
+
+/**
+ * 分级名 → el-tag 的 type。未知分级走 info，不猜。
+ *
+ * @param {string} grade 分级名
+ * @returns {'success'|'warning'|'danger'|'info'}
+ */
+export function gradeTagType(grade) {
+  return GRADE_TAG[grade] || 'info'
 }
 
 /**
