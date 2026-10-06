@@ -219,35 +219,10 @@ public final class QcScorer {
 
     /** 原始列取值（按 Record 属性名） */
     private static String rawValue(Record r, String field) {
-        // 1. 无病历或无字段名一律无值
-        if (r == null || field == null) {
-            return null;
-        }
-        // 2. 按属性名映射到列，未配置的字段给 null
-        String value = switch (field) {
-            case "registrationNo" -> r.getRegistrationNo();
-            case "outpatientNo" -> r.getOutpatientNo();
-            case "gender" -> r.getGender();
-            case "age" -> r.getAge();
-            case "westernDiagnosis" -> r.getWesternDiagnosis();
-            case "tcmDiagnosis" -> r.getTcmDiagnosis();
-            case "presentIllness" -> r.getPresentIllness();
-            case "chiefComplaint" -> r.getChiefComplaint();
-            case "selfReport" -> r.getSelfReport();
-            case "inspection" -> r.getInspection();
-            case "pulse" -> r.getPulse();
-            case "tongue" -> r.getTongue();
-            case "physicalExam" -> r.getPhysicalExam();
-            case "pattern" -> r.getPattern();
-            case "prescription" -> r.getPrescription();
-            case "followUp" -> r.getFollowUp();
-            case "treatmentEffect" -> r.getTreatmentEffect();
-            case "department" -> r.getDepartment();
-            case "doctorId" -> r.getDoctorId();
-            default -> null;
-        };
-        // 3. 空白视作无值，避免空格被当成内容
-        return value == null || value.isBlank() ? null : value.trim();
+        // 取值与空白口径都在 RecordUtil.column 一处（批次14 收敛）：原先本类与
+        // QcServiceImpl 各写一份 19 / 17 个 case 的 switch，而两边的取值与 trim
+        // 逐字相同，差别只在明细那份少了 department、doctorId 两个 case。
+        return RecordUtil.column(r, field);
     }
 
     /** 术语类型 → 结构化 structuredKey；未纳入未归一扣分的类型返回 null */

@@ -572,32 +572,10 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 按字段名取原始列值（空白视作无值），字段名由规则集配置 */
     private String rawValue(Record r, String field) {
-        // 1. 字段名由规则集配置，null 字段或 null 病历都按无值处理
-        if (r == null || field == null) {
-            return null;
-        }
-        // 2. 按字段名映射到列；未配置的字段返回 null
-        String v = switch (field) {
-            case "registrationNo" -> r.getRegistrationNo();
-            case "outpatientNo" -> r.getOutpatientNo();
-            case "gender" -> r.getGender();
-            case "age" -> r.getAge();
-            case "westernDiagnosis" -> r.getWesternDiagnosis();
-            case "tcmDiagnosis" -> r.getTcmDiagnosis();
-            case "presentIllness" -> r.getPresentIllness();
-            case "chiefComplaint" -> r.getChiefComplaint();
-            case "selfReport" -> r.getSelfReport();
-            case "inspection" -> r.getInspection();
-            case "pulse" -> r.getPulse();
-            case "tongue" -> r.getTongue();
-            case "physicalExam" -> r.getPhysicalExam();
-            case "pattern" -> r.getPattern();
-            case "prescription" -> r.getPrescription();
-            case "followUp" -> r.getFollowUp();
-            case "treatmentEffect" -> r.getTreatmentEffect();
-            default -> null;
-        };
-        // 3. 空白视作无值，避免把空格当内容做存在性判断
-        return v == null || v.isBlank() ? null : v.trim();
+        // 取值与空白口径都在 RecordUtil.column 一处（批次14 收敛）：原先本类与
+        // QcScorer 各写一份 17 / 19 个 case 的 switch，取值与 trim 逐字相同，
+        // 差别只在本类少了 department、doctorId 两个 case —— 规则引用这两个字段时
+        // 这里会静默返回 null，看上去像"病历没填"。合并后两侧口径一致。
+        return com.tcm.ehr.common.utils.RecordUtil.column(r, field);
     }
 }
