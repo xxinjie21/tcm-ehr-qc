@@ -83,8 +83,7 @@ class RecordServiceImplDeleteExecutionTest {
         req.setAttribute("currentOrgRole", "member");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
         try {
-            DeleteRecordsDTO dto = new DeleteRecordsDTO();
-            dto.setIds(List.of("r1", "r2", "r-other-org"));   // 第三个不可达
+            DeleteRecordsDTO dto = new DeleteRecordsDTO(List.of("r1", "r2", "r-other-org"));   // 第三个不可达
             DeleteRecordsVO vo = svc(mapper, reviewTaskMapper).deleteRecords(dto);
 
             assertEquals(2, vo.getDeletedCount(), "只应删除数据域内可达的两条");
@@ -117,8 +116,7 @@ class RecordServiceImplDeleteExecutionTest {
         req.setAttribute("currentOrgRole", "member");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
         try {
-            DeleteRecordsDTO dto = new DeleteRecordsDTO();
-            dto.setIds(List.of("r-other-org"));
+            DeleteRecordsDTO dto = new DeleteRecordsDTO(List.of("r-other-org"));
             DeleteRecordsVO vo = svc(mapper, reviewTaskMapper).deleteRecords(dto);
 
             assertEquals(0, vo.getDeletedCount());

@@ -76,14 +76,13 @@ class RecordServiceImplWriteGuardTest {
         assertEquals("未选择要操作的病历", ex.getMessage());
 
         assertThrows(IllegalArgumentException.class,
-                () -> svc(mock(RecordMapper.class)).deleteRecords(new DeleteRecordsDTO()));
+                () -> svc(mock(RecordMapper.class)).deleteRecords(new DeleteRecordsDTO(null)));
     }
 
     @Test
     @DisplayName("按 ID 删除：空 id 集合 ⇒ 拒绝")
     void deleteRecordsRejectsBlankIdList() {
-        DeleteRecordsDTO dto = new DeleteRecordsDTO();
-        dto.setIds(List.of());
+        DeleteRecordsDTO dto = new DeleteRecordsDTO(List.of());
         assertThrows(IllegalArgumentException.class, () -> svc(mock(RecordMapper.class)).deleteRecords(dto));
     }
 

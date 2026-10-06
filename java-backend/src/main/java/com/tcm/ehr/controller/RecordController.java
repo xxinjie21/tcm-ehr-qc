@@ -138,7 +138,7 @@ public class RecordController {
         DeleteRecordsVO vo = recordService.deleteRecords(dto);
         // 2. 留痕：请求条数与实际删除条数分开记，跨组尝试才看得出来
         operationLogger.log("病历删除",
-                "请求" + dto.getIds().size() + "条 / 实际删除" + vo.getDeletedCount() + "条", null);
+                "请求" + dto.ids().size() + "条 / 实际删除" + vo.getDeletedCount() + "条", null);
         return Result.ok("删除成功", vo);
     }
 

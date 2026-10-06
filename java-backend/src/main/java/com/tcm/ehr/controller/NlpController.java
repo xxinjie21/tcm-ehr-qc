@@ -63,7 +63,7 @@ public class NlpController {
     @PostMapping("/extract")
     public ResponseEntity<Result<NlpExtractVO>> extract(@Valid @RequestBody NlpExtractDTO dto) {
         // 1. 取待抽取文本，为空回 400（其余情况一律降级）
-        String text = dto == null ? null : dto.getText();
+        String text = dto == null ? null : dto.text();
         if (text == null || text.isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入待抽取文本"));
         }

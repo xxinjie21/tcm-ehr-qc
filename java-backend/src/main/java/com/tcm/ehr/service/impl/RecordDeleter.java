@@ -53,11 +53,11 @@ public class RecordDeleter {
      */
     public DeleteRecordsVO deleteByIds(DeleteRecordsDTO dto) {
         // 1. 没选 id 直接拒：空删会静默「成功」，用户以为删掉了
-        if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
+        if (dto == null || dto.ids() == null || dto.ids().isEmpty()) {
             throw new IllegalArgumentException("未选择要操作的病历");
         }
         // 2. 请求体里的 id 不可信：别组的必须剔除
-        List<String> accessible = filterAccessibleIds(dto.getIds());
+        List<String> accessible = filterAccessibleIds(dto.ids());
         // 3. 同一段删除逻辑
         return doDelete(accessible);
     }

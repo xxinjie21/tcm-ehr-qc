@@ -41,41 +41,32 @@ class RequiredFieldDtoValidationTest {
     @Test
     @DisplayName("DeleteRecordsDTO.ids 为空 → 未选择要操作的病历")
     void deleteRecordsRequiresIds() {
-        DeleteRecordsDTO empty = new DeleteRecordsDTO();
+        DeleteRecordsDTO empty = new DeleteRecordsDTO(null);
         assertSingle(validator().validate(empty), "未选择要操作的病历");
 
-        DeleteRecordsDTO blank = new DeleteRecordsDTO();
-        blank.setIds(List.of());
+        DeleteRecordsDTO blank = new DeleteRecordsDTO(List.of());
         assertSingle(validator().validate(blank), "未选择要操作的病历");
 
-        DeleteRecordsDTO ok = new DeleteRecordsDTO();
-        ok.setIds(List.of("rec-1"));
+        DeleteRecordsDTO ok = new DeleteRecordsDTO(List.of("rec-1"));
         assertTrue(validator().validate(ok).isEmpty());
     }
 
     @Test
     @DisplayName("NlpExtractDTO.text 为空/全空白 → 请输入待抽取文本")
     void nlpExtractRequiresText() {
-        assertSingle(validator().validate(new NlpExtractDTO()), "请输入待抽取文本");
+        assertSingle(validator().validate(new NlpExtractDTO(null)), "请输入待抽取文本");
 
-        NlpExtractDTO blank = new NlpExtractDTO();
-        blank.setText("   ");
-        assertSingle(validator().validate(blank), "请输入待抽取文本");
+        assertSingle(validator().validate(new NlpExtractDTO("   ")), "请输入待抽取文本");
 
-        NlpExtractDTO ok = new NlpExtractDTO();
-        ok.setText("患者发热咳嗽两天");
-        assertTrue(validator().validate(ok).isEmpty());
+        assertTrue(validator().validate(new NlpExtractDTO("患者发热咳嗽两天")).isEmpty());
     }
 
     @Test
     @DisplayName("NormalizeDTO.term 为空 → 请输入术语（type 合法性仍由 Controller 判 4001）")
     void normalizeRequiresTerm() {
-        assertSingle(validator().validate(new NormalizeDTO()), "请输入术语");
+        assertSingle(validator().validate(new NormalizeDTO(null, null)), "请输入术语");
 
-        NormalizeDTO ok = new NormalizeDTO();
-        ok.setType("symptom");
-        ok.setTerm("嗓子疼");
-        assertTrue(validator().validate(ok).isEmpty());
+        assertTrue(validator().validate(new NormalizeDTO("symptom", "嗓子疼")).isEmpty());
     }
 
     @Test

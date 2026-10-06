@@ -50,15 +50,15 @@ public class GovernanceController {
     @PostMapping("/governance/normalize")
     public ResponseEntity<Result<Map<String, Object>>> normalize(@Valid @RequestBody NormalizeDTO dto) {
         // 1. 术语必填（错误体下沉：抛 BusinessException 由 GlobalExceptionHandler 统一出口）
-        if (dto.getTerm() == null || dto.getTerm().isBlank()) {
+        if (dto.term() == null || dto.term().isBlank()) {
             throw new com.tcm.ehr.common.exception.BusinessException(400, "请输入术语");
         }
-        // 2. 类型必须是 5 类词典之一（与词表单一来源一致）
-        if (dto.getType() == null || !com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(dto.getType())) {
+        // 2. 类型必须是词典类之一（与词表单一来源一致）
+        if (dto.type() == null || !com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(dto.type())) {
             throw new com.tcm.ehr.common.exception.BusinessException(4001, "术语类型非法");
         }
         // 3. 归一（未命中时 standardTerm 原样返回、level 为 null）
-        var r = governanceService.normalize(dto.getType(), dto.getTerm());
+        var r = governanceService.normalize(dto.type(), dto.term());
         Map<String, Object> data = new java.util.LinkedHashMap<>();
         data.put("standardTerm", r.standardTerm());
         data.put("source", r.source());

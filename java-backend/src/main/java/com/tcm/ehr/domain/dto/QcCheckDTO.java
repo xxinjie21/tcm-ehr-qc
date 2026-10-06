@@ -1,12 +1,9 @@
 package com.tcm.ehr.domain.dto;
 
-import lombok.Data;
-
 /**
  * 事前质控检查请求。
+ *
+ * @param recordId 病历 ID
  */
-@Data
-public class QcCheckDTO {
-
-    private String recordId;
+public record QcCheckDTO(String recordId) {
 }

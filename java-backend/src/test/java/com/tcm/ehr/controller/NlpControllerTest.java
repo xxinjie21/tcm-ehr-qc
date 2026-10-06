@@ -28,9 +28,7 @@ import static org.mockito.Mockito.when;
 class NlpControllerTest {
 
     private NlpExtractDTO dto(String text) {
-        NlpExtractDTO d = new NlpExtractDTO();
-        d.setText(text);
-        return d;
+        return new NlpExtractDTO(text);
     }
 
     /** 构造 controller；termNormalizer 传 null 表示该用例不关心归一行为 */
@@ -45,7 +43,7 @@ class NlpControllerTest {
     void blankTextReturns400() {
         NlpController controller = controller(mock(PythonNlpClient.class), null);
         assertEquals(400, controller.extract(dto("   ")).getStatusCode().value());
-        assertEquals(400, controller.extract(new NlpExtractDTO()).getStatusCode().value());
+        assertEquals(400, controller.extract(new NlpExtractDTO(null)).getStatusCode().value());
     }
 
     @Test

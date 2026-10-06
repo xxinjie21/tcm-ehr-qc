@@ -88,7 +88,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     @Override
     public QcCheckVO check(QcCheckDTO dto) {
         // 1. 载入原始病历（缺省时按 recordId 取，无则 null）
-        Record raw = loadRaw(dto == null ? null : dto.getRecordId());
+        Record raw = loadRaw(dto == null ? null : dto.recordId());
         // 2. 组装结构化数据：请求内联优先、病历回退
         Map<String, Object> data = asMap(null, raw == null ? null : raw.getStructuredData());
         // 3. 取当前生效规则
