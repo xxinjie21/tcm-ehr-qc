@@ -26,7 +26,7 @@
 export const MULTI_AUTOSIZE = { minRows: 3, maxRows: 30 }
 
 // 病历 21 原始字段（含表单属性 max / multi）
-export const RECORD_FIELDS = [
+const RECORD_FIELDS = [
   { key: 'registrationNo', label: '登记号', max: 50 },
   { key: 'outpatientNo', label: '门诊号', max: 50 },
   { key: 'gender', label: '性别' },

@@ -68,11 +68,6 @@ public final class StructuredDataMeta {
         }
     }
 
-    /** 兼容旧调用点（不带词条数） */
-    public static String stamp(ObjectMapper mapper, String json, String dictVersion) {
-        return stamp(mapper, json, dictVersion, null);
-    }
-
     /**
      * 给结构化数据 JSON 打上<b>人工修改</b>标记（人工流程：复核提交 / 手工改结构化数据）。
      *

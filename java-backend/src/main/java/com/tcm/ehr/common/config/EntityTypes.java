@@ -20,7 +20,7 @@ import java.util.Set;
  * ⚠️ 新增词典类型不会改变质控扣分口径：计分只认
  *
  * QcScorer.keyOf() 里硬编码的 5 类，新类型落到 default -> null
- * 后按 0 条未命中处理（详见《多批次实施计划》批次 20 与 §0.0b）。
+ * 后按 0 条未命中处理（详见《多批次实施计划》批次 20）。
  */
 public final class EntityTypes {
 
@@ -125,7 +125,7 @@ public final class EntityTypes {
         // 从 9 类里筛出**有词典的 8 类**并取 key；LinkedHashSet 保住 order。
         // ⚠️ 别把这里读成「计分也用 8 类」：质控计分只认 QcScorer.keyOf() 里硬编码的 5 类
         // （疾病/证候/症状/中药/方剂），舌象/脉象/治法落 default → 按 0 条未命中处理。
-        // 口径差异是有意的（见本类第 14-22 行与《多批次实施计划》批次 20 的 §0.0b）。
+        // 口径差异是有意的（见本类头部说明与《多批次实施计划》批次 20）。
         Set<String> out = new LinkedHashSet<>();
         for (EntityType t : BY_KEY.values()) {
             if (t.dict()) {

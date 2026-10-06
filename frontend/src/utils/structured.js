@@ -4,20 +4,20 @@
  * <p>解析页要做「归一汇总统计」、实体卡片要按分区渲染，两处必须用同一份分区与同一套措辞；
  * 各写一份必然漂移（改了这边忘了那边），所以统一放这里。</p>
  *
- * <p><b>dict 的口径与后端 {@code EntityNormalizer.dictionaryType} 对齐</b>：
- * 疾病 / 症状 / 证候 / 方剂 四类走词典，中药走 herb 词典（后端在 herbs 分支单独处理），
- * 舌象 / 脉象 / 病因 / 治法 四类没有独立词典、只保留原文。</p>
+ * <p><b>dict 的口径与后端 {@code EntityTypes}（dict=true）对齐</b>：
+ * 疾病 / 症状 / 证候 / 方剂 / 中药 / 舌象 / 脉象 / 治法 八类都有独立词典
+ * （舌象 / 脉象 / 治法自批次 20 起有词典），只有病因没有独立词典、只保留原文。</p>
  */
 
 // 9 类实体分区（顺序即页面展示顺序）
 export const ENTITY_SECTIONS = [
   { key: 'diseases', label: '疾病', dict: true },
   { key: 'symptoms', label: '症状', dict: true },
-  { key: 'tongueList', label: '舌象', dict: false },
-  { key: 'pulseList', label: '脉象', dict: false },
+  { key: 'tongueList', label: '舌象', dict: true },
+  { key: 'pulseList', label: '脉象', dict: true },
   { key: 'patternList', label: '证候', dict: true },
   { key: 'causeList', label: '病因', dict: false },
-  { key: 'treatmentList', label: '治法', dict: false },
+  { key: 'treatmentList', label: '治法', dict: true },
   { key: 'formulaList', label: '方剂', dict: true },
   { key: 'herbs', label: '中药', dict: true }
 ]
@@ -71,13 +71,13 @@ export function summarizeNorm(vo) {
   if (!vo) return null
   // 2. 初始化各计数累加器
   const s = {
-    total: 0,      // 参与统计的实体总数（有词典的 5 类）
+    total: 0,      // 参与统计的实体总数（有词典的 8 类）
     hit: 0,        // 命中词典
     exact: 0,      // 1 精确
     contain: 0,    // 2 包含
     fuzzy: 0,      // 3 模糊
     miss: 0,       // 未命中词典
-    noDict: 0      // 无独立词典、不参与归一的实体数（舌/脉/病因/治法）
+    noDict: 0      // 无独立词典、不参与归一的实体数（病因）
   }
   // 3. 遍历 9 类分区，按「有无词典」分流累计
   for (const sec of ENTITY_SECTIONS) {

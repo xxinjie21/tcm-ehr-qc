@@ -11,9 +11,6 @@ export function getMyOrg() {
 export function listOrgs(status) {
   return request.get('/orgs', { params: { status } })
 }
-export function updateGroup(id, body) {
-  return request.put(`/orgs/${id}`, body)
-}
 export function stopGroup(id) {
   return request.post(`/orgs/${id}/stop`)
 }

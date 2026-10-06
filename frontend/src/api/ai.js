@@ -20,12 +20,12 @@ export function aiReview(data) {
 // 好处不只是「不占线程」：用户可以离开页面，回来时任务号还在，再查一次就能拿到结论。
 
 /** 提交一次 AI 生成，立即拿到任务号 */
-export function aiSubmit(kind, data) {
+function aiSubmit(kind, data) {
   return request.post(`/ai/async/${kind}`, data)
 }
 
 /** 查任务结果：state = RUNNING | DONE | FAILED */
-export function aiResult(taskId) {
+function aiResult(taskId) {
   return request.get(`/ai/async/${taskId}`)
 }
 

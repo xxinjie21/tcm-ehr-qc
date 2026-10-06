@@ -19,7 +19,7 @@ import { getTerms } from '@/api/dictionary'
  */
 
 /** 展开时预载的条数：够看又不至于卡；证候词典 2080 条，必须靠虚拟滚动 + 远程检索 */
-export const PRELOAD_SIZE = 50
+const PRELOAD_SIZE = 50
 
 /** 输入防抖间隔（毫秒） */
 const DEBOUNCE_MS = 200

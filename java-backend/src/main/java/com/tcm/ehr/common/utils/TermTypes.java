@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * 术语类型清单（唯一副本）。
  *
- * <p> 起改为直接取 {@link EntityTypes} 中 {@code dict=true} 的类型（疾病/证候/症状/中药/方剂），
+ * <p>改为直接取 {@link EntityTypes} 中 {@code dict=true} 的类型（8 类：疾病/证候/症状/中药/方剂/舌象/脉象/治法；病因无词典），
  * 不再单独维护，避免与"实体类型目录"漂移。</p>
  *
  * <p>与 {@link EntityNormalizer#dictionaryType(String)} 的分工：本类回答「系统有哪几类术语」，

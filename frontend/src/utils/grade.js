@@ -8,7 +8,8 @@
  * 在复核页显示「合格 → 进入数据清洗」。改动其中一处，另一处不会跟着变。</p>
  *
  * <p>这里给出三件事的唯一实现：<b>判定</b>（{@link gradeOf}）、
- * <b>名称</b>（{@link GRADE_LABELS}）、<b>配色</b>（{@link gradeClass}）。
+ * <b>名称</b>（{@code GRADE_OK} / {@code GRADE_REVIEW} / {@code GRADE_INVALID}）、
+ * <b>配色</b>（{@link gradeClass}）。
  * 阈值必须来自后端规则（管理员可改），前端不写死数值。</p>
  *
  * <p>名称与后端 {@code ScoreResultVO.grade} 保持逐字一致：复核页展示的
@@ -17,27 +18,24 @@
  */
 
 /** 合格 */
-export const GRADE_OK = '合格'
+const GRADE_OK = '合格'
 /** 待复核 */
-export const GRADE_REVIEW = '待复核'
+const GRADE_REVIEW = '待复核'
 /** 无效 */
-export const GRADE_INVALID = '无效'
+const GRADE_INVALID = '无效'
 
 /** 分级名 → 样式类（配色唯一副本） */
-export const GRADE_CLASS = {
+const GRADE_CLASS = {
   [GRADE_OK]: 'is-ok',
   [GRADE_INVALID]: 'is-bad'
 }
 
 /** 分级名 → 处置建议。与分级名分开：建议会随流程变化，不该混进名称里。 */
-export const GRADE_HINT = {
+const GRADE_HINT = {
   [GRADE_OK]: '进入数据清洗',
   [GRADE_REVIEW]: '需人工复核后重算',
   [GRADE_INVALID]: '退回补录关键字段'
 }
-
-/** 阈值未从后端取到时不给判定结论（原来前端写死 90 / 60，改了合格线就对不上） */
-export const THRESHOLDS_UNKNOWN = null
 
 /**
  * 按后端阈值判定分级。

@@ -6,7 +6,7 @@
  * 新增图表类型时在此处补注册，不要在页面里直接 import 'echarts'。</p>
  */
 import * as echarts from 'echarts/core'
-import { BarChart, LineChart, PieChart, GraphChart } from 'echarts/charts'
+import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -14,7 +14,6 @@ echarts.use([
   BarChart,
   LineChart,
   PieChart,
-  GraphChart,
   GridComponent,
   LegendComponent,
   TooltipComponent,
