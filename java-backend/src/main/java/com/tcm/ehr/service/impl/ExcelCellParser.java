@@ -116,7 +116,13 @@ final class ExcelCellParser {
         return v.length() == 1 ? "0" + v : v;
     }
 
-    /** 单元格取文本：按显示格式取值，数字/日期型统一转字符串 */
+    /**
+     * 单元格取文本：按显示格式取值，数字/日期型统一转字符串。
+     *
+     * <p><b>这是全仓唯一的「单元格 → 文本」实现</b>（批次14 审核后收敛，见下方 FORMULA 的取舍）。
+     * 词典导入原本自己写了一份，两份在 <b>BOOLEAN</b>（这里给 "true"/"false"，那份落 default 给 null）
+     * 与 <b>FORMULA</b> 上不一致 —— 同一个 .xlsx 从不同页面导入会读出不同的文本。</p>
+     */
     static String cellText(Cell cell) {
         // 1. 空单元格给 null
         if (cell == null) {
@@ -136,7 +142,14 @@ final class ExcelCellParser {
                 yield String.valueOf(d);
             }
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            case FORMULA -> cell.getCellFormula();
+            // 公式取**算出来的值**而不是公式文本：原先这里是 cell.getCellFormula()，
+            // 那会把 "=B2&\"室\"" 这类公式原文当成字段值导进去。词典导入的旧实现用的是
+            // cell.toString()（POI 的显示值），两相权衡取后者 —— 合并两份实现时一并统一，
+            // 这也是本次唯一一处**行为变化**（公式列的导入值从公式文本变成计算结果）。
+            case FORMULA -> {
+                String v = cell.toString();
+                yield v == null || v.isBlank() ? null : v.trim();
+            }
             default -> null;
         };
     }

@@ -9,7 +9,6 @@ import com.tcm.ehr.service.IEsTermIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -564,23 +563,15 @@ if (matched) {
         return isHeaderRow(new String[]{cellText(r.getCell(0))});
     }
 
+    /**
+     * 单元格取文本 —— **委托给全仓唯一实现** {@link ExcelCellParser#cellText(Cell)}。
+     *
+     * <p>原本这里自己写了一份，与病历导入那份在 BOOLEAN 与 FORMULA 上并不一致：
+     * 同一个 .xlsx 从词典页导入和从病历页导入会读出不同文本。两份合一后，
+     * 词典侧原先的两条要求（整数不带 .0、国标代码保留 3.01 这种小数）由该实现原样满足。</p>
+     */
     private String cellText(Cell cell) {
-        // 1. 空单元格给 null
-        if (cell == null) return null;
-        CellType type = cell.getCellType();
-        // 2. 按单元格类型取值
-        return switch (type) {
-            case STRING -> cell.getStringCellValue().trim();
-            // 整数按 long 输出（避免 1.0 这种尾数）；非整数保留小数（国标代码常形如 3.01）
-            case NUMERIC -> {
-                double d = cell.getNumericCellValue();
-                yield d == Math.floor(d) && !Double.isInfinite(d)
-                        ? String.valueOf((long) d)
-                        : String.valueOf(d);
-            }
-            case FORMULA -> cell.toString().trim();
-            default -> null;
-        };
+        return ExcelCellParser.cellText(cell);
     }
 
     /** 读文本并自动判定编码（优先 UTF-8，解出乱码则回退 GBK） */
