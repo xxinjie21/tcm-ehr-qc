@@ -611,10 +611,6 @@ onMounted(() => {
   gap: var(--sp-4);
   margin-bottom: var(--sp-1);
 }
-.tip {
-  font-size: var(--fs-md);
-  color: var(--text-sub);
-}
 
 /* ===== 清洗结果（中部） ===== */
 .clean-result {

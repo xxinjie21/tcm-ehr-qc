@@ -112,6 +112,15 @@ body {
   background: var(--paper);
 }
 
+/* ===== 次级说明文字 .tip（批次 26.15）=====
+   各页共用的「说明/提示」文字。此前 8 个组件各自复制
+   `font-size: var(--fs-md); color: var(--text-sub);`（内容完全一致），
+   收敛为全局基类；各页只保留自己的间距 / 行高 / 布局增量。 */
+.tip {
+  font-size: var(--fs-md);
+  color: var(--text-sub);
+}
+
 /* ===== 表格（原型表格风格） ===== */
 .el-table {
   --el-table-border-color: #eee9dd;

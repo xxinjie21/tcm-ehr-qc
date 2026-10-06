@@ -733,10 +733,6 @@ onMounted(() => {
   font-size: var(--fs-base);
   color: var(--text-sub);
 }
-.tip {
-  font-size: var(--fs-md);
-  color: var(--text-sub);
-}
 .overdue {
   color: var(--danger);
   font-weight: bold;

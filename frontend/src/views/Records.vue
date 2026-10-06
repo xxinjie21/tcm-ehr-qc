@@ -711,12 +711,7 @@ onMounted(handleSearch)
 .records-tabs :deep(.el-tabs__nav-wrap::after) {
   display: none;
 }
-.tip {
-  font-size: var(--fs-md);
-  color: var(--text-sub);
-  line-height: 1.7;
-  margin-bottom: 14px;
-}
+.tip { line-height: 1.7; margin-bottom: 14px; }
 .tip-inline {
   font-size: var(--fs-md);
   color: var(--text-sub);

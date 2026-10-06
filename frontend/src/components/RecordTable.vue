@@ -134,5 +134,4 @@ const scoreClass = (s) => (s >= 90 ? 'score-ok' : s >= 60 ? 'score-mid' : 'score
 .score-ok { color: var(--ink-mid); font-weight: 600; }
 .score-mid { color: var(--ochre); }
 .score-low { color: var(--danger); }
-.tip { color: var(--text-sub); }
 </style>

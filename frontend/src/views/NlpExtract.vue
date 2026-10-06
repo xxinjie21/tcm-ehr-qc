@@ -952,7 +952,7 @@ onBeforeUnmount(stopPoll)
 </script>
 
 <style scoped>
-.tip { font-size: var(--fs-md); color: var(--text-sub); line-height: 1.7; }
+.tip { line-height: 1.7; }
 .actions { margin-top: var(--sp-3); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .nlp-tabs :deep(.el-tabs__header) { margin-bottom: var(--sp-3); }
 .nlp-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }

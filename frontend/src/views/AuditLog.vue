@@ -188,9 +188,4 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
 }
-/* 右侧条数提示 */
-.tip {
-  font-size: var(--fs-md);
-  color: var(--text-sub);
-}
 </style>

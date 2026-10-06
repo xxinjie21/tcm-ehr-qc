@@ -841,11 +841,6 @@ onMounted(() => {
   gap: var(--sp-3);
   flex-wrap: wrap;
 }
-/* 次级说明文字 */
-.tip {
-  font-size: var(--fs-md);
-  color: var(--text-sub);
-}
 /* 截断 / 告警提示条：浅黄底，与错误红区分 */
 .trunc-hint {
   background: var(--ochre-surface);

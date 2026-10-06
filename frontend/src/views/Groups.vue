@@ -196,9 +196,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.tip {
-  color: var(--text-sub);
-  font-size: var(--fs-md);
-  margin: 0 0 var(--sp-2);
-}
+/* 字号/颜色取自全局 .tip；这里只加组间距 */
+.tip { margin: 0 0 var(--sp-2); }
 </style>

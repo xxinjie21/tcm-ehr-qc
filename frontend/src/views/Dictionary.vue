@@ -43,6 +43,20 @@
         />
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms()">查 询</el-button>
         <span class="tip">共 {{ total }} 条</span>
+        <!-- 批次 26.17：零信息列默认隐藏，需要时在这里勾回来 -->
+        <el-popover placement="bottom-end" :width="180" trigger="click">
+          <template #reference>
+            <el-button size="small" plain>列显示（{{ visibleCols.length }}/{{ OPTIONAL_COLS.length }}）</el-button>
+          </template>
+          <div class="col-picker">
+            <el-checkbox-group v-model="visibleCols" @change="colTouched = true">
+              <el-checkbox v-for="c in OPTIONAL_COLS" :key="c.prop" :value="c.prop">{{ c.label }}</el-checkbox>
+            </el-checkbox-group>
+            <div class="col-picker-actions">
+              <el-button size="small" @click="resetCols">恢复默认</el-button>
+            </div>
+          </div>
+        </el-popover>
       </div>
       <!-- 作用域提示：词典已按组织隔离（批次8b）。这一条不是装饰 —— 组织 A 导入的词
            只在 A 的归一里生效，管理员在此看到「基础层」时不能以为那就是全量生效词典 -->
@@ -56,7 +70,7 @@
 <el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" :max-height="termsTableHeight">
           <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
           <el-table-column prop="standardTerm" label="标准术语" width="220" />
-        <el-table-column label="别名">
+        <el-table-column v-if="visibleCols.includes('aliases')" label="别名">
           <template #default="{ row }">
             <el-tag
               v-for="a in row.aliases"
@@ -65,12 +79,20 @@
               effect="plain"
               style="margin-right: 6px"
             >{{ a }}</el-tag>
-            <span v-if="!row.aliases?.length" class="tip">无</span>
+            <!-- 空值与「国标编码」列统一写 —（原「无」），空列语义只有一种 -->
+            <span v-if="!row.aliases?.length" class="tip">—</span>
           </template>
         </el-table-column>
         <!-- 批次 22：显示国标编码。没有编码的词条显式写「—」而不是留空，
              免得「空白」被误读成「这一列没加载出来」 -->
-        <el-table-column prop="code" label="国标编码" width="150">
+        <el-table-column v-if="visibleCols.includes('code')" prop="code" width="150">
+          <template #header>
+            <span>国标编码
+              <el-tooltip content="国标编码待补：多数词条暂无对应的国标编码，故该列常为空" placement="top">
+                <span class="hdr-info" tabindex="0" aria-label="国标编码说明">ⓘ</span>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">
             <span v-if="row.code" class="code-cell">{{ row.code }}</span>
             <span v-else class="tip">—</span>
@@ -489,6 +511,33 @@ const size = ref(20)
 // 让「选了多少条/页就能一眼看到多少行」，同时保留「页面本身不出现滚动条」的原设计。
 const termsTableHeight = computed(() => 32 + (size.value || 10) * 32 + 8)
 const total = ref(0)
+
+// 批次 26.17：基线表「别名」「国标编码」两列在当前页常常一条数据都没有，
+// 却合计占掉约 40% 横向宽度（零信息量）。这里把两列做成可显隐：
+// 默认只显示「当前页确实有数据」的列；用户手动勾选后就不再自动重算（colTouched），
+// 免得翻页时列自己跳来跳去。
+const OPTIONAL_COLS = [
+  { prop: 'aliases', label: '别名' },
+  { prop: 'code', label: '国标编码' }
+]
+const colTouched = ref(false)
+const visibleCols = ref([])
+const hasAliasData = computed(() => terms.value.some((t) => t.aliases?.length > 0))
+const hasCodeData = computed(() => terms.value.some((t) => t.code))
+const colsWithData = () => {
+  const cols = []
+  if (hasAliasData.value) cols.push('aliases')
+  if (hasCodeData.value) cols.push('code')
+  return cols
+}
+// 数据变化（查询 / 翻页 / 换类型）后，未手动干预过就按「有数据才显示」重算
+watch([terms, typeKey], () => {
+  if (!colTouched.value) visibleCols.value = colsWithData()
+})
+const resetCols = () => {
+  colTouched.value = false
+  visibleCols.value = colsWithData()
+}
 
 // 查询当前类型下的术语（关键字命中标准词或别名）
 // resetPage：切类型 / 搜索 / 导入后 / 回滚后都应回到第 1 页（数据集合已变），
@@ -926,10 +975,26 @@ onMounted(() => {
 .dl-up { color: var(--ochre); }
 .dl-down { color: var(--danger); }
 .dl-flat { color: var(--text-sub); }
-.tip {
-  font-size: var(--fs-md);
-  color: var(--text-sub);
+/* 批次 26.17：基线表「列显示」选择器（照 Governance 的列选择器样式） */
+.col-picker :deep(.el-checkbox-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
+.col-picker :deep(.el-checkbox) { margin-right: 0; }
+.col-picker-actions {
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line-soft);
+  text-align: right;
+}
+/* 列头 ⓘ：可聚焦，键盘用户也能读出说明 */
+.hdr-info {
+  color: var(--text-sub);
+  cursor: help;
+  font-size: var(--fs-md);
+}
+
 /* 词典作用域提示条：与查询区同一行基线，标签 + 说明一行排开 */
 .scope-hint {
   display: flex;
