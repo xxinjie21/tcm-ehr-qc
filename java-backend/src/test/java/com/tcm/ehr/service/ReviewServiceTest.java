@@ -17,6 +17,7 @@ import com.tcm.ehr.mapper.QcRuleMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
 import com.tcm.ehr.service.impl.ReviewServiceImpl;
+import com.tcm.ehr.service.impl.ReviewWriteService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,9 +78,13 @@ class ReviewServiceTest {
                         Mockito.anyString()))
                 .thenAnswer(inv -> new EsTermNormalizer.NormalizeResult(
                         inv.getArgument(2), "测试词典", 1, null));
-        service = new ReviewServiceImpl(recordMapper, new ObjectMapper(),
-                new QcRuleStore(new ObjectMapper(), org.mockito.Mockito.mock(QcRuleMapper.class)),
-                new EntityNormalizer(termNormalizer, new ObjectMapper()));
+        QcRuleStore ruleStore = new QcRuleStore(new ObjectMapper(),
+                org.mockito.Mockito.mock(QcRuleMapper.class));
+        // 复核写库段自批次 26.4 起是独立 Bean（事务落点），入口只做归一后委托
+        ReviewWriteService writeService = new ReviewWriteService(recordMapper, reviewTaskMapper,
+                new ObjectMapper(), ruleStore);
+        service = new ReviewServiceImpl(recordMapper,
+                new EntityNormalizer(termNormalizer, new ObjectMapper()), writeService);
         // ServiceImpl 的 baseMapper 由 Spring 注入，测试中手动设置
         ReflectionTestUtils.setField(service, "baseMapper", reviewTaskMapper);
     }
@@ -260,6 +265,29 @@ class ReviewServiceTest {
 
         assertNotNull(vo);
         assertEquals("已完成", vo.getStatus());
+    }
+
+    /**
+     * 批次 26.e 定案 A：归一在事务外，ES 失败时写库段一步都不进 —— 零写入。
+     *
+     * <p>这条同时钉住「归一没有被挪进事务」：只有入口先调归一、后委托，
+     * 才会在抛异常时连一次 DB 读都没发生。</p>
+     */
+    @Test
+    void normalizationFailureHappensBeforeAnyDatabaseWork() {
+        EntityNormalizer failing = Mockito.mock(EntityNormalizer.class);
+        Mockito.doThrow(new IllegalStateException("ES 不可用"))
+                .when(failing).normalizeMap(Mockito.anyMap(), Mockito.anyString());
+        ReviewWriteService write = new ReviewWriteService(recordMapper, reviewTaskMapper,
+                new ObjectMapper(), new QcRuleStore(new ObjectMapper(), Mockito.mock(QcRuleMapper.class)));
+        ReviewServiceImpl svc = new ReviewServiceImpl(recordMapper, failing, write);
+
+        ReviewDTO dto = new ReviewDTO();
+        dto.setCorrectedData(Map.of("diseases", List.of(Map.of("content", "水肿"))));
+
+        assertThrows(IllegalStateException.class, () -> svc.review("rec-es", dto));
+        Mockito.verify(recordMapper, Mockito.never()).selectById(Mockito.anyString());
+        Mockito.verifyNoInteractions(reviewTaskMapper);
     }
 
     @Test

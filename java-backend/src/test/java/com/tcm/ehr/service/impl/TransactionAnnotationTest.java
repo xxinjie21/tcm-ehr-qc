@@ -44,10 +44,28 @@ class TransactionAnnotationTest {
         assertTransactional(RecordServiceImpl.class, "deleteByFilter", FiltersDTO.class);
     }
 
-    /** 复核会写结构化数据 + 评分 + 任务状态，中途失败会让分数与任务状态对不上 */
+    /**
+     * 复核会写结构化数据 + 评分 + 任务状态，中途失败会让分数与任务状态对不上。
+     *
+     * <p>批次 26.4：事务落在 {@link ReviewWriteService} —— 它独占「读改写」时段，
+     * 而归一（走 ES）被特意留在事务外。</p>
+     */
     @Test
-    void reviewIsTransactional() throws NoSuchMethodException {
-        assertTransactional(ReviewServiceImpl.class, "review", String.class, ReviewDTO.class);
+    void reviewWriteIsTransactional() throws NoSuchMethodException {
+        assertTransactional(ReviewWriteService.class, "review", String.class, ReviewDTO.class);
+    }
+
+    /**
+     * 批次 26.e 定案 A：入口 {@link ReviewServiceImpl#review} 刻意不带 @Transactional。
+     *
+     * <p>加上就会把 {@code EntityNormalizer.normalizeMap} 的 ES 往返重新包进事务，
+     * ES 往返期间数据库连接被占住 —— 正是这次要拆开的东西。</p>
+     */
+    @Test
+    void reviewEntryIsNotTransactional() throws NoSuchMethodException {
+        assertTrue(!ReviewServiceImpl.class.getMethod("review", String.class, ReviewDTO.class)
+                        .isAnnotationPresent(Transactional.class),
+                "ReviewServiceImpl#review 不应带 @Transactional：归一（ES）必须在事务外");
     }
 
     /**

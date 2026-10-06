@@ -29,6 +29,7 @@ public interface IReviewService extends IService<ReviewTask> {
      * @param dto      correctedData=校正后的结构化数据；remark=意见
      * @return status=复核后状态；score=重算得分
      * @throws com.tcm.ehr.common.exception.ResourceNotFoundException 病历或复核任务不存在
+     * @throws com.tcm.ehr.common.exception.ConcurrentOperationException 读时指纹与服务端当前不一致（批次 25.15）
      */
     ReviewResultVO review(String recordId, ReviewDTO dto);
 }
