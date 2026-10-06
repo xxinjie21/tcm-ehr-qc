@@ -252,4 +252,23 @@ class StandardizationReportServiceImplTest {
                 .mapToInt(StandardizationReportVO.MonthlyBucket::getRecords).sum();
         assertEquals(2, sum, "未知组的记录也必须计入");
     }
+
+    @Test
+    @DisplayName("报告 CSV 带 UTF-8 BOM、固定表头与声明行（28.23）")
+    void reportCsvHasBomHeaderAndDisclaimer() {
+        givenRecords("{\"symptoms\":["
+                + entity("双", "双", false) + "]}");
+
+        byte[] csv = svc.reportCsv(null, null);
+
+        assertNotNull(csv);
+        assertTrue(csv.length > 3, "至少要有 BOM + 表头");
+        assertEquals((byte) 0xEF, csv[0]);
+        assertEquals((byte) 0xBB, csv[1]);
+        assertEquals((byte) 0xBF, csv[2]);
+        String text = new String(csv, java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(text.contains("\"区块\",\"指标\",\"数值\",\"说明\""), "固定表头必须是四列");
+        assertTrue(text.contains("\"声明\""), "必须带声明行，禁止前端隐藏免责声明");
+        assertTrue(text.contains("\r\n"), "行尾用 CRLF，Excel 兼容");
+    }
 }

@@ -318,7 +318,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import FreshnessTag from '@/components/FreshnessTag.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
-import { getStandardizationReport } from '@/api/stats'
+import { getStandardizationReport, exportStandardizationReport } from '@/api/stats'
 import { submitNlpBatch as submitExtractBatch, getNlpBatchProgress, listNlpBatch } from '@/api/nlp'
 import { recomputeQc as submitQcBatch, getQcBatch, listQcBatch } from '@/api/qc'
 import { saveBlob } from '@/utils/download'
@@ -894,52 +894,25 @@ try {
     }
   }
 
-/** 导出 CSV：BOM 头让 Excel 正确识别 UTF-8，否则中文全是乱码 */
-const handleExport = () => {
+// 导出 CSV（28.23）：改由后端生成文件流，与数据集/日志两条导出口径一致。
+// 后端成功回文件流、失败回 JSON，故先判别 blob 类型，避免把错误 JSON 当 CSV 存下来。
+const handleExport = async () => {
   const r = report.value
   if (!r) return
   exporting.value = true
   try {
-    const rows = [['区块', '指标', '数值', '说明']]
-    r.dictQuality.forEach((d) => {
-      rows.push(['词典质量', `${d.label} 词条数`, d.termCount, d.source || ''])
-      rows.push(['词典质量', `${d.label} 有别名`, d.aliasedCount, `共 ${d.termCount} 条`])
-      rows.push(['词典质量', `${d.label} 有国标编码`, d.codedCount, `共 ${d.termCount} 条`])
-      rows.push(['词典质量', `${d.label} 别名重复`, d.selfAliasCount, '别名含标准词本身会自命中'])
-    })
-    rows.push(['词典质量', '同名术语跨词典', r.crossTypeDuplicates.length, '同一词出现在多本词典'])
-    r.coverage.forEach((c) => {
-      rows.push(['归一情况', `${c.label} 归一率`, c.total ? pct(c.normalized, c.total) : '未抽取',
-        `抽取 ${c.total} 条`])
-    })
-    const u = r.unmatched
-    rows.push(['未归一构成', '词表未收录', u.dictionaryGap, '责任：词表'])
-    rows.push(['未归一构成', '脉/舌被当成症状', u.misrouted, '责任：抽取'])
-    rows.push(['未归一构成', '体征被当成症状', u.physicalSign, '责任：抽取'])
-    rows.push(['未归一构成', '抽取残词', u.fragment, '责任：抽取'])
-    rows.push(['未归一构成', '合计', u.total, ''])
-    const s = r.score
-    rows.push(['评分', '扣分相同占比', pct(s.capped, s.total), `平均分 ${s.avg}，区间 ${s.min}~${s.max}`])
-    // 时间维度一并导出：脱离区间的月度数据没有意义
-    const rg = r.range || {}
-    rows.push(['区间', '统计区间',
-      `${rg.start || '不限'} ~ ${rg.end || '不限'}`, `区间内 ${rg.records} 条，排除 ${rg.excluded || 0} 条`])
-    ;(r.byMonth || []).forEach((m) => {
-      rows.push(['按月份', `${m.month} 病历数`, m.records, ''])
-      rows.push(['按月份', `${m.month} 症状归一率`, m.symptomRate || '未抽取', ''])
-      rows.push(['按月份', `${m.month} 词表缺口`, m.dictionaryGap, '补词表可解决'])
-      rows.push(['按月份', `${m.month} 平均分`, m.avgScore, `扣分封顶 ${m.capped}`])
-    })
-    rows.push(['数据集', '病历总数', r.dataset.recordCount, ''])
-    rows.push(['数据集', '主诉写法种类', r.dataset.chiefComplaintTemplates, '远小于病历数说明是测试数据'])
-    rows.push(['数据集', '来自患者口语', r.dataset.recordsWithColloquialSymptom, '口语不是标准症状词'])
-    rows.push(['声明', r.disclaimer, '', r.generatedAt])
-
-    const csv = rows
-      .map((x) => x.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
-      .join('\r\n')
-    saveBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }),
-      `标准化质量报告-${r.generatedAt.replace(/[-: ]/g, '')}.csv`)
+    const blob = await exportStandardizationReport(currentRange() || undefined)
+    if (blob && blob.type && blob.type.includes('application/json')) {
+      let msg = '导出失败'
+      try {
+        msg = JSON.parse(await blob.text()).msg || msg
+      } catch { /* 解析不出就沿用默认文案 */ }
+      ElMessage.error(msg)
+      return
+    }
+    saveBlob(blob, `标准化质量报告-${r.generatedAt.replace(/[-: ]/g, '')}.csv`)
+  } catch {
+    // 拦截器已提示
   } finally {
     exporting.value = false
   }

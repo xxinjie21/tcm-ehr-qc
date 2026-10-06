@@ -9,6 +9,9 @@ import com.tcm.ehr.domain.vo.StandardizationReportVO;
 import com.tcm.ehr.domain.vo.StatsAllVO;
 import com.tcm.ehr.domain.vo.StatsVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -53,6 +56,27 @@ public class StatsController {
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end) {
         return Result.ok(reportService.report(start, end));
+    }
+
+    /**
+     * 导出标准化质量报告 CSV（批次 28 · 28.23）。
+     *
+     * <p>【权限：登录即可 + 数据域】与页面同源同域。改由后端生成并与另外两条导出
+     * （数据集 / 日志）一样返回文件流，前端不再自行拼 CSV。</p>
+     *
+     * @param start 接诊时间起（yyyy-MM-dd），空表示不限
+     * @param end   接诊时间止（yyyy-MM-dd），空表示不限
+     * @return CSV 文件流（UTF-8 BOM，Excel 可直接打开）
+     */
+    @GetMapping("/standardization-report/export")
+    public ResponseEntity<byte[]> standardizationReportExport(
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end) {
+        byte[] content = reportService.reportCsv(start, end);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=standardization-report.csv")
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .body(content);
     }
 
     /**

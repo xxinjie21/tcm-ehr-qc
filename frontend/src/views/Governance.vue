@@ -52,6 +52,33 @@
         </span>
       </div>
 
+      <!-- 28.14：后端是同步接口、拿不到真实百分比，用不确定进度条只表达「在推进」；
+           刻意不显示百分比数字，避免暗示一个并不存在的精确进度 -->
+      <el-progress
+        v-if="clean.loading"
+        class="clean-progress"
+        :percentage="100"
+        :indeterminate="true"
+        :duration="2"
+        :show-text="false"
+      />
+
+      <!-- 28.14：清洗失败时给出可操作的失败报告（原因 + 发生时间 + 会不会留下半成品），
+           而不是只留一个一闪而过的全局错误提示 -->
+      <el-alert
+        v-if="clean.error"
+        class="clean-error"
+        type="error"
+        show-icon
+        title="清洗未完成"
+        @close="clean.error = null"
+      >
+        <div>{{ clean.error.message }}</div>
+        <div class="clean-error-sub">
+          发生时间：{{ clean.error.at }}。可点上方按钮重试；失败不会改动已清洗完成的数据。
+        </div>
+      </el-alert>
+
       <!-- 清洗结果统计（中部） -->
       <div v-if="clean.result" class="clean-result">
         <div class="result-hd">清洗结果</div>
@@ -277,7 +304,8 @@ const loadStats = async () => {
   }
 }
 
-const clean = reactive({ loading: false, result: null })
+// 28.14：clean.error 保存最近一次清洗失败的「原因 + 发生时间」，供失败报告展示
+const clean = reactive({ loading: false, result: null, error: null })
 
 // 执行数据清洗：先二次确认（文案明确「只标记不删除、不补医生未写内容」），
 // 再按当前 filters 提交；成功后写入分步结果与三级命中分布，并刷新顶部统计
@@ -301,8 +329,9 @@ const handleClean = async () => {
       { type: 'warning', confirmButtonText: affected > 0 ? `确认清洗 ${affected} 条` : '确认执行', cancelButtonText: '取消' }))) {
     return
   }
-  // 3. 置清洗中状态
+  // 3. 置清洗中状态，并清掉上一次失败报告
   clean.loading = true
+  clean.error = null
   try {
     // 4. 按当前范围提交清洗
     const res = await cleanApi({ filters: { ...filters } })
@@ -316,9 +345,12 @@ const handleClean = async () => {
       : `清洗完成：归一命中 ${res.data.normalized} 处`)
     // 7. 刷新顶部统计（待清洗 / 已清洗会变化）
     loadStats()
-  // 8. 失败由响应拦截器统一提示
-  } catch {
-    // 拦截器已提示
+  // 8. 失败由响应拦截器统一提示，这里再落一条可操作的失败报告供页面回看
+  } catch (e) {
+    clean.error = {
+      message: e?.message || '清洗请求失败',
+      at: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    }
   // 9. 无论成败都关掉清洗中状态
   } finally {
     clean.loading = false
@@ -610,6 +642,20 @@ onMounted(() => {
   justify-content: center;
   gap: var(--sp-4);
   margin-bottom: var(--sp-1);
+}
+
+/* 28.14：不确定进度条与失败报告 */
+.clean-progress {
+  margin: var(--sp-3) auto 0;
+  max-width: 420px;
+}
+.clean-error {
+  margin-top: var(--sp-3);
+}
+.clean-error-sub {
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+  color: var(--text-sub);
 }
 
 /* ===== 清洗结果（中部） ===== */

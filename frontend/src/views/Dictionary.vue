@@ -270,6 +270,47 @@
             </div>
           </div>
 
+          <!-- 28.15：基础信息卡片 + 流转时间线。提案一旦离开「待审核」，光看差异区
+               不知道「谁提的、谁审的、何时审的、为什么拒」，这四项此前无处可看 -->
+          <el-descriptions
+            v-if="!editing"
+            class="rv-detail-info"
+            :column="2"
+            size="small"
+            border
+          >
+            <el-descriptions-item label="词典类型">{{ typeLabel(currentProposal.type) }}</el-descriptions-item>
+            <el-descriptions-item label="术语条数">{{ currentProposal.termCount }} 条</el-descriptions-item>
+            <el-descriptions-item label="提交人">{{ currentProposal.submitUserId || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="提交时间">{{ fmtTime(currentProposal.createTime) }}</el-descriptions-item>
+            <el-descriptions-item label="审核人">{{ currentProposal.auditUserId || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="审核时间">
+              {{ currentProposal.auditTime ? fmtTime(currentProposal.auditTime) : '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="审核意见" :span="2">
+              {{ currentProposal.auditComment || (currentProposal.status === 'pending' ? '待审核' : '—') }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-timeline v-if="!editing" class="rv-detail-flow">
+            <el-timeline-item
+              :timestamp="fmtTime(currentProposal.createTime)"
+              type="primary"
+              placement="top"
+            >
+              提交提案（{{ currentProposal.submitUserId || '未知提交人' }}）
+            </el-timeline-item>
+            <el-timeline-item
+              v-if="currentProposal.status !== 'pending'"
+              :timestamp="fmtTime(currentProposal.auditTime)"
+              :type="currentProposal.status === 'approved' ? 'success' : 'danger'"
+              placement="top"
+            >
+              {{ currentProposal.status === 'approved' ? '审核通过' : '审核拒绝' }}（{{ currentProposal.auditUserId || '未知审核人' }}）
+              <div v-if="currentProposal.auditComment" class="tip">{{ currentProposal.auditComment }}</div>
+            </el-timeline-item>
+          </el-timeline>
+
           <el-alert
             v-if="editing" type="warning" :closable="false" show-icon
             title="编辑中：改动仅作用于本次提案，不会改动小组基线"
@@ -1234,6 +1275,14 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+}
+/* 28.15：基础信息卡片与流转时间线 */
+.rv-detail-info {
+  margin-bottom: var(--sp-4);
+}
+.rv-detail-flow {
+  margin-bottom: var(--sp-3);
+  padding-left: 2px;
 }
 /* 编辑态的术语行 */
 .rv-edit-hd {

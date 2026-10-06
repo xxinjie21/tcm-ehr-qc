@@ -19,3 +19,8 @@ export function getExtraStats(params) {
 export function getStandardizationReport(params) {
   return request.get('/stats/standardization-report', { params })
 }
+
+// 导出标准化质量报告 CSV（28.23）：后端生成文件流，与数据集/日志导出口径一致
+export function exportStandardizationReport(params) {
+  return request.get('/stats/standardization-report/export', { params, responseType: 'blob', timeout: 200000 })
+}

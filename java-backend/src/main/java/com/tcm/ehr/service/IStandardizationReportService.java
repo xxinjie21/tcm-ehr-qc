@@ -32,4 +32,18 @@ public interface IStandardizationReportService {
      * @return 同上，并附带本次区间与按月分组
      */
     StandardizationReportVO report(String start, String end);
+
+    /**
+     * 把报告导出为 CSV（批次 28 · 28.23）。
+     *
+     * <p>与 {@link #report(String, String)} 同一数据源、同一数据域，走同一套
+     * 「登录即可 + 组织数据域」约束；之所以放在后端生成，是为了和另外两条导出
+     * （数据集导出 {@code POST /api/export/dataset}、日志导出 {@code GET /api/logs/export}）
+     * 对齐 —— 前端只负责收文件流落盘。</p>
+     *
+     * @param start 起（yyyy-MM-dd），为空表示不限
+     * @param end   止（yyyy-MM-dd），为空表示不限
+     * @return 带 UTF-8 BOM 的 CSV 字节；列固定为 区块 / 指标 / 数值 / 说明
+     */
+    byte[] reportCsv(String start, String end);
 }

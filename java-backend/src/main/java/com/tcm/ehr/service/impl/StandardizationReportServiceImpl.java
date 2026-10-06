@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -64,6 +66,79 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     @Override
     public StandardizationReportVO report() {
         return report(null, null);
+    }
+
+    /**
+     * 28.23：报告 CSV 由后端生成，与另外两条导出（数据集 / 日志）统一走文件流。
+     *
+     * <p>列固定为 区块 / 指标 / 数值 / 说明；中文靠 UTF-8 BOM 让 Excel 正确识别。
+     * 行内容与报告页展示一一对应，前端不再自行拼 CSV。</p>
+     */
+    @Override
+    public byte[] reportCsv(String start, String end) {
+        StandardizationReportVO r = report(start, end);
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("区块", "指标", "数值", "说明"));
+        for (StandardizationReportVO.DictQuality d : r.getDictQuality()) {
+            String label = nz(d.getLabel());
+            rows.add(List.of("词典质量", label + " 词条数", String.valueOf(d.getTermCount()), nz(d.getSource())));
+            rows.add(List.of("词典质量", label + " 有别名", String.valueOf(d.getAliasedCount()), "共 " + d.getTermCount() + " 条"));
+            rows.add(List.of("词典质量", label + " 有国标编码", String.valueOf(d.getCodedCount()), "共 " + d.getTermCount() + " 条"));
+            rows.add(List.of("词典质量", label + " 别名重复", String.valueOf(d.getSelfAliasCount()), "别名含标准词本身会自命中"));
+        }
+        rows.add(List.of("词典质量", "同名术语跨词典",
+                String.valueOf(r.getCrossTypeDuplicates().size()), "同一词出现在多本词典"));
+        for (StandardizationReportVO.TypeCoverage c : r.getCoverage()) {
+            rows.add(List.of("归一情况", nz(c.getLabel()) + " 归一率",
+                    c.getTotal() > 0 ? pct(c.getNormalized(), c.getTotal()) : "未抽取",
+                    "抽取 " + c.getTotal() + " 条"));
+        }
+        StandardizationReportVO.UnmatchedBreakdown u = r.getUnmatched();
+        rows.add(List.of("未归一构成", "词表未收录", String.valueOf(u.getDictionaryGap()), "责任：词表"));
+        rows.add(List.of("未归一构成", "脉/舌被当成症状", String.valueOf(u.getMisrouted()), "责任：抽取"));
+        rows.add(List.of("未归一构成", "体征被当成症状", String.valueOf(u.getPhysicalSign()), "责任：抽取"));
+        rows.add(List.of("未归一构成", "抽取残词", String.valueOf(u.getFragment()), "责任：抽取"));
+        rows.add(List.of("未归一构成", "合计", String.valueOf(u.getTotal()), ""));
+        StandardizationReportVO.ScoreDistribution s = r.getScore();
+        rows.add(List.of("评分", "扣分相同占比", s.getTotal() > 0 ? pct(s.getCapped(), s.getTotal()) : "—",
+                "平均分 " + s.getAvg() + "，区间 " + s.getMin() + "~" + s.getMax()));
+        StandardizationReportVO.TimeRange rg = r.getRange();
+        rows.add(List.of("区间", "统计区间",
+                (rg.getStart() == null ? "不限" : rg.getStart()) + " ~ "
+                        + (rg.getEnd() == null ? "不限" : rg.getEnd()),
+                "区间内 " + rg.getRecords() + " 条，排除 " + rg.getExcluded() + " 条"));
+        for (StandardizationReportVO.MonthlyBucket m : r.getByMonth()) {
+            rows.add(List.of("按月份", m.getMonth() + " 病历数", String.valueOf(m.getRecords()), ""));
+            rows.add(List.of("按月份", m.getMonth() + " 症状归一率",
+                    m.getSymptomRate() == null ? "未抽取" : m.getSymptomRate(), ""));
+            rows.add(List.of("按月份", m.getMonth() + " 词表缺口", String.valueOf(m.getDictionaryGap()), "补词表可解决"));
+            rows.add(List.of("按月份", m.getMonth() + " 平均分", String.valueOf(m.getAvgScore()), "扣分封顶 " + m.getCapped()));
+        }
+        StandardizationReportVO.DatasetShape ds = r.getDataset();
+        rows.add(List.of("数据集", "病历总数", String.valueOf(ds.getRecordCount()), ""));
+        rows.add(List.of("数据集", "主诉写法种类", String.valueOf(ds.getChiefComplaintTemplates()), "远小于病历数说明是测试数据"));
+        rows.add(List.of("数据集", "来自患者口语", String.valueOf(ds.getRecordsWithColloquialSymptom()), "口语不是标准症状词"));
+        rows.add(List.of("声明", nz(r.getDisclaimer()), "", nz(r.getGeneratedAt())));
+        return csvBytes(rows);
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
+    }
+
+    /** 生成带 UTF-8 BOM 的 CSV：单元格一律加引号并转义内部引号，行尾 CRLF */
+    private static byte[] csvBytes(List<List<String>> rows) {
+        StringBuilder sb = new StringBuilder("\uFEFF");
+        for (List<String> row : rows) {
+            for (int i = 0; i < row.size(); i++) {
+                if (i > 0) {
+                    sb.append(',');
+                }
+                sb.append('"').append(nz(row.get(i)).replace("\"", "\"\"")).append('"');
+            }
+            sb.append("\r\n");
+        }
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     /**
