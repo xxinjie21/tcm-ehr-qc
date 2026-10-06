@@ -139,6 +139,33 @@ public class DictionaryTermStore {
         return v;
     }
 
+    /**
+     * 提交后让两层缓存失效（批次 26.8）。
+     *
+     * <p>在事务内提前失效，别的线程可能在词条行尚未提交时就按旧版本回填缓存，
+     * 之后一直读到旧内容；推迟到 {@code afterCommit} 才能保证「提交即可见」。
+     * 无活动事务时（单测直调 {@code replace}）立即失效。</p>
+     */
+    private void invalidateCachesAfterCommit(String org, String type) {
+        Runnable invalidate = () -> {
+            // 主动失效：内容哈希相同（同一份内容重灌）时版本不变，但库里的行 ID 已经换了一批，
+            // 缓存里那份 list 仍是可用的等价内容 —— 这里失效是为了让「重灌后立刻读」拿到新行
+            termsCache.invalidate(org + "|" + type);
+            // 版本缓存同样要失效（批次 12 · 12a）：否则重灌后紧接着的读会拿旧版本号
+            invalidateVersionCache(org, type);
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    invalidate.run();
+                }
+            });
+        } else {
+            invalidate.run();
+        }
+    }
+
     /** 让版本缓存失效（写路径必须调用，否则会读到旧版本号） */
     private void invalidateVersionCache(String org, String type) {
         versionCache.remove(org + "|" + type);
@@ -194,11 +221,9 @@ public class DictionaryTermStore {
         //    因导入顺序不同算出两个版本」而白白触发一次 ES 全量重建
         String version = contentVersion(entries);
         upsertVersion(org, type, version);
-        // 主动失效：内容哈希相同（同一份内容重灌）时版本不变，但库里的行 ID 已经换了一批，
-        // 缓存里那份 list 仍是可用的等价内容 —— 这里失效是为了让「重灌后立刻读」拿到新行
-        termsCache.invalidate(org + "|" + type);
-        // 版本缓存同样要失效（批次 12 · 12a）：否则重灌后紧接着的读会拿旧版本号
-        invalidateVersionCache(org, type);
+        // 失效推迟到提交后（批次 26.8）：在事务里提前失效，别的线程可能在词条行尚未提交时
+        // 就按旧版本回填缓存，随后一直读到旧内容；提交后再失效才能保证「提交即可见」。
+        invalidateCachesAfterCommit(org, type);
         return version;
     }
 

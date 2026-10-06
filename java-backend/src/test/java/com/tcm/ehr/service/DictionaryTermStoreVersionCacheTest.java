@@ -1,10 +1,14 @@
 package com.tcm.ehr.service;
 
+import com.tcm.ehr.domain.po.DictionaryTerm;
+import com.tcm.ehr.domain.po.DictionaryVersion;
 import com.tcm.ehr.mapper.DictionaryTermMapper;
 import com.tcm.ehr.mapper.DictionaryVersionMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -34,6 +38,14 @@ class DictionaryTermStoreVersionCacheTest {
 
     private static int versionCalls(DictionaryVersionMapper m) {
         return Mockito.mockingDetails(m).getInvocations().size();
+    }
+
+    private static DictionaryVersion freshVersion() {
+        DictionaryVersion v = new DictionaryVersion();
+        v.setOrgId("");
+        v.setType("symptom");
+        v.setVersion("v1");
+        return v;
     }
 
     @Test
@@ -107,5 +119,47 @@ class DictionaryTermStoreVersionCacheTest {
         store.readEffective("org-A", "symptom");
         assertTrue(versionCalls(versionMapper) > afterFirst,
                 "TTL 到期后必须重新查版本表 —— 这是跨实例改动的兜底");
+    }
+
+    @Test
+    @DisplayName("事务内写路径把缓存失效推迟到提交后：提交前不暴露未提交词条，提交后必刷新（批次 26.8）")
+    void replaceDefersInvalidationUntilAfterCommit() {
+        DictionaryTermMapper termMapper = mock(DictionaryTermMapper.class);
+        DictionaryVersionMapper versionMapper = mock(DictionaryVersionMapper.class);
+        // 每次都回一个新对象：upsertVersion 会就地改写 findVersion 拿到的版本行，
+        // 若复用同一实例，提交前的读会看到一个被改成新哈希的版本而误判缓存未失效
+        when(versionMapper.selectOne(any())).thenAnswer(inv -> freshVersion());
+        when(versionMapper.selectList(any())).thenAnswer(inv -> List.of(freshVersion()));
+        when(versionMapper.selectMaps(any())).thenReturn(List.of());
+
+        DictionaryTerm oldRow = new DictionaryTerm();
+        oldRow.setOrgId("");
+        oldRow.setType("symptom");
+        oldRow.setStandardTerm("旧");
+        DictionaryTerm newRow = new DictionaryTerm();
+        newRow.setOrgId("");
+        newRow.setType("symptom");
+        newRow.setStandardTerm("新");
+        // 第一次装载读到旧行，缓存失效后的下一次装载读到新行
+        when(termMapper.selectList(any())).thenReturn(List.of(oldRow), List.of(newRow));
+        when(termMapper.delete(any())).thenReturn(0);
+
+        DictionaryTermStore store = svc(termMapper, versionMapper);
+        assertEquals("旧", store.readEffective("", "symptom").get(0).getStandardTerm(),
+                "前置：第一次读装载旧词条");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            store.replace("", "symptom", List.of());
+            assertEquals("旧", store.readEffective("", "symptom").get(0).getStandardTerm(),
+                    "事务未提交：不得失效缓存去读到尚未提交的新词条");
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertEquals("新", store.readEffective("", "symptom").get(0).getStandardTerm(),
+                "提交后必须失效缓存并重新装载");
     }
 }
