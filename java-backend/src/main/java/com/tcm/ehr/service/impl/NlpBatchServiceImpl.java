@@ -602,6 +602,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）
         int limit = t.getTotal() == null ? 0 : t.getTotal();
         QueryWrapper<Record> wrapper = RecordFilter.build(t.getOrgId(), readFilters(t.getFiltersJson()));
+        // 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
+        DictMeta dictMeta = new DictMeta(termStore, t.getOrgId());
         int pageNo = 1;
         // 2. 分页循环取数：每页都先看取消位，避免停得慢
         while (true) {
@@ -623,7 +625,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 if (processed[0] >= limit) {
                     return false;
                 }
-                step(id, r, t, failures, truncated, processed);
+                step(id, r, t, failures, truncated, processed, dictMeta);
             }
             // 4. 不满一页即到末尾
             if (list.size() < PAGE_SIZE) {
@@ -663,6 +665,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 .select("id").eq("org_id", t.getOrgId()).in("id", ids)
                 .last("LIMIT " + ids.size()))
                 .stream().map(Record::getId).toList();
+        // 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
+        DictMeta dictMeta = new DictMeta(termStore, t.getOrgId());
         // 1. 按页大小切块：IN 过长会让 SQL 变慢
         for (int off = 0; off < ids.size(); off += PAGE_SIZE) {
             // 2. 每块开始前看取消位
@@ -677,7 +681,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                         || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
                     return true;
                 }
-                step(id, r, t, failures, truncated, processed);
+                step(id, r, t, failures, truncated, processed, dictMeta);
             }
         }
         return false;
@@ -685,12 +689,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     /** 处理单条并更新进度（两条取数路径共用） */
     private void step(String id, Record r, NlpTask t, List<NlpTaskVO.Failure> failures,
-                      boolean[] truncated, int[] processed) {
+                      boolean[] truncated, int[] processed, DictMeta dictMeta) {
         // 1. 处理前先计数：done 以「已尝试」为准，失败也算一条
         processed[0]++;
         try {
             // 2. 成功则累加成功数
-            processOne(r, t.getOrgId());
+            processOne(r, t.getOrgId(), dictMeta);
             t.setSuccess(t.getSuccess() + 1);
         } catch (Exception e) {
             // 3. 失败累加并记明细；明细只留前 MAX_FAILURES 条，超出置截断标记
@@ -727,7 +731,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /** 单条：拼文本 → 抽取 → 归一 → 打词典版本 → 写库（与单条抽取口径一致） */
-    private void processOne(Record r, String orgId) throws Exception {
+    private void processOne(Record r, String orgId, DictMeta dictMeta) throws Exception {
         // 1. 拼可抽取文本；空文本直接判失败，不去调抽取服务
         String text = NlpTextComposer.compose(r);
         if (text.isBlank()) {
@@ -749,10 +753,53 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         //    的文件哈希。词典源在批次 8b 已入库，文件哈希从此冻结不变，库里 500 条记录
         //    的 dictVersion 全是同一个值，既无法区分、也不是真正用的那版词典。
         //    这里改用「本组织归一实际覆盖的 5 类词典」的有效版本 + 词条数。
+        // 批次 25.3：元数据走批级 DictMeta（一批只查一次库），不再逐条查
         json = StructuredDataMeta.stamp(objectMapper, json,
-                termStore.effectiveDictVersion(orgId),
-                termStore.effectiveTermCount(orgId));
+                dictMeta.version(),
+                dictMeta.termCount());
         recordMapper.updateStructuredData(r.getId(), json);
+    }
+
+    /**
+     * 批次 25.3：一次批解析里词典元数据只取一次。
+     *
+     * <p>原先 {@code processOne} 对<b>每条</b>病历都调 {@code effectiveDictVersion} 与
+     * {@code effectiveTermCount}（每次又各自查库），3.5 万条就是十几万次 SQL，
+     * 而 {@code orgId} 在一批内恒定、同一批也不该盖上两个不同的版本戳。
+     * 这里按「批」持有、<b>惰性</b>取一次：没有待处理项时一次查库都不会发。</p>
+     *
+     * <p>包级可见是为了让「只取一次」能被同步测试直接钉住 —— 线程里的流程难测，
+     * 但这条缓存行为好测，而漏掉它正是要修的东西。</p>
+     */
+    static final class DictMeta {
+        private final com.tcm.ehr.service.DictionaryTermStore store;
+        private final String orgId;
+        private String version;
+        private int termCount;
+        private boolean loaded;
+
+        DictMeta(com.tcm.ehr.service.DictionaryTermStore store, String orgId) {
+            this.store = store;
+            this.orgId = orgId;
+        }
+
+        String version() {
+            load();
+            return version;
+        }
+
+        int termCount() {
+            load();
+            return termCount;
+        }
+
+        private void load() {
+            if (!loaded) {
+                version = store.effectiveDictVersion(orgId);
+                termCount = store.effectiveTermCount(orgId);
+                loaded = true;
+            }
+        }
     }
 
     private void markFailed(String id) {

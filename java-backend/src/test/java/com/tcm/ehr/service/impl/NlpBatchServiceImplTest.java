@@ -413,4 +413,40 @@ class NlpBatchServiceImplTest {
                 com.tcm.ehr.domain.po.NlpTask.CANCELLED).contains(normal),
                 "正常完成不得被前三种终态误判，实际=" + normal);
     }
+
+    /**
+     * 批次 25.3：词典元数据必须<b>按批</b>取一次，不能按条取。
+     *
+     * <p>原先每条病历都调 (effectiveDictVersion + effectiveTermCount)，
+     * 35000 条 ≈ 14 万次 SQL。这里模拟一批里反复打版本戳，验证底层只被查一次。</p>
+     */
+    @Test
+    void dictMetaQueriesDictionaryOncePerBatch() {
+        com.tcm.ehr.service.DictionaryTermStore store =
+                mock(com.tcm.ehr.service.DictionaryTermStore.class);
+        when(store.effectiveDictVersion("org-1")).thenReturn("v9");
+        when(store.effectiveTermCount("org-1")).thenReturn(42);
+
+        NlpBatchServiceImpl.DictMeta meta = new NlpBatchServiceImpl.DictMeta(store, "org-1");
+        for (int i = 0; i < 100; i++) {
+            assertEquals("v9", meta.version(), "同一批内版本戳必须一致");
+            assertEquals(42, meta.termCount(), "同一批内词条数必须一致");
+        }
+        // 一份批任务只应查一次库（两条元数据各一次），而不是每条一次
+        verify(store, Mockito.times(1)).effectiveDictVersion("org-1");
+        verify(store, Mockito.times(1)).effectiveTermCount("org-1");
+    }
+
+    /**
+     * 批次 25.3：惰性 —— 一条都没处理时不许查库。
+     *
+     * <p>筛选型任务可能筛出空集，那时一次词典查询都不该发。</p>
+     */
+    @Test
+    void dictMetaDoesNotQueryWhenNeverUsed() {
+        com.tcm.ehr.service.DictionaryTermStore store =
+                mock(com.tcm.ehr.service.DictionaryTermStore.class);
+        new NlpBatchServiceImpl.DictMeta(store, "org-1");
+        Mockito.verifyNoInteractions(store);
+    }
 }
