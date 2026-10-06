@@ -95,4 +95,18 @@ class QcRuleOrgTest {
         assertThrows(IllegalArgumentException.class,
                 () -> store.updateFor(null, QcRuleSet.defaults()));
     }
+
+    @Test
+    void warningsAreReplacedNotAccumulated() {
+        // 26.10：normalize 的告警是「整体替换」的快照；第二次 normalize 不得把上一次的累加进来
+        QcRuleSet bad = QcRuleSet.defaults();
+        bad.getThresholds().setQualified(10); // 合格线(10) <= 无效线(60) → 非法
+        store.updateFor("org-a", bad);
+        assertTrue(store.warnings().contains("分级阈值非法，已回默认 90/60/3"),
+                "非法阈值应产生告警");
+
+        store.updateFor("org-b", QcRuleSet.defaults());
+        assertTrue(store.warnings().isEmpty(),
+                "第二次 normalize 应整体替换告警，而不是把上一次的累加进来");
+    }
 }

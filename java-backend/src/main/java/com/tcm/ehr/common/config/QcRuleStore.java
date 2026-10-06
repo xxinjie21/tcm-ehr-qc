@@ -8,7 +8,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
 
 /**
@@ -38,7 +37,8 @@ public class QcRuleStore {
     /** 组织级规则的解析结果缓存（版本一致就复用，避免批任务逐条重新解析 rules_json） */
     private final com.tcm.ehr.common.utils.VersionedCache<QcRuleSet> perOrg =
             new com.tcm.ehr.common.utils.VersionedCache<>(64);
-    private final List<String> warnings = new CopyOnWriteArrayList<>();
+    /** 最近一次 normalize 的告警（不可变快照，整体替换；见 26.10） */
+    private volatile List<String> warnings = List.of();
 
     public QcRuleStore(ObjectMapper mapper, QcRuleMapper ruleMapper) {
         this.mapper = mapper;
@@ -170,10 +170,12 @@ public class QcRuleStore {
     /** 关键项兜底：空标准/非法阈值一律回默认并告警（不允许空标准导致人人满分） */
     private QcRuleSet normalize(QcRuleSet r) {
         // 1. 完整性要素为空 → 回填内置 6 要素
-        warnings.clear();
+        // 26.10：告警先累积到局部列表，最后整体替换 volatile 字段，
+        // 避免并发 normalize 互相 clear/覆盖成半个列表（仅影响提示文案，但旧写法会丢告警）
+        List<String> w = new ArrayList<>();
         if (r.getCompleteness() == null || r.getCompleteness().getElements() == null
                 || r.getCompleteness().getElements().isEmpty()) {
-            warnings.add("完整性要素为空，已回填内置 6 要素");
+            w.add("完整性要素为空，已回填内置 6 要素");
             r.setCompleteness(QcRuleSet.defaults().getCompleteness());
         }
         // 2. 过滤旧格式/不完整的一致性规则（缺触发或期望值 → 丢弃并告警）
@@ -189,7 +191,7 @@ public class QcRuleStore {
                 if (ok) {
                     valid.add(c);
                 } else {
-                    warnings.add("存在旧版/无效的一致性规则，已忽略：" + (c.getName() == null ? "(未命名)" : c.getName()));
+                    w.add("存在旧版/无效的一致性规则，已忽略：" + (c.getName() == null ? "(未命名)" : c.getName()));
                 }
             }
             r.setConsistency(valid);
@@ -204,9 +206,10 @@ public class QcRuleStore {
         // 4. 分级阈值非法（合格线 ≤ 无效线等）→ 回默认并告警
         QcRuleSet.Thresholds t = r.getThresholds();
         if (t == null || t.getQualified() <= t.getInvalid() || t.getInvalid() < 0 || t.getSeriousFullMissing() < 1) {
-            warnings.add("分级阈值非法，已回默认 90/60/3");
+            w.add("分级阈值非法，已回默认 90/60/3");
             r.setThresholds(new QcRuleSet.Thresholds());
         }
+        this.warnings = List.copyOf(w);
         return r;
     }
 
