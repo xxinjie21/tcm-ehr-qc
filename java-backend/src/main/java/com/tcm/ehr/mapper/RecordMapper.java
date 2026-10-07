@@ -18,20 +18,10 @@ import java.util.Map;
 public interface RecordMapper extends BaseMapper<Record> {
 
     /**
-     * 指标卡聚合（按 grade 口径，与质控分级一致）。
+     * 指标卡聚合（管理员「看全部」路径）：按 grade 口径对**全部机构**聚合。
      *
-     * <p>{@code orgId} 是<b>数据域</b>参数（取值来自
-     * {@link com.tcm.ehr.common.utils.RecordFilter#domainOrgId()}）。没有它，任何人调
-     * {@code /api/stats/overview} 都能读到全库的分级分布。</p>
-     *
-     * <p>⚠️ <b>不能写成 {@code (#{orgId} IS NULL OR org_id = #{orgId})}</b>：
-     * 那句话的语义是「无组 → 不限」，恰好与 fail-closed 相反。
-     * 所以 {@code RecordFilter.domainOrgId()} 在无组时返回一个<b>不可能值</b>，
-     * 而不是 null，由 SQL 自然落到空集。</p>
-     *
-     * <p>viewAll 单独给一个布尔参数，表示管理员「看全部」：不能用 orgId 为空来表达，
-     * 那会与 fail-closed 的无组撞在一起（同 build 里 viewAllOrgs 单独判断的理由）。
-     * 少了它，看板只统计自己机构、而病历列表显示全部，两边数字对不上。</p>
+     * <p>只允许管理员调用（Service 层按 {@code RequestUtils.viewAllOrgs()} 分支），
+     * 口径与 {@link com.tcm.ehr.common.utils.RecordFilter} 的「管理员 = 全部」一致。</p>
      */
     @Select("""
             SELECT
@@ -40,19 +30,32 @@ public interface RecordMapper extends BaseMapper<Record> {
                 COALESCE(SUM(CASE WHEN grade = '待复核' THEN 1 ELSE 0 END), 0) AS pendingReviewCount,
                 COALESCE(SUM(CASE WHEN grade = '无效' THEN 1 ELSE 0 END), 0) AS invalidCount
             FROM records
-            WHERE (#{viewAll} = 1 OR org_id = #{orgId})
             """)
-    Map<String, Object> selectOverview(@Param("orgId") String orgId,
-                                       @Param("viewAll") boolean viewAll);
+    Map<String, Object> selectOverviewAll();
 
     /**
-     * 清洗状态统计：合格总数/已清洗/待清洗。
+     * 指标卡聚合（数据域路径）：{@code WHERE org_id = ?}，只统计本机构。
      *
-     * <p>原版是无参全库聚合 —— 那不只是「看到别组数据」，
-     * 还会让清洗页的卡片数字与实际可清洗范围对不上。</p>
+     * <p>⚠️ <b>fail-closed</b>：这里永远是「org_id 等值过滤」，不存在任何「没传 org → 不限」
+     * 的分支 —— {@code orgId} 传哨兵值（{@code RecordFilter.NO_GROUP_SENTINEL}）、空串或
+     * {@code null} 时自然查到 0 行，绝不会退化成全表（那会跨机构泄漏）。
+     * 与 {@link com.tcm.ehr.common.utils.RecordFilter#operatorScope} 同口径。</p>
      *
-     * <p>viewAll 同 {@link #selectOverview}：管理员看全部时按全部机构统计，
-     * 否则清洗页的「待清洗」数字与实际会被清洗的范围对不上。</p>
+     * <p>{@code orgId} 取自 {@link com.tcm.ehr.common.utils.RecordFilter#domainOrgId()}。</p>
+     */
+    @Select("""
+            SELECT
+                COUNT(*) AS totalRecords,
+                COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualifiedCount,
+                COALESCE(SUM(CASE WHEN grade = '待复核' THEN 1 ELSE 0 END), 0) AS pendingReviewCount,
+                COALESCE(SUM(CASE WHEN grade = '无效' THEN 1 ELSE 0 END), 0) AS invalidCount
+            FROM records
+            WHERE org_id = #{orgId}
+            """)
+    Map<String, Object> selectOverviewOrg(@Param("orgId") String orgId);
+
+    /**
+     * 清洗状态统计（管理员「看全部」路径）：全部机构的合格/已清洗/待清洗。
      */
     @Select("""
             SELECT
@@ -60,10 +63,22 @@ public interface RecordMapper extends BaseMapper<Record> {
                 COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 1 THEN 1 ELSE 0 END), 0) AS governedCount,
                 COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 0 THEN 1 ELSE 0 END), 0) AS pendingGovern
             FROM records
-            WHERE (#{viewAll} = 1 OR org_id = #{orgId})
             """)
-    Map<String, Object> selectGovernanceStats(@Param("orgId") String orgId,
-                                              @Param("viewAll") boolean viewAll);
+    Map<String, Object> selectGovernanceStatsAll();
+
+    /**
+     * 清洗状态统计（数据域路径）：{@code WHERE org_id = ?}，fail-closed 口径同
+     * {@link #selectOverviewOrg}。
+     */
+    @Select("""
+            SELECT
+                COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualified,
+                COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 1 THEN 1 ELSE 0 END), 0) AS governedCount,
+                COALESCE(SUM(CASE WHEN grade = '合格' AND governed = 0 THEN 1 ELSE 0 END), 0) AS pendingGovern
+            FROM records
+            WHERE org_id = #{orgId}
+            """)
+    Map<String, Object> selectGovernanceStatsOrg(@Param("orgId") String orgId);
 
     /** 清洗后的字段修复（trim/空值清理/状态标记）——仅隔离路径用：它要同时改 status/grade */
     @Update("""
@@ -117,20 +132,26 @@ public interface RecordMapper extends BaseMapper<Record> {
     int updateStructuredData(@Param("id") String id, @Param("structuredData") String structuredData);
 
     /**
-     * 科室动态选项：distinct 非空科室。
-     *
-     * <p>{@code orgId} 同 {@link #selectOverview} 的数据域参数 ——
-     * 不传的话任何人都能从下拉选项里看到别组的科室名
-     * （这是轻度信息泄漏：科室名不是事实但会推断出东西）。</p>
+     * 科室动态选项（管理员「看全部」路径）：全部机构的非空科室。
      */
     @Select("""
             SELECT DISTINCT department FROM records
             WHERE department IS NOT NULL AND department <> ''
-              AND (#{viewAll} = 1 OR org_id = #{orgId})
             ORDER BY department
             """)
-    List<String> selectDepartments(@Param("orgId") String orgId,
-                                   @Param("viewAll") boolean viewAll);
+    List<String> selectDepartmentsAll();
+
+    /**
+     * 科室动态选项（数据域路径）：{@code WHERE org_id = ?}，fail-closed 口径同
+     * {@link #selectOverviewOrg}（空/哨兵 orgId 自然空集，不会查到别组科室名）。
+     */
+    @Select("""
+            SELECT DISTINCT department FROM records
+            WHERE department IS NOT NULL AND department <> ''
+              AND org_id = #{orgId}
+            ORDER BY department
+            """)
+    List<String> selectDepartmentsOrg(@Param("orgId") String orgId);
 
     /** 质控评分结果回写：分数 / 分级 / 状态 / 预检单 */
     @Update("""

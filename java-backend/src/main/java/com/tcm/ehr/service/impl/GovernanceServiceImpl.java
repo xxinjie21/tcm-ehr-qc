@@ -466,8 +466,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public Map<String, Object> governanceStats() {
-        // viewAllOrgs 一并下推：清洗页的「待清洗/已清洗」必须与 clean() 实际会处理的范围同域
-        return baseMapper.selectGovernanceStats(RecordFilter.domainOrgId(), RequestUtils.viewAllOrgs());
+        // viewAllOrgs 一并下推：清洗页的「待清洗/已清洗」必须与 clean() 实际会处理的范围同域。
+        // 性能审查 P1-6 / A5：拆成 All/Org 两条 SQL，Java 侧二选一；Org 分支 orgId 取
+        // domainOrgId()（无组=哨兵值），fail-closed 不会统计到别组。
+        return RequestUtils.viewAllOrgs()
+                ? baseMapper.selectGovernanceStatsAll()
+                : baseMapper.selectGovernanceStatsOrg(RecordFilter.domainOrgId());
     }
 
     /**

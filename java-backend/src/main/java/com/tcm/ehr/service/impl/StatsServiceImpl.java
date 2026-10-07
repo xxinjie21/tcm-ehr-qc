@@ -55,7 +55,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public List<String> departments() {
-        return baseMapper.selectDepartments(domainOrgId(), RequestUtils.viewAllOrgs());
+        // 性能审查 P1-6 / A5：拆成两条 SQL，Java 侧按 viewAllOrgs 二选一 ——
+        // 原本的 WHERE (#{viewAll}=1 OR org_id=#{orgId}) 会让优化器难按 org_id 收窄。
+        // Org 分支的 orgId 传 domainOrgId()（无组=哨兵值），fail-closed 不会查到别组科室。
+        return RequestUtils.viewAllOrgs()
+                ? baseMapper.selectDepartmentsAll()
+                : baseMapper.selectDepartmentsOrg(domainOrgId());
     }
 
     /**
@@ -70,8 +75,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     public OverviewVO overview() {
         // 1. 指标在库里聚合，只按数据域过滤（总览不受页面筛选影响）。
         //    viewAllOrgs 必须一并下推：同一次响应里的词频走 RecordFilter.build（认看全部），
-        //    指标卡若不认，管理员的卡片数字与词频/列表就对不上
-        Map<String, Object> row = baseMapper.selectOverview(domainOrgId(), RequestUtils.viewAllOrgs());
+        //    指标卡若不认，管理员的卡片数字与词频/列表就对不上。
+        //    性能审查 P1-6 / A5：拆成两条 SQL（All/Org），Java 侧二选一，让
+        //    (org_id, grade, governed) 覆盖索引对非管理员路径稳定生效。
+        Map<String, Object> row = RequestUtils.viewAllOrgs()
+                ? baseMapper.selectOverviewAll()
+                : baseMapper.selectOverviewOrg(domainOrgId());
         OverviewVO vo = new OverviewVO();
         vo.setTotalRecords(num(row.get("totalRecords")));
         vo.setQualifiedCount(num(row.get("qualifiedCount")));
