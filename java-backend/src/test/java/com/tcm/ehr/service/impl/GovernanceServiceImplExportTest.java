@@ -130,30 +130,29 @@ class GovernanceServiceImplExportTest {
     }
 
     @Test
-    @DisplayName("证候筛选在批内做内存筛，预览 total 与导出行数一致（< 1000 一页）")
-    void patternFilterWithinBatchAndPreviewTotalMatchesExportRows() throws Exception {
+    @DisplayName("证候筛选下沉到 SQL 并集（A8）：导出不再内存二次筛，行数==预览 total")
+    void patternGoesToSqlUnionAndExportMatchesPreview() throws Exception {
         LocalDateTime t = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
-        // structured_patternContains 走 JSON 的 patternList；为让测试可构造，用原始列回退不可达 →
-        // 这里直接给 JSON：content 含「肝郁」的两条命中，另一条不命中
-        Record hit1 = rec("h1", t, null);
-        hit1.setStructuredData("{\"patternList\":[{\"content\":\"肝郁气滞\"}]}");
-        Record miss = rec("m1", t, null);
-        miss.setStructuredData("{\"patternList\":[{\"content\":\"脾虚\"}]}");
-        Record hit2 = rec("h2", t.plusSeconds(1), null);
-        hit2.setStructuredData("{\"patternList\":[{\"content\":\"肝郁化火\"}]}");
-        when(mapper.selectList(any())).thenReturn(List.of(hit1, miss, hit2));
+        List<Record> rows = List.of(rec("a", t, null), rec("b", t.plusSeconds(1), null), rec("c", t.plusSeconds(2), null));
+        when(mapper.selectList(any())).thenReturn(rows);
 
         ExportDTO dto = csv();
         dto.setFilters(Map.of("pattern", "肝郁"));
 
         IGovernanceService.ExportedFile file = svc.export(dto);
-        assertEquals(2, csvDataLines(file), "带证候筛选时应只导出命中的 2 条");
+        // SQL 已把 pattern 并集筛完，批内不再二次过滤 → 直接导出 SQL 返回的所有行
+        assertEquals(3, csvDataLines(file));
+
+        // 关键：传给 selectList 的 wrapper 必须带上「pattern OR structured_data」并集条件
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<QueryWrapper<Record>> captor = ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(mapper, org.mockito.Mockito.atLeast(1)).selectList(captor.capture());
+        String sql = captor.getValue().getCustomSqlSegment();
+        assertTrue(sql.contains("pattern") && sql.contains("structured_data"),
+                "证候筛选必须走 pattern OR structured_data（A8 并集）: " + sql);
 
         Map<String, Object> preview = svc.previewDataset(dto);
-        assertEquals(2L, preview.get("total"), "预览 total == 导出行数（口径一致）");
-        @SuppressWarnings("unchecked")
-        List<?> sample = (List<?>) preview.get("sample");
-        assertEquals(2, sample.size());
+        assertEquals(3L, preview.get("total"), "预览 total == 导出行数（与列表同一筛选条件）");
     }
 
     @Test

@@ -510,18 +510,13 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 导出/预览共用的范围条件：能下推 SQL 的都下推，再追加"只含合格"这条硬约束。
      *
-     * <p>证候存在 {@code structured_data} 的 JSON 里，SQL 表达不了，只能留给调用方在内存筛。</p>
+     * <p>证候筛选不再这里剥离、也不在内存二次筛（A8）：直接保留 {@code pattern}，
+     * 由 {@link RecordFilter#build} 的「原始列 OR structured_data JSON」并集统一收窄 ——
+     * 导出与列表/范围删除/统计下钻/范围扣分/批量质控共用同一个 builder，口径不再分叉。</p>
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
-        // 1. 条件组装复用 RecordFilter（与其余读路径同一个函数），但**去掉 pattern**：
-        //    证候存在 structured_data 的 JSON 里，SQL 表达不了；若在这里带上，
-        //    RecordFilter 会把它翻译成「原始 pattern 列 LIKE」，而归一后的证候写法
-        //    常与医生原写法不同 —— 那一步收窄会在内存筛之前就把本该命中的病历排除掉。
-        //    证候判定统一交给 filterQualified 的内存筛（含原始列回退）。
+        // 1. 条件组装复用 RecordFilter（证候并集见 RecordFilter.patternUnion）
         FiltersDTO f = RecordFilter.fromMap(dto.getFilters());
-        if (f != null) {
-            f.setPattern(null);
-        }
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), f);
         // 2. 追加导出自己的硬约束：只导「合格且已清洗」的病历。
         //    governed=1 是清洗完成的标记（术语归一跑过、且不是人工跳过的那一类），
@@ -538,27 +533,26 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /**
      * keyset 流式取「范围 + 只含合格」的病历，每批 {@link #EXPORT_PAGE_SIZE} 条交给
-     * {@code batchConsumer}；带证候筛选时在<b>批内</b>做内存筛（证候在 JSON 里，SQL 筛不了）。
+     * {@code batchConsumer}。证候筛选已在 SQL 层完成（A8：RecordFilter 的 pattern OR
+     * structured_data 并集），这里**不再**二次内存筛，否则会与列表口径二次分叉。
      *
-     * <p>性能审查 A7：原先 {@code filterQualified} 用 {@code selectList} 一次性把全部匹配行
-     * （4 万 ≈320MB）物化进堆，带证候时再逐条 {@code readValue} 4 万次。keyset 分批后
-     * 内存恒定一页、JSON 每次只解析当批；实现与 RecordKeyset 的锚点语义一致
-     * （{@code visit_time DESC, id ASC} 全序），不漏行不重复。</p>
+     * <p>性能审查 A7：formerly {@code filterQualified} 用 {@code selectList} 一次性把全部
+     * 匹配行（4 万 ≈320MB）物化进堆，带证候时再逐条 {@code readValue} 4 万次。keyset 分批后
+     * 内存恒定一页；实现与 RecordKeyset 的锚点语义一致（{@code visit_time DESC, id ASC}
+     * 全序），不漏行不重复。</p>
      *
-     * <p><b>锚点取原始行</b>：即使本页部分行被证候筛掉，锚点仍用 SQL 取到的末条
-     * （含被筛掉的），避免「筛掉即漏推」。</p>
+     * <p><b>锚点取 SQL 返回的末条</b>（含被本页筛掉的行不适用——已无内存筛，每行都是命中）。</p>
      *
      * @param dto           导出/预览请求
-     * @param batchConsumer 每批（已做证候内存筛）回调；回调内不得改批次内容
+     * @param batchConsumer 每批回调；回调内不得改批次内容
      */
     private void forEachQualified(ExportDTO dto, Consumer<List<Record>> batchConsumer) {
-        String pattern = patternOf(dto);
         java.time.LocalDateTime cursorVt = null;
         String cursorId = null;
         boolean firstPage = true;
         while (true) {
             // 每页重建 wrapper：QueryWrapper.and() 原地追加，复用会把 WHERE 逐页累积；
-            // qualifiedWrapper 已去掉 pattern（证候在内存筛）并追加 grade=合格 & governed=1
+            // qualifiedWrapper 含证候并集（RecordFilter.patternUnion）+ grade=合格 & governed=1
             QueryWrapper<Record> wrapper = qualifiedWrapper(dto);
             if (!firstPage) {
                 RecordKeyset.anchorAfter(wrapper, cursorVt, cursorId);
@@ -567,10 +561,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (rows.isEmpty()) {
                 break;
             }
-            List<Record> batch = pattern == null
-                    ? rows
-                    : rows.stream().filter(r -> structuredPatternContains(r, pattern)).toList();
-            batchConsumer.accept(batch);
+            batchConsumer.accept(rows);
             if (rows.size() < EXPORT_PAGE_SIZE) {
                 break;
             }
@@ -581,34 +572,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         }
     }
 
-    /** structuredData.patternList 是否包含指定证候（模糊包含匹配），否则回退原始辨证结论列 */
-    private boolean structuredPatternContains(Record r, String pattern) {
-        // 1. 只在真有结构化数据时才解析 JSON。
-        //    不能在这里提前 return false —— 注释里承诺的「原始列回退」会永远走不到，
-        //    未结构化的合格病历会在带证候筛选时被整批丢掉
-        if (r.getStructuredData() == null || r.getStructuredData().isBlank()) {
-            return r.getPattern() != null && r.getPattern().contains(pattern);
-        }
-        try {
-            Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
-                    new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
-                    });
-            // 2. 先看归一后的证候列表（这是质控实际认的证候）
-            if (data.get("patternList") instanceof List<?> list) {
-                for (Object item : list) {
-                    if (item instanceof Map<?, ?> m) {
-                        Object c = m.get("content");
-                        if (c != null && String.valueOf(c).contains(pattern)) return true;
-                    }
-                }
-            }
-            // 3. 再回退原始辨证结论：未结构化的病历只能靠这一列
-            return r.getPattern() != null && r.getPattern().contains(pattern);
-        } catch (JacksonException e) {
-            // 4. JSON 坏了当不匹配，不让一条脏数据把整个导出带崩
-            return false;
-        }
-    }
+    // 原 structuredPatternContains（内存筛）已随 A8 移除：证候筛选下沉到 RecordFilter 的
+    // 「pattern OR structured_data」SQL 并集，列表/导出同一口径，不再需要 JVM 侧二次过滤。
 
     /** 敏感信息脱敏：11位手机号、18位身份证号 → *** */
     private static final String PHONE_RE = "(?<!\\d)1[3-9]\\d{9}(?!\\d)";
