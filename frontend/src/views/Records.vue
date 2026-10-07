@@ -17,10 +17,11 @@
             <span class="tip-inline">共 {{ total }} 条</span>
             <span class="danger-zone">
               <span class="danger-note">
-                {{ searching ? '正在查询…' : (hasFilter ? '删除范围内全部匹配病历' : '需先设置筛选范围') }}
+                {{ searching ? '正在查询…' : (hasFilter ? `删除范围内全部匹配病历（共 ${total} 条）` : '需先设置筛选范围') }}
               </span>
               <el-button
                 type="danger"
+                title="勾选 = 仅当前页选中的这几条；要对全部筛选结果生效请用右边的「删除范围内病历」"
                 :disabled="searching || !selectedIds.length"
                 @click="handleBatchDelete"
               >批量删除{{ selectedIds.length ? `（${selectedIds.length}）` : '' }}</el-button>

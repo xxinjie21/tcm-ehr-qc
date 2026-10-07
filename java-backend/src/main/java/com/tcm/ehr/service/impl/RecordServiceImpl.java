@@ -437,9 +437,12 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
      * <p>保留这两个入口在此类，是因为它们是 {@code IRecordService} 的接口方法，
      * 而且事务必须加在这里的 public 方法上（见上）。</p>
      */
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, timeout = 60)
     @Override
     public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
+        // 性能审查 A4：整个游标分批删除在一个事务内（all-or-nothing）。timeout=60s 是防呆：
+        // 4 万条删除 + 连带 review_tasks 的单事务，长于 innodb_lock_wait_timeout(默认50s) 就先被
+        // 锁等待坑掉；超时只保护「误操作长时间锁表」，不是对条数的限制。
         return deleter().deleteByFilter(filters);
     }
 

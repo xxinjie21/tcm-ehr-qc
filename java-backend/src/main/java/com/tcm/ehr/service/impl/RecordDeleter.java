@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RecordKeyset;
 import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.domain.dto.DeleteRecordsDTO;
 import com.tcm.ehr.domain.dto.FiltersDTO;
@@ -12,6 +13,7 @@ import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -62,18 +64,59 @@ public class RecordDeleter {
         return doDelete(accessible);
     }
 
-    /** 按筛选范围删除：只取 id 列，再走同一段删除逻辑 */
+    /**
+     * 按筛选范围删除：keyset 游标分批「边取边删」，内存恒定 {@link #DELETE_CHUNK} 条 id。
+     *
+     * <p>性能审查 A4：原先 `selectList(全部 id)` 会把 4 万条 id 一次性拉进堆（≈1.1~1.7s +
+     * 40 万字符），随后再分 80 轮 IN 删除。改为每页 ≤500 条（已含 id + visit_time 锚点
+     * 列）、取到即删，内存恒定一页。</p>
+     *
+     * <p><b>事务口径</b>：整个循环在调用方（{@code RecordServiceImpl.deleteByFilter}）的
+     * 一个 {@code @Transactional(timeout=60)} 事务内 —— all-or-nothing 语义与现状完全一致，
+     * 失败 = 一条都没删。额外的收益是 keyset 一致性：InnoDB 默认 REPEATABLE READ，
+     * **第一个读建立快照**，80 页游标读的都是同一份快照，翻页期间新增行不会造成锚点漂移。</p>
+     *
+     * <p>两条安全网不变：{@link #hasAnyFilter} 守卫 + {@link RecordFilter} 数据域过滤。</p>
+     */
     public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
         // 1. 必须至少有一个筛选条件，否则就是「删全库」
         if (!hasAnyFilter(filters)) {
             throw new IllegalArgumentException("请至少设置一个筛选条件，避免误删全库");
         }
-        // 2. 只取 id 列，不取整行数据
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
-        List<Record> rows = baseMapper.selectList(wrapper.select("id"));
-        List<String> ids = rows.stream().map(Record::getId).toList();
-        // 3. 走同一段删除逻辑
-        return doDelete(ids);
+        int deleted = 0;
+        // 2. keyset 锚点：上一页末条 (visit_time, id)；前提 visit_time 非空（与既有排序口径一致）
+        LocalDateTime cursorVt = null;
+        String cursorId = null;
+        boolean firstPage = true;
+        while (true) {
+            // 3. 每页从 RecordFilter.build 重建 wrapper（QueryWrapper.and 原地追加，复用会累积条件），
+            //    只取 id（+ anchor 需要的 visit_time），build 已自带 ORDER BY visit_time DESC, id ASC
+            QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
+            if (!firstPage) {
+                RecordKeyset.anchorAfter(wrapper, cursorVt, cursorId);
+            }
+            List<Record> rows = baseMapper.selectList(wrapper
+                    .select("id", "visit_time")
+                    .last("LIMIT " + DELETE_CHUNK));
+            if (rows.isEmpty()) {
+                break;
+            }
+            // 4. 本页取到即删：先子表后主表，顺序不能反（review_tasks.record_id 有外键）
+            List<String> chunk = rows.stream().map(Record::getId).toList();
+            reviewTaskMapper.delete(new QueryWrapper<com.tcm.ehr.domain.po.ReviewTask>().in("record_id", chunk));
+            deleted += baseMapper.deleteBatchIds(chunk);
+            // 5. 不满一页即到末尾
+            if (rows.size() < DELETE_CHUNK) {
+                break;
+            }
+            Record last = rows.get(rows.size() - 1);
+            cursorVt = last.getVisitTime();
+            cursorId = last.getId();
+            firstPage = false;
+        }
+        DeleteRecordsVO vo = new DeleteRecordsVO();
+        vo.setDeletedCount(deleted);
+        return vo;
     }
 
     /**

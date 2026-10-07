@@ -9,6 +9,7 @@ import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RecordKeyset;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +37,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * 数据清洗服务实现：术语归一、数据清洗、标准数据集导出
@@ -46,6 +49,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 预览只回前 10 条 */
     private static final int PREVIEW_SAMPLE_SIZE = 10;
+
+    /** 导出流式分批大小（性能审查 A7）：边取边写，内存恒定一页，不再全量 selectList */
+    private static final int EXPORT_PAGE_SIZE = 1000;
 
     private final EsTermNormalizer termNormalizer;
     private final ObjectMapper objectMapper;
@@ -405,20 +411,38 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public ExportedFile export(ExportDTO dto) throws IOException {
-        // 1. 只导合格病历；一条都没有就返回 null，由 Controller 转 400
-        List<Record> records = filterQualified(dto);
-        if (records.isEmpty()) {
+        // 性能审查 A7：不再 filterQualified 全量入堆，改 forEachQualified 边取边写，
+        // onces 内存恒定一页（1000）。JSON/CSV 两条路各自流式拼接。
+        if ("json".equalsIgnoreCase(dto.getFormat())) {
+            StringBuilder sb = new StringBuilder();
+            final long[] exported = {0};
+            sb.append('[');
+            forEachQualified(dto, batch -> {
+                for (Record r : batch) {
+                    if (exported[0]++ > 0) {
+                        sb.append(',');
+                    }
+                    try {
+                        sb.append(objectMapper.writeValueAsString(r));
+                    } catch (JacksonException e) {
+                        throw new UncheckedIOException(new IOException(e));
+                    }
+                }
+            });
+            sb.append(']');
+            // 范围内无合格病历时返回 null，由 Controller 转 400 + code=2001
+            if (exported[0] == 0) {
+                return null;
+            }
+            return new ExportedFile("tcm_ehr_dataset_" + ts() + ".json",
+                    mask(sb.toString()).getBytes(StandardCharsets.UTF_8));
+        }
+        // CSV：流式拼行，再对字节打码（与旧实现同一脱敏口径）
+        byte[] csv = toCsvStream(dto);
+        if (csv == null) {
             return null;
         }
-
-        // 2. JSON：序列化后整体打码
-        if ("json".equalsIgnoreCase(dto.getFormat())) {
-            String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(records);
-            return new ExportedFile("tcm_ehr_dataset_" + ts() + ".json",
-                    mask(json).getBytes(StandardCharsets.UTF_8));
-        }
-        // 3. CSV：先生成再对字节打码
-        return new ExportedFile("tcm_ehr_dataset_" + ts() + ".csv", maskCsv(toCsv(records)));
+        return new ExportedFile("tcm_ehr_dataset_" + ts() + ".csv", maskCsv(csv));
     }
 
     /**
@@ -437,10 +461,19 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             // LIMIT 只加在这里：导出要全量，预览只要 10 条
             sample = baseMapper.selectList(qualifiedWrapper(dto).last("LIMIT " + PREVIEW_SAMPLE_SIZE));
         } else {
-            // 2. 带证候筛选：证候在 JSON 里 SQL 筛不了，退化为内存筛后取前 10
-            List<Record> records = filterQualified(dto);
-            result.put("total", (long) records.size());
-            sample = records.subList(0, Math.min(PREVIEW_SAMPLE_SIZE, records.size()));
+            // 2. 带证候筛选：证候在 JSON 里 SQL 筛不了；流式统计 total 与样本，
+            //    不再像原实现那样把全表 selectList 进堆（性能审查 A7）
+            final long[] total = {0};
+            sample = new ArrayList<>();
+            forEachQualified(dto, batch -> {
+                total[0] += batch.size();
+                for (Record r : batch) {
+                    if (sample.size() < PREVIEW_SAMPLE_SIZE) {
+                        sample.add(r);
+                    }
+                }
+            });
+            result.put("total", total[0]);
         }
         // 3. 预览样本与导出件走同一套脱敏。此前预览直接塞实体 ——
         // 于是同一条现病史（可能写着手机号）在导出件里打码、在预览表格里明文。
@@ -503,15 +536,49 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return toTrimmedOrNull(filters.get("pattern"));
     }
 
-    /** 取范围内合格病历；带证候筛选时额外做内存筛（证候在 JSON 里，SQL 筛不了） */
-    private List<Record> filterQualified(ExportDTO dto) {
-        // 1. 先用 SQL 收窄（数据域 + 用户筛选 + 只含合格）
-        List<Record> records = baseMapper.selectList(qualifiedWrapper(dto));
-        // 2. 证候筛选在 JSON 里，只能内存筛；没这项就直接返回
+    /**
+     * keyset 流式取「范围 + 只含合格」的病历，每批 {@link #EXPORT_PAGE_SIZE} 条交给
+     * {@code batchConsumer}；带证候筛选时在<b>批内</b>做内存筛（证候在 JSON 里，SQL 筛不了）。
+     *
+     * <p>性能审查 A7：原先 {@code filterQualified} 用 {@code selectList} 一次性把全部匹配行
+     * （4 万 ≈320MB）物化进堆，带证候时再逐条 {@code readValue} 4 万次。keyset 分批后
+     * 内存恒定一页、JSON 每次只解析当批；实现与 RecordKeyset 的锚点语义一致
+     * （{@code visit_time DESC, id ASC} 全序），不漏行不重复。</p>
+     *
+     * <p><b>锚点取原始行</b>：即使本页部分行被证候筛掉，锚点仍用 SQL 取到的末条
+     * （含被筛掉的），避免「筛掉即漏推」。</p>
+     *
+     * @param dto           导出/预览请求
+     * @param batchConsumer 每批（已做证候内存筛）回调；回调内不得改批次内容
+     */
+    private void forEachQualified(ExportDTO dto, Consumer<List<Record>> batchConsumer) {
         String pattern = patternOf(dto);
-        return pattern == null
-                ? records
-                : records.stream().filter(r -> structuredPatternContains(r, pattern)).toList();
+        java.time.LocalDateTime cursorVt = null;
+        String cursorId = null;
+        boolean firstPage = true;
+        while (true) {
+            // 每页重建 wrapper：QueryWrapper.and() 原地追加，复用会把 WHERE 逐页累积；
+            // qualifiedWrapper 已去掉 pattern（证候在内存筛）并追加 grade=合格 & governed=1
+            QueryWrapper<Record> wrapper = qualifiedWrapper(dto);
+            if (!firstPage) {
+                RecordKeyset.anchorAfter(wrapper, cursorVt, cursorId);
+            }
+            List<Record> rows = baseMapper.selectList(wrapper.last("LIMIT " + EXPORT_PAGE_SIZE));
+            if (rows.isEmpty()) {
+                break;
+            }
+            List<Record> batch = pattern == null
+                    ? rows
+                    : rows.stream().filter(r -> structuredPatternContains(r, pattern)).toList();
+            batchConsumer.accept(batch);
+            if (rows.size() < EXPORT_PAGE_SIZE) {
+                break;
+            }
+            Record last = rows.get(rows.size() - 1);
+            cursorVt = last.getVisitTime();
+            cursorId = last.getId();
+            firstPage = false;
+        }
     }
 
     /** structuredData.patternList 是否包含指定证候（模糊包含匹配），否则回退原始辨证结论列 */
@@ -570,7 +637,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return s.isEmpty() ? null : s;
     }
 
-    private byte[] toCsv(List<Record> records) throws IOException {
+    /** 流式生成 CSV：表头 + 每批行（性能审查 A7）。无任何数据时返回 null（= 导出空集） */
+    private byte[] toCsvStream(ExportDTO dto) throws IOException {
         // 1. 表头与列顺序一一对应，改一处必须改另一处
         String[] headers = {"id", "挂号号", "门诊号", "性别", "年龄", "就诊次数", "西医诊断", "中医诊断",
                 "现病史", "主诉", "自述", "望诊", "脉象", "舌象", "体格检查", "辨证结论", "处方",
@@ -584,22 +652,30 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         out.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         out.write(String.join(",", headers).getBytes(StandardCharsets.UTF_8));
         out.write('\n');
-        // 3. 逐行输出，所有单元格加引号并转义内部引号/换行
-        for (Record r : records) {
-            List<String> cells = new ArrayList<>();
-            for (String col : cols) {
-                Object v = objectMapper.convertValue(r, Map.class).get(col);
-                // visitTime格式规整：展示/导出统一为YYYY-MM-DD（文档9.5③格式规整）
-                if ("visitTime".equals(col) && v != null) {
-                    v = String.valueOf(v).substring(0, 10);
-                }
-                String s = v == null ? "" : String.valueOf(v).replace("\"", "\"\"").replace("\n", " ");
-                cells.add("\"" + s + "\"");
+        // 3. 流式逐批逐行输出（ByteArrayOutputStream.write 不抛受检异常，lambda 内可直接写）
+        final boolean[] hasRow = {false};
+        forEachQualified(dto, batch -> {
+            for (Record r : batch) {
+                hasRow[0] = true;
+                appendCsvRow(out, r, cols);
             }
-            out.write(String.join(",", cells).getBytes(StandardCharsets.UTF_8));
-            out.write('\n');
+        });
+        return hasRow[0] ? out.toByteArray() : null;
+    }
+
+    /** 写一行 CSV：所有单元格加引号并转义内部引号/换行；就诊时间规整为 YYYY-MM-DD */
+    private void appendCsvRow(ByteArrayOutputStream out, Record r, List<String> cols) {
+        List<String> cells = new ArrayList<>();
+        for (String col : cols) {
+            Object v = objectMapper.convertValue(r, Map.class).get(col);
+            // visitTime格式规整：展示/导出统一为YYYY-MM-DD（文档9.5③格式规整）
+            if ("visitTime".equals(col) && v != null) {
+                v = String.valueOf(v).substring(0, 10);
+            }
+            String s = v == null ? "" : String.valueOf(v).replace("\"", "\"\"").replace("\n", " ");
+            cells.add("\"" + s + "\"");
         }
-        return out.toByteArray();
+        out.writeBytes((String.join(",", cells) + "\n").getBytes(StandardCharsets.UTF_8));
     }
 
     private String trim(String s) {
