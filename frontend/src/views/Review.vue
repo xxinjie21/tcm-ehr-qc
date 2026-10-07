@@ -153,7 +153,7 @@
 // 关键取舍：修正提交前只做「已补齐核心字段把对应扣分加回」的本地预估，最终评分与分级以服务端重算为准。
 import { ref, reactive, watch, onMounted } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
-import { listReviewTasks } from '@/api/review'
+import { listReviewTasks, getReviewStats } from '@/api/review'
 import { usePagedList } from '@/composables/usePagedList'
 import { useUrlFilters } from '@/composables/useUrlFilters'
 import { fmtDateTime } from '@/utils/format'
@@ -245,19 +245,15 @@ const handleSizeChange = () => {
 const rowClass = ({ row }) => (row.overdue ? 'row-overdue' : '')
 
 // ===== 28.18 复核概览统计 =====
-// 三个数由三次 pageSize=1 的列表查询得到（后端按 status/overdueOnly 过滤后的 total）：
-// 复用既有接口、不新增后端端点；pageSize=1 只取 total，代价可忽略。
+// 三个数由专用 /count 端点一次返回（只 COUNT 不 SELECT）；原先三次 pageSize=1 的
+// 列表查询每次都会附带一次全表排序（性能审查 P1-5）。
 const reviewStats = reactive({ pending: 0, done: 0, overdue: 0 })
 const loadReviewStats = async () => {
   try {
-    const [p, d, o] = await Promise.all([
-      listReviewTasks({ page: 1, pageSize: 1, status: '待复核', overdueOnly: false }),
-      listReviewTasks({ page: 1, pageSize: 1, status: '已完成', overdueOnly: false }),
-      listReviewTasks({ page: 1, pageSize: 1, status: '待复核', overdueOnly: true })
-    ])
-    reviewStats.pending = p.data?.total ?? 0
-    reviewStats.done = d.data?.total ?? 0
-    reviewStats.overdue = o.data?.total ?? 0
+    const res = await getReviewStats()
+    reviewStats.pending = res.data?.pending ?? 0
+    reviewStats.done = res.data?.done ?? 0
+    reviewStats.overdue = res.data?.overdue ?? 0
   } catch { /* 拦截器已提示；统计失败不影响任务列表本身 */ }
 }
 

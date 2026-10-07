@@ -107,7 +107,7 @@ import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { submitNlpBatch, getNlpBatchProgress, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
-import { searchRecords } from '@/api/records'
+import { searchRecords, countRecords } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
 import { confirmBox } from '@/utils/confirm'
 
@@ -238,8 +238,8 @@ const describeBatchScope = async () => {
   // 2. 查该范围条数，取不到就退化成「未知」，不阻塞确认
   let count = '未知'
   try {
-    const res = await searchRecords({ ...batchFilters, page: 1, pageSize: 1 })
-    count = res.data?.total ?? '未知'
+    const res = await countRecords({ ...batchFilters })
+    count = res.data ?? '未知'
   } catch {
     // 取不到条数不阻塞确认，退化成「未知」
   }

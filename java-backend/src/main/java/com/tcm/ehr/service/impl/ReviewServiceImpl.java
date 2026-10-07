@@ -10,6 +10,7 @@ import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.po.ReviewTask;
 import com.tcm.ehr.domain.vo.ReviewResultVO;
+import com.tcm.ehr.domain.vo.ReviewStatsVO;
 import com.tcm.ehr.domain.vo.ReviewTaskVO;
 import com.tcm.ehr.domain.vo.ReviewTasksVO;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -39,6 +40,46 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     private final IReviewWriteService reviewWriteService;
 
     /**
+     * 组装复核任务查询条件（未失效 + 数据域 + 状态 / 超期），列表与统计共用。
+     *
+     * <p>§6.3 缺点 7：不能看到别组的复核任务 —— 管理员「看全部」时不加 org 条件
+     * （与病历列表/详情同一口径，RecordFilter.canAccess 已按 viewAllOrgs 放行）。</p>
+     */
+    private QueryWrapper<ReviewTask> buildTaskWrapper(String status, Boolean overdueOnly) {
+        QueryWrapper<ReviewTask> w = new QueryWrapper<>();
+        w.eq("is_obsolete", 0);
+        if (!RequestUtils.viewAllOrgs()) {
+            w.eq("org_id", RequestUtils.currentOrgId());
+        }
+        String dbStatus = dbStatus(status);
+        if (dbStatus != null) {
+            w.eq("status", dbStatus);
+        }
+        // 批次9：worklist「只需我处理」= 已超期且仍待复核的任务（最该先做的那批）。
+        // 过滤必须落在 SQL 层：前端过滤只作用于当前页。overdueOnly 优先于 status 入参。
+        if (Boolean.TRUE.equals(overdueOnly)) {
+            w.eq("status", dbStatus("待复核"));
+            w.lt("deadline_time", LocalDateTime.now());
+        }
+        return w;
+    }
+
+    /** 复核概览统计：待复核 / 已完成 / 待复核超期（性能审查 P1-5，只 COUNT 不 SELECT） */
+    @Override
+    public ReviewStatsVO countStats() {
+        ReviewStatsVO vo = new ReviewStatsVO();
+        vo.setPending(countOf("待复核", false));
+        vo.setDone(countOf("已完成", false));
+        vo.setOverdue(countOf("待复核", true));
+        return vo;
+    }
+
+    private long countOf(String status, Boolean overdueOnly) {
+        Long n = baseMapper.selectCount(buildTaskWrapper(status, overdueOnly));
+        return n == null ? 0 : n;
+    }
+
+    /**
      * 分页查询复核任务列表，只读。
      *
      * <p>只取未失效任务（{@code is_obsolete=0}），按创建时间倒序；只返回本组织任务
@@ -56,27 +97,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         int s = pageSize != null && pageSize > 0 ? pageSize : 20;
 
         // 2. 组装查询条件：未失效任务，按创建时间倒序
-        QueryWrapper<ReviewTask> w = new QueryWrapper<>();
-        w.eq("is_obsolete", 0);
-        // 3. § 6.3 缺点 7：不能看到别组的复核任务（与判杂志事实同级的数据）。
-        //    review_tasks 打组是写入时做的（upsertReviewTask），这里只需等值过滤。
-        //    管理员「看全部」时不加这条 —— 与病历列表/详情同一口径（RecordFilter.canAccess
-        //    已按 viewAllOrgs 放行），否则管理员能看到他组病历却看不到它的复核任务
-        if (!RequestUtils.viewAllOrgs()) {
-            w.eq("org_id", RequestUtils.currentOrgId());
-        }
-        // 4. 状态筛选：无组时上面的 org_id 等值已让结果为空，不再需要角色判断
-        String dbStatus = dbStatus(status);
-        if (dbStatus != null) {
-            w.eq("status", dbStatus);
-        }
-        // 4.1 批次9：worklist「只需我处理」= 已超期且仍待复核的任务（最该先做的那批）。
-        //     过滤必须落在 SQL 层：前端过滤只作用于当前页，用户会以为「我处理完了」而其它页还有
-        //     超期任务 —— 那是状态撒谎。overdueOnly 优先于 status 入参（勾了它就是唯一口径）。
-        if (Boolean.TRUE.equals(overdueOnly)) {
-            w.eq("status", dbStatus("待复核"));
-            w.lt("deadline_time", LocalDateTime.now());
-        }
+        QueryWrapper<ReviewTask> w = buildTaskWrapper(status, overdueOnly);
         w.orderByDesc("create_time");
 
         // 4. 分页查询

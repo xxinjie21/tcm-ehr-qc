@@ -5,6 +5,7 @@ import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.vo.ReviewResultVO;
+import com.tcm.ehr.domain.vo.ReviewStatsVO;
 import com.tcm.ehr.domain.vo.ReviewTasksVO;
 import com.tcm.ehr.service.IReviewService;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,19 @@ public class ReviewController {
                                        @RequestParam(required = false) String status,
                                        @RequestParam(required = false) Boolean overdueOnly) {
         return Result.ok(reviewService.listTasks(page, PageSizeGuard.clamp(pageSize), status, overdueOnly));
+    }
+
+    /**
+     * 复核概览统计：一次返回「待复核 / 已完成 / 待复核超期」三个数。
+     *
+     * <p>【权限：登录即可】与 {@code GET /review/tasks} 同一 wrapper 口径，只 {@code COUNT}
+     * 不 {@code SELECT} —— 替代原先的三次 {@code pageSize=1} 列表查询（性能审查 P1-5）。</p>
+     *
+     * @return pending / done / overdue 三个计数
+     */
+    @GetMapping("/review/tasks/count")
+    public Result<ReviewStatsVO> countStats() {
+        return Result.ok(reviewService.countStats());
     }
 
     /**

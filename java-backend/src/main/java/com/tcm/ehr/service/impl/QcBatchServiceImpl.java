@@ -10,6 +10,7 @@ import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RecordKeyset;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.QcBatchDTO;
@@ -474,16 +475,25 @@ public class QcBatchServiceImpl implements IQcBatchService {
      */
     private boolean run(String id, QcTask t, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules,
                         List<QcTaskVO.Failure> failures, boolean[] truncated, int[] processed) {
-        // 1. 还原落库时的筛选条件（提交时冻结，不随数据变化）
-        QueryWrapper<Record> wrapper = RecordFilter.build(t.getOrgId(), readFilters(t.getFiltersJson()));
-        int pageNo = 1;
-        // 2. 分页循环取数：每页都先看取消位，避免停不下来
+        // 1. 还原落库时的筛选条件（提交时冻结，不随数据变化）；filtersJson 只反序列化一次
+        com.tcm.ehr.domain.dto.FiltersDTO frozenFilters = readFilters(t.getFiltersJson());
+        // 2. 游标分页循环取数（性能审查 P0-2）：每页都先看取消位，避免停不下来。
+        //    keyset 锚定上一页末条 (visit_time, id) 而非 offset —— offset 每页重排
+        //    剩余全表（4 万行 × 41 页），游标配 idx_records_org_vt_id 后是纯区间扫描。
+        //    id 主键唯一 → (visit_time, id) 严格全序，不漏行不重复。
+        //    ⚠️ wrapper 必须每页重建：QueryWrapper.and() 原地追加，复用会逐页累积 WHERE。
+        java.time.LocalDateTime cursorVt = null;
+        String cursorId = null;
+        boolean firstPage = true;
         while (true) {
             if (cancelFlags.contains(id) || isCancelRequested(id)) {
                 return true;
             }
-            Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE), wrapper);
-            List<Record> list = page.getRecords();
+            QueryWrapper<Record> wrapper = RecordFilter.build(t.getOrgId(), frozenFilters);
+            if (!firstPage) {
+                RecordKeyset.anchorAfter(wrapper, cursorVt, cursorId);
+            }
+            List<Record> list = recordMapper.selectList(wrapper.last("LIMIT " + PAGE_SIZE));
             if (list.isEmpty()) {
                 break;
             }
@@ -500,7 +510,11 @@ public class QcBatchServiceImpl implements IQcBatchService {
             if (list.size() < PAGE_SIZE) {
                 break;
             }
-            pageNo++;
+            // 5. 记下上一页末条作为下一页锚点（取末条、必含 id）
+            Record last = list.get(list.size() - 1);
+            cursorVt = last.getVisitTime();
+            cursorId = last.getId();
+            firstPage = false;
         }
         return false;
     }

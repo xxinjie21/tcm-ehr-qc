@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.spring.service.IService;
 import com.tcm.ehr.domain.dto.ReviewDTO;
 import com.tcm.ehr.domain.po.ReviewTask;
 import com.tcm.ehr.domain.vo.ReviewResultVO;
+import com.tcm.ehr.domain.vo.ReviewStatsVO;
 import com.tcm.ehr.domain.vo.ReviewTasksVO;
 
 /**
@@ -21,6 +22,17 @@ public interface IReviewService extends IService<ReviewTask> {
      * @return total=总条数；tasks=任务列表
      */
     ReviewTasksVO listTasks(Integer page, Integer pageSize, String status, Boolean overdueOnly);
+
+    /**
+     * 一次返回复核概览的三个数：待复核 / 已完成 / 待复核超期。
+     *
+     * <p>统计口径与 {@link #listTasks} 同一 wrapper 组装（未失效任务 + 数据域），
+     * 只 {@code COUNT} 不 {@code SELECT} —— 替代原先三次 {@code pageSize=1} 列表查询
+     * （性能审查 P1-5，每次都会附带一次全表排序）。</p>
+     *
+     * @return pending=待复核总数；done=已完成；overdue=待复核中已超期
+     */
+    ReviewStatsVO countStats();
 
     /**
      * 提交人工复核并自动重算分级。

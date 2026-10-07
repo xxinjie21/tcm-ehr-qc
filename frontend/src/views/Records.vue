@@ -226,7 +226,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import {
-  importRecords, createRecord, searchRecords, getRawRecord, deleteRecords, deleteRecordsByFilter
+  importRecords, createRecord, searchRecords, countRecords, getRawRecord, deleteRecords, deleteRecordsByFilter
 } from '@/api/records'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { useAiContextStore } from '@/stores/ai'
@@ -441,11 +441,11 @@ const handleRangeDelete = async () => {
     ElMessage.warning('请先设置至少一个筛选条件')
     return
   }
-  // 2. 先只取总数（pageSize=1），拿到确切条数供确认文案用
+  // 2. 先只取总数（专用 /count 接口只 COUNT 不 SELECT，替代 pageSize=1 的全表排序）
   let n = 0
   try {
-    const res = await searchRecords({ ...query, page: 1, pageSize: 1 })
-    n = res.data?.total || 0
+    const res = await countRecords({ ...query })
+    n = res.data || 0
   // 3. 取数失败就中止，不进入删除流程
   } catch {
     return

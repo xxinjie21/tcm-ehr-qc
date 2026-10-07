@@ -78,4 +78,14 @@ public interface IRecordService extends IService<Record> {
      * @return total=总条数；records=当前页摘要列表
      */
     SearchVO searchRecords(SearchDTO dto);
+
+    /**
+     * 只统计筛选范围内的病历总数（与 {@link #searchRecords} 同一 wrapper 数据域口径），
+     * 供「只要 total」的调用替换 {@code pageSize=1} —— 后者同样会附带一次全表排序
+     * （性能审查 P1-5，4 万行下 filesort 是全列表查询的主要成本）。
+     *
+     * @param dto 检索请求（仅消费筛选条件，page / pageSize 忽略）
+     * @return 命中总数
+     */
+    long countMatched(SearchDTO dto);
 }

@@ -107,7 +107,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         } else {
             wrapper = RecordFilter.build(orgId, new FiltersDTO());
         }
-        return statsFor(baseMapper.selectList(wrapper), dto.getType());
+        // 列投影（性能审查 P0-3）：单类型统计只消费 structured_data（词频）与
+        //    pattern（证候回退原始列），别把 21 个文本列一起拉进堆
+        wrapper.select("id", "structured_data", "pattern");
+        List<Record> records = baseMapper.selectList(wrapper);
+        // 词频解析「解析一次、多处复用」（单类型只取一类，缓存仍传入以统一口径）
+        return statsFor(records, dto.getType(), new java.util.HashMap<>());
     }
 
     /**
@@ -123,14 +128,20 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     public StatsAllVO all(FiltersDTO filters) {
         // 1. 先把范围内的病历一次取出，四类词频共用这一份（避免查四次库）
         List<Record> records = recordsFor(filters);
+        // 2. 词频解析缓存（性能审查 P0-3）：同一条 structured_data 会被下方 4 个分区
+        //    （疾病/证候/症状 = 各 1 次，处方 = 方剂 + 中药 2 次）重复解析，合计 5 次/条；
+        //    这里按 record id 缓存解析结果，每条只 readValue 一次。
+        //    ⚠️ 必须请求级局部变量：共享给同一次 /stats/all 的调用即可，
+        //    不能做成实例字段/单例（会跨请求泄漏内存并返回过期数据）。
+        Map<String, Map<String, Object>> parsedCache = new HashMap<>();
         StatsAllVO vo = new StatsAllVO();
-        // 2. 总览单独按数据域聚合，不受本次筛选影响
+        // 3. 总览单独按数据域聚合，不受本次筛选影响
         vo.setOverview(overview());
-        // 3. 四类词频各自取 Top10
-        vo.setDisease(statsFor(records, "disease"));
-        vo.setSymptom(statsFor(records, "symptom"));
-        vo.setPattern(statsFor(records, "pattern"));
-        vo.setPrescription(statsFor(records, "prescription"));
+        // 4. 四类词频共享同一份解析缓存
+        vo.setDisease(statsFor(records, "disease", parsedCache));
+        vo.setSymptom(statsFor(records, "symptom", parsedCache));
+        vo.setPattern(statsFor(records, "pattern", parsedCache));
+        vo.setPrescription(statsFor(records, "prescription", parsedCache));
         return vo;
     }
 
@@ -243,20 +254,25 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     private List<Record> recordsFor(FiltersDTO filters) {
         // 条件组装统一走 RecordFilter：数据域与用户筛选的交集口径只有那一处
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
+        // ⚠️ 列投影（性能审查 P0-3）：本层只消费 visit_time / grade / department / score /
+        //    structured_data / pattern（词频 + 证候回退）；不投影会把 21 个 TEXT 列
+        //    + qc_results 全拉进堆（4 万行 ≈320MB）。列名与 RecordFilter / Record 实体
+        //    列一致，新增字段请同步补进列名守卫测试。
+        wrapper.select("id", "visit_time", "grade", "department", "score", "structured_data", "pattern");
         return baseMapper.selectList(wrapper);
     }
 
     /** 按类型统计词频 Top10：全部取自结构化实体（仅证候在缺失时回退原始辨证结论，中药/方剂不回退） */
-    private StatsVO statsFor(List<Record> records, String type) {
+    private StatsVO statsFor(List<Record> records, String type, Map<String, Map<String, Object>> parsedCache) {
         StatsVO vo = new StatsVO();
         // 1. 按类型分派：中药/方剂走"处方"这一档（同时出方剂与中药两组）
         switch (type == null ? "" : type) {
-            case "disease" -> vo.setStatistics(top(agg(records, "diseases", "disease"), 10, "disease"));
-            case "pattern" -> vo.setDistribution(top(agg(records, "patternList", "pattern"), 10, "pattern"));
-            case "symptom" -> vo.setStatistics(top(agg(records, "symptoms", "symptom"), 10, "symptom"));
+            case "disease" -> vo.setStatistics(top(agg(records, "diseases", "disease", parsedCache), 10, "disease"));
+            case "pattern" -> vo.setDistribution(top(agg(records, "patternList", "pattern", parsedCache), 10, "pattern"));
+            case "symptom" -> vo.setStatistics(top(agg(records, "symptoms", "symptom", parsedCache), 10, "symptom"));
             case "prescription" -> {
-                vo.setFormulaStats(top(agg(records, "formulaList", "formula"), 10, "formula"));
-                vo.setHerbStats(top(agg(records, "herbs", "herb"), 10, "herb"));
+                vo.setFormulaStats(top(agg(records, "formulaList", "formula", parsedCache), 10, "formula"));
+                vo.setHerbStats(top(agg(records, "herbs", "herb", parsedCache), 10, "herb"));
             }
             // 同理：原来把四个英文枚举值拼进报错，界面上直接显示给用户
             default -> throw new IllegalArgumentException("统计类型不合法，请选择：疾病 / 证型 / 症状 / 处方");
@@ -306,11 +322,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      * 从structured_data(附录A结构)按key抽取词频计数
      * Entity数组取content；Herb数组取name；fallback到实体原始字段（兼容未结构化病历）
      */
-    private Map<String, Integer> agg(List<Record> records, String jsonKey, String fallbackField) {
+    private Map<String, Integer> agg(List<Record> records, String jsonKey, String fallbackField,
+                                     Map<String, Map<String, Object>> parsedCache) {
         Map<String, Integer> counter = new LinkedHashMap<>();
         // 1. 逐条抽词
         for (Record r : records) {
-            List<String> terms = extractFromStructured(r, jsonKey);
+            List<String> terms = extractFromStructured(r, jsonKey, parsedCache);
             // 2. 证候这一类特殊：结构化没抽到时回退原始辨证结论并切分多证组合串
             //    ⚠️ 这是「未重解析的旧数据」的**过渡兜底**：裸切分不查词典，同义写法
             //    （「肝阳上亢」vs「肝阳上亢证」）会各计一份，与归一口径不一致。
@@ -333,36 +350,46 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     /** 解析附录A结构：Entity数组取content，Herb数组取name；无数据返回null（触发fallback） */
-    private List<String> extractFromStructured(Record r, String key) {
+    private List<String> extractFromStructured(Record r, String key, Map<String, Map<String, Object>> parsedCache) {
         // 1. 没有结构化数据直接给 null，由调用方决定是否回退原始列
         if (r.getStructuredData() == null || r.getStructuredData().isBlank()) return null;
-        try {
-            Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
-                    new TypeReference<Map<String, Object>>() {
-                    });
-            Object val = data.get(key);
-            // 2. 数组：逐项取文本
-            if (val instanceof List<?> list) {
-                List<String> result = new java.util.ArrayList<>();
-                for (Object item : list) {
-                    if (item instanceof Map<?, ?> m) {
-                        // Entity: {content, sourceText}；Herb: {name, dosage, sourceText}
-                        Object c = m.get("content") != null ? m.get("content") : m.get("name");
-                        if (c != null && !String.valueOf(c).isBlank()) result.add(String.valueOf(c));
-                    } else if (item != null) {
-                        result.add(String.valueOf(item)); // 兼容旧字符串格式
-                    }
+        // 2. 解析结果按 record id 缓存（性能审查 P0-3）：/stats/all 的 4 个分区共享同一份
+        //    cache，同一条 JSON 每条只 readValue 一次。computeIfAbsent 在解析失败（返回
+        //    null）时不落缓存，等效于原有「解析不了按没抽到处理」。
+        Map<String, Object> data = parsedCache == null
+                ? parseStructured(r.getStructuredData())
+                : parsedCache.computeIfAbsent(r.getId(), id -> parseStructured(r.getStructuredData()));
+        if (data == null) return null;
+        Object val = data.get(key);
+        // 3. 数组：逐项取文本
+        if (val instanceof List<?> list) {
+            List<String> result = new java.util.ArrayList<>();
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> m) {
+                    // Entity: {content, sourceText}；Herb: {name, dosage, sourceText}
+                    Object c = m.get("content") != null ? m.get("content") : m.get("name");
+                    if (c != null && !String.valueOf(c).isBlank()) result.add(String.valueOf(c));
+                } else if (item != null) {
+                    result.add(String.valueOf(item)); // 兼容旧字符串格式
                 }
-                return result;
             }
-            // 3. 单值字符串：当成单元素列表
-            if (val instanceof String s) {
-                return List.of(s);
-            }
-        } catch (JacksonException ignored) {
-            // 解析不了按"没抽到"处理，交给上层回退
+            return result;
+        }
+        // 4. 单值字符串：当成单元素列表
+        if (val instanceof String s) {
+            return List.of(s);
         }
         return null;
+    }
+
+    /** 结构化 JSON → Map；解析失败返回 null（口径同 extractFromStructured 原有行为） */
+    private Map<String, Object> parseStructured(String json) {
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
+            });
+        } catch (JacksonException ignored) {
+            return null;
+        }
     }
 
     /** 词频计数取 Top N（按次数降序，同次数按名称升序保证稳定） */

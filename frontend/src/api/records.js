@@ -36,6 +36,11 @@ export function searchRecords(data, config = {}) {
   return request.post('/records/search', data, config)
 }
 
+// 只取筛选范围内的总数（后端只 COUNT 不 SELECT；替换 pageSize=1，性能审查 P1-5）
+export function countRecords(data) {
+  return request.post('/records/count', data)
+}
+
 // 人工复核提交（POST /records/{id}/review）：路径域属 /records/*，故从 review.js 移来。
 // correctedData 可空（仅裁定，不改结构化数据）
 export function submitReview(recordId, data) {

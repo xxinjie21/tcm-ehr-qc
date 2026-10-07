@@ -460,6 +460,13 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         int size = dto != null && dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 20;
         // 数据域 → 用户筛选，取交集（统一走 RecordFilter，禁止手写 where）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), dto);
+        // ⚠️ 列投影（性能审查 P1-2）：列表项只消费 id/grade/visitTime/gender/age/score/
+        //    summarize 三字段回退链（主诉→中医诊断→西医诊断）/structured_data（manual 标记），
+        //    其余 21 个 TEXT 列 + qc_results 不拉进堆（每行省 ~5KB）。
+        //    列名与 RecordFilter / Record 实体列一致，改动时同步维护 RecordServiceImplTest 的列名守卫。
+        //    刻意保留 structured_data：manuallyEdited 仍靠解析 _meta 取（落列方案未本轮）。
+        wrapper.select("id", "grade", "visit_time", "gender", "age", "score",
+                "chief_complaint", "tcm_diagnosis", "western_diagnosis", "structured_data");
         // 2. 分页查询（条件已含数据域与用户筛选）
         Page<Record> p = baseMapper.selectPage(new Page<>(page, size), wrapper);
         // 3. 组装返回：总数与当前页列表项
@@ -472,6 +479,19 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                     r.getVisitTime(), r.getGender(), r.getAge(), r.getScore(), manual));
         }
         return vo;
+    }
+
+    /**
+     * 只统计筛选范围内的病历总数（与 {@link #searchRecords} 同一 wrapper 口径）。
+     * <p>性能审查 P1-5：原「只取 total」用 {@code pageSize=1} 走 SELECT —— 即便只回 1 行，
+     * 后端仍会对 4 万行做一次 filesort/读全表；改成 {@code selectCount} 后是纯 COUNT。</p>
+     */
+    @Override
+    public long countMatched(SearchDTO dto) {
+        // 数据域 + 用户筛选，统一走 RecordFilter（与 searchRecords 完全相同，禁止手写 where）
+        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), dto);
+        // COUNT 不关心 ORDER BY / SELECT 列，表结构有 (org_id) 覆盖后仅 5ms
+        return baseMapper.selectCount(wrapper);
     }
 
     private String summarize(Record r) {

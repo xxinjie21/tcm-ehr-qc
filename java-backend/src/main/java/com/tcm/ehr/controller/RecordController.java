@@ -173,4 +173,19 @@ public class RecordController {
     public Result<SearchVO> search(@Valid @RequestBody SearchDTO dto) {
         return Result.ok(recordService.searchRecords(dto));
     }
+
+    /**
+     * 只返回筛选范围内的病历总数。
+     *
+     * <p>【权限：登录即可】与 {@link #search} 同一数据域 / 筛选口径，只 {@code COUNT} 不
+     * {@code SELECT} —— 供「只要 total」的调用替换 {@code pageSize=1}（后者会附带一次
+     * 全表排序，4 万行下是列表查询的主要成本，见性能审查 P1-5）。</p>
+     *
+     * @param dto 查询条件（page / pageSize 忽略）
+     * @return 命中总数
+     */
+    @PostMapping("/count")
+    public Result<Long> count(@RequestBody(required = false) SearchDTO dto) {
+        return Result.ok(recordService.countMatched(dto));
+    }
 }

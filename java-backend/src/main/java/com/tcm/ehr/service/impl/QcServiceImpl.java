@@ -10,6 +10,7 @@ import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.utils.LogicChecker;
 import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RecordKeyset;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.LogicCheckDTO;
@@ -359,24 +360,37 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      */
     @Override
     public DeductionStatsVO deductionStats(FiltersDTO filters) {
-        // 1. 构造数据域过滤条件（角色可见范围 + 用户筛选）
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
-        // 2. 主扫描只取 3 列（见方法注释的「两段式扫描」）
-        wrapper.select("id", "grade", "qc_results");
-        // 3. 初始化聚合容器：按类型、按条目、等级分布
+        // 1. 初始化聚合容器：按类型、按条目、等级分布
         DeductionStatsVO vo = new DeductionStatsVO();
         Map<String, int[]> byType = new LinkedHashMap<>();
         Map<String, int[]> byItem = new LinkedHashMap<>();
         Map<String, Integer> gradeDist = new LinkedHashMap<>();
-        // 4. 慢路径待回查的 id：库内没有可用的 qc_results
+        // 2. 慢路径待回查的 id：库内没有可用的 qc_results
         List<String> fallbackIds = new ArrayList<>();
         int scanned = 0;
         int totalPoints = 0;
-        int pageNo = 1;
-        // 5. 分页扫描，每页 1000 条，最多扫 MAX_SCAN_RECORDS 条
+        // 3. 游标分页扫描（性能审查 P0-2）：每页 1000 条，最多扫 MAX_SCAN_RECORDS 条。
+        //    keyset（keyset）而不是 offset：offset 每页「ORDER BY ... LIMIT offset,1000」
+        //    都要重排一次剩余全表（4 万行 × 41 页，每页 O(全表)），实测扫完 4 万行 4.9s；
+        //    游标锚定上一页末条 (visit_time, id) 后只做区间扫描（配 idx_records_org_vt_id
+        //    后 216ms，22×）。id 为主键唯一 → (visit_time, id) 严格全序，不漏行不重复。
+        //    前提：visit_time 非空（与既有排序/分页口径一致，见 RecordFilter 注释）。
+        java.time.LocalDateTime cursorVt = null;
+        String cursorId = null;
+        boolean firstPage = true;
         while (true) {
-            Page<Record> page = baseMapper.selectPage(new Page<>(pageNo, BATCH_PAGE_SIZE), wrapper);
-            List<Record> records = page.getRecords();
+            // ⚠️ 每页从 RecordFilter.build 重建 wrapper：QueryWrapper.and() 是原地追加，
+            //   复用同一个实例会在 41 页后把 WHERE 条件累加成 40 多个（逐页越扫越慢、结果还错）。
+            //   build() 已自带 ORDER BY visit_time DESC, id ASC（RecordFilter.java:315）。
+            QueryWrapper<Record> pageWrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
+            // 2. 主扫描只取 3 列（见方法注释的「两段式扫描」）
+            pageWrapper.select("id", "grade", "qc_results");
+            if (!firstPage) {
+                // keyset 条件：取 「上一页末条 (cursorVt, cursorId) 之后」的全序区间，
+                //   并用 (visit_time, id) 双键避免「visit_time 相同跳过 / 重复」。
+                RecordKeyset.anchorAfter(pageWrapper, cursorVt, cursorId);
+            }
+            List<Record> records = baseMapper.selectList(pageWrapper.last("LIMIT " + BATCH_PAGE_SIZE));
             if (records.isEmpty()) {
                 break;
             }
@@ -401,7 +415,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             if (vo.isTruncated() || records.size() < BATCH_PAGE_SIZE) {
                 break;
             }
-            pageNo++;
+            // 5.5 记下上一页末条作为下一页锚点（取「末条」不是「首条」，且必含 id）
+            Record last = records.get(records.size() - 1);
+            cursorVt = last.getVisitTime();
+            cursorId = last.getId();
+            firstPage = false;
         }
         // 6. 慢路径：分批回查整行（含 structured_data 与 19 个原始列）后现算并聚合
         for (int i = 0; i < fallbackIds.size(); i += FALLBACK_CHUNK) {
