@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 
-export function getLogs(params) {
-  return request.get('/logs', { params })
+export function getLogs(params, config = {}) {
+  return request.get('/logs', { params, ...config })
 }
 
 // 操作类型选项：取库中实际出现过的值，避免前端写死清单与后端漂移

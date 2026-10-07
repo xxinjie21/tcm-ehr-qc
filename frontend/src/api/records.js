@@ -31,9 +31,9 @@ export function deleteRecordsByFilter(filters) {
   return request.post('/records/delete-by-filter', filters, { timeout: 200000 })
 }
 
-// F·7.4 多条件分页查询
-export function searchRecords(data) {
-  return request.post('/records/search', data)
+// F·7.4 多条件分页查询；config 透传 axios 配置（如 { signal } 供请求取消，见 usePagedList）
+export function searchRecords(data, config = {}) {
+  return request.post('/records/search', data, config)
 }
 
 // 人工复核提交（POST /records/{id}/review）：路径域属 /records/*，故从 review.js 移来。

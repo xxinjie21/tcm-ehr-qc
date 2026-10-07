@@ -16,6 +16,10 @@ import { describeBizError, describeHttpError } from '@/utils/errorMessage'
  * 静默开关：请求第二参可传 `{ silent: true }`（axios 会原样挂在 config 上），
  * 拦截器据此跳过 ElMessage —— 供健康探测 / 后台刷新这类「失败由页面自己降级」的请求使用；
  * 401 清登录态与跳登录不受它影响，任何请求都照旧执行。
+ *
+ * 取消信号：axios 原生支持 config.signal（AbortController），`usePagedList` 在换筛 /
+ * 翻页前 abort 上一个请求时走的就是它。**被取消的请求不是错误** —— 拦截器要把它
+ * 与「真的失败」区分开：不弹提示、不动登录态、原样 reject，由调用方捕获。
  */
 
 const request = axios.create({
@@ -77,6 +81,11 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
+    // 请求被 AbortController 主动取消（usePagedList 换筛 / 翻页时 abort 上一个）：
+    // 预期内行为，不是错误 —— 不提示、不动登录态，原样透传给调用方处理。
+    if (axios.isCancel(error)) {
+      return Promise.reject(error)
+    }
     const { message, logout } = describeHttpError(error)
     // 同上：silent 只压提示不压副作用。error.config 在请求还没发出的错误里可能不存在
     // （如请求拦截器抛错），用可选链按「不静默」处理，宁可多提示也不吞掉真问题。

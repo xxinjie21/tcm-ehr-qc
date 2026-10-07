@@ -133,10 +133,11 @@
           v-model:current-page="precheckPage"
           v-model:page-size="precheckSize"
           :page-sizes="PAGE_SIZES_STANDARD"
-          :total="precheckTotal"
-          layout="total, sizes, prev, pager, next, jumper"
-          style="margin-top: var(--sp-3); justify-content: flex-end"
-          @current-change="loadPrecheck"
+:total="precheckTotal"
+            layout="total, sizes, prev, pager, next, jumper"
+            :disabled="precheckLoading"
+            style="margin-top: var(--sp-3); justify-content: flex-end"
+            @current-change="loadPrecheck"
           @size-change="handleSizeChange"
         />
       </PanelCard>
@@ -353,7 +354,7 @@ const {
   list: precheckRows, total: precheckTotal, loading: precheckLoading,
   failed: precheckFailed, load: loadPrecheckList
 } = usePagedList({
-  fetcher: () => searchRecords({ ...filters, page: precheckPage.value, pageSize: precheckSize.value }),
+  fetcher: (signal) => searchRecords({ ...filters, page: precheckPage.value, pageSize: precheckSize.value }, { signal }),
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   clearOnFailure: false
 })

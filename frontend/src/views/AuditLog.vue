@@ -96,6 +96,7 @@
         :page-sizes="PAGE_SIZES_STANDARD"
         :total="total"
         layout="total, sizes, prev, pager, next, jumper"
+        :disabled="loading"
         style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="loadLogs"
         @size-change="handleSizeChange"
@@ -184,7 +185,7 @@ const exporting = ref(false)
 // 列表骨架统一走 usePagedList；本页失败要「清空 + 标记」（不退化成展示编造的日志，
 // 空态据此给重试入口、导出按钮据此禁用），故三个开关都用默认
 const { list: logs, total, loading, failed: logFailed, load: loadLogs } = usePagedList({
-  fetcher: () => getLogs(query),
+  fetcher: (signal) => getLogs(query, { signal }),
   extract: (res) => ({ list: res.data?.list, total: res.data?.total })
 })
 

@@ -39,10 +39,11 @@
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :page-sizes="PAGE_SIZES_STANDARD"
-        :total="total"
-        layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: var(--sp-3); justify-content: flex-end"
-        @current-change="search"
+:total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            :disabled="listLoading"
+            style="margin-top: var(--sp-3); justify-content: flex-end"
+            @current-change="search"
         @size-change="handleSizeChange"
       />
     </PanelCard>
@@ -396,7 +397,7 @@ const pageSize = ref(10)
 // 也不提前收掉 loading（范式同 components/TermInput.vue）
 // 列表骨架统一走 usePagedList：失败保留已有行，但仍标记失败（与「确实没有匹配」区分）
 const { list: rows, total, loading: listLoading, failed: listFailed, load: loadRecords } = usePagedList({
-  fetcher: () => searchRecords({ ...query, page: page.value, pageSize: pageSize.value }),
+  fetcher: (signal) => searchRecords({ ...query, page: page.value, pageSize: pageSize.value }, { signal }),
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   clearOnFailure: false
 })

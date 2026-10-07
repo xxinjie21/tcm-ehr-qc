@@ -59,6 +59,7 @@
             :page-sizes="PAGE_SIZES_STANDARD"
             :total="total"
             layout="total, sizes, prev, pager, next, jumper"
+            :disabled="searching"
             style="margin-top: var(--sp-3); justify-content: flex-end"
             @current-change="handleSearch"
             @size-change="handleSizeChange"
@@ -290,7 +291,7 @@ const pageSize = ref(10)
 const {
   list: rows, total, loading: searching, failed: listFailed, load: loadList
 } = usePagedList({
-  fetcher: () => searchRecords({ ...query, page: page.value, pageSize: pageSize.value }),
+  fetcher: (signal) => searchRecords({ ...query, page: page.value, pageSize: pageSize.value }, { signal }),
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   clearOnFailure: false
 })

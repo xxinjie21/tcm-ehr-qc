@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import axios from 'axios'
 
 /**
  * 分页列表的公共骨架：加载态 / 失败态 / 竞态取号 / 失败清空。
@@ -34,17 +35,28 @@ export function usePagedList({
   const failed = ref(false)
   // 竞态取号：发起时取号，回来时号不是最新就整体丢弃（范式同 components/TermInput.vue）
   let seq = 0
+  // 请求取消（性能审查报告 P1-5）：换筛 / 翻页前 abort 上一个请求，
+  // 让「快速改条件」不再把 N 个全表排序并发打给后端。controller 同时兼任
+  // 「谁是当前最新请求」的判定 —— 取消后旧响应的 finally 靠它不再动 loading。
+  let controller = null
 
   const load = async () => {
     // 1. 取本次请求的号（不用取号时固定 0，下面的判断也随之跳过）
     const mine = race ? ++seq : 0
-    // 2. 进入加载态，并清掉上一次的失败标记（重试时能重新给出 loading）
+    // 2. abort 上一个仍在飞的请求，新建本次的取消令牌与 signal
+    if (controller) {
+      controller.abort()
+    }
+    const myCtrl = new AbortController()
+    controller = myCtrl
+    const signal = myCtrl.signal
+    // 3. 进入加载态，并清掉上一次的失败标记（重试时能重新给出 loading）
     loading.value = true
     if (trackFailure) {
       failed.value = false
     }
     try {
-      const res = await fetcher()
+      const res = await fetcher(signal)
       if (race && mine !== seq) return
       const next = extract(res) || {}
       list.value = next.list || []
@@ -52,7 +64,10 @@ export function usePagedList({
       if (onLoaded) {
         onLoaded(res)
       }
-    } catch {
+    } catch (e) {
+      // 被更新的请求主动取消（abort）不是失败：任何状态都不动，直接结束。
+      // 否则快速连点翻页时，被取消的旧请求会把「加载失败」当作结果写进列表。
+      if (axios.isCancel(e)) return
       if (race && mine !== seq) return
       if (clearOnFailure) {
         list.value = []
@@ -63,8 +78,9 @@ export function usePagedList({
       }
       // 具体提示由拦截器统一给，这里只管状态
     } finally {
-      // 3. 只有最新一次请求才收掉加载态，否则会把还在飞的请求的 loading 提前收掉
-      if (!race || mine === seq) {
+      // 4. 只有「仍是当前最新请求」才收掉加载态 —— 被取消的旧请求不能把新请求
+      //    的 loading 提前收掉，否则新请求还在飞、页面却已经不在加载。
+      if (controller === myCtrl) {
         loading.value = false
       }
     }

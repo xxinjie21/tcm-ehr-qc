@@ -85,6 +85,7 @@
         :page-sizes="PAGE_SIZES_STANDARD"
         :total="total"
         layout="total, sizes, prev, pager, next, jumper"
+        :disabled="loading"
         style="margin-top: var(--sp-3); justify-content: flex-end"
         @current-change="load"
         @size-change="handleSizeChange"
@@ -127,6 +128,7 @@
           :page-sizes="PAGE_SIZES_STANDARD"
           :total="allTotal"
           layout="total, sizes, prev, pager, next, jumper"
+          :disabled="allLoading"
           style="margin-top: var(--sp-3); justify-content: flex-end"
           @current-change="loadAllRecords"
           @size-change="handleAllSizeChange"
@@ -178,7 +180,7 @@ const pageSize = ref(10)
 // 列表骨架统一走 usePagedList：本页按原口径「失败只由拦截器提示 —— 不清空已有行、
 // 也不置失败标记」，故 clearOnFailure / trackFailure 都关掉
 const { list: rows, total, loading, load: loadTasks } = usePagedList({
-  fetcher: () => listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value, overdueOnly: overdueOnly.value }),
+  fetcher: (signal) => listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value, overdueOnly: overdueOnly.value }, { signal }),
   extract: (res) => ({ list: res.data?.tasks, total: res.data?.total }),
   onLoaded: (res) => { skippedMissing.value = res.data?.skippedMissing || 0 },
   clearOnFailure: false,
@@ -207,7 +209,7 @@ const allTableRef = ref(null)
 const {
   list: allRows, total: allTotal, loading: allLoading, failed: allFailed, load: loadAllList
 } = usePagedList({
-  fetcher: () => searchRecords({ page: allPage.value, pageSize: allPageSize.value }),
+  fetcher: (signal) => searchRecords({ page: allPage.value, pageSize: allPageSize.value }, { signal }),
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   race: false
 })
