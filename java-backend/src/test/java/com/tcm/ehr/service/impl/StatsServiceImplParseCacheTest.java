@@ -48,7 +48,8 @@ class StatsServiceImplParseCacheTest {
     }
 
     private static StatsServiceImpl svc() {
-        return new StatsServiceImpl(new ObjectMapper(), mock(IDictionaryTermStore.class));
+        return new StatsServiceImpl(new ObjectMapper(), mock(IDictionaryTermStore.class),
+                mock(com.tcm.ehr.common.cache.StatsCache.class));
     }
 
     @Test

@@ -147,7 +147,10 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         if (dto != null && dto.getCorrectedData() != null) {
             entityNormalizer.normalizeMap(dto.getCorrectedData(), RequestUtils.currentOrgId());
         }
-        return reviewWriteService.review(recordId, dto);
+        ReviewResultVO vo = reviewWriteService.review(recordId, dto);
+        // 复核会改写 correctedData（结构化数据）→ 统计词频过期，主动失效（B1）
+        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+        return vo;
     }
 
     private String dbStatus(String status) {

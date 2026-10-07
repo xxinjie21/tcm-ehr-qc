@@ -210,6 +210,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         }
         log.info("[清洗] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
                 vo.getTotal(), vo.getDeduped(), vo.getRepaired(), vo.getIsolated(), vo.getNormalized());
+        // 清洗改写了 structured_data / pattern / governed → 统计词频过期，主动失效（B1）
+        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
         return vo;
     }
 

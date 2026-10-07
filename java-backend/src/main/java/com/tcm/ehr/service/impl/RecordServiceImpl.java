@@ -208,6 +208,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         vo.setAutoExtractTaskId(autoTaskId);
         log.info("[病历导入] task={} 文件={} 行={} 成功={} 失败={}",
                 taskId, files.length, summary.getTotal(), summary.getSuccess(), summary.getFailed());
+        // 导入写了 structured_data / pattern 等 → 统计词频已过期，主动失效（B1）
+        if (summary.getSuccess() > 0) {
+            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+        }
         return vo;
     }
 
@@ -291,6 +295,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 5. 只回传新病历 ID
         CreateRecordVO vo = new CreateRecordVO();
         vo.setId(r.getId());
+        // 新增病历后统计词频过期 → 主动失效（B1）
+        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
         return vo;
     }
 
@@ -401,6 +407,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 termStore.effectiveDictVersion(RequestUtils.currentOrgId()),
                 termStore.effectiveTermCount(RequestUtils.currentOrgId()));
         baseMapper.updateStructuredData(recordId, json);
+        // 结构化数据 → 统计词频过期，主动失效（B1）
+        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
     }
 
     /**
@@ -415,7 +423,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     public DeleteRecordsVO deleteRecords(DeleteRecordsDTO dto) {
         // 批次13 · 13.3：删除逻辑抽到 RecordDeleter（防误删守卫、数据域过滤、分块、外键顺序都在那边）。
         // 事务仍留在本方法上：加在被调用方或私有方法上不经过代理，等于没加。
-        return deleter().deleteByIds(dto);
+        DeleteRecordsVO vo = deleter().deleteByIds(dto);
+        if (vo.getDeletedCount() > 0) {
+            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats(); // 删除 → 词频过期（B1）
+        }
+        return vo;
     }
 
     /**
@@ -443,7 +455,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 性能审查 A4：整个游标分批删除在一个事务内（all-or-nothing）。timeout=60s 是防呆：
         // 4 万条删除 + 连带 review_tasks 的单事务，长于 innodb_lock_wait_timeout(默认50s) 就先被
         // 锁等待坑掉；超时只保护「误操作长时间锁表」，不是对条数的限制。
-        return deleter().deleteByFilter(filters);
+        DeleteRecordsVO vo = deleter().deleteByFilter(filters);
+        if (vo.getDeletedCount() > 0) {
+            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats(); // 范围删除 → 词频过期（B1）
+        }
+        return vo;
     }
 
     /**

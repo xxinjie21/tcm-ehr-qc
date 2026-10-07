@@ -428,6 +428,10 @@ public class QcBatchServiceImpl implements IQcBatchService {
         boolean failed = false;
         try {
             cancelled = run(id, t, result, seenHash, rules, failures, truncated, processed);
+            // 质控重算完成后会改写 grade/qc_results（清洗与看板都读它）→ 统计缓存主动失效（B1）
+            if (!cancelled) {
+                com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+            }
         } catch (Exception e) {
             // 执行期异常必须落 FAILED。
             // 不能指望 workerLoop 的 markFailed：finally 会先把终态写成 COMPLETED，

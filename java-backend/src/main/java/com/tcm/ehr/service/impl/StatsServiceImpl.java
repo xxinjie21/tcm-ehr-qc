@@ -45,6 +45,8 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     private final ObjectMapper objectMapper;
     // 词典真源（批次8b）：统计必须与归一读同一处，否则看板数字和实际生效词典对不上
     private final com.tcm.ehr.service.IDictionaryTermStore termStore;
+    // 词频统计短 TTL 缓存（B1）：只缓 /stats/all 的词频分布，按数据域 + 筛选条件隔离
+    private final com.tcm.ehr.common.cache.StatsCache statsCache;
 
     /**
      * 查询可选科室列表，只读。
@@ -135,22 +137,28 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public StatsAllVO all(FiltersDTO filters) {
-        // 1. 先把范围内的病历一次取出，四类词频共用这一份（避免查四次库）
-        List<Record> records = recordsFor(filters);
-        // 2. 词频解析缓存（性能审查 P0-3）：同一条 structured_data 会被下方 4 个分区
-        //    （疾病/证候/症状 = 各 1 次，处方 = 方剂 + 中药 2 次）重复解析，合计 5 次/条；
-        //    这里按 record id 缓存解析结果，每条只 readValue 一次。
-        //    ⚠️ 必须请求级局部变量：共享给同一次 /stats/all 的调用即可，
-        //    不能做成实例字段/单例（会跨请求泄漏内存并返回过期数据）。
-        Map<String, Map<String, Object>> parsedCache = new HashMap<>();
+        // 1. 总览每次现算（A5 已把计数下推 SQL 聚合，毫秒级；它依赖 grade/governed，
+        //    与词频的失效时机不同，不放进缓存）
         StatsAllVO vo = new StatsAllVO();
-        // 3. 总览单独按数据域聚合，不受本次筛选影响
         vo.setOverview(overview());
-        // 4. 四类词频共享同一份解析缓存
-        vo.setDisease(statsFor(records, "disease", parsedCache));
-        vo.setSymptom(statsFor(records, "symptom", parsedCache));
-        vo.setPattern(statsFor(records, "pattern", parsedCache));
-        vo.setPrescription(statsFor(records, "prescription", parsedCache));
+        // 2. 词频分布：结果集小、计算贵（4 万行 × 词频 JSON）→ 60s 缓存 + 写操作主动失效
+        //    （StatsCacheInvalidator）。缓存未命中/Redis 不可用都回退现算，不阻塞页面。
+        StatsAllVO freq = statsCache.wordFreq(filters, () -> {
+            List<Record> records = recordsFor(filters);
+            Map<String, Map<String, Object>> parsedCache = new HashMap<>();
+            StatsAllVO f = new StatsAllVO();
+            f.setDisease(statsFor(records, "disease", parsedCache));
+            f.setSymptom(statsFor(records, "symptom", parsedCache));
+            f.setPattern(statsFor(records, "pattern", parsedCache));
+            f.setPrescription(statsFor(records, "prescription", parsedCache));
+            return f;
+        });
+        if (freq != null) {
+            vo.setDisease(freq.getDisease());
+            vo.setSymptom(freq.getSymptom());
+            vo.setPattern(freq.getPattern());
+            vo.setPrescription(freq.getPrescription());
+        }
         return vo;
     }
 

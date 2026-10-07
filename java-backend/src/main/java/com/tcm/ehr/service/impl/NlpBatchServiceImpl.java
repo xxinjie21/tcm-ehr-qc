@@ -565,6 +565,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             cancelled = idSource != null
                     ? runByIds(id, idSource, t, failures, truncated, processed)
                     : runByFilter(id, t, failures, truncated, processed);
+            // 批量解析改写 structured_data → 统计词频过期，主动失效（B1）
+            if (!cancelled) {
+                com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+            }
         } catch (Exception e) {
             // 执行期异常必须落 FAILED，且不能指望 workerLoop 的 markFailed：
             // 它的 satisfiesGroup 读的是请求上下文，worker 线程里恒为空 → 每次直接 return
