@@ -21,14 +21,14 @@
         <!-- 这里的视觉标签是普通 span（不是 <label for>），控件本身没有无障碍名称，
              Chrome 会报「No label associated with a form field」；补 aria-label 即可 -->
         <span>状态</span>
-        <el-select v-model="status" size="small" aria-label="状态" style="width: 130px" @change="load(1)">
+        <el-select v-model="status" size="small" aria-label="状态" style="width: 130px" @change="loadTaskDebounced">
           <el-option label="待复核" value="待复核" />
           <el-option label="已完成" value="已完成" />
         </el-select>
         <el-button size="small" @click="load()">刷新</el-button>
         <span class="tip">超时仅视觉提醒、不自动流转；点击「进入复核」在下方展开对照</span>
         <!-- 批次9：worklist 入口 —— 复核员真正关心的是「现在必须处理哪几条」 -->
-        <el-checkbox v-model="overdueOnly" size="small" @change="loadTasks(1)">只看超期未复核</el-checkbox>
+        <el-checkbox v-model="overdueOnly" size="small" @change="loadTaskDebounced">只看超期未复核</el-checkbox>
         <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
       </div>
 
@@ -157,6 +157,7 @@ import { listReviewTasks, getReviewStats } from '@/api/review'
 import { usePagedList } from '@/composables/usePagedList'
 import { useUrlFilters } from '@/composables/useUrlFilters'
 import { fmtDateTime } from '@/utils/format'
+import { debounce } from '@/utils/debounce'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 import RecordTable from '@/components/RecordTable.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -234,6 +235,10 @@ const load = async (p) => {
   if (typeof p === 'number') page.value = p
   await loadTasks()
 }
+
+// 状态/超期开关的连发防抖（性能审查 P1-5 收尾 / B5）：300ms 内连点只发最后一次查询。
+// AbortController 兜底「已发出的旧请求」，这里负责「干脆别发出」；按钮语义不变。
+const loadTaskDebounced = debounce(() => load(1), 300)
 
 // 每页条数变化：回到第 1 页再查，防止页码越界后拿到空列表
 const handleSizeChange = () => {

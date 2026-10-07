@@ -15,7 +15,7 @@
           placeholder="操作人 / 对象关键字"
           clearable
           style="width: 200px"
-          @keyup.enter="loadLogs"
+          @keyup.enter="loadLogsDebounced"
         />
         <!-- 28.8：独立操作人筛选。关键字是模糊三列命中，要「只看某人」时不够用 -->
         <el-input
@@ -24,7 +24,7 @@
           placeholder="操作人（精确）"
           clearable
           style="width: 140px"
-          @keyup.enter="loadLogs"
+          @keyup.enter="loadLogsDebounced"
         />
         <!-- 28.8：时间范围。审计最常见的诉求是「某某时间之后发生过什么」 -->
         <el-date-picker
@@ -119,6 +119,7 @@ import { useUrlFilters } from '@/composables/useUrlFilters'
 import { getLogs, getLogActions, exportLogs } from '@/api/log'
 import { saveBlob } from '@/utils/download'
 import { fmtDateTime } from '@/utils/format'
+import { debounce } from '@/utils/debounce'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 import { useUserStore } from '@/stores/user'
 
@@ -188,6 +189,9 @@ const { list: logs, total, loading, failed: logFailed, load: loadLogs } = usePag
   fetcher: (signal) => getLogs(query, { signal }),
   extract: (res) => ({ list: res.data?.list, total: res.data?.total })
 })
+// 关键词/操作人回车连发防抖（P1-5 收尾 / B5）：300ms 内只发最后一次，
+// AbortController 兜底已发出的旧请求
+const loadLogsDebounced = debounce(loadLogs, 300)
 
 // 操作类型 → el-tag 配色；未登记的走默认色
 const tagType = (action) => TAG_TYPES[action] || 'primary'
