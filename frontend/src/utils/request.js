@@ -12,6 +12,10 @@ import { describeBizError, describeHttpError } from '@/utils/errorMessage'
  * 两者原先挤在一个文件里，改一句提示得先读懂拦截器。
  *
  * 文件流（responseType: 'blob'）不套 Result，拦截器直接透传 response.data。
+ *
+ * 静默开关：请求第二参可传 `{ silent: true }`（axios 会原样挂在 config 上），
+ * 拦截器据此跳过 ElMessage —— 供健康探测 / 后台刷新这类「失败由页面自己降级」的请求使用；
+ * 401 清登录态与跳登录不受它影响，任何请求都照旧执行。
  */
 
 const request = axios.create({
@@ -57,7 +61,14 @@ request.interceptors.response.use(
     // 非 200 视为失败：提示后 reject，401 额外清登录态
     if (res.code !== 200) {
       const { message, logout } = describeBizError(res)
-      ElMessage.error(message)
+      // silent 用于健康探测等后台请求，失败只走页面内降级提示，不弹全局红条
+      // （例：/api/nlp/health 在未部署 NLP 的后端上是 404，打开结构化解析页
+      //   就弹一条「接口不存在」纯属噪音，页面自己会显示「不知道服务状态」）。
+      // ⚠️ 只跳过提示：logout（401 清登录态 / 跳登录）与 silent 无关，必须照旧执行，
+      //    否则一次后台探测撞上过期 token，登录态会被静默吞掉、用户毫无感知。
+      if (!response.config?.silent) {
+        ElMessage.error(message)
+      }
       if (logout) {
         redirectToLogin()
       }
@@ -67,7 +78,11 @@ request.interceptors.response.use(
   },
   (error) => {
     const { message, logout } = describeHttpError(error)
-    ElMessage.error(message)
+    // 同上：silent 只压提示不压副作用。error.config 在请求还没发出的错误里可能不存在
+    // （如请求拦截器抛错），用可选链按「不静默」处理，宁可多提示也不吞掉真问题。
+    if (!error.config?.silent) {
+      ElMessage.error(message)
+    }
     if (logout) {
       redirectToLogin()
     }

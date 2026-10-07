@@ -3,7 +3,7 @@
        面板可拖动、位置存 localStorage；本会话多轮对话，刷新即清空 -->
   <div class="ai-assistant" :style="containerStyle">
     <!-- 展开面板。非模态浮窗（用户仍可操作页面），故不做焦点陷阱，只做焦点转移 -->
-    <transition name="aii-fade">
+    <transition name="slide-y">
       <section v-if="open" class="aii-panel" role="dialog" aria-label="AI 助手">
         <header class="aii-hd" title="按住可拖动" @pointerdown="startDrag">
           <span class="aii-dot" />
@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   margin-left: auto;
   box-shadow: 0 4px 14px rgba(47, 70, 57, 0.28);
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-fast) var(--ease-out);
   touch-action: none;
 }
 .aii-ball:hover { transform: translateY(-2px); }
@@ -393,7 +393,9 @@ onBeforeUnmount(() => {
 }
 .aii-title { font-size: var(--fs-base); font-weight: bold; }
 .aii-sub { font-size: var(--fs-xs); color: #c9b99a; margin-left: 2px; }
-/* 「清空」「收起」用无底透明按钮，避免在深色标题栏上抢视觉 */
+/* 「清空」「收起」用无底透明按钮，避免在深色标题栏上抢视觉。
+   点击区补到 ≥28×28（原「清空」24×12、「×」22×20，I4-2）：
+   padding 撑开、min-尺寸兜底；负向不留白 —— 字号不变，靠 inline-flex 居中。 */
 .aii-clear,
 .aii-close {
   background: transparent;
@@ -401,16 +403,27 @@ onBeforeUnmount(() => {
   color: #d8dfd9;
   cursor: pointer;
   line-height: 1;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .aii-clear { margin-left: auto; font-size: var(--fs-xs); }
 .aii-close { font-size: var(--fs-page); }
-.aii-clear:hover, .aii-close:hover { color: var(--surface); }
+.aii-clear:hover, .aii-close:hover {
+  color: var(--surface);
+  /* 与顶栏铃铛 hover 同一档压白，深色标题栏上给出同一套反馈 */
+  background: rgba(255, 255, 255, 0.14);
+}
 
 /* 可查范围提示条：浅色底与上方标题栏区分 */
 .aii-scope {
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   background: var(--ink-light);
   border-bottom: 1px solid var(--line-soft);
 }
@@ -443,7 +456,7 @@ onBeforeUnmount(() => {
   font-size: var(--fs-xs);
   line-height: 1.7;
 }
-.aii-empty { color: var(--text-sub); }
+.aii-empty { color: var(--text-sub-strong); }
 .msg { border-radius: 6px; padding: var(--sp-2) var(--sp-3); margin-bottom: 10px; word-break: break-word; }
 /* 用户消息靠右留白，与 AI 消息一眼分开 */
 .msg.user {
@@ -463,9 +476,9 @@ onBeforeUnmount(() => {
   display: inline-block;
   margin-top: 6px;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
-.msg.loading { color: var(--text-sub); }
+.msg.loading { color: var(--text-sub-strong); }
 
 /* 输入区固定在面板底部 */
 .aii-input {
@@ -476,9 +489,8 @@ onBeforeUnmount(() => {
   background: var(--surface);
 }
 
-/* 展开/收起过渡：淡入 + 上移 8px */
-.aii-fade-enter-active,
-.aii-fade-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
-.aii-fade-enter-from,
-.aii-fade-leave-to { opacity: 0; transform: translateY(8px); }
+/* 展开/收起过渡：用全局共享的 slide-y（淡入 + 12px 上升）。
+   面板锚在右下角、向上展开，所以方向取 Y 而非 X。
+   此前这里是自写的 .aii-fade（0.15s ease / 位移 8px），
+   已并入 theme.css 的动效令牌与 ③ 类，见 docs/视觉与交互审查报告-第三轮.md 附录 D。 */
 </style>

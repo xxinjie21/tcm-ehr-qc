@@ -288,7 +288,7 @@ const levelDesc = (level, raw, name) => {
 .sd-card { font-size: var(--fs-base); }
 .sd-meta {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 10px;
   padding-bottom: 6px;
   border-bottom: 1px dashed var(--line);
@@ -306,11 +306,11 @@ const levelDesc = (level, raw, name) => {
 }
 .sd-manual strong {
   margin-right: var(--sp-2);
-  color: var(--ochre);
+  color: var(--ochre-text);
 }
 .sd-manual-t {
   margin-left: var(--sp-2);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 降级提示（25.7）：解释「为什么少 / 空」。与「人工修改」同款位置，
    用危险色系是因为它说明这份数据不完整，而不是一条中性元信息 */
@@ -331,7 +331,7 @@ const levelDesc = (level, raw, name) => {
 }
 .sd-meta-fp {
   margin-left: var(--sp-1);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   cursor: help;
   border-bottom: 1px dotted var(--line);
 }
@@ -344,7 +344,7 @@ const levelDesc = (level, raw, name) => {
   padding-left: var(--sp-2);
   margin-bottom: var(--sp-2);
 }
-.sd-sec-hint { font-size: var(--fs-xs); color: var(--text-sub); margin-left: 6px; }
+.sd-sec-hint { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-left: 6px; }
 .sd-items { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .sd-item {
   background: var(--paper);
@@ -353,10 +353,10 @@ const levelDesc = (level, raw, name) => {
   padding: var(--sp-1) var(--sp-3);
   color: var(--ink);
 }
-.sd-item .src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: 6px; }
-.sd-item.clickable { cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.sd-item .src { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-left: 6px; }
+.sd-item.clickable { cursor: pointer; transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
 .sd-item.clickable:hover { border-color: var(--ink-mid); box-shadow: 0 1px 4px rgba(47, 70, 57, 0.12); }
-.sd-item .dosage { color: var(--ochre); margin-left: var(--sp-1); }
+.sd-item .dosage { color: var(--ochre-text); margin-left: var(--sp-1); }
 .sd-item .tag {
   font-style: normal;
   font-size: var(--fs-xs);
@@ -366,24 +366,24 @@ const levelDesc = (level, raw, name) => {
   color: var(--surface);
   background: var(--ink-mid);
 }
-.sd-item .tag.rule { background: var(--ochre); }
+.sd-item .tag.rule { background: var(--ochre-deep); }
 .sd-item .tag.lv {
   background: transparent;
   border: 1px solid currentColor;
   padding: 0 var(--sp-1);
 }
-.sd-item .tag.lv0 { color: var(--text-sub); }
+.sd-item .tag.lv0 { color: var(--text-sub-strong); }
 .sd-item .tag.lv1 { color: var(--ink-mid); }
-.sd-item .tag.lv2 { color: var(--ochre); }
+.sd-item .tag.lv2 { color: var(--ochre-text); }
 .sd-item .tag.lv3 { color: var(--danger); }
-.sd-item .conf { font-size: var(--fs-xs); color: var(--text-sub); margin-left: var(--sp-1); }
+.sd-item .conf { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-left: var(--sp-1); }
 /* 空态副文案：标题只说「哪一种空」，下一步动作放这里 */
 .empty-hint {
   max-width: 420px;
   margin: 2px auto 0;
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 原因补白：与空态正文分开一段，颜色偏警示 —— 它说的是「这份空不一定可信」 */
 .sd-live {

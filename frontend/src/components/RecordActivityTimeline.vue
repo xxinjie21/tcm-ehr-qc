@@ -112,7 +112,7 @@ watch(() => props.recordId, () => load(true), { immediate: true })
 
 .act-by {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 
 .act-detail {
@@ -126,7 +126,7 @@ watch(() => props.recordId, () => load(true), { immediate: true })
 .act-org {
   margin-top: 2px;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 
 .act-more {

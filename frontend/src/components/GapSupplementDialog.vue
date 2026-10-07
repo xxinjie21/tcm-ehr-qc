@@ -215,7 +215,7 @@ async function doGapProposal() {
   margin: 0 0 var(--sp-3);
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .gap-words {
   display: flex;
@@ -237,13 +237,13 @@ async function doGapProposal() {
 .gap-target-label {
   flex: 0 0 auto;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .gap-note {
   margin: var(--sp-3) 0 0;
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   word-break: break-all;
 }
 .gap-preview { color: var(--ink); }

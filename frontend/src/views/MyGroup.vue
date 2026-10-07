@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page-fill">
     <PanelCard title="我的组织">
       <!-- 按身份切三种视图：所有者（成员管理）/ 成员（组织信息）/ 未加入组织（引导） -->
       <!-- 加载遮罩：容器常驻、遮罩只进出（与 Dashboard / Governance / Qc / Review 一致）。
@@ -361,7 +361,7 @@ onMounted(loadMyOrg)
 }
 .empty-hint {
   margin: 0 0 var(--sp-1);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .owner-actions {
   margin-top: var(--sp-4);
@@ -377,9 +377,9 @@ onMounted(loadMyOrg)
 }
 .member-note {
   margin-top: var(--sp-4);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .is-owner {
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 </style>

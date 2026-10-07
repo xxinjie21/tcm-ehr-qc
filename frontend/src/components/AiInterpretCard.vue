@@ -160,7 +160,7 @@ watch(() => props.recordId, () => {
 }
 .aii-src {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* margin-left: auto 把按钮推到标题行最右 */
 .aii-btn {
@@ -187,8 +187,17 @@ watch(() => props.recordId, () => {
   animation: sk 1.2s ease-in-out infinite;
 }
 @keyframes sk {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
+  /* P1-3（第三轮）：原实现动的是 background-position，而骨架屏是**纯色**底
+     （无渐变 / 背景图），background-position 是空操作 → 1.2s 无限循环跑了个寂寞，
+     加载态完全静止。按紧邻注释的本意改回「纯色 + opacity 呼吸」
+     （项目硬规则禁渐变；infinite 属规范 D.5 循环环境动画例外，不套令牌）。 */
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 /* 要点摘要：两列网格 */
 .aii-summary {
@@ -208,7 +217,7 @@ watch(() => props.recordId, () => {
 /* flex-shrink:0 保证标签不被长文本挤窄 */
 .sum-item .sum-key {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   flex-shrink: 0;
 }
 .sum-item span {
@@ -265,9 +274,9 @@ watch(() => props.recordId, () => {
   color: var(--ink);
 }
 .chip.miss { color: var(--danger); border-color: #e6c9c3; }
-.chip.core { color: var(--ochre); border-color: #e2d3b8; }
+.chip.core { color: var(--ochre-text); border-color: #e2d3b8; }
 .chip.exact { color: var(--ink-mid); }
-.chip.contain { color: var(--ochre); }
+.chip.contain { color: var(--ochre-text); }
 .chip.fuzzy { color: var(--danger); }
 .hints {
   margin: 0;
@@ -280,14 +289,14 @@ watch(() => props.recordId, () => {
 .aii-disclaimer {
   margin-top: var(--sp-3);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   text-align: right;
   border-top: 1px dashed var(--line-soft);
   padding-top: var(--sp-2);
 }
 .aii-tip {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 窄屏（<1200px）摘要与结论块由两列塌成一列 */
 @media (max-width: 1200px) {

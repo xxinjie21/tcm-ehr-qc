@@ -494,7 +494,7 @@ defineExpose({ open: openReview, close: closeReview })
 
 <style scoped>
 .no-task-tip {
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   font-size: var(--fs-xs);
 }
 
@@ -524,7 +524,7 @@ defineExpose({ open: openReview, close: closeReview })
   line-height: 20px;
 }
 .tag-score {
-  color: var(--ochre);
+  color: var(--ochre-text);
   background: var(--ochre-light);
   border: 1px solid #e0cdb0;
 }
@@ -536,7 +536,7 @@ defineExpose({ open: openReview, close: closeReview })
 .deadline {
   margin-left: auto;
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .deadline b {
   color: var(--danger);
@@ -580,7 +580,7 @@ defineExpose({ open: openReview, close: closeReview })
   margin-left: var(--sp-2);
   font-size: var(--fs-xs);
   font-weight: normal;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .raw-bd {
   padding: var(--sp-1) 20px var(--sp-4);
@@ -603,7 +603,7 @@ defineExpose({ open: openReview, close: closeReview })
 .raw-item .k {
   width: 76px;
   flex-shrink: 0;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .raw-item .v {
   flex: 1;
@@ -631,7 +631,7 @@ defineExpose({ open: openReview, close: closeReview })
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: var(--fs-base);
+  font-size: var(--fs-title);
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -647,7 +647,7 @@ defineExpose({ open: openReview, close: closeReview })
 .panel-hd.hd-left {
   border-bottom-color: #eee4d3;
   background: #faf6ee;
-  color: var(--ochre);
+  color: var(--ochre-text);
 }
 .panel-hd.hd-right {
   border-bottom-color: var(--el-color-primary-light-8);
@@ -656,7 +656,7 @@ defineExpose({ open: openReview, close: closeReview })
 }
 .mini-tag {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   border: 1px solid var(--line);
   border-radius: 2px;
   padding: 0 var(--sp-2);
@@ -687,7 +687,7 @@ defineExpose({ open: openReview, close: closeReview })
   width: 78px;
   flex-shrink: 0;
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   padding-top: 6px;
 }
 .fvalue {
@@ -705,12 +705,12 @@ defineExpose({ open: openReview, close: closeReview })
 }
 .term-note {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin: 6px 0 var(--sp-2) 78px;
 }
 .ded-hd {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin: var(--sp-3) 0 var(--sp-2);
 }
 .ded-item {
@@ -730,7 +730,7 @@ defineExpose({ open: openReview, close: closeReview })
 }
 .structured-miss {
   background: var(--ink-light);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .ok {
   padding: var(--sp-2) 0;
@@ -753,7 +753,7 @@ defineExpose({ open: openReview, close: closeReview })
   display: inline-block;
   margin-top: var(--sp-1);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .preview {
   margin-top: var(--sp-3);
@@ -781,7 +781,7 @@ defineExpose({ open: openReview, close: closeReview })
 }
 .est-note {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 
 /* ===== ⑤ 提交反馈条 ===== */
@@ -802,7 +802,7 @@ defineExpose({ open: openReview, close: closeReview })
   color: var(--ink-mid);
 }
 .result-bar .rv {
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   font-size: var(--fs-base);
 }
 .result-bar b {

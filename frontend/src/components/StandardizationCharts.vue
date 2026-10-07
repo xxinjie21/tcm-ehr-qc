@@ -108,27 +108,30 @@ const renderCov = () => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
+      // 浮层投影统一成全站的墨绿投影（C3：ECharts 默认是冷灰投影，与页面浮层不是一个色系）
+      extraCssText: 'box-shadow: 0 2px 8px rgba(47,70,57,.12); border-radius: 2px;',
       formatter: (ps) => {
         const r = rows[ps[0].dataIndex]
         const miss = r.total - r.normalized
         return `${r.label}<br/>抽取 ${r.total} 条<br/>已归一 ${r.normalized} 条<br/>未归一 ${miss} 条（${Math.round((miss / r.total) * 100)}%）<br/>归一率 ${Math.round(r.rate * 100)}%`
       }
     },
-    legend: { data: ['已归一', '未归一'], right: 0, top: 0, textStyle: { fontSize: 12 } },
+    // 图例/轴标签 12 → 13，与 --fs-xs 上调到 13 同步（F6：图内文字不再比页面最小字号还小）
+    legend: { data: ['已归一', '未归一'], right: 0, top: 0, textStyle: { fontSize: 13 } },
     grid: { left: 56, right: 30, top: 28, bottom: 6, containLabel: false },
     xAxis: { type: 'value', axisLine: { lineStyle: { color: '#d8d2c4' } }, splitLine: { lineStyle: { color: '#efebe1' } } },
     yAxis: {
       type: 'category',
       data: rows.map((r) => r.label),
       axisLine: { lineStyle: { color: '#d8d2c4' } },
-      axisLabel: { color: '#4a4438', fontSize: 12 }
+      axisLabel: { color: '#4a4438', fontSize: 13 }
     },
     series: [
       {
         name: '已归一', type: 'bar', stack: 'c', barWidth: 14,
         itemStyle: { color: '#4d6b58' },
         label: {
-          show: true, position: 'insideRight', color: '#fff', fontSize: 11,
+          show: true, position: 'insideRight', color: '#fff', fontSize: 12, fontWeight: 600,
           formatter: (p) => (rows[p.dataIndex].rate >= 0.18 ? `${Math.round(rows[p.dataIndex].rate * 100)}%` : '')
         },
         data: rows.map((r) => r.normalized)
@@ -137,7 +140,8 @@ const renderCov = () => {
         name: '未归一', type: 'bar', stack: 'c', barWidth: 14,
         itemStyle: { color: '#cbb89a' },
         label: {
-          show: true, position: 'right', color: '#726d63', fontSize: 11,
+          // 旧次文本色 #726d63 白底 5.14:1，同色相降明度到 #6b6558 → 5.79:1
+          show: true, position: 'right', color: '#6b6558', fontSize: 12, fontWeight: 600,
           formatter: (p) => (rows[p.dataIndex].normalized === 0 ? `${Math.round(rows[p.dataIndex].rate * 100)}%` : '')
         },
         data: rows.map((r) => r.missing)
@@ -155,19 +159,25 @@ const renderTop = () => {
   }
   const rows = topBars.value
   topChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    // 与图一同一套浮层投影（C3）
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      extraCssText: 'box-shadow: 0 2px 8px rgba(47,70,57,.12); border-radius: 2px;'
+    },
     grid: { left: 76, right: 34, top: 8, bottom: 6 },
     xAxis: { type: 'value', axisLine: { lineStyle: { color: '#d8d2c4' } }, splitLine: { lineStyle: { color: '#efebe1' } } },
     yAxis: {
       type: 'category',
       data: rows.map((r) => r.word),
       axisLine: { lineStyle: { color: '#d8d2c4' } },
-      axisLabel: { color: '#4a4438', fontSize: 12 }
+      axisLabel: { color: '#4a4438', fontSize: 13 }
     },
     series: [{
       type: 'bar', barWidth: 14,
       itemStyle: { color: '#96714f', borderRadius: [0, 3, 3, 0] },
-      label: { show: true, position: 'right', color: '#726d63', fontSize: 11 },
+      // 次文本色同步 #726d63 → #6b6558（同上，白底对比度 5.14 → 5.79）
+      label: { show: true, position: 'right', color: '#6b6558', fontSize: 12, fontWeight: 600 },
       data: rows.map((r) => r.count)
     }]
   })
@@ -205,19 +215,19 @@ onBeforeUnmount(() => {
   gap: var(--sp-4);
 }
 .sc-hd { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
-.sc-sub { margin-left: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); font-weight: 400; }
+.sc-sub { margin-left: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); font-weight: 400; }
 .sc-chart { width: 100%; height: 260px; margin-top: var(--sp-2); }
 .sc-empty {
   margin: var(--sp-4) 0;
   text-align: center;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .sc-note {
   margin: var(--sp-3) 0 0;
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .sc-note b { color: var(--ink); }
 </style>

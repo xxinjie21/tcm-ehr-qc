@@ -83,14 +83,14 @@
   margin-top: 14px;
   font-size: var(--fs-xs);
   line-height: 1.75;
-  color: var(--ochre);
+  color: var(--ochre-text);
   letter-spacing: 1.2px;
   text-transform: uppercase;
 }
 .auth-brand .ver {
   margin-top: auto;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   letter-spacing: 0.5px;
 }
 
@@ -109,7 +109,7 @@
 }
 .auth-form .hint {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin: var(--sp-2) 0 var(--sp-5);
 }
 
@@ -119,7 +119,7 @@
 }
 .auth-form .el-form-item__label {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   letter-spacing: 0.5px;
   padding-bottom: var(--sp-1);
   line-height: 1.5;
@@ -132,13 +132,19 @@
 .auth-switch {
   margin-top: var(--sp-4);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
+/* 切换链接（「没有账号？立即注册」）：实测可点区只有 48×18（I4-3）。
+   inline-block + 内边距把点击区撑到 ≥28px 高，负外边距把撑开的尺寸原样收回，
+   行高/段落布局一行不变（否则这行文字会把上下间距顶开）。
+   下边框仍只留 1px 下内边距：换掉整段 padding 的话，下划线会离文字 5px、不再贴字。 */
 .auth-switch a {
+  display: inline-block;
+  padding: 5px 4px 1px;
+  margin: -5px -4px -1px;
   color: var(--ink-mid);
   text-decoration: none;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 1px;
 }
 
 /* U13：演示账号提示（登录页底部小字） */
@@ -147,7 +153,7 @@
   padding-top: 20px;
   border-top: 1px dashed var(--line);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   line-height: 2;
 }
 .auth-demo b {
@@ -155,7 +161,7 @@
 }
 .auth-demo code {
   font-family: Consolas, monospace;
-  color: var(--ochre);
+  color: var(--ochre-text);
 }
 
 /* 注册页：角色固定提示（替代 el-alert，与中式主题一致） */
@@ -173,7 +179,7 @@
   margin-top: var(--sp-5);
   text-align: center;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   letter-spacing: 0.5px;
 }
 

@@ -42,7 +42,27 @@
           <el-table-column prop="points" label="扣分" width="70">
             <template #default="{ row }">-{{ row.points }}</template>
           </el-table-column>
-          <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+          <el-table-column prop="reason" label="原因">
+            <template #default="{ row }">
+              <div class="ded-reason">{{ row.reason }}</div>
+              <!-- 术语未标准化这条要说明白「哪些词没收录」：只有「有 N 个实体未命中标准词典」
+                   等于没说 —— 用户还得翻原文才知道是哪个词。missedNormTerms 与后端
+                   QcScorer 同一口径（normLevel 缺失即未命中），structuredData 拿不到时
+                   只显示原因行，退化为原样。 -->
+              <div v-if="row.type === '术语未标准化' && missedTerms.length" class="missed">
+                <span class="missed-lbl">未命中词典的词（共 {{ missedCount }} 个）：</span>
+                <span class="missed-list">
+                  <el-tag
+                    v-for="(m, i) in missedTerms"
+                    :key="i"
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                  >{{ m.term }}<template v-if="m.count > 1">×{{ m.count }}</template></el-tag>
+                </span>
+              </div>
+            </template>
+          </el-table-column>
           <template #empty><div class="ok">无扣分项</div></template>
         </el-table>
       </div>
@@ -58,10 +78,13 @@
 // 阈值未就绪时统一显示「—」，不再退回 90（那个 90 是后端出厂默认值的拷贝）。
 import { computed } from 'vue'
 import { gradeClass as gradeClassOf, THRESHOLD_PLACEHOLDER } from '@/utils/grade'
+import { missedNormTerms } from '@/utils/structured'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   detail: { type: Object, default: null },
+  /** 该病历的 structuredData：供「未命中标准词典」列出具体词；null 则只显示原因行 */
+  structuredData: { type: Object, default: null },
   qualified: { type: Number, default: null }
 })
 const emit = defineEmits(['update:modelValue'])
@@ -78,6 +101,22 @@ const distanceToQualified = computed(() =>
 // 扣分合计：弹窗里直接给出，省得用户在长表里自己加
 const detailTotal = computed(() =>
   (props.detail?.deductions || []).reduce((s, d) => s + (d.points || 0), 0)
+)
+// 未命中标准词典的具体词（structuredData 可能被存成 JSON 字符串，兼容一下）
+const missedTerms = computed(() => {
+  let vo = props.structuredData
+  if (typeof vo === 'string') {
+    try {
+      vo = JSON.parse(vo)
+    } catch {
+      vo = null
+    }
+  }
+  return missedNormTerms(vo)
+})
+// 实体口径合计（同一词 ×2 计 2 个），与后端「有 N 个实体未命中」的 N 对齐
+const missedCount = computed(() =>
+  missedTerms.value.reduce((s, m) => s + (m.count || 0), 0)
 )
 </script>
 
@@ -160,7 +199,27 @@ const detailTotal = computed(() =>
 /* 合格线说明 */
 .wf-note {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 10px;
+}
+/* 「原因」列：原因行与未命中清单分层，标签可换行、不压占整行 */
+.ded-reason {
+  line-height: 1.6;
+}
+.missed {
+  margin-top: 4px;
+  padding-top: var(--sp-1);
+  border-top: 1px dashed var(--line-soft);
+}
+.missed-lbl {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+  margin-bottom: 4px;
+}
+.missed-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 </style>

@@ -4,7 +4,10 @@
     <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilters" />
 
     <!-- 待办快捷条；无权限的卡片置灰并标注，避免点了才被 403 弹回
-         用 button 而非 div：天然可聚焦、支持 Enter/Space-->
+         用 button 而非 div：天然可聚焦、支持 Enter/Space
+         V1：内部改横向 —— 数字+标签靠左、箭头贴右缘。
+         原竖排在 ~770px 宽的栅格卡里只占 44px，右侧 ~90% 全空；
+         只重排既有子元素（数字/标签/箭头），不新增业务文案。 -->
     <section class="todo-bar">
       <button
         type="button"
@@ -12,8 +15,11 @@
         :class="{ warn: overview.pendingReviewCount > 0 }"
         @click="go('/review', '人工复核')"
       >
-        <span class="todo-num">{{ overview.pendingReviewCount }}</span>
-        <span class="todo-lbl">待复核 ›</span>
+        <span class="todo-main">
+          <span class="todo-num">{{ overview.pendingReviewCount }}</span>
+          <span class="todo-lbl">待复核</span>
+        </span>
+        <span class="todo-arrow" aria-hidden="true">›</span>
       </button>
       <button
         type="button"
@@ -21,8 +27,12 @@
         :class="{ warn: govern.pendingGovern > 0, readonly: !canVisit('清洗与导出') }"
         @click="go('/governance', '清洗与导出')"
       >
-        <span class="todo-num">{{ govern.pendingGovern }}</span>
-        <span class="todo-lbl">待清洗 <span v-if="canVisit('清洗与导出')">›</span></span>
+        <span class="todo-main">
+          <span class="todo-num">{{ govern.pendingGovern }}</span>
+          <span class="todo-lbl">待清洗</span>
+        </span>
+        <!-- 无权限时不渲染箭头：置灰卡不该暗示「可点进去」 -->
+        <span v-if="canVisit('清洗与导出')" class="todo-arrow" aria-hidden="true">›</span>
       </button>
       <!-- 「病历总数」原来也在这里占一张可点卡片，但它没有动作语义（点进去只是跳质控页），
            而且与下方指标卡的同一个数字重复。待办条只留动作型入口，数字看指标卡。 -->
@@ -35,13 +45,18 @@
            两处都有会让看板与待办条各说一个数、对不上时无从判断谁对）。
            对标 E3「一个指标只出现一次且可下钻」：卡片即入口 —— 点了带上对应筛选去列表页，
            而筛选能落在 URL 上（对标 E5），所以下钻后的页面是可刷新、可分享的。 -->
-      <div class="stats">
+      <!-- stagger-in：三张指标卡错峰 24ms 依次浮现（见 theme.css ④）。
+           「接口返回 → 卡片出现」是页内状态切换，同时出现时人眼会把三张卡看成
+           一整块；错峰后能感知到「一条一条来的」，指标数量才被看清。
+           只给这一组（3 个）用，表格行与长列表一律不用 —— 几十行逐个浮现会变成等待。 -->
+      <div class="stats stagger-in">
+        <!-- note：口径说明，文案取自本页既有 .stats-note（不编造业务数字） -->
         <StatCard label="病历总数" :value="overview.totalRecords" icon="record"
-          clickable @click="drill('')" />
+          note="全部病历 · 不受筛选影响" clickable @click="drill('')" />
         <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate"
-          clickable @click="drill('合格')" />
+          note="分级「合格」的病历占比" clickable @click="drill('合格')" />
         <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid"
-          clickable @click="drill('无效')" />
+          note="质控判定无有效内容" clickable @click="drill('无效')" />
       </div>
 
       <!-- 28.18：指标口径提示 —— 页面上有三个「率/数」，不写清怎么算、算哪些病历，
@@ -64,6 +79,9 @@
         <EmptyState v-else :failed="failed" :loading="loading" text="暂无趋势数据" @retry="loadAll" />
         <!-- P5.2：趋势被截到最近 12 个月时告知，避免误以为只有这些数据 -->
         <p v-if="extra.trendTruncated" class="trend-trunc">仅展示最近 12 个月（更早的月份已省略）</p>
+        <!-- L1：两条线都完全无波动时给一行文字结论，替代「图是平的」这个纯视觉信息；
+             月份数取实际展示条数，数据不足 12 个月时不谎称「近 12 个月」 -->
+        <p v-if="trendFlat" class="trend-flat">近 {{ (extra.trend || []).length }} 个月无波动</p>
       </PanelCard>
 
       <div class="grid-2 mb">
@@ -193,6 +211,15 @@ const distLabel = computed(() => {
   return `评分分布柱状图：${d.map((b) => `${b.bucket} 分 ${b.count} 条`).join('，')}`
 })
 
+// L1：趋势是否完全无波动 —— 合格率与待复核两条线**各自** max===min 才算「平」。
+// 单条平、另一条有起伏仍是有效信息（如合格率恒 100 但待复核在变），不能一并抹掉。
+const trendFlat = computed(() => {
+  const t = extra.value.trend || []
+  if (!t.length) return false
+  const flat = (arr) => Math.max(...arr) === Math.min(...arr)
+  return flat(t.map((p) => p.qualifiedRate)) && flat(t.map((p) => p.pendingReview))
+})
+
 // 渲染趋势图。容器变化时先 dispose 旧实例再重建，避免 ECharts 挂在已卸载的 DOM 上
 const renderTrend = () => {
   // 1. 空态占位时容器不存在，直接返回（等有数据再画）
@@ -206,22 +233,43 @@ const renderTrend = () => {
   const t = extra.value.trend
   // 4. 组装配置并渲染：双 Y 轴 —— 左轴合格率、右轴待复核条数
   trendChart.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['合格率', '待复核'], right: 10, top: 0, textStyle: { fontSize: 12 } },
-    grid: { left: 44, right: 48, top: 34, bottom: 28 },
-    xAxis: { type: 'category', data: t.map((p) => p.month), axisLine: { lineStyle: { color: '#d8d2c4' } } },
+    // I6/C3：全站浮层统一墨绿投影（--shadow-pop 同值 rgba(47,70,57,.12)）；
+    // ECharts 默认是冷灰投影，落在宣纸底上发灰。formatter 把月份/指标名保持默认灰 13px，
+    // 数值用 15px 墨绿加粗 —— 让「100」「0」成为 tooltip 的视觉主项。
+    // 已确认 utils/echarts.js 只注册基础组件、未启用 rich/安全过滤，renderMode 默认 html，可直接返 HTML。
+    tooltip: {
+      trigger: 'axis',
+      textStyle: { fontSize: 13 },
+      extraCssText: 'box-shadow: 0 2px 8px rgba(47,70,57,.12); border-radius: 2px;',
+      formatter: (params) => {
+        const list = Array.isArray(params) ? params : [params]
+        const rows = list.map((p) =>
+          `${p.marker}${p.seriesName}：<b style="color:#2f4639;font-size:15px">${p.value}</b>`
+        ).join('<br/>')
+        return `${list[0]?.axisValue ?? ''}<br/>${rows}`
+      }
+    },
+    // F6：图例字号 12→13，与全站字号令牌上移后的最低档对齐
+    legend: { data: ['合格率', '待复核'], right: 10, top: 0, textStyle: { fontSize: 13 } },
+    // L1：容器由 230px 压到 180px 后，grid 上边距同步从 34 压到 28，避免图例与绘区间留死白
+    grid: { left: 44, right: 48, top: 28, bottom: 28 },
+    xAxis: { type: 'category', data: t.map((p) => p.month), axisLine: { lineStyle: { color: '#d8d2c4' } }, axisLabel: { fontSize: 13 } },
     yAxis: [
-      { type: 'value', name: '合格率%', max: 100, axisLabel: { formatter: '{value}' }, splitLine: { lineStyle: { color: '#efebe1' } } },
-      { type: 'value', splitLine: { show: false } }
+      // F6：两条 Y 轴补显式 axisLabel 字号 13（保持既有 color / splitLine 配置不变）
+      { type: 'value', name: '合格率%', max: 100, axisLabel: { formatter: '{value}', fontSize: 13 }, splitLine: { lineStyle: { color: '#efebe1' } } },
+      { type: 'value', splitLine: { show: false }, axisLabel: { fontSize: 13 } }
     ],
     series: [
       {
         name: '合格率', type: 'line', smooth: true, yAxisIndex: 0,
+        // L1：180px 高的图里折线几乎无起伏，加数据点标记让每个月的取值可指认
+        showSymbol: true, symbolSize: 5,
         data: t.map((p) => p.qualifiedRate),
         itemStyle: { color: 'var(--ink-mid)' }, areaStyle: { color: 'rgba(61,90,76,0.10)' }
       },
       {
         name: '待复核', type: 'line', smooth: true, yAxisIndex: 1,
+        showSymbol: true, symbolSize: 5,
         data: t.map((p) => p.pendingReview),
         itemStyle: { color: 'var(--ochre)' }, lineStyle: { type: 'dashed' }
       }
@@ -242,10 +290,23 @@ const renderDist = () => {
   const d = extra.value.scoreDistribution
   // 4. 组装配置并渲染：单轴柱状，x 为分数档、y 为条数
   distChart.setOption({
-    tooltip: { trigger: 'axis' },
+    // I6/C3：与趋势图同一套浮层口径 —— 墨绿投影 + 数值 15px 墨绿加粗。
+    // 轴触发下 p.name 即分数档，数值用 <b> 突出。
+    tooltip: {
+      trigger: 'axis',
+      textStyle: { fontSize: 13 },
+      extraCssText: 'box-shadow: 0 2px 8px rgba(47,70,57,.12); border-radius: 2px;',
+      formatter: (params) => {
+        const list = Array.isArray(params) ? params : [params]
+        return list.map((p) =>
+          `${p.marker}${p.name}：<b style="color:#2f4639;font-size:15px">${p.value}</b>`
+        ).join('<br/>')
+      }
+    },
     grid: { left: 40, right: 16, top: 16, bottom: 28 },
-    xAxis: { type: 'category', data: d.map((b) => b.bucket), axisLine: { lineStyle: { color: '#d8d2c4' } } },
-    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#efebe1' } } },
+    // F6：两条轴 axisLabel 补 13（原轴标签走 ECharts 默认字号，未随令牌上移）
+    xAxis: { type: 'category', data: d.map((b) => b.bucket), axisLine: { lineStyle: { color: '#d8d2c4' } }, axisLabel: { fontSize: 13 } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 13 }, splitLine: { lineStyle: { color: '#efebe1' } } },
     series: [{
       type: 'bar', barWidth: '46%',
       // 28.21：0 值档位单独弱化，避免与「有数据」的档位在视觉上同一观感
@@ -344,16 +405,23 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   padding: var(--sp-2) var(--sp-4);
   cursor: pointer;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  /* 微反馈只过渡阴影，不做位移 —— transform 会劫持 position:fixed 后代的包含块（红线），
+     且 hover 上的 translateY 会让并排卡片整行抖一下 */
+  transition: box-shadow var(--dur-fast) var(--ease-out);
   /* button 元素重置：保持原卡片观感*/
   width: 100%;
   text-align: left;
   font-family: inherit;
   font-size: inherit;
   color: inherit;
+  /* V1：横向排布 —— 数字+标签靠左（竖排关系不变），箭头贴右缘收口，
+     把原先右侧 ~90% 的空白变成两端锚定后的呼吸位 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
 }
 .todo:hover {
-  transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(47, 70, 57, 0.1);
 }
 /* 无权限卡片：置灰、取消悬浮反馈，并标注原因*/
@@ -362,13 +430,24 @@ onBeforeUnmount(() => {
   opacity: 0.72;
 }
 .todo.readonly:hover {
-  transform: none;
   box-shadow: none;
+}
+/* 左侧信息块：数字在上、标签在下（沿用原竖排关系，只是整体挪到卡片左侧） */
+.todo-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* 右侧箭头：原文案里的 › 从标签中拆出右置，作为「可点击入口」的收口 */
+.todo-arrow {
+  font-size: var(--fs-base);
+  color: var(--text-sub-strong);
+  flex-shrink: 0;
 }
 /* 「仅管理员」小标记 */
 .todo-lock {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   border: 1px solid var(--line);
   border-radius: 2px;
   padding: 0 var(--sp-1);
@@ -376,17 +455,15 @@ onBeforeUnmount(() => {
 }
 /* 待办数字：大号；有待办时（.warn）转 ochre */
 .todo-num {
-  display: block;
   font-size: var(--fs-xl);
   font-weight: bold;
   color: var(--ink);
   line-height: 1.2;
 }
-.todo.warn .todo-num { color: var(--ochre); }
+.todo.warn .todo-num { color: var(--ochre-text); }
 .todo-lbl {
-  display: block;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-top: 2px;
 }
 /* 28.19-08：描述性指标统一等宽栅格。
@@ -418,7 +495,8 @@ onBeforeUnmount(() => {
 }
 .chart-tall {
   width: 100%;
-  height: 230px;
+  /* L1：230px 高几乎全空却独占整行；180px + 数据点标记后信息密度足够 */
+  height: 180px;
 }
 /* 科室合格率列表：超 260px 时内部滚动 */
 .rate-list {
@@ -434,15 +512,16 @@ onBeforeUnmount(() => {
   gap: var(--sp-2);
   font-size: var(--fs-xs);
 }
-/* 科室名固定宽度右对齐，过长省略（完整名放 title） */
+/* V5：科室名改 min-width + 允许收缩 —— 原固定 width:72px + flex-shrink:0 会把
+   「合格 x / 共 y」挤成 3 行（sub 只有 40px 宽）；现在空间紧时科室名先收缩、
+   过长省略（完整名放 title），右侧口径行保持一行 */
 .rate-name {
-  width: 72px;
+  min-width: 72px;
   text-align: right;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 /* 进度条轨道与填充；宽度由行内 style 按百分比给出 */
 .rate-track {
@@ -457,13 +536,17 @@ onBeforeUnmount(() => {
   background: var(--ink-mid);
 }
 .rate-val {
-  width: 46px;
+  /* V5：固定 width → min-width，右对齐保持；46px 足够放下「100%」 */
+  min-width: 46px;
   text-align: right;
   color: var(--ink);
 }
 .rate-sub {
-  width: 40px;
-  color: var(--text-sub);
+  /* V5：「合格 500 / 共 500」一行放下（原 40px 宽被折成 3 行、整行高 59px）；
+     nowrap + min-width 保证单行，整行高回到 ~20px */
+  min-width: 96px;
+  white-space: nowrap;
+  color: var(--text-sub-strong);
 }
 /* 窄屏（<1200px）：面板与待办条都收成单列 */
 @media (max-width: 1200px) {
@@ -475,7 +558,9 @@ onBeforeUnmount(() => {
   }
 }
 /* P5.2：趋势截断提示 */
-.trend-trunc { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-sub); }
+.trend-trunc { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-sub-strong); }
+/* L1：完全无波动时的文字结论；与 trend-trunc 同级同权重，不抢图表注意力 */
+.trend-flat { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-sub-strong); }
 /* 28.18：指标口径说明 —— 灰底浅字，与卡片区分开，不抢指标数字的注意力 */
 .stats-note {
   margin: 0 0 10px;
@@ -485,7 +570,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   font-size: var(--fs-xs);
   line-height: 1.6;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .stats-note b { color: var(--ink); }
 /* 对标 A5：指标卡下方的血缘行。刻意做得比正文轻 —— 它是下钻入口，不该和指标抢注意力 */

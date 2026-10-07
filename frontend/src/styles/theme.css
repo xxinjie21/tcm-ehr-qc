@@ -7,12 +7,26 @@
   --ink: #2f4639;          /* 墨绿（标题/顶栏） */
   --ink-mid: #3d5a4c;      /* 墨绿中（主色） */
   --ink-light: #e6ede8;    /* 墨绿浅（选中底） */
-  --ochre: #96714f;        /* 赭石 */
+  --ochre: #96714f;        /* 赭石（图形用：图表线条、进度条、边框、描边 —— 不作文字色） */
+  /* 赭石文字色（同色相降明度，审查报告 C1/C6/C8）：
+     --ochre 作 12~14px 文字压白底只有 4.40:1、压纸底 3.97:1、压墨浅底 3.70:1，均不过 AA；
+     #846440 压白底 5.42 / 纸底 4.88 / 墨浅底 4.55 / 赭浅底 4.61，全部达标。
+     ⚠️ 文字用法一律用 --ochre-text，--ochre 只留给图形（线条/边框/填充）。 */
+  --ochre-text: #846440;
+  /* 赭石实心底（第 3 轮 P2-3）：作 13px 白字小标签的**底色**时 #96714f 只有 4.40:1，
+     差 0.1 未达 AA（命中结构化卡片的「规则兜底」标签，全站仅这一处组合）。
+     沿用「只降明度、不换色相」：#8f6a4a 压白字 5.0:1 达标。只作小字底色用，
+     图表线条 / 进度条 / 描边仍走 --ochre。 */
+  --ochre-deep: #8f6a4a;
   --ochre-light: #f3ecdf;  /* 赭石浅 */
   --paper: #f5f3ed;        /* 宣纸（页面背景） */
   --line: #ddd7c9;         /* 边框线 */
   --text: #33322e;         /* 主文本 */
-  --text-sub: #726d63;     /* 次文本；对 --paper 4.64:1、对 #fff 5.14:1，满足 WCAG AA 4.5:1 */
+  --text-sub: #726d63;     /* 次文本（图形/描边用）；对白底 5.14:1 达标，对非白底不达标 → 文字用 --text-sub-strong */
+  /* 次文本文字色（同色相降明度，审查报告 C2/C7）：
+     --text-sub 压墨浅底 #e6ede8 = 4.32:1、压赭石浅底 = 4.38:1，均差一口气；
+     #6b6558 对白 5.79 / 纸 5.22 / 墨浅 4.86 / 赭浅 4.93，四种底全部达标。 */
+  --text-sub-strong: #6b6558;
   --danger: #a04335;       /* 警示红 */
   /* 28.9①：成功色此前只有登记（见文件末「语义三对」），没有 token —— StandardizationReport
      3 处 var(--success, #3a7d44) 恒走 fallback，改 token 不会生效。这里补上定义。 */
@@ -33,22 +47,23 @@
   --sp-4: 16px;
   --sp-5: 24px;
 
-  /* ===== 字号阶梯（28.11 度量收敛）=====
-     目标：全站**只有 5 档字号**。此前有 11 / 11.5 / 12 / 12.5 / 13 / 13.5 / 14 / 15
-     / 17 / 18 / 20 / 21 / 22 / 24 十几个值，其中 11.5、12、12.5、13 相差不到 1px
-     却在两百多处混用 —— 「看起来都差不多、谁也不知道该用哪个」，主次不可辨。
-     收敛后：
-       12px 辅助（表内单位、角标、标签、次要说明）
-       14px 正文基准（与 Ant Design 主字体一致；Element Plus 基础字号同步为 14）
-       16px 小标题（卡片/区块标题、强调数值）
-       20px 页面标题
-       24px 大号指标（看板/统计卡的关键数字）
-     旧的 --fs-sm / --fs-md / --fs-lg 三个名字已全部替换到上述档位，不再定义。 */
-  --fs-xs: 12px;       /* 辅助：表内单位、角标、标签、次要说明 */
-  --fs-base: 14px;     /* 正文基准（Element Plus 基础字号同步取它） */
-  --fs-title: 16px;    /* 卡片/区块标题、强调数值 */
-  --fs-page: 20px;     /* 页面标题 */
-  --fs-xl: 24px;       /* 大号指标：看板/统计卡的关键数字 */
+  /* ===== 字号阶梯（28.11 度量收敛 · 视觉审查报告 §三 整体上移）=====
+     目标：全站**只有 5 档字号**，且最低档不低于 13px。
+     28.11 收敛时把 11.5 / 12 / 12.5 / 13 / 13.5 五档压到 12px，副作用是一半文本
+     落到最低档（实测 12px 占全站可见文本 52.7%，且「越需要细读的界面小字越多」——
+     弹窗最高 75.5%）。本轮整体上移一档，让最低档回到 13px：
+        13px 辅助（表内单位、角标、标签、次要说明）
+        15px 正文基准（医疗长阅读场景 14→15 负担改善明显）
+        17px 小标题（卡片/区块标题、强调数值）
+        22px 页面标题
+        30px 大号指标（看板/统计卡关键数字，对标东华/卫宁 30–36px）
+      旧的 --fs-sm / --fs-md / --fs-lg 三个名字已全部替换到上述档位，不再定义。
+      ⚠️ Element Plus 侧的 --el-font-size-* 在下方 :root:root 同步，两边必须一起改。 */
+  --fs-xs: 13px;       /* 辅助：表内单位、角标、标签、次要说明 */
+  --fs-base: 15px;     /* 正文基准（Element Plus 基础字号同步取它） */
+  --fs-title: 17px;    /* 卡片/区块标题、强调数值 */
+  --fs-page: 22px;     /* 页面标题 */
+  --fs-xl: 30px;       /* 大号指标：看板/统计卡的关键数字 */
 
   /* ===== 控件高度三档（28.19-05）=====
      全站控件高度只此三档，与 Element Plus 的 small / default / large 一一对应：
@@ -69,6 +84,29 @@
      两档都用墨绿的透明投影而非中性黑，落在宣纸底上不发灰。 */
   --shadow-pop: 0 2px 8px rgba(47, 70, 57, 0.12);
   --shadow-dialog: 0 8px 28px rgba(47, 70, 57, 0.18);
+
+  /* ===== 动效令牌（切换过渡统一收口）=====
+     此前全站动效「各自为政」：7 处 `0.15s ease` 字面量、2 个各写各的具名过渡
+     （aii-fade / step-fade），时长与曲线互不相干；而路由切换、页内状态切换、
+     页签切换则完全没有过渡，内容「啪」地跳出来。这里收敛成 3 档时长 + 2 条曲线，
+     任何过渡都必须引用它们，不再出现时长字面量。
+
+     时长（三档，全部落在 150~300ms 的「感知窗口」内 —— 低于 100ms 用户看不出
+     发生过过渡，高于 300ms 会让连续操作显得拖沓）：
+       fast 120ms  微反馈：hover / focus / 颜色 / 边框 / 阴影。点一下要立刻有回应。
+       base 200ms  常态切换：路由页面淡入、组件与状态切换、页签换页。
+       slow 280ms  空间位移：侧边面板推入、列表错峰入场。位移需要更长时间才显得从容。
+
+     缓动曲线（两条）：
+       --ease-out    快起慢停。用于所有「进入 / 离开」—— 用户只在意结果，
+                     前段快、后段收得稳，观感最顺。全站默认用它。
+       --ease-in-out 两端都收。只用于需要「看见过程」的空间位移（推入 / 退出），
+                     起步和收尾都减速，避免位移的起始与终止显得突兀。 */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ===== 字重基线（批次 11）=====
@@ -109,8 +147,25 @@ h1, h2, h3, h4, h5, h6, b, strong {
   --el-color-success-light-8: #d9e3dc;
   --el-color-success-light-9: #f2f6f3;
   --el-color-success-dark-2: var(--ink);
-  --el-color-warning: var(--ochre);
+  /* 赭石/危险两族此前只改了基色、没改派生档（审查报告 C4/C6 同一根因：
+     「同一色相族的浅色档整段缺失」）—— warning/danger 的 light-3~9 仍是 EP 默认
+     （橙系 / 粉系 #fab6b6），禁用态白字压粉底实测 1.69:1，是全站最差对比度。
+     这里按新基色整套补齐（同色相降明度），并补 dark-2（否则 active 态回落到
+     EP 默认的橙 #b88230 / 红 #c45656，点击瞬间露馅）。 */
+  --el-color-warning: #846440;      /* = --ochre-text：warning 令牌与文字用法一起换 */
+  --el-color-warning-light-3: #cdb49a;
+  --el-color-warning-light-5: #e2d3c1;
+  --el-color-warning-light-7: #ece2d6;
+  --el-color-warning-light-8: #f1e9e0;
+  --el-color-warning-light-9: #f6f1ea;
+  --el-color-warning-dark-2: #6f5536;
   --el-color-danger: var(--danger);
+  --el-color-danger-light-3: #d8a99f;
+  --el-color-danger-light-5: #e8cfc8;
+  --el-color-danger-light-7: #f2e0db;
+  --el-color-danger-light-8: #f7ece9;
+  --el-color-danger-light-9: #fbf5f3;
+  --el-color-danger-dark-2: #8a3d33;
   --el-color-error: var(--danger);
   --el-color-info: var(--text-sub);
   --el-border-radius-base: 2px;
@@ -127,7 +182,15 @@ h1, h2, h3, h4, h5, h6, b, strong {
   /* 28.9③：Element Plus 默认 --el-text-color-placeholder:#a8abb2 对白底仅 2.30:1，不过 AA。
      前文只覆盖了 regular/secondary，漏了 placeholder（disabled 文字引用它，一并对齐）。 */
   --el-text-color-placeholder: var(--text-sub);
-  --el-font-size-base: 14px;
+  /* 字号与左侧 --fs-* 五档一一同步（审查报告 §三：EP 变量不跟，F2 的一半白改）。
+     extra-small 直接决定 size="small" 表格的正文字号 —— 主数据表（病历数据/质控校验/
+     人工复核/清洗导出）此前被 EP 压在 12px，是「表格正文最小」的根因。 */
+  --el-font-size-extra-small: 13px;
+  --el-font-size-small: 14px;
+  --el-font-size-base: 15px;
+  --el-font-size-medium: 17px;
+  --el-font-size-large: 19px;
+  --el-font-size-extra-large: 22px;
 }
 
 /* ===== 全局基础 ===== */
@@ -141,19 +204,25 @@ body {
 
 /* ===== 次级说明文字 .tip（批次 26.15）=====
    各页共用的「说明/提示」文字。此前 8 个组件各自复制
-   `font-size: var(--fs-xs); color: var(--text-sub);`（内容完全一致），
+   `font-size: var(--fs-xs); color: var(--text-sub-strong);`（内容完全一致），
    收敛为全局基类；各页只保留自己的间距 / 行高 / 布局增量。 */
 .tip {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 
-/* ===== 表格（原型表格风格） ===== */
-.el-table {
+/* ===== 表格（原型表格风格） =====
+   ⚠️ 选择器必须带 `:root:root` 提特异性（同前文 EP 变量覆盖的坑）：
+   Element Plus 的组件样式由 unplugin 按需注入、**晚于本文件**，同为单类 (0,1,0)
+   时 EP 胜出 —— 此前这 4 条表头色/底色/hover 底色实际**全部失效**，表头渲染成
+   EP 默认灰字白底（审查报告 F3：「表格看起来脏、没质感」的隐性根因）。
+   行 hover 底色改为 --ink-light（对白 1.19:1），原 #f7f5ee 对白仅 1.06:1，
+   长表格里几乎无法用 hover 定位当前行（审查报告 I2）。 */
+:root:root .el-table {
   --el-table-border-color: #eee9dd;
   --el-table-header-bg-color: #fbfaf6;
   --el-table-header-text-color: var(--ink);
-  --el-table-row-hover-bg-color: #f7f5ee;
+  --el-table-row-hover-bg-color: var(--ink-light);
   font-size: var(--fs-base);
 }
 .el-table th.el-table__cell {
@@ -161,21 +230,97 @@ body {
   font-size: var(--fs-xs);
 }
 
+/* ===== Element Plus 横向滚动条（审查报告 L3/V3 全局一处修）=====
+   EP 的滚动条条体是 thumb 组件的根节点，用 **v-show** 控制显隐 —— v-show 写的是
+   **内联 style="display:none"**，只有鼠标在其容器上移动（mousemove → visible=true）
+   才临时显示。后果：表格列超出容器时「有滚动能力，但静止状态下滚动条看不见也拖不到」
+   （治理页预览 20 个元素被裁、结构化解析左栏 6 列不可见，同一个机制）。
+   普通声明压不过内联样式，必须 !important —— 限定在 .el-table 内，
+   下拉等浮层保持 EP 的「悬停才显示」原生手感。
+   表头 wrapper 与 body 的横向偏移必须联动（EP 用 transform 同步），overflow-x 收紧。 */
+:root:root .el-table .el-scrollbar__bar {
+  display: block !important;
+}
+:root:root .el-table__header-wrapper {
+  overflow-x: hidden;
+}
+.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
+  height: 8px;
+  background: #c9c3b4;
+  border-radius: 4px;
+}
+.el-table .el-scrollbar__bar.is-vertical .el-scrollbar__thumb {
+  width: 8px;
+  background: #c9c3b4;
+  border-radius: 4px;
+}
+
 /* ===== 按钮（原型 btn 风格） ===== */
 .el-button {
   font-size: var(--fs-base);
 }
 
-/* ===== 表格操作列：把「链接式」按钮的命中区补到 ≥24px（批次 16 · 16.3）=====
-   各列表页的操作列普遍是 <el-button link size="small">：纯文字、没有内边距。
-   视觉上轻是想要的，但命中区只有文字本身高（约 16~18px），触控板与手指都容易点空。
-   这里**只加纵向内边距**把命中区抬到 24px 以上，字号与颜色一律不动 ——
-   观感不变、手感变好，这正是 16.3「点击目标 ≥24px 高（表格操作列）」要的东西。
-   不用 min-height 单顶：那会让文字贴顶、行内基线跑掉；配合 inline-flex 居中才稳。 */
+/* ===== 按钮非默认态：禁用态与 hover（审查报告 C4/C5/I1/I5）=====
+   四条共同的根因：**默认态全部达标，问题集中在状态切换与派生色档** ——
+   EP 的禁用态结构是「浅底 + 白字」，浅色档换成我们的派生色后白字对比度崩掉；
+   hover 态同理（把文字变淡而不是变明确，反馈方向是反的）。
+   一律「同色相调明度、不换色相」，且全部用 :root:root 提特异性压过 EP 后注入的同名规则。 */
+
+/* C5：主色禁用态 —— 白字压 #93a99e 只有 2.50:1（全站 7 处按钮）。
+   改「墨浅底 + 深墨字」= 4.98:1，且与全站「墨浅底 = 失效/不可用」的既有语义一致
+   （--ink-light 已是 .nlp-off、空态条的底色）。 */
+:root:root .el-button--primary.is-disabled,
+:root:root .el-button--primary.is-disabled:hover {
+  background: var(--ink-light);
+  border-color: #c8d6cd;
+  color: #4a6b5a;
+}
+/* C4：危险禁用态 —— 白字压 EP 默认粉 #fab6b6 = 1.69:1，全站最差。
+   改「浅赭底 + 深赭字」= 5.08:1，仍一眼可辨「不可点」。 */
+:root:root .el-button--danger.is-disabled,
+:root:root .el-button--danger.is-disabled:hover {
+  background: var(--el-color-danger-light-5);
+  border-color: var(--el-color-danger-light-3);
+  color: #8a3d33;
+}
+/* I5：主色实心 hover 用 light-3 #6b8a79（3.79:1，主色感明显变灰）→ light-1 #506a5e（5.89:1）。 */
+:root:root .el-button--primary:not(.is-disabled):hover {
+  --el-button-hover-bg-color: var(--el-color-primary-light-1);
+  --el-button-hover-border-color: var(--el-color-primary-light-1);
+}
+/* warning / danger 实心 hover：EP 默认取 light-3（比基色更浅）+ 白字，
+   补齐浅色档后白字压 light-3 会掉到 2.x:1 —— 改为同色相**加深**（C6 的 hover 版）。 */
+:root:root .el-button--warning:not(.is-disabled):hover {
+  --el-button-hover-bg-color: var(--el-color-warning-dark-2);
+  --el-button-hover-border-color: var(--el-color-warning-dark-2);
+}
+:root:root .el-button--danger:not(.is-disabled):hover {
+  --el-button-hover-bg-color: var(--el-color-danger-dark-2);
+  --el-button-hover-border-color: var(--el-color-danger-dark-2);
+}
+/* I1：链接式按钮 hover 反而变淡 —— 主色 link hover 取 light-5 #93a99e = 2.50:1，
+   低于 idle 的 7.59:1，鼠标一移上去按钮更看不清（全站最高频的操作入口，方向反了）。
+   危险/赭石 link 同理（danger light-5 压白 ≈1.5:1），统一改为「同色相加深」。 */
+:root:root .el-button.is-link:not(.is-disabled):hover {
+  color: var(--el-color-primary-light-1);
+}
+:root:root .el-button--danger.is-link:not(.is-disabled):hover {
+  color: #8a3d33;
+}
+:root:root .el-button--warning.is-link:not(.is-disabled):hover {
+  color: var(--el-color-warning-dark-2);
+}
+
+/* ===== 表格操作列：把「链接式」按钮的命中区补到 ≥28px（批次 16 · 16.3，视觉审查 I4 提档）=====
+    各列表页的操作列普遍是 <el-button link size="small">：纯文字、没有内边距。
+    视觉上轻是想要的，但命中区只有文字本身高（约 16~18px），触控板与手指都容易点空。
+    这里**只加纵向内边距**把命中区抬到 28px 以上，字号与颜色一律不动 ——
+    观感不变、手感变好。
+    不用 min-height 单顶：那会让文字贴顶、行内基线跑掉；配合 inline-flex 居中才稳。 */
 .el-table .el-button.is-link {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  min-height: 24px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
 }
@@ -202,8 +347,7 @@ body {
   box-shadow: var(--shadow-pop) !important;
 }
 .el-dialog,
-.el-message-box,
-.el-drawer {
+.el-message-box {
   box-shadow: var(--shadow-dialog);
 }
 .el-message {
@@ -258,8 +402,79 @@ body {
   box-shadow: 0 0 0 2px var(--ink-mid) inset;
 }
 
-/* ===== 视觉隐藏（给屏幕阅读器的文本，不占视觉空间） ===== */
-.visually-hidden {
+/* ===== 短内容页撑满（审查报告 V6）=====
+   我的组织 / 组织管理 / 日志审计三页内容少，最后一个模块在 900px 高的视口里
+   只占到 300~740px，下半屏裸露纸底 —— 观感像「没加载完」。
+   根节点加 .page-fill：页面自身撑到主内容区底部，并让首块 PanelCard 随之拉伸，
+   于是「空白」被卡片边框包住（卡内留白），而不是卡片戛然而止、下面全是底色。
+   min-height 扣掉的 34px 是面包屑（.crumb）高度，与 Review.vue 的既有写法同口径。 */
+.page-fill {
+  display: flex;
+  flex-direction: column;
+  /* 这里**不能**用 100%：main 与页面根节点之间还有一层 Transition 包裹的无类名 div
+     （height:auto），百分比 min-height 解析到它身上 = 解析不到（实测 50% 不生效）。
+     改用视口推算：100vh − 顶栏 52 − main 上下内边距 16+84 − 面包屑 ≈34。 */
+  min-height: calc(100vh - 186px);
+}
+.page-fill > :first-child {
+  flex: 1;
+}
+
+/* ===== EP small 档字号：写死的 12px 收口到 --fs-xs（审查报告 F1/F8 残留）=====
+   Element Plus 把 size="small" 一族的字号**直接写死 12px**（.el-button--small /
+   .el-select--small / .el-input--small / .el-form-item--small / 各 small label /
+   .el-tag 的 --el-tag-font-size），根本不引用 --el-font-size-* 变量 —— 上面把
+   extra-small 提到 13px 对它们无效，实测全站残留的 ≤12px 文本节点几乎全部来自这里
+   （筛选条小按钮、小标签、单选组、字数计数）。统一改引 --fs-xs。 */
+:root:root .el-button--small,
+:root:root .el-select--small .el-select__wrapper,
+:root:root .el-input--small,
+:root:root .el-select-group__title,
+:root:root .el-input__count {
+  font-size: var(--fs-xs);
+}
+:root:root .el-form-item--small {
+  --font-size: var(--fs-xs);
+  --el-form-label-font-size: var(--fs-xs);
+}
+:root:root .el-checkbox.el-checkbox--small .el-checkbox__label,
+:root:root .el-radio.el-radio--small .el-radio__label,
+:root:root .el-radio-button--small .el-radio-button__inner,
+:root:root .el-checkbox-button--small .el-checkbox-button__inner {
+  font-size: var(--fs-xs);
+}
+:root:root .el-tag {
+  --el-tag-font-size: var(--fs-xs);
+}
+/* el-descriptions 的 small 档是**漏网的一条**：EP 同样写死 12px，且写在
+   `.el-descriptions--small` 与其 `__cell` 两处（后者比前者更具体），只覆盖容器无效。
+   命中范围：病历详情弹窗（21 字段 × label/value）、治理详情弹窗、扣分明细弹窗、
+   提案审核的「基础信息」块 —— 全是信息最密集、最需要看清的地方，
+   却成了全站唯一还在 12px 的区域（复核实测：这 3 个弹窗合计 96 个 12px 文本节点，
+   其余 30 个界面已全部 ≥13px）。 */
+:root:root .el-descriptions--small,
+:root:root .el-descriptions--small .el-descriptions__body .el-descriptions__table .el-descriptions__cell {
+  font-size: var(--fs-xs);
+}
+
+/* ===== 弹窗过渡 300ms → 200ms（审查报告第三轮 P1-1）=====
+   EP 的 .dialog-fade-enter-active 用 `animation: … var(--el-transition-duration)`，
+   该变量默认 **0.3s**，超出 B 端建议的 150~250ms —— 全站 9 个弹窗每次开关多等 50~100ms。
+   这里只对弹窗覆盖层收口（不动 :root 上的全局变量，避免带偏其它 EP 组件动效）。 */
+:root:root .el-overlay.el-modal-dialog,
+:root:root .el-overlay-dialog {
+  --el-transition-duration: var(--dur-base);
+}
+
+/* ===== 表格行选择复选框：命中区 12×12 → 24×24（审查报告第三轮 P2-2）=====
+   .el-checkbox--small 视觉方块只有 12px，批量选择是质控第一步，点不准会选错病历。
+   只加内边距扩命中区、不放大视觉方块（负 margin 抵消占位，视觉不变）。 */
+.el-table .el-checkbox {
+  padding: 6px;
+  margin: -6px;
+}
+
+/* ===== 视觉隐藏（给屏幕阅读器的文本，不占视觉空间） ===== */.visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -297,6 +512,173 @@ aside :focus-visible,
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* ============================================================
+   切换过渡动效（统一动效语言）
+   ------------------------------------------------------------
+   把「切换」归成四类，每类一个固定类名 + 固定令牌，新加的过渡一律复用，
+   不再自己写时长/曲线。完整规范（触发时机 / 作用范围 / 表现 / 时长曲线）见
+   docs/视觉与交互审查报告-第三轮.md 附录 D。
+
+     ① .page-fade   顶层路由切换（登录 ↔ 外壳）  淡入淡出 + 6px 上浮（出场反向）
+     ①b .page-enter 内层路由入场（应用内切页）    纯淡入（顶层可用 out-in，内层不可，见 ①b）
+     ② .panel-fade  组件 / 状态 / 页签切换  纯淡入淡出（不做位移）
+     ③ .slide-x     侧边面板推入        淡入 + 12px 右移
+     ④ .stagger-in  列表 / 卡片批量入场   同组元素错峰浮现
+   ============================================================ */
+
+/* ① 顶层路由切换（.page-fade）—— 仅「登录/注册 ↔ 应用外壳」--------------------
+   触发时机：router 路径变化且**顶层匹配到的组件变了**（外壳整个换掉）。
+   ⚠️ 应用内子页面之间的切换**不走这里** —— 那时顶层匹配到的仍是 MainLayout，
+      顶层过渡根本不触发；真正换页的是 MainLayout 内层 router-view，用 ①b。
+   作用范围：被切换的那一页的根元素。
+   表现：淡入 + 6px 上浮。**刻意不做整屏滑动** —— 本项目主区是长表格 / 长表单，
+   整块位移会让大面积内容扫过视口，观感晕；且主区自身是滚动容器（main），
+   位移与内部滚动叠加后方向感会混乱。6px 只够让「换了一页」被感知到。
+   时长：入场 200ms / 出场 120ms。出场快一档，连续切换时才不觉得在等动画。
+
+   ⚠️ 关于 transform 的既有约定：PanelCard.vue 的注释写明「容器上加 transform 会
+   劫持 position:fixed 后代的包含块」。那条针对的是 **hover 持续态**（鼠标在面板内
+   移动 → hover 反复求值 → 包含块反复变化 → 弹层跳位）。
+   这里的 transform 是**一次性、瞬态**的：入场动画结束即被移除，不会长期驻留，
+   故不会出现「弹层被方框截断」。全站 el-dialog 又均为 v-if 守卫或关闭态隐藏。
+   已按此前提在真机复核（见验收记录）。 */
+.page-fade-enter-active {
+  transition: opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+.page-fade-leave-active {
+  transition: opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.page-fade-enter-from { opacity: 0; transform: translateY(6px); }
+.page-fade-leave-to { opacity: 0; transform: translateY(-4px); }
+
+/* ①b 页面切换入场（**内层路由切换实际在用的实现**）--------------------------
+   为什么 MainLayout 的内层 router-view 不用上面的 <Transition mode="out-in">：
+
+   ⚠️ 实测结论（2026-10 真机复现，Vue 3.5.42 + vue-router 4.5）：
+      `<router-view v-slot="{ Component }">` + `<Transition mode="out-in">`
+      + `<component :is="Component" />` 这一形态**挂在 MainLayout 的 <main> 内**
+      时会卡死 —— 切换后 main 里只剩面包屑与 h1，页面内容**永久空白**。
+      逐帧取证显示：leave 过渡其实跑完了（transitionrun/start 与 transitionend
+      成对出现，耗时 122ms ≈ --dur-fast），旧页元素在 transitionend 后被正常移除，
+      但**新页始终不进入**（等到 2.8s 仍是空白，main.innerHTML 里只剩占位注释）。
+      对应 Vue 源码（@vue/runtime-core BaseTransition 的 out-in 分支）：
+      `state.isLeaving = true` 后靠 `leavingHooks.afterLeave` 回调里的
+      `instance.update()` 复位并驱动重渲染；该路径在此形态下未生效，
+      于是 `state.isLeaving` 恒为 true，渲染函数每次都走
+      `if (state.isLeaving) return emptyPlaceholder(child)`。
+
+   排除项（都实测过，均与故障无关）：
+     · 去掉 `:key` → 仍卡死；
+     · 去掉顶层 App.vue 的 Transition（消除嵌套）→ 仍卡死。
+   反例（说明不是「out-in 一律不能用」）：
+     · App.vue 顶层同样写 out-in，登录/注册 ↔ 应用外壳切换**正常**，
+       实测有完整的淡出→淡入，故顶层保留 out-in（见 App.vue 注释）。
+     · NlpExtract.vue 的「空态 ↔ 结果态」两分支是不同组件（StructuredDataCard /
+       EmptyState）时也会卡死，改成同类型 div 包裹后恢复 —— 与本条同源。
+
+   因此内层路由**不再走 Transition 状态机**，改用「:key 强制重建 + CSS 入场动画」：
+     · :key 变化 → Vue 卸载旧节点、挂载新节点 → 新节点上的 animation 自动重放；
+     · 全程不经过 Transition 状态机 → 不存在卡死路径；
+     · 不引入额外包裹元素 → 页面根的 min-height:100% / .page-fill 语义不被破坏
+       （曾为让 Transition 能包裹而加了一层 div，height:auto 的它把百分比
+       min-height 吃掉了，逼得 .page-fill 改用 calc(100vh - 186px) 硬推）。
+
+   表现：**纯淡入，不做位移**。理由有两条：
+     ① 医疗系统要「轻量化、稳重」，位移属于额外表演；
+     ② 页面根里挂着 el-dialog / el-select 弹层，transform 会劫持它们的
+        position:fixed 包含块（本仓 PanelCard.vue 注释记录的既有故障），
+        opacity 是唯一零风险的选择。
+   时长：200ms（--dur-base），落在 B 端 150~250ms 的建议区间内。
+   ⚠️ 代价：没有「出场」动画（旧页瞬间卸载，新页淡入）。换来的是绝不会卡死、
+      也不多一层 DOM —— 对高频切页的医护场景，稳比花哨重要。 */
+.page-enter {
+  animation: page-in var(--dur-base) var(--ease-out);
+}
+/* P2-1：起点从 0 抬到 0.25 —— out-in 切走旧页后，新页若从 opacity:0 开始会先出现
+   2 帧（约 33ms）全透明（实测定帧 0,0,0.076,0.68…）。0.25 消除「全透明帧」，
+   代价只是淡入对比度略降，肉眼几乎不可感知。 */
+@keyframes page-in {
+  from { opacity: 0.25; }
+  to { opacity: 1; }
+}
+
+/* ② 组件 / 状态 / 页签切换 --------------------------------------------------
+   触发时机：v-if / v-show 切换、条件分支（空态 ↔ 结果态）、页签换页。
+   作用范围：发生切换的那块容器，通常嵌在卡片里。
+   表现：**纯淡入淡出，不做位移**。这类容器嵌在卡片里，位移会让卡片边缘「跳动」；
+   更重要的是它们内部常挂着 el-dialog / el-select 弹层，而 opacity 既不创建包含块
+   也不产生裁剪 —— 是唯一万无一失的做法（沿用 PanelCard 的既有结论）。
+   时长：入场 200ms / 出场 120ms，与 ① 同档，保证「换内容」与「换页」节奏一致。 */
+.panel-fade-enter-active { transition: opacity var(--dur-base) var(--ease-out); }
+.panel-fade-leave-active { transition: opacity var(--dur-fast) var(--ease-out); }
+.panel-fade-enter-from,
+.panel-fade-leave-to { opacity: 0; }
+
+/* ③ 侧边面板推入（空间位移）--------------------------------------------------
+   触发时机：需要「看见它从哪儿来」的面板 —— AI 助手展开、侧边抽屉。
+   作用范围：面板**自身**。祖先不得是 fixed 后代的依赖方（见 ① 的说明）。
+   表现：淡入 + 位移 12px，方向随面板的锚点定：
+     slide-x  面板锚在右侧 → 从右推入（translateX）
+     slide-y  面板锚在底部（如右下角 AI 助手）→ 从下升起（translateY）
+   位移取 12px：200ms 内移 12px ≈ 60px/s，是人眼能跟上、又不至于看出「在飞」的速度；
+   再大就与时长不匹配，会让面板显得在「飞」。
+   时长：280ms，比 ①② 慢一档 —— 空间位移要更长时间才显得从容。
+   缓动用 --ease-in-out：位移的起步与收尾都要减速，两端才不突兀。
+   📌 slide-x 属规范资产、当前暂未使用（全站侧向面板只有 AI 助手的 slide-y，
+   见审查报告第三轮 P2-7）—— 保留不与删除，将来做右侧抽屉时直接用。 */
+.slide-x-enter-active,
+.slide-x-leave-active,
+.slide-y-enter-active,
+.slide-y-leave-active {
+  transition: opacity var(--dur-slow) var(--ease-in-out),
+    transform var(--dur-slow) var(--ease-in-out);
+}
+.slide-x-enter-from,
+.slide-x-leave-to { opacity: 0; transform: translateX(12px); }
+.slide-y-enter-from,
+.slide-y-leave-to { opacity: 0; transform: translateY(12px); }
+
+/* ④ 列表 / 卡片批量入场 ------------------------------------------------------
+   触发时机：一组同构元素首次渲染（看板统计卡、结果卡片组）。
+   作用范围：带 .stagger-in 的容器的**直接子元素**。
+   表现：逐个浮现（上浮 4px + 淡入），每个比前一个晚 24ms。
+   为什么错峰：同组元素同时出现时人眼会把它们当成「一整块」；错峰 24ms 能让人
+   感知到「这是一条一条来的」，从而看清数量。
+   ⚠️ 上限 6 个：第 7 个起与第 6 个同时，不继续累加延迟。
+   ⚠️ 表格行、长列表**不要**用 —— 几十行逐个浮现会变成拖沓的等待。 */
+.stagger-in > * {
+  animation: stagger-rise var(--dur-slow) var(--ease-out) both;
+}
+.stagger-in > *:nth-child(2) { animation-delay: 24ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 48ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 72ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 96ms; }
+.stagger-in > *:nth-child(n + 6) { animation-delay: 120ms; }
+
+@keyframes stagger-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 页签内容切换 --------------------------------------------------------------
+   Element Plus 的 el-tab-pane 用 v-show 控制显隐（非活动页签是 display:none），
+   换页时内容**直接出现、没有任何过渡** —— 全站 5 个带页签的页面（病历数据 /
+   人工复核 / 结构化解析 / 术语词典 / 病历详情）都缺这一下。
+   这里用一条 CSS 兜住全部：元素从 display:none 回到 display:block 时，
+   CSS 动画会重新开始播放，于是每次换页签都会重放一次淡入。
+   只淡入、不位移：页签之间内容高度差异大，位移会让容器高度跳变。
+   ⚠️ 不写 fill-mode：万一浏览器不重放动画，元素也会停在自身正常样式（opacity:1），
+   不会出现「内容永久不可见」的兜底失败。 */
+.el-tabs__content > .el-tab-pane {
+  animation: tab-pane-in var(--dur-base) var(--ease-out);
+}
+@keyframes tab-pane-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* 动效退出开关（无障碍）
@@ -344,30 +726,6 @@ aside :focus-visible,
    处理约定：新增页面时优先复用现有 token；确需新色请先在此登记并补充 token，
    不要直接写死十六进制（否则这份清单会重新变长）。 */
 
-/* 28.18：打印 / 另存 PDF。报告页的「打印 / 导出 PDF」按钮走浏览器打印 ——
-   后端虽声明了 pdfbox 但从未使用，且 PDFBox 标准字体不含 CJK，中文报告要嵌字体，成本高。
-   打印时只留正文：隐藏顶栏、侧栏、AI 浮球与操作区，去掉固定视口高度限制。
-   各页自己的操作按钮（导出/补词/重跑等）在页面内用 scoped 的 @media print 隐藏。 */
-@media print {
-  .topbar,
-  aside,
-  .skip-link,
-  .ai-assistant {
-    display: none !important;
-  }
-  .app-shell,
-  .layout {
-    min-width: 0;
-    height: auto;
-    overflow: visible;
-  }
-  main {
-    height: auto;
-    overflow: visible;
-    background: #fff !important;
-  }
-  /* 卡片在纸上不需要阴影/描边，浅底也更省墨 */
-  .app-shell {
-    background: #fff;
-  }
-}
+/* 原 28.18 的 @media print 全局打印样式已删（2026-10-07）：全站唯一的打印入口
+   「打印 / 另存 PDF」（标准化质量报告页）已按需求移除，window.print 再无调用方，
+   这块 CSS 随之成为死代码。将来若恢复打印再按当时的口径重建。 */

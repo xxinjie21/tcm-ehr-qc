@@ -452,7 +452,7 @@ const handleSubmit = async () => {
 .rh-desc {
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .rh-ops {
   display: flex;
@@ -467,7 +467,7 @@ const handleSubmit = async () => {
 }
 .rh-skip {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 步骤条：序号圆点 + 标题 + 说明，降低「不知道下一步做什么」的成本 */
 .step {
@@ -504,7 +504,7 @@ const handleSubmit = async () => {
 }
 .step-d {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   line-height: 1.7;
   margin-bottom: var(--sp-2);
 }
@@ -518,8 +518,40 @@ const handleSubmit = async () => {
 .do-btn {
   margin-top: 2px;
 }
+/* V7（审查报告）：「格式示例」卡此前独占整行 —— 1384px 宽只填 31%、右侧空 932px。
+   改为与导入面板**左右并排**：示例卡收敛到 320~420px 的右列（内容正好铺满），
+   导入面板占左列；顶部的重跑引导横跨两列。窄屏回退为上下堆叠。 */
+.dict-import {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 0 var(--sp-3);
+  align-items: start;
+}
+.dict-import > .rerun-hint {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1100px) {
+  .dict-import {
+    grid-template-columns: 1fr;
+  }
+}
 .import-result {
   margin-top: var(--sp-4);
+  /* V1 同款：结果统计卡横排吃掉宽度，不再竖着堆成三条满宽窄卡；
+     文本块（下一步说明 / 体检 / 失败行 / 出口行）整行占满。 */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+.import-result .stat {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.import-result > .what-next,
+.import-result > .lint,
+.import-result > .failures,
+.import-result > .import-done-ops {
+  flex: 0 0 100%;
 }
 /* 词表体检（批次 21）：问题清单。错误与警告用左侧色条区分，不用整块红黄底 ——
    整块底色会让人以为「导入失败了」，其实多数条目仍会正常导入 */
@@ -558,7 +590,7 @@ const handleSubmit = async () => {
 }
 .lint-count {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .lint-terms {
   margin-top: 4px;
@@ -571,7 +603,7 @@ const handleSubmit = async () => {
   margin-top: 4px;
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 「接下来会怎样」：把结果落到下一步动作上，而不是只报数字 */
 .what-next {

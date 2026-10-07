@@ -106,3 +106,35 @@ export function summarizeNorm(vo) {
   }
   return s
 }
+
+/**
+ * 未命中标准词典的实体清单（按词去重 + 计数）。
+ *
+ * <p>给「规则预检单（扣分明细）」用：扣分原因里只写「有 N 个实体未命中标准词典」，
+ * 用户还要再翻原文才知道是哪几个 —— 这里把哪些词没收录直接列出来。</p>
+ *
+ * <p><b>口径与后端 {@code QcScorer.countUnnormalized} 对齐</b>：同一份
+ * {@code ENTITY_SECTIONS}（dict=true 的 8 类，与后端 {@code EntityTypes.dictKeys()} 一致），
+ * 同一判据（{@code normLevel} 为 null/undefined 即算未命中）。默认规则集正好就是这 8 类；
+ * 若用户在规则配置里改了参与计分的类型，后端按子集计、此处按全集列 —— 列表会比扣分条数多
+ * 出被排除类型的那几条，属预期差异（仍能反映「哪些词没收录」。</p>
+ *
+ * @param vo structuredData 对象
+ * @returns [{ term, count }]（同一词未命中多次时 count > 1，便于复现后端按实体计数的 N）
+ */
+export function missedNormTerms(vo) {
+  if (!vo) return []
+  const acc = new Map()
+  for (const sec of ENTITY_SECTIONS) {
+    if (!sec.dict) continue
+    const arr = Array.isArray(vo[sec.key]) ? vo[sec.key] : []
+    for (const it of arr) {
+      // 与 summarizeNorm 同一判据：normLevel 不存在（未命中词典）才算
+      if (!it || it.normLevel != null) continue
+      const t = String(entityName(sec, it) ?? '').trim()
+      if (!t) continue
+      acc.set(t, (acc.get(t) || 0) + 1)
+    }
+  }
+  return [...acc.entries()].map(([term, count]) => ({ term, count }))
+}

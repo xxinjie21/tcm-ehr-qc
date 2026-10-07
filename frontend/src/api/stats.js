@@ -5,8 +5,10 @@ export function getOverview() {
 }
 
 // 科室动态选项
+// silent：useDepartments 失败后回退 []（下拉变空但不阻断手输），
+// 属于后台取数，失败只在页面内降级，不弹全局红条
 export function getDepartments() {
-  return request.get('/stats/departments')
+  return request.get('/stats/departments', { silent: true })
 }
 
 // 看板扩展：趋势 / 科室合格率 / 评分分布 / 词典规模

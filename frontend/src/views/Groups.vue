@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page-fill">
     <PanelCard title="组织管理">
       <!-- 组织列表（仅管理员）：批次 6 起组织由用户自助创建、无审核，
            管理员只做治理 —— 停用 / 恢复 / 归档 / 改派所有者 -->

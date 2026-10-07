@@ -3,8 +3,10 @@ import request from '@/utils/request'
 // ===== 组织 =====
 
 // 我的组织：所有者 / 成员 / 未加入组织，统一从这里拿自己的状态
+// silent：主框架进页顺手刷新（stores/user.js refreshOrg 是 catch{}，MyGroup 有自己的
+// 失败空态），失败由页面降级，不弹全局红条
 export function getMyOrg() {
-  return request.get('/my-org')
+  return request.get('/my-org', { silent: true })
 }
 
 // ---- 管理员 ----

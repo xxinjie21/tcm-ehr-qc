@@ -96,7 +96,7 @@ const FIELDS = fieldsWithWide([
   border-radius: 8px;
   font-size: var(--fs-xs);
   background: var(--line-soft);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .detail-2col {
   display: grid;
@@ -115,7 +115,7 @@ const FIELDS = fieldsWithWide([
 /* 栏标题：小字次级色，只作分区提示 */
 .col-hd {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: var(--sp-2);
 }
 /* 窄屏（<900px）两栏塌成单列，避免每栏过窄导致长文本逐字换行 */

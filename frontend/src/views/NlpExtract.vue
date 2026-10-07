@@ -11,18 +11,22 @@
         <span class="tip">共 {{ total }} 条，点击行即载入该病历原文</span>
       </div>
 
-      <!-- max-height 必须 ≥「表头 + 每页 10 行」= 32 + 32×10 = 352px，否则默认每页 10 条会多出
-           一条内部滚动条。实测：写 320 时可视区只有 288px，差 32px 就冒滚动条；写 360 与人工复核、
-           质控校验同口径，10 行正好铺满且不滚（>10 条时仍保留滚动，属预期）。
-           改小这个值等于把滚动条加回来 -->
+      <!-- max-height 与病历数据 / 人工复核同口径（420，2026-10-07 调档）：
+           每页 10 行直接显示完，不再出现「要多滚一格才见底」的内部滚动条
+           （原 360 在 13px 字阶下只够 ~9 行，用户得在表格里上下滚才能看全）。
+           >10 条时仍保留滚动，属预期。
+           slim：左栏是窄分栏，8 列全渲染会把摘要挤没、并冒出不可发现的横向滚动条；
+           slim 只留「病历ID(90) / 摘要 / 操作」三列（内容宽约 420px），其余信息在
+           右侧详情区可见（载入后有完整原文与结构化结果）。不传 slim 的共用页不受影响。 -->
       <RecordTable
         ref="tableRef"
+        slim
         :rows="rows"
         :loading="listLoading"
         loading-text="正在读取任务列表…"
         highlight-current
         :row-class-name="rowClass"
-        :max-height="360"
+        :max-height="420"
         :action-width="90"
         @row-click="loadRecord"
       >
@@ -251,19 +255,11 @@
                 </div>
               </div>
 
-              <!-- 28.17：点击结果里的实体，左侧原文区定位到对应字段并高亮原文片段 -->
-              <StructuredDataCard v-if="result" :data="result" locatable @locate="locateSourceText" />
-              <!-- 28.13：空态补行动引导 —— 此前只有「尚未抽取」四个字，
-                   用户不知道该在哪一步、做什么，空白区又占满一屏 -->
-              <EmptyState v-else text="尚未抽取">
-                <div class="empty-hint">
-                  先在左侧「选择病历」点一条载入原文，切到「结构化抽取」后点<b>执行抽取</b>；
-                  识别出的要素会在这里按疾病 / 症状 / 证候等 9 类展示，并可逐项归一。
-                </div>
-              </EmptyState>
-
               <!-- 术语归一试算：词典直查，不依赖 Python NLP 服务，
-                   让用户在本页就能亲自跑一次归一、看到「原文 → 标准词」 -->
+                   让用户在本页就能亲自跑一次归一、看到「原文 → 标准词」。
+                   V4：原先排在空态**下方** —— 尚未抽取时用户先看到空态与大片留白，
+                   往下滚才撞见这个可用工具；按「信息优先」移到空态上方，
+                   词典直查入口先于留白出现。 -->
               <div class="norm-tool">
                 <div class="nt-hd">术语归一试算（直查词典，不依赖 NLP 服务）</div>
                 <div class="nt-row">
@@ -290,23 +286,55 @@
                     归 一
                   </el-button>
                 </div>
-                <div v-if="normResult" class="nt-result">
-                  <span class="nt-in">{{ normResult.term }}</span>
-                  <span class="nt-arrow">→</span>
-                  <span class="nt-out" :class="{ miss: !normResult.source }">{{ normResult.standardTerm }}</span>
-                  <!-- 试算也要说清「怎么比上的」：否则用户没法判断是精确命中还是猜的 -->
-                  <span class="nt-src">
-                    <template v-if="normResult.source">
-                      命中词典 · {{ normResult.source }}
-                      <template v-if="normResult.level">· {{ LEVEL_FULL[normResult.level] || normResult.level }}</template>
-                    </template>
-                    <template v-else>未命中词典，返回原词</template>
-                  </span>
-                </div>
-                <div v-else class="nt-hint">
-                  命中示例：证候「脾肾阳虚」、中药「炙甘草」；词典未收录的口语词（如「嗓子疼」）会原样返回并标为未命中。
-                </div>
+                <!-- 「试算结果 ↔ 示例提示」也是一处状态切换，用同一套 panel-fade 保持节奏一致。
+                     两个分支都是 div（同类型），必须给 key 才能被识别为「换了内容」。 -->
+                <Transition name="panel-fade" mode="out-in">
+                  <div v-if="normResult" key="r" class="nt-result">
+                    <span class="nt-in">{{ normResult.term }}</span>
+                    <span class="nt-arrow">→</span>
+                    <span class="nt-out" :class="{ miss: !normResult.source }">{{ normResult.standardTerm }}</span>
+                    <!-- 试算也要说清「怎么比上的」：否则用户没法判断是精确命中还是猜的 -->
+                    <span class="nt-src">
+                      <template v-if="normResult.source">
+                        命中词典 · {{ normResult.source }}
+                        <template v-if="normResult.level">· {{ LEVEL_FULL[normResult.level] || normResult.level }}</template>
+                      </template>
+                      <template v-else>未命中词典，返回原词</template>
+                    </span>
+                  </div>
+                  <div v-else key="h" class="nt-hint">
+                    命中示例：证候「脾肾阳虚」、中药「炙甘草」；词典未收录的口语词（如「嗓子疼」）会原样返回并标为未命中。
+                  </div>
+                </Transition>
               </div>
+
+              <!-- 28.17：点击结果里的实体，左侧原文区定位到对应字段并高亮原文片段。
+                   「空态 ↔ 结果态」是典型的页内状态切换：加 panel-fade 让结果「浮现」
+                   而不是「啪」地出现。用 mode="out-in" 先让空态淡出再让结果淡入 ——
+                   两个分支都很高，同时在场会让容器高度瞬间翻倍、下方内容整体下跳。
+                   不做位移：容器嵌在卡片里，位移会带动整块抖动。
+                   V4：结果列被拉到与左栏等高（align-self:stretch）后，空态用
+                   .empty-center 在列内垂直居中，留白上下对称、不再整块堆在底部。
+                   ⚠️ 分支必须包成**同为 div** 的 wrapper（key 区分）：直接让两个不同
+                   组件（StructuredDataCard / EmptyState）互为 v-if/v-else 分支。
+                   Vue 3.5 的 Transition out-in 对「两个不同组件分支」实测会卡死
+                   （占位注释常驻、新旧都不渲染），换成同类型根节点后才有正确的
+                   类型匹配与 key 替换路径。 -->
+              <Transition name="panel-fade" mode="out-in">
+                <div v-if="result" key="result" class="sd-branch">
+                  <StructuredDataCard :data="result" locatable @locate="locateSourceText" />
+                </div>
+                <!-- 28.13：空态补行动引导 —— 此前只有「尚未抽取」四个字，
+                     用户不知道该在哪一步、做什么，空白区又占满一屏 -->
+                <div v-else key="empty" class="sd-branch empty-center">
+                  <EmptyState text="尚未抽取">
+                    <div class="empty-hint">
+                      先在左侧「选择病历」点一条载入原文，切到「结构化抽取」后点<b>执行抽取</b>；
+                      识别出的要素会在这里按疾病 / 症状 / 证候等 9 类展示，并可逐项归一。
+                    </div>
+                  </EmptyState>
+                </div>
+              </Transition>
             </div>
           </div>
         </PanelCard>
@@ -751,7 +779,7 @@ onMounted(() => {
   border-radius: 6px;
   padding: var(--sp-2) var(--sp-4);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 14px;
 }
 .loaded-bar b { color: var(--ink); }
@@ -779,9 +807,14 @@ onMounted(() => {
 /* 外层是「左＝选择病历（挑一份就够）／右＝工作区（改原文 + 看结果）」。
    原来是 1.25fr : 1fr —— 挑病历的列表反而比干活的工作区宽，优先级是反的；
    多层分栏叠起来后工作区只剩不到四成屏宽，长文本字段逐字换行。
-   这里把宽度让给工作区，列表给一个能看全登记号 + 日期的下限即可。 */
+   这里把宽度让给工作区，列表给一个能看全登记号 + 日期的下限即可。
+   V3：左栏下限 300px → 460px，右栏 1.7fr → 1.6fr。
+   原因：左栏表格在 slim 模式下内容宽约 420px（90 ID + 240 摘要下限 + 90 操作，
+   加单元格内边距约需 440~460px），300px 下限等于把 6 列塞进看不见的横向滚动条；
+   460px 保证「内容宽 ≤ 容器宽」，不再横向滚动。右栏仍拿大头（1.6fr），
+   工作区表单与实体卡不被挤窄。 */
 .split-picker {
-  grid-template-columns: minmax(300px, 0.7fr) minmax(0, 1.7fr);
+  grid-template-columns: minmax(460px, 1fr) minmax(0, 1.6fr);
 }
 /* 内层「原文 / 抽取结果」保持**左右并排**（这是本页的核心：对着原文核实体）。
    比例给原文略多（1.15 : 1）：原文里长文本字段多，实体侧是标签云，同样宽度下原文更吃紧。
@@ -789,18 +822,34 @@ onMounted(() => {
 .split-compare {
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 }
+/* V4：结果列拉到与左栏等高 —— 继承自 .split 的 align-items:start 让右栏只有自身内容高
+   （空态时约 465px，左栏约 943px），478px 空白整块堆在下方。
+   stretch 之后空白回到列内，配合 .empty-center 上下对称分掉。 */
+.split-compare > .pane:last-child {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+}
+/* V4：空态（尚未抽取）在列内垂直居中。
+   margin:auto 上下均分剩余空间 —— flex 列布局中 auto 边距先于 justify-content
+   吸收空隙，故留白上下对称而不是全堆在底部。
+   .empty-center 挂在 EmptyState 组件上，Vue 会把它透传到 el-empty 根节点。 */
+.split-compare > .pane:last-child .empty-center { margin: auto 0; }
 /* 批次3 收尾（2026-10-05）：右栏顶部是标签行「单条解析 / 批量解析」，左栏顶部是卡片标题条 ——
    两者高度不同，直接并排时左栏会明显「高出一截」（1264×569 实拍对比可见：左卡起 y≈105，右卡起 y≈150）。
    这里让左栏下移一个标签行的高度，使两栏内容同线起点。
-   45px 为实拍测量值；只此一处，若调整 Element 标签主题需同步改这里。 */
-.split > .pane:first-child { margin-top: 45px; }
+   45px 为实拍测量值；只此一处，若调整 Element 标签主题需同步改这里。
+   连带修正：原先写的是 `.split > .pane:first-child`，会把内层 .split-compare 的
+   左栏（原文）也下移 45px —— 但内层两栏同在一张卡片里、表头本就同线，
+   那 45px 是误伤（V4 拉伸对齐时会放大成肉眼可见的错位）。收窄到 .split-picker 才是原意。 */
+.split-picker > .pane:first-child { margin-top: 45px; }
 .pane { min-width: 0; }
 .pane-hd { font-size: var(--fs-base); font-weight: bold; color: var(--ink); margin-bottom: var(--sp-2); }
 .src-note { font-size: var(--fs-xs); color: var(--ink-mid); margin-left: var(--sp-2); }
 .src-note.warn { color: var(--danger); }
 .norm-note {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -817,7 +866,7 @@ onMounted(() => {
 /* 归一汇总（第九轮）：把命中数、未命中数、走 ES 还是内存摊开 */
 .norm-stat {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -876,7 +925,7 @@ onMounted(() => {
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.nt-hd { font-size: var(--fs-xs); color: var(--text-sub); margin-bottom: var(--sp-2); }
+.nt-hd { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
 .nt-row { display: flex; gap: var(--sp-2); align-items: center; }
 .nt-result {
   display: flex;
@@ -888,19 +937,21 @@ onMounted(() => {
   border-top: 1px dashed var(--line-soft);
   font-size: var(--fs-xs);
 }
-.nt-in { color: var(--text-sub); }
+.nt-in { color: var(--text-sub-strong); }
 .nt-arrow { color: #c9c3b4; }
 .nt-out { color: var(--ink); font-weight: bold; }
 .nt-out.miss { color: var(--danger); }
-.nt-src { font-size: var(--fs-xs); color: var(--text-sub); margin-left: auto; }
-.nt-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.7; }
+.nt-src { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-left: auto; }
+.nt-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); line-height: 1.7; }
 /* 28.13：空态引导文案，居中但不喧宾夺主 */
-.empty-hint { max-width: 360px; margin: 0 auto; font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.8; }
+.empty-hint { max-width: 360px; margin: 0 auto; font-size: var(--fs-xs); color: var(--text-sub-strong); line-height: 1.8; }
 
-/* 原文模块化字段；分区常显 + 3 列栅格：
-   wide（长文本）占 2 列而非整行，否则每行拉满宽度、纵向白白多出数行。
-   再收紧行距与列间距，控件尺寸统一由 el-form 的 size="large" 决定（40px） */
-.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 10px; }
+/* 原文模块化字段；分区常显 + 2 列栅格：
+   V8：基础栅格从 3 列降到 2 列 —— 3 列时舌诊/脉诊等短字段的输入框只有约 89px，
+   连「淡红舌」三个字都放不下；2 列下短字段输入框约 150~170px（典型视口），
+   达到 ≥140px 的可输入下限。wide（长文本）占 2 列 = 整行，整行铺满不浪费。
+   控件尺寸统一由 el-form 的 size="large" 决定（40px） */
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
 .form-grid .wide { grid-column: span 2; }
 .form-group { margin-bottom: var(--sp-1); }
 .group-hd {
@@ -922,7 +973,7 @@ onMounted(() => {
   background: var(--ink-mid);
 }
 .form-grid :deep(.el-form-item) { margin-bottom: 6px; }
-.form-grid :deep(.el-form-item__label) { font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.5; padding-bottom: 0; }
+.form-grid :deep(.el-form-item__label) { font-size: var(--fs-xs); color: var(--text-sub-strong); line-height: 1.5; padding-bottom: 0; }
 .field-form { margin-bottom: 6px; }
 /* 28.17：点结果实体后命中的字段高亮，与下方原文片段标记同一色系 */
 .form-grid :deep(.el-form-item.src-hit) {
@@ -975,16 +1026,16 @@ onMounted(() => {
 /* 28.17：整段文本里被点中的原文片段标记 */
 .composed mark.hit {
   background: var(--ochre-light);
-  color: var(--ochre);
+  color: var(--ochre-text);
   font-weight: 600;
   border-radius: 3px;
   padding: 0 var(--sp-1);
 }
 :deep(.row-active) td { background: var(--ink-light) !important; }
 
-@media (max-width: 1560px) {
-  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+/* V8：原先这里有一条 `@media (max-width: 1560px) { .form-grid { 2 列 } }` ——
+   基础栅格已改为 2 列（见上方 .form-grid），该断点与基础样式重复，故删除；
+   降 1 列的职责只留给 ≤900px，不再需要中间档。 */
 @media (max-width: 1200px) {
   .split { grid-template-columns: 1fr; }
 }

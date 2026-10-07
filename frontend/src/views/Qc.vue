@@ -1,39 +1,6 @@
 <template>
   <!-- 质控页：范围查询（整页口径）+ 评分标准 + 规则配置（三档授权）+ 扣分构成 + AI 预检列表 + 扣分明细弹窗 -->
   <div>
-    <!-- 范围查询提升为整页生效：此前 RangeFilter 只喂图谱，
-         而「AI 预检列表」另挂一个独立的分级下拉，同一页存在两个互不相干的范围口径 -->
-    <PanelCard title="范围查询">
-      <div class="filter-bar">
-        <RangeFilter v-model="filters" />
-        <el-button type="primary" size="small" :loading="queryLoading" @click="applyFilters">查 询</el-button>
-        <el-button size="small" :disabled="queryLoading" @click="resetFilters">重置</el-button>
-        <!-- 重算是异步任务（§七 L5）：提交后按钮立刻解锁，进度单独显示，别让按钮一直转圈 -->
-        <el-button
-          type="warning"
-          size="small"
-          :loading="recomputing"
-          :disabled="isActiveTask(recomputeProgress)"
-          @click="handleRecompute"
-        >
-          {{ recomputeButtonText }}
-        </el-button>
-        <!-- 28.3：cancelQcBatch 后端早已就绪，前端却一直没入口 ——
-             一旦提交就只剩等，想停只能刷新页面（任务仍在后台跑）。
-             只在运行中出现，避免常态多一个永远点不到的按钮 -->
-        <el-button
-          v-if="isActiveTask(recomputeProgress)"
-          size="small"
-          :loading="cancelling"
-          @click="handleCancelRecompute"
-        >
-          取消重算
-        </el-button>
-        <span class="tip">范围对本页各块同时生效；「质控评分计算」按当前范围重算评分与分级</span>
-      </div>
-    </PanelCard>
-
-
     <!-- 规则配置（管理员 / 所有者 / 被授权成员）：句子清单 + 就地编辑，保存即生效 -->
     <QcRulesDialog
       v-model="rulesVisible"
@@ -43,84 +10,137 @@
       @saved="applyRules"
     />
 
-    <!-- 本范围扣分构成：范围内各病历扣分明细聚合 -->
-    <PanelCard title="本范围扣分构成">
-      <div v-loading="dedLoading" element-loading-text="正在统计扣分分布…">
-        <template v-if="dedStats">
-          <!-- 按扣分类型聚合：横条长度按最大扣分点数归一（见 barWidth） -->
-          <div v-if="dedStats.byType.length" class="dist">
-            <div v-for="t in dedStats.byType" :key="t.type" class="dist-row">
-              <span class="dr-l">{{ t.type }}</span>
-              <div class="dr-bar"><i :style="{ width: barWidth(t.points) }"></i></div>
-              <span class="dr-v">{{ t.count }} 份 · -{{ t.points }}</span>
+    <!-- 本范围扣分构成：范围内各病历扣分明细聚合。
+         顶部工具条 = 原独立的「范围查询」PanelCard（审查报告 L2）：那张卡只有 137px 高、
+         里面仅一行筛选，八成面积是空的。去掉卡壳降级为工具条后，筛选与它实际驱动的
+         两块数据在视觉上更近，也省掉一整张卡的卡头与内边距。
+         整页口径的语义不变：一次「查询」同时刷新扣分构成与 AI 预检列表
+         （此前 RangeFilter 只喂图谱，而「AI 预检列表」另挂独立分级下拉，同一页两个口径）。 -->
+    <div class="grid-2">
+      <PanelCard title="本范围扣分构成">
+        <!-- 工具条：下边框与正文分隔，避免筛选与统计内容糊在一起 -->
+        <div class="panel-toolbar">
+          <div class="filter-bar">
+            <RangeFilter v-model="filters" />
+            <!-- F7：与同排 RangeFilter 的 32px 输入框等高，按钮改 default 档；
+                 同排的重算 / 取消重算一并改，否则底对齐后会出现 24px 与 32px 混排 -->
+            <el-button type="primary" size="default" :loading="queryLoading" @click="applyFilters">查 询</el-button>
+            <el-button size="default" :disabled="queryLoading" @click="resetFilters">重置</el-button>
+            <!-- 重算是异步任务（§七 L5）：提交后按钮立刻解锁，进度单独显示，别让按钮一直转圈 -->
+            <el-button
+              type="warning"
+              size="default"
+              :loading="recomputing"
+              :disabled="isActiveTask(recomputeProgress)"
+              @click="handleRecompute"
+            >
+              {{ recomputeButtonText }}
+            </el-button>
+            <!-- 28.3：cancelQcBatch 后端早已就绪，前端却一直没入口 ——
+                 一旦提交就只剩等，想停只能刷新页面（任务仍在后台跑）。
+                 只在运行中出现，避免常态多一个永远点不到的按钮 -->
+            <el-button
+              v-if="isActiveTask(recomputeProgress)"
+              size="default"
+              :loading="cancelling"
+              @click="handleCancelRecompute"
+            >
+              取消重算
+            </el-button>
+            <span class="tip">范围对本页各块同时生效；「质控评分计算」按当前范围重算评分与分级</span>
+          </div>
+          <!-- I7：批量重算此前只有按钮文案（「重算中 1234/40000…」），看不出推进快慢。
+               数据早已在 recomputeProgress 里，补一条进度条：只在任务运行时渲染，
+               终态由 v-if 自动移除，不留占位 -->
+          <el-progress
+            v-if="isActiveTask(recomputeProgress)"
+            class="recompute-progress"
+            :percentage="recomputePercent"
+            :stroke-width="10"
+          />
+        </div>
+        <div v-loading="dedLoading" element-loading-text="正在统计扣分分布…">
+          <template v-if="dedStats">
+            <!-- 按扣分类型聚合：横条长度按最大扣分点数归一（见 barWidth） -->
+            <div v-if="dedStats.byType.length" class="dist">
+              <div v-for="t in dedStats.byType" :key="t.type" class="dist-row">
+                <span class="dr-l">{{ t.type }}</span>
+                <div class="dr-bar"><i :style="{ width: barWidth(t.points) }"></i></div>
+                <span class="dr-v">{{ t.count }} 份 · -{{ t.points }}</span>
+              </div>
             </div>
-          </div>
-          <div v-else class="ok">本范围内没有扣分项（全部病历未触发任何扣分规则）</div>
+            <div v-else class="ok">本范围内没有扣分项（全部病历未触发任何扣分规则）</div>
 
-          <!-- 扣分项明细：受影响病历数 + 合计扣分，用于定位主要扣分来源 -->
-          <template v-if="dedStats.byItem.length">
-            <div class="sub-hd">Top 扣分项</div>
-            <el-table :data="dedStats.byItem" border size="small" max-height="240">
-              <el-table-column prop="type" label="类型" width="130" />
-              <el-table-column prop="item" label="项" width="110" />
-              <el-table-column prop="count" label="受影响病历数" width="110" />
-              <el-table-column prop="points" label="合计扣分" width="100" />
-            </el-table>
-            <!-- P5.2：明细被截断时告知，避免「为什么只看到 20 条」的隔屏疑问 -->
-            <div v-if="dedStats.itemsTruncated" class="trunc-hint">扣分项较多，仅展示扣分最高的 20 项</div>
+            <!-- 扣分项明细：受影响病历数 + 合计扣分，用于定位主要扣分来源 -->
+            <template v-if="dedStats.byItem.length">
+              <div class="sub-hd">Top 扣分项</div>
+              <el-table :data="dedStats.byItem" border size="small" max-height="240">
+                <el-table-column prop="type" label="类型" width="130" />
+                <el-table-column prop="item" label="项" width="110" />
+                <el-table-column prop="count" label="受影响病历数" width="110" />
+                <el-table-column prop="points" label="合计扣分" width="100" />
+              </el-table>
+              <!-- P5.2：明细被截断时告知，避免「为什么只看到 20 条」的隔屏疑问 -->
+              <div v-if="dedStats.itemsTruncated" class="trunc-hint">扣分项较多，仅展示扣分最高的 20 项</div>
+            </template>
+
+            <!-- 分级分布；扫描份数可能被上限截断，截断时下方另有提示 -->
+            <div class="sub-hd">分级分布（扫描 {{ dedStats.scanned }} 份）</div>
+            <div class="grade-chips">
+              <span v-for="(v, k) in dedStats.gradeDist" :key="k" class="gc">{{ k }} {{ v }}</span>
+            </div>
+            <div v-if="dedStats.truncated" class="trunc-hint">超出扫描上限，仅统计前 {{ dedStats.scanned }} 份</div>
           </template>
+          <EmptyState v-else-if="!dedLoading" text="当前范围暂无可统计的评分结果" :image-size="70" />
+        </div>
+      </PanelCard>
 
-          <!-- 分级分布；扫描份数可能被上限截断，截断时下方另有提示 -->
-          <div class="sub-hd">分级分布（扫描 {{ dedStats.scanned }} 份）</div>
-          <div class="grade-chips">
-            <span v-for="(v, k) in dedStats.gradeDist" :key="k" class="gc">{{ k }} {{ v }}</span>
-          </div>
-          <div v-if="dedStats.truncated" class="trunc-hint">超出扫描上限，仅统计前 {{ dedStats.scanned }} 份</div>
+      <!-- AI 预检列表：与「病历数据」共用同一套 searchRecords 查询，扣分范围沿用上方筛选。
+           与左侧「本范围扣分构成」并排（grid-2）：原来 4 张卡纵向堆到 1235px，
+           第 4 块整块在屏外，先用并排把上半页收成一行 -->
+      <PanelCard title="AI 预检列表 / 扣分明细">
+        <!-- M20：原「点击行查看…」提示条独占一行（约 40px）。并进卡头后，
+             首条扣分明细在 1366×768 下从 y=776 提前到屏内（标题行本来就有 48px 高） -->
+        <template #header>
+          <span>AI 预检列表 / 扣分明细</span>
+          <span class="tip" style="font-weight: normal">点击行查看规则扣分明细；扣分范围沿用上方「范围查询」</span>
         </template>
-        <EmptyState v-else-if="!dedLoading" text="当前范围暂无可统计的评分结果" :image-size="70" />
-      </div>
-    </PanelCard>
 
-    <!-- AI 预检列表：与「病历数据」共用同一套 searchRecords 查询，扣分范围沿用上方筛选 -->
-    <PanelCard title="AI 预检列表 / 扣分明细">
-      <!-- M20：原「点击行查看…」提示条独占一行（约 40px）。并进卡头后，
-           首条扣分明细在 1366×768 下从 y=776 提前到屏内（标题行本来就有 48px 高） -->
-      <template #header>
-        <span>AI 预检列表 / 扣分明细</span>
-        <span class="tip" style="font-weight: normal">点击行查看规则扣分明细；扣分范围沿用上方「范围查询」</span>
-      </template>
-
-      <!-- max-height 360：表头 32 + 10 行 × 32 + 余量，表格内部滚动 -->
-      <RecordTable
-          ref="precheckTableRef"
-          :rows="precheckRows"
-          :loading="precheckLoading"
-          loading-text="正在预检待复核项…"
-          :max-height="360"
-          :action-width="120"
-          :row-class-name="precheckRowClass"
-        >
-          <template #action="{ row }">
-            <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
-          </template>
-          <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一份 searchRecords 查询 -->
-          <template #empty>
-            <EmptyState :failed="precheckFailed" :loading="precheckLoading"
-              text="筛选范围内没有病历" @retry="() => loadPrecheck(1)" />
-          </template>
-        </RecordTable>
-      <!-- 分页：切换每页条数时回到第 1 页（见 handleSizeChange） -->
-      <el-pagination
-        v-model:current-page="precheckPage"
-        v-model:page-size="precheckSize"
-        :page-sizes="PAGE_SIZES_STANDARD"
-        :total="precheckTotal"
-        layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: var(--sp-3); justify-content: flex-end"
-        @current-change="loadPrecheck"
-        @size-change="handleSizeChange"
-      />
-    </PanelCard>
+        <!-- 并排后本表只有半幅宽（约 660px），固定列合计 716px 必然横向滚动 ——
+             theme.css 已放开 EP 横向滚动条，滚动是可达的；操作列仍 fixed 在右侧。
+             max-height 360 → 420：半幅宽下行数不变但表更窄，略增高度让右栏
+             与左侧统计栏的底边基本齐平，不至于一高一矮 -->
+        <RecordTable
+            ref="precheckTableRef"
+            :rows="precheckRows"
+            :loading="precheckLoading"
+            loading-text="正在预检待复核项…"
+            :max-height="420"
+            :action-width="100"
+            :row-class-name="precheckRowClass"
+          >
+            <template #action="{ row }">
+              <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
+            </template>
+            <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一份 searchRecords 查询 -->
+            <template #empty>
+              <EmptyState :failed="precheckFailed" :loading="precheckLoading"
+                text="筛选范围内没有病历" @retry="() => loadPrecheck(1)" />
+            </template>
+          </RecordTable>
+        <!-- 分页：切换每页条数时回到第 1 页（见 handleSizeChange） -->
+        <el-pagination
+          v-model:current-page="precheckPage"
+          v-model:page-size="precheckSize"
+          :page-sizes="PAGE_SIZES_STANDARD"
+          :total="precheckTotal"
+          layout="total, sizes, prev, pager, next, jumper"
+          style="margin-top: var(--sp-3); justify-content: flex-end"
+          @current-change="loadPrecheck"
+          @size-change="handleSizeChange"
+        />
+      </PanelCard>
+    </div>
 
     <!-- 质控评分标准（M20 复测 2026-10-06：低频阅读内容 → 移到结果区之后并默认收起）。
          此前它占首屏 332px（y282~614），把承载结论的「AI 预检列表 / 扣分明细」推到 y≈989、
@@ -190,6 +210,7 @@
     <QcDeductionDialog
       v-model="detailVisible"
       :detail="detail"
+      :structured-data="detailStructured"
       :qualified="qualified"
     />
   </div>
@@ -212,7 +233,7 @@ import QcDeductionDialog from '@/components/QcDeductionDialog.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { recomputeQc, getQcBatch, cancelQcBatch, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
-import { searchRecords } from '@/api/records'
+import { searchRecords, getRawRecord } from '@/api/records'
 import { GRADE_OK } from '@/utils/grade'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
@@ -391,6 +412,14 @@ const recomputeButtonText = computed(() => {
   return t.status === 'QUEUED' ? '重算排队中…' : `重算中 ${t.done} / ${t.total}…`
 })
 
+// 工具条进度条百分比（I7）：按钮文案只有「x / y」，看不出推进快慢。
+// total 为 0（刚提交、分母还没算出来）时给 0，避免除零；上限 100 防后端回包越界
+const recomputePercent = computed(() => {
+  const t = recomputeProgress.value
+  if (!t || !t.total) return 0
+  return Math.min(100, Math.round((t.done / t.total) * 100))
+})
+
 // 停掉轮询并清空句柄，防止重复启动或组件卸载后继续发请求
 const stopPoll = () => {
   if (pollTimer) {
@@ -494,15 +523,25 @@ onBeforeUnmount(stopPoll)
 // 扣分明细改回弹窗；关闭时只收起、不清数据，避免关闭动画期间内容闪空
 const detail = ref(null)
 const detailVisible = ref(false)
+// 该病历的结构化数据（供弹窗列出「未命中标准词典」的具体词）。拿不到就保持 null，
+// 弹窗退化为只显示原因行 —— 列表是增强，不能因为取数失败挡住弹窗本身。
+const detailStructured = ref(null)
 
-// 打开扣分明细：按病历 ID 单独取一次评分结果
+// 打开扣分明细：按病历 ID 单独取一次评分结果；评分与结构化数据并行拉取
 const openDetail = async (recordId) => {
+  detailStructured.value = null
   try {
     // 1. 按病历 ID 单独取一次评分结果
     const res = await qcScore({ recordId })
     // 2. 回填明细数据（分数 / 分级 / 扣分列表）
     detail.value = res.data
-    // 3. 打开弹窗
+    // 3. 并行拉原始病历（含 structuredData），失败不阻断弹窗
+    getRawRecord(recordId)
+      .then((r) => {
+        detailStructured.value = r?.data?.structuredData ?? null
+      })
+      .catch(() => {})
+    // 4. 打开弹窗
     detailVisible.value = true
   } catch {
     // 拦截器已提示
@@ -527,11 +566,46 @@ onMounted(() => {
   gap: var(--sp-3);
   flex-wrap: wrap;
 }
+/* 面板顶部工具条：原「范围查询」独立面板并入后，用下边框 + 间距与正文分隔，
+   视觉上仍是「一行筛选」，但不再多占一张卡的卡头与内边距 */
+.panel-toolbar {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--sp-3);
+}
+/* 重算进度条：贴在按钮行下方，限宽避免横贯整块面板 */
+.recompute-progress {
+  max-width: 420px;
+  margin-top: var(--sp-2);
+}
+/* 扣分构成与 AI 预检左右并排（写法照抄 Dashboard 的 .grid-2）：
+   四张卡纵向堆到 1235px、第 4 块落在屏外（审查报告 L2）。
+   面板自带 14px 下边距，网格内改由 gap 供间距（:deep 置 0），避免双重留白；
+   容器自己补 14px，与卡间节奏一致 */
+.grid-2 {
+  display: grid;
+  /* ⚠️ 列必须用 minmax(0, …)：右栏 AI 预检表列宽合计 ~936px，其 min-content 会把
+     默认的 1fr（= minmax(auto,1fr)）撑破 —— 整行越出 main 右缘、页面出现横向滚动条
+     （1366/1600 两档实测踩到）。minmax(0,…) 允许列收缩，表内容由表格自身的横向滚动
+     承接（滚动条已全局放开，可见可拖）。 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
+  gap: var(--sp-3);
+  margin-bottom: 14px;
+}
+.grid-2 :deep(.panel) {
+  margin-bottom: 0;
+}
+/* 报告口径：≥1600 档才左右并排；1366 档半幅宽连一行筛选都放不下，收回单列 */
+@media (max-width: 1599px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
 /* 截断 / 告警提示条：浅黄底，与错误红区分 */
 .trunc-hint {
   background: var(--ochre-surface);
   border: 1px solid #ecd9b0;
-  color: var(--ochre);
+  color: var(--ochre-text);
   border-radius: 6px;
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-xs);
@@ -546,7 +620,7 @@ onMounted(() => {
 }
 .precheck-bar > span:first-child {
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 「无扣分项」等正向文案 */
 .ok {
@@ -599,11 +673,11 @@ onMounted(() => {
 }
 .std-dim .sd-desc {
   flex: 1 1 auto;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .std-dim .sd-w {
   flex: 0 0 auto;
-  color: var(--ochre);
+  color: var(--ochre-text);
   font-weight: bold;
 }
 .std-grade {
@@ -673,7 +747,7 @@ onMounted(() => {
 .dist-row .dr-v {
   flex: 0 0 130px;
   text-align: right;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 分级分布：胶囊标签 */
 .grade-chips {
@@ -700,11 +774,12 @@ onMounted(() => {
   color: var(--ink);
   padding: var(--sp-1) 0;
 }
-/* 标准：紧凑一行一项（标签 + 值） */
+/* 标准：展开后横向吃宽度（auto-fit 多列），而不是竖着把页面拉长 ——
+   原 flex-direction:column 每项独占一行，7 项 + 说明折叠区把展开态撑出一屏 */
 .std-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-2) var(--sp-4);
 }
 /* 一行：标签固定宽 + 值自适应 */
 .st {
@@ -716,7 +791,7 @@ onMounted(() => {
 }
 .st-k {
   flex: 0 0 110px;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .st-v {
   flex: 1 1 auto;
@@ -752,7 +827,7 @@ onMounted(() => {
   list-style: none;
   cursor: pointer;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .std-sum::-webkit-details-marker {
   display: none;

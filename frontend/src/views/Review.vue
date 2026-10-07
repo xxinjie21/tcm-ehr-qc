@@ -3,12 +3,13 @@
     <!-- 28.18：复核页统计卡 —— 原来这一屏只有「状态下拉」，进来看不出待办总量与超期压力。
          卡片可点：点了直接切到对应筛选（沿用看板「指标即入口」的口径）。 -->
     <div class="rv-stats">
+      <!-- note：口径说明，取自本页既有文案/查询语义（不编造业务数字） -->
       <StatCard label="待复核任务" :value="reviewStats.pending" icon="pending" tone="ochre"
-        clickable @click="filterBy('pending')" />
+        note="由质控评分产生" clickable @click="filterBy('pending')" />
       <StatCard label="超时未复核" :value="reviewStats.overdue" icon="invalid" tone="red"
-        clickable @click="filterBy('overdue')" />
+        note="待复核中已超期" clickable @click="filterBy('overdue')" />
       <StatCard label="已完成复核" :value="reviewStats.done" icon="rate" tone="green"
-        clickable @click="filterBy('done')" />
+        note="状态「已完成」" clickable @click="filterBy('done')" />
     </div>
     <!-- ① 待复核任务列表 -->
     <!-- 两个页签：「待复核任务」是复核主入口（原有内容一字未改）；
@@ -37,7 +38,7 @@
         :data="rows"
         border
         size="small"
-        max-height="360"
+        max-height="420"
         :row-class-name="rowClass"
         highlight-current-row
       >
@@ -100,13 +101,15 @@
             该病历若没有待复核任务，则只可查看与修正、不能提交裁决（后端要求任务存在）。
           </span>
         </div>
+        <!-- max-height 与病历数据页同口径（420）：每页 10 行直接显示完，
+             不再出现「要多滚一格才见底」的内部滚动条 -->
         <RecordTable
           ref="allTableRef"
           :rows="allRows"
           :loading="allLoading"
           loading-text="正在读取病历…"
           highlight-current
-          :max-height="360"
+          :max-height="420"
           :action-width="90"
           @row-click="openReviewFromRecords"
         >
@@ -325,7 +328,7 @@ onMounted(() => {
 }
 .rv-bar > span:first-child {
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .overdue {
   color: var(--danger);
@@ -341,10 +344,13 @@ onMounted(() => {
 .review-page {
   display: flex;
   flex-direction: column;
-  min-height: calc(100% - 34px);
+  /* 与 theme.css 的 .page-fill 同口径：页面根与 main 之间隔着 Transition 包裹的
+     无类名 div（height:auto），100% 解析不到，改用视口推算（顶栏 52 + main 内边距
+     16/84 + 面包屑 ≈34）。 */
+  min-height: calc(100vh - 186px);
 }
 /* P5.2：跳过已删病历的提示 */
-.skip-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); }
+.skip-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); }
 /* 28.13：空态引导文案，居中并限制行宽 */
-.empty-hint { max-width: 380px; margin: 0 auto var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); line-height: 1.8; }
+.empty-hint { max-width: 380px; margin: 0 auto var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); line-height: 1.8; }
 </style>

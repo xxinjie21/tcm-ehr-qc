@@ -36,13 +36,13 @@ defineProps({
   font-size: var(--fs-xs);
   color: var(--ink-mid);
 }
-.fresh-tag .k { color: var(--text-sub); }
+.fresh-tag .k { color: var(--text-sub-strong); }
 .fresh-tag.stale {
-  color: var(--ochre);
+  color: var(--ochre-text);
   background: var(--ochre-surface);
   border: 1px solid var(--ochre-light);
   border-radius: 4px;
   padding: var(--sp-1) var(--sp-2);
 }
-.fresh-tag .why { color: var(--ochre); }
+.fresh-tag .why { color: var(--ochre-text); }
 </style>

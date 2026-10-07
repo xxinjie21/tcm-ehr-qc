@@ -1,6 +1,7 @@
 <template>
-  <!-- 操作日志页：筛选 + 分页表格 + 导出 CSV（无日志删除入口） -->
-  <div>
+  <!-- 操作日志页：筛选 + 分页表格 + 导出 CSV（无日志删除入口）
+       根节点 .page-fill：短内容时卡片撑到主区底部（V6），不再裸露下半屏纸底 -->
+  <div class="page-fill">
     <PanelCard title="操作日志">
       <div class="filter-row">
         <!-- 这两个控件只有 placeholder、没有视觉标签，补 aria-label
@@ -44,8 +45,11 @@
       <!-- 可见范围说明：三档口径不同，不写清楚用户会以为「日志少了」 -->
       <p class="scope-tip">{{ scopeTip }}</p>
 
-      <!-- 28.7：整行可点，跳转到关联对象（objectType/objectId 早已入库，此前只是没渲染） -->
-      <el-table v-loading="loading" element-loading-text="正在读取操作日志…" :data="logs" border stripe max-height="520" style="margin-top: var(--sp-3)" @row-click="onRowClick">
+      <!-- 28.7：整行可点，跳转到关联对象（objectType/objectId 早已入库，此前只是没渲染）
+           去掉写死的 max-height="520"（审查报告 V6）：520 在默认 10 条/页时根本触不到、
+           形同虚设，调到 50 条/页时又变成「页内滚动 + 卡内滚动」两层嵌套。
+           行数由分页控制（10/20/50），超长时统一交给 main 这一个滚动层。 -->
+      <el-table v-loading="loading" element-loading-text="正在读取操作日志…" :data="logs" border stripe style="margin-top: var(--sp-3)" @row-click="onRowClick">
         <el-table-column label="操作时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.logTime) }}</template>
         </el-table-column>
@@ -239,7 +243,7 @@ onMounted(() => {
 .scope-tip {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 筛选行：单行排列，窄屏自动换行 */
 .filter-row {

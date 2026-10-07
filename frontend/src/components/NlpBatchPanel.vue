@@ -52,7 +52,11 @@
         <div class="bf-hd">
           失败清单（{{ activeTask.failures.length }} 条{{ activeTask.failureTruncated ? '，仅显示前 500 条' : '' }}）
         </div>
-        <el-table :data="activeTask.failures" border size="small" max-height="240">
+        <!-- V8b：去掉原先写死的 max-height="240" —— 卡内再开一层滚动，与 main 的页内滚动
+             叠成「两层嵌套」：失败清单内容高可达上千 px，卡内却只能滚 5 屏，且滚动条
+             藏在卡片底部很难发现。改为随内容撑高，由页面（main）统一滚动；
+             上方计数与截断说明保留，不丢信息。 -->
+        <el-table :data="activeTask.failures" border size="small">
           <el-table-column prop="label" label="病历" width="200" show-overflow-tooltip />
           <el-table-column prop="reason" label="原因" show-overflow-tooltip />
         </el-table>
@@ -66,7 +70,13 @@
         <!-- 批次4：长任务要能一眼找到「哪些批次出过错」，不必逐条看状态 -->
         <el-checkbox v-model="onlyFailedTasks" size="small" style="margin-left: var(--sp-3)">只看有失败的</el-checkbox>
       </div>
-      <el-table :data="onlyFailedTasks ? batchTasks.filter((t) => t.failed > 0) : batchTasks" border size="small" max-height="260">
+      <!-- V8b：同失败清单 —— 去掉写死的 max-height="260"，卡内不再自开滚动层，
+           表格随任务条数撑高，与 main 页内滚动合一；标题行的条数上限与截断说明保留。 -->
+      <el-table
+        :data="onlyFailedTasks ? batchTasks.filter((t) => t.failed > 0) : batchTasks"
+        border
+        size="small"
+      >
         <el-table-column label="提交时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
         </el-table-column>
@@ -187,7 +197,9 @@ const poll = async () => {
   }
 }
 
-// 启动轮询（先停旧定时器）：每 2 秒刷新任务详情与最近任务列表，供提交后与查看任务共用
+// 启动轮询（先停旧定时器）：每 10 秒刷新任务详情与最近任务列表，供提交后与查看任务共用
+// （原先注释写「每 2 秒」与实现不符 —— 实际是 10000ms，2026-10-06 校正注释、不动间隔，
+//   避免行为变更）
 const startPoll = () => {
   stopPoll()
   pollTimer = setInterval(() => {
@@ -327,7 +339,7 @@ onBeforeUnmount(stopPoll)
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.bf-title { font-size: var(--fs-xs); color: var(--text-sub); margin-bottom: var(--sp-2); }
+.bf-title { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
 .batch-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 var(--sp-1); }
 .batch-progress {
   margin-top: 14px;
@@ -338,10 +350,10 @@ onBeforeUnmount(stopPoll)
 }
 .bp-hd { font-size: var(--fs-xs); color: var(--text); margin-bottom: var(--sp-2); }
 .bp-hd b { color: var(--ink); }
-.bp-sub { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub); }
+.bp-sub { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); }
 .batch-failures { margin-top: 14px; border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
 .batch-list { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
-.bf-hd { font-size: var(--fs-xs); color: var(--text-sub); margin-bottom: var(--sp-2); }
+.bf-hd { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
 /* 截断提示：用的是次要色而不是警示色 —— 列表被截断是正常上限行为，不是错误 */
-.bf-trunc { margin-left: var(--sp-2); color: var(--ochre); }
+.bf-trunc { margin-left: var(--sp-2); color: var(--ochre-text); }
 </style>

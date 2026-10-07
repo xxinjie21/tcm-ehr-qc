@@ -341,7 +341,7 @@ const resetRules = async () => {
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .rc-fmt.on {
   border-color: var(--ink-mid);
@@ -359,18 +359,25 @@ const resetRules = async () => {
 /* 弹窗顶部说明 */
 .rc-tip {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 6px;
 }
 /* 28.19-10：长说明下沉到 ⓘ —— 标题与句子里只留结论，机制/口径走 tooltip。
    tabindex 让键盘也能聚焦触发（EP tooltip 默认 hover，focus 亦可显示）。 */
 .rc-info {
-  color: var(--ochre);
+  color: var(--ochre-text);
   cursor: help;
   font-size: var(--fs-xs);
   margin-left: 4px;
   vertical-align: middle;
+  /* P1-5（第三轮）：outline:none 与全局 :focus-visible 同特异性（0,1,0）、组件样式后注入
+      → 把焦点环整个抹掉；而这个元素特意加了 tabindex=0 让键盘可聚焦（tooltip hover/focus 都能触发），
+      等于「为键盘可达而加、又把可见反馈抹掉」。保留鼠标下无环，恢复键盘下的环。 */
   outline: none;
+}
+.rc-info:focus-visible {
+  outline: 2px solid var(--ink-mid);
+  outline-offset: 2px;
 }
 /* 句子式编辑行：文字与控件同行排布，窄屏换行 */
 .rc-line {

@@ -9,6 +9,11 @@
     两页的差异全部走 props / slot，不在这里写死：
       · 选择列：Records 需要批量操作，NlpExtract 不需要
       · 操作列：各页按钮不同，用 action 插槽由页面自己填
+      · slim：NlpExtract 左栏「选择病历」用 —— 该栏是窄分栏（约 460~600px），
+        8 列全渲染会把摘要挤没并冒出不可发现的横向滚动条；slim 只留
+        「病历ID / 摘要 / 操作」三列，其余信息在该页右侧详情区可见
+        （载入后有完整原文与结构化结果），列表里不必重复摆一遍。
+        默认不传 slim：列与引入 slim 之前逐列一致，病历数据 / 复核等共用页不受影响。
   -->
   <el-table
     :ref="tableRef"
@@ -29,8 +34,10 @@
          把「摘要」挤到只剩半行可见（结构化解析页实拍可见：ID 完整、摘要被截）。
          这里只做长度收敛 —— 常态显示前 8 位（支持场景足以口头报出），悬停给全文。
          数据侧另有更可读的 registrationNo / outpatientNo，但它们各有语义（挂号号 / 门诊号），
-         不适合冒充「病历 ID」，故不在此处替换。 -->
-    <el-table-column label="病历ID" width="120">
+         不适合冒充「病历 ID」，故不在此处替换。
+         slim 时再收到 90：前 8 位 UUID 在 13px 字号下约 70px，90 列宽刚好放下
+         （含单元格内边距），省下的 30px 全部让给「摘要」列。 -->
+    <el-table-column label="病历ID" :width="slim ? 90 : 120">
       <template #default="{ row }">
         <el-tooltip :content="row.id || '—'" placement="top">
           <span>{{ (row.id || '—').slice(0, 8) }}</span>
@@ -38,8 +45,11 @@
       </template>
     </el-table-column>
     <el-table-column prop="summary" label="摘要" min-width="240" show-overflow-tooltip />
+    <!-- 以下 5 列在 slim 模式下不渲染（v-if）：窄栏只承担「挑一份」的职责，
+         评分/分级/来源/接诊时间/年龄·性别在 NlpExtract 页载入病历后的右侧详情区可见；
+         默认模式（不传 slim）这些列原样渲染，列序、宽度与配色均不变。 -->
     <!-- 评分与分级成对：分级是结论、评分是量值，只给分级看不出差多少分 -->
-    <el-table-column label="评分" width="80" align="center">
+    <el-table-column v-if="!slim" label="评分" width="80" align="center">
       <template #default="{ row }">
         <span v-if="row.score != null" :class="scoreClass(row.score)">{{ row.score }}</span>
         <span v-else class="tip">—</span>
@@ -47,7 +57,7 @@
     </el-table-column>
     <!-- 28.12：分级此前是纯文本，与「评分」列（已按档上色）口径不一；
          分级是结论、评分是量值，结论更该一眼可辨。配色口径沿用 utils/grade.js -->
-    <el-table-column label="分级" width="90" align="center">
+    <el-table-column v-if="!slim" label="分级" width="90" align="center">
       <template #default="{ row }">
         <el-tag v-if="row.grade" size="small" effect="plain" :type="gradeTagType(row.grade)">{{ row.grade }}</el-tag>
         <span v-else class="tip">—</span>
@@ -55,7 +65,7 @@
     </el-table-column>
     <!-- 人工修改标记：该条结构化数据被人工改过（复核修正 / 手工改结构化数据），
          不是模型原样抽的。标出来是为了评估模型准确率时能排除它。 -->
-    <el-table-column label="来源" width="86">
+    <el-table-column v-if="!slim" label="来源" width="86">
       <template #default="{ row }">
         <el-tooltip
           v-if="row.manuallyEdited"
@@ -70,13 +80,13 @@
     <!-- 接诊时间：常态只到日，悬停给秒级原值。
          只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
          会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上 -->
-    <el-table-column label="接诊时间" width="110">
+    <el-table-column v-if="!slim" label="接诊时间" width="110">
       <template #default="{ row }">
         <VisitTimeCell :visit-time="row.visitTime" />
       </template>
     </el-table-column>
     <!-- 年龄/性别：单块自包含，两字段后端追加、向后兼容 -->
-    <el-table-column label="年龄/性别" width="110">
+    <el-table-column v-if="!slim" label="年龄/性别" width="110">
       <template #default="{ row }">
         <AgeGenderCell :age="row.age" :gender="row.gender" />
       </template>
@@ -100,6 +110,10 @@
  *
  * <p>不接管请求与分页状态 —— 那些各页差异大（范围不同、有的要批量选择）。
  * 本组件只负责「列口径」，让同一份病历在所有列表里长得一样。</p>
+ *
+ * <p>slim 模式（结构化解析页左栏窄分栏专用）：只渲染「病历ID(90) / 摘要 / 操作」，
+ * 其余 5 列不渲染；被省略的信息在该页右侧详情区可见，列表不重复展示。
+ * 默认（不传 slim）的列集、列序、宽度与配色与引入 slim 之前完全一致。</p>
  */
 import { ref } from 'vue'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
@@ -118,7 +132,15 @@ defineProps({
   rowClassName: { type: [String, Function], default: '' },
   maxHeight: { type: [String, Number], default: 420 },
   /** 操作列宽度：按钮多的一页给大一些 */
-  actionWidth: { type: [String, Number], default: 90 }
+  actionWidth: { type: [String, Number], default: 90 },
+  /**
+   * 窄栏瘦身模式：只留「病历ID / 摘要 / 操作」三列，其余 5 列不渲染。
+   * 使用场景：NlpExtract 左栏「选择病历」—— 该栏宽仅约 460~600px，
+   * 8 列全渲染会把摘要挤没并冒出不可发现的横向滚动条。
+   * 被省略的信息（评分/分级/来源/接诊时间/年龄·性别）在该页右侧详情区可见，
+   * 列表只承担「挑一份」的职责。默认 false，共用本组件的其它页面不受影响。
+   */
+  slim: { type: Boolean, default: false }
 })
 
 defineEmits(['selection-change', 'row-click'])
@@ -140,6 +162,6 @@ const scoreClass = (s) => (s >= 90 ? 'score-ok' : s >= 60 ? 'score-mid' : 'score
 
 <style scoped>
 .score-ok { color: var(--ink-mid); font-weight: 600; }
-.score-mid { color: var(--ochre); }
+.score-mid { color: var(--ochre-text); }
 .score-low { color: var(--danger); }
 </style>

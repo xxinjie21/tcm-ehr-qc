@@ -47,32 +47,33 @@
         </span>
       </div>
 
-      <!-- 时间维度：病历接诊时间跨度大，混在一起看不出「换了词表之后有没有变好」 -->
-      <PanelCard title="统计区间">
-        <div class="time-row">
-          <el-radio-group v-model="preset" size="small" @change="applyPreset">
-            <el-radio-button value="all">全部</el-radio-button>
-            <el-radio-button value="1y">近一年</el-radio-button>
-            <el-radio-button value="3y">近三年</el-radio-button>
-            <el-radio-button value="custom">自定义</el-radio-button>
-          </el-radio-group>
-          <el-date-picker
-            v-if="preset === 'custom'"
-            v-model="customRange"
-            type="daterange"
-            size="small"
-            value-format="YYYY-MM-DD"
-            range-separator="至"
-            start-placeholder="开始"
-            end-placeholder="结束"
-            style="width: 240px"
-            @change="applyCustom"
-          />
-          <el-button size="small" :loading="loading" @click="loadReport">刷新</el-button>
-          <span class="tip">{{ rangeTip }}</span>
-        </div>
-      </PanelCard>
-
+      <!-- 时间维度：病历接诊时间跨度大，混在一起看不出「换了词表之后有没有变好」。
+           原「统计区间」是一整张 PanelCard，1384×106 里只有 40px 内容、八成是空的
+           （审查报告 V7）。去掉卡片外壳，把 .time-row 作为顶部工具条放在正文最上方，
+           下边框与下方的结论条分隔；区间口径本来就有同排的 tip 说明，卡头标题不再需要。
+           控件与事件绑定（preset / applyPreset / applyCustom / loadReport）原样保留。 -->
+      <div class="time-row panel-toolbar">
+        <el-radio-group v-model="preset" size="small" @change="applyPreset">
+          <el-radio-button value="all">全部</el-radio-button>
+          <el-radio-button value="1y">近一年</el-radio-button>
+          <el-radio-button value="3y">近三年</el-radio-button>
+          <el-radio-button value="custom">自定义</el-radio-button>
+        </el-radio-group>
+        <el-date-picker
+          v-if="preset === 'custom'"
+          v-model="customRange"
+          type="daterange"
+          size="small"
+          value-format="YYYY-MM-DD"
+          range-separator="至"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          style="width: 240px"
+          @change="applyCustom"
+        />
+        <el-button size="small" :loading="loading" @click="loadReport">刷新</el-button>
+        <span class="tip">{{ rangeTip }}</span>
+      </div>
 
     <!-- 第一屏：一句话结论 + 三个关键卡。看这一屏就知道该做什么、去哪看。 -->
     <div class="headline" :class="headline.tone">
@@ -150,8 +151,7 @@
 
     <div class="foot">
       <el-button size="small" :loading="exporting" @click="handleExport">导出 CSV</el-button>
-      <el-button size="small" @click="handlePrint">打印 / 导出 PDF</el-button>
-      <span class="tip">CSV 导出全部明细指标；PDF 走浏览器打印，可在打印对话框里选「另存为 PDF」</span>
+      <span class="tip">CSV 导出全部明细指标</span>
     </div>
 
     <!-- 25.13 一键补词 -->
@@ -167,7 +167,7 @@
 //   ② 把「多少条没归一」翻译成「该做什么、归谁管」；
 //   ③ 明细默认收起，需要时再展开。
 // 技术口径（甲类/乙类、normLevel、可归一实体）只在本文件内部使用，不出现在界面上。
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StandardizationDetails from '@/components/StandardizationDetails.vue'
@@ -760,16 +760,6 @@ const handleExport = async () => {
   }
 }
 
-// 打印 / 另存 PDF（28.18）：走浏览器打印，不新增依赖。
-// 不用后端生成：pom.xml 里的 pdfbox 从未被使用，且 PDFBox 标准字体不含 CJK，
-// 中文报告要额外嵌入字体文件，成本远高于让用户在打印对话框里「另存为 PDF」。
-// 页面级交互控件由本文件 scoped 的 @media print 隐藏，顶栏/侧栏由 theme.css 统一隐藏。
-const handlePrint = () => {
-  // 先让打印态样式生效（隐藏按钮会改变布局），下一帧再唤起打印对话框，
-  // 否则打印预览可能拿到隐藏前的布局
-  nextTick(() => window.print())
-}
-
 // ---- 25.13 一键补词 ----
 
 /** 打开补词对话框：候选词交给子组件，父页只负责显示与传词 */
@@ -817,7 +807,7 @@ function onVisibilityChange() {
   line-height: 20px;
   text-align: center;
   border-radius: 50%;
-  background: var(--ochre);
+  background: var(--ochre-deep);
   color: var(--surface);
   font-size: var(--fs-xs);
   font-weight: 700;
@@ -832,7 +822,7 @@ function onVisibilityChange() {
 .gate-desc {
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .gate-ops {
   display: flex;
@@ -851,14 +841,21 @@ function onVisibilityChange() {
 .gp-label {
   flex: 0 0 auto;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   white-space: nowrap;
 }
 .gate-note {
   margin-top: var(--sp-2);
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
+}
+/* 顶部工具条：原独立「统计区间」PanelCard 去壳并入正文（审查报告 V7）——
+   卡壳 + 标题行占掉的约 60px 全部让给内容，下边框与下方结论条分隔 */
+.panel-toolbar {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--sp-3);
 }
 /* 时间区间条 */
 .time-row {
@@ -878,7 +875,7 @@ function onVisibilityChange() {
   border-radius: 4px;
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .src-icon {
   flex: 0 0 16px;
@@ -921,7 +918,7 @@ function onVisibilityChange() {
   color: var(--surface);
   background: var(--ink-mid);
 }
-.headline.warn .hl-icon { background: var(--ochre); }
+.headline.warn .hl-icon { background: var(--ochre-deep); }
 .headline.ok .hl-icon { background: var(--success, #3a7d44); }
 .hl-title {
   font-size: var(--fs-title);
@@ -932,7 +929,7 @@ function onVisibilityChange() {
 .hl-desc {
   font-size: var(--fs-base);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 关键卡 */
 .kpi-row {
@@ -953,7 +950,7 @@ function onVisibilityChange() {
 .kpi.ok { border-left: 3px solid var(--success, #3a7d44); }
 .kpi-label {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 2px;
 }
 .kpi-value {
@@ -966,7 +963,7 @@ function onVisibilityChange() {
   margin-top: 4px;
   font-size: var(--fs-xs);
   line-height: 1.6;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 待办清单 */
 .todo-list {
@@ -1003,30 +1000,23 @@ function onVisibilityChange() {
 .todo-desc {
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .empty-tip {
   padding: var(--sp-3) 0;
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
-.warn { color: var(--ochre); font-weight: 600; }
+.warn { color: var(--ochre-text); font-weight: 600; }
 .foot {
   display: flex;
   gap: var(--sp-2);
   align-items: center;
 }
 
-/* 28.18：打印 / 另存 PDF 时只留报告内容 —— 隐藏各操作按钮与筛选控件，
-   避免打印稿里出现点不动的按钮和「刷新」这类无意义元素。 */
-@media print {
-  .foot,
-  .gate-ops {
-    display: none !important;
-  }
-  .time-row :deep(.el-button),
-  .todo-list :deep(.el-button) {
-    display: none !important;
-  }
-}
+/*
+ * 打印 / 导出 PDF 功能已移除（2026-10-07）：原 28.18 的「打印 / 另存 PDF」按钮
+ * 走浏览器打印，后端 pdfbox 从未使用且无 CJK 字体，实际依赖用户在打印对话框里
+ * 「另存为 PDF」，体验鸡肋，按需求整段删除（按钮 / handlePrint / scoped @media print）。
+ */
 </style>

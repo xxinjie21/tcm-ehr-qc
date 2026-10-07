@@ -625,7 +625,7 @@ onMounted(() => {
 .code-cell {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 类型 tab：激活态与下划线改用主题墨色，替换 Element Plus 默认蓝 */
 .dict-tabs {
@@ -640,9 +640,9 @@ onMounted(() => {
 /* 查询行 / 回滚行：单行水平排布 */
 .search-row,
 /* 「较当前」的增减配色：多=ochre、少=danger、无变化=次级色 */
-.dl-up { color: var(--ochre); }
+.dl-up { color: var(--ochre-text); }
 .dl-down { color: var(--danger); }
-.dl-flat { color: var(--text-sub); }
+.dl-flat { color: var(--text-sub-strong); }
 /* 批次 26.17：基线表「列显示」选择器（照 Governance 的列选择器样式） */
 .col-picker :deep(.el-checkbox-group) {
   display: flex;
@@ -658,7 +658,7 @@ onMounted(() => {
 }
 /* 列头 ⓘ：可聚焦，键盘用户也能读出说明 */
 .hdr-info {
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   cursor: help;
   font-size: var(--fs-xs);
 }
@@ -683,7 +683,7 @@ onMounted(() => {
 }
 .upload-tip .sub {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-top: var(--sp-1);
 }
 /* 详细格式收进折叠说明，避免一上来把数据结构摊给用户；
@@ -691,7 +691,7 @@ onMounted(() => {
 .fmt-detail {
   margin-top: 10px;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .fmt-detail summary {
   display: inline-block;
@@ -735,7 +735,7 @@ onMounted(() => {
 /* 失败明细小标题 */
 .ded-hd {
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 6px;
 }
 /* 单条失败项：浅 ochre 底条，与正文区分 */
@@ -757,10 +757,10 @@ onMounted(() => {
 .rv-meta {
   margin-top: var(--sp-2);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .rv-dirty {
-  color: var(--ochre);
+  color: var(--ochre-text);
   margin-left: var(--sp-2);
 }
 .rv-pager {
@@ -788,7 +788,7 @@ onMounted(() => {
   background: var(--surface-sub);
   border-radius: 4px;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .dg-item b {
   color: var(--ink);
@@ -802,7 +802,7 @@ onMounted(() => {
 }
 .dh-label {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 
 </style>

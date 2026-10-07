@@ -1,23 +1,29 @@
 <template>
   <div>
-    <!-- 清洗状态行（顶部） -->
-    <section v-loading="statsLoading" element-loading-text="正在统计标准化情况…" class="gov-stats">
-      <span class="gs" title="这三张卡只统计「质控合格」的病历；清洗范围若包含待复核/无效，条数会对不上">
-        <b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
-      <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
-      <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已清洗</span>
-      <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果-->
-      <span v-if="statsFailed" class="gs-fail">
-        统计加载失败{{ statsLoadedAt ? `（上次成功 ${statsLoadedAt}）` : '' }}
-        <el-button link type="primary" size="small" @click="loadStats">重试</el-button>
-      </span>
-    </section>
-
-    <!-- 当前范围（先选范围 → 后续操作只作用于范围内） -->
+    <!-- 顶部合并条（审查报告 V7）：原「清洗状态行」独占一行、右侧 60% 是空白，
+         紧随其后的「当前范围」条又是整行。两块合成一条 —— 左边三个统计数字，
+         右边范围选择 + 当前范围文案，右侧留白由控件吃掉，不再裸露。
+         统计的加载 / 失败态（含重试按钮）原样保留，但只挂在数字组上：
+         给整条加 loading 遮罩会让统计刷新期间范围筛选也点不了。 -->
     <section class="scope-bar">
-      <RangeFilter v-model="filters" />
-      <div class="scope-row">
-        <span class="scope-tip">当前范围：<b>{{ scopeText }}</b></span>
+      <div v-loading="statsLoading" element-loading-text="正在统计标准化情况…" class="gs-group">
+        <span class="gs" title="这三张卡只统计「质控合格」的病历；清洗范围若包含待复核/无效，条数会对不上">
+          <b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
+        <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
+        <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已清洗</span>
+        <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果-->
+        <span v-if="statsFailed" class="gs-fail">
+          统计加载失败{{ statsLoadedAt ? `（上次成功 ${statsLoadedAt}）` : '' }}
+          <el-button link type="primary" size="small" @click="loadStats">重试</el-button>
+        </span>
+      </div>
+
+      <!-- 当前范围（先选范围 → 后续操作只作用于范围内） -->
+      <div class="scope-ctrls">
+        <RangeFilter v-model="filters" />
+        <div class="scope-row">
+          <span class="scope-tip">当前范围：<b>{{ scopeText }}</b></span>
+        </div>
       </div>
     </section>
 
@@ -51,7 +57,7 @@
       </div>
 
       <!-- 28.18：点开的步骤详述；再点同一张卡或「收起」关闭 -->
-      <transition name="step-fade">
+      <transition name="panel-fade">
         <div v-if="activeStepInfo" class="step-detail">
           <div class="sd-hd">
             <span class="sd-num">{{ activeStep + 1 }}</span>
@@ -251,6 +257,7 @@
             :prop="c.prop"
             :label="c.label"
             :width="c.width"
+            :min-width="c.minWidth"
             :formatter="c.formatter"
             show-overflow-tooltip
           />
@@ -450,6 +457,11 @@ const buildPayload = () => ({
 /**
  * 预览表列定义。21 列全出横向滚动很长，默认只显示关键列，
  * 其余在「列显示」里按需勾选；formatter 处理接诊时间这类要截断展示的字段。
+ *
+ * 长文本列（≥180 的主诉 / 自诉 / 现病史 / 辨证结论 / 草药）用 min-width 而不是 width：
+ * 它们的固定宽是「内容很长时的上限」，不是「必须占的位」。窄容器里先被压缩
+ * （配合 show-overflow-tooltip 省略），而不是把整张表顶到溢出；宽容器里仍按原值展开。
+ * 主键 / 编号这类定宽列保持 width，避免压缩后对不齐。
  */
 const PREVIEW_COLS = [
   { prop: 'registrationNo', label: '登记号', width: 150 },
@@ -457,15 +469,15 @@ const PREVIEW_COLS = [
   { prop: 'age', label: '年龄', width: 60 },
   { prop: 'westernDiagnosis', label: '西医诊断', width: 150 },
   { prop: 'tcmDiagnosis', label: '中医诊断', width: 150 },
-  { prop: 'chiefComplaint', label: '主诉', width: 180 },
-  { prop: 'selfReport', label: '自诉', width: 180 },
-  { prop: 'presentIllness', label: '现病史', width: 200 },
+  { prop: 'chiefComplaint', label: '主诉', minWidth: 180 },
+  { prop: 'selfReport', label: '自诉', minWidth: 180 },
+  { prop: 'presentIllness', label: '现病史', minWidth: 200 },
   { prop: 'inspection', label: '望诊', width: 120 },
   { prop: 'pulse', label: '脉诊', width: 120 },
   { prop: 'tongue', label: '舌诊', width: 140 },
   { prop: 'physicalExam', label: '查体', width: 120 },
-  { prop: 'pattern', label: '辨证结论', width: 200 },
-  { prop: 'prescription', label: '草药', width: 260 },
+  { prop: 'pattern', label: '辨证结论', minWidth: 200 },
+  { prop: 'prescription', label: '草药', minWidth: 260 },
   { prop: 'followUp', label: '随访', width: 120 },
   { prop: 'treatmentEffect', label: '治疗效果', width: 100 },
   { prop: 'department', label: '科室', width: 90 },
@@ -475,8 +487,12 @@ const PREVIEW_COLS = [
   { prop: 'grade', label: '分级', width: 70 }
 ]
 
-const DEFAULT_COLS = ['registrationNo', 'gender', 'age', 'westernDiagnosis', 'tcmDiagnosis',
-  'chiefComplaint', 'pattern', 'prescription', 'score', 'grade']
+// 默认列收敛到 7 个核心字段（审查报告 L3）：原 10 列定宽合计 1340 + 操作列 70，
+// 比 1350 的容器还宽，预览一打开就横向溢出。取「主键 / 诊断 / 来源 / 时间 / 结论」
+// 这几类信息量最大的列（合计 780 + 70，留有余量）；长文本（主诉 / 现病史 / 草药…）
+// 移出默认集，需要时仍在「列显示」popover 里勾选（选择器未改动）。
+const DEFAULT_COLS = ['registrationNo', 'westernDiagnosis', 'tcmDiagnosis',
+  'department', 'visitTime', 'score', 'grade']
 const visibleCols = ref([...DEFAULT_COLS])
 // 由勾选的列 prop 过滤出实际要渲染的列定义（顺序跟随 PREVIEW_COLS）；
 // 用户把列全部取消时返回空数组，表格只剩固定的「操作」列，不额外兜底回默认列
@@ -591,35 +607,32 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ===== 清洗状态行（顶部） ===== */
-.gov-stats {
-  background: var(--surface);
+/* ===== 顶部合并条（统计数字 + 当前范围，审查报告 V7） ===== */
+/* 数字组：合并进 .scope-bar 后作为左侧一簇。
+   baseline 对齐让三个数字与各自的单位文字落在同一基线上 */
+.gs-group {
   display: flex;
-  flex-wrap: wrap;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: var(--sp-4) var(--sp-5);
-  margin-bottom: 20px;
-  display: flex;
+  align-items: baseline;
   gap: var(--sp-5);
+  flex-wrap: wrap;
 }
 .gs {
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .gs b {
   font-size: var(--fs-xl);
   color: var(--ink);
   margin-right: 6px;
 }
-/* 统计失败提示*/
+/* 统计失败提示：紧跟数字组尾部。原先靠 margin-left:auto 顶到独占一行的最右侧，
+   合并后右侧已被范围控件占住，容器宽度由内容决定，那条 auto 外边距已无可分配空间 */
 .gs-fail {
-  margin-left: auto;
   font-size: var(--fs-xs);
   color: var(--danger);
 }
 
-/* 当前范围条*/
+/* 当前范围条：合并后承载左数字组 + 右范围控件两簇 */
 .scope-bar {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -630,10 +643,19 @@ onMounted(() => {
      原先 .scope-row（「当前范围」那行）带 margin-top:10px，**永远另起一行** —— 控件本身
      在 1366 下是放得下的（约 700px），是这一行让整块筛选区占到 2~3 行，把下面的流程区
      挤出首屏。改成横向：左筛选、右「当前范围」；窄屏（≤1560）由 flex-wrap 自动换行，
-     不裁切、也不硬挤成一行。 */
+     不裁切、也不硬挤成一行。
+     V7 合并后再套一层 space-between：左簇统计数字、右簇范围控件，
+     原来统计条右侧那 60% 空白由右簇吃掉。 */
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+/* 右簇：范围选择器 + 「当前范围」文案，内部仍横排、底对齐（沿用原 scope-bar 的排法） */
+.scope-ctrls {
+  display: flex;
+  align-items: flex-end;
   gap: var(--sp-4);
   flex-wrap: wrap;
 }
@@ -650,7 +672,7 @@ onMounted(() => {
     padding: var(--sp-3) var(--sp-4);
   }
 }
-.scope-tip { font-size: var(--fs-base); color: var(--text-sub); }
+.scope-tip { font-size: var(--fs-base); color: var(--text-sub-strong); }
 .scope-tip b { color: var(--ink); }
 
 /* ===== 流程说明条 =====
@@ -690,7 +712,9 @@ onMounted(() => {
   border-radius: 6px;
   padding: var(--sp-4) var(--sp-3);
   text-align: center;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
   /* 28.18：div → button 后的重置，保持原卡片观感 */
   cursor: pointer;
   font-family: inherit;
@@ -735,7 +759,7 @@ onMounted(() => {
   margin-left: auto;
   border: none;
   background: none;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   font-size: var(--fs-xs);
   cursor: pointer;
   padding: 0;
@@ -745,11 +769,13 @@ onMounted(() => {
   margin: 6px 0 0;
   font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .sd-where { color: var(--ink-mid); }
-.step-fade-enter-active, .step-fade-leave-active { transition: opacity 0.15s ease; }
-.step-fade-enter-from, .step-fade-leave-to { opacity: 0; }
+/* 步骤详述的展开/收起：用全局共享的 panel-fade（纯淡入淡出，不做位移）。
+   它嵌在卡片里，位移会让卡片边缘跳动；纯 opacity 也不创建包含块、不裁剪，
+   是这类内嵌面板最稳的做法。此前是自写的 .step-fade（写死了时长与 ease 曲线），
+   已并入 theme.css 的动效令牌与 ② 类，见 docs/视觉与交互审查报告-第三轮.md 附录 D。 */
 .step-num {
   width: 30px;
   height: 30px;
@@ -771,7 +797,7 @@ onMounted(() => {
   margin-top: 6px;
   font-size: var(--fs-xs);
   line-height: 1.6;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 箭头定宽，末步用同宽占位，保证 5 张卡片等宽*/
 .step-arrow {
@@ -779,7 +805,7 @@ onMounted(() => {
   flex-shrink: 0;
   text-align: center;
   font-size: var(--fs-page);
-  color: var(--ochre);
+  color: var(--ochre-text);
   font-weight: bold;
 }
 .step-arrow.ghost {
@@ -806,7 +832,7 @@ onMounted(() => {
 .clean-error-sub {
   margin-top: 2px;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 
 /* ===== 清洗结果（中部） ===== */
@@ -840,11 +866,11 @@ onMounted(() => {
 }
 .stat-item .lbl {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-top: var(--sp-1);
 }
 .stat-item.green .num { color: var(--ink-mid); }
-.stat-item.ochre .num { color: var(--ochre); }
+.stat-item.ochre .num { color: var(--ochre-text); }
 .stat-item.red .num { color: var(--danger); }
 
 /* 三级命中分布；圆角与流程区统一为 6px*/
@@ -856,10 +882,10 @@ onMounted(() => {
   font-size: var(--fs-base);
   color: var(--ink);
 }
-.level-dist .ld-lbl { color: var(--text-sub); font-size: var(--fs-xs); }
+.level-dist .ld-lbl { color: var(--text-sub-strong); font-size: var(--fs-xs); }
 .level-dist .ld { padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .level-dist .ld.exact { color: var(--ink-mid); }
-.level-dist .ld.contain { color: var(--ochre); }
+.level-dist .ld.contain { color: var(--ochre-text); }
 .level-dist .ld.fuzzy { color: var(--danger); }
 
 /* ===== 导出区 ===== */
@@ -875,7 +901,7 @@ label,
 .field-lbl {
   display: block;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 3px;
 }
 /* 28.18：导出历史列表 */
@@ -886,7 +912,7 @@ label,
 }
 .eh-hd {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: var(--sp-1);
 }
 .eh-list {
@@ -900,7 +926,7 @@ label,
   gap: var(--sp-2);
   padding: 3px 0;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .eh-time { min-width: 150px; }
 .eh-fmt {

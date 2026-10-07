@@ -104,9 +104,11 @@
         </nav>
       </aside>
 
-      <main id="main-content">
-        <!-- 面包屑：承载分组与当前位置-->
-        <nav v-if="breadcrumb.length" class="crumb" aria-label="面包屑">
+      <main id="main-content" ref="mainRef">
+        <!-- 面包屑：承载分组与当前位置。
+             随路由一起淡入 —— 与主内容同一套 .page-enter 动画、同一触发时机，
+             否则主内容在淡入、面包屑却「啪」地换成新文字，两个节奏对不上。 -->
+        <nav v-if="breadcrumb.length" :key="route.path" class="crumb page-enter" aria-label="面包屑">
           <template v-for="(c, i) in breadcrumb" :key="c">
             <span class="crumb-item">{{ c }}</span>
             <span v-if="i < breadcrumb.length - 1" class="crumb-sep">/</span>
@@ -114,7 +116,16 @@
         </nav>
         <!-- 每页一个 h1（视觉隐藏），与面板标题 h2 构成层级-->
         <h1 class="visually-hidden">{{ route.meta?.title || '首页看板' }}</h1>
-        <router-view />
+        <!-- 内层路由切换：应用内子页面切换的主战场（顶层 App.vue 只管登录/注册 ↔ 外壳）。
+             用「:key 强制重建 + .page-enter 入场动画」，**不用 <Transition mode="out-in">**
+             —— 后者在 Vue 3.5 下对「不同组件类型的分支」会卡死（详见 theme.css ①b）。
+             :key 取 r.path 而非 fullPath：路径变了就重挂载并播放淡入；「同页只改 query」
+             （如 /review?recordId=1 → 2）不重挂载，保住页面内已填的表单与已选的筛选。
+             滚动归零见下方 watch(route.path)：主区是 main 自身在滚（.layout 定高 +
+             main overflow-y:auto），document 并不滚，router 的 scrollBehavior 管不到这里。 -->
+        <router-view v-slot="{ Component, route: r }">
+          <component :is="Component" :key="r.path" class="page-enter" />
+        </router-view>
       </main>
     </div>
 
@@ -130,7 +141,7 @@
 import { logout as logoutApi } from '@/api/auth'
 import { getOverview } from '@/api/stats'
 import { governanceStats } from '@/api/governance'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AiAssistant from '@/components/AiAssistant.vue'
@@ -139,6 +150,21 @@ import LlmConfigDialog from '@/components/LlmConfigDialog.vue'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+
+// 主区滚动容器（<main> 自身）。路由切换时要把它的 scrollTop 归零 ——
+// 主区是 main 内部滚动（.layout 定高 + main overflow-y:auto），document 不滚，
+// 所以 router 的 scrollBehavior 对它无效，必须直接操作这个元素。
+// 不归零的后果：从长页面（如病历数据滚到第 300 行）切到短页面，浏览器只把
+// scrollTop 夹到新上限、不会自动回顶，新页面直接停在底部。
+// flush:'post' —— 等新页挂载完再归零，避免对旧页写入后被新页的高度覆盖。
+const mainRef = ref(null)
+watch(
+  () => route.path,
+  () => {
+    if (mainRef.value) mainRef.value.scrollTop = 0
+  },
+  { flush: 'post' }
+)
 
 // 28.20：登录时的权限快照会过期（owner 改权限 / 移除成员后），进主框架时重取一次
 onMounted(() => {
@@ -390,28 +416,43 @@ const handleLogout = async () => {
   font-size: var(--fs-base);
   color: #d8dfd9;
 }
-/* 导入 LLM 入口：与「退出」同为顶栏次级操作，样式保持一致 */
-.llm-entry {
+/* 导入 LLM 入口：与「退出」同为顶栏次级操作，样式保持一致。
+   P1-2（第三轮）：文字链接实测 36×21 / 69×21（padding:2px），命中区只有 21px 高，
+   而同排通知铃铛已修到 32×32 —— 三个操作只修了中间那个。这里补齐：
+   只放大命中区、视觉不变（文字仍 15px）。el-button link 自带 padding:2px 会压低行高，
+   用 min-height + 负 margin 抵消，避免把顶栏撑高。 */
+.topbar .llm-entry,
+.topbar .logout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
+  margin: -4px 0 -4px 0;
+}
+.topbar .llm-entry {
   color: #d8dfd9;
   font-size: var(--fs-base);
 }
-.llm-entry:hover {
+.topbar .llm-entry:hover {
   color: var(--surface);
 }
-/* 通知铃铛：顶栏深色底上的图标按钮，与 llm-entry 同一浅色处理 */
+/* 通知铃铛：顶栏深色底上的图标按钮，与 llm-entry 同一浅色处理。
+   点击区 32×32（原 28×28 低于 32px 的最小点击目标，I4-1）：svg 仍 18px 居中，
+   el-badge 徽标挂在按钮右上角外侧，不会被裁。 */
 .notice-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: #d8dfd9;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 .notice-btn:hover,
 .notice-btn:focus-visible {
@@ -425,7 +466,7 @@ const handleLogout = async () => {
 }
 .nt-hd {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   padding-bottom: var(--sp-1);
   border-bottom: 1px solid var(--line-soft);
   margin-bottom: var(--sp-1);
@@ -469,18 +510,18 @@ const handleLogout = async () => {
 .nt-desc {
   display: block;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   line-height: 1.4;
 }
 .nt-go {
   flex: none;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   font-size: var(--fs-base);
 }
 .nt-empty {
   padding: var(--sp-3) 0;
   text-align: center;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   font-size: var(--fs-base);
 }
 /* 顶栏是深色底（.topbar background: var(--ink)），所以这里必须用浅色 ——
@@ -547,7 +588,7 @@ aside {
 .menu .sec {
   padding: var(--sp-4) var(--sp-4) var(--sp-1);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 
 /* 子菜单（如「术语批量导入」）：缩进一级 + 稍小字号，视觉上从属于父项。
@@ -555,7 +596,7 @@ aside {
 .menu .sub a {
   padding-left: var(--sp-5);
   font-size: var(--fs-base);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .menu .sub a:hover {
   background: var(--ink-light);
@@ -579,8 +620,19 @@ main {
 }
 /* 内层内容仍限宽居中，但滚动容器保持通宽 */
 main > * {
-  max-width: 1600px /* P4.18：与设计稿一致，超出横向留白不拉伸数据区；改动此值需两档视口实测 */;
+  /* P4.18：超出横向留白不拉伸数据区；改动此值需两档视口实测。
+     V2（本次）：固定 1600px 在宽屏上留白过大 —— 审查报告实测 1920 档单侧空 72px、
+     2560 档单侧空 392px（占视口 30.6%，两侧近 800px 全是空白）。
+     改成 min(100% - 48px, 1760px)：中低视口恒留 24px 单侧呼吸位、上限抬到 1760，
+     ≥2200px 再放开到 2000px（见下方媒体查询）——既吃掉宽屏空白，又不让数据区无限拉宽。 */
+  max-width: min(100% - 48px, 1760px);
   margin: 0 auto;
+}
+/* 超宽屏（≥2200px）再放开一档：1760 在 2560/3440 上仍偏窄，2000 更贴内容密度 */
+@media (min-width: 2200px) {
+  main > * {
+    max-width: 2000px;
+  }
 }
 
 /* ===== 面包屑===== */
@@ -590,7 +642,7 @@ main > * {
   gap: 6px;
   margin-bottom: var(--sp-3);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .crumb-item:last-child {
   color: var(--ink);

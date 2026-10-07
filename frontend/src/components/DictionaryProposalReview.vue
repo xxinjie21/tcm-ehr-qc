@@ -480,7 +480,7 @@ defineExpose({
   border-left: 3px solid var(--line);
 }
 .rv-diff-hd.add { border-left-color: var(--ink-mid); color: var(--ink-mid); }
-.rv-diff-hd.mod { border-left-color: var(--ochre); color: var(--ochre); }
+.rv-diff-hd.mod { border-left-color: var(--ochre); color: var(--ochre-text); }
 .rv-diff-hd.del { border-left-color: var(--danger); color: var(--danger); }
 .rv-diff-row {
   padding: var(--sp-1) var(--sp-2);
@@ -489,7 +489,7 @@ defineExpose({
 }
 .rv-diff-al {
   margin-left: var(--sp-2);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   font-size: var(--fs-xs);
 }
 

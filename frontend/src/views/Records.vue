@@ -727,7 +727,7 @@ onMounted(async () => {
 .tip { line-height: 1.7; margin-bottom: 14px; }
 .tip-inline {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .import-auto {
   display: flex;
@@ -749,7 +749,7 @@ onMounted(async () => {
 .up-inner { text-align: center; }
 .up-title { font-size: var(--fs-base); color: var(--ink); }
 .up-title em { color: var(--ink-mid); font-style: normal; font-weight: bold; }
-.up-sub { font-size: var(--fs-xs); color: var(--text-sub); margin-top: var(--sp-1); }
+.up-sub { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-top: var(--sp-1); }
 .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 /* 28.19-06：右侧 danger 区 —— 与左侧主操作/统计信息用分隔线隔开，并推到行尾 */
 .danger-zone {
@@ -762,7 +762,7 @@ onMounted(async () => {
 }
 .danger-note {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .result { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: 14px; }
 .import-failed {
@@ -793,13 +793,13 @@ onMounted(async () => {
 .ip-sub {
   margin-top: var(--sp-2);
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 .result-hd { font-size: var(--fs-base); font-weight: bold; color: var(--ink); margin-bottom: var(--sp-3); }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: var(--sp-3) var(--sp-4); text-align: center; }
 .stat-item .num { font-size: var(--fs-xl); font-weight: bold; color: var(--ink); }
-.stat-item .lbl { font-size: var(--fs-xs); color: var(--text-sub); margin-top: var(--sp-1); }
+.stat-item .lbl { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-top: var(--sp-1); }
 .stat-item.green .num { color: var(--ink-mid); }
 .stat-item.red .num { color: var(--danger); }
 /* 多列栅格：3 列时 21 字段压到约 11 行，常规屏幕一屏可填完。

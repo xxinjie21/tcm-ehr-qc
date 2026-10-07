@@ -19,8 +19,10 @@
       <label for="sf-end">就诊截止</label>
       <el-date-picker id="sf-end" v-model="model.end" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
     </div>
-    <el-button type="primary" size="small" @click="$emit('search')">查 询</el-button>
-    <el-button size="small" @click="$emit('reset')">重 置</el-button>
+    <!-- 按钮用 default 尺寸（32px 高）：同排 el-select / el-date-picker 也是 default，
+         原先 small 只有 24px，按钮明显矮一截（F7） -->
+    <el-button type="primary" size="default" @click="$emit('search')">查 询</el-button>
+    <el-button size="default" @click="$emit('reset')">重 置</el-button>
   </section>
 </template>
 
@@ -63,7 +65,7 @@ defineEmits(['search', 'reset'])
 .filter label {
   display: block;
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   margin-bottom: 3px;
 }
 </style>

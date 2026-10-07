@@ -23,7 +23,7 @@ defineProps({
   border: 1px solid var(--line);
   border-radius: 6px;
   margin-bottom: 14px;
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow var(--dur-fast) var(--ease-out);
 }
 /* hover 只给阴影，**不要** translateY：
  * transform 会让 .panel 成为 position:fixed 后代的包含块 —— 面板内的
@@ -38,7 +38,9 @@ defineProps({
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: var(--fs-base);
+  /* F4：标题此前用 --fs-base，与卡片内正文完全同号，层级只靠字重与竖条区分。
+     --fs-title 令牌自定义以来几乎闲置（全站仅 2 个节点在用），此处真正启用。 */
+  font-size: var(--fs-title);
   font-weight: bold;
   color: var(--ink);
   display: flex;

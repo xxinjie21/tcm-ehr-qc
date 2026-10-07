@@ -315,14 +315,14 @@ async function handleSave() {
 }
 .llm-form :deep(.el-form-item__label) {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   padding-bottom: 2px;
   line-height: 1.6;
 }
 /* 字段下方的补充说明（比 label 更小、更弱） */
 .llm-hint {
   font-size: var(--fs-xs);
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
   line-height: 1.7;
 }
 /* 温度与超时并排一行 */
@@ -355,10 +355,10 @@ async function handleSave() {
 }
 .llm-result.is-idle {
   border-style: dashed;
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 /* 模型回复单独一行、用次级色，与「连接正常」这类结论区分开 */
 .llm-reply {
-  color: var(--text-sub);
+  color: var(--text-sub-strong);
 }
 </style>

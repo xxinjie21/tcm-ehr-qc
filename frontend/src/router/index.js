@@ -2,8 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
-// 已登录用户的合法系统级角色（与后端一致：管理员 / 用户。
-// 所有者、成员、未加入组织在前端都归「用户」，组织内区分看 orgRole）
+// 已登录用户的合法**系统级**角色（与后端 users.role 口径一致，见 docs/角色与权限矩阵.md：
+// 系统级只有「管理员」；其余身份都是组织级，登录响应里另有 orgRole，不在这层判定）。
+// 注意：**没有「审核员」** —— 那是线上库 auditor 的 role 漂移出来的
+// （种子 SQL 写的是「用户」，线上被写成了「审核员」），属数据异常而非合法角色。
+// 这里**不能**为它扩白名单（否则等于把异常当成设计）；正确的修法是对齐
+// users.role / 种子，而不是给白名单加角色。漂移账号登录会在 beforeEach 被显式
+// 拦截并提示（原先静默踢回登录页，用户只会以为密码错了，见审查报告 I8）。
 const KNOWN_ROLES = ['管理员', '用户']
 
 const routes = [
@@ -38,7 +43,19 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  // 切页后回到顶部。
+  // ⚠️ 只对「文档级滚动」生效（登录 / 注册页，以及将来可能出现的长公开页）。
+  // 应用内的主内容区不是 document 在滚 —— 它是 main 自身在滚
+  // （.layout 定高 + main{overflow-y:auto}），document 的滚动量恒为 0，
+  // 所以这里管不到应用内切页。那部分由 MainLayout 在
+  // <Transition @before-enter="resetMainScroll"> 里手动把 main.scrollTop 归零。
+  // 两处都要写：只写这里，从长页面切到短页面会停在「短页面的底部」。
+  // savedPosition 用于浏览器前进/后退时还原文档级滚动位置。
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  }
 })
 
 router.beforeEach((to) => {
@@ -51,8 +68,11 @@ router.beforeEach((to) => {
   if (isPublic) {
     return true
   }
-  // 登录态存在但角色缺失或非法（localStorage 被清、旧版本残留）→ 强制重新登录
+  // 登录态存在但角色缺失或非法（localStorage 被清、旧版本残留）→ 强制重新登录。
+  // 原来是静默 return '/login'：密码明明校验通过，页面却"刷新"回登录页，
+  // 用户只当自己密码输错（I8）。先弹一条显式提示，再跳走。
   if (!KNOWN_ROLES.includes(userStore.role)) {
+    ElMessage.error('当前账号角色「' + userStore.role + '」不受支持，请联系管理员')
     return '/login'
   }
   // 角色守卫：直输管理页 URL 时退回落地页
