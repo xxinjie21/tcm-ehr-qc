@@ -12,6 +12,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -91,6 +92,20 @@ class DictionaryLintServiceImplTest {
         assertTrue(w.getTerms().contains("流清涕反复发作"));
         assertTrue(w.getAdvice().contains("别名"),
                 "建议要给出「标准词 + 别名」的拆法，而不只是说「有问题」");
+    }
+
+    @Test
+    @DisplayName("「发作期」「持续性」这类合法术语不该被判成原文短语（标记词只在词尾才算信号）")
+    void legalTermContainingMarkerIsNotFlagged() {
+        // 回归：标记词原先做子串匹配，「发作」会把「发作期」判成原文短语 ——
+        // 提示词（举「边有齿痕」「流清涕反复发作」为例）与被标记的词对不上，用户完全看不懂。
+        DictionaryLintVO vo = svc.lint("pattern", List.of(
+                term("发作期"),
+                term("持续性"),
+                term("发热")));
+
+        assertNull(find(vo, "term-looks-like-sentence"),
+                "标记词出现在词中间是合法术语的一部分，不能当原文短语");
     }
 
     @Test

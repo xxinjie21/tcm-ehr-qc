@@ -51,8 +51,14 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
      *
      * 它们没有任何标点，光看标点查不出来，但同样是把病历原文抄进来当标准词 ——
      * 后果是归一时拿原文匹配自己，看着命中了、其实没做任何标准化。
+     *
+     *
+     * <b>标记词只在词尾才算信号</b>：单个标记词做子串匹配会误伤合法术语 ——
+     * 「发作」会把「发作期」判成原文短语（实测误报，提示词与被标记的词对不上）。
+     * 所以只有「反复发作 / 反复出现」这种整串出现，或标记词恰好落在词尾时才算命中。
      */
-    private static final Pattern PHRASE_MARKERS = Pattern.compile("反复|发作|加重|减轻|明显|持续|多年|数次");
+    private static final Pattern PHRASE_MARKERS =
+            Pattern.compile("反复发作|反复出现|(反复|发作|加重|减轻|明显|持续|多年|数次)$");
     /** 单字标准词：药名「姜」「术」确实存在，但出现得多半是抽取截断被粘进来了 */
     private static final int MIN_TERM_LEN = 2;
     private static final int MAX_TERM_LEN = 20;
@@ -241,11 +247,10 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
             }
         }
         addIfAny(vo, sentenceLike, "term-looks-like-sentence",
-                "标准术语像是从病历原文抄下来的短语",
-                "标准术语应是规范名词（如「齿痕」「鼻痒」）。"
-                        + "若原文写的是「边有齿痕」「流清涕反复发作」，"
-                        + "正确做法是标准词写规范名词、把原文放进别名 —— "
-                        + "否则归一时是拿原文匹配自己，看着命中了、实际没做标准化。");
+                "标准术语是整句描述，不是规范名词",
+                "例：把「流清涕反复发作」直接当标准词。应改成标准词「流清涕」、"
+                        + "把「流清涕反复发作」放进别名 —— "
+                        + "否则归一时是拿原文匹配自己，看着命中了、其实没做标准化。");
         addIfAny(vo, tooShort, "term-too-short",
                 "标准术语只有一个字",
                 "药名确有单字（「姜」），但占比高时多半是抽取截断的残字被粘进来了，请核对来源。");
