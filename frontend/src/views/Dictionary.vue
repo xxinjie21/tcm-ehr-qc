@@ -190,7 +190,72 @@
         <el-input v-model="newTerm" placeholder="标准词" style="width: 150px" size="small" />
         <el-input v-model="newAliases" placeholder="别名，多个用「、」分隔（可选）" style="width: 230px" size="small" />
         <el-button size="small" :disabled="!newTerm.trim()" @click="addLocalTerm">加入本地</el-button>
+        <!-- 与批量导入页同一套 AI 补词建议：拿不准一个词该「新建标准词」还是
+             「挂到某个已有标准词当别名」时，先让 AI 判一遍。采纳后只回填上面的输入框，
+             不直接入库 —— 仍由人工核对无误再点「加入本地」。 -->
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="suggestLoading"
+          :disabled="!addSuggestWords.length"
+          @click="askAddSuggest"
+        >AI 建议</el-button>
         <span class="tip">加入本地后同样需要提交提案才会进入小组基线</span>
+      </div>
+
+      <!-- AI 建议结果：只出候选、不落库。字段与批量导入页的建议面板一致
+           （原文 / 建议动作 / 标准词 / 依据），采用后回填输入框，人工核对再入库。 -->
+      <div v-if="suggestions.length" class="ai-suggest">
+        <div class="as-head">
+          <span class="as-title">AI 补词建议（{{ suggestions.length }} 条）</span>
+          <span class="tip">{{ suggestNote }}</span>
+        </div>
+        <el-table :data="suggestions" border size="small" max-height="320">
+          <el-table-column prop="original" label="原文" min-width="120" />
+          <el-table-column label="建议动作" width="120">
+            <template #default="{ row }">
+              <el-select v-model="row.action" size="small">
+                <el-option label="挂别名" value="alias" />
+                <el-option label="新建标准词" value="new" />
+                <el-option label="忽略" value="ignore" />
+                <el-option label="待判断" value="unknown" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="标准词" min-width="150">
+            <template #default="{ row }">
+              <el-input
+                v-model="row.standardTerm"
+                size="small"
+                :disabled="row.action === 'ignore' || row.action === 'unknown'"
+                placeholder="填标准词"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="依据" min-width="220">
+            <template #default="{ row }">
+              <span class="as-reason">{{ row.reason || '—' }}</span>
+              <el-tag
+                v-if="row.source === 'model'"
+                size="small"
+                type="warning"
+                effect="plain"
+                class="as-tag"
+              >AI 生成</el-tag>
+              <el-tag v-else-if="row.source === 'dict'" size="small" effect="plain" class="as-tag">
+                词表命中
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="as-foot">
+          <el-button size="small" type="primary" :disabled="!confirmable.length" @click="applyAddSuggest">
+            采用结果（{{ confirmable.length }} 条）
+          </el-button>
+          <el-button size="small" @click="suggestions = []">关闭</el-button>
+          <span class="tip">采用后会填回上方输入框，核对无误再点「加入本地」</span>
+        </div>
       </div>
     </PanelCard>
 
@@ -265,6 +330,7 @@ import DictionaryProposalReview from '@/components/DictionaryProposalReview.vue'
 import {
   getTerms, exportBaseline, submitProposal, listArchives, rollbackArchive
 } from '@/api/dictionary'
+import { runTermSuggest } from '@/api/ai'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES_WIDE } from '@/utils/constants'
@@ -522,6 +588,85 @@ const addLocalTerm = () => {
   newTerm.value = ''
   newAliases.value = ''
   saveLocal()
+}
+
+// ---- AI 补词建议（与批量导入页同一套：只出候选，人工确认后才录入）----
+// 复用后端 termsuggest：它按字面相似度从现有词表召回候选，再让 LLM 判断
+// 「挂别名 / 新建标准词 / 忽略」。判定不进归一链路，只作人工录入前的参考。
+const suggestions = ref([])
+const suggestLoading = ref(false)
+const suggestNote = ref('')
+
+/** 送给 AI 的原文 = 标准词 + 别名，按输入顺序、去重去空 */
+const addSuggestWords = computed(() => {
+  const out = []
+  const push = (s) => {
+    const v = String(s || '').trim()
+    if (v && !out.includes(v)) out.push(v)
+  }
+  push(newTerm.value)
+  for (const a of splitAliases(newAliases.value, newTerm.value)) push(a)
+  return out
+})
+
+/** 可采用的条目：动作是挂别名或新建，且标准词非空 */
+const confirmable = computed(() =>
+  suggestions.value.filter(
+    (s) => (s.action === 'alias' || s.action === 'new') && String(s.standardTerm || '').trim()
+  )
+)
+
+/** 向 AI 要建议；失败或不可用都不影响手动录入那条路 */
+const askAddSuggest = async () => {
+  const words = addSuggestWords.value
+  if (!words.length) return
+  suggestLoading.value = true
+  suggestions.value = []
+  try {
+    const reply = await runTermSuggest({ terms: words, termType: typeKey.value })
+    const list = reply?.termSuggestions || []
+    if (!list.length) {
+      ElMessage.warning('AI 没有返回建议，请稍后重试')
+      return
+    }
+    suggestions.value = list.map((s) => ({ ...s, aliases: s.aliases || [] }))
+    suggestNote.value = reply.llmAvailable
+      ? 'AI 建议仅供参考，标「AI 生成」的条目未经权威词表校验。'
+      : 'AI 不可用，以下是词表中字面相近的候选，需人工判断。'
+  } catch (e) {
+    ElMessage.warning(e?.message || 'AI 建议生成失败')
+  } finally {
+    suggestLoading.value = false
+  }
+}
+
+/**
+ * 采纳建议 → 回填「标准词 / 别名」输入框（**不直接入库**）。
+ *
+ * 主标准词优先取判为「新建」的那条；若全判成「挂别名」，则取第一条命中的标准词，
+ * 它对应的原文本身就成了别名。其余各条的原文与其别名一并收作别名。
+ * 只回填、不落库：这一行的语义是「人工录入」，AI 只是把要填的东西先摆好。
+ */
+const applyAddSuggest = () => {
+  const rows = confirmable.value
+  if (!rows.length) return
+  const main = rows.find((r) => r.action === 'new') || rows[0]
+  const std = String(main.standardTerm || '').trim()
+  if (!std) return
+  const aliasSet = []
+  for (const r of rows) {
+    if (r === main) {
+      if (r.action === 'alias') aliasSet.push(r.original)
+    } else {
+      aliasSet.push(r.original)
+    }
+    for (const a of r.aliases || []) aliasSet.push(a)
+  }
+  const aliases = [...new Set(aliasSet.map((s) => String(s).trim()).filter((s) => s && s !== std))]
+  newTerm.value = std
+  newAliases.value = aliases.join('、')
+  suggestions.value = []
+  ElMessage.success('已把建议填回输入框，核对无误后点「加入本地」')
 }
 
 const removeLocalTerm = (std) => {
@@ -783,6 +928,39 @@ onMounted(() => {
   gap: var(--sp-2);
   margin-top: var(--sp-2);
   flex-wrap: wrap;
+}
+
+/* AI 补词建议：候选表 + 逐条确认。与批量导入页的建议面板同款（字段与配色一致），
+   便于在「导入」与「手动录入」两个入口之间保持一致的操作预期。 */
+.ai-suggest {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--ochre-surface);
+}
+.as-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.as-title {
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+.as-reason {
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+}
+.as-tag { margin-left: var(--sp-1); }
+.as-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 
 /* ===== 页头：术语类型筛选器 ===== */
