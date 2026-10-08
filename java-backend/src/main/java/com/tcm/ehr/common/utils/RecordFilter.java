@@ -88,14 +88,64 @@ public final class RecordFilter {
                 wrapper.le("visit_time", dto.getDateRange().get(1).trim() + " 23:59:59");
             }
         }
-        // 排序键必须是列表实际展示的那一列（visit_time 接诊时间）。
+// 排序键必须是列表实际展示的那一列（visit_time 接诊时间）。
         // 原先按 create_time 排，但批量导入/灌库场景下 create_time 会大量同值 ——
         // 实测 500 条演示数据 create_time 只有 1 个不同值，排序完全失效、返回 UUID 序，
-        // 对用户等于随机。visit_time 有真实分布（2019~2025），且可走 idx_department_visit_time。
+        // 对用户等于随机。visit_time 有真实分布（2019~2025），可走 idx_department_visit_time。
         // 次级键 id 不能省：visit_time 大量同值时，LIMIT/OFFSET 分页在页边界会重复取或漏取
         // （批任务据此累加分级计数，重复取到的还会被批内判重扣分）
-        wrapper.orderByDesc("visit_time").orderByAsc("id");
+        //
+        // B3 用户可排序（方案 b）：白名单三列，未命中/未传一律回落上面对的默认序。
+        // 注入串（sortBy=id); DROP...）会被白名单挡掉 → 走默认序，不拼接、不报错。
+        String sortCol = sortColumn(dto == null ? null : dto.getSortBy());
+        if (sortCol == null) {
+            wrapper.orderByDesc("visit_time").orderByAsc("id");
+        } else {
+            String so = dto.getSortOrder() == null ? "" : dto.getSortOrder().trim();
+            // 方向：只认 asc / desc，其余（含空、含非法值）取该列默认方向
+            boolean desc = "asc".equalsIgnoreCase(so) ? false
+                    : ("desc".equalsIgnoreCase(so) ? true : !"registration_no".equals(sortCol));
+            // 次级键 id 与**索引扫描方向**一致（性能审查方案 B 同构）：
+            //   score / visit_time 走 (org_id, <col> DESC, id ASC) 索引 →
+            //   列 desc 正扫 = id ASC；列 asc 反扫 = id DESC。
+            //   registration_no 走 (org_id, registration_no, id) 升序索引 →
+            //   列 asc 正扫 = id ASC；列 desc 反扫 = id DESC。
+            // 无论哪条路径，(列, id) 都是严格全序 —— 分页页边界不重不漏。
+            boolean idAsc = "registration_no".equals(sortCol) ? !desc : desc;
+            // ⚠️ 显式用 orderByDesc/orderByAsc 而非 orderBy(boolean, String)：
+            // MP 里后者是 orderBy(boolean condition, R... columns) 的 varargs 重载，
+            // boolean 会被当成 condition —— 传 false 时排序会整体不生效。
+            if (desc) {
+                wrapper.orderByDesc(sortCol);
+            } else {
+                wrapper.orderByAsc(sortCol);
+            }
+            if (idAsc) {
+                wrapper.orderByAsc("id");
+            } else {
+                wrapper.orderByDesc("id");
+            }
+        }
         return wrapper;
+    }
+
+    /**
+     * 排序列白名单（B3）：key=入参（含驼峰别名），value=真实列名。
+     * 只认这三列 —— 其余一律返回 null（回落默认序）。新增可排序列时先补对应
+     * {@code (org_id, <col> [方向], id)} 复合索引，再加这里。
+     */
+    private static final java.util.Map<String, String> SORT_WHITELIST = java.util.Map.of(
+            "score", "score",
+            "visit_time", "visit_time",
+            "visitTime", "visit_time",
+            "registration_no", "registration_no",
+            "registrationNo", "registration_no");
+
+    private static String sortColumn(String sortBy) {
+        if (sortBy == null) {
+            return null;
+        }
+        return SORT_WHITELIST.get(sortBy.trim());
     }
 
     /**

@@ -108,6 +108,7 @@
           ref="allTableRef"
           :rows="allRows"
           :loading="allLoading"
+          @sort-change="onAllSortChange"
           loading-text="正在读取病历…"
           highlight-current
           :max-height="420"
@@ -205,12 +206,17 @@ const loadedAt = ref(new Date().toLocaleString())
 const allPage = ref(1)
 const allPageSize = ref(10)
 const allTableRef = ref(null)
+// B3 列头排序（评分 / 接诊时间）：本页 allPage 本来就不入 URL，sort 同口径不入 URL
+const allSort = reactive({ sortBy: '', sortOrder: '' })
 // 「全部病历」列表：本页原本没有取号（后到的旧响应会覆盖新结果）—— 按验收「行为不变」
 // 的要求保留这一现状，故 race: false；失败要清空并标记，走默认
 const {
   list: allRows, total: allTotal, loading: allLoading, failed: allFailed, load: loadAllList
 } = usePagedList({
-  fetcher: (signal) => searchRecords({ page: allPage.value, pageSize: allPageSize.value }, { signal }),
+  fetcher: (signal) => searchRecords({
+    page: allPage.value, pageSize: allPageSize.value,
+    sortBy: allSort.sortBy, sortOrder: allSort.sortOrder
+  }, { signal }),
   extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
   race: false
 })
@@ -224,6 +230,13 @@ const {
 const loadAllRecords = async (p) => {
   if (p) allPage.value = p
   await loadAllList()
+}
+
+// B3 列头排序变更：写排序回第 1 页重查（排序变了旧页码没有意义）
+const onAllSortChange = ({ sortBy, sortOrder }) => {
+  allSort.sortBy = sortBy
+  allSort.sortOrder = sortOrder
+  loadAllRecords(1)
 }
 
 const handleAllSizeChange = (sz) => {

@@ -43,6 +43,7 @@
             :max-height="420"
             :action-width="150"
             @selection-change="onSelectionChange"
+            @sort-change="onSortChange"
           >
             <template #action="{ row }">
                 <el-button link type="primary" @click="openDetail(row.id)">查看</el-button>
@@ -278,7 +279,7 @@ const GROUP_FIELDS = new Map(
 const groupFields = (group) => GROUP_FIELDS.get(group) || []
 
 // ===== F·7.4 查询 =====
-const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+const query = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '' })
 // 范围删除要求至少一个筛选条件（与后端一致，防误删全库）
 const hasFilter = computed(() => {
   const r = query.dateRange
@@ -310,6 +311,16 @@ useUrlFilters(query, page, pageSize)
 
 // 查询列表：翻页 / 改筛选 / 重试共用同一入口
 const handleSearch = () => loadList()
+
+// B3 列头排序（评分 / 接诊时间）：更新查询并回第 1 页 —— 排序变了，旧页码没有意义。
+// sortBy/sortOrder 随 useUrlFilters 入 URL，刷新/分享可还原；空串不落 URL（默认序）。
+// 多余的两个键随范围删除/重算请求发出会被 FiltersDTO 忽略（Jackson 未知字段不报错）。
+const onSortChange = ({ sortBy, sortOrder }) => {
+  query.sortBy = sortBy
+  query.sortOrder = sortOrder
+  page.value = 1
+  handleSearch()
+}
 
 // 每页条数变化回到第 1 页
 const handleSizeChange = () => {

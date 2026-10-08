@@ -118,6 +118,7 @@
             :max-height="420"
             :action-width="100"
             :row-class-name="precheckRowClass"
+            @sort-change="onPrecheckSortChange"
           >
             <template #action="{ row }">
               <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
@@ -245,7 +246,7 @@ const userStore = useUserStore()
 const canWriteRules = computed(() => userStore.canWriteQcRulesEntry)
 
 // 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护
-const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '' })
 
 // ===== 评分标准 / 扣分构成=====
 // 评分标准：rules 为当前生效规则，descriptions 为自然语言说明，catalog* 为可选项目录
@@ -368,6 +369,15 @@ useUrlFilters(filters, precheckPage, precheckSize)
 const loadPrecheck = async (p) => {
   if (typeof p === 'number') precheckPage.value = p
   await loadPrecheckList()
+}
+
+// B3 列头排序（评分 / 接诊时间）：写入 filters 回第 1 页重查。
+// sortBy/sortOrder 随 useUrlFilters 入 URL；这两个键随重算/扣分统计发给 FiltersDTO
+// 端点时被 Jackson / Spring 绑定忽略（未知字段），不影响范围语义。
+const onPrecheckSortChange = ({ sortBy, sortOrder }) => {
+  filters.sortBy = sortBy
+  filters.sortOrder = sortOrder
+  loadPrecheck(1)
 }
 
 // 每页条数变化回到第 1 页

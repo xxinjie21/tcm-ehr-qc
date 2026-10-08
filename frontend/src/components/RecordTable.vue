@@ -28,6 +28,7 @@
     :highlight-current-row="highlightCurrent"
     @selection-change="$emit('selection-change', $event)"
     @row-click="(row, col, e) => $emit('row-click', row, col, e)"
+    @sort-change="onSortChange"
   >
     <el-table-column v-if="selectable" type="selection" width="46" />
     <!-- 病历 ID 是 36 字符的 UUID：常态下没人读它，却固定吃掉 320px，
@@ -48,8 +49,10 @@
     <!-- 以下 5 列在 slim 模式下不渲染（v-if）：窄栏只承担「挑一份」的职责，
          评分/分级/来源/接诊时间/年龄·性别在 NlpExtract 页载入病历后的右侧详情区可见；
          默认模式（不传 slim）这些列原样渲染，列序、宽度与配色均不变。 -->
-    <!-- 评分与分级成对：分级是结论、评分是量值，只给分级看不出差多少分 -->
-    <el-table-column v-if="!slim" label="评分" width="80" align="center">
+    <!-- 评分与分级成对：分级是结论、评分是量值，只给分级看不出差多少分。
+         B3：评分/接诊时间两列开放列头排序（sortable="custom" 只发事件、不做本地排序，
+         由页面把 sortBy/sortOrder 放进查询，后端走 RecordFilter 白名单）。 -->
+    <el-table-column v-if="!slim" prop="score" label="评分" width="80" align="center" sortable="custom">
       <template #default="{ row }">
         <span v-if="row.score != null" :class="scoreClass(row.score)">{{ row.score }}</span>
         <span v-else class="tip">—</span>
@@ -80,7 +83,7 @@
     <!-- 接诊时间：常态只到日，悬停给秒级原值。
          只到日是有意的 —— 演示数据的时间分量是脱敏噪声（57% 落在非门诊时段，
          会出现凌晨 2 点接诊），常态展示等于把噪声摆在列表上 -->
-    <el-table-column v-if="!slim" label="接诊时间" width="110">
+    <el-table-column v-if="!slim" prop="visit_time" label="接诊时间" width="110" sortable="custom">
       <template #default="{ row }">
         <VisitTimeCell :visit-time="row.visitTime" />
       </template>
@@ -143,7 +146,17 @@ defineProps({
   slim: { type: Boolean, default: false }
 })
 
-defineEmits(['selection-change', 'row-click'])
+const emit = defineEmits(['selection-change', 'row-click', 'sort-change'])
+
+// B3：列头排序（custom 模式，不做本地排序）→ 把 el-table 的 {prop, order} 映射成
+// 后端白名单字段与方向（prop 已是 DB 列名：score / visit_time）；order=null 表示清序。
+// 页面收到后把 sortBy/sortOrder 放进查询并回第 1 页重查；白名单外的值由后端回落默认序。
+const onSortChange = ({ prop, order }) => {
+  emit('sort-change', {
+    sortBy: order ? prop || '' : '',
+    sortOrder: order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : ''
+  })
+}
 
 const tableRef = ref(null)
 
