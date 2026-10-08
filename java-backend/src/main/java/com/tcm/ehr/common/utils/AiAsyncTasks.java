@@ -81,18 +81,25 @@ public class AiAsyncTasks {
     public String submit(Supplier<AiReplyVO> work) {
         prune();
         String id = UUID.randomUUID().toString();
-        // 在**请求线程**上捕获上下文：异步线程里 RequestUtils 取不到当前组织
-        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        // H4（术语词典交互审查报告）：**捕获值，而不是捕获请求上下文对象**。
+        // 原实现把 RequestContextHolder 的整个 RequestAttributes 交给任务线程重绑，
+        // 而该对象包装的是容器的请求对象 —— 请求结束后容器会回收并清空它；
+        // 任务线程只要在提交后夹一次数据库往返（AI 服务读词典/查病历）就必然读到「未知」，
+        // 于是 AI 解读/复核恒定报「病历不存在」、术语建议约三成静默降级。
+        // 正确写法（与 QcBatchServiceImpl 的批任务同一口径）：把本条请求会用到的
+        // 用户 / 组织 / 角色**标量**在提交线程固定下来，任务线程重建一个纯值上下文。
         String orgId = RequestUtils.currentOrgId();
         String userId = safeUserId();
+        String role = RequestUtils.safeCurrentRole();
+        ValueRequestAttributes ctx = new ValueRequestAttributes();
+        ctx.setAttribute(RequestUtils.ATTR_ORG_ID, orgId, RequestAttributes.SCOPE_REQUEST);
+        ctx.setAttribute(RequestUtils.ATTR_USER_ID, userId, RequestAttributes.SCOPE_REQUEST);
+        ctx.setAttribute(RequestUtils.ATTR_ORG_ROLE, role, RequestAttributes.SCOPE_REQUEST);
         tasks.put(id, new Task(orgId, userId, State.RUNNING, null, null, LocalDateTime.now()));
 
         pool.submit(() -> {
-            RequestAttributes previous = RequestContextHolder.getRequestAttributes();
             try {
-                if (attrs != null) {
-                    RequestContextHolder.setRequestAttributes(attrs);
-                }
+                RequestContextHolder.setRequestAttributes(ctx);
                 AiReplyVO reply = work.get();
                 update(id, t -> t.with(State.DONE, reply, null));
             } catch (Exception e) {
@@ -101,11 +108,7 @@ public class AiAsyncTasks {
                 log.warn("[AI 异步] 任务 {} 失败：{}", id, msg);
                 update(id, t -> t.with(State.FAILED, null, msg));
             } finally {
-                if (attrs != null) {
-                    RequestContextHolder.resetRequestAttributes();
-                } else {
-                    RequestContextHolder.setRequestAttributes(previous);
-                }
+                RequestContextHolder.resetRequestAttributes();
             }
         });
         return id;
@@ -157,6 +160,60 @@ public class AiAsyncTasks {
             return String.valueOf(RequestUtils.currentUserId());
         } catch (Exception e) {
             return "";
+        }
+    }
+
+    /**
+     * 纯值请求上下文（H4）：只承载提交线程捕获的标量（user / org / role / viewAll），
+     * **不包装任何容器请求对象** —— 容器在请求结束后会回收并清空它，跨线程重绑必然读到
+     * 「未知」；纯 Map 值没有生命周期问题，可安全跨线程读取。
+     */
+    static final class ValueRequestAttributes implements RequestAttributes {
+
+        private final java.util.Map<String, Object> values = new java.util.HashMap<>();
+
+        @Override
+        public Object getAttribute(String name, int scope) {
+            return name == null ? null : values.get(name);
+        }
+
+        @Override
+        public void setAttribute(String name, Object value, int scope) {
+            if (name != null) {
+                values.put(name, value);
+            }
+        }
+
+        @Override
+        public void removeAttribute(String name, int scope) {
+            if (name != null) {
+                values.remove(name);
+            }
+        }
+
+        @Override
+        public String[] getAttributeNames(int scope) {
+            return values.keySet().toArray(new String[0]);
+        }
+
+        @Override
+        public void registerDestructionCallback(String name, Runnable callback, int scope) {
+            // 纯值属性不参与容器销毁回调
+        }
+
+        @Override
+        public Object resolveReference(String key) {
+            return values.get(key);
+        }
+
+        @Override
+        public String getSessionId() {
+            return null;
+        }
+
+        @Override
+        public Object getSessionMutex() {
+            return this;
         }
     }
 }
