@@ -178,9 +178,35 @@
                所以可以放心在点确认之前先把影响面摆出来（条数 + 前几条样例）。 -->
           <div style="margin-top: 6px">
             <span v-if="previewLoading" class="tip">正在解析文件（只解析，不会写入任何数据）…</span>
-            <template v-else-if="preview && preview.count">
-              <b>将写入 {{ preview.count }} 条术语</b>
-              <span v-if="preview.sample.length" class="tip">示例：{{ preview.sample.join('、') }}</span>
+            <template v-else-if="preview && preview.terms.length">
+              <div class="prev-head">
+                <b>将写入 {{ preview.count }} 条术语</b>
+                <!-- M10（审查报告）：生成待导入文件后必须能撤回 —— 此前只能刷新页面才能回到初始态 -->
+                <el-button size="small" text @click="clearImportFile">撤回</el-button>
+              </div>
+              <!-- H5（审查报告）：粘贴内容改过之后，这份明细与待导入文件都已过期。
+                   提示放在表格**上方**，避免用户把下面这份旧明细当成「当前要导入的内容」。 -->
+              <div v-if="pastedStale" class="prev-stale">
+                粘贴内容已变化，下面这份明细与待导入文件已失效 —— 请重新点上方「粘贴后生成待导入文件」
+              </div>
+              <!-- M8（审查报告）：把解析出的词条**逐条**摆出来。原先只给「条数 + 前 6 条示例」，
+                   而这一步之后是覆盖型导入（直写基线会整体替换共享词典），用户没有可核对的东西。
+                   表体 max-height 内滚，不撑破「1600×900 一屏」的版式约束。 -->
+              <el-table :data="preview.terms" size="small" border max-height="260" class="prev-table">
+                <el-table-column prop="standardTerm" label="标准术语" min-width="140" />
+                <el-table-column label="别名" min-width="160">
+                  <template #default="{ row }">
+                    <span v-if="row.aliases?.length">{{ row.aliases.join('、') }}</span>
+                    <span v-else class="tip">—</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="国标编码" width="120">
+                  <template #default="{ row }">
+                    <span v-if="row.code">{{ row.code }}</span>
+                    <span v-else class="tip">—</span>
+                  </template>
+                </el-table-column>
+              </el-table>
             </template>
             <span v-else-if="importFile" class="tip">未取得预览（解析失败或格式不符），仍可继续，但请自行确认{{ isPastedFile ? '粘贴内容' : '文件内容' }}</span>
           </div>
@@ -204,10 +230,12 @@
             type="primary"
             class="do-btn"
             :loading="submitting"
-            :disabled="!importFile"
+            :disabled="!canImport"
             @click="handleSubmit"
           >{{ submitLabel }}</el-button>
-          <span v-if="!importFile" class="tip">{{ pastedText.trim() ? '粘贴后请先点上方「粘贴后生成待导入文件」' : '请先上传文件，或用粘贴内容生成待导入文件' }}</span>
+          <!-- H5：粘贴内容变了就必须重新生成，不能拿着旧文件往下导 -->
+          <span v-if="pastedStale" class="prev-stale">粘贴内容已变化，请重新点上方「粘贴后生成待导入文件」</span>
+          <span v-else-if="!importFile" class="tip">{{ pastedText.trim() ? '粘贴后请先点上方「粘贴后生成待导入文件」' : '请先上传文件，或用粘贴内容生成待导入文件' }}</span>
           <!-- H2：导入失败要在页内可见、可重试，不能只靠一闪而过的 toast -->
           <div v-if="submitError" class="import-err" role="alert">
             <b>导入失败：</b>{{ submitError }}
@@ -414,9 +442,11 @@ const loadPreview = async (file) => {
     const res = await parseDictFile(form, type.value)
     // 兼容两种返回：直接是数组，或包在 terms 里
     const terms = Array.isArray(res.data) ? res.data : (res.data?.terms || [])
+    // M8（审查报告）：把**完整**词条留在 preview 里，第三步据此渲染明细表。
+    // 原先只留 { count, sample: 前 6 条 }，用户拿不到可核对的东西。
     preview.value = {
       count: terms.length,
-      sample: terms.slice(0, 6).map((t) => t.standardTerm || t.term || '').filter(Boolean)
+      terms
     }
   } catch {
     // 预览失败不阻断导入，但绝不假装「0 条」—— 置 null，界面按「未预览」呈现
@@ -436,11 +466,8 @@ const onFileChange = (file) => {
     preview.value = null
     loadPreview(file)
   }
-  const onFileRemove = () => {
-    importFile.value = null
-    result.value = null
-    lint.value = null
-  }
+  // 移除文件与「撤回」同一语义（M10）：一并清掉预览与体检，避免残留上一个文件的明细
+  const onFileRemove = () => clearImportFile()
 const onFileExceed = (files) => {
   uploadRef.value?.clearFiles()
   const f = files[0]
@@ -509,6 +536,32 @@ const parsedPasted = computed(() => parsePastedTerms(pastedText.value))
 // 当前待导入文件是否来自粘贴（L2：措辞区分「内容 / 文件」、确认框源名判断）
 const isPastedFile = computed(() => String(importFile.value?.name || '').startsWith('pasted-'))
 
+// ---- H5：粘贴框与待导入文件必须同源 ----
+// 「生成待导入文件」做出的是一份**独立快照**；此后改粘贴框并不会让它更新，
+// 于是出现「屏幕上写 A、点下去导入 B」。这里给生成那一刻的内容记一个指纹，
+// 粘贴框一旦对不上就让导入按钮失效。
+// 用 computed 而不是 watch：内容改回原样时自动恢复可用，不白丢用户已生成的那份文件。
+const pastedFingerprint = ref('')
+/** 指纹 = 标准词 + 别名，顺序敏感（改一个别名也算变了） */
+const fingerprintOf = (terms) => JSON.stringify(terms.map((t) => [t.standardTerm, t.aliases || []]))
+/** 粘贴生成的待导入文件是否已因粘贴框被改动而失效 */
+const pastedStale = computed(
+  () => !!pastedFingerprint.value && fingerprintOf(parsedPasted.value) !== pastedFingerprint.value
+)
+/** 能否提交导入（H5：粘贴内容变了就不能再导旧文件） */
+const canImport = computed(() => !!importFile.value && !pastedStale.value)
+
+/** 撤回待导入文件（M10）：预览 / 体检 / 结果一并回到「未选择」态 */
+const clearImportFile = () => {
+  importFile.value = null
+  preview.value = null
+  lint.value = null
+  result.value = null
+  // 撤回后不再与粘贴框联动，否则会立刻又被判成「已失效」
+  pastedFingerprint.value = ''
+  uploadRef.value?.clearFiles()
+}
+
 /** 用粘贴内容走与文件导入完全相同的链路（M5：按钮名与文案说清「这是导入前置闸门」） */
 const usePastedText = () => {
   const terms = parsedPasted.value
@@ -519,6 +572,8 @@ const usePastedText = () => {
     type: 'application/json'
   })
   onFileChange(file)
+  // H5：记下这一刻的内容指纹，之后粘贴框对不上即判失效
+  pastedFingerprint.value = fingerprintOf(terms)
   ElMessage.success(`已生成待导入文件（${terms.length} 条），确认无误后点下方导入`)
 }
 
@@ -831,6 +886,25 @@ const handleSubmit = async () => {
 }
 .do-btn {
   margin-top: 2px;
+}
+/* M8：预览明细表 —— 「将写入 N 条术语」与「撤回」同排，表体在 max-height 内滚 */
+.prev-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+.prev-table {
+  margin-top: var(--sp-1);
+}
+/* H5：粘贴内容变化后的失效提示（预览区上方与导入按钮旁两处复用同一套样式） */
+.prev-stale {
+  display: block;
+  margin: var(--sp-1) 0;
+  font-size: var(--fs-xs);
+  color: var(--danger);
+  line-height: 1.6;
 }
 /* H2：导入失败页内提示——与成功结果区共用同一块位置语义，失败不静默 */
 .import-err {
