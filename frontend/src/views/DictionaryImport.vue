@@ -77,16 +77,17 @@
           <!-- 上传文件这条路径也要能用 AI 建议。
                此前 AI 按钮只长在下面的粘贴块里，上传的人不会把它和文件联系起来；
                这里给一个属于「上传」自己的入口。两条路径各按各的输入取词，
-               但结果落到**同一块**建议面板（见下方 .ai-suggest）。 -->
+               但结果落到**同一块**建议面板（见下方 .ai-suggest）。
+               形态取「我的 LLM」里「启用 LLM」同款的 el-switch（只借外观，不借那边的逻辑）：
+               打开 = 对文件解析出的词条跑一次建议，关闭 = 收起建议面板。 -->
           <div class="upload-foot">
-            <el-button
-              size="small"
-              type="primary"
-              plain
+            <span class="uf-label">开启 AI 建议</span>
+            <el-switch
+              v-model="uploadSuggestOn"
               :loading="suggestLoading"
-              :disabled="!importTerms.length"
-              @click="askSuggest(importTerms)"
-            >开启 AI 建议</el-button>
+              :disabled="!importTerms.length || isPastedFile"
+              @change="onUploadSuggestToggle"
+            />
             <span class="tip">
               对文件解析出的词条逐条判断「挂到已有标准词当别名 / 新建标准词」，确认后再导入
             </span>
@@ -244,7 +245,7 @@
                刻意不抽组件 —— 两处的上下文文案不同，且本项目单文件页面惯例外置组件成本更高。 -->
           <div v-if="!result && lintIssues.length" class="lint">
             <div class="lint-hd">
-              词表体检：{{ lintErrors.length }} 项需要修改，{{ lintWarnings.length }} 项建议确认
+              词表体检：{{ lintErrors }} 项需要修改，{{ lintWarnings }} 项建议确认
             </div>
             <div v-for="(it, i) in lintIssues" :key="i" class="lint-item" :class="it.level">
               <div class="lint-top">
@@ -303,7 +304,7 @@
                但会让词条悄悄变少或归一失效，所以在这里指出来 -->
           <div v-if="lintIssues.length" class="lint">
             <div class="lint-hd">
-              词表体检：{{ lintErrors.length }} 项需要修改，{{ lintWarnings.length }} 项建议确认
+              词表体检：{{ lintErrors }} 项需要修改，{{ lintWarnings }} 项建议确认
             </div>
             <div v-for="(it, i) in lintIssues" :key="i" class="lint-item" :class="it.level">
               <div class="lint-top">
@@ -525,6 +526,9 @@ const onFileChange = (file) => {
     // 批次7：换文件即重算预览，避免「看着 A 的预览导入了 B」
     preview.value = null
     importTerms.value = []
+    // 换文件后上一份建议已不适用：开关归位、面板收起
+    uploadSuggestOn.value = false
+    suggestions.value = []
     loadPreview(file)
   }
   // 移除文件与「撤回」同一语义（M10）：一并清掉预览与体检，避免残留上一个文件的明细
@@ -619,6 +623,9 @@ const clearImportFile = () => {
   importTerms.value = []
   lint.value = null
   result.value = null
+  // 待导入内容撤掉了，挂在它上面的 AI 建议也一并收起（含上传区开关归位）
+  uploadSuggestOn.value = false
+  suggestions.value = []
   // 撤回后不再与粘贴框联动，否则会立刻又被判成「已失效」
   pastedFingerprint.value = ''
   uploadRef.value?.clearFiles()
@@ -656,6 +663,9 @@ onMounted(async () => {
   }
 })
 
+/** 上传区的「开启 AI 建议」开关：打开即对上传文件解析出的词条跑一次建议，关闭收起结果。
+ *  只借 el-switch 的外观，与「我的 LLM」里的「启用 LLM」没有状态关联。 */
+const uploadSuggestOn = ref(false)
 const suggestions = ref([])
 const suggestLoading = ref(false)
 const suggestNote = ref('')
@@ -702,19 +712,37 @@ const askSuggest = async (source) => {
   }
 }
 
+/** 上传区开关：打开就对上传文件解析出的词条跑一次建议；关闭把建议面板收起 */
+const onUploadSuggestToggle = (on) => {
+  if (!on) {
+    suggestions.value = []
+    return
+  }
+  askSuggest(importTerms.value)
+}
+
 /** 把确认过的建议填回粘贴框，并**立即生成待导入文件**（H3 / 4.3.2）：
  *  原来只回填粘贴框、预览还是旧的「N 条」——屏幕上写 A、实际导入 B 的错位根因；
- *  现在采纳即调 usePastedText()，预览 / 待导入文件 / 导入内容三者同时同步，且省一次点击。 */
+ *  现在采纳即调 usePastedText()，预览 / 待导入文件 / 导入内容三者同时同步，且省一次点击。
+ *
+ *  **按标准词归并**：同一个标准词常被多行命中（一行判「新建」、其余判「挂别名」），
+ *  逐行输出会写出「柴胡」和「柴胡\t柴胡」两行 —— 待导入文件里同一个标准词出现两次，
+ *  词表体检立刻报「需修改」。归并后一个标准词只出一行，别名合并去重。 */
 const applySuggestions = () => {
-  const lines = []
+  const byStd = new Map()
   for (const s of confirmable.value) {
-    const std = String(s.standardTerm).trim()
-    const extra = (s.aliases || []).filter((a) => a && a !== std)
-    // 挂别名：原文本身就是那个别名；新建：原文即标准词，其余别名跟在后面
-    const aliasPart = s.action === 'alias'
-      ? [s.original, ...extra].filter((a) => a && a !== std)
-      : extra
-    lines.push(aliasPart.length ? `${std}\t${aliasPart.join('、')}` : std)
+    const std = String(s.standardTerm || '').trim()
+    if (!std) continue
+    if (!byStd.has(std)) byStd.set(std, new Set())
+    const bag = byStd.get(std)
+    // 挂别名：原文本身就是那个别名；新建：原文即标准词（等于 std 的会在下面被滤掉）
+    if (s.action === 'alias') bag.add(String(s.original || '').trim())
+    for (const a of s.aliases || []) bag.add(String(a || '').trim())
+  }
+  const lines = []
+  for (const [std, bag] of byStd) {
+    const aliases = [...bag].filter((a) => a && a !== std)
+    lines.push(aliases.length ? `${std}\t${aliases.join('、')}` : std)
   }
   if (!lines.length) return
   pastedText.value = lines.join('\n')
@@ -858,6 +886,11 @@ const handleSubmit = async () => {
   gap: var(--sp-2);
   flex-wrap: wrap;
   margin-top: var(--sp-2);
+}
+/* 开关左侧的说明文字：与「我的 LLM」里「启用 LLM」的排布一致（文字在左、开关在右） */
+.uf-label {
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
 }
 .paste-warn {
   font-size: var(--fs-xs);
