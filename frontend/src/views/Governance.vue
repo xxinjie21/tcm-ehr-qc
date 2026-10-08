@@ -775,7 +775,7 @@ onMounted(() => {
 /* 步骤详述的展开/收起：用全局共享的 panel-fade（纯淡入淡出，不做位移）。
    它嵌在卡片里，位移会让卡片边缘跳动；纯 opacity 也不创建包含块、不裁剪，
    是这类内嵌面板最稳的做法。此前是自写的 .step-fade（写死了时长与 ease 曲线），
-   已并入 theme.css 的动效令牌与 ② 类，见 docs/视觉与交互审查报告-第三轮.md 附录 D。 */
+   已并入 theme.css 的动效令牌与 ② 类。 */
 .step-num {
   width: 30px;
   height: 30px;

@@ -492,5 +492,5 @@ onBeforeUnmount(() => {
 /* 展开/收起过渡：用全局共享的 slide-y（淡入 + 12px 上升）。
    面板锚在右下角、向上展开，所以方向取 Y 而非 X。
    此前这里是自写的 .aii-fade（0.15s ease / 位移 8px），
-   已并入 theme.css 的动效令牌与 ③ 类，见 docs/视觉与交互审查报告-第三轮.md 附录 D。 */
+   已并入 theme.css 的动效令牌与 ③ 类。 */
 </style>
