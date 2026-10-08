@@ -99,11 +99,12 @@
                解析结果包装成 JSON File 后走与上传完全相同的链路（预览 / 体检 / 提交），
                不另起一套逻辑 —— 否则两条路会各自演化出不同的行为。 -->
           <div class="paste-block">
-            <div class="paste-head">
-              <span class="paste-t">或直接粘贴文本</span>
-              <span class="tip">
-                每行一条，标准词与别名之间用 Tab 分隔（从 Excel 复制即 Tab）；也可直接粘「A、B、C」这样的一串标准词。
-              </span>
+            <!-- 标题独占一行、说明另起一行 —— 与上方「步骤标题 + 步骤说明」同一套层级。
+                 原先这两句挤在同一行里，读起来像一句话被硬拆成两半，
+                 也让人分不清「或直接粘贴文本」是标题还是正文的一部分。 -->
+            <div class="paste-t">或直接粘贴文本</div>
+            <div class="paste-d">
+              每行一条，标准词与别名之间用 Tab 分隔（从 Excel 复制即 Tab）；也可直接粘「A、B、C」这样的一串标准词。
             </div>
             <el-input
               v-model="pastedText"
@@ -260,34 +261,40 @@
             </div>
           </div>
 
-          <!-- 管理员可选「直接生效」；其余身份只有本地一条路，不给选择避免困惑 -->
-          <div v-if="isAdmin" class="target-row">
-            <el-radio-group v-model="mode" size="small">
-              <el-radio-button value="local">导入本机个人词典</el-radio-button>
-              <el-radio-button value="direct">直接生效到小组基线</el-radio-button>
-            </el-radio-group>
-          </div>
+          <!-- 确认区：去向选择 + 主操作 + 状态提示收成一组，与上方的预览明细 / 词表体检
+               用一条分隔线分开。这样这一步在版面上是**两个阶段** ——
+               先「核对上面那份明细」，再「在下面选去向、点导入」；
+               原先它们竖着堆成一长串，主操作跟在一堆说明后面，找不到落脚点。 -->
+          <div class="confirm-area">
+            <!-- 管理员可选「直接生效」；其余身份只有本地一条路，不给选择避免困惑 -->
+            <div v-if="isAdmin" class="target-row">
+              <el-radio-group v-model="mode" size="small">
+                <el-radio-button value="local">导入本机个人词典</el-radio-button>
+                <el-radio-button value="direct">直接生效到小组基线</el-radio-button>
+              </el-radio-group>
+            </div>
 
-          <div v-if="isAdmin && mode === 'direct'" class="target-row">
-            <el-radio-group v-model="target" size="small">
-              <el-radio-button value="org">当前组织</el-radio-button>
-              <el-radio-button value="base">基础层（影响所有组织）</el-radio-button>
-            </el-radio-group>
-          </div>
+            <div v-if="isAdmin && mode === 'direct'" class="target-row">
+              <el-radio-group v-model="target" size="small">
+                <el-radio-button value="org">当前组织</el-radio-button>
+                <el-radio-button value="base">基础层（影响所有组织）</el-radio-button>
+              </el-radio-group>
+            </div>
 
-          <el-button
-            type="primary"
-            class="do-btn"
-            :loading="submitting"
-            :disabled="!canImport"
-            @click="handleSubmit"
-          >{{ submitLabel }}</el-button>
-          <!-- H5：粘贴内容变了就必须重新生成，不能拿着旧文件往下导 -->
-          <span v-if="pastedStale" class="prev-stale">粘贴内容已变化，请重新点上方「粘贴后生成待导入文件」</span>
-          <span v-else-if="!importFile" class="tip">{{ pastedText.trim() ? '粘贴后请先点上方「粘贴后生成待导入文件」' : '请先上传文件，或用粘贴内容生成待导入文件' }}</span>
-          <!-- H2：导入失败要在页内可见、可重试，不能只靠一闪而过的 toast -->
-          <div v-if="submitError" class="import-err" role="alert">
-            <b>导入失败：</b>{{ submitError }}
+            <el-button
+              type="primary"
+              class="do-btn"
+              :loading="submitting"
+              :disabled="!canImport"
+              @click="handleSubmit"
+            >{{ submitLabel }}</el-button>
+            <!-- H5：粘贴内容变了就必须重新生成，不能拿着旧文件往下导 -->
+            <span v-if="pastedStale" class="prev-stale">粘贴内容已变化，请重新点上方「粘贴后生成待导入文件」</span>
+            <span v-else-if="!importFile" class="tip">{{ pastedText.trim() ? '粘贴后请先点上方「粘贴后生成待导入文件」' : '请先上传文件，或用粘贴内容生成待导入文件' }}</span>
+            <!-- H2：导入失败要在页内可见、可重试，不能只靠一闪而过的 toast -->
+            <div v-if="submitError" class="import-err" role="alert">
+              <b>导入失败：</b>{{ submitError }}
+            </div>
           </div>
         </div>
       </div>
@@ -348,9 +355,18 @@
           </tbody>
         </table>
         <div class="sample-t" style="margin-top: var(--sp-3)">JSON（等价写法）</div>
+        <!-- 一行一个字段：这张卡只有 320~420px 宽，整条对象写成一行会被右边缘截断
+             （实测 "aliases": ["北柴胡", "醋… 后面看不全）—— 示例卡是给人照抄的，
+             看不全就等于没给。 -->
         <pre class="code">[
-  { "standardTerm": "肝郁气滞", "aliases": ["肝气郁结", "肝郁"] },
-  { "standardTerm": "柴胡", "aliases": ["北柴胡", "醋柴胡"] }
+  {
+    "standardTerm": "肝郁气滞",
+    "aliases": ["肝气郁结", "肝郁"]
+  },
+  {
+    "standardTerm": "柴胡",
+    "aliases": ["北柴胡", "醋柴胡"]
+  }
 ]</pre>
       </div>
     </PanelCard>
@@ -857,21 +873,27 @@ const handleSubmit = async () => {
 
 <style scoped>
 /* 粘贴文本导入：没有现成文件时的第二条入口 */
+/* 第二条入口的分隔线用**浅一档**的 --line-soft，步骤之间的分隔线才用 --line。
+   两级线的深浅拉开，版面上一眼能分出「这是同一步里的另一条路」
+   和「这是下一步」—— 原先两处都用 --line，看起来像并列的四个步骤。
+   与项目既有的两级用法一致（--line 边框线 / --line-soft 更轻的分隔）。 */
 .paste-block {
   margin-top: var(--sp-3);
   padding-top: var(--sp-3);
-  border-top: 1px dashed var(--line);
+  border-top: 1px dashed var(--line-soft);
 }
-.paste-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-2);
-}
+/* 两条入口的标题与说明：与「步骤标题 + 步骤说明」同一套层级
+   （标题 15px 墨色，说明 13px 次级灰）—— 同一页里同级的文字用同一种排版 */
 .paste-t {
   font-size: var(--fs-base);
   color: var(--ink);
+  margin-bottom: 2px;
+}
+.paste-d {
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+  line-height: 1.7;
+  margin-bottom: var(--sp-2);
 }
 .paste-foot {
   display: flex;
@@ -1011,6 +1033,14 @@ const handleSubmit = async () => {
   color: var(--text-sub-strong);
   line-height: 1.7;
   margin-bottom: var(--sp-2);
+}
+/* 确认区：与上方的「核对」内容（预览明细 / 词表体检）用一条分隔线分开，
+   让「核对」与「确认导入」在版面上成为两个阶段，而不是混在一起的一长串。
+   只加分隔与留白，不动任何控件尺寸。 */
+.confirm-area {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-soft);
 }
 .target-row {
   display: flex;
