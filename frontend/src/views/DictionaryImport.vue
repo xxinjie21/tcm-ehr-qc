@@ -74,6 +74,24 @@
             </div>
           </el-upload>
 
+          <!-- 上传文件这条路径也要能用 AI 建议。
+               此前 AI 按钮只长在下面的粘贴块里，上传的人不会把它和文件联系起来；
+               这里给一个属于「上传」自己的入口。两条路径各按各的输入取词，
+               但结果落到**同一块**建议面板（见下方 .ai-suggest）。 -->
+          <div class="upload-foot">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :loading="suggestLoading"
+              :disabled="!importTerms.length"
+              @click="askSuggest(importTerms)"
+            >开启 AI 建议</el-button>
+            <span class="tip">
+              对文件解析出的词条逐条判断「挂到已有标准词当别名 / 新建标准词」，确认后再导入
+            </span>
+          </div>
+
           <!-- 没有现成文件时不必先去造一个：直接把词粘进来即可。
                从「标准化质量报告」复制的「A、B、C」可直接粘（逐个当标准词入库）；
                要带别名就每行一条，行内用 Tab / 逗号分隔「标准词」与「别名」。
@@ -101,12 +119,12 @@
                 type="primary"
                 plain
                 :loading="suggestLoading"
-                :disabled="!suggestSource.length"
-                @click="askSuggest"
+                :disabled="!parsedPasted.length"
+                @click="askSuggest(parsedPasted)"
               >AI 建议怎么补</el-button>
-              <span v-if="!suggestSource.length" class="tip">
+              <span v-if="!parsedPasted.length" class="tip">
                 <!-- L4：AI 与导入按钮为什么灰，给出说明而不是让人瞎点 -->
-                需先粘贴文本或用上面的上传文件；AI 建议基于待导入的词条
+                需先粘贴文本，AI 建议基于粘贴框里的词条
               </span>
               <span v-if="pastedText.trim() && !parsedPasted.length" class="paste-warn">
                 没解析出词条，请检查格式
@@ -650,21 +668,15 @@ const confirmable = computed(() =>
 )
 
 /**
- * M9（审查报告）：AI 建议的入参。
- *
- * 优先用「本次待导入文件解析出的词条」—— 这样**上传文件**的路径也能用 AI 建议，
- * 而不只是粘贴框（原先只吃粘贴框，上传路径完全够不着）。
- * 粘贴框改过、导致待导入文件已失效时，退回按粘贴框当前内容取词：
- * 用户此刻的意图显然是框里新写的东西，而不是那份已过期的文件。
+ * AI 建议的入参由**调用方显式给出**：
+ *   · 上传区的「开启 AI 建议」→ 该文件解析出的词条（importTerms）
+ *   · 粘贴行的「AI 建议怎么补」→ 粘贴框当前的词条（parsedPasted）
+ * 两条路径各有各的入口，不再靠一个「自动挑来源」的 computed 去猜 ——
+ * 猜错会让用户对着上传的文件拿到一份基于粘贴框的建议。
  */
-const suggestSource = computed(() => {
-  if (importTerms.value.length && !pastedStale.value) return importTerms.value
-  return parsedPasted.value
-})
-
 /** 向 AI 要建议；失败或不可用都不影响手动路径 */
-const askSuggest = async () => {
-  const words = suggestSource.value.map((t) => t.standardTerm)
+const askSuggest = async (source) => {
+  const words = (source || []).map((t) => t.standardTerm).filter(Boolean)
   if (!words.length) return
   suggestLoading.value = true
   suggestions.value = []
@@ -837,6 +849,14 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+/* 上传路径的 AI 入口：与上传组件同区，别让 AI 按钮只长在下面的粘贴块里 */
+.upload-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
   margin-top: var(--sp-2);
 }
 .paste-warn {
