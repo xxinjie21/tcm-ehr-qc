@@ -136,6 +136,16 @@ defineProps({
 <style scoped>
 /* 明细折叠 */
 .detail { margin-bottom: var(--sp-3); }
+/* P1-6：折叠展开/收起此前是 EP 默认的 ~350ms ease-in-out —— 超出全站最慢档
+   （--dur-slow 280ms），同一次操作里「换页 200ms、换内容 200ms、展开 350ms」三种节奏。
+   收口到 --dur-base + --ease-out，与页面/组件切换同档；分隔线用 --dur-fast。
+   注意：只覆盖 transition 属性本身，动画曲线由 EP 的高度过渡驱动，行为不变。 */
+.detail :deep(.el-collapse-item__wrap) {
+  transition: height var(--dur-base) var(--ease-out);
+}
+.detail :deep(.el-collapse-item__header) {
+  transition: border-bottom-color var(--dur-fast) var(--ease-out);
+}
 .ct { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
 .ct-sub { margin-left: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); font-weight: 400; }
 .detail-note {

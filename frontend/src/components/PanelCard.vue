@@ -22,7 +22,9 @@ defineProps({
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
-  margin-bottom: 14px;
+  /* P2-2（标准化质量报告审查）：原 14px 不在 4/8/12/16/24 五档内 ——
+     收敛到 --sp-3，与页面级区块间距（.kpi-row 等）同一档 */
+  margin-bottom: var(--sp-3);
   transition: box-shadow var(--dur-fast) var(--ease-out);
 }
 /* hover 只给阴影，**不要** translateY：

@@ -36,9 +36,25 @@
       </div>
     </div>
 
+    <!-- P0-4：加载失败必须是独立状态 —— 此前 catch 把 report 置 null，
+         与「加载中」共用一个值，失败被渲染成「正在读取…」+ 空态文案 + 绿色结论。
+         现在失败只走这一条横幅（带重试），下方所有结论类区块一律不渲染。 -->
+    <div v-if="loadError" class="load-fail" role="alert">
+      <span class="lf-icon">!</span>
+      <div class="lf-body">
+        <div class="lf-title">报告加载失败</div>
+        <div class="lf-desc">
+          服务没有返回数据，本页不展示任何统计结论 —— 故障不能被读成「没有数据」或「一切正常」。
+        </div>
+      </div>
+      <el-button type="primary" size="small" :loading="loading" @click="loadReport">重试</el-button>
+    </div>
+
       <!-- 数据来源提示：放在顶部但用轻量样式，不用刺眼的告警条。
-           这批数据只有 10 个模板，数字不能当真实病历性能看，但也不该拦住用户往下读。 -->
-      <div class="src-note">
+           这批数据只有 10 个模板，数字不能当真实病历性能看，但也不该拦住用户往下读。
+           P0-4：只在真拿到报告后渲染 —— 加载中 / 失败时它会陈述「0 条病历」，
+           那是错误陈述（不是 0 条，是还没读到 / 没读到）。 -->
+      <div v-if="report && !loadError" class="src-note">
         <span class="src-icon">i</span>
         <span>
           当前数据共 {{ report?.dataset?.recordCount ?? 0 }} 条病历，主诉只有
@@ -75,8 +91,9 @@
         <span class="tip">{{ rangeTip }}</span>
       </div>
 
-    <!-- 第一屏：一句话结论 + 三个关键卡。看这一屏就知道该做什么、去哪看。 -->
-    <div class="headline" :class="headline.tone">
+    <!-- 第一屏：一句话结论 + 三个关键卡。看这一屏就知道该做什么、去哪看。
+         P0-4：失败态不渲染（横幅已接管）；加载态保留「正在读取…」是合法的中间态。 -->
+    <div v-if="!loadError" class="headline" :class="headline.tone">
       <div class="hl-icon">{{ headline.icon }}</div>
       <div class="hl-text">
         <div class="hl-title">{{ headline.title }}</div>
@@ -84,43 +101,78 @@
       </div>
     </div>
 
-    <div class="kpi-row">
-      <div v-for="k in kpis" :key="k.label" class="kpi" :class="k.tone">
-        <div class="kpi-label">{{ k.label }}</div>
-        <div class="kpi-value">{{ k.value }}</div>
-        <div class="kpi-note">{{ k.note }}</div>
-      </div>
+    <!-- P0-6：加载态给固定高度骨架（与终态同为 .kpi、同 min-height），
+         KPI 区不再从 0px 一次性撑开 546px。 -->
+    <div v-if="!loadError" class="kpi-row">
+      <template v-if="loading">
+        <div v-for="n in 4" :key="'kpi-skel-' + n" class="kpi kpi-skel" aria-hidden="true">
+          <span class="sk sk-label" />
+          <span class="sk sk-value" />
+          <span class="sk sk-note" />
+        </div>
+      </template>
+      <template v-else>
+        <div v-for="k in kpis" :key="k.label" class="kpi" :class="k.tone">
+          <div class="kpi-label">{{ k.label }}</div>
+          <div class="kpi-value">{{ k.value }}</div>
+          <div class="kpi-note">{{ k.note }}</div>
+        </div>
+      </template>
     </div>
 
     <!-- 28.22：归一率与缺词的图形视图。原先这两项只在下方收起区的 el-table 里，
-         业务用户要先展开、再逐行读才知道短板在哪。 -->
-    <StandardizationCharts :coverage="report?.coverage || []" :unmatched="report?.unmatched || {}" />
+         业务用户要先展开、再逐行读才知道短板在哪。
+         P0-4：把加载 / 失败两个状态一并传给图表组件，三态互斥渲染。 -->
+    <StandardizationCharts
+      :coverage="report?.coverage || []"
+      :unmatched="report?.unmatched || {}"
+      :loading="loading"
+      :error="loadError"
+      @retry="loadReport"
+    />
 
     <!-- 第二屏：待办清单。这是本页最有价值的部分 ——
          把「多少条未归一」翻译成「该做什么、归谁、值多少」。 -->
-    <PanelCard title="建议的下一步">
+    <PanelCard v-if="!loadError" title="建议的下一步">
       <template #extra>
         <span class="tip">按影响面排序，先做第一条</span>
       </template>
-      <ol class="todo-list">
+      <!-- P0-6：加载态给 2~3 行占位，列表不再从 0px 撑开 -->
+      <ol v-if="loading" class="todo-list" aria-hidden="true">
+        <li v-for="n in 3" :key="'todo-skel-' + n" class="todo">
+          <div class="todo-idx" />
+          <div class="todo-body">
+            <div class="sk sk-line sk-w40" />
+            <div class="sk sk-line sk-w90" />
+          </div>
+          <span class="sk sk-tag" />
+        </li>
+      </ol>
+      <ol v-else class="todo-list">
         <li v-for="(t, i) in todos" :key="i" class="todo">
           <div class="todo-idx">{{ i + 1 }}</div>
           <div class="todo-body">
             <div class="todo-title">{{ t.title }}</div>
             <div class="todo-desc">{{ t.desc }}</div>
           </div>
-          <el-tag size="small" :type="t.tagType" effect="plain">{{ t.owner }}</el-tag>
-          <!-- 批次2：把这条待办的「待补词」复制走 —— 直达词典导入页粘贴即可，
-               避免用户看完「先补这 8 个词」还得自己手抄。无接口调用，不会有副作用。 -->
-          <el-button
-            v-if="t.words && t.words.length"
-            size="small"
-            @click="copyGapWords(t.words)"
-          >复制待补词</el-button>
+          <!-- P1-8：右侧「标签 + 操作」固定宽度成列 —— 无按钮的行用同宽占位，
+               否则第 1 条的标签被按钮挤到左边 101px，右侧列视觉断裂。 -->
+          <div class="todo-ops">
+            <el-tag size="small" :type="t.tagType" effect="plain">{{ t.owner }}</el-tag>
+            <!-- 批次2：把这条待办的「待补词」复制走 —— 直达词典导入页粘贴即可，
+                 避免用户看完「先补这 8 个词」还得自己手抄。无接口调用，不会有副作用。 -->
+            <span class="todo-act">
+              <el-button
+                v-if="t.words && t.words.length"
+                size="small"
+                @click="copyGapWords(t.words)"
+              >复制待补词</el-button>
+            </span>
+          </div>
         </li>
       </ol>
-      <div v-if="!todos.length" class="empty-tip">
-        当前没有明显短板。词典规模、归一与评分都处在合理区间。
+      <div v-if="!loading && !todos.length" class="empty-tip">
+        {{ emptyTip }}
       </div>
     </PanelCard>
 
@@ -128,6 +180,7 @@
       <!-- 按接诊月份看趋势：补词表 + 重跑解析只会覆盖部分月份，
            按月看才能判断「哪些月份已经吃到新词表」 -->
     <StandardizationDetails
+      v-if="!loadError"
       :report="report"
       :coverage-rows="coverageRows"
       :has-stale-rows="hasStaleRows"
@@ -164,6 +217,9 @@ import { saveBlob } from '@/utils/download'
 
 const report = ref(null)
 const loading = ref(false)
+// P0-4：加载失败与加载中互斥 —— null 只表示「还没读到」，失败另有其位，
+// 否则失败会被渲染成「正在读取…」+ 空态 + 绿色结论（把故障读成了一切正常）。
+const loadError = ref(false)
 const exporting = ref(false)
 const rerunning = ref(false)
 
@@ -473,15 +529,35 @@ const rerunAll = async () => {
       .sort((a, b) => (b.unmatched - a.unmatched) || (a.termCount - b.termCount))[0]
   })
 
+// ---------------- 空数据判据（P0-5）----------------
+// 「没有数据」绝不能渲染成「全部达标」：指标卡的绿色与结论条的绿色对勾都只在
+// 真有数据可评时才允许出现。展示分支判定，不动后端任何计算口径。
+const isEmptyReport = computed(() => {
+  const d = report.value
+  if (!d) return false
+  return (d.dataset?.recordCount ?? 0) === 0 || (d.coverage || []).length === 0
+})
+
 // ---------------- 关键卡 ----------------
 // 三张卡各回答一个业务问题：词典够不够、归一顺不顺、评分灵不灵
 const kpis = computed(() => {
   const d = report.value
   if (!d) return []
+  // P0-5：全空数据 → 四张卡一律「—」+ 中性色。此前第 4 张卡的判据是
+  // noCode === 0，对空数组同样成立，「国标编码：已覆盖」就是一盏假绿灯。
+  if (isEmptyReport.value) {
+    return [
+      { label: '最该补的词表', value: '—', note: '本期无数据可评估', tone: '' },
+      { label: '术语归一率', value: '—', note: '本期无数据可评估', tone: '' },
+      { label: '评分区分度', value: '—', note: '本期无数据可评估', tone: '' },
+      { label: '国标编码', value: '—', note: '本期无数据可评估', tone: '' }
+    ]
+  }
   const gap = d.unmatched || {}
   const gapRate = gap.total ? gap.dictionaryGap / gap.total : 0
   const b = bottleneck.value
-  const noCode = (d.dictQuality || []).filter((x) => x.codedCount === 0).length
+  const dictRows = d.dictQuality || []
+  const noCode = dictRows.filter((x) => x.codedCount === 0).length
   const s = d.score || {}
   const cappedRate = s.total ? s.capped / s.total : 0
 
@@ -513,9 +589,11 @@ const kpis = computed(() => {
     },
     {
       label: '国标编码',
-      value: noCode === 0 ? '已覆盖' : `${noCode} 类缺`,
-      note: noCode === 0 ? '词表已带编码' : '缺编码时术语无法与国标库对接',
-      tone: noCode === 0 ? 'ok' : 'warn'
+      // P0-5 补丁：coverage 非空但 dictQuality 为空时 noCode 也等于 0，
+      // 此时同样不许说「已覆盖」—— 判据必须先有数据
+      value: !dictRows.length ? '—' : (noCode === 0 ? '已覆盖' : `${noCode} 类缺`),
+      note: !dictRows.length ? '本期无词典数据' : (noCode === 0 ? '词表已带编码' : '缺编码时术语无法与国标库对接'),
+      tone: !dictRows.length ? '' : (noCode === 0 ? 'ok' : 'warn')
     }
   ]
 })
@@ -533,6 +611,15 @@ function symRateValue(d) {
 const headline = computed(() => {
   const d = report.value
   if (!d) return { icon: '·', tone: '', title: '正在读取…', desc: '' }
+  // P0-5：空数据走中性分支，不得进入 ok 分支（绿色对勾 + 「合理区间」是假绿灯）
+  if (isEmptyReport.value) {
+    return {
+      icon: '·',
+      tone: '',
+      title: '本期无数据可评估',
+      desc: '统计区间内没有可用于评估的病历数据，换一个时间区间或先导入病历。'
+    }
+  }
   const u = d.unmatched || {}
   const b = bottleneck.value
   const s = d.score || {}
@@ -666,6 +753,11 @@ const todos = computed(() => {
   return list
 })
 
+// 待办区的空态文案：真·空数据要说「无数据」，不能说「没有短板、一切合理」
+const emptyTip = computed(() => (isEmptyReport.value
+  ? '本期无可评估数据，暂无待办建议。'
+  : '当前没有明显短板。词典规模、归一与评分都处在合理区间。'))
+
 // ---------------- 明细 ----------------
 const coverageRows = computed(() =>
   (report.value?.coverage || []).map((c) => ({
@@ -695,14 +787,17 @@ const scoreRange = computed(() => {
 
 const loadReport = async () => {
 loading.value = true
+loadError.value = false
 try {
       // 时间区间为空时把参数省略，不发 start=undefined 这类脏参数
       const range = currentRange()
       const res = await getStandardizationReport(range || undefined)
       report.value = res.data || null
     } catch {
-      // 拦截器已提示，这里不叠加泛化文案
+      // 拦截器已提示，这里不叠加泛化文案；
+      // P0-4：失败必须落进独立状态位，不能只把 report 置 null 了事
       report.value = null
+      loadError.value = true
     } finally {
       loading.value = false
     }
@@ -725,6 +820,8 @@ const handleExport = async () => {
       return
     }
     saveBlob(blob, `标准化质量报告-${r.generatedAt.replace(/[-: ]/g, '')}.csv`)
+    // P1-7：导出成功此前静默 —— 下载发生在浏览器层，页面必须给一句确认
+    ElMessage.success('报告已导出')
   } catch {
     // 拦截器已提示
   } finally {
@@ -811,6 +908,40 @@ function onVisibilityChange() {
 </script>
 
 <style scoped>
+/* P0-4：加载失败横幅 —— 失败态唯一入口，自带重试；与 gate 同构但用告警色 */
+.load-fail {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-3);
+  border-left: 3px solid var(--danger);
+  background: var(--danger-surface);
+  border-radius: 6px;
+}
+.lf-icon {
+  flex: 0 0 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--danger);
+  color: var(--surface);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.lf-body { flex: 1 1 auto; min-width: 0; }
+.lf-title {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.lf-desc {
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-sub-strong);
+}
 /* 质控未完成时的拦截提示：这是「结论不可信」的告知，不是报错 */
 .gate {
   display: flex;
@@ -820,7 +951,8 @@ function onVisibilityChange() {
   margin-bottom: var(--sp-3);
   border-left: 3px solid var(--ochre);
   background: var(--ochre-surface);
-  border-radius: 4px;
+  /* P2-1：容器类统一 6px 圆角（与 PanelCard 同档），消除同页 4px/6px 并存 */
+  border-radius: 6px;
 }
 .gate-icon {
   flex: 0 0 20px;
@@ -893,7 +1025,10 @@ function onVisibilityChange() {
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-3);
   background: var(--surface-sub);
-  border-radius: 4px;
+  /* P2-3：三种顶部提示条同构 —— 补 3px 左边框（灰系），与结论条/门禁条一致 */
+  border-left: 3px solid var(--text-sub);
+  /* P2-1：容器类 6px */
+  border-radius: 6px;
   font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub-strong);
@@ -916,7 +1051,8 @@ function onVisibilityChange() {
   align-items: flex-start;
   padding: var(--sp-3) var(--sp-4);
   margin-bottom: var(--sp-3);
-  border-radius: 4px;
+  /* P2-1：容器类 6px */
+  border-radius: 6px;
   border-left: 3px solid var(--ink-mid);
   background: var(--ink-light);
 }
@@ -957,18 +1093,44 @@ function onVisibilityChange() {
   display: flex;
   gap: var(--sp-3);
   flex-wrap: wrap;
-  margin-bottom: var(--sp-4);
+  /* P2-2：区块间距收口到 --sp-3 —— 与上下相邻区块（12px）同一档，
+     消除 12/16/14 三个越档值混排 */
+  margin-bottom: var(--sp-3);
 }
 .kpi {
-  flex: 1 1 200px;
-  min-width: 190px;
+  /* P1-5：四张卡等分一行。旧写法 flex:1 1 200px + min-width:190 在
+     1024~1100 视口会换行且末张被 grow 拉满整行（3+1 通栏孤卡）。
+     改为按 4 等分取基宽、禁止 grow；窄屏走 2×2 断点，同行永远等宽。 */
+  flex: 0 1 calc((100% - 3 * var(--sp-3)) / 4);
+  min-width: 0;
+  /* P0-6：终态实测 134px —— min-height 把骨架与终态钉在同一高度，A9 差值 0 */
+  min-height: 134px;
   padding: var(--sp-3);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  /* P2-1：容器类 6px */
+  border-radius: 6px;
   background: var(--surface);
 }
 .kpi.warn { border-left: 3px solid var(--ochre); }
 .kpi.ok { border-left: 3px solid var(--success, #3a7d44); }
+/* P1-5：受支持视口的下半段（<1100px）走 2×2 等宽，不出现通栏孤卡 */
+@media (max-width: 1100px) {
+  .kpi { flex-basis: calc((100% - var(--sp-3)) / 2); }
+}
+@media (max-width: 700px) {
+  .kpi { flex-basis: 100%; }
+}
+/* P0-6：骨架块 —— 静态占位（全站动效令牌约束：不允许新增字面量 transition/animation） */
+.kpi-skel { display: block; }
+.sk {
+  display: block;
+  background: var(--surface-sub);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.sk-label { width: 72px; height: 14px; margin-bottom: 8px; }
+.sk-value { width: 116px; height: 34px; margin-bottom: 10px; }
+.sk-note { width: 70%; height: 14px; }
 .kpi-label {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
@@ -1022,6 +1184,37 @@ function onVisibilityChange() {
   font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub-strong);
+  /* P2-5：长说明限宽 —— 1115px 单行 85+ 字远超中文长文 30~45 字/行的可读行宽 */
+  max-width: 88ch;
+}
+/* P1-8：右侧固定宽度操作列。无按钮的行用 .todo-act 同宽占位，
+     保证 5 条待办的标签左缘竖直成列（A17）。 */
+.todo-ops {
+  flex: 0 0 160px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.todo-act {
+  flex: 0 0 96px;
+  display: flex;
+  justify-content: flex-end;
+}
+/* P0-6：待办区加载占位 —— 2~3 行，不再是 0 高 */
+.todo-list .sk-line {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--surface-sub);
+  margin-bottom: 6px;
+}
+.sk-w40 { width: 40%; }
+.sk-w90 { width: 90%; }
+.sk-tag {
+  flex: 0 0 48px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--surface-sub);
 }
 .empty-tip {
   padding: var(--sp-3) 0;
