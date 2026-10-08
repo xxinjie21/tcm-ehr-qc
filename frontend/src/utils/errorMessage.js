@@ -23,6 +23,24 @@ export function apiErrorMessage(e, fallback = '请求失败') {
 }
 
 /**
+ * 把后端直通的「技术措辞」翻译成「哪一步、怎么办」（审查报告 M6）。
+ *
+ * 后端统一回 Result{msg}，多数 msg 已面向用户；少数异常层直出的还是
+ * 实现措辞（如「术语类型非法」「缺少文件参数：file」），原样弹给用户
+ * 既不知道是哪一步也不知道改什么。白名单式小表只追已知的几类，命中就换。
+ */
+const HINT_MAP = {
+  '术语类型非法': '词典解析失败：术语类型无效，请确认已正确选择术语类型',
+  '缺少文件参数：file': '文件未成功上传，请重新选择文件后再试',
+  '缺少必填参数：type': '词典解析失败：缺少术语类型，请刷新当前页后重试'
+}
+
+function humanize(msg) {
+  if (msg && HINT_MAP[msg]) return HINT_MAP[msg]
+  return msg
+}
+
+/**
  * 判定一个失败响应「该提示什么、要不要清登录态」。
  *
  * 把判断与副作用分开：这里只做纯计算，清登录态与跳转由拦截器执行 ——
@@ -36,13 +54,13 @@ export function describeHttpError(error) {
   const msg = error?.response?.data?.msg
   // 401：凭证错误 / token 过期，以后端 msg 为准（登录页密码错误也走这里）
   if (status === 401) {
-    return { message: msg || '登录已过期，请重新登录', logout: true }
+    return { message: humanize(msg) || '登录已过期，请重新登录', logout: true }
   }
   // 403：无权限只提示，不跳转（跳走会让用户以为「被踢了」）
   if (status === 403) {
-    return { message: msg || '无权限执行该操作', logout: false }
+    return { message: humanize(msg) || '无权限执行该操作', logout: false }
   }
-  return { message: msg || error?.message || '网络异常', logout: false }
+  return { message: humanize(msg) || error?.message || '网络异常', logout: false }
 }
 
 /**
@@ -54,7 +72,7 @@ export function describeHttpError(error) {
 export function describeBizError(body) {
   const code = body?.code
   return {
-    message: body?.msg || '请求失败',
+    message: humanize(body?.msg) || '请求失败',
     logout: code === 401
   }
 }

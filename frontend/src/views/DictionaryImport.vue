@@ -1,5 +1,10 @@
 <template>
   <div class="dict-import">
+    <!-- M2（审查报告）：导入页常驻返回入口 —— 面包屑不可点，未成功导入/导入失败时
+         页面不能连一条出路都没有，否则用户卡死在这；全部角色都需要。 -->
+    <div class="import-top">
+      <router-link class="rh-link" to="/dictionary">← 返回术语词典</router-link>
+    </div>
     <!--
       批量导入词典。
 
@@ -87,7 +92,7 @@
             />
             <div class="paste-foot">
               <el-button size="small" :disabled="!parsedPasted.length" @click="usePastedText">
-                用粘贴内容（{{ parsedPasted.length }} 条）
+                粘贴后生成待导入文件（{{ parsedPasted.length }} 条）
               </el-button>
               <el-button
                 size="small"
@@ -97,6 +102,10 @@
                 :disabled="!parsedPasted.length"
                 @click="askSuggest"
               >AI 建议怎么补</el-button>
+              <span v-if="!parsedPasted.length" class="tip">
+                <!-- L4：AI 与导入按钮为什么灰，给出说明而不是让人瞎点 -->
+                需先粘贴文本（或用上面的上传）；AI 建议基于粘贴内容
+              </span>
               <span v-if="pastedText.trim() && !parsedPasted.length" class="paste-warn">
                 没解析出词条，请检查格式
               </span>
@@ -173,7 +182,7 @@
               <b>将写入 {{ preview.count }} 条术语</b>
               <span v-if="preview.sample.length" class="tip">示例：{{ preview.sample.join('、') }}</span>
             </template>
-            <span v-else-if="importFile" class="tip">未取得预览（解析失败或格式不符），仍可继续，但请自行确认文件内容</span>
+            <span v-else-if="importFile" class="tip">未取得预览（解析失败或格式不符），仍可继续，但请自行确认{{ isPastedFile ? '粘贴内容' : '文件内容' }}</span>
           </div>
 
           <!-- 管理员可选「直接生效」；其余身份只有本地一条路，不给选择避免困惑 -->
@@ -198,7 +207,11 @@
             :disabled="!importFile"
             @click="handleSubmit"
           >{{ submitLabel }}</el-button>
-          <span v-if="!importFile" class="tip">请先在上一步选择文件</span>
+          <span v-if="!importFile" class="tip">{{ pastedText.trim() ? '粘贴后请先点上方「粘贴后生成待导入文件」' : '请先上传文件，或用粘贴内容生成待导入文件' }}</span>
+          <!-- H2：导入失败要在页内可见、可重试，不能只靠一闪而过的 toast -->
+          <div v-if="submitError" class="import-err" role="alert">
+            <b>导入失败：</b>{{ submitError }}
+          </div>
         </div>
       </div>
 
@@ -279,6 +292,7 @@ import { runTermSuggest } from '@/api/ai'
 import { submitNlpBatch } from '@/api/nlp'
 import { recomputeQc } from '@/api/qc'
 import { confirmBox } from '@/utils/confirm'
+import { apiErrorMessage } from '@/utils/errorMessage'
 import { useUserStore } from '@/stores/user'
 import { splitAliases } from '@/utils/terms'
 
@@ -309,6 +323,8 @@ const preview = ref(null)
 const previewLoading = ref(false)
 const importFile = ref(null)
 const submitting = ref(false)
+/** H2（审查报告）：导入失败要在页内可见、可走，不能只靠一闪而过的 toast */
+const submitError = ref('')
 const result = ref(null)
 /** 词表体检结果（批次 21），来自 /parse 响应的 lint 段 */
 const lint = ref(null)
@@ -316,8 +332,10 @@ const lint = ref(null)
 const rerunHint = ref(null)
 const rerunning = ref(false)
 const type = ref('herb')
-// local = 并入本机个人词典（所有人）；direct = 直接写小组基线（仅管理员）
-const mode = ref(isAdmin.value ? 'direct' : 'local')
+// M4（审查报告）：默认落到更安全的「导入本机个人词典」——
+// 「直接生效到小组基线」是特权通道，不应作为默认可直接被「顺手点两下」触发。
+// 管理员若真要直写，选一次即可（确认框文案仍在兜底）。
+const mode = ref('local')
 const target = ref('org')
 
 const modeTip = computed(() => {
@@ -388,8 +406,11 @@ const loadPreview = async (file) => {
   previewLoading.value = true
   try {
     const form = new FormData()
-    form.append('file', file)
-    form.append('type', type.value)
+    // H1 成因二：ES upload 组件回调给的是包裹对象，真正的原生文件在 .raw 上 ——
+    // 直接塞 FormData 会被转成字符串 "[object Object]"（后端先报「缺少文件参数：file」）
+    form.append('file', file?.raw ?? file)
+    // H1 成因一：type 只放 query（parseDictFile 的 params 已带），表单里**不得再放一份** ——
+    // 两处同时放会被后端判成「术语类型非法」（4001）
     const res = await parseDictFile(form, type.value)
     // 兼容两种返回：直接是数组，或包在 terms 里
     const terms = Array.isArray(res.data) ? res.data : (res.data?.terms || [])
@@ -408,6 +429,7 @@ const loadPreview = async (file) => {
 const onFileChange = (file) => {
     importFile.value = file
     result.value = null
+    submitError.value = ''
     // 换文件就清掉上一份的体检结果，否则会误以为是新文件的问题
     lint.value = null
     // 批次7：换文件即重算预览，避免「看着 A 的预览导入了 B」
@@ -426,6 +448,8 @@ const onFileExceed = (files) => {
   f.uid = genFileId()
   uploadRef.value?.handleStart(f)
   importFile.value = f
+  // L5（审查报告）：静默替换会让用户以为两个文件都在队列里 —— 给一句提示
+  ElMessage.warning('每次只能上传 1 个文件，已替换为最新选择')
 }
 
 // ---- 粘贴文本导入 ----
@@ -482,7 +506,10 @@ const parsePastedTerms = (text) => {
 
 const parsedPasted = computed(() => parsePastedTerms(pastedText.value))
 
-/** 用粘贴内容走与文件导入完全相同的链路 */
+// 当前待导入文件是否来自粘贴（L2：措辞区分「内容 / 文件」、确认框源名判断）
+const isPastedFile = computed(() => String(importFile.value?.name || '').startsWith('pasted-'))
+
+/** 用粘贴内容走与文件导入完全相同的链路（M5：按钮名与文案说清「这是导入前置闸门」） */
 const usePastedText = () => {
   const terms = parsedPasted.value
   if (!terms.length) return
@@ -492,7 +519,7 @@ const usePastedText = () => {
     type: 'application/json'
   })
   onFileChange(file)
-  ElMessage.success(`已载入 ${terms.length} 条，确认无误后点下方导入`)
+  ElMessage.success(`已生成待导入文件（${terms.length} 条），确认无误后点下方导入`)
 }
 
 // ---- AI 补词建议 ----
@@ -536,7 +563,9 @@ const askSuggest = async () => {
   }
 }
 
-/** 把确认过的建议填回粘贴框，复用既有导入链路（用户仍可再改再导） */
+/** 把确认过的建议填回粘贴框，并**立即生成待导入文件**（H3 / 4.3.2）：
+ *  原来只回填粘贴框、预览还是旧的「N 条」——屏幕上写 A、实际导入 B 的错位根因；
+ *  现在采纳即调 usePastedText()，预览 / 待导入文件 / 导入内容三者同时同步，且省一次点击。 */
 const applySuggestions = () => {
   const lines = []
   for (const s of confirmable.value) {
@@ -550,8 +579,10 @@ const applySuggestions = () => {
   }
   if (!lines.length) return
   pastedText.value = lines.join('\n')
+  // 让下一次模板渲染把 enable 状态算对后立即生成文件；computed 同步重算，可直接调
+  usePastedText()
   suggestions.value = []
-  ElMessage.success(`已填入 ${lines.length} 条，请核对后点「用粘贴内容」导入`)
+  ElMessage.success(`已采纳 ${lines.length} 条并生成待导入文件，确认后点下方面板导入`)
 }
 
 const handleSubmit = async () => {
@@ -573,10 +604,11 @@ const handleSubmit = async () => {
   if (!ok) return
 
   submitting.value = true
+  submitError.value = ''
   try {
     const form = new FormData()
-    form.append('file', importFile.value)
-    form.append('type', type.value)
+    // H1 成因二：同一处理，取原生文件（upload 组件包裹对象的 .raw）
+    form.append('file', importFile.value?.raw ?? importFile.value)
     if (direct) {
       const res = await importDict(form, target.value)
       result.value = {
@@ -622,8 +654,9 @@ const handleSubmit = async () => {
       rerunHint.value = { mode: direct ? 'direct' : 'local', at: new Date().toLocaleString() }
       uploadRef.value?.clearFiles()
       importFile.value = null
-    } catch {
-      // 拦截器已提示
+    } catch (e) {
+      // H2 / M6：失败留在页面里给「哪一步、怎么办」，拦截器那条通用 toast 之外再补上下文
+      submitError.value = apiErrorMessage(e, '导入失败')
     } finally {
       submitting.value = false
     }
@@ -799,6 +832,16 @@ const handleSubmit = async () => {
 .do-btn {
   margin-top: 2px;
 }
+/* H2：导入失败页内提示——与成功结果区共用同一块位置语义，失败不静默 */
+.import-err {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--danger);
+  background: var(--danger-surface);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+}
 /* V7（审查报告）：「格式示例」卡此前独占整行 —— 1384px 宽只填 31%、右侧空 932px。
    改为与导入面板**左右并排**：示例卡收敛到 320~420px 的右列（内容正好铺满），
    导入面板占左列；顶部的重跑引导横跨两列。窄屏回退为上下堆叠。 */
@@ -810,6 +853,11 @@ const handleSubmit = async () => {
 }
 .dict-import > .rerun-hint {
   grid-column: 1 / -1;
+}
+/* M2：常驻返回入口的呼吸位，别贴在面板上 */
+.import-top {
+  grid-column: 1 / -1;
+  margin-bottom: var(--sp-2);
 }
 @media (max-width: 1100px) {
   .dict-import {

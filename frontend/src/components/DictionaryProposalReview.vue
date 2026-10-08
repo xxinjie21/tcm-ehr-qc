@@ -309,7 +309,17 @@ const doAudit = async (row, approve) => {
   try {
     await auditProposal(row.id, { approve, comment })
     ElMessage.success(approve ? '已通过并合并入基线' : '已驳回')
-    loadProposals()
+    await loadProposals()
+    // M7（审查报告）：审核动作完成后，右侧详情必须与列表同步 ——
+    // 列表刷新了、详情还留在「待审核 + 三个按钮」的缓存视图，会让用户以为没生效，
+    // 且按钮仍可点会对已审提案发第二次请求。
+    const found = proposals.value.find((p) => p.id === row.id)
+    if (found) {
+      currentProposal.value = found
+    } else if (currentProposal.value?.id === row.id) {
+      // 该提案已不在当前筛选态（例如待审列表）→ 清空详情回空态，避免残留操作按钮
+      currentProposal.value = null
+    }
     emit('audited') // 父页据此刷新「归档版本」页签
   } catch {
     // 拦截器已提示

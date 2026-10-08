@@ -29,7 +29,7 @@
     <el-tabs v-model="tab" class="dict-tabs">
 
     <el-tab-pane label="小组基线" name="baseline">
-    <PanelCard :title="`小组基线（${typeLabel(typeKey.value)}）`">
+    <PanelCard :title="`小组基线（${typeLabel(typeKey)}）`">
       <div class="search-row">
         <!-- 只给 placeholder 的搜索框没有无障碍名称，补 aria-label
              （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
@@ -46,7 +46,7 @@
         <!-- 批次 26.17：零信息列默认隐藏，需要时在这里勾回来 -->
         <el-popover placement="bottom-end" :width="180" trigger="click">
           <template #reference>
-            <el-button size="small" plain>列显示（{{ visibleCols.length }}/{{ OPTIONAL_COLS.length }}）</el-button>
+            <el-button size="small" plain>列显示：已显示 {{ visibleCols.length }}/{{ OPTIONAL_COLS.length }} 列</el-button>
           </template>
           <div class="col-picker">
             <el-checkbox-group v-model="visibleCols" @change="colTouched = true">
@@ -71,7 +71,7 @@
            每页条数可调（20~200），行数多时由页面自身滚动 -->
 <el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" :max-height="termsTableHeight">
           <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
-          <el-table-column prop="standardTerm" label="标准术语" width="220" />
+          <el-table-column prop="standardTerm" label="标准术语" min-width="240" />
         <el-table-column v-if="visibleCols.includes('aliases')" label="别名">
           <template #default="{ row }">
             <el-tag
