@@ -77,6 +77,15 @@ public final class RequestUtils {
         }
     }
 
+    /** 取当前组织角色（owner/member）；非请求线程/异常时给空串（H4 捕获值的兜底） */
+    public static String safeCurrentOrgRole() {
+        try {
+            return attr(ATTR_ORG_ROLE);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     /**
      * 当前操作人所属课题组。
      *

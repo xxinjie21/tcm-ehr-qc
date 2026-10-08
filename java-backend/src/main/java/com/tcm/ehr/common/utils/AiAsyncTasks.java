@@ -90,11 +90,15 @@ public class AiAsyncTasks {
         // 用户 / 组织 / 角色**标量**在提交线程固定下来，任务线程重建一个纯值上下文。
         String orgId = RequestUtils.currentOrgId();
         String userId = safeUserId();
+        // 角色有两个维度：系统角色（管理员/用户）与组织角色（owner/member），
+        // 任务线程读哪一个都不能退化成 null/unknown —— 一并捕获并在任务线程重建。
         String role = RequestUtils.safeCurrentRole();
+        String orgRole = RequestUtils.safeCurrentOrgRole();
         ValueRequestAttributes ctx = new ValueRequestAttributes();
         ctx.setAttribute(RequestUtils.ATTR_ORG_ID, orgId, RequestAttributes.SCOPE_REQUEST);
         ctx.setAttribute(RequestUtils.ATTR_USER_ID, userId, RequestAttributes.SCOPE_REQUEST);
-        ctx.setAttribute(RequestUtils.ATTR_ORG_ROLE, role, RequestAttributes.SCOPE_REQUEST);
+        ctx.setAttribute(RequestUtils.ATTR_ROLE, role, RequestAttributes.SCOPE_REQUEST);
+        ctx.setAttribute(RequestUtils.ATTR_ORG_ROLE, orgRole, RequestAttributes.SCOPE_REQUEST);
         tasks.put(id, new Task(orgId, userId, State.RUNNING, null, null, LocalDateTime.now()));
 
         pool.submit(() -> {
