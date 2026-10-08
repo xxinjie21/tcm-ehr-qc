@@ -99,12 +99,12 @@
                 type="primary"
                 plain
                 :loading="suggestLoading"
-                :disabled="!parsedPasted.length"
+                :disabled="!suggestSource.length"
                 @click="askSuggest"
               >AI 建议怎么补</el-button>
-              <span v-if="!parsedPasted.length" class="tip">
+              <span v-if="!suggestSource.length" class="tip">
                 <!-- L4：AI 与导入按钮为什么灰，给出说明而不是让人瞎点 -->
-                需先粘贴文本（或用上面的上传）；AI 建议基于粘贴内容
+                需先粘贴文本或用上面的上传文件；AI 建议基于待导入的词条
               </span>
               <span v-if="pastedText.trim() && !parsedPasted.length" class="paste-warn">
                 没解析出词条，请检查格式
@@ -209,6 +209,28 @@
               </el-table>
             </template>
             <span v-else-if="importFile" class="tip">未取得预览（解析失败或格式不符），仍可继续，但请自行确认{{ isPastedFile ? '粘贴内容' : '文件内容' }}</span>
+          </div>
+
+          <!-- M11（审查报告）：体检必须在**导入前**可见。
+               它是解析接口在预览阶段就返回的，此前被丢弃、只在「导入本地」成功后才显示，
+               而「直接生效到小组基线」这条覆盖型路径更是永远看不到 —— 偏偏它最需要先看体检。
+               与结果区那份体检是同一段结构：两处互斥（这里 !result、那里 result），
+               刻意不抽组件 —— 两处的上下文文案不同，且本项目单文件页面惯例外置组件成本更高。 -->
+          <div v-if="!result && lintIssues.length" class="lint">
+            <div class="lint-hd">
+              词表体检：{{ lintErrors.length }} 项需要修改，{{ lintWarnings.length }} 项建议确认
+            </div>
+            <div v-for="(it, i) in lintIssues" :key="i" class="lint-item" :class="it.level">
+              <div class="lint-top">
+                <el-tag size="small" :type="it.level === 'error' ? 'danger' : 'warning'" effect="plain">
+                  {{ it.level === 'error' ? '需修改' : '建议确认' }}
+                </el-tag>
+                <span class="lint-msg">{{ it.message }}</span>
+                <span v-if="it.count > 1" class="lint-count">（{{ it.count }} 条）</span>
+              </div>
+              <div v-if="it.terms" class="lint-terms">{{ it.terms }}</div>
+              <div v-if="it.advice" class="lint-advice">{{ it.advice }}</div>
+            </div>
           </div>
 
           <!-- 管理员可选「直接生效」；其余身份只有本地一条路，不给选择避免困惑 -->
@@ -346,10 +368,12 @@ const goDictionary = () => router.push('/dictionary')
 
 const uploadRef = ref(null)
 const dictFileList = ref([])
-// 批次7：dry-run 预览结果 { count, sample } 与加载态
+// 批次7：dry-run 预览结果 { count, terms } 与加载态
 const preview = ref(null)
 const previewLoading = ref(false)
 const importFile = ref(null)
+/** M9（审查报告）：本次待导入文件解析出的完整词条 —— AI 建议的入参，上传与粘贴共用 */
+const importTerms = ref([])
 const submitting = ref(false)
 /** H2（审查报告）：导入失败要在页内可见、可走，不能只靠一闪而过的 toast */
 const submitError = ref('')
@@ -448,9 +472,18 @@ const loadPreview = async (file) => {
       count: terms.length,
       terms
     }
+    // M9（审查报告）：AI 建议改吃「本次待导入文件解析出的词条」——
+    // 原先只吃粘贴框，上传文件的路径完全够不着 AI 建议。
+    importTerms.value = terms
+    // M11（审查报告）：体检结果在预览阶段就拿到了，必须在导入**之前**摆出来 ——
+    // 它正是决定「要不要现在导入」的依据。此前被丢弃，只在「导入本地」成功后才显示，
+    // 而「直接生效到小组基线」这条覆盖型路径更是永远看不到。
+    lint.value = res.data?.lint ?? null
   } catch {
     // 预览失败不阻断导入，但绝不假装「0 条」—— 置 null，界面按「未预览」呈现
     preview.value = null
+    importTerms.value = []
+    lint.value = null
   } finally {
     previewLoading.value = false
   }
@@ -464,6 +497,7 @@ const onFileChange = (file) => {
     lint.value = null
     // 批次7：换文件即重算预览，避免「看着 A 的预览导入了 B」
     preview.value = null
+    importTerms.value = []
     loadPreview(file)
   }
   // 移除文件与「撤回」同一语义（M10）：一并清掉预览与体检，避免残留上一个文件的明细
@@ -555,6 +589,7 @@ const canImport = computed(() => !!importFile.value && !pastedStale.value)
 const clearImportFile = () => {
   importFile.value = null
   preview.value = null
+  importTerms.value = []
   lint.value = null
   result.value = null
   // 撤回后不再与粘贴框联动，否则会立刻又被判成「已失效」
@@ -590,9 +625,22 @@ const confirmable = computed(() =>
   )
 )
 
+/**
+ * M9（审查报告）：AI 建议的入参。
+ *
+ * 优先用「本次待导入文件解析出的词条」—— 这样**上传文件**的路径也能用 AI 建议，
+ * 而不只是粘贴框（原先只吃粘贴框，上传路径完全够不着）。
+ * 粘贴框改过、导致待导入文件已失效时，退回按粘贴框当前内容取词：
+ * 用户此刻的意图显然是框里新写的东西，而不是那份已过期的文件。
+ */
+const suggestSource = computed(() => {
+  if (importTerms.value.length && !pastedStale.value) return importTerms.value
+  return parsedPasted.value
+})
+
 /** 向 AI 要建议；失败或不可用都不影响手动路径 */
 const askSuggest = async () => {
-  const words = parsedPasted.value.map((t) => t.standardTerm)
+  const words = suggestSource.value.map((t) => t.standardTerm)
   if (!words.length) return
   suggestLoading.value = true
   suggestions.value = []
