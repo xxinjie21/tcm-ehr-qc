@@ -1,5 +1,12 @@
 <template>
   <div class="dict-import">
+    <!-- M2（审查报告）：导入页常驻返回入口 —— 面包屑不可点，未成功导入/导入失败时
+         页面不能连一条出路都没有，否则用户卡死在这；全部角色都需要。
+         L6（审查报告）：原先复用 rh-link（那是给提示条用的 13px 文字链），
+         挂在页头主入口上显得突兀；改用与页内其余操作一致的 el-button。 -->
+    <div class="import-top">
+      <el-button size="small" @click="goDictionary">← 返回术语词典</el-button>
+    </div>
     <!--
       批量导入词典。
 
@@ -29,41 +36,26 @@
       </div>
     </div>
 
-    <PanelCard>
-      <!-- M2（审查报告）：导入页常驻返回入口 —— 面包屑不可点，未成功导入 / 导入失败时
-           页面不能连一条出路都没有，否则用户卡死在这；全部角色都需要。
-           L6（审查报告）：原先复用 rh-link（那是给提示条用的 13px 文字链），
-           挂在页头主入口上显得突兀；改用与页内其余操作一致的 el-button。
-           位置：并进面板标题行。它此前是面板**上方另起一行**的按钮（26px 高 + 8px 间距），
-           在一个要「一屏放下」的页面上这 34px 是纯浪费，而它本就属于页头。 -->
-      <template #header>
-        <span>批量导入词典</span>
-        <el-button class="hd-back" size="small" @click="goDictionary">← 返回术语词典</el-button>
-      </template>
-
-      <!-- 第一步：选类型。
-           标题 / 选择器 / 说明排成**一行** —— 这一步只有「选一个值」一件事，
-           竖着堆三行纯属占高度。本页的版式约束是「1600×900 空页面一屏放下」。 -->
+    <PanelCard title="批量导入词典">
+      <!-- 第一步：选类型 -->
       <div class="step">
         <div class="step-no">1</div>
-        <div class="step-body step-row">
-          <span class="step-t">选术语类型</span>
+        <div class="step-body">
+          <div class="step-t">选术语类型</div>
+          <div class="step-d">要与「小组基线」里现有的类型一致，导入后归一才会按新词条命中。</div>
           <el-select v-model="type" style="width: 160px" size="small" aria-label="术语类型">
             <el-option v-for="t in TYPES" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
-          <span class="step-d-inline">需与「小组基线」里现有的类型一致，导入后归一才会按新词条命中</span>
         </div>
       </div>
 
-      <!-- 第二步：选文件。说明与标题同行，不再独占一行 -->
+      <!-- 第二步：选文件 -->
       <div class="step">
         <div class="step-no">2</div>
         <div class="step-body">
-          <div class="step-row">
-            <span class="step-t">上传词典文件</span>
-            <span class="step-d-inline">
-              支持 Excel(.xlsx/.xls) / CSV / JSON；首列<b>标准术语</b>，第二列<b>别名</b>（用「、」分隔，可选）
-            </span>
+          <div class="step-t">上传词典文件</div>
+          <div class="step-d">
+            支持 Excel(.xlsx/.xls)、CSV、JSON。首列必须是<b>标准术语</b>，第二列<b>别名</b>（多个用「、」分隔，可选）。
           </div>
           <el-upload
             ref="uploadRef"
@@ -101,34 +93,6 @@
             </span>
           </div>
 
-          <!-- 格式示例：此前是与导入面板**并排**的独立卡片，固定占掉右栏 320~420px ——
-               1366 宽下把导入面板挤到 670px，JSON 示例自己也被横向截断（「北柴胡、醋」看不全）。
-               改为整宽折叠、默认收起：要照抄格式的人点开就在眼前，
-               不需要的人不必为它让出半屏宽度，也不再挤压导入面板。 -->
-          <el-collapse v-model="sampleOpen" class="sample-collapse">
-            <el-collapse-item name="sample" title="格式示例（可照抄）">
-              <div class="sample">
-                <div class="sample-t">Excel / CSV（三列：标准术语、别名、国标代码）</div>
-                <table class="sample-tb">
-                  <thead><tr><th>标准术语</th><th>别名</th><th>国标代码</th></tr></thead>
-                  <tbody>
-                    <tr><td>肝郁气滞</td><td>肝气郁结、肝郁</td><td>ZYBNR0101</td></tr>
-                    <tr><td>柴胡</td><td>北柴胡、醋柴胡</td><td></td></tr>
-                  </tbody>
-                </table>
-                <div class="sample-t">JSON（等价写法）</div>
-                <pre class="code">[
-  { "standardTerm": "肝郁气滞", "aliases": ["肝气郁结", "肝郁"] },
-  { "standardTerm": "柴胡", "aliases": ["北柴胡", "醋柴胡"] }
-]</pre>
-                <div class="sample-t">粘贴文本（每行一条，标准词与别名之间用 Tab —— 从 Excel 直接复制就是 Tab）</div>
-                <pre class="code">神疲乏力
-食少纳呆
-恶风	平时也怕风</pre>
-              </div>
-            </el-collapse-item>
-          </el-collapse>
-
           <!-- 没有现成文件时不必先去造一个：直接把词粘进来即可。
                从「标准化质量报告」复制的「A、B、C」可直接粘（逐个当标准词入库）；
                要带别名就每行一条，行内用 Tab / 逗号分隔「标准词」与「别名」。
@@ -141,11 +105,10 @@
                 每行一条，标准词与别名之间用 Tab 分隔（从 Excel 复制即 Tab）；也可直接粘「A、B、C」这样的一串标准词。
               </span>
             </div>
-            <!-- 3 行足够看清「每行一条」的写法；4 行在空页面白占 22px -->
             <el-input
               v-model="pastedText"
               type="textarea"
-              :rows="3"
+              :rows="4"
               placeholder="神疲乏力&#10;食少纳呆&#10;恶风&#9;平时也怕风"
             />
             <div class="paste-foot">
@@ -232,14 +195,12 @@
         </div>
       </div>
 
-      <!-- 第三步：确认。去向说明与标题同行（两种去向的文案都在 50 字内，铺得下一行） -->
+      <!-- 第三步：确认 -->
       <div class="step">
         <div class="step-no">3</div>
         <div class="step-body">
-          <div class="step-row">
-            <span class="step-t">选择去向并确认</span>
-            <span class="step-d-inline">{{ modeTip }}</span>
-          </div>
+          <div class="step-t">选择去向并确认</div>
+          <div class="step-d">{{ modeTip }}</div>
           <!-- 批次7：dry-run 预览。后端 /dictionary/parse 明确「只解析、不落库」，
                所以可以放心在点确认之前先把影响面摆出来（条数 + 前几条样例）。 -->
           <div style="margin-top: 6px">
@@ -313,10 +274,25 @@
               <el-radio-button value="base">基础层（影响所有组织）</el-radio-button>
             </el-radio-group>
           </div>
+
+          <el-button
+            type="primary"
+            class="do-btn"
+            :loading="submitting"
+            :disabled="!canImport"
+            @click="handleSubmit"
+          >{{ submitLabel }}</el-button>
+          <!-- H5：粘贴内容变了就必须重新生成，不能拿着旧文件往下导 -->
+          <span v-if="pastedStale" class="prev-stale">粘贴内容已变化，请重新点上方「粘贴后生成待导入文件」</span>
+          <span v-else-if="!importFile" class="tip">{{ pastedText.trim() ? '粘贴后请先点上方「粘贴后生成待导入文件」' : '请先上传文件，或用粘贴内容生成待导入文件' }}</span>
+          <!-- H2：导入失败要在页内可见、可重试，不能只靠一闪而过的 toast -->
+          <div v-if="submitError" class="import-err" role="alert">
+            <b>导入失败：</b>{{ submitError }}
+          </div>
         </div>
       </div>
 
-      <div v-if="result" class="import-result">
+<div v-if="result" class="import-result">
           <StatCard label="文件解析" :value="result.parsed" />
           <StatCard v-if="result.failed > 0" label="解析失败" :value="result.failed" tone="red" />
           <StatCard v-if="result.added != null" label="本地新增" :value="result.added" />
@@ -360,29 +336,24 @@
         </div>
     </PanelCard>
 
-    <!-- 吸底操作条：内容一长起来（预览明细表 / 词表体检 / AI 建议面板），
-         「导入」这个本页唯一的主操作就被推到视口之外，用户得先滚到底才找得到它。
-         sticky 吸在滚动容器（main）底部 —— 不滚也在眼前。代价是它会盖住正文，
-         所以给了不透明底色 + 上投阴影，读起来像「一条工具条」而不是「一块错位的白板」。
-         形态对齐 ReviewDetailPanel 的 .footer-bar（本项目既有的吸底底栏范式）。
-         导入成功后（result）整条收起 —— 那时页面唯一的出口是「返回术语词典」。 -->
-    <div v-if="!result" class="action-bar">
-      <el-button
-        type="primary"
-        class="do-btn"
-        :loading="submitting"
-        :disabled="!canImport"
-        @click="handleSubmit"
-      >{{ submitLabel }}</el-button>
-      <!-- H5：粘贴内容变了就必须重新生成，不能拿着旧文件往下导 -->
-      <span v-if="pastedStale" class="prev-stale">粘贴内容已变化，请重新点上方「粘贴后生成待导入文件」</span>
-      <span v-else-if="!importFile" class="tip">{{ pastedText.trim() ? '粘贴后请先点上方「粘贴后生成待导入文件」' : '请先上传文件，或用粘贴内容生成待导入文件' }}</span>
-      <!-- H2：导入失败要在页内可见、可重试，不能只靠一闪而过的 toast。
-           占满整行落到按钮下方，不挤在同一行里 -->
-      <div v-if="submitError" class="import-err" role="alert">
-        <b>导入失败：</b>{{ submitError }}
+    <PanelCard title="格式示例">
+      <!-- 直接给可照抄的样子，比抽象描述省事 -->
+      <div class="sample">
+        <div class="sample-t">Excel / CSV（三列：标准术语、别名、国标代码）</div>
+        <table class="sample-tb">
+          <thead><tr><th>标准术语</th><th>别名</th><th>国标代码</th></tr></thead>
+          <tbody>
+            <tr><td>肝郁气滞</td><td>肝气郁结、肝郁</td><td>ZYBNR0101</td></tr>
+            <tr><td>柴胡</td><td>北柴胡、醋柴胡</td><td></td></tr>
+          </tbody>
+        </table>
+        <div class="sample-t" style="margin-top: var(--sp-3)">JSON（等价写法）</div>
+        <pre class="code">[
+  { "standardTerm": "肝郁气滞", "aliases": ["肝气郁结", "肝郁"] },
+  { "standardTerm": "柴胡", "aliases": ["北柴胡", "醋柴胡"] }
+]</pre>
       </div>
-    </div>
+    </PanelCard>
   </div>
 </template>
 
@@ -425,9 +396,6 @@ const goDictionary = () => router.push('/dictionary')
 
 const uploadRef = ref(null)
 const dictFileList = ref([])
-/** 「格式示例」折叠区：默认收起。它是**参考**不是流程的一环 ——
- *  展开后会把下面三步往下推，所以只在用户主动点开时才占高度。 */
-const sampleOpen = ref([])
 // 批次7：dry-run 预览结果 { count, terms } 与加载态
 const preview = ref(null)
 const previewLoading = ref(false)
@@ -888,52 +856,10 @@ const handleSubmit = async () => {
   </script>
 
 <style scoped>
-/* 上传拖拽区：默认 padding 是 40px 0，光这一块就吃掉约 180px 高度。
-   收到 sp-3(12px)：热区仍是整宽虚线框，只是不再虚胖。 */
-.dict-import :deep(.el-upload-dragger) {
-  padding: var(--sp-3);
-}
-/* 拖拽区内的主提示与副说明 */
-.upload-tip {
-  font-size: var(--fs-base);
-  color: var(--text);
-}
-.upload-tip em {
-  font-style: normal;
-  font-weight: bold;
-  color: var(--ink-mid);
-}
-.upload-tip .sub {
-  font-size: var(--fs-xs);
-  color: var(--text-sub-strong);
-  margin-top: var(--sp-1);
-}
-/* 格式示例折叠区：收起时只是一行标题（34px），点开才占高度。
-   高度必须改**变量**而不是直接写 height —— Element Plus 对折叠标题同时设了
-   height 与 min-height（都取 --el-collapse-header-height，默认 48px），
-   只写 height: 34px 会被那条 min-height 顶回去（实测计算值仍是 48px）。 */
-.sample-collapse {
-  --el-collapse-header-height: 34px;
-  margin-top: var(--sp-1);
-  border-top: none;
-  border-bottom: none;
-}
-.sample-collapse :deep(.el-collapse-item__header),
-.sample-collapse :deep(.el-collapse-item__wrap) {
-  border-bottom: none;
-}
-.sample-collapse :deep(.el-collapse-item__header) {
-  font-size: var(--fs-xs);
-  color: var(--ink-mid);
-}
-.sample-collapse :deep(.el-collapse-item__content) {
-  padding-bottom: var(--sp-2);
-}
-
 /* 粘贴文本导入：没有现成文件时的第二条入口 */
 .paste-block {
-  margin-top: var(--sp-1);
-  padding-top: var(--sp-1);
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
   border-top: 1px dashed var(--line);
 }
 .paste-head {
@@ -1047,38 +973,17 @@ const handleSubmit = async () => {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
 }
-/* 步骤条：序号圆点 + 标题 + 说明，降低「不知道下一步做什么」的成本。
-   三步各有一圈上下间距，累计起来足以压垮「空页面一屏放下」这个约束，
-   所以取最紧的一档（sp-2 = 8px）；靠虚线分隔符维持「这是两步」的视觉区分。 */
+/* 步骤条：序号圆点 + 标题 + 说明，降低「不知道下一步做什么」的成本 */
 .step {
   display: flex;
   gap: var(--sp-3);
-  padding-bottom: var(--sp-2);
-  margin-bottom: var(--sp-2);
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-4);
   border-bottom: 1px dashed var(--line);
 }
-/* 最后一步不再留底部内边距：面板自身的 .panel-bd 内边距已经给了呼吸位，
-   两步加起来就是 24px 空白 —— 在一个要「一屏放下」的页面上这是白扔的。 */
 .step:last-of-type {
   border-bottom: none;
   margin-bottom: 0;
-  padding-bottom: 0;
-}
-/* 「标题 + 控件 + 说明」同行：只有一件事的步骤不该竖着堆三行 */
-.step-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-.step-row .step-t {
-  margin-bottom: 0;
-}
-/* 与标题同行的说明：比 .step-d 弱一档，不抢标题的注意力 */
-.step-d-inline {
-  font-size: var(--fs-xs);
-  color: var(--text-sub-strong);
-  line-height: 1.7;
 }
 .step-no {
   flex: 0 0 22px;
@@ -1114,40 +1019,8 @@ const handleSubmit = async () => {
   flex-wrap: wrap;
   margin-bottom: var(--sp-2);
 }
-/* 步骤 3 的最后一个去向选择行贴着步骤底，不再多留一层下边距 */
-.target-row:last-child {
-  margin-bottom: 0;
-}
 .do-btn {
-  margin-top: 0;
-}
-/* 吸底操作条：本页唯一的主操作（导入）必须始终可见 ——
-   预览明细表 / 词表体检 / AI 建议面板任意一个出现，就足以把它推到视口外。
-   形态与 ReviewDetailPanel 的 .footer-bar 一致（同为 sticky 底栏），
-   底色不透明是硬要求：吸底时它会盖在正文之上。 */
-.action-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-3);
-  margin-top: 0;
-  padding: var(--sp-2) var(--sp-4);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  box-shadow: 0 -2px 8px rgba(47, 70, 57, 0.06);
-}
-/* 失败提示整行落到按钮下方，不挤在同一行里 */
-.action-bar .import-err {
-  flex: 1 0 100%;
-  margin-top: 0;
-}
-/* 标题行里的「返回术语词典」：推到行尾，与标题分列两端 */
-.hd-back {
-  margin-left: auto;
+  margin-top: 2px;
 }
 /* M8：预览明细表 —— 「将写入 N 条术语」与「撤回」同排，表体在 max-height 内滚 */
 .prev-head {
@@ -1178,12 +1051,27 @@ const handleSubmit = async () => {
   font-size: var(--fs-xs);
   line-height: 1.6;
 }
-/* 单列铺满：导入面板独占整宽。
-   此前是「导入面板 + 格式示例卡」两栏，右栏固定吃 320~420px ——
-   1366 宽下导入面板只剩 670px，示例卡自己的 JSON 也被横向截断。
-   格式示例改成面板内的折叠区（见 .sample-collapse），两栏的理由就不成立了。 */
+/* V7（审查报告）：「格式示例」卡此前独占整行 —— 1384px 宽只填 31%、右侧空 932px。
+   改为与导入面板**左右并排**：示例卡收敛到 320~420px 的右列（内容正好铺满），
+   导入面板占左列；顶部的重跑引导横跨两列。窄屏回退为上下堆叠。 */
 .dict-import {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 0 var(--sp-3);
+  align-items: start;
+}
+.dict-import > .rerun-hint {
+  grid-column: 1 / -1;
+}
+/* M2：常驻返回入口的呼吸位，别贴在面板上 */
+.import-top {
+  grid-column: 1 / -1;
+  margin-bottom: var(--sp-2);
+}
+@media (max-width: 1100px) {
+  .dict-import {
+    grid-template-columns: 1fr;
+  }
 }
 .import-result {
   margin-top: var(--sp-4);
@@ -1263,15 +1151,11 @@ const handleSubmit = async () => {
   border-radius: 4px;
   font-size: var(--fs-base);
 }
-/* 格式示例：给可照抄的表。三段（Excel/CSV、JSON、粘贴文本）之间用上边距拉开，
-   首段不留上边距 —— 折叠区展开后第一行不该凭空多一截空白。 */
+/* 格式示例：给可照抄的表 */
 .sample-t {
   font-size: var(--fs-base);
   font-weight: 600;
-  margin: var(--sp-3) 0 var(--sp-2);
-}
-.sample-t:first-child {
-  margin-top: 0;
+  margin-bottom: var(--sp-2);
 }
 .sample-tb {
   border-collapse: collapse;
