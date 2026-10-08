@@ -127,7 +127,24 @@ llm:
   # 也不知道还要等多久。20s 后走规则兜底（见本块上方注释）比让他干等 60s 更有用。
   # 这是配置项，模型慢（如本地小显卡跑大模型）时改回大值即可，不需要动代码。
   timeout: 20000              # 毫秒
-  config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化（重启回显）；api-key 不落盘
+
+  # 批次18 · 用户 LLM 密钥的**落库加密**密钥（AES-256-GCM，见 LlmSecretCipher）。
+  # 为什么必须有它：配置改成「每个用户一份」后，密钥会跟着每个用户落库；
+  # 没有加密密钥时服务照常启动，但「导入 LLM」保存密钥会被拒（503 + code=1011），
+  # 也就是用户看到的「未配置 LLM 加密密钥，无法保存密钥」。
+  #
+  # 口径与上方 jwt.secret 完全一致：冒号后是**开发用**默认值（32 字节 Base64，
+  # 明文是 "tcm-ehr-qc-dev-only-llm-enc-key!"），保证拉下代码就能用；
+  # 生产用环境变量 TCM_LLM_ENC_KEY 覆盖 —— 它优先级更高
+  # （LlmSecretCipher.resolveKey 先读 System.getenv，再读本项）。
+  #
+  # ⚠️ 与 jwt.secret 不同的是，换这个值的代价更重：GCM 密文绑定密钥，换掉之后
+  #    user_llm_config 里已加密的 API Key 全部解不开（decrypt 返回空串并告警一次），
+  #    用户表现为「配置看着还在、但模型调不通」，需要各自重填一次。
+  #    故生产上要把它当**持久密钥**保管；生成/轮换用 tools/init-llm-enc-key.py。
+  crypto-key: ${TCM_LLM_ENC_KEY:dGNtLWVoci1xYy1kZXYtb25seS1sbG0tZW5jLWtleSE=}
+
+  config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化（重启回显）；api-key 加密落库，不写本文件
 
 # 操作日志：§七 L2 起只入库（operation_log 表），不再落文件，故无 log.* 配置项。
 # ⚠️ 下面的 logging: 是 Spring 应用日志（另一回事），不要一起删。

@@ -3,6 +3,8 @@ package com.tcm.ehr.domain.dto;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * AI 解读/问答/复核请求。
  *
@@ -37,4 +39,22 @@ public class AiQueryDTO {
     /** 追问上下文：本会话近期问答（可选，前端拼好后传入；仅用于 chat） */
     @Size(max = 8000, message = "上文最长 8000 字")
     private String history;
+
+    /**
+     * 待规范的术语原文（<b>仅 termsuggest 必填</b>）。
+     *
+     * <p>同样<b>不能</b>加 {@code @NotEmpty}：本 DTO 被四个端点共用，加上会让
+     * interpret / chat / review 在进入 Controller 之前就被 Bean Validation 拦掉
+     * —— 与 {@link #question} 是同一个坑。termsuggest 的必填在 Controller 里校验。</p>
+     */
+    @Size(max = 50, message = "单次最多 50 个待补词")
+    private List<String> terms;
+
+    /**
+     * 术语类型（仅 termsuggest；如 symptom / disease / pattern）。
+     *
+     * <p>留空按 symptom —— 质量报告的「待补词」清单恒来自症状类
+     * （{@code StandardizationReportServiceImpl.unmatched()} 只遍历 structured_data 的 symptoms）。</p>
+     */
+    private String termType;
 }

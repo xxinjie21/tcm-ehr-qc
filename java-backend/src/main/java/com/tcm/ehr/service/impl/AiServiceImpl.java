@@ -13,10 +13,12 @@ import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
 import com.tcm.ehr.domain.po.OperationLog;
 import com.tcm.ehr.domain.po.Record;
+import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.AiReplyVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IAiService;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.ILogService;
 import com.tcm.ehr.service.IStatsService;
 import lombok.RequiredArgsConstructor;
@@ -72,6 +74,8 @@ public class AiServiceImpl implements IAiService {
     private final ObjectMapper objectMapper;
     private final ILogService logService;
     private final com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
+    /** 词表读取（术语补词建议的召回来源）；与词典页、归一链路同一份 effective 视图 */
+    private final IDictionaryTermStore termStore;
 
     // ------------------------------------------------------------------ 3.1 解读
 
@@ -654,6 +658,216 @@ public class AiServiceImpl implements IAiService {
 
     private static boolean blank(String s) {
         return s == null || s.isBlank();
+    }
+
+    // ------------------------------------------------------------------ 3.4 术语补词建议
+
+    /** 召回候选条数上限：够模型判断即可，给太多反而稀释注意力 */
+    private static final int RECALL_TOP_N = 5;
+
+    /**
+     * 召回门槛：与原文重叠的字符数低于此值即视为噪声，不放进候选。
+     *
+     * <p>实测（72 条症状词典 × 质量报告里的 8 个待补词）：门槛取 1 时会把
+     * 「食少纳呆 ← 多饮多食多尿」「面红目赤 ← 目盲」这种只共用一个字的候选塞给模型，
+     * 而模型<b>倾向于硬凑给定的上下文</b> —— 噪声候选反而会诱导它做出错误归类。
+     * 取 2 后只剩「心烦易怒 ← 急躁易怒」「头晕头重 ← 头晕头痛」这类真正有用的。</p>
+     */
+    private static final int RECALL_MIN_OVERLAP = 2;
+
+    /**
+     * 术语补词建议：先按字面召回候选，再让 LLM 在候选约束下判断该怎么补。
+     *
+     * <p><b>两步的顺序不能颠倒</b>：召回是纯规则能力（不依赖 LLM），先算出来放进兜底结果，
+     * 这样 LLM 不可用或输出解析失败时，用户至少还能看到「词表里有哪些字面相近的词」。
+     * 与 {@link #interpret} 的「规则先出结论、LLM 只做增强」是同一套降级思路。</p>
+     *
+     * <p><b>本方法只出候选，不落库。</b>建议要经人工逐条确认才会进词典 ——
+     * 归一链路本身不消费本结果，与「判定地基仍是规则引擎」一致。</p>
+     */
+    @Override
+    public AiReplyVO suggestTerms(AiQueryDTO dto) {
+        // 1. 归一入参：去空、去重；类型缺省按 symptom（质量报告的待补词恒来自症状类）
+        List<String> terms = new ArrayList<>();
+        if (dto != null && dto.getTerms() != null) {
+            for (String t : dto.getTerms()) {
+                if (t == null) continue;
+                String v = t.trim();
+                if (!v.isEmpty() && !terms.contains(v)) terms.add(v);
+            }
+        }
+        String type = dto == null || blank(dto.getTermType()) ? "symptom" : dto.getTermType().trim();
+
+        AiReplyVO vo = new AiReplyVO();
+
+        // 2. 规则地基：从现有词表按字面相似度召回候选（这一步不依赖 LLM）
+        List<TermEntry> all = termStore.readEffective(RequestUtils.currentOrgId(), type);
+        Map<String, List<TermEntry>> recalled = new LinkedHashMap<>();
+        for (String t : terms) {
+            recalled.put(t, recallCandidates(t, all));
+        }
+        vo.setTermSuggestions(fallbackSuggestions(terms, recalled));
+
+        // 3. LLM 判断；不可用或输出不可解析，都保留上一步的兜底
+        String raw = llmClient.chat(LlmClient.AI_TERM_SUGGEST_SYSTEM_PROMPT,
+                termSuggestPrompt(terms, recalled, type));
+        boolean llmOk = raw != null && !raw.isBlank();
+        vo.setLlmAvailable(llmOk);
+        vo.setSource(llmOk ? "llm" : "rule");
+        if (llmOk) {
+            List<AiReplyVO.TermSuggestion> parsed = parseSuggestions(raw, terms);
+            if (!parsed.isEmpty()) {
+                vo.setTermSuggestions(parsed);
+            }
+        }
+
+        // 4. answer 只做一句概述，真正的结果在 termSuggestions 里
+        int n = vo.getTermSuggestions() == null ? 0 : vo.getTermSuggestions().size();
+        vo.setAnswer(llmOk
+                ? "已生成 " + n + " 条补词建议，请逐条确认后录入；AI 建议仅供参考，以人工判断为准。"
+                : "AI 暂不可用，已列出词表中字面相近的候选，请人工判断后录入。");
+        return vo;
+    }
+
+    /**
+     * 从词表里按<b>字面</b>相似度为原文召回候选。
+     *
+     * <p>只做字面、不做语义 —— 语义判断交给 LLM。召回的作用是给它一个
+     * 「系统已经认这些词」的约束，避免凭空造词。</p>
+     */
+    private static List<TermEntry> recallCandidates(String content, List<TermEntry> all) {
+        List<TermEntry> hit = new ArrayList<>();
+        for (TermEntry e : all) {
+            if (overlap(content, e) >= RECALL_MIN_OVERLAP) hit.add(e);
+        }
+        // 按重叠字符数降序；List.sort 是稳定排序，同分保持词表原序
+        hit.sort((a, b) -> Integer.compare(overlap(content, b), overlap(content, a)));
+        return hit.size() > RECALL_TOP_N ? new ArrayList<>(hit.subList(0, RECALL_TOP_N)) : hit;
+    }
+
+    /** 原文与某词条的最大字符重叠数（标准词与各别名取最大） */
+    private static int overlap(String content, TermEntry e) {
+        int best = commonChars(content, e.getStandardTerm());
+        if (e.getAliases() != null) {
+            for (String a : e.getAliases()) {
+                best = Math.max(best, commonChars(content, a));
+            }
+        }
+        return best;
+    }
+
+    /** 两串的字符交集大小（按字符去重）。中文短词用这个足够，不必引入编辑距离的复杂度 */
+    private static int commonChars(String a, String b) {
+        if (a == null || b == null || a.isEmpty() || b.isEmpty()) return 0;
+        StringBuilder rest = new StringBuilder(b);
+        int n = 0;
+        for (char c : a.toCharArray()) {
+            int i = rest.indexOf(String.valueOf(c));
+            if (i >= 0) {
+                n++;
+                rest.deleteCharAt(i);
+            }
+        }
+        return n;
+    }
+
+    /**
+     * LLM 不可用时的兜底：把召回候选原样列出，action 一律 {@code unknown} 交给人工判断。
+     *
+     * <p>刻意<b>不猜</b> action —— 猜错会让用户以为系统已经判过了，
+     * 反而更容易把口语当成标准词录进去。</p>
+     */
+    private static List<AiReplyVO.TermSuggestion> fallbackSuggestions(List<String> terms,
+                                                                     Map<String, List<TermEntry>> recalled) {
+        List<AiReplyVO.TermSuggestion> out = new ArrayList<>();
+        for (String t : terms) {
+            AiReplyVO.TermSuggestion s = new AiReplyVO.TermSuggestion();
+            s.setOriginal(t);
+            s.setAction("unknown");
+            s.setSource("dict");
+            List<TermEntry> cs = recalled.getOrDefault(t, List.of());
+            if (cs.isEmpty()) {
+                s.setReason("词表里没有字面相近的词，需人工判断是规范术语还是口语");
+            } else {
+                List<String> names = new ArrayList<>();
+                for (TermEntry e : cs) names.add(e.getStandardTerm());
+                s.setReason("词表里的相近词：" + String.join("、", names));
+            }
+            out.add(s);
+        }
+        return out;
+    }
+
+    /** 组装用户提示词：原文与各自召回到的候选成对列出，模型只需在候选里做判断 */
+    private static String termSuggestPrompt(List<String> terms, Map<String, List<TermEntry>> recalled,
+                                           String type) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("术语类型：").append(type).append("\n\n待规范原文与候选词：\n");
+        for (String t : terms) {
+            sb.append("- 原文：").append(t).append("\n  候选：");
+            List<TermEntry> cs = recalled.getOrDefault(t, List.of());
+            if (cs.isEmpty()) {
+                sb.append("（词表里没有字面相近的词）");
+            } else {
+                List<String> parts = new ArrayList<>();
+                for (TermEntry e : cs) {
+                    String one = e.getStandardTerm();
+                    if (e.getAliases() != null && !e.getAliases().isEmpty()) {
+                        one += "（别名：" + String.join("、", e.getAliases()) + "）";
+                    }
+                    parts.add(one);
+                }
+                sb.append(String.join("；", parts));
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 解析模型输出的 JSON 数组。
+     *
+     * <p>模型不一定听话：可能包 markdown 围栏、可能少给元素。这里只做两件事 ——
+     * 剥围栏后按数组解析；解析不出来就返回空集合，由调用方保留召回兜底。
+     * <b>不做「字段缺了就补猜」的补救</b>，因为补出来的 action 会误导人工复核。</p>
+     */
+    private List<AiReplyVO.TermSuggestion> parseSuggestions(String raw, List<String> terms) {
+        try {
+            String json = TextUtil.stripCodeFence(raw);
+            List<Map<String, Object>> list = objectMapper.readValue(json,
+                    new TypeReference<List<Map<String, Object>>>() {
+                    });
+            List<AiReplyVO.TermSuggestion> out = new ArrayList<>();
+            for (Map<String, Object> m : list) {
+                if (m == null) continue;
+                AiReplyVO.TermSuggestion s = new AiReplyVO.TermSuggestion();
+                s.setOriginal(nz(rawOrNull(m.get("original"))).trim());
+                if (s.getOriginal().isEmpty()) continue;
+                String action = nz(rawOrNull(m.get("action"))).trim();
+                s.setAction(action.isEmpty() ? "unknown" : action);
+                s.setStandardTerm(nz(rawOrNull(m.get("standardTerm"))).trim());
+                String src = nz(rawOrNull(m.get("source"))).trim();
+                s.setSource(src.isEmpty() ? "model" : src);
+                s.setReason(nz(rawOrNull(m.get("reason"))).trim());
+                if (m.get("aliases") instanceof List<?> al) {
+                    for (Object o : al) {
+                        String v = nz(rawOrNull(o)).trim();
+                        if (!v.isEmpty() && !v.equals(s.getStandardTerm()) && !s.getAliases().contains(v)) {
+                            s.getAliases().add(v);
+                        }
+                    }
+                }
+                out.add(s);
+            }
+            // 数量对不上（模型漏项）不整体丢弃，但记一条日志便于排查
+            if (out.size() != terms.size()) {
+                log.warn("[AI 补词建议] 模型返回 {} 条，输入 {} 条，按返回结果采用", out.size(), terms.size());
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("[AI 补词建议] 模型输出无法解析为 JSON，降级为召回候选：{}", e.getMessage());
+            return List.of();
+        }
     }
 
 }

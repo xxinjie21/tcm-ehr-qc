@@ -187,7 +187,8 @@
         </el-button>
       </div>
       <div class="rv-add">
-        <el-input v-model="newTerm" placeholder="新增标准词" style="width: 160px" size="small" />
+        <el-input v-model="newTerm" placeholder="标准词" style="width: 150px" size="small" />
+        <el-input v-model="newAliases" placeholder="别名，多个用「、」分隔（可选）" style="width: 230px" size="small" />
         <el-button size="small" :disabled="!newTerm.trim()" @click="addLocalTerm">加入本地</el-button>
         <span class="tip">加入本地后同样需要提交提案才会进入小组基线</span>
       </div>
@@ -267,6 +268,7 @@ import {
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES_WIDE } from '@/utils/constants'
+import { splitAliases } from '@/utils/terms'
 
 const userStore = useUserStore()
 
@@ -431,6 +433,7 @@ const baselineTouched = ref(false)
 const baselineLoading = ref(false)
 const submittingProposal = ref(false)
 const newTerm = ref('')
+const newAliases = ref('')
 const localPage = ref(1)
 
 const localPageCount = computed(() =>
@@ -510,9 +513,14 @@ const addLocalTerm = () => {
     ElMessage.warning('本地词典里已有该标准词')
     return
   }
-  localTerms.value.push({ standardTerm: t, aliases: [], source: '本地新增' })
+  localTerms.value.push({
+    standardTerm: t,
+    aliases: splitAliases(newAliases.value, t),
+    source: '本地新增'
+  })
   baselineTouched.value = true
   newTerm.value = ''
+  newAliases.value = ''
   saveLocal()
 }
 

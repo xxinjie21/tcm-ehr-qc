@@ -42,17 +42,22 @@ public class AiController {
      *
      * <p>同步接口保留不动：调用方按需选择，向后兼容。</p>
      *
-     * @param kind interpret | chat | review
+     * @param kind interpret | chat | review | termsuggest
      * @return 202 + {taskId}
      */
     @PostMapping("/async/{kind}")
     public ResponseEntity<Result<Map<String, String>>> submitAsync(@PathVariable String kind,
                                                                   @Valid @RequestBody AiQueryDTO dto) {
-        if (!List.of("interpret", "chat", "review").contains(kind)) {
+        if (!List.of("interpret", "chat", "review", "termsuggest").contains(kind)) {
             return ResponseEntity.badRequest().body(Result.error(400, "不支持的 AI 动作"));
         }
-        // 与同步接口同一套必填校验：缺参数当场 400，不丢进任务里让用户等一轮才知道
-        if (!"chat".equals(kind)
+        // 与同步接口同一套必填校验：缺参数当场 400，不丢进任务里让用户等一轮才知道。
+        // termsuggest 不看病历，校验的是待规范词表；其余三个端点必填 recordId。
+        if ("termsuggest".equals(kind)) {
+            if (dto == null || dto.getTerms() == null || dto.getTerms().isEmpty()) {
+                return ResponseEntity.badRequest().body(Result.error(400, "请提供待规范的术语"));
+            }
+        } else if (!"chat".equals(kind)
                 && (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank())) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }
@@ -63,11 +68,13 @@ public class AiController {
             AiReplyVO r = switch (kind) {
                 case "interpret" -> aiService.interpret(dto);
                 case "chat" -> aiService.chat(dto);
+                case "termsuggest" -> aiService.suggestTerms(dto);
                 default -> aiService.review(dto);
             };
             if (r == null) {
                 // 同步路径这里回 404；异步路径只能把结论放进任务结果，所以显式失败，
-                // 让前端显示「病历不存在」而不是一个空回复
+                // 让前端显示「病历不存在」而不是一个空回复。
+                // termsuggest 恒不返回 null，故不会走到这里。
                 throw new IllegalArgumentException("病历不存在");
             }
             return r;

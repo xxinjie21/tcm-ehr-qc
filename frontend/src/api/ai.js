@@ -67,3 +67,19 @@ export async function runAiAsync(kind, data, onState) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
   }
 }
+
+/**
+ * AI 术语补词建议（termsuggest）。
+ *
+ * 后端会先按字面相似度从现有词表召回候选，再让 LLM 在候选约束下判断
+ * 「挂别名 / 新建标准词 / 忽略」。**只出候选，不落库** —— 必须人工确认后才录入。
+ *
+ * 走异步路：一次要跑 LLM，同步接口会把请求线程占住几十秒。
+ *
+ * @param {{terms: string[], termType?: string}} data terms=待规范原文；termType 留空按 symptom
+ * @param {(state: string) => void} [onState]
+ * @returns {Promise<object>} AiReplyVO，结果在 termSuggestions 里
+ */
+export function runTermSuggest(data, onState) {
+  return runAiAsync('termsuggest', data, onState)
+}

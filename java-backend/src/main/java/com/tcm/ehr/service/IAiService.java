@@ -33,4 +33,16 @@ public interface IAiService {
      * @return 预检结果；病历不存在返回 {@code null}
      */
     AiReplyVO review(AiQueryDTO dto);
+
+    /**
+     * 为一批待规范术语给出补词建议（termsuggest）。
+     *
+     * <p>先按字面相似度从现有词表召回候选，再让 LLM 在候选约束下判断
+     * 「挂别名 / 新建标准词 / 忽略」。<b>只出候选，不落库</b> ——
+     * 录入必须由人工确认，归一链路不消费本结果。</p>
+     *
+     * @param dto terms=待规范原文（必填）；termType=术语类型，留空按 symptom
+     * @return 建议列表；LLM 不可用时降级为「仅召回候选」，恒不返回 {@code null}
+     */
+    AiReplyVO suggestTerms(AiQueryDTO dto);
 }

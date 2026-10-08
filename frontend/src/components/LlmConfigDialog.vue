@@ -23,7 +23,7 @@
     <p class="llm-tip">
       配置运行时生效的模型通道：<b>ollama</b> 走本机、无需 API Key；<b>openai</b> 兼容三方网关，
       改接口地址即可接入 DeepSeek / 通义 / 智谱等。保存后立即生效，<b>无需重启</b>。
-      通道与模型会保存、重启后仍回显；<b>API Key 不落盘，每次需重新填写</b>。
+      通道与模型会保存、重启后仍回显；<b>API Key 加密保存在服务端，重启后仍生效</b>。
     </p>
 
     <!-- 左右两栏：原先 7 个表单项纵向堆叠，窗口一矮就要滚动才能
@@ -61,7 +61,7 @@
               show-password
               :placeholder="config.apiKeySet ? `已配置 ${config.apiKeyMask}，留空表示不修改` : '必填'"
             />
-            <span class="llm-hint">密钥只保存在服务端内存，不会写入配置文件或前端存储</span>
+            <span class="llm-hint">密钥经 AES-256-GCM 加密后保存在服务端数据库，接口只回传掩码；不写入配置文件，也不存到前端</span>
           </el-form-item>
         </el-form>
       </div>

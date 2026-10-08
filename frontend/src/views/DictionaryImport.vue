@@ -66,6 +66,96 @@
               <div class="sub">支持 Excel / CSV / JSON，单个文件不超过 50MB</div>
             </div>
           </el-upload>
+
+          <!-- 没有现成文件时不必先去造一个：直接把词粘进来即可。
+               从「标准化质量报告」复制的「A、B、C」可直接粘（逐个当标准词入库）；
+               要带别名就每行一条，行内用 Tab / 逗号分隔「标准词」与「别名」。
+               解析结果包装成 JSON File 后走与上传完全相同的链路（预览 / 体检 / 提交），
+               不另起一套逻辑 —— 否则两条路会各自演化出不同的行为。 -->
+          <div class="paste-block">
+            <div class="paste-head">
+              <span class="paste-t">或直接粘贴文本</span>
+              <span class="tip">
+                每行一条，标准词与别名之间用 Tab 分隔（从 Excel 复制即 Tab）；也可直接粘「A、B、C」这样的一串标准词。
+              </span>
+            </div>
+            <el-input
+              v-model="pastedText"
+              type="textarea"
+              :rows="4"
+              placeholder="神疲乏力&#10;食少纳呆&#10;恶风&#9;平时也怕风"
+            />
+            <div class="paste-foot">
+              <el-button size="small" :disabled="!parsedPasted.length" @click="usePastedText">
+                用粘贴内容（{{ parsedPasted.length }} 条）
+              </el-button>
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                :loading="suggestLoading"
+                :disabled="!parsedPasted.length"
+                @click="askSuggest"
+              >AI 建议怎么补</el-button>
+              <span v-if="pastedText.trim() && !parsedPasted.length" class="paste-warn">
+                没解析出词条，请检查格式
+              </span>
+            </div>
+          </div>
+
+          <!-- AI 建议结果：只出候选，必须逐条确认后才生成词条。
+               不直接落库是刻意的 —— 归一链路不消费 LLM 判定，判定地基仍是规则与人工。 -->
+          <div v-if="suggestions.length" class="ai-suggest">
+            <div class="as-head">
+              <span class="as-title">AI 补词建议（{{ suggestions.length }} 条）</span>
+              <span class="tip">{{ suggestNote }}</span>
+            </div>
+            <el-table :data="suggestions" border size="small" max-height="320">
+              <el-table-column prop="original" label="原文" min-width="120" />
+              <el-table-column label="建议动作" width="120">
+                <template #default="{ row }">
+                  <el-select v-model="row.action" size="small">
+                    <el-option label="挂别名" value="alias" />
+                    <el-option label="新建标准词" value="new" />
+                    <el-option label="忽略" value="ignore" />
+                    <el-option label="待判断" value="unknown" />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column label="标准词" min-width="150">
+                <template #default="{ row }">
+                  <el-input
+                    v-model="row.standardTerm"
+                    size="small"
+                    :disabled="row.action === 'ignore' || row.action === 'unknown'"
+                    placeholder="填标准词"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="依据" min-width="220">
+                <template #default="{ row }">
+                  <span class="as-reason">{{ row.reason || '—' }}</span>
+                  <el-tag
+                    v-if="row.source === 'model'"
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                    class="as-tag"
+                  >AI 生成</el-tag>
+                  <el-tag v-else-if="row.source === 'dict'" size="small" effect="plain" class="as-tag">
+                    词表命中
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="as-foot">
+              <el-button size="small" type="primary" :disabled="!confirmable.length" @click="applySuggestions">
+                采用结果（{{ confirmable.length }} 条）
+              </el-button>
+              <el-button size="small" @click="suggestions = []">关闭</el-button>
+              <span class="tip">采用后会填回上方粘贴框，核对无误再导入</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -185,10 +275,12 @@ import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
 import { importDict, parseDictFile } from '@/api/dictionary'
+import { runTermSuggest } from '@/api/ai'
 import { submitNlpBatch } from '@/api/nlp'
 import { recomputeQc } from '@/api/qc'
 import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
+import { splitAliases } from '@/utils/terms'
 
 const TYPES = [
   { value: 'disease', label: '疾病' },
@@ -336,16 +428,145 @@ const onFileExceed = (files) => {
   importFile.value = f
 }
 
+// ---- 粘贴文本导入 ----
+// 与文件导入共用同一条链路：把粘贴内容包装成 JSON File，后续的 dry-run 预览、
+// 词表体检、直写基线 / 并入本地、重跑引导全部复用，不另写一套。
+const pastedText = ref('')
+
+/**
+ * 解析粘贴的文本为词条数组。
+ *
+ * 三种约定，按内容自动区分：
+ *   · 多行            → 每行一条，行内分列出「标准词」与「别名」；
+ *   · 单行含 Tab/竖线 → 按「标准词 + 别名」单条处理；
+ *   · 单行不含分列符  → 按顿号 / 逗号拆成多个标准词（别名留空）。
+ *     最后这条是给「标准化质量报告」的「复制待补词」准备的 ——
+ *     它复制出来的就是「神疲乏力、食少纳呆、…」这种顿号分隔的一串词。
+ *
+ * ⚠️ 单行必须靠 Tab/竖线来判「这是要分列」，不能靠逗号：单行里的逗号
+ * 既可能是「多个词的分隔」也可能是「标准词与别名的分隔」，无法两全；
+ * 而 Tab 只可能来自表格粘贴，语义唯一。
+ */
+const parsePastedTerms = (text) => {
+  // 去掉开头空行与首尾空白，但**保留行首 Tab** —— 它是「首列为空」的信号，见下方注释
+  const raw = String(text || '').replace(/^\n+/, '').replace(/\s+$/, '')
+  if (!raw) return []
+  // 只去行尾空白、保留行首 —— 行首的 Tab 是「首列为空」的信号（从表格复制到一列空值就会这样），
+  // 若连行首一起 trim 掉，那行会被误当成一个标准词写进词典，正是要防的那类脏数据。
+  const lines = raw.split(/\r?\n/).map((l) => l.replace(/\s+$/, '')).filter(Boolean)
+  // 行内分列：Tab 是表格粘贴的主通道（从 Excel 复制就是 Tab），竖线与逗号一并认，
+  // 让从 CSV 复制来的两列也能直接落进来。
+  const splitCells = (line) => line.split(/[\t|,，;；]/).map((c) => c.trim())
+  const out = []
+  if (lines.length > 1) {
+    for (const line of lines) {
+      const cells = splitCells(line)
+      const std = cells[0]
+      if (!std) continue
+      out.push({ standardTerm: std, aliases: splitAliases(cells.slice(1).join('、'), std) })
+    }
+    return out
+  }
+  if (/[\t|]/.test(lines[0])) {
+    const cells = splitCells(lines[0])
+    const std = cells[0]
+    if (!std) return []
+    return [{ standardTerm: std, aliases: splitAliases(cells.slice(1).join('、'), std) }]
+  }
+  for (const w of lines[0].split(/[、,，;；\s]+/)) {
+    const std = w.trim()
+    if (std) out.push({ standardTerm: std, aliases: [] })
+  }
+  return out
+}
+
+const parsedPasted = computed(() => parsePastedTerms(pastedText.value))
+
+/** 用粘贴内容走与文件导入完全相同的链路 */
+const usePastedText = () => {
+  const terms = parsedPasted.value
+  if (!terms.length) return
+  const blob = new Blob([JSON.stringify(terms)], { type: 'application/json' })
+  // 文件名带条数，便于和真实上传文件区分；确认框里会改写成「粘贴的 N 条」
+  const file = new File([blob], `pasted-${terms.length}-terms.json`, {
+    type: 'application/json'
+  })
+  onFileChange(file)
+  ElMessage.success(`已载入 ${terms.length} 条，确认无误后点下方导入`)
+}
+
+// ---- AI 补词建议 ----
+// 只出候选、不落库：LLM 判定不进归一链路，用户逐条确认后才生成词条。
+const suggestions = ref([])
+const suggestLoading = ref(false)
+const suggestNote = ref('')
+
+/** 可采用的条目：动作是挂别名或新建，且标准词非空 */
+const confirmable = computed(() =>
+  suggestions.value.filter(
+    (s) => (s.action === 'alias' || s.action === 'new') && String(s.standardTerm || '').trim()
+  )
+)
+
+/** 向 AI 要建议；失败或不可用都不影响手动路径 */
+const askSuggest = async () => {
+  const words = parsedPasted.value.map((t) => t.standardTerm)
+  if (!words.length) return
+  suggestLoading.value = true
+  suggestions.value = []
+  try {
+    const reply = await runTermSuggest({ terms: words, termType: type.value })
+    const list = reply?.termSuggestions || []
+    if (!list.length) {
+      ElMessage.warning('AI 没有返回建议，请稍后重试')
+      return
+    }
+    suggestions.value = list.map((s) => ({ ...s, aliases: s.aliases || [] }))
+    // 把「当前类型可能不对」这件事说出来：报告页复制的待补词恒来自症状类
+    const typeHint = type.value === 'symptom'
+      ? ''
+      : `当前类型是「${typeLabel(type.value)}」，而质量报告复制的待补词属于症状类，请确认。`
+    suggestNote.value = reply.llmAvailable
+      ? `AI 建议仅供参考，标「AI 生成」的条目未经权威词表校验。${typeHint}`
+      : `AI 不可用，以下是词表中字面相近的候选，需人工判断。${typeHint}`
+  } catch (e) {
+    ElMessage.warning(e?.message || 'AI 建议生成失败')
+  } finally {
+    suggestLoading.value = false
+  }
+}
+
+/** 把确认过的建议填回粘贴框，复用既有导入链路（用户仍可再改再导） */
+const applySuggestions = () => {
+  const lines = []
+  for (const s of confirmable.value) {
+    const std = String(s.standardTerm).trim()
+    const extra = (s.aliases || []).filter((a) => a && a !== std)
+    // 挂别名：原文本身就是那个别名；新建：原文即标准词，其余别名跟在后面
+    const aliasPart = s.action === 'alias'
+      ? [s.original, ...extra].filter((a) => a && a !== std)
+      : extra
+    lines.push(aliasPart.length ? `${std}\t${aliasPart.join('、')}` : std)
+  }
+  if (!lines.length) return
+  pastedText.value = lines.join('\n')
+  suggestions.value = []
+  ElMessage.success(`已填入 ${lines.length} 条，请核对后点「用粘贴内容」导入`)
+}
+
 const handleSubmit = async () => {
   if (!importFile.value) return
   const direct = isAdmin.value && mode.value === 'direct'
   const where = direct
     ? (target.value === 'base' ? '基础层（影响所有组织）' : '当前组织')
     : '本机个人词典'
+  // 粘贴导入没有真实文件名，别让确认框显示「pasted-8-terms.json」这种内部产物名
+  const isPasted = importFile.value.name.startsWith('pasted-')
+  const src = isPasted ? `粘贴的 ${parsedPasted.value.length} 条` : `「${importFile.value.name}」`
   const ok = await confirmBox(
     direct
-      ? `将用「${importFile.value.name}」直接覆盖【${where}】的${typeLabel(type.value)}词典，立即生效。`
-      : `将把「${importFile.value.name}」解析后并入${where}（${typeLabel(type.value)}），不影响小组基线。`,
+      ? `将用${src}直接覆盖【${where}】的${typeLabel(type.value)}词典，立即生效。`
+      : `将把${src}解析后并入${where}（${typeLabel(type.value)}），不影响小组基线。`,
     direct ? '确认直接导入' : '确认导入本地',
     { type: 'warning', confirmButtonText: direct ? '直接导入' : '导入本地', cancelButtonText: '取消' }
   )
@@ -435,6 +656,66 @@ const handleSubmit = async () => {
   </script>
 
 <style scoped>
+/* 粘贴文本导入：没有现成文件时的第二条入口 */
+.paste-block {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px dashed var(--line);
+}
+.paste-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.paste-t {
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+.paste-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.paste-warn {
+  font-size: var(--fs-xs);
+  color: var(--danger);
+}
+
+/* AI 补词建议：候选表 + 逐条确认 */
+.ai-suggest {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--ochre-surface);
+}
+.as-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.as-title {
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+.as-reason {
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+}
+.as-tag { margin-left: var(--sp-1); }
+.as-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
 /* 导入后的重跑引导：说清「为什么要重跑」，否则用户会以为导入没生效而反复重传 */
 .rerun-hint {
   padding: var(--sp-3) var(--sp-4);

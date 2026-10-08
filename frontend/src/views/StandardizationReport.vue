@@ -110,25 +110,13 @@
             <div class="todo-desc">{{ t.desc }}</div>
           </div>
           <el-tag size="small" :type="t.tagType" effect="plain">{{ t.owner }}</el-tag>
-          <!-- 批次2：把这条待办的「待补词」一键复制走 —— 直达词典导入页粘贴即可，
+          <!-- 批次2：把这条待办的「待补词」复制走 —— 直达词典导入页粘贴即可，
                避免用户看完「先补这 8 个词」还得自己手抄。无接口调用，不会有副作用。 -->
           <el-button
             v-if="t.words && t.words.length"
             size="small"
-            @click="navigator.clipboard.writeText(t.words.join('、'))
-              .then(() => ElMessage.success(`已复制 ${t.words.length} 个待补词，可到「术语词典 → 批量导入」粘贴`))
-              .catch(() => ElMessage.warning('复制失败，请手动选中复制'))"
+            @click="copyGapWords(t.words)"
           >复制待补词</el-button>
-          <!-- 25.13：把「先补这几个词」从一句话变成一个能直接执行的动作。
-               两条出口对应两种权限：有写权限的直写（立即生效 + 归档版本），
-               普通成员走提案（需审核，不直接改基线）。 -->
-          <el-button
-            v-if="t.words && t.words.length && (canImportGap || canProposeGap)"
-            size="small"
-            type="primary"
-            plain
-            @click="openGapDialog(t.words)"
-          >一键补词</el-button>
         </li>
       </ol>
       <div v-if="!todos.length" class="empty-tip">
@@ -153,9 +141,6 @@
       <el-button size="small" :loading="exporting" @click="handleExport">导出 CSV</el-button>
       <span class="tip">CSV 导出全部明细指标</span>
     </div>
-
-    <!-- 25.13 一键补词 -->
-    <GapSupplementDialog v-model="gapDialog" :words="gapDialogWords" />
   </div>
 </template>
 
@@ -176,24 +161,11 @@ import { getStandardizationReport, exportStandardizationReport } from '@/api/sta
 import { submitNlpBatch as submitExtractBatch, getNlpBatchProgress, listNlpBatch } from '@/api/nlp'
 import { recomputeQc as submitQcBatch, getQcBatch, listQcBatch } from '@/api/qc'
 import { saveBlob } from '@/utils/download'
-import { useUserStore } from '@/stores/user'
-import GapSupplementDialog from '@/components/GapSupplementDialog.vue'
 
 const report = ref(null)
 const loading = ref(false)
 const exporting = ref(false)
 const rerunning = ref(false)
-
-// ---- 25.13 一键补词 ----
-// 待办清单里「一键补词」按钮的可见性：直写要写权限，提案要登录 + 组织/管理员。
-// 补词对话框本体（候选词勾选、写入层级、直写/提案两条出口）已抽为 GapSupplementDialog.vue。
-const userStore = useUserStore()
-const gapDialog = ref(false)
-const gapDialogWords = ref([])
-// 直写词典要写权限（管理员 / 组织所有者 / 被授权成员）
-const canImportGap = computed(() => userStore.canWriteDictionaryEntry)
-// 提案只需「登录 + 属于一个组织」；基础层提案仅管理员可提交，故无组织又非管理员时不给入口
-const canProposeGap = computed(() => userStore.isAdmin || userStore.hasOrg)
 
 // ---- 时间区间 ----
 // 病历接诊时间跨度大（实测 2019-01 ~ 2025-12），必须能按时间切：
@@ -760,12 +732,61 @@ const handleExport = async () => {
   }
 }
 
-// ---- 25.13 一键补词 ----
+// ---- 待补词复制 ----
 
-/** 打开补词对话框：候选词交给子组件，父页只负责显示与传词 */
-function openGapDialog(words) {
-  gapDialogWords.value = [...(words || [])]
-  gapDialog.value = true
+/**
+ * 复制待补词到剪贴板。
+ *
+ * 写成函数而不是模板内联表达式，是为了处理一个真实故障：navigator.clipboard
+ * 只在安全上下文（HTTPS / localhost）下存在，内网 HTTP 部署时它是 undefined ——
+ * 内联写法 `navigator.clipboard.writeText(...)` 会**同步抛 TypeError**，
+ * 后面的 .catch 根本不会执行，用户看到的就是「点了没反应」。
+ *
+ * 所以走双通道：异步剪贴板 API 可用就优先用；不可用或失败则退回 execCommand 兜底；
+ * 两条都失败时把词显示出来让用户手动复制 —— 保证任何情况下都有反馈，不静默失败。
+ */
+async function copyGapWords(words) {
+  const list = words || []
+  if (!list.length) return
+  const okTip = `已复制 ${list.length} 个待补词，可到「术语词典 → 批量导入」粘贴`
+
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(list.join('、'))
+      ElMessage.success(okTip)
+      return
+    } catch {
+      // 权限被拒 / 文档未聚焦：落到下面的兜底通道
+    }
+  }
+  if (copyByExecCommand(list.join('、'))) {
+    ElMessage.success(okTip)
+    return
+  }
+  // 两条通道都失败：至少让用户能手动复制，不给「静默失败」
+  ElMessageBox.alert(list.join('\n'), '复制失败，请手动选中以下待补词复制', {
+    confirmButtonText: '知道了'
+  })
+}
+
+/** execCommand('copy') 兜底：HTTP 环境下的唯一可用通道（API 已废弃，但浏览器仍普遍支持） */
+function copyByExecCommand(text) {
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.setAttribute('readonly', '')
+  ta.style.position = 'fixed'
+  ta.style.top = '-1000px'
+  ta.style.opacity = '0'
+  document.body.appendChild(ta)
+  try {
+    ta.select()
+    ta.setSelectionRange(0, text.length)
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    document.body.removeChild(ta)
+  }
 }
 
 onMounted(() => {
