@@ -1,9 +1,11 @@
 <template>
   <div class="dict-import">
     <!-- M2（审查报告）：导入页常驻返回入口 —— 面包屑不可点，未成功导入/导入失败时
-         页面不能连一条出路都没有，否则用户卡死在这；全部角色都需要。 -->
+         页面不能连一条出路都没有，否则用户卡死在这；全部角色都需要。
+         L6（审查报告）：原先复用 rh-link（那是给提示条用的 13px 文字链），
+         挂在页头主入口上显得突兀；改用与页内其余操作一致的 el-button。 -->
     <div class="import-top">
-      <router-link class="rh-link" to="/dictionary">← 返回术语词典</router-link>
+      <el-button size="small" @click="goDictionary">← 返回术语词典</el-button>
     </div>
     <!--
       批量导入词典。
@@ -109,6 +111,12 @@
               <span v-if="pastedText.trim() && !parsedPasted.length" class="paste-warn">
                 没解析出词条，请检查格式
               </span>
+            </div>
+            <!-- M3①（审查报告）：AI 不可用的前置提示 —— 先告诉用户会拿到什么，
+                 而不是让他点完、等一次往返、再发现是张需要手工逐条填的空表。 -->
+            <div v-if="llmAvailable === false" class="ai-off">
+              当前没有可用的模型：到右上角「导入 LLM」填入自己的 API Key 后，AI 建议才会真正产出结果。
+              现在点「AI 建议怎么补」只会返回词表里字面相近的候选，需人工逐条判断。
             </div>
           </div>
 
@@ -332,13 +340,14 @@
 
 <script setup>
 // 批量导入词典。所有人可导入本机个人词典；管理员可直写基线。
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
 import { importDict, parseDictFile } from '@/api/dictionary'
 import { runTermSuggest } from '@/api/ai'
+import { getLlmConfig } from '@/api/llm'
 import { submitNlpBatch } from '@/api/nlp'
 import { recomputeQc } from '@/api/qc'
 import { confirmBox } from '@/utils/confirm'
@@ -614,6 +623,21 @@ const usePastedText = () => {
 
 // ---- AI 补词建议 ----
 // 只出候选、不落库：LLM 判定不进归一链路，用户逐条确认后才生成词条。
+//
+// M3①（审查报告）：AI 不可用要**提前**说 —— 不能等用户点了按钮、等一次模型往返、
+// 拿到一张全是「待判断」的空表才知道。配置接口只回「参数是否齐备」、不发起任何模型请求，代价很低。
+// 三态：null = 还没问到（不问就不提示）/ true / false。
+const llmAvailable = ref(null)
+onMounted(async () => {
+  try {
+    const res = await getLlmConfig()
+    llmAvailable.value = !!res.data?.available
+  } catch {
+    // 拿不到配置就不下结论（可能是没权限），不打扰用户
+    llmAvailable.value = null
+  }
+})
+
 const suggestions = ref([])
 const suggestLoading = ref(false)
 const suggestNote = ref('')
@@ -818,6 +842,16 @@ const handleSubmit = async () => {
 .paste-warn {
   font-size: var(--fs-xs);
   color: var(--danger);
+}
+/* M3①：AI 不可用的前置提示。整行块，不挤在按钮那一行里 */
+.ai-off {
+  margin-top: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-left: 3px solid var(--ochre);
+  background: var(--ochre-surface);
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+  line-height: 1.6;
 }
 
 /* AI 补词建议：候选表 + 逐条确认 */
