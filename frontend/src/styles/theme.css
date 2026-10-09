@@ -255,6 +255,22 @@ body {
   border-radius: 4px;
 }
 
+/* ===== 分页：窄容器下不溢出（全局一处修）=====
+   EP 的 .el-pagination 是 display:flex 但**没有 flex-wrap**（还带 white-space:nowrap），
+   而各列表页又在其上写了 inline 的 justify-content:flex-end —— 两者相遇时内容宽于容器
+   不会换行，且溢出方向由 flex-end 决定为**朝左**，于是「共 N 条」与「每页条数」被推出
+   容器左边界之外。
+   实测（结构化解析页右栏）：分页内容需约 726px，而右栏容器仅 506px（1600 视口）/
+   458px（1366 视口），首个元素向左溢出 181px / 229px —— 表现为「共 500 条」整块被推出
+   可视区、「10条/页」只剩一个空框。
+   补 flex-wrap 让页码折到下一行；row-gap 补换行后的行距（EP 的水平间距是各子项
+   margin-left，换行后垂直方向没有间距）。
+   宽屏下内容不超宽、不会换行，外观与修复前完全一致。 */
+.el-pagination {
+  flex-wrap: wrap;
+  row-gap: var(--sp-2);
+}
+
 /* ===== 按钮（原型 btn 风格） ===== */
 .el-button {
   font-size: var(--fs-base);
