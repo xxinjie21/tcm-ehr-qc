@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
  * 操作日志：审计页（{@code GET /api/logs}）的唯一数据源，读 {@code operation_log} 表做分页 / 筛选 / 导出。
  * 字段与 database-init.sql 的 operation_log 表一一对应。
  *
- * <p><b>不记 IP</b>（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原 {@code ip} 列已由
- * {@code data/migration-01-drop-operation-log-ip.sql} 从存量库删除。</p>
+ * <p><b>不记 IP</b>（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原先的 {@code ip} 列已从表中移除，
+ * 唯一权威建表脚本是 {@code database-init.sql}。</p>
  */
 @Data
 @TableName("operation_log")

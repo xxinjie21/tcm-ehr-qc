@@ -88,7 +88,15 @@ CREATE TABLE IF NOT EXISTS records (
   INDEX idx_records_org (org_id),
   -- 25.4：列表/导出/统计普遍是「org_id 等值（数据域）+ visit_time 范围或排序」，
   -- 两个单列索引同时存在时 MySQL 只能选其一，另一维回表过滤；复合索引才两维都走
-  INDEX idx_records_org_visit_time (org_id, visit_time)
+  INDEX idx_records_org_visit_time (org_id, visit_time),
+  -- 40,000 条性能审查（2026-10-07）：列表排序键 (visit_time DESC, id ASC) 的降序复合索引；
+  -- (org_id, department) 覆盖 COUNT/科室下拉；(org_id, grade, governed) 覆盖 overview/governance 聚合
+  INDEX idx_records_org_vt_id (org_id, visit_time DESC, id ASC),
+  INDEX idx_records_org_department (org_id, department),
+  INDEX idx_records_org_grade_gov (org_id, grade, governed),
+  -- B3 用户可排序（2026-10-08，方案 b）：白名单 score / registration_no 的复合索引，末级 id 保稳定
+  INDEX idx_records_org_score_desc_id (org_id, score DESC, id ASC),
+  INDEX idx_records_org_regno_id (org_id, registration_no, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='病历表';
 
 CREATE TABLE IF NOT EXISTS review_tasks (
@@ -119,6 +127,8 @@ CREATE TABLE IF NOT EXISTS operation_log (
   operator VARCHAR(50) COMMENT '操作人用户名',
   role VARCHAR(20) COMMENT '操作人角色：管理员/用户',
   action VARCHAR(50) COMMENT '操作类型：数据清洗/数据集导出/词典导入/词典回滚/人工复核/批量重算',
+  object_type VARCHAR(32) NULL COMMENT '对象类型（record/dictionary/…）；无单一对象的批量操作留 NULL',
+  object_id VARCHAR(64) NULL COMMENT '对象 ID（如病历 ID）；与 object_type 成对使用',
   target VARCHAR(255) COMMENT '操作对象：筛选范围/文件名/词典类型/病历ID',
   detail TEXT COMMENT '操作明细',
   org_id VARCHAR(36) COMMENT '操作时所属组织，留痕用（按它做三档可见性）',
@@ -126,6 +136,7 @@ CREATE TABLE IF NOT EXISTS operation_log (
   -- idx_operator_time 覆盖 AI 助手的 listRecentByOperator
   -- （WHERE operator=? ORDER BY log_time DESC），故单列 idx_operator 已被取代
   INDEX idx_action (action),
+  INDEX idx_log_object (org_id, object_type, object_id, log_time),
   INDEX idx_group_time (org_id, log_time),
   INDEX idx_operator_time (operator, log_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
