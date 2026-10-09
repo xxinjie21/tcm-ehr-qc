@@ -166,7 +166,7 @@ class ExcelRawStreamReaderTest {
             Row header = sheet.createRow(0);
             header.createCell(0).setCellValue("标准术语");
             header.createCell(1).setCellValue("别名");
-            header.createCell(2).setCellValue("国标代码");
+            header.createCell(2).setCellValue("第三列");
 
             Row r1 = sheet.createRow(1);
             r1.createCell(0).setCellValue("  肝郁气滞  "); // 带空白：应被 trim
