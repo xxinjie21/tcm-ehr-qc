@@ -42,17 +42,11 @@
           <el-table-column label="有别名" width="100" align="right">
             <template #default="{ row }">{{ row.aliasedCount }}</template>
           </el-table-column>
-          <el-table-column label="有国标编码" width="120" align="right">
-            <template #default="{ row }">
-              <span :class="{ warn: row.codedCount === 0 }">{{ row.codedCount }}</span>
-            </template>
-          </el-table-column>
           <el-table-column label="别名重复" width="100" align="right">
             <template #default="{ row }">
               <span :class="{ warn: row.selfAliasCount > 0 }">{{ row.selfAliasCount }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="source" label="词表来源" min-width="170" show-overflow-tooltip />
         </el-table>
         <p v-if="report?.crossTypeDuplicates?.length" class="detail-note">
           另有 {{ report.crossTypeDuplicates.length }} 个术语同时出现在多本词典里

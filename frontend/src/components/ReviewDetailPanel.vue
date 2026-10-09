@@ -98,7 +98,7 @@
                 />
               </div>
             </div>
-            <div class="term-note">↑ 带下拉的字段可直接搜索国标术语；多个词用「、」分隔</div>
+            <div class="term-note">↑ 带下拉的字段可直接搜索标准术语；多个词用「、」分隔</div>
 
             <div class="field-row">
               <div class="flabel">复核备注</div>

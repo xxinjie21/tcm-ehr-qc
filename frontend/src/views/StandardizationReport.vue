@@ -543,21 +543,16 @@ const isEmptyReport = computed(() => {
 const kpis = computed(() => {
   const d = report.value
   if (!d) return []
-  // P0-5：全空数据 → 四张卡一律「—」+ 中性色。此前第 4 张卡的判据是
-  // noCode === 0，对空数组同样成立，「国标编码：已覆盖」就是一盏假绿灯。
   if (isEmptyReport.value) {
     return [
       { label: '最该补的词表', value: '—', note: '本期无数据可评估', tone: '' },
       { label: '术语归一率', value: '—', note: '本期无数据可评估', tone: '' },
-      { label: '评分区分度', value: '—', note: '本期无数据可评估', tone: '' },
-      { label: '国标编码', value: '—', note: '本期无数据可评估', tone: '' }
+      { label: '评分区分度', value: '—', note: '本期无数据可评估', tone: '' }
     ]
   }
   const gap = d.unmatched || {}
   const gapRate = gap.total ? gap.dictionaryGap / gap.total : 0
   const b = bottleneck.value
-  const dictRows = d.dictQuality || []
-  const noCode = dictRows.filter((x) => x.codedCount === 0).length
   const s = d.score || {}
   const cappedRate = s.total ? s.capped / s.total : 0
 
@@ -586,14 +581,6 @@ const kpis = computed(() => {
         ? `${pct(s.capped, s.total)} 的病历扣分相同，分数难以区分质量`
         : '扣分分布较分散，评分有区分度',
       tone: cappedRate > 0.3 ? 'warn' : 'ok'
-    },
-    {
-      label: '国标编码',
-      // P0-5 补丁：coverage 非空但 dictQuality 为空时 noCode 也等于 0，
-      // 此时同样不许说「已覆盖」—— 判据必须先有数据
-      value: !dictRows.length ? '—' : (noCode === 0 ? '已覆盖' : `${noCode} 类缺`),
-      note: !dictRows.length ? '本期无词典数据' : (noCode === 0 ? '词表已带编码' : '缺编码时术语无法与国标库对接'),
-      tone: !dictRows.length ? '' : (noCode === 0 ? 'ok' : 'warn')
     }
   ]
 })
@@ -709,16 +696,6 @@ const todos = computed(() => {
         + '会让症状归一率被拉低，也可能影响完整性判定。',
       owner: '抽取',
       tagType: 'warning'
-    })
-  }
-  const noCode = (d.dictQuality || []).filter((x) => x.codedCount === 0).length
-  if (noCode > 0) {
-    list.push({
-      title: '补录国标编码',
-      desc: `${noCode} 类词典尚无国标编码。编码是术语与国标/医保/ICD 对接的钥匙，`
-        + '缺编码时词典只能用于本系统内部匹配。',
-      owner: '词表',
-      tagType: 'info'
     })
   }
   const s = d.score || {}

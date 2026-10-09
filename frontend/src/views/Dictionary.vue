@@ -5,13 +5,18 @@
        管理员在那里还能选择直接生效。 -->
   <div>
     <!-- 页头：一句话交代四个页签各自管什么，避免新用户对着名词猜。
-         页签划分依据是「谁能改」：基线=只读现状；我的词典=你自己的副本；
+         页签划分依据是「谁能改」：词典查询=只读浏览（可切三层）；我的词典=你自己的副本；
          提案审核=把改动交给组长；归档版本=历史与回滚。 -->
     <div class="dict-guide">
-      <span class="dg-item"><b>小组基线</b>组织当前生效的词典（只读）</span>
+      <span class="dg-item"><b>词典查询</b>只读浏览：系统默认 / 组内 / 本地三层可切</span>
       <span class="dg-item"><b>我的词典</b>你自己的副本，改完提交提案</span>
       <span class="dg-item"><b>提案审核</b>组长在此确认改动并合并</span>
       <span class="dg-item"><b>归档版本</b>历史快照，可回滚</span>
+      <!-- 词典范围全站唯一入口，就在这一行末尾：点开可对 8 类术语词典各选一层。
+           按钮文字带当前层名，所以它同时是状态显示，页面上不再另摆一排 radio。 -->
+      <el-button class="dg-action" size="small" plain @click="openLayerDialog">
+        词典范围：{{ scopeLabel }}
+      </el-button>
     </div>
 
     <!-- 术语类型筛选器。类型是**全局过滤**（切类型后四个页签的数据都跟着换），
@@ -28,8 +33,8 @@
     <!-- 术语查询：按当前类型 + 关键字模糊匹配（标准词与别名都参与匹配） -->
     <el-tabs v-model="tab" class="dict-tabs">
 
-    <el-tab-pane label="小组基线" name="baseline">
-    <PanelCard :title="`小组基线（${typeLabel(typeKey)}）`">
+    <el-tab-pane label="词典查询" name="baseline">
+    <PanelCard :title="`词典查询（${typeLabel(typeKey)}）`">
       <div class="search-row">
         <!-- 只给 placeholder 的搜索框没有无障碍名称，补 aria-label
              （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
@@ -58,12 +63,6 @@
           </div>
         </el-popover>
       </div>
-      <!-- 作用域提示：词典已按组织隔离（批次8b）。这一条不是装饰 —— 组织 A 导入的词
-           只在 A 的归一里生效，管理员在此看到「基础层」时不能以为那就是全量生效词典 -->
-      <div class="scope-hint">
-        <el-tag size="small" :type="scopeTagType" effect="plain">{{ scopeLabel }}</el-tag>
-        <span class="tip">{{ scopeTip }}</span>
-      </div>
       <!-- 高度随分页大小联动（表头 40 + 每行 40 × 当前页大小 + 余量 8）：
            固定高度的目的是「选了多少条/页就能看到多少行」——当前页整页铺开，不再有隐藏行。
            原公式按 32px 估算，而本表未加 size="small"（表头与行高实测均为 40px），
@@ -81,30 +80,15 @@
               effect="plain"
               style="margin-right: 6px"
             >{{ a }}</el-tag>
-            <!-- 空值与「国标编码」列统一写 —（原「无」），空列语义只有一种 -->
+            <!-- 空值与「别名」列统一写 —（原「无」），空列语义只有一种 -->
             <span v-if="!row.aliases?.length" class="tip">—</span>
-          </template>
-        </el-table-column>
-        <!-- 批次 22：显示国标编码。没有编码的词条显式写「—」而不是留空，
-             免得「空白」被误读成「这一列没加载出来」 -->
-        <el-table-column v-if="visibleCols.includes('code')" prop="code" width="150">
-          <template #header>
-            <span>国标编码
-              <el-tooltip content="国标编码待补：多数词条暂无对应的国标编码，故该列常为空" placement="top">
-                <span class="hdr-info" tabindex="0" aria-label="国标编码说明">ⓘ</span>
-              </el-tooltip>
-            </span>
-          </template>
-          <template #default="{ row }">
-            <span v-if="row.code" class="code-cell">{{ row.code }}</span>
-            <span v-else class="tip">—</span>
           </template>
         </el-table-column>
         <template #empty>
           <!-- P5.8：空态必须解释「为什么空 / 怎么才有内容」；加载失败与真为空分开 -->
           <EmptyState
             :failed="termsFailed"
-            :text="keyword ? `没有匹配「${keyword}」的术语：换个更短的关键词，或确认该类型已导入过词条` : '该词典暂无术语：使用「术语库导入」上传词典后可在此检索'"
+            :text="emptyText"
             @retry="loadTerms(true)"
           />
         </template>
@@ -129,13 +113,13 @@
     <!-- 原「版本回滚」面板已移除：dictionary_backups 表废弃，回滚改为
          「基于归档版本生成提案 → 组长审核」，历史列表改为「归档版本」。 -->
 
-    <!-- 个人词典：拉取小组基线存本地，可在本地编辑后提交提案 -->
+    <!-- 个人词典：拉取组内词典存本地，可在本地编辑后提交提案 -->
     </el-tab-pane>
 
     <el-tab-pane label="我的词典" name="mine">
     <PanelCard title="个人词典（本地）">
       <div class="tip" style="margin-bottom: var(--sp-2)">
-        这是你自己的词典副本：可手动增删，也可<b>批量导入文件</b>或从小组基线拉取。
+        这是你自己的词典副本：可手动增删，也可<b>批量导入文件</b>或从组内词典拉取。
         它只存在这台电脑。
         <template v-if="isOwner">
           你是本组组长，改完点「提交更新提案」，再到「提案审核」点「通过」即合并入小组基线。
@@ -144,11 +128,24 @@
           改动要生效必须提交提案、由组长审核通过。
         </template>
       </div>
+      <!-- 拉取只拉**组内词典**（= 提案基线，审核走整快照替换组织层）。
+           系统默认词典不落地：它随系统库更新而变，查询时直接读后端就是最新的
+           （DictionaryTermStoreImpl.read 按内容哈希查库，写路径主动失效），
+           存一份到本地反而会过期，也会把基础层词条混进组织层快照。 -->
       <div class="rv-row">
-        <el-button size="small" :loading="baselineLoading" @click="loadBaseline">
-          拉取小组基线
+        <el-button
+          v-if="userStore.orgId"
+          size="small"
+          :loading="baselineLoading"
+          @click="pullBaseline"
+        >
+          拉取组内词典
         </el-button>
-        <el-button size="small" @click="$router.push('/dictionary/import')">
+        <!-- 带上当前选中的类型：从「舌象」点进来，导入页就默认「舌象」（页内仍可自由改） -->
+        <el-button
+          size="small"
+          @click="$router.push({ path: '/dictionary/import', query: { type: typeKey } })"
+        >
           批量导入文件
         </el-button>
         <el-button
@@ -165,7 +162,7 @@
         <span v-else>与基线一致</span>
       </div>
       <el-table :data="localPaged" border size="small" max-height="260" style="margin-top: var(--sp-3)"
-        :empty-text="localTerms.length ? '' : '先点「拉取小组基线」把当前组织的词典下载到本地'">
+        :empty-text="localTerms.length ? '' : '先点「拉取组内词典」或「批量导入文件」把词条加到本地'">
         <el-table-column prop="standardTerm" label="标准词" min-width="160" />
         <el-table-column label="别名" min-width="200">
           <template #default="{ row }">{{ (row.aliases || []).join('、') }}</template>
@@ -316,17 +313,84 @@
     </PanelCard>
     </el-tab-pane>
     </el-tabs>
+
+    <!-- 合并确认弹窗：拉取 / 导入进本地之前，把「同名差异」与「归属冲突」摆出来让人拍板 -->
+    <DictMergeDialog
+      v-model:visible="mergeVisible"
+      :result="mergeResult"
+      :type-key="typeKey"
+      @confirm="applyMerge"
+    />
+
+    <!-- 词典范围 —— 全站唯一入口（页头引导条那一行的那颗按钮）。
+         弹窗里对 8 类术语词典**逐个**选层，每类各记各的（scopeByType），互不影响。 -->
+    <el-dialog
+      v-model="layerDialog"
+      class="layer-dialog"
+      title="词典范围与归一"
+      width="min(1020px, 96vw)"
+      top="6vh"
+    >
+      <!-- 一、先回答用户真正的问题：归一到底拿的是哪份 -->
+      <div class="ld-answer">
+        归一与输入联想实际使用的是 <b>系统默认词典 ∪ 组内词典</b>，同一个标准词两边都有时
+        <b>以组内那条为准</b>。这里选的只是「页面上看哪一层」，<b>不会改变归一结果</b>。
+      </div>
+      <div class="ld-note">
+        <b>本地词典不参与归一</b>：它只存在这台电脑上，是给「我的词典」页签编辑、
+        提交提案用的工作副本；提交提案并经组长审核后，才会进入组内词典。
+      </div>
+
+      <!-- 二、8 类逐个调控。每一行的三档是独立的：把「症状」切到组内，不影响「中药」 -->
+      <el-table :data="layerRows" border size="small" class="ld-table">
+        <el-table-column label="术语词典" min-width="110">
+          <template #default="{ row }">
+            <span>{{ row.label }}</span>
+            <el-tag v-if="row.value === typeKey" size="small" effect="plain" class="ld-cur">当前</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="查看哪一层" min-width="300">
+          <template #default="{ row }">
+            <el-radio-group v-model="scopeByType[row.value]" size="small" :aria-label="`${row.label}词典范围`">
+              <el-radio-button
+                v-for="s in SCOPE_OPTIONS"
+                :key="s.value"
+                :value="s.value"
+                :disabled="s.value === 'org' && !userStore.orgId"
+              >
+                {{ s.label }}
+              </el-radio-button>
+            </el-radio-group>
+          </template>
+        </el-table-column>
+        <el-table-column label="归一实际用（系统默认 ∪ 组内）" min-width="200">
+          <template #default="{ row }">
+            <span v-if="row.effective === null" class="tip">—</span>
+            <span v-else>{{ row.effective }} 条</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="goType(row.value)">查看</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="tip ld-foot">
+        条数读不到时显示「—」（可能未登录或服务不可用），上面的说明不受影响。
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 // 词典管理页：类型切换会同时刷新「术语查询」与「版本回滚」两块数据。
 // 导入只有一条路径 —— Excel / CSV / JSON 覆盖入库（导入前自动备份）。
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import DictionaryProposalReview from '@/components/DictionaryProposalReview.vue'
+import DictMergeDialog from '@/components/DictMergeDialog.vue'
 import {
   getTerms, exportBaseline, submitProposal, listArchives, rollbackArchive
 } from '@/api/dictionary'
@@ -335,6 +399,7 @@ import { confirmBox } from '@/utils/confirm'
 import { useUserStore } from '@/stores/user'
 import { PAGE_SIZES_WIDE } from '@/utils/constants'
 import { splitAliases } from '@/utils/terms'
+import { mergeTermLists } from '@/utils/dictMerge'
 
 const userStore = useUserStore()
 
@@ -371,16 +436,35 @@ const TYPE_LABELS = {
 const TYPE_OPTIONS = Object.keys(TYPE_LABELS).map((v) => ({ value: v, label: TYPE_LABELS[v] }))
 const canWrite = computed(() => userStore.canWriteDictionaryEntry)
 
-// 词典作用域（批次8b）：后端按「本组织自有词条 → 无则回退基础层」返回，
-// 前端不额外判断层级，只把「看的是谁的词典」讲清楚，避免误以为改的是全局词典。
-const scopeLabel = computed(() =>
-  userStore.orgId ? `组织词典：${userStore.orgId}` : '基础层词典（全局共享）'
+// ===== 词典范围（三档：本地 / 组内 / 系统默认）=====
+// 三档对应三个**不同的数据源**，不是同一个数据源的三种视图：
+//   本地词典   = localStorage（我的词典页签那份），纯前端，不参与解析与归一
+//   组内词典   = 组织层（org_id = 本组），只含本组自己维护的词条，不含系统默认
+//   系统默认词典 = 基础层（org_id = ''），随系统发布的初始词典，全组织共享只读
+// 三者不是互斥的替换关系：解析与归一看的是「系统默认 ∪ 组内」的并集（同标准词以组内为准）。
+// 默认停「系统默认词典」——它是所有用户开箱即用的那一层。
+const SCOPE_OPTIONS = [
+  { value: 'local', label: '本地词典' },
+  { value: 'org', label: '组内词典' },
+  { value: 'base', label: '系统默认词典' }
+]
+
+/**
+ * 每一类术语词典**各记各的**查看层，互不影响。
+ *
+ * <p>做成 per-type 而不是全局一个值：八类词典的数据量差着数量级（证候两千多条、
+ * 舌象几十条），用户很可能想「症状看组内、中药看系统默认」—— 一个全局档位做不到这件事，
+ * 每切一次类型就得重选一次。</p>
+ */
+const scopeByType = reactive(
+  Object.fromEntries(Object.keys(TYPE_LABELS).map((k) => [k, 'base']))
 )
-const scopeTagType = computed(() => (userStore.orgId ? 'primary' : 'info'))
-const scopeTip = computed(() =>
-  userStore.orgId
-    ? '本组织没有自有词条时自动回退基础层；你导入的词只在本组织的解析与归一中生效'
-    : '你当前不在任何组织中，看到并编辑的是全组织共享的基础层词典'
+/** 当前类型的查看层（按钮文字、查询请求、本地档判定都用它） */
+const viewScope = computed(() => scopeByType[typeKey.value] || 'base')
+
+/** 当前查看层的名字（页头那颗按钮的文字用） */
+const scopeLabel = computed(
+  () => (SCOPE_OPTIONS.find((s) => s.value === viewScope.value) || {}).label || ''
 )
 
 // 词典类型 → 界面文案；键名与后端 type 参数一致（disease / pattern / symptom / herb / formula）
@@ -409,22 +493,19 @@ const size = ref(20)
 const termsTableHeight = computed(() => 40 + (size.value || 10) * 40 + 8)
 const total = ref(0)
 
-// 批次 26.17：基线表「别名」「国标编码」两列在当前页常常一条数据都没有，
-// 却合计占掉约 40% 横向宽度（零信息量）。这里把两列做成可显隐：
+// 批次 26.17：基线表「别名」列在当前页常常一条数据都没有，
+// 却占掉可观横向宽度（零信息量）。这里把该列做成可显隐：
 // 默认只显示「当前页确实有数据」的列；用户手动勾选后就不再自动重算（colTouched），
 // 免得翻页时列自己跳来跳去。
 const OPTIONAL_COLS = [
-  { prop: 'aliases', label: '别名' },
-  { prop: 'code', label: '国标编码' }
+  { prop: 'aliases', label: '别名' }
 ]
 const colTouched = ref(false)
 const visibleCols = ref([])
 const hasAliasData = computed(() => terms.value.some((t) => t.aliases?.length > 0))
-const hasCodeData = computed(() => terms.value.some((t) => t.code))
 const colsWithData = () => {
   const cols = []
   if (hasAliasData.value) cols.push('aliases')
-  if (hasCodeData.value) cols.push('code')
   return cols
 }
 // 数据变化（查询 / 翻页 / 换类型）后，未手动干预过就按「有数据才显示」重算
@@ -444,15 +525,33 @@ const loadTerms = async (resetPage = true) => {
   if (resetPage) page.value = 1
   loadingTerms.value = true
   termsFailed.value = false
+  // 2a. 本地词典档：数据就在浏览器里（localTerms），不发请求、不分页到后端 ——
+  //     自己按当前页切一刀即可，否则会去问后端「本地词典」，拿到的是空集。
+  if (viewScope.value === 'local') {
+    const kw = keyword.value.trim()
+    const hit = kw
+      ? localTerms.value.filter(
+        (t) => String(t.standardTerm || '').includes(kw)
+          || (t.aliases || []).some((a) => String(a).includes(kw))
+      )
+      : localTerms.value
+    total.value = hit.length
+    const from = (page.value - 1) * size.value
+    terms.value = hit.slice(from, from + size.value)
+    loadingTerms.value = false
+    return
+  }
   try {
-    // 2. 按当前词典类型 + 关键字查询（标准词与别名都参与匹配）
+    // 2b. 按当前词典类型 + 关键字 + 词典范围查询（标准词与别名都参与匹配）
     //    page 与 size 永远成对传：后端 page>0 时按 size 切片，漏传 size 会让
     //    后端用默认值 100，与前端 el-pagination 显示的每页条数对不上。
+    //    scope 交给后端分三路读：base 只读基础层、org 只读组织层、effective 读并集。
     const res = await getTerms({
       type: typeKey.value,
       keyword: keyword.value,
       page: page.value,
-      size: size.value
+      size: size.value,
+      scope: viewScope.value
     })
     // 3. 回填当前页结果与命中总数
     terms.value = res.data.terms || []
@@ -474,6 +573,21 @@ const handleSizeChange = () => {
   loadTerms(false)
 }
 
+// 空态文案按当前范围分档：三层「为什么空、怎么才有内容」的答案不一样，
+// 只写一句通用的会让用户以为是自己查询方式错了。
+const emptyText = computed(() => {
+  if (keyword.value) {
+    return `没有匹配「${keyword.value}」的术语：换个更短的关键词，或确认该层词典已导入过词条`
+  }
+  if (viewScope.value === 'local') {
+    return '本地词典为空：切到「我的词典」页签，用「拉取组内词典」或「批量导入文件」把词条加到本地'
+  }
+  if (viewScope.value === 'org') {
+    return '组内词典为空：本组还没有自己的词条。可在「我的词典」批量导入文件或手动新增，再提交提案由组长审核'
+  }
+  return '系统默认词典暂无该类型术语：确认系统已导入过词条'
+})
+
 // 切换词典类型：先清掉上一次的查询与导入状态，再拉新类型的数据
 watch(typeKey, () => {
   // 切术语类型：本地词典按类型分开存，切回来要恢复；提案/归档同理
@@ -482,6 +596,20 @@ watch(typeKey, () => {
   loadArchives()
   keyword.value = ''
   loadTerms()
+})
+
+// 切换词典范围：只影响本页签的查询结果，不动本地副本、也不动提案与归档。
+// 清掉关键词再查 —— 关键词往往是针对上一层挑的，留着会让人误以为新范围是空的。
+watch(viewScope, () => {
+  keyword.value = ''
+  loadTerms()
+})
+
+// 切回「词典查询」页签时，本地档要重取一次：本页展示的是 localTerms 的一份切片快照，
+// 而「我的词典」页签里增删的正是它 —— 不重取就会看到切走之前的旧内容。
+// 只在本地档做，系统默认 / 组内两档没这个必要，也免得每次切页签都多打一次接口。
+watch(tab, (v) => {
+  if (v === 'baseline' && viewScope.value === 'local') loadTerms()
 })
 
 
@@ -523,34 +651,109 @@ function saveLocal() {
   }
 }
 
-/** 拉取小组基线到本地（覆盖本地已有内容） */
-const loadBaseline = async () => {
+/**
+ * 拉取组内词典到本地 —— **并入，不是覆盖**。
+ *
+ * <p>本地词典是一个持续累积的工作副本：拉取只往里加，不把本地已有内容整份换掉
+ * （整份换掉会让「先导入再拉取」丢掉刚导入的词）。合并口径在
+ * {@code utils/dictMerge.js}，与批量导入共用同一套。</p>
+ *
+ * <p>只拉组织层 —— 它才是提案基线（审核走整快照替换组织层）。系统默认词典不拉：
+ * 它随系统库更新而变，查询时直接读后端就是最新的，存到本地反而会过期。</p>
+ *
+ * <p>有「同名差异」或「归属冲突」时**不替用户决定**，弹窗交人工拍板；
+ * 纯新增这种没有歧义的情况直接落盘，不为了一次纯新增也拦一道弹窗。</p>
+ */
+const pullBaseline = async () => {
   baselineLoading.value = true
   try {
-    const res = await exportBaseline({ type: typeKey.value })
-    const raw = localStorage.getItem(localKey.value)
-    let at = ''
-    if (raw) {
-      try {
-        at = (JSON.parse(raw) || {}).at || ''
-      } catch (e) {
-        at = ''
-      }
-    }
-    localTerms.value = (res.data || []).map((t) => ({
+    const res = await exportBaseline({ type: typeKey.value, scope: 'org' })
+    const incoming = (res.data || []).map((t) => ({
       standardTerm: t.standardTerm,
       aliases: t.aliases || [],
+      // source 必须带上：漏了它，新增词条的来源会变空、同名词条会错标成「本地」——
+      // 而「这条词是从哪来的」正是用户判断该不该保留它的主要依据
       source: t.source || ''
     }))
-    localLoadedAt.value = at || new Date().toLocaleString()
-    baselineTouched.value = false
-    saveLocal()
-    ElMessage.success(`已拉取 ${localTerms.value.length} 条到本地个人词典`)
+    const r = mergeTermLists(localTerms.value, incoming)
+    if (!r.sameTermDiff.length && !r.collisions.length) {
+      commitLocal(r.merged, `已并入 ${r.added} 条（合计 ${r.total} 条）`)
+      return
+    }
+    mergeResult.value = r
+    mergeVisible.value = true
   } catch {
     // 拦截器已提示
   } finally {
     baselineLoading.value = false
   }
+}
+
+// ---- 合并结果落盘（弹窗确认后 / 无需确认时直接走）----
+const mergeVisible = ref(false)
+const mergeResult = ref(null)
+
+/**
+ * 把合并结果写进本地词典。
+ *
+ * <p>{@code baselineTouched} 只能近似：合并后本地是「组织层 ∪ 本地原有」，
+ * 只有本地原本是空的才严格等于基线。所以判据取「合并前本地有没有内容」——
+ * 比一律置 true/false 更贴近它要表达的「本地是否比基线多了东西」。</p>
+ */
+const commitLocal = (terms, msg) => {
+  const hadLocal = localTerms.value.length > 0
+  localTerms.value = terms
+  localLoadedAt.value = new Date().toLocaleString()
+  baselineTouched.value = hadLocal
+  localPage.value = 1
+  saveLocal()
+  // 正停在「本地词典」档看查询结果时，写完要让表格跟着刷新
+  if (viewScope.value === 'local') loadTerms()
+  ElMessage.success(msg)
+}
+
+const applyMerge = (terms) => {
+  const before = localTerms.value.length
+  commitLocal(terms, `已并入本地词典：${before} → ${terms.length} 条`)
+}
+
+// ---- 词典范围弹窗：对 8 类术语词典逐个选层 ----
+const layerDialog = ref(false)
+/** 各类词典「归一实际用」的条数（系统默认 ∪ 组内）；取不到时该行显 — */
+const effectiveCounts = reactive(
+  Object.fromEntries(Object.keys(TYPE_LABELS).map((k) => [k, null]))
+)
+
+const layerRows = computed(() => TYPE_OPTIONS.map((t) => ({
+  value: t.value,
+  label: t.label,
+  effective: effectiveCounts[t.value]
+})))
+
+/**
+ * 打开弹窗，并取八类词典「归一实际用」的条数。
+ *
+ * <p>每类只取 1 条（{@code size: 1}）—— 只需要 {@code total}，不必把几千条词条拉下来。
+ * 八条请求并行；任一条失败就整批退化成「—」，不因为一次读不到就卡住弹窗。</p>
+ */
+const openLayerDialog = async () => {
+  layerDialog.value = true
+  try {
+    const res = await Promise.all(TYPE_OPTIONS.map((t) =>
+      getTerms({ type: t.value, page: 1, size: 1, scope: 'effective' })))
+    TYPE_OPTIONS.forEach((t, i) => {
+      effectiveCounts[t.value] = res[i].data?.total ?? 0
+    })
+  } catch {
+    // 读不到就让各行显示「—」：上面那段归一说明不依赖条数，照常可看
+    for (const k of Object.keys(effectiveCounts)) effectiveCounts[k] = null
+  }
+}
+
+/** 从弹窗里跳去看某一类：切类型 + 关弹窗（该类型的查看层已在表里选好） */
+const goType = (t) => {
+  typeKey.value = t
+  layerDialog.value = false
 }
 
 /** 从本地存储恢复上次编辑（切页签回来时用），没有就空着 */
@@ -572,13 +775,30 @@ function restoreLocal() {
   }
 }
 
-const addLocalTerm = () => {
+/**
+ * 手动新增一条到本地词典。
+ *
+ * <p><b>两种重名都要拦</b>：①同标准词已存在（纯重复，直接拒绝）；
+ * ②该词已是另一条的别名（归属冲突）—— 这一种直接放行会造出「一个词既是标准词、
+ * 又是别人的别名」，归一里两边都要它，结果不确定。所以问一句，同意后才把
+ * 它从原别名里摘出来、提为独立标准词（与弹窗里选「按新来」是同一套语义）。</p>
+ */
+const addLocalTerm = async () => {
   const t = newTerm.value.trim()
   if (!t) return
   if (localTerms.value.some((x) => x.standardTerm === t)) {
     ElMessage.warning('本地词典里已有该标准词')
     return
   }
+  const owner = localTerms.value.find((x) => (x.aliases || []).includes(t))
+  if (owner && !(await confirmBox(
+    `「${t}」当前是「${owner.standardTerm}」的别名。提为独立标准词吗？`
+    + '（会同时把它从原别名里移除，避免同一个词两边都要）',
+    '归属冲突', { type: 'warning', confirmButtonText: '提为标准词', cancelButtonText: '取消' }
+  ))) {
+    return
+  }
+  if (owner) owner.aliases = owner.aliases.filter((a) => a !== t)
   localTerms.value.push({
     standardTerm: t,
     aliases: splitAliases(newAliases.value, t),
@@ -774,12 +994,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 批次 22：国标编码用等宽字体，便于逐字符核对（编码错一位就查不出来了） */
-.code-cell {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: var(--fs-xs);
-  color: var(--text-sub-strong);
-}
 /* 类型 tab：激活态与下划线改用主题墨色，替换 Element Plus 默认蓝 */
 .dict-tabs {
   margin-bottom: var(--sp-1);
@@ -816,13 +1030,6 @@ onMounted(() => {
   font-size: var(--fs-xs);
 }
 
-/* 词典作用域提示条：与查询区同一行基线，标签 + 说明一行排开 */
-.scope-hint {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-top: var(--sp-2);
-}
 /* 导入区：左上传拖拽框、右操作列 */
 .import-row {
   display: flex;
@@ -980,6 +1187,12 @@ onMounted(() => {
   color: var(--ink);
   margin-right: 2px;
 }
+/* 词典范围按钮：推到引导条行末，与引导项同一行；窄屏换行时也自成一个块 */
+.dg-action {
+  margin-left: auto;
+  align-self: center;
+}
+/* ===== 词典范围：页面上只有一颗按钮（就在页头引导条那一行） ===== */
 .dict-head {
   display: flex;
   align-items: center;
@@ -990,5 +1203,26 @@ onMounted(() => {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
 }
+
+/* ===== 「归一用的是哪份词典」说明弹窗 ===== */
+.ld-answer {
+  font-size: var(--fs-base);
+  line-height: 1.8;
+  color: var(--text);
+}
+.ld-answer b { color: var(--ink); }
+.ld-note {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-sub);
+  border-radius: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+}
+.ld-note b { color: var(--ink); }
+/* 三档切换行：标签 + 切换按钮 + 当前层 tag 一行排开 */
+.ld-cur { margin-left: var(--sp-1); }
+.ld-table { margin-top: var(--sp-3); }
+.ld-foot { margin-top: var(--sp-2); }
 
 </style>

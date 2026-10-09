@@ -293,12 +293,11 @@
                   <div v-if="normResult" key="r" class="nt-result">
                     <span class="nt-in">{{ normResult.term }}</span>
                     <span class="nt-arrow">→</span>
-                    <span class="nt-out" :class="{ miss: !normResult.source }">{{ normResult.standardTerm }}</span>
+                    <span class="nt-out" :class="{ miss: !normResult.level }">{{ normResult.standardTerm }}</span>
                     <!-- 试算也要说清「怎么比上的」：否则用户没法判断是精确命中还是猜的 -->
                     <span class="nt-src">
-                      <template v-if="normResult.source">
-                        命中词典 · {{ normResult.source }}
-                        <template v-if="normResult.level">· {{ LEVEL_FULL[normResult.level] || normResult.level }}</template>
+                      <template v-if="normResult.level">
+                        命中词典 · {{ LEVEL_FULL[normResult.level] || normResult.level }}
                       </template>
                       <template v-else>未命中词典，返回原词</template>
                     </span>
@@ -720,13 +719,12 @@ const runNormalize = async () => {
   // 2. 进入试算态
   normLoading.value = true
   try {
-    // 3. 查词典归一，把命中词 / 来源 / 级别落成展示结果
+    // 3. 查词典归一，把命中词 / 级别落成展示结果
     const res = await normalize({ type: normType.value, term })
     const d = res.data || {}
     normResult.value = {
       term,
       standardTerm: d.standardTerm || term,
-      source: d.source || '',
       level: d.level || 0
     }
   } catch {

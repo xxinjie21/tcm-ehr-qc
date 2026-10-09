@@ -32,7 +32,11 @@
         <!-- 与「查看质量报告」并排：导入完这一页的任务就结束了，用户要么去看结果，
              要么回词典确认新词条 —— 两条出口都给，别让人靠侧边栏自己找路 -->
         <router-link class="rh-link" to="/dictionary">返回术语词典</router-link>
-        <span class="rh-skip">稍后再说（可随时回来重跑）</span>
+        <!-- 「稍后再说」：与左侧两条出口的区别是「什么都不做」，所以给它一个真按钮，
+             点了把这条提示收起来 —— 重跑入口在「标准化质量报告」页，随时能回去。 -->
+        <el-button link class="rh-skip" @click="dismissRerun">
+          稍后再说（可随时回来重跑）
+        </el-button>
       </div>
     </div>
 
@@ -228,12 +232,6 @@
                     <span v-else class="tip">—</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="国标编码" width="120">
-                  <template #default="{ row }">
-                    <span v-if="row.code">{{ row.code }}</span>
-                    <span v-else class="tip">—</span>
-                  </template>
-                </el-table-column>
               </el-table>
             </template>
             <span v-else-if="importFile" class="tip">未取得预览（解析失败或格式不符），仍可继续，但请自行确认{{ isPastedFile ? '粘贴内容' : '文件内容' }}</span>
@@ -346,12 +344,12 @@
     <PanelCard title="格式示例">
       <!-- 直接给可照抄的样子，比抽象描述省事 -->
       <div class="sample">
-        <div class="sample-t">Excel / CSV（三列：标准术语、别名、国标代码）</div>
+        <div class="sample-t">Excel / CSV（两列：标准术语、别名）</div>
         <table class="sample-tb">
-          <thead><tr><th>标准术语</th><th>别名</th><th>国标代码</th></tr></thead>
+          <thead><tr><th>标准术语</th><th>别名</th></tr></thead>
           <tbody>
-            <tr><td>肝郁气滞</td><td>肝气郁结、肝郁</td><td>ZYBNR0101</td></tr>
-            <tr><td>柴胡</td><td>北柴胡、醋柴胡</td><td></td></tr>
+            <tr><td>肝郁气滞</td><td>肝气郁结、肝郁</td></tr>
+            <tr><td>柴胡</td><td>北柴胡、醋柴胡</td></tr>
           </tbody>
         </table>
         <div class="sample-t" style="margin-top: var(--sp-3)">JSON（等价写法）</div>
@@ -370,16 +368,25 @@
 ]</pre>
       </div>
     </PanelCard>
+
+    <!-- 并入本机个人词典前的合并确认弹窗：与「词典」页「拉取组内词典」共用同一个组件 -->
+    <DictMergeDialog
+      v-model:visible="mergeVisible"
+      :result="mergeResult"
+      :type-key="type"
+      @confirm="applyMerge"
+    />
   </div>
 </template>
 
 <script setup>
 // 批量导入词典。所有人可导入本机个人词典；管理员可直写基线。
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, genFileId } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import StatCard from '@/components/StatCard.vue'
+import DictMergeDialog from '@/components/DictMergeDialog.vue'
 import { importDict, parseDictFile } from '@/api/dictionary'
 import { runTermSuggest } from '@/api/ai'
 import { getLlmConfig } from '@/api/llm'
@@ -389,6 +396,7 @@ import { confirmBox } from '@/utils/confirm'
 import { apiErrorMessage } from '@/utils/errorMessage'
 import { useUserStore } from '@/stores/user'
 import { splitAliases } from '@/utils/terms'
+import { mergeTermLists } from '@/utils/dictMerge'
 
 const TYPES = [
   { value: 'disease', label: '疾病' },
@@ -408,6 +416,8 @@ const isAdmin = computed(() => userStore.role === '管理员')
 // 导入完成后回术语词典。用 router.push 而不是 <router-link>：
 // 结果区里它要呈现为**主按钮**（这一步的出口），而 rh-link 那套链接样式是给提示条用的。
 const router = useRouter()
+// 来源页（「术语词典」）会把当前选中的类型放进 query.type，下面用它决定默认值
+const route = useRoute()
 const goDictionary = () => router.push('/dictionary')
 
 const uploadRef = ref(null)
@@ -427,7 +437,13 @@ const lint = ref(null)
 /** 导入完成后置位：提示需要重跑解析，mode=direct 时才提示（本地词典不影响基线） */
 const rerunHint = ref(null)
 const rerunning = ref(false)
-const type = ref('herb')
+/** 「稍后再说」把本次提示收起来了；下一次导入会重新放出来 */
+const rerunDismissed = ref(false)
+// 类型默认跟随来源：从「术语词典」页某类型点「批量导入」进来时，路由 query 带该类型，
+// 这里按 TYPES 白名单校验后采用；缺失或非法（侧边栏入口 / 直接敲 URL）回落 'herb'。
+// 页内下拉仍可自由改 —— 只是默认值跟着来源走。
+const qType = String(route.query.type || '')
+const type = ref(TYPES.some((t) => t.value === qType) ? qType : 'herb')
 // M4（审查报告）：默认落到更安全的「导入本机个人词典」——
 // 「直接生效到小组基线」是特权通道，不应作为默认可直接被「顺手点两下」触发。
 // 管理员若真要直写，选一次即可（确认框文案仍在兜底）。
@@ -436,7 +452,7 @@ const target = ref('org')
 
 const modeTip = computed(() => {
   if (isAdmin.value && mode.value === 'direct') {
-    return '文件直接覆盖写入小组基线并生成归档版本，不经过审核，立即对所有成员生效。仅在确信无误时使用。'
+    return '文件并入小组基线并生成归档版本：同标准词合并别名、不删除已有词条，不经过审核，立即对所有成员生效。仅在确信无误时使用。'
   }
   return '文件解析后并入你的本机个人词典（只存在你这台浏览器，不影响小组基线，也不影响其他成员）。'
 })
@@ -467,30 +483,68 @@ const lintWarnings = computed(() => lint.value?.warnings?.length || 0)
 // 个人词典在 localStorage，键与词典页「我的词典」保持一致
 const localKey = () => `dict.local.${userStore.orgId || 'base'}.${type.value}`
 
-/** 把解析出的词条并入本机个人词典，返回新增条数；同名词以文件为准 */
-function mergeIntoLocal(terms) {
-  let obj = {}
+/** 读本机个人词典（坏数据当空处理，不因为一条脏记录整份读不出来） */
+function readLocalTerms() {
   try {
-    obj = JSON.parse(localStorage.getItem(localKey()) || '{}') || {}
+    const obj = JSON.parse(localStorage.getItem(localKey()) || '{}') || {}
+    return Array.isArray(obj.terms) ? obj.terms : []
   } catch (e) {
-    obj = {}
+    return []
   }
-  const list = Array.isArray(obj.terms) ? obj.terms : []
-  const byTerm = new Map(list.map((t) => [t.standardTerm, t]))
-  let added = 0
-  for (const t of terms) {
-    if (!byTerm.has(t.standardTerm)) added++
-    byTerm.set(t.standardTerm, {
-      standardTerm: t.standardTerm,
-      aliases: t.aliases || [],
-      source: t.source || '批量导入'
-    })
-  }
+}
+
+/** 写本机个人词典；localStorage 满 / 隐私模式会抛，由调用方兜住并如实告知 */
+function writeLocalTerms(terms) {
   localStorage.setItem(localKey(), JSON.stringify({
     at: new Date().toLocaleString(),
-    terms: [...byTerm.values()]
+    terms
   }))
-  return added
+}
+
+// 合并确认弹窗（与「词典」页「拉取组内词典」共用同一个组件与同一套合并口径）
+const mergeVisible = ref(false)
+const mergeResult = ref(null)
+
+/**
+ * 把解析出的词条并入本机个人词典。
+ *
+ * <p><b>并入而不是覆盖</b>：本地词典是持续累积的工作副本，导入只往里加。
+ * 合并口径走 {@code utils/dictMerge.js}（同标准词别名取并集、剔除自指），
+ * 与后端 {@code DictionaryServiceImpl.mergeEntries} 一致 ——
+ * 本地这套若自己另立口径，会出现「本机 100 条、提交上去 98 条」的对不上。</p>
+ *
+ * <p><b>有歧义就交人工</b>：同名但别名不一致、或同一个词在两边归属不同，
+ * 都返回 null 并打开弹窗，等用户选完再落盘。纯新增没有歧义，直接写。</p>
+ *
+ * @returns {number|null} 新增条数；返回 null 表示已打开弹窗、尚未落盘
+ */
+function mergeIntoLocal(terms) {
+  const incoming = terms.map((t) => ({
+    standardTerm: t.standardTerm,
+    aliases: t.aliases || [],
+    source: t.source || '批量导入'
+  }))
+  const r = mergeTermLists(readLocalTerms(), incoming)
+  if (!r.sameTermDiff.length && !r.collisions.length) {
+    writeLocalTerms(r.merged)
+    return r.added
+  }
+  mergeResult.value = r
+  mergeVisible.value = true
+  return null
+}
+
+/** 弹窗里选完 → 落盘。失败（存储满）必须说出来，不能假装成功 */
+const applyMerge = (finalTerms) => {
+  const added = mergeResult.value?.added ?? null
+  try {
+    writeLocalTerms(finalTerms)
+    // 把「本地新增」卡片补上真实条数：弹窗路径下这件统计本来要到这一步才算得出来
+    if (result.value && added != null) result.value.added = added
+    ElMessage.success(`已并入本机个人词典（合计 ${finalTerms.length} 条）`)
+  } catch (e) {
+    ElMessage.warning('本机存储不可用或已满，导入未能保存')
+  }
 }
 
 /**
@@ -779,7 +833,7 @@ const handleSubmit = async () => {
   const src = isPasted ? `粘贴的 ${parsedPasted.value.length} 条` : `「${importFile.value.name}」`
   const ok = await confirmBox(
     direct
-      ? `将用${src}直接覆盖【${where}】的${typeLabel(type.value)}词典，立即生效。`
+      ? `将把${src}并入【${where}】的${typeLabel(type.value)}词典（同标准词合并别名，不删除已有词条），立即生效。`
       : `将把${src}解析后并入${where}（${typeLabel(type.value)}），不影响小组基线。`,
     direct ? '确认直接导入' : '确认导入本地',
     { type: 'warning', confirmButtonText: direct ? '直接导入' : '导入本地', cancelButtonText: '取消' }
@@ -793,7 +847,7 @@ const handleSubmit = async () => {
     // H1 成因二：同一处理，取原生文件（upload 组件包裹对象的 .raw）
     form.append('file', importFile.value?.raw ?? importFile.value)
     if (direct) {
-      const res = await importDict(form, target.value)
+      const res = await importDict(form, type.value, target.value)
       result.value = {
         parsed: res.data?.imported ?? 0,
         failed: res.data?.failed ?? 0,
@@ -826,15 +880,24 @@ const handleSubmit = async () => {
         }
         result.value = {
         parsed: terms.length,
+        // 弹窗路径下 added 是 null（还没落盘），先留空不显示这张卡 ——
+        // 原来写 `added ?? 0` 会让卡片显示「本地新增 0」，而实际合并后可能新增几十条
         added,
         failed: (res.data?.failures ?? []).length,
         failures: res.data?.failures ?? []
       }
-        ElMessage.success(`已并入本机个人词典（新增 ${added} 条）`)
+        if (added === null) {
+          // 有需要人工确认的差异：等弹窗里选完再落盘，成功提示由 applyMerge 出
+          ElMessage.info('有需要确认的差异，请在弹窗里选择后合并')
+        } else {
+          ElMessage.success(`已并入本机个人词典（新增 ${added} 条）`)
+        }
       }
       // 导入完成了，但要提醒「词表变了不等于归一结果变了」——
       // structured_data 是抽取时写下的快照，不重跑解析，新词条不会生效。
       rerunHint.value = { mode: direct ? 'direct' : 'local', at: new Date().toLocaleString() }
+      // 上一次导入被「稍后再说」收起来的提示，这一轮重新放出来
+      rerunDismissed.value = false
       uploadRef.value?.clearFiles()
       importFile.value = null
     } catch (e) {
@@ -848,7 +911,12 @@ const handleSubmit = async () => {
   // ---- 导入后的重跑引导 ----
   // 「本机个人词典」只影响这台浏览器上的个人用词，不影响小组基线，
   // 因此不需要（也不应该）在这里提示重跑；只有落到小组基线的那条路径才需要。
-  const rerunNeeded = computed(() => rerunHint.value?.mode === 'direct')
+  const rerunNeeded = computed(() => rerunHint.value?.mode === 'direct' && !rerunDismissed.value)
+
+  /** 「稍后再说」：收起这条提示。重跑入口在「标准化质量报告」页，随时能回去重跑 */
+  const dismissRerun = () => {
+    rerunDismissed.value = true
+  }
 
   const rerunAll = async () => {
     if (!(await confirmBox(
@@ -991,9 +1059,20 @@ const handleSubmit = async () => {
   font-size: var(--fs-xs);
   color: var(--link, #2b6cb0);
 }
+/* 「稍后再说」：这一行唯一的「什么都不做」出口。靠右放、配色压到最弱 ——
+   它原先是个不可点的 span，夹在两个蓝色链接后面，看起来像「第三个失效的链接」。
+   el-button link 自带 padding:2px 且行高比 13px 的链接高，用 height:auto 抹平，别把这一行撑高。 */
 .rh-skip {
+  margin-left: auto;
+  height: auto;
+  padding: 0 var(--sp-1);
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
+}
+/* 不加这条，el-button link 悬停会变主题蓝 —— 那又变回「链接」了 */
+.rh-skip:hover,
+.rh-skip:focus {
+  color: var(--text);
 }
 /* 步骤条：序号圆点 + 标题 + 说明，降低「不知道下一步做什么」的成本 */
 .step {
