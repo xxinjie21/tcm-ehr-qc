@@ -1,38 +1,11309 @@
 [
- {
-  "standardTerm": "独活寄生汤",
-  "aliases": [
-   "寄生汤"
-  ],
-  "source": "中医方剂大辞典"
- },
- {
-  "standardTerm": "柴胡疏肝散",
-  "aliases": [
-   "疏肝散",
-   "柴胡疏肝汤"
-  ],
-  "source": "中医方剂大辞典"
- },
- {
-  "standardTerm": "白虎加人参汤",
-  "aliases": [
-   "白虎汤加人参"
-  ],
-  "source": "中医方剂大辞典"
- },
- {
-  "standardTerm": "济生肾气丸",
-  "aliases": [
-   "肾气丸"
-  ],
-  "source": "中医方剂大辞典"
- },
- {
-  "standardTerm": "知柏地黄丸",
-  "aliases": [
-   "知柏地黄汤"
-  ],
-  "source": "中医方剂大辞典"
- }
+  {
+    "standardTerm": "独活寄生汤",
+    "aliases": [
+      "寄生汤"
+    ]
+  },
+  {
+    "standardTerm": "柴胡疏肝散",
+    "aliases": [
+      "疏肝散",
+      "柴胡疏肝汤"
+    ]
+  },
+  {
+    "standardTerm": "白虎加人参汤",
+    "aliases": [
+      "白虎汤加人参",
+      "人参白虎汤"
+    ]
+  },
+  {
+    "standardTerm": "济生肾气丸",
+    "aliases": [
+      "资生肾气丸",
+      "牛车肾气丸"
+    ]
+  },
+  {
+    "standardTerm": "知柏地黄丸",
+    "aliases": [
+      "知柏地黄汤",
+      "滋阴八味丸",
+      "知柏八味丸"
+    ]
+  },
+  {
+    "standardTerm": "一捻金",
+    "aliases": []
+  },
+  {
+    "standardTerm": "一捻金胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "一清胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "一清颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乙肝宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乙肝养阴活血颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乙肝益气解郁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二十七味定坤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二十五味松石丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二十五味珍珠丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二十五味珊瑚丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二丁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二冬膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二母安嗽丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二至丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二陈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二妙丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十一味参芪片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十一味参芪胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十一味能消丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十二味翼首散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十三味榜嘎散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十五味沉香丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十六味冬青丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十全大补丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十味消渴胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十香止痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十香返生丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十滴水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十滴水软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七十味珍珠丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七叶神安片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七叶总皂苷",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七味广枣丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七味姜黄探",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七味都气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七味铁屑丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七味葡萄散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七味榼藤子丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七制香附丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七宝美髯颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七珍丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七厘胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七厘散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八正合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八味沉香散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八味檀香散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八宝坤顺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八珍丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八珍丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八珍颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八珍益母丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八珍益母胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参再造丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参养荣丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参首乌胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参健脾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "儿宝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "儿康宁糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "儿童清肺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "儿童清咽解热口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "儿童清热导滞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "儿感退热宁口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九一散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九气拈痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九分散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九味石灰华散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九味肝泰胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九味羌活口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九味羌活丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九味羌活颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九制大黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九香止痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七伤药片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七伤药胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七伤药颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七血伤宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七通舒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三九胃泰胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三九胃泰颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三子散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三两半药酒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三妙丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三拗片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三味蒺藜散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三金片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三宝胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三黄片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大七厘散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大山楂丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大川芎口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大补阴丸",
+    "aliases": [
+      "补阴丸"
+    ]
+  },
+  {
+    "standardTerm": "大黄利胆胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄清胃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄廣虫丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "万氏牛黄清心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "万应胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "万应锭",
+    "aliases": []
+  },
+  {
+    "standardTerm": "万通炎康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口炎清颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咽清丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口腔溃疡散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "山东阿胶膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "山玫胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "山香圆片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "山菊降压片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "山绿茶降压片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "山楂化滞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千金止带丸-大蜜丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千金止带丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千柏鼻炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千喜片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千喜胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川贝止咳露",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川贝枇杷糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川贝雪梨膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川芎茶调丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川芎茶调片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川芎茶调袋泡茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川芎茶调散",
+    "aliases": [
+      "茶调散"
+    ]
+  },
+  {
+    "standardTerm": "川芎茶调颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "女金丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "女金胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "女珍颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿七星茶口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿七星茶颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿止咳糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿止嗽糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿化毒散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿化食口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿化食丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿百寿丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿百部止咳糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿至宝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿扶牌颗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿抗痫胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿肝炎颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿金丹片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿肺咳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿肺热平胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿肺热咳喘口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿泻速停颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿泻痢片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿宝泰康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿咽扁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿咳喘灵口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿咳喘颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿香橘丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿退热合剂-小儿退热口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿退热颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿柴桂退热口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿柴桂退热颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿热速清口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿热速清颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿热速清糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿消食片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿消积止咳口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿豉翘清热颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿惊风散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿清肺止咳片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿清肺化痰口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿清热止咳合剂-小儿清热止咳口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿清热片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿感冒口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿感冒茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿感冒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿感冒宁糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿腹泻宁糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿解表颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿解热丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿解感片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿敷脐止泻散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小青龙合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小青龙颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小金丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小金片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小金胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小建中片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小建中合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小活络丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小柴胡片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小柴胡泡腾片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小柴胡胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小柴胡颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "马应龙八宝眼膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "马应龙麝香痔疮膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "马钱子散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开光复明丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开胃山楂丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开胃健脾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开胸顺气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开胸顺气胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天王补心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天王补心丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天丹通",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天丹通络胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天和追风膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天菊脑安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天麻丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天麻头痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天麻钩藤颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天麻首乌片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天麻祛风补片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天麻醒脑胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天紫红女金胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天智颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天舒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天舒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "元胡止痛口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "元胡止痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "元胡止痛软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "元胡止痛胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "元胡止痛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "元胡止痛滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "无比山药丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "无烟艾条",
+    "aliases": []
+  },
+  {
+    "standardTerm": "云南白药",
+    "aliases": []
+  },
+  {
+    "standardTerm": "云南白药胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "云香祛风止痛酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木瓜丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木香分气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木香顺气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木香槟榔丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五子衍宗丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五加生胶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五苓胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五苓散",
+    "aliases": [
+      "五苓汤",
+      "生料五苓散",
+      "五苓饮子"
+    ]
+  },
+  {
+    "standardTerm": "五虎散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五味子颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五味子糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五味沙棘散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五味清浊散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五味麝香丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五黄养阴颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五福化毒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五福化毒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "比拜克胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牙痛一粒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止血定痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止血复脉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止红肠辟丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止咳宝片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止咳喘颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止咳橘红口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止咳橘红丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止喘灵注射液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止痢宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止痛化癥片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止痛化癜胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止痛紫金丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止嗽定喘口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "少阳感冒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "少林风湿跌打膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "少腹逐瘀丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "中风回春丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "中风回春片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "中华跌打丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "贝羚胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "内消瘰病片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "午时茶胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "午时茶颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄上清丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄上清软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄上清胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄千金散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄化毒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄至宝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄抱龙丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄净脑片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄降压丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄降压片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄降压胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄消炎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄蛇胆川贝液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄清心丸-局方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄清宫丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄清感胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄解毒丸",
+    "aliases": [
+      "牛黄解毒丹"
+    ]
+  },
+  {
+    "standardTerm": "牛黄解毒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄解毒软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄解毒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄镇惊丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气滞胃痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气滞胃痛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升气养元糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升血颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "仁青芒觉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "仁青常觉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "片仔癀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "片仔廣胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化积口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化痔栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀祛斑胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘦回生片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "分清五淋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹七片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹灯通脑软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹灯通脑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹红化瘀口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹参片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹香清脂颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹桂香颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹益片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹鹿通督片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹萎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹膝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风热清口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风痛安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风湿马钱片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风湿定片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风湿骨痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风湿骨痛胶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风寒双离拐片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风寒咳嗽丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风寒咳嗽颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌贝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌贝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌军治胆片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌鸡白凤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌鸡白凤片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌鸡白凤颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌梅丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌蛇止痒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六一散",
+    "aliases": [
+      "天水散",
+      "太白散"
+    ]
+  },
+  {
+    "standardTerm": "六合定中丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六应丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六君子丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六味木香散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六味地黄丸",
+    "aliases": [
+      "六味丸"
+    ]
+  },
+  {
+    "standardTerm": "六味地黄丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六味地黄颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六味安消胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六味安消散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心元胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心可舒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心血宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心血宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心荣口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心速宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心悦胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑欣丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑欣胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑健片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茶叶提取物",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑健胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脑静片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心通口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心舒宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心舒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双丹口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双虎清肝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双金连合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双黄连口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双黄连片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双黄连栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双黄连胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双黄连颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双黄连滴眼剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉泉胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉泉颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉屏风口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉屏风胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉屏风袋泡茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉屏风颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉真散",
+    "aliases": [
+      "玉贞散"
+    ]
+  },
+  {
+    "standardTerm": "正天丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正天胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正气片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正心降脂片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正心泰片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正心泰胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正金油软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正骨水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正柴胡饮颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正清风痛宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "功劳去火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘桔冰梅片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘露消毒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "艾附暖宫丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "艽龙胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "古汉养生精口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "古汉养生精片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "古汉养生精颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "左金丸",
+    "aliases": [
+      "回令丸",
+      "茱连丸"
+    ]
+  },
+  {
+    "standardTerm": "左金胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石斛夜光丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石淋通片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石榴健胃散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "右归丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龙牡壮颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龙泽熊胆胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龙胆泻肝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "戊己丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平肝舒络丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平消片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平消胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "北芪五加片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "北豆根片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "北豆根胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "归芍地黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "归脾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "归脾丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "归脾合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "归脾颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四方胃片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四方胃胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四正丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四君子丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四君子颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四妙丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四味土木香散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四味珍层冰硼滴眼液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四制香附丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四物合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四物颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四物益母丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四季感冒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四季感",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四逆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四神丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四神片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生白合剂-生白口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生发搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生血宝合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生血宝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生脉饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生脉胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "代温灸膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白带丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白蒲黄片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白癫风胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瓜霜退热灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乐儿康糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乐脉丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乐脉片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乐脉胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乐脉颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "外伤如意膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "外感风寒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冬凌草片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宁神补心片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冯了性风湿跌打药酒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玄麦甘桔含片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玄麦甘桔胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玄麦甘桔颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏天麻丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "汉桃叶片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味左金丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味生化颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味香连丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味逍遥口服液-合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味逍遥丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味藿香正气合剂-覆香正气合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味藿香正气软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "孕康合剂-孕康口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "孕康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "老年咳喘片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "老鹤草软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "地奥心血康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "地奥心血康",
+    "aliases": []
+  },
+  {
+    "standardTerm": "地榆槐角丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳聋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳聋左慈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芎菊上清丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芎菊上清片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "朴沉化郁丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "再造生血片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "再造生血胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "西瓜霜润喉片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "西汉养生口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "西青果茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "西青果颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "西黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百令胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合固金口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合固金丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合固金丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合固金片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合固金颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百咳静糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "达立通颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当飞利肝宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归龙荟丸",
+    "aliases": [
+      "龙荟丸"
+    ]
+  },
+  {
+    "standardTerm": "当归补血口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归拈痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归养血丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归调经颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "仲景胃灵丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "伤疖膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "伤科接骨片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "伤痛宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "伤湿止痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "华山参片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "华佗再造丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血府逐瘀丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血府逐瘀胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血美安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血栓心脉宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血栓心脉宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血栓通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三七总皂苷",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血脂宁丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血脂灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血脂康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血脂康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血康口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血滞通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血塞通片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血塞通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血塞通颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "全天麻胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "全杜仲胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "全鹿丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "壮骨关节丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "壮骨伸筋胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "壮腰健身丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冰黄肤乐软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冰硼散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "庆余辟瘟丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "产复康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羊藿三七胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "关节止痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灯台叶颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灯盞生脉胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灯盏花素片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灯盏细辛注射液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灯盏细辛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安儿宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安中片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安阳精制膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安胃片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安胎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安宫止血丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安宫止血颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安宫牛黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安宫牛黄散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安宫降压丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神补心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神补心颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神补脑液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神宝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安脑丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安脑片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "导赤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阳和解凝膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阴虚胃痛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "防风通丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "防风通圣颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "如意金黄散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "如意定喘片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇必舒阴道泡腾片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇乐颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇宁栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇宁康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇良片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇炎净胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇炎消泡腾片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇炎康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇宝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科十味片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科千金片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科千金胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科止带片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科止带胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科分清丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科养坤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科养荣丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇科调经片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇康宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妇康宝口服液-妇康宝合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "红色正金软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "红灵散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "红药贴膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麦味地黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "远志酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "坎离砂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "花红片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "花红胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "花红颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "从蓉益肾颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芩芷鼻炎糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芩连片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芩暴红止咳口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芩暴红止咳片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芩暴红止咳分散片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芩暴红止咳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪风固表颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪冬颐心口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪冬颐心颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪苈强心胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪明颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪参胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪参益气滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "降香油",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪珍胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪黄通秘软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪葛口液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪葛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪蛭降糖片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芪蛭降糖胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "克伤痛搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "克咳片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "克痢痧胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "克感利咽口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苏子降气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苏合香丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苏黄止咳胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杏仁止咳合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杏贝止咳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杏苏止咳口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杏苏止咳软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杏苏止咳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杏苏止咳糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杞菊地黄口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杞菊地黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杞菊地黄丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杞菊地黄片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杞菊地黄胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "更年安丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "更年安片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "更年安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "医痫丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尪痹片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尪痹颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连花清瘟片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连花清瘟胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连花清瘟颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连苏胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连参通淋片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连蒲双清片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗炎退热片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗骨增生丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗骨增生胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗骨髓炎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗宫炎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益母草干浸膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗宫炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗宫炎颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗病毒口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗感口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抗感颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "护肝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "护肝片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "护肝胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "护肝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "护肝宁",
+    "aliases": []
+  },
+  {
+    "standardTerm": "护肝宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "男康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牡荆油胶丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利肝隆颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利咽解毒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利胆片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利胆排石片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利胆排石颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利脑心胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利鼻片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利膈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "伸筋丹胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "伸筋活络丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "快胃片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肝炎康复丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肛泰软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肠炎宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肠炎宁糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肠胃宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肠胃适胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肠康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龟鹿二仙膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龟鹿补肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛夷鼻炎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛芩片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛芩颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "沈阳红药胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "沉香化气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "良附丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "启脾口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "启脾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补中益气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补中益气丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补中益气合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补中益气颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补心气口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补白颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血生乳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血安神胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾养血丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾益脑丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾益脑片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾益精丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肺活血胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益地黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益蒺藜丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补虚通瘀颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补脾益肠丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灵丹草颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灵宝护心丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灵泽片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灵莲花颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "局方至宝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿感宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿塞通片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阿胶三宝膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阿胶补血口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阿胶补血膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "附子理中丸",
+    "aliases": [
+      "附子理中汤"
+    ]
+  },
+  {
+    "standardTerm": "附子理中片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "附桂骨痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "附桂骨痛胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "附桂骨痛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妙灵丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "妙济丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "纯阳正气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "驴胶补血颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "青叶胆片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "青果丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "青娥丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "表实感冒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苦甘颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苦参片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苦参软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "坤宁口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "坤宝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "坤泰胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枇杷止咳软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枇杷止咳胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枇杷止咳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枇杷叶膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "板蓝大青片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "板蓝根茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "板蓝根颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "松龄血脉康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "刺五加片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "刺五加胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "刺五加颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "刺五加脑灵合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枣仁安神胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枣仁安神颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "郁金银屑片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抱龙丸",
+    "aliases": [
+      "保肝丸"
+    ]
+  },
+  {
+    "standardTerm": "拨云退翳丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "软脉灵口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "齿痛消炎灵颗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾炎四味片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾炎消肿片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾炎舒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾炎解热片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾炎康复片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾宝合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾宝糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾复康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾衰宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾康宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾康宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾康宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "昆明山海棠片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "国公酒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "明目上清片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "明目地黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "明目地黄丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固本咳喘片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固本统血颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固本益肠片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固肾定喘丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固肠止泻胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固经丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "罗布麻茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "帕朱丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "败毒散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "垂盆草颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "知柏地黄丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和中理脾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和血明目片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和胃止泻胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "季德胜蛇药片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金贝痰咳清颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金水宝片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金水宝胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金花明目丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金芪降糖片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金佛止痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金果含片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金果饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金果饮咽喉片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金莲花口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金莲花片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金莲花胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金莲花颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金莲花润喉片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金振口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金钱草片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金钱胆通颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金黄利胆胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金银花露",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金嗓开音丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金嗓开音胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金嗓开音颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金嗓利咽丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金嗓清音丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金噪清音胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金噪散结丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金蝉止痒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳块消片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳块消胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳块消颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳核散结片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳疾灵颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳康丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳增宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳癖消片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳癖消胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳癖消颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乳癖散结胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肿节风片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肥儿丸",
+    "aliases": [
+      "参术肥儿丸"
+    ]
+  },
+  {
+    "standardTerm": "周氏回生丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鱼腥草滴眼液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "狗皮膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "京万红软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夜宁糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "炎宁糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "注射用双黄连-冻干",
+    "aliases": []
+  },
+  {
+    "standardTerm": "注射用灯盏花素",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泌石通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻青丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肝安神丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻痢消胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "治伤胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "治咳川贝枇杷滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "川贝母流浸膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "治糜康栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宝咳宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "定坤丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "定喘膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "降脂灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "降脂通络软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "姜黄提取物",
+    "aliases": []
+  },
+  {
+    "standardTerm": "降糖甲片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参乌健脑胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芍片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芍胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芪十一味颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芪口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芪五味子片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芪五味子胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芪五味子颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芪降糖片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参芪降糖胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参苏丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参附强心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参苓白术丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参苓白术散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参松养心胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参茸白凤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参茸固本片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参茸保胎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参桂胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参精止渴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "驻车丸",
+    "aliases": [
+      "小连丸",
+      "小驻车丸"
+    ]
+  },
+  {
+    "standardTerm": "春血安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "珍珠胃安丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "珍黄胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "草香胃康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵山莲颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵芪肝复颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵栀黄口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵梔黄软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵梔黄泡腾片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵栀黄胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵栀黄颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵胆平肝胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "华铃胃痛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荡石胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药艾条",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳术丸",
+    "aliases": [
+      "二味枳术丸"
+    ]
+  },
+  {
+    "standardTerm": "枳术颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳实导滞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柏子养心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柏子养心片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀子金花丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀芩清热合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厚朴排气合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "按摩软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丁香油",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃乃安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃立康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃苏颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃肠安丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃肠复元膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃药胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃复春片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃疡宁丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃疡灵颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃祥宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃皖舒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃康灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃康灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃康灵颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃舒宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳特灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳特灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳喘宁口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳喘顺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨友灵搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨仙片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨折挫伤胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨刺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨刺宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨刺消痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨质宁搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨痛灵酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨疏康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨疏康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香苏正",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香苏调胃片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香连丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香连丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香连片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香连化滞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香附丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香附丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂六君丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂平胃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂和中丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂枳术丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂胃苓丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂养胃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂养胃丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂养胃颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方大青叶合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方川贝精片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方川芎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方川芎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方牛黄消炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方牛黄清胃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方丹参丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方丹参片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方丹参胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方丹参喷雾剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方丹参颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方丹参滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方双花口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方石韦片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方龙血竭胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方仙鹤草肠炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方瓜子金颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方血栓通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方羊角片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方芩兰口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方杏香兔耳风颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方扶芳藤合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方皂矾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方阿胶浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方陈香胃片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方青黛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方苦参肠炎康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方金钱草颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方金黄连颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方鱼腥草片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方鱼腥草合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方鱼腥草糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方珍珠口疮颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方珍珠散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方珍珠暗疮片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方草珊瑚含片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方牵正膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方夏天无片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方益母草胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方益肝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方益肝灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方消食茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方黄连素片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方黄柏液涂剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方羚角降压片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方蛤青片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方满山红糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方滇鸡血藤膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方鲜竹沥液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方熊胆滴眼液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复芪止汗颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复明片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复脉定胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "便通片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "便通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保心片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保妇康栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保赤散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保和丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保和丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保和片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保和颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保胎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保济口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保济丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "恒古骨伤愈合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "恒制咳喘胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "追风透骨丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆石通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆乐胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脉络舒通丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脉络舒通颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脉管复康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "独一味片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "独一味胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "独圣活血片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "独活寄生丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "独活寄生合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "急支颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "急支糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "姜酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养心氏片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养心生脉颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养心定悸口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养心定悸膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养正消积胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血生发胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血当归胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血当归糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血饮口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血荣筋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血清脑丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血清脑颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养阴生血合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养阴降糖片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养阴清肺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养阴清肺膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养胃颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "前列欣胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "前列通片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "前列舒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "首乌丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "洁白丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活力苏口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血止痛软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血止痛胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血止痛散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血止痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血壮筋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血通脉片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "洋参保肺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "津力达颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺止嗽合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宫宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宫血宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宫炎平片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宫瘤清片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宫瘤清胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "穿心莲内酯滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "穿心莲片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "穿心莲胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "穿龙骨刺片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冠心丹参片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冠心丹参胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冠心生脉口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冠心苏合丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冠心苏合胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冠心舒通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冠脉宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风止痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风止痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风止痛胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风舒筋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛伤消肿酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰灵口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祖师麻片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神香苏合丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿白带丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "珠黄吹喉散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "珠黄散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蚕蛾公补片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "都梁丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "都梁软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "都梁滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荷丹片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荷叶丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂龙咳喘宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂龙咳喘宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂芍镇痫片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂附地黄口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂附地黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂附地黄胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂附理中丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂林西瓜霜",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝茯苓丸",
+    "aliases": [
+      "夺命丸",
+      "牡丹丸",
+      "夺命丹",
+      "桂心茯苓丸"
+    ]
+  },
+  {
+    "standardTerm": "桂枝茯苓片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝茯苓胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桔贝合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桔梗冬花片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "根痛平颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "速效牛黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "速效救心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "唇齿清胃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夏天无片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夏天无滴眼液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夏枯草-服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夏枯草膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夏桑菊颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热炎宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热炎宁合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热炎宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热淋清颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴连口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡舒肝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴黄口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴黄片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴银口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "致康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逍遥丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逍遥丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逍遥丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逍遥片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逍遥胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逍遥颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蚝贝钙咀嚼片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "钻山风糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "铁笛口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "铁笛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "积雪苷片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "射麻口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健儿乐颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健儿消食口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健民咽喉片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健步丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健胃片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健胃消食片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健胃愈疡片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健胃愈疡颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脑丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脑安神片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脑补肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脑胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脾糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脾生血片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脾生血颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脂脉康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脂康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脏连丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑心通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑心清片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柿叶提取物",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑乐静",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑立清丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑立清胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑脉泰胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑栓通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑得生丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑得生片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑得生胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑得生颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "狼疮丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疮积散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益元散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气养血口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气通颗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气维血颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气聪明丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心宁神片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心通脉颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心舒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心舒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心舒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心舒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心酮片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心酮分散片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益心酮滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益母丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益母草口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益母草片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益母草胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益母草颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益母草膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益肾化湿颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益肾灵颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益肺清化膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益脑片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益脑宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "烧伤灵酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宽胸气雾剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉解感冒合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消肿止痛酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消炎止咳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消炎止痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消炎利胆片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消炎退热颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消咳喘胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消咳喘糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消食退热糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消络痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消络痛胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消栓口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消栓肠溶胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消栓颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消栓通络片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消栓通络胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消栓通络颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消眩止晕片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消银片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消银胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消痔软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消痤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消痛贴膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消渴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消渴平片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消渴灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消康",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消瘀康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消糜栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消癜丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润肺止嗽丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "烫伤油",
+    "aliases": []
+  },
+  {
+    "standardTerm": "诺迪康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调经丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调经止痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调经促孕丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调经养血丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调经活血片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调经活血胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调胃消滞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通天口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通心络胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通乐颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通关散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通幽润燥丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通脉养心口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通脉养心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通宣理肺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通宣理肺片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通宣理肺胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通宣理肺颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通络祛痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通窍耳聋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通窍鼻炎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通窍鼻炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通窍鼻炎颗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通窍镇痛散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桑姜感冒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桑菊感冒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桑菊感冒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桑菊感冒合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桑葛降脂丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理中丸",
+    "aliases": [
+      "治中汤",
+      "理中煎",
+      "人参理中汤",
+      "四顺理中丸",
+      "白术丸"
+    ]
+  },
+  {
+    "standardTerm": "培元通脑胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "培坤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄氏响声丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪生脉颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪健胃膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄杨宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连上清丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连上清胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连上清颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄莪胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄疸肝炎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄藤素片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "萆薢分清丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "梅花点舌丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "排石颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "控涎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "虚寒胃痛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "野菊花栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "野菊花颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛇胆川贝软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛇胆川贝胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛇胆川贝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛇胆陈皮片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛇胆陈皮胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛇胆陈皮散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银丹心脑通软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银杏叶口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银杏叶片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银杏叶软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银杏叶胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银杏叶滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银屑灵膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银黄口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银黄片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银黄颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银黄清肺胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘双解栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘伤风胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘解毒丸-浓缩蜜丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘解毒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘解毒软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘解毒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘解毒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银蒲解毒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甜梦口服液-甜梦合",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甜梦胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "得生丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻仁丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻仁润肠丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻仁滋脾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痔宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痔炎消颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痔疮片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痔疮外洗散-痔疮外洗药",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痔疮胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痔康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "康尔心胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "康妇软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "康妇消炎栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "康莱特软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羚羊角胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羚羊清肺丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羚羊清肺颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羚羊感冒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "断血流片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "断血流胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "断血流颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清开灵口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清开灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清开灵软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清开灵泡腾片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清开灵注射液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清开灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清开灵颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清气化痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清火栀麦丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清火栀麦片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清火栀麦胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清宁丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝利胆口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝利胆胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺化痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺抑火丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺消炎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清泻丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清降片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胃保安丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胃黄连丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胃黄连丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胃黄连片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清咽丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清咽利膈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清咽润喉丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清音丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清宣止咳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热灵颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热凉血丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热银花糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热解毒-服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热解毒片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热镇咳糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清眩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清眩片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清眩治瘫丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清脑降压片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清脑降压胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清脑降压颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清淋颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清暑益气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清喉利咽颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清喉咽合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清膈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清瘟解毒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "添精补肾膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寄生追风酒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "颈复康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "颈舒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "颈痛颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "维C银翘片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "维血宁合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "维血宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "琥珀还晴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "琥珀抱龙丸",
+    "aliases": [
+      "万金不换抱龙丹"
+    ]
+  },
+  {
+    "standardTerm": "斑秃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "越鞠二陈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "越鞠丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "越鞠保和丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散结镇痛胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根汤片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根汤颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根芩连丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根芩连片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荨贝胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "雅叫哈顿散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫龙金片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫地宁血散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫花烧伤软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫金锭",
+    "aliases": [
+      "追毒丹",
+      "紫金丹",
+      "太乙紫金丹",
+      "太乙紫金锭",
+      "玉枢丹"
+    ]
+  },
+  {
+    "standardTerm": "紫草软膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫雪散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暑症片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暑湿感冒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "跌打七厘片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "跌打丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "跌打活血散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "跌打镇痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛤蚧补肾胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛤蚧定喘丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛤蚧定喘胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喉咽清口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喉疾灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喉疾灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "锁阳固精丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "筋骨康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "筋骨痛消丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "筋痛消酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒心口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒心糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒尔经颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒肝丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒肝丸-浓缩丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒肝平胃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒肝和胃丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒肝解郁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒泌通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒胆胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒胸片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒胸胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒胸颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒康贴膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒筋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒筋活血定痛散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒筋活络酒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒筋通络颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脾胃舒丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猴头健胃灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猴头健胃灵胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猴耳环消炎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猴耳环消炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痢必灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痧药",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痛风定片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痛风定胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痛泻宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痛经丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痛经宝颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "普乐安片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "普乐安胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "湿毒清片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "湿毒清胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "湿热痹片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温胃舒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "渴乐宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "溃疡散胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滑膜炎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滑膜炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滑膜炎颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋心阴口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋心阴胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋心阴颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋补生发片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋肾健脑颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强力天麻杜仲丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强力枇杷胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强力枇杷-蜜炼",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强力枇杷露",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强力定眩胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强阳保肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强肾片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风定痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风活络丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风解毒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏痛安涂膜剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蒲元和胃胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蒲地蓝消炎口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蒲地蓝消炎胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "槐角丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒止咳颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒止咳糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒退热颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒清热口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒清热咀嚼片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒清热胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒清热颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "感冒舒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暖脐膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "催汤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "微达康口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "愈风宁心片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "愈风宁心胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰痛片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰痛宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰痹通胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解肌宁嗽丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解郁安神颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痹祺胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘀血痹胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘀血痹颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰饮丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "新血宝胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "新雪颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "新清宁片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "新廣片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "满山红油胶丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "裸花紫珠片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "裸花紫珠干浸膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "裸花紫珠胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "障眼明片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "障翳散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "槟榔四消丸-大蜜丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "槟榔四消丸-水丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "稀红通络-服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "豨莶丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "豨莶通栓丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "希签通栓胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "豨桐丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "稀桐胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "稳心片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "稳心胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "稳心颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "慢支固本颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "慢肝解郁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻炎片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻炎灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻炎通喷雾剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛夷油",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻炎康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻咽灵片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻咽清毒颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻渊丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻渊片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻渊通窍颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻渊舒口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻渊舒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻窦炎口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鲜益母草胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "精制冠心口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "精制冠心片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "精制冠心软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "精制冠心颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "熊胆胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "熊胆救心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "熊胆痔灵栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "熊胆痔灵膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "缩泉丸",
+    "aliases": [
+      "三仙丸"
+    ]
+  },
+  {
+    "standardTerm": "缩泉胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "增液颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "镇心痛口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "镇咳宁口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "镇咳宁颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "镇咳宁糖浆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "镇脑宁胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "澳泰乐颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "颠茄片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "颠茄酊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘红丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘红片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘红胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘红颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘红化痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘红痰咳液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "醒脑再造胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "癃闭舒胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "癃清片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘫清胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "糖尿乐胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "糖脉康片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "糖脉康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "糖脉康颗粒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "避瘟散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黛蛤散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藤丹胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石滚痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鹭鸶咯丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藿香正气口服液",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藿香正气水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藿香正气软胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藿香正气滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藿胆丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藿胆片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "癣宁搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "癣湿药水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "獾油搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "癫痫平片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "癫痫康胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香风湿胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香抗栓胶囊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香保心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香祛痛气雾剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香祛痛搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香通心滴丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香痔疮栓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香跌打风湿膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "跌打风湿流浸膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香舒活搽剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麝香镇痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蠲哮片",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻黄汤",
+    "aliases": [
+      "麻黄解肌汤"
+    ]
+  },
+  {
+    "standardTerm": "桂枝汤",
+    "aliases": [
+      "阳旦汤"
+    ]
+  },
+  {
+    "standardTerm": "九味羌活汤",
+    "aliases": [
+      "大羌活汤",
+      "羌活冲和汤"
+    ]
+  },
+  {
+    "standardTerm": "香苏散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小青龙汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止嗽散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正柴胡饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三拗汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大青龙汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝加厚朴杏子汤",
+    "aliases": [
+      "桂枝加厚朴杏仁汤",
+      "桂枝加朴杏汤"
+    ]
+  },
+  {
+    "standardTerm": "葱豉汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "射干麻黄汤",
+    "aliases": [
+      "紫菀散",
+      "麻黄射干汤"
+    ]
+  },
+  {
+    "standardTerm": "荆防四物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五虎汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "华盖散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金沸草散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝麻黄各半汤",
+    "aliases": [
+      "麻黄芍药汤",
+      "桂麻各半汤",
+      "麻黄桂枝合半汤"
+    ]
+  },
+  {
+    "standardTerm": "麻黄连翘赤小豆汤",
+    "aliases": [
+      "麻黄连翘汤"
+    ]
+  },
+  {
+    "standardTerm": "越婢汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝加葛根汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝二麻黄一汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝加芍药汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝去芍药汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝去芍药加附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝去芍药加麻黄细辛附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小青龙加石膏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻黄醇酒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻黄附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瓜蒌桂枝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝加黄芪汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝加附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘草麻黄汤",
+    "aliases": [
+      "麻黄甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "麻黄加术汤",
+    "aliases": [
+      "麻黄白术汤"
+    ]
+  },
+  {
+    "standardTerm": "麻黄杏仁薏苡甘草汤",
+    "aliases": [
+      "薏苡麻黄汤",
+      "杏仁薏苡汤",
+      "麻黄杏仁薏苡仁汤",
+      "麻黄杏仁甘草薏苡汤",
+      "麻杏薏苡甘草汤",
+      "麻黄杏子薏苡甘草汤",
+      "麻杏苡甘汤"
+    ]
+  },
+  {
+    "standardTerm": "行气香苏散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神术散",
+    "aliases": [
+      "神术汤"
+    ]
+  },
+  {
+    "standardTerm": "桑菊饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻黄杏仁甘草石膏汤",
+    "aliases": [
+      "麻黄杏仁汤",
+      "麻黄杏子草膏汤",
+      "麻杏甘石汤",
+      "四物甘草汤",
+      "麻杏石甘汤"
+    ]
+  },
+  {
+    "standardTerm": "柴葛解肌汤",
+    "aliases": [
+      "葛根解肌汤",
+      "柴胡解肌汤"
+    ]
+  },
+  {
+    "standardTerm": "升麻葛根汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "越婢加半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "越婢加术汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣毒发表汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛夷清肺饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "驱风散热饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解肌透痧汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根汤",
+    "aliases": [
+      "葛根麻黄汤",
+      "麻黄葛根汤",
+      "麻黄加葛根汤"
+    ]
+  },
+  {
+    "standardTerm": "加味桔梗汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喉科六味汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛蒡解肌汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清神散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "文蛤汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴归饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香葛汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参苏饮",
+    "aliases": [
+      "十味参苏散"
+    ]
+  },
+  {
+    "standardTerm": "麻黄细辛附子汤",
+    "aliases": [
+      "麻黄附子细辛汤",
+      "附子细辛汤"
+    ]
+  },
+  {
+    "standardTerm": "加减葳蕤汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "仓廪散",
+    "aliases": [
+      "仓廪汤"
+    ]
+  },
+  {
+    "standardTerm": "荆防败毒散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "再造散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻黄附子甘草汤",
+    "aliases": [
+      "麻黄甘草附子汤",
+      "附子麻黄汤"
+    ]
+  },
+  {
+    "standardTerm": "葱白七味饮",
+    "aliases": [
+      "七味葱白汤"
+    ]
+  },
+  {
+    "standardTerm": "桂枝新加汤",
+    "aliases": [
+      "桂枝加芍药生姜人参汤",
+      "桂枝加芍药生姜人参新加汤",
+      "桂枝芍药人参生姜汤",
+      "桂枝加芍药人参新加汤",
+      "新加汤"
+    ]
+  },
+  {
+    "standardTerm": "黄芪芍药桂枝苦酒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大柴胡汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厚朴七物汤",
+    "aliases": [
+      "厚朴七味汤",
+      "七物厚朴汤"
+    ]
+  },
+  {
+    "standardTerm": "防风通圣散",
+    "aliases": [
+      "通圣散",
+      "双解散"
+    ]
+  },
+  {
+    "standardTerm": "双解汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根芩连汤合升阳除湿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝人参汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "表里双解汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香苏饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛蒡子散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根加半夏汤",
+    "aliases": [
+      "葛根半夏汤"
+    ]
+  },
+  {
+    "standardTerm": "桂枝二越婢一汤",
+    "aliases": [
+      "桂枝越婢汤"
+    ]
+  },
+  {
+    "standardTerm": "桂枝加大黄汤",
+    "aliases": [
+      "桂枝大黄汤",
+      "桂枝芍药大黄汤",
+      "桂枝加芍药大黄汤"
+    ]
+  },
+  {
+    "standardTerm": "黄芩加半夏生姜汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻黄升麻汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "文蛤散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "竹叶汤",
+    "aliases": [
+      "竹叶防风汤"
+    ]
+  },
+  {
+    "standardTerm": "五积散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大承气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄牡丹汤",
+    "aliases": [
+      "大黄牡丹皮汤"
+    ]
+  },
+  {
+    "standardTerm": "小承气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大成汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调胃承气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三化汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复方大承气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "薏苡附子败酱散",
+    "aliases": [
+      "败酱散"
+    ]
+  },
+  {
+    "standardTerm": "大陷胸汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄黄连泻心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄甘草汤",
+    "aliases": [
+      "大甘丸"
+    ]
+  },
+  {
+    "standardTerm": "厚朴大黄汤",
+    "aliases": [
+      "枳朴大黄汤"
+    ]
+  },
+  {
+    "standardTerm": "肠痈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神保丸",
+    "aliases": [
+      "遇仙丹"
+    ]
+  },
+  {
+    "standardTerm": "大黄附子汤",
+    "aliases": [
+      "大黄附子细辛汤"
+    ]
+  },
+  {
+    "standardTerm": "温脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "走马汤",
+    "aliases": [
+      "走马散",
+      "外台走马汤"
+    ]
+  },
+  {
+    "standardTerm": "感应丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫丸",
+    "aliases": [
+      "紫双丸",
+      "紫霜丸",
+      "紫霞丸",
+      "紫丸子",
+      "四味紫丸"
+    ]
+  },
+  {
+    "standardTerm": "麻子仁丸",
+    "aliases": [
+      "脾约麻仁丸"
+    ]
+  },
+  {
+    "standardTerm": "济川煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润肠丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "增液承气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五仁丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苁蓉润肠丸",
+    "aliases": [
+      "苁沉丸"
+    ]
+  },
+  {
+    "standardTerm": "蜜煎导方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润肠汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "万亿丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十枣汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏凿饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三物备急丸",
+    "aliases": [
+      "大黄备急丸",
+      "备急丸"
+    ]
+  },
+  {
+    "standardTerm": "己椒苈黄丸",
+    "aliases": [
+      "椒目丸"
+    ]
+  },
+  {
+    "standardTerm": "甘遂半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白散",
+    "aliases": [
+      "三物白散",
+      "桔梗白散"
+    ]
+  },
+  {
+    "standardTerm": "控涎丹",
+    "aliases": [
+      "子龙丸"
+    ]
+  },
+  {
+    "standardTerm": "黄龙汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小柴胡汤",
+    "aliases": [
+      "三禁汤",
+      "和解散"
+    ]
+  },
+  {
+    "standardTerm": "柴胡枳桔汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蒿芩清胆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "达原饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡桂枝干姜汤",
+    "aliases": [
+      "柴胡桂姜汤",
+      "姜桂汤",
+      "桂姜汤",
+      "姜桂饮子",
+      "柴胡姜桂汤",
+      "柴桂干姜汤"
+    ]
+  },
+  {
+    "standardTerm": "柴枳半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡加芒硝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡加龙骨牡蛎汤",
+    "aliases": [
+      "柴胡龙骨牡蛎汤"
+    ]
+  },
+  {
+    "standardTerm": "柴胡去半夏加瓜蒌根汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牡蛎汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蜀漆散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡桂枝汤",
+    "aliases": [
+      "柴胡加桂汤"
+    ]
+  },
+  {
+    "standardTerm": "柴苓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴陈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴梗半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冷附汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清脾汤",
+    "aliases": [
+      "清脾饮子",
+      "清脾饮"
+    ]
+  },
+  {
+    "standardTerm": "参胡芍药汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "追疟饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四逆散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逍遥散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黑逍遥散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开郁种玉汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痛泻要方",
+    "aliases": [
+      "白术芍药散"
+    ]
+  },
+  {
+    "standardTerm": "加味逍遥散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝引经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "缓肝理脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "奔豚汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参逍遥散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏泻心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苏叶黄连汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘草泻心汤",
+    "aliases": [
+      "伊尹甘草泻心汤"
+    ]
+  },
+  {
+    "standardTerm": "柴胡达原饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡截疟饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血清肠散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生姜泻心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "干姜黄芩黄连人参汤",
+    "aliases": [
+      "四味人参汤",
+      "干姜芩连人参汤",
+      "干姜黄连黄芩汤",
+      "人参黄芩黄连干姜汤",
+      "干姜黄连人参汤"
+    ]
+  },
+  {
+    "standardTerm": "干姜人参半夏丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厚朴生姜半夏甘草人参汤",
+    "aliases": [
+      "厚朴生姜半夏人参甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "外台黄芩汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白虎汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "竹叶石膏汤",
+    "aliases": [
+      "人参竹叶汤"
+    ]
+  },
+  {
+    "standardTerm": "白虎加桂枝汤",
+    "aliases": [
+      "桂枝白虎汤"
+    ]
+  },
+  {
+    "standardTerm": "救苦汤",
+    "aliases": [
+      "还阴救苦汤"
+    ]
+  },
+  {
+    "standardTerm": "栀子胜奇散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眼珠灌脓方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀子豉汤",
+    "aliases": [
+      "栀子香豉汤",
+      "香豉栀子汤",
+      "加减栀子汤",
+      "栀子豆豉汤",
+      "栀豉汤"
+    ]
+  },
+  {
+    "standardTerm": "栀子甘草豉汤",
+    "aliases": [
+      "栀子豉加甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "栀子干姜汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀子厚朴汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀子生姜豉汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳实栀子豉汤",
+    "aliases": [
+      "枳实栀子汤",
+      "栀豉枳实汤"
+    ]
+  },
+  {
+    "standardTerm": "清营汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清宫汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉营清气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化斑汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化斑解毒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热地黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热调血汤",
+    "aliases": [
+      "清热四物汤"
+    ]
+  },
+  {
+    "standardTerm": "犀角地黄汤",
+    "aliases": [
+      "芍药地黄汤"
+    ]
+  },
+  {
+    "standardTerm": "赤小豆当归散",
+    "aliases": [
+      "赤小豆散"
+    ]
+  },
+  {
+    "standardTerm": "防己地黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生料四物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九味神功散",
+    "aliases": [
+      "九味神效散"
+    ]
+  },
+  {
+    "standardTerm": "黄连解毒汤",
+    "aliases": [
+      "火剂汤",
+      "三黄解毒汤"
+    ]
+  },
+  {
+    "standardTerm": "凉膈散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "普济消毒饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "仙方活命饮",
+    "aliases": [
+      "真人活命饮"
+    ]
+  },
+  {
+    "standardTerm": "祛毒散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石膏汤",
+    "aliases": [
+      "三黄石膏汤"
+    ]
+  },
+  {
+    "standardTerm": "马齿苋合剂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "内疏黄连汤",
+    "aliases": [
+      "黄连内疏汤"
+    ]
+  },
+  {
+    "standardTerm": "天行赤眼方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五味消毒饮合大黄牡丹汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四顺清凉饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四妙勇安汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "青叶紫草汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "透疹凉解汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "透脓散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清咽下痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清咽双和饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清咽利膈汤",
+    "aliases": [
+      "清咽利膈散"
+    ]
+  },
+  {
+    "standardTerm": "清胃解毒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清瘟败毒饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "萆薢化毒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银花解毒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "犀黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "如金解毒散",
+    "aliases": [
+      "如金解毒汤"
+    ]
+  },
+  {
+    "standardTerm": "泻心汤",
+    "aliases": [
+      "三黄泻心汤"
+    ]
+  },
+  {
+    "standardTerm": "矾石汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘草汤",
+    "aliases": [
+      "温液汤",
+      "独胜散",
+      "忘忧汤"
+    ]
+  },
+  {
+    "standardTerm": "排脓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升麻鳖甲汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "雄黄熏方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "钩藤散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清上防风汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "回春凉膈散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味芷贝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龙石散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蔓荆子散",
+    "aliases": [
+      "蔓荆子汤"
+    ]
+  },
+  {
+    "standardTerm": "清上泻火汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五福化毒丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "犀角升麻汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "犀角消毒饮",
+    "aliases": [
+      "犀角消毒汤"
+    ]
+  },
+  {
+    "standardTerm": "仙遗粮汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉池散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "争功散",
+    "aliases": [
+      "热疟争攻散"
+    ]
+  },
+  {
+    "standardTerm": "吹喉散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "导赤散",
+    "aliases": [
+      "导赤汤"
+    ]
+  },
+  {
+    "standardTerm": "龙胆泻肝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苇茎汤",
+    "aliases": [
+      "千金苇茎汤"
+    ]
+  },
+  {
+    "standardTerm": "泻白散",
+    "aliases": [
+      "泻肺散"
+    ]
+  },
+  {
+    "standardTerm": "清胃散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉女煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛根黄芩黄连汤",
+    "aliases": [
+      "葛根黄连汤",
+      "葛根黄连黄芩汤",
+      "干葛黄芩黄连汤",
+      "葛根芩连汤"
+    ]
+  },
+  {
+    "standardTerm": "芍药汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白头翁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芩汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清经散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热泻脾散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风清热汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻黄散",
+    "aliases": [
+      "泻脾散"
+    ]
+  },
+  {
+    "standardTerm": "附子泻心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肺饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀子清肝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "菊花决明散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋肾通关丸",
+    "aliases": [
+      "知母黄柏滋肾丸",
+      "大补滋肾丸"
+    ]
+  },
+  {
+    "standardTerm": "葶苈大枣泻肺汤",
+    "aliases": [
+      "葶苈大枣汤"
+    ]
+  },
+  {
+    "standardTerm": "新制柴连汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白头翁加甘草阿胶汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连附六一汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升阳除湿和血汤",
+    "aliases": [
+      "除湿热和血汤",
+      "升阳和血汤",
+      "除湿和血汤",
+      "升麻去湿和血散"
+    ]
+  },
+  {
+    "standardTerm": "泻胃汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "增味导赤散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿清心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九味清心丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "青蒿鳖甲汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清骨散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归六黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "秦艽鳖甲散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保阴煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡清骨散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合洗方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合地黄汤",
+    "aliases": [
+      "百合汤"
+    ]
+  },
+  {
+    "standardTerm": "百合滑石散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滑石代赭汤",
+    "aliases": [
+      "百合滑石代赭汤"
+    ]
+  },
+  {
+    "standardTerm": "百合鸡子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合知母汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三物黄芩汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "竹皮大丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瓜蒌牡蛎散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清火补阴汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清离滋坎汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清络饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香薷散",
+    "aliases": [
+      "香薷汤",
+      "香薷饮",
+      "三物香薷饮"
+    ]
+  },
+  {
+    "standardTerm": "桂苓甘露散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "王氏清暑益气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "新加香薷饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清暑汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "碧玉散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "李氏清暑益气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "薷苓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小建中汤",
+    "aliases": [
+      "桂心汤",
+      "建中汤",
+      "桂枝芍药汤",
+      "小健中汤"
+    ]
+  },
+  {
+    "standardTerm": "吴茱萸汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大建中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归建中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连理汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丁香散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丁萸理中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵陈理中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂附理中汤",
+    "aliases": [
+      "参桂理中汤",
+      "附桂理中丸"
+    ]
+  },
+  {
+    "standardTerm": "乌头桂枝汤",
+    "aliases": [
+      "抵当乌头桂枝汤",
+      "桂枝汤加乌头汤",
+      "桂枝乌头汤",
+      "大乌头桂枝汤"
+    ]
+  },
+  {
+    "standardTerm": "当归生姜羊肉汤",
+    "aliases": [
+      "小羊肉汤",
+      "羊肉汤"
+    ]
+  },
+  {
+    "standardTerm": "附子粳米汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逐寒荡惊汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵陈术附汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丁桂散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘草干姜茯苓白术汤",
+    "aliases": [
+      "肾着汤",
+      "苓姜术甘汤",
+      "茯苓干姜白术甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "赤丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九痛丸",
+    "aliases": [
+      "附子丸"
+    ]
+  },
+  {
+    "standardTerm": "乌头赤石脂丸",
+    "aliases": [
+      "乌头丸"
+    ]
+  },
+  {
+    "standardTerm": "乌头煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘草干姜汤",
+    "aliases": [
+      "干姜甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "安中散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "扶阳助胃汤",
+    "aliases": [
+      "扶阳益胃汤"
+    ]
+  },
+  {
+    "standardTerm": "和胃二陈煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蟠葱散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神香散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃关煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五德丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "壮原汤",
+    "aliases": [
+      "壮元汤"
+    ]
+  },
+  {
+    "standardTerm": "回阳救急汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参附汤",
+    "aliases": [
+      "转厥安产汤"
+    ]
+  },
+  {
+    "standardTerm": "参附龙牡救逆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六味回阳饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白通汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白通加猪胆汁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茯苓四逆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "干姜附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通脉四逆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通脉四逆加猪胆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四逆加人参汤",
+    "aliases": [
+      "四顺汤",
+      "回阳饮",
+      "人参四顺汤"
+    ]
+  },
+  {
+    "standardTerm": "当归四逆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阳和汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小金丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "长胎白术散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪桂枝五物汤",
+    "aliases": [
+      "黄芪五物汤",
+      "桂枝五物汤"
+    ]
+  },
+  {
+    "standardTerm": "当归四逆加吴茱萸生姜汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蜘蛛散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "仓卒散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麻桂饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三气饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四君子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补中益气汤",
+    "aliases": [
+      "医主汤"
+    ]
+  },
+  {
+    "standardTerm": "生脉散",
+    "aliases": [
+      "生脉汤"
+    ]
+  },
+  {
+    "standardTerm": "玉屏风散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "完带汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参五味子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保元汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六君子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香砂六君子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味四君子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七味白术散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气升阳通络方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "举元煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气聪明汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升陷汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升阳益胃汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气运脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肺汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "何人饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪建中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安冲汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "异功散",
+    "aliases": [
+      "五味异功散"
+    ]
+  },
+  {
+    "standardTerm": "当归鸡血藤汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保真汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肺止流丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参健脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五痿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固真汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "独参汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胎元饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气导溺汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调元肾气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调元散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "都气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪当归散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芪鳖甲散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心莲子饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "保生汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茯苓补心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九仙王道糕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凝神散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参清肌散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三白汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寿脾煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四蒸木瓜丸",
+    "aliases": [
+      "四蒸丸"
+    ]
+  },
+  {
+    "standardTerm": "太和丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻湿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "休疟饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升麻附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四柱散",
+    "aliases": [
+      "四柱饮"
+    ]
+  },
+  {
+    "standardTerm": "益胃升阳汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参复脉散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四物汤",
+    "aliases": [
+      "地髓汤",
+      "大川芎汤"
+    ]
+  },
+  {
+    "standardTerm": "当归补血汤",
+    "aliases": [
+      "黄芪当归汤",
+      "补血汤",
+      "当归黄芪汤",
+      "芪归汤",
+      "黄芪补血汤"
+    ]
+  },
+  {
+    "standardTerm": "归脾汤",
+    "aliases": [
+      "加味归脾汤",
+      "归脾养营汤"
+    ]
+  },
+  {
+    "standardTerm": "圣愈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桃红四物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小营煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大补元煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "定经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四乌贼骨一芦茹丸",
+    "aliases": [
+      "乌贼鱼骨丸",
+      "乌鱼骨丸"
+    ]
+  },
+  {
+    "standardTerm": "四物五子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生血补髓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血定痛汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血润肤饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神应养真丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荆穗四物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除风益损汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清血四物汤",
+    "aliases": [
+      "凉血四物汤"
+    ]
+  },
+  {
+    "standardTerm": "凉血地黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "熟地首乌汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归汤",
+    "aliases": [
+      "保安散",
+      "保全散"
+    ]
+  },
+  {
+    "standardTerm": "调经种玉汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胶艾四物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛膝煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "全生活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参术饮",
+    "aliases": [
+      "参术散"
+    ]
+  },
+  {
+    "standardTerm": "四物龙胆汤",
+    "aliases": [
+      "龙胆汤"
+    ]
+  },
+  {
+    "standardTerm": "通乳汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芎归鳖甲散",
+    "aliases": [
+      "芎归鳖甲饮",
+      "芎归鳖甲汤"
+    ]
+  },
+  {
+    "standardTerm": "芎归汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三和汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八珍汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "炙甘草汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十全大补汤",
+    "aliases": [
+      "十补汤"
+    ]
+  },
+  {
+    "standardTerm": "人参养荣汤",
+    "aliases": [
+      "养荣汤"
+    ]
+  },
+  {
+    "standardTerm": "通乳丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泰山磐石散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味圣愈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "壮筋养血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "托里消毒散",
+    "aliases": [
+      "托里消毒饮",
+      "托里消毒汤"
+    ]
+  },
+  {
+    "standardTerm": "归灵内托散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神功内托散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "先天大造丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归芍药汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "助阳和血补气汤",
+    "aliases": [
+      "助阳活血汤",
+      "助阳和血汤"
+    ]
+  },
+  {
+    "standardTerm": "寿胎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肠宁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补筋丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "薯蓣丸",
+    "aliases": [
+      "大山蓣丸"
+    ]
+  },
+  {
+    "standardTerm": "补阴益气煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固真饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味大补汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "两仪膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "参归益元汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双和汤",
+    "aliases": [
+      "双和散"
+    ]
+  },
+  {
+    "standardTerm": "顺气和中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴健脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "左归丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "一贯煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘露饮",
+    "aliases": [
+      "甘露饮子"
+    ]
+  },
+  {
+    "standardTerm": "两地汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "地参菊花汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肺阿胶汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茜根散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "明目地黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固阴煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通幽汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "上下相资汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "月华丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养金汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养胃增液汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养精种玉汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清海丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋水清肝饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化阴煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味麦门冬汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加减一阴煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "归肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芍药甘草汤",
+    "aliases": [
+      "戊己汤"
+    ]
+  },
+  {
+    "standardTerm": "虎潜丸",
+    "aliases": [
+      "补阴种子丸"
+    ]
+  },
+  {
+    "standardTerm": "益阴汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴除湿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉液汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猪肤汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴至宝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴降火汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "斑龙丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡四物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "单鹿茸汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "古庵心肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "琼玉膏",
+    "aliases": [
+      "生地黄膏"
+    ]
+  },
+  {
+    "standardTerm": "生津养血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双补丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "增益归茸丸",
+    "aliases": [
+      "归茸丸"
+    ]
+  },
+  {
+    "standardTerm": "万金散",
+    "aliases": [
+      "万金汤"
+    ]
+  },
+  {
+    "standardTerm": "肾气丸",
+    "aliases": [
+      "金匮肾气丸",
+      "桂附八味丸",
+      "八味地黄丸"
+    ]
+  },
+  {
+    "standardTerm": "十补丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七福饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "右归饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "内补丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾地黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾壮筋汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾安胎饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调肝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四味回阳饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "毓麟珠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二仙汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "壮筋续骨丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾明目丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养荣壮肾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益肾调经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温胞饮",
+    "aliases": [
+      "温胞散"
+    ]
+  },
+  {
+    "standardTerm": "桂枝甘草汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝去芍药加蜀漆牡蛎龙骨救逆汤",
+    "aliases": [
+      "桂枝救逆汤"
+    ]
+  },
+  {
+    "standardTerm": "獭肝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "磁石羊肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茸附汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "地黄饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龟鹿二仙胶",
+    "aliases": [
+      "二仙胶"
+    ]
+  },
+  {
+    "standardTerm": "补天大造丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七宝美髯丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健步虎潜丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芍药甘草附子汤",
+    "aliases": [
+      "芍药附子甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "理阴煎",
+    "aliases": [
+      "理营煎"
+    ]
+  },
+  {
+    "standardTerm": "镇阴煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "究原心肾丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘皮煎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牡蛎散",
+    "aliases": [
+      "麦煎散"
+    ]
+  },
+  {
+    "standardTerm": "九仙散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "真人养脏汤",
+    "aliases": [
+      "养脏汤"
+    ]
+  },
+  {
+    "standardTerm": "桃花汤",
+    "aliases": [
+      "三物桃花汤"
+    ]
+  },
+  {
+    "standardTerm": "赤石脂丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "赤石脂禹余粮汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "烧针丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八柱汤",
+    "aliases": [
+      "八柱散"
+    ]
+  },
+  {
+    "standardTerm": "桑螵蛸散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾固冲丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金锁固精丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝加龙骨牡蛎汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天雄散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连清心饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鸡肠散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "秘元煎",
+    "aliases": [
+      "秘元汤"
+    ]
+  },
+  {
+    "standardTerm": "固冲汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "易黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固本止崩汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝甘草龙骨牡蛎汤",
+    "aliases": [
+      "桂枝龙骨牡蛎汤",
+      "桂甘龙骨牡蛎汤"
+    ]
+  },
+  {
+    "standardTerm": "定吐丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "朱砂安神丸",
+    "aliases": [
+      "安神丸",
+      "黄连安神丸"
+    ]
+  },
+  {
+    "standardTerm": "镇惊丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天王补心丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "酸枣仁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连阿胶汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神定志丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘麦大枣汤",
+    "aliases": [
+      "大枣汤",
+      "枣麦甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "交泰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "远志丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "定志丸",
+    "aliases": [
+      "开心丸"
+    ]
+  },
+  {
+    "standardTerm": "茯神散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益脾镇惊散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "二神交济丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "拱辰丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "交感丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "仁熟散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫雪",
+    "aliases": [
+      "紫雪丹"
+    ]
+  },
+  {
+    "standardTerm": "至宝丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿回春丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龙脑安神丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牛黄凉膈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳实薤白桂枝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏厚朴汤",
+    "aliases": [
+      "大七气汤",
+      "四七汤",
+      "厚朴半夏汤",
+      "七气汤",
+      "四七饮"
+    ]
+  },
+  {
+    "standardTerm": "金铃子散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厚朴温中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天台乌药散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暖肝煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "顺气活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木香顺气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瓜蒌薤白半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌药汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡清肝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香棱丸",
+    "aliases": [
+      "香壳丸"
+    ]
+  },
+  {
+    "standardTerm": "启膈散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘皮丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解肝煎",
+    "aliases": [
+      "解恨煎"
+    ]
+  },
+  {
+    "standardTerm": "四磨汤",
+    "aliases": [
+      "四磨饮"
+    ]
+  },
+  {
+    "standardTerm": "五磨饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六磨汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荆蓬煎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瓜蒌薤白白酒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正气天香散",
+    "aliases": [
+      "绀珠正气天香汤"
+    ]
+  },
+  {
+    "standardTerm": "乌药散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "匀气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味乌沉汤",
+    "aliases": [
+      "加味乌药汤"
+    ]
+  },
+  {
+    "standardTerm": "加味枳术丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正骨紫金丹",
+    "aliases": [
+      "正骨紫金丸"
+    ]
+  },
+  {
+    "standardTerm": "天仙藤散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "沉香化滞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复元通气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "海藻玉壶汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘核丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "趁痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茯苓杏仁甘草汤",
+    "aliases": [
+      "茯苓杏仁汤"
+    ]
+  },
+  {
+    "standardTerm": "茯苓饮",
+    "aliases": [
+      "外台茯苓饮",
+      "茯苓饮子"
+    ]
+  },
+  {
+    "standardTerm": "枳实芍药散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳术汤",
+    "aliases": [
+      "枳实汤"
+    ]
+  },
+  {
+    "standardTerm": "厚朴三物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘枳姜汤",
+    "aliases": [
+      "橘枳生姜汤"
+    ]
+  },
+  {
+    "standardTerm": "神秘汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八味顺气散",
+    "aliases": [
+      "乌药顺气散"
+    ]
+  },
+  {
+    "standardTerm": "分心气饮",
+    "aliases": [
+      "心气饮"
+    ]
+  },
+  {
+    "standardTerm": "加味四七汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桔梗枳壳汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘皮一物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开结舒经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "立安散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "立效济众丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六郁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木香顺气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木萸汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千金广济丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝解郁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参芎归汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "如神汤",
+    "aliases": [
+      "如神散"
+    ]
+  },
+  {
+    "standardTerm": "三和散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神圣代针散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十将军丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十六味流气饮",
+    "aliases": [
+      "疮科流气饮",
+      "流气饮",
+      "消毒流气饮"
+    ]
+  },
+  {
+    "standardTerm": "水煮木香丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苏感丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消滞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芎乌散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芎夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芎辛导痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳芎散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫苏饮",
+    "aliases": [
+      "紫苏和气饮"
+    ]
+  },
+  {
+    "standardTerm": "星香正气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开郁正元散",
+    "aliases": [
+      "消积正元散"
+    ]
+  },
+  {
+    "standardTerm": "芎附饮",
+    "aliases": [
+      "芎香散",
+      "莎芎散",
+      "芎附散"
+    ]
+  },
+  {
+    "standardTerm": "苏子降气汤",
+    "aliases": [
+      "降气汤"
+    ]
+  },
+  {
+    "standardTerm": "定喘汤",
+    "aliases": [
+      "千金定喘汤"
+    ]
+  },
+  {
+    "standardTerm": "小半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "旋覆代赭汤",
+    "aliases": [
+      "旋覆代赭石汤",
+      "代赭旋覆汤"
+    ]
+  },
+  {
+    "standardTerm": "橘皮竹茹汤",
+    "aliases": [
+      "陈皮汤"
+    ]
+  },
+  {
+    "standardTerm": "大半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丁香柿蒂汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厚朴麻黄汤",
+    "aliases": [
+      "厚朴石膏汤"
+    ]
+  },
+  {
+    "standardTerm": "小半夏加茯苓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏干姜散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茯苓桂枝甘草大枣汤",
+    "aliases": [
+      "甘草大枣汤",
+      "茯苓桂枝汤",
+      "茯苓桂甘大枣汤",
+      "茯苓桂枝甘枣汤",
+      "茯苓甘桂大枣汤",
+      "苓桂甘枣汤",
+      "桂苓甘枣汤"
+    ]
+  },
+  {
+    "standardTerm": "桂枝加桂汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘皮汤",
+    "aliases": [
+      "生姜橘皮汤",
+      "小橘皮汤"
+    ]
+  },
+  {
+    "standardTerm": "桃核承气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血府逐瘀汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补阳还五汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "复元活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温经汤",
+    "aliases": [
+      "千金调经散"
+    ]
+  },
+  {
+    "standardTerm": "生化汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "失笑散",
+    "aliases": [
+      "断弓弦散"
+    ]
+  },
+  {
+    "standardTerm": "代抵当丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活络效灵丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "少腹逐瘀汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "身痛逐瘀汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通窍活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大营煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宫外孕Ⅱ号方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "膈下逐瘀汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通瘀煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逐瘀止崩汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逐瘀止血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒筋活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化积丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "延胡索汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和营通气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黎洞丸",
+    "aliases": [
+      "黎洞丹",
+      "(山黎)峒丹",
+      "(山黎)峒丸"
+    ]
+  },
+  {
+    "standardTerm": "桃仁红花煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调荣饮",
+    "aliases": [
+      "调荣散"
+    ]
+  },
+  {
+    "standardTerm": "理冲汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "棕蒲散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和营止痛汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹参饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八厘散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "续骨活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "新伤续断汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "接骨紫金丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鸡鸣散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "会厌逐瘀汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大红丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄茯苓丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄蟅虫丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血止痛汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冲和仙膏",
+    "aliases": [
+      "阴阳散",
+      "冲和散"
+    ]
+  },
+  {
+    "standardTerm": "当归芍药散",
+    "aliases": [
+      "六气经纬丸"
+    ]
+  },
+  {
+    "standardTerm": "芎归泻心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抵当汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血散瘀汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "顺经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桃仁承气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "海桐皮汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调经散",
+    "aliases": [
+      "小调经散",
+      "小调经汤"
+    ]
+  },
+  {
+    "standardTerm": "脱花煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散结定疼汤",
+    "aliases": [
+      "散结安枕汤"
+    ]
+  },
+  {
+    "standardTerm": "散瘀和伤汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鳖甲煎丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血五根汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五加皮汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "下瘀血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄甘遂汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抵当丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蒲灰散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "土瓜根散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "王不留行散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "旋覆花汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猪膏发煎",
+    "aliases": [
+      "膏发煎"
+    ]
+  },
+  {
+    "standardTerm": "疏经活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通导散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芎归调血饮",
+    "aliases": [
+      "芎归补血汤"
+    ]
+  },
+  {
+    "standardTerm": "归术破瘕汤",
+    "aliases": [
+      "归术破癥汤"
+    ]
+  },
+  {
+    "standardTerm": "起枕散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "手拈散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒经汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风活血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十灰散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳血方",
+    "aliases": [
+      "肺血丸"
+    ]
+  },
+  {
+    "standardTerm": "小蓟饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "槐花散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄土汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胶艾汤",
+    "aliases": [
+      "芎归胶艾汤"
+    ]
+  },
+  {
+    "standardTerm": "芩术四物汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生蒲黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安老汤",
+    "aliases": [
+      "安老丹"
+    ]
+  },
+  {
+    "standardTerm": "槐角地榆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四味丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宁血汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "地榆丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柏叶汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滑石白鱼散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芩芍药汤",
+    "aliases": [
+      "芍药黄芩汤",
+      "黄芩甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "平胃地榆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七生汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "秦艽苍术汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归和血散",
+    "aliases": [
+      "当归和血汤"
+    ]
+  },
+  {
+    "standardTerm": "大秦艽汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小活络丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牵正散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消风散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苍耳散",
+    "aliases": [
+      "芷荑散",
+      "芷辛散",
+      "辛夷散",
+      "苍耳草散",
+      "苍耳子散"
+    ]
+  },
+  {
+    "standardTerm": "化风丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正容汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神仙解语丹",
+    "aliases": [
+      "解语丹"
+    ]
+  },
+  {
+    "standardTerm": "抑阳酒连散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "青州白丸子",
+    "aliases": [
+      "白丸子",
+      "青州白露丸"
+    ]
+  },
+  {
+    "standardTerm": "大活络丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三黄汤",
+    "aliases": [
+      "千金三黄汤"
+    ]
+  },
+  {
+    "standardTerm": "续命汤",
+    "aliases": [
+      "古今录验续命汤",
+      "大续命汤"
+    ]
+  },
+  {
+    "standardTerm": "八宝回春汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白僵蚕散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "薄荷煎丸",
+    "aliases": [
+      "薄荷煎"
+    ]
+  },
+  {
+    "standardTerm": "荆芥连翘汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气祛风散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丽泽通气汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六安煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "龙脑膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木香保命丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清上蠲痛汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升麻黄连汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升麻胃风汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消毒保婴丹",
+    "aliases": [
+      "神功消毒保婴丹",
+      "保婴丹",
+      "神效消毒保婴丹"
+    ]
+  },
+  {
+    "standardTerm": "甘桔汤",
+    "aliases": [
+      "必用方甘桔汤"
+    ]
+  },
+  {
+    "standardTerm": "杏苏汤",
+    "aliases": [
+      "橘苏汤",
+      "橘苏饮"
+    ]
+  },
+  {
+    "standardTerm": "洗肝明目散",
+    "aliases": [
+      "洗肝明目汤"
+    ]
+  },
+  {
+    "standardTerm": "立效散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羚角钩藤汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "镇肝熄风汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天麻钩藤饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大定风珠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "钩藤饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三甲复脉汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "绿风羚羊饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羚羊角汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋生青阳汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四物消风饮",
+    "aliases": [
+      "四物消风散"
+    ]
+  },
+  {
+    "standardTerm": "救产止痉汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阿胶鸡子黄汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "羚羊角饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "搜风解毒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石决明散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风引汤",
+    "aliases": [
+      "紫石煮散",
+      "紫石汤",
+      "引风汤",
+      "紫石散",
+      "癫痫汤"
+    ]
+  },
+  {
+    "standardTerm": "鸡屎白散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "侯氏黑散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抑肝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杏苏散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桑杏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清燥救肺汤",
+    "aliases": [
+      "清燥汤"
+    ]
+  },
+  {
+    "standardTerm": "翘荷汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "沙参麦冬汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清金化痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枇杷清肺饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "增液汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麦门冬汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益胃汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养阴清肺汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "百合固金汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血消风散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血润燥生津饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平胃散",
+    "aliases": [
+      "受拜平胃散",
+      "神效平胃散",
+      "生料平胃散",
+      "平胃丸"
+    ]
+  },
+  {
+    "standardTerm": "藿香正气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "六和汤",
+    "aliases": [
+      "六合汤"
+    ]
+  },
+  {
+    "standardTerm": "全生白术散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "藿朴夏苓汤",
+    "aliases": [
+      "藿朴胃苓汤"
+    ]
+  },
+  {
+    "standardTerm": "不换金正气散",
+    "aliases": [
+      "不换金散",
+      "真方不换金正气散",
+      "普贤正气散"
+    ]
+  },
+  {
+    "standardTerm": "柴平汤",
+    "aliases": [
+      "柴平饮",
+      "柴平煎"
+    ]
+  },
+  {
+    "standardTerm": "回生散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双解饮子",
+    "aliases": [
+      "交加散",
+      "草豆蔻散",
+      "交解饮",
+      "生熟饮子",
+      "交解饮子",
+      "交加双解饮子",
+      "交加饮子"
+    ]
+  },
+  {
+    "standardTerm": "茵陈蒿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八正散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三仁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连朴饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "拈痛汤",
+    "aliases": [
+      "当归拈痛汤"
+    ]
+  },
+  {
+    "standardTerm": "二妙散",
+    "aliases": [
+      "二妙汤"
+    ]
+  },
+  {
+    "standardTerm": "加味三妙丸",
+    "aliases": [
+      "经验加味二妙丸",
+      "加味二妙丸"
+    ]
+  },
+  {
+    "standardTerm": "五淋散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄芩滑石汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣痹汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石韦散",
+    "aliases": [
+      "石韦瞿麦散",
+      "长将散",
+      "石韦饮"
+    ]
+  },
+  {
+    "standardTerm": "甘露消毒丹",
+    "aliases": [
+      "普济解疫丹",
+      "普济解毒饮"
+    ]
+  },
+  {
+    "standardTerm": "苦参汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝止淋汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化毒除湿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀子柏皮汤",
+    "aliases": [
+      "柏皮汤",
+      "柏皮散"
+    ]
+  },
+  {
+    "standardTerm": "秦艽丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止带方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大黄硝石汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "当归贝母苦参丸",
+    "aliases": [
+      "苦参丸"
+    ]
+  },
+  {
+    "standardTerm": "矾石丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茯苓戎盐汤",
+    "aliases": [
+      "戎盐汤"
+    ]
+  },
+  {
+    "standardTerm": "金匮苦参汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "狼牙汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牡蛎泽泻散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木防己汤",
+    "aliases": [
+      "防己桂枝汤"
+    ]
+  },
+  {
+    "standardTerm": "硝石矾石散",
+    "aliases": [
+      "消石散",
+      "矾石散",
+      "矾消散",
+      "消矾散",
+      "矾石消散",
+      "矾石消石散"
+    ]
+  },
+  {
+    "standardTerm": "泽漆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "栀子大黄汤",
+    "aliases": [
+      "枳实大黄栀子豉汤",
+      "大黄汤",
+      "枳实大黄汤",
+      "栀子枳实豉大黄汤"
+    ]
+  },
+  {
+    "standardTerm": "禹功散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "万全木通汤",
+    "aliases": [
+      "万全木通散"
+    ]
+  },
+  {
+    "standardTerm": "猪苓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "防己黄芪汤",
+    "aliases": [
+      "逐湿汤",
+      "白术煎",
+      "黄芪防己汤"
+    ]
+  },
+  {
+    "standardTerm": "五皮散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿胃苓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃苓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五神汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味五苓散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "沉香散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "萆薢渗湿汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五皮饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味五淋散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "春泽汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵陈五苓散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健固汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脾利水汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鲤鱼汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝去桂加茯苓白术汤",
+    "aliases": [
+      "白术茯苓汤",
+      "桂枝去桂加苓术汤"
+    ]
+  },
+  {
+    "standardTerm": "葵子茯苓散",
+    "aliases": [
+      "葵子散",
+      "葵苓散",
+      "葵茯汤"
+    ]
+  },
+  {
+    "standardTerm": "防己茯苓汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茯苓甘草汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茯苓泽泻汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木防己去石膏加茯苓芒硝汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泽泻汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猪苓散",
+    "aliases": [
+      "三物猪苓散"
+    ]
+  },
+  {
+    "standardTerm": "赤小豆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大分清饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "对金饮子",
+    "aliases": [
+      "节金饮子"
+    ]
+  },
+  {
+    "standardTerm": "复元丹",
+    "aliases": [
+      "复元散"
+    ]
+  },
+  {
+    "standardTerm": "参术膏",
+    "aliases": [
+      "参术汤"
+    ]
+  },
+  {
+    "standardTerm": "万病五苓散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消胀饮子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "天乙丸",
+    "aliases": [
+      "天一水串"
+    ]
+  },
+  {
+    "standardTerm": "茯苓桂枝白术甘草汤",
+    "aliases": [
+      "苓桂术甘汤",
+      "茯苓白术桂枝甘草汤",
+      "茯苓桂甘白术汤",
+      "茯苓桂术甘草汤",
+      "苓桂汤",
+      "苓桂术甘草汤",
+      "桂苓甘术汤",
+      "桂苓术甘汤"
+    ]
+  },
+  {
+    "standardTerm": "真武汤",
+    "aliases": [
+      "玄武汤",
+      "固阳汤",
+      "真武丸"
+    ]
+  },
+  {
+    "standardTerm": "实脾散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "萆薢分清散",
+    "aliases": [
+      "分清散",
+      "分清饮",
+      "萆薢分清饮",
+      "萆薢饮",
+      "萆薢散"
+    ]
+  },
+  {
+    "standardTerm": "附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白术散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏麻黄丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂苓五味甘草汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛇床子散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生姜甘草汤",
+    "aliases": [
+      "生姜汤",
+      "人参甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "瓜蒌瞿麦丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "薏苡附子散",
+    "aliases": [
+      "薏苡散",
+      "薏苡仁散",
+      "薏苡仁附子散",
+      "薏苡附子汤"
+    ]
+  },
+  {
+    "standardTerm": "回首散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵陈四逆汤",
+    "aliases": [
+      "加味姜附汤",
+      "茵陈附子干姜甘草汤"
+    ]
+  },
+  {
+    "standardTerm": "羌活胜湿汤",
+    "aliases": [
+      "通气防风汤",
+      "通气防风散",
+      "胜湿汤"
+    ]
+  },
+  {
+    "standardTerm": "蠲痹汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "乌头汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八仙逍遥汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三痹汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "薏苡仁汤",
+    "aliases": [
+      "苡仁汤"
+    ]
+  },
+  {
+    "standardTerm": "防风汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "防风根汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "防风散",
+    "aliases": [
+      "圆翳防风散"
+    ]
+  },
+  {
+    "standardTerm": "羌活胜风汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "定痛膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿蠲痛汤",
+    "aliases": [
+      "除热蠲痛汤",
+      "除湿捐痹汤"
+    ]
+  },
+  {
+    "standardTerm": "桂枝芍药知母汤",
+    "aliases": [
+      "桂芍知母汤"
+    ]
+  },
+  {
+    "standardTerm": "白术附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂枝附子汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘草附子汤",
+    "aliases": [
+      "四物附子汤",
+      "桂枝甘草附子汤"
+    ]
+  },
+  {
+    "standardTerm": "二术汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "槟苏散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苍术防风汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "行湿流气散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "酒归饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灵仙除痛饮",
+    "aliases": [
+      "麻黄赤芍汤"
+    ]
+  },
+  {
+    "standardTerm": "清肌散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血驱风散",
+    "aliases": [
+      "治血驱风散",
+      "活血祛风散",
+      "活血驱风汤"
+    ]
+  },
+  {
+    "standardTerm": "二陈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温胆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连温胆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "治痰茯苓丸",
+    "aliases": [
+      "茯苓丸",
+      "消痰茯苓丸",
+      "指迷茯苓丸",
+      "千金指迷丸",
+      "世传茯苓丸",
+      "茯苓指迷丸",
+      "指述丸"
+    ]
+  },
+  {
+    "standardTerm": "导痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "涤痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苍附导痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丹溪治湿痰方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开郁二陈汤",
+    "aliases": [
+      "开菀二陈汤"
+    ]
+  },
+  {
+    "standardTerm": "化坚二陈丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "定喘化痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味磁朱丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味温胆汤",
+    "aliases": [
+      "参胡温胆汤"
+    ]
+  },
+  {
+    "standardTerm": "金水六君煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荆苏汤",
+    "aliases": [
+      "荆芥汤"
+    ]
+  },
+  {
+    "standardTerm": "开气消痰汤",
+    "aliases": [
+      "开结导痰汤"
+    ]
+  },
+  {
+    "standardTerm": "平陈汤",
+    "aliases": [
+      "陈平饮",
+      "陈平汤"
+    ]
+  },
+  {
+    "standardTerm": "清晕化痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四兽饮",
+    "aliases": [
+      "四兽汤"
+    ]
+  },
+  {
+    "standardTerm": "枳缩二陈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小陷胸汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "礞石滚痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味二陈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生铁落饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桑白皮汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "癫狂梦醒汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "将军定痛丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "竹茹汤",
+    "aliases": [
+      "干葛竹茹汤"
+    ]
+  },
+  {
+    "standardTerm": "青竹茹汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桔梗杏仁煎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清宁散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苦酒汤",
+    "aliases": [
+      "鸡壳苦酒汤",
+      "半夏苦酒汤"
+    ]
+  },
+  {
+    "standardTerm": "桔梗汤",
+    "aliases": [
+      "如圣汤"
+    ]
+  },
+  {
+    "standardTerm": "排脓散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏芩术汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瓜蒌枳实汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清金降火汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清上补下丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心滚痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小调中汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芷贝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "贝母瓜蒌散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参百合汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苓甘五味姜辛汤",
+    "aliases": [
+      "五味细辛汤",
+      "苓甘味姜辛汤",
+      "桂枝五味甘草去桂加姜辛汤"
+    ]
+  },
+  {
+    "standardTerm": "三子养亲汤",
+    "aliases": [
+      "三子汤"
+    ]
+  },
+  {
+    "standardTerm": "半夏散及汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂苓五味甘草去桂加干姜细辛半夏汤",
+    "aliases": [
+      "苓甘味姜辛夏汤",
+      "茯苓五味甘草去桂加姜辛夏汤",
+      "桂苓五味甘草去桂加姜辛半夏汤",
+      "苓甘五味姜辛半夏汤",
+      "姜苓五味细辛汤",
+      "苓甘姜味辛夏汤",
+      "桂苓五味甘草去桂加姜辛夏汤"
+    ]
+  },
+  {
+    "standardTerm": "苓甘五味加姜辛半夏杏仁汤",
+    "aliases": [
+      "苓甘味姜辛夏仁汤",
+      "茯苓甘草五味姜辛汤",
+      "苓甘姜味辛夏仁汤",
+      "茯苓甘草五味辛夏仁汤"
+    ]
+  },
+  {
+    "standardTerm": "苓甘五味加姜辛半杏大黄汤",
+    "aliases": [
+      "苓甘味姜辛夏仁黄汤",
+      "茯甘姜味辛夏仁黄汤",
+      "苓甘姜味辛夏仁黄汤"
+    ]
+  },
+  {
+    "standardTerm": "桂枝去芍药加皂荚汤",
+    "aliases": [
+      "桂枝皂荚汤"
+    ]
+  },
+  {
+    "standardTerm": "皂荚丸",
+    "aliases": [
+      "皂角丸"
+    ]
+  },
+  {
+    "standardTerm": "半夏温肺汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "半夏白术天麻汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "定痫丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "洗心汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "顺气导痰汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "追风祛痰丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大安丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消乳丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白豆蔻散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阿魏丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消疳理脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消积丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大和中饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大异香散",
+    "aliases": [
+      "大异功散"
+    ]
+  },
+  {
+    "standardTerm": "导滞汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳实消痞丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛花解酲汤",
+    "aliases": [
+      "葛花解酒汤",
+      "解酲汤"
+    ]
+  },
+  {
+    "standardTerm": "资生丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "启脾汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正传加味二陈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理中安蛔汤",
+    "aliases": [
+      "理中安蛔散",
+      "理中安蛔丸",
+      "安蛔理中汤"
+    ]
+  },
+  {
+    "standardTerm": "连梅安蛔汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆蛔汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甘草粉蜜汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿疳虫蚀齿方",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温脏丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "楝陈汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瓜蒂散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "急救稀涎散",
+    "aliases": [
+      "救急稀涎散",
+      "稀涎散",
+      "稀涎饮",
+      "吐痰散"
+    ]
+  },
+  {
+    "standardTerm": "止痛如神汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "连翘败毒散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消瘕汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消瘿散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三仁膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荣卫返魂汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "九一丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "万灵膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "八宝丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "三品一条枪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千金散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "太乙膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四黄膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生肌玉红膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白降丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "回阳玉龙膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "红灵丹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阳毒内消散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "陀僧膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桂麝散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "象皮膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄连膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双柏膏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润肌膏",
+    "aliases": []
+  }
 ]

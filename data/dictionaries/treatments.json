@@ -1,137 +1,5907 @@
 [
- {
-  "standardTerm": "解表",
-  "aliases": ["疏解表邪"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "清热",
-  "aliases": ["清热泻火", "清解里热"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "清热解毒",
-  "aliases": [],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "清热燥湿",
-  "aliases": [],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "泻下",
-  "aliases": ["攻下", "峻下"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "和解",
-  "aliases": ["和解表里", "和解少阳"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "理气",
-  "aliases": ["行气", "疏肝理气", "理气解郁"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "活血",
-  "aliases": ["活血化瘀", "行血"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "止血",
-  "aliases": [],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "化痰",
-  "aliases": ["燥湿化痰", "清热化痰"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "止咳平喘",
-  "aliases": ["降气平喘"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "安神",
-  "aliases": ["重镇安神", "养心安神"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "开窍",
-  "aliases": ["醒神开窍"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "补气",
-  "aliases": ["益气", "健脾益气"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "补血",
-  "aliases": ["养血"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "补阴",
-  "aliases": ["滋阴", "滋养阴津"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "补阳",
-  "aliases": ["温阳", "温补阳气"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "温里",
-  "aliases": ["温中", "散寒"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "祛湿",
-  "aliases": ["燥湿", "利湿", "健脾祛湿"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "利水",
-  "aliases": ["利尿", "通利小便"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "消食",
-  "aliases": ["消导"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "驱虫",
-  "aliases": [],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "固涩",
-  "aliases": ["收敛固涩"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "止痒",
-  "aliases": ["祛风止痒"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "舒筋活络",
-  "aliases": ["通络", "舒筋"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "调和气血",
-  "aliases": ["调气和血"],
-  "source": "GB/T 16751.3-2023 治法"
- },
- {
-  "standardTerm": "扶正祛邪",
-  "aliases": ["祛邪扶正"],
-  "source": "GB/T 16751.3-2023 治法"
- }
+  {
+    "standardTerm": "解表",
+    "aliases": [
+      "疏解表邪"
+    ]
+  },
+  {
+    "standardTerm": "清热",
+    "aliases": [
+      "清解里热"
+    ]
+  },
+  {
+    "standardTerm": "清热解毒",
+    "aliases": [
+      "泻火解毒",
+      "清泻火毒",
+      "清火解毒",
+      "清泻败毒"
+    ]
+  },
+  {
+    "standardTerm": "清热燥湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻下",
+    "aliases": [
+      "攻下",
+      "峻下"
+    ]
+  },
+  {
+    "standardTerm": "和解",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气",
+    "aliases": [
+      "行气"
+    ]
+  },
+  {
+    "standardTerm": "活血",
+    "aliases": [
+      "行血"
+    ]
+  },
+  {
+    "standardTerm": "止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止咳平喘",
+    "aliases": [
+      "降气平喘"
+    ]
+  },
+  {
+    "standardTerm": "安神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开窍",
+    "aliases": [
+      "醒神开窍"
+    ]
+  },
+  {
+    "standardTerm": "补气",
+    "aliases": [
+      "益气"
+    ]
+  },
+  {
+    "standardTerm": "补血",
+    "aliases": [
+      "养血"
+    ]
+  },
+  {
+    "standardTerm": "补阴",
+    "aliases": [
+      "滋养阴津"
+    ]
+  },
+  {
+    "standardTerm": "补阳",
+    "aliases": [
+      "温阳",
+      "温补阳气",
+      "壮阳"
+    ]
+  },
+  {
+    "standardTerm": "温里",
+    "aliases": [
+      "温中",
+      "散寒"
+    ]
+  },
+  {
+    "standardTerm": "祛湿",
+    "aliases": [
+      "健脾祛湿"
+    ]
+  },
+  {
+    "standardTerm": "利水",
+    "aliases": [
+      "利尿",
+      "通利小便"
+    ]
+  },
+  {
+    "standardTerm": "消食",
+    "aliases": [
+      "消导"
+    ]
+  },
+  {
+    "standardTerm": "驱虫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固涩",
+    "aliases": [
+      "收敛固涩"
+    ]
+  },
+  {
+    "standardTerm": "止痒",
+    "aliases": [
+      "祛风止痒"
+    ]
+  },
+  {
+    "standardTerm": "舒筋活络",
+    "aliases": [
+      "通络",
+      "舒筋"
+    ]
+  },
+  {
+    "standardTerm": "调和气血",
+    "aliases": [
+      "调气和血",
+      "理气和血",
+      "调理气血"
+    ]
+  },
+  {
+    "standardTerm": "扶正祛邪",
+    "aliases": [
+      "扶正达邪"
+    ]
+  },
+  {
+    "standardTerm": "治未病法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "未病先防",
+    "aliases": []
+  },
+  {
+    "standardTerm": "已病防变",
+    "aliases": [
+      "既病防变"
+    ]
+  },
+  {
+    "standardTerm": "瘥后防复",
+    "aliases": []
+  },
+  {
+    "standardTerm": "急则治标",
+    "aliases": []
+  },
+  {
+    "standardTerm": "缓则治本",
+    "aliases": []
+  },
+  {
+    "standardTerm": "标本兼治",
+    "aliases": [
+      "标本同治"
+    ]
+  },
+  {
+    "standardTerm": "因时制宜",
+    "aliases": []
+  },
+  {
+    "standardTerm": "因地制宜",
+    "aliases": []
+  },
+  {
+    "standardTerm": "因人制宜",
+    "aliases": []
+  },
+  {
+    "standardTerm": "扶正固本",
+    "aliases": [
+      "扶正培本"
+    ]
+  },
+  {
+    "standardTerm": "祛邪扶正",
+    "aliases": [
+      "祛邪安正"
+    ]
+  },
+  {
+    "standardTerm": "攻补兼施",
+    "aliases": []
+  },
+  {
+    "standardTerm": "先攻后补",
+    "aliases": []
+  },
+  {
+    "standardTerm": "先补后攻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寓攻于补",
+    "aliases": [
+      "补中寓攻"
+    ]
+  },
+  {
+    "standardTerm": "寓补于攻",
+    "aliases": [
+      "攻中寓补"
+    ]
+  },
+  {
+    "standardTerm": "正治法",
+    "aliases": [
+      "逆治法"
+    ]
+  },
+  {
+    "standardTerm": "寒者热之",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热者寒之",
+    "aliases": []
+  },
+  {
+    "standardTerm": "虚则补之",
+    "aliases": []
+  },
+  {
+    "standardTerm": "实则泻之",
+    "aliases": []
+  },
+  {
+    "standardTerm": "反治法",
+    "aliases": [
+      "从治法"
+    ]
+  },
+  {
+    "standardTerm": "寒因寒用",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热因热用",
+    "aliases": []
+  },
+  {
+    "standardTerm": "塞因塞用",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通因通用",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调理阴阳",
+    "aliases": [
+      "调平阴阳",
+      "调整阴阳"
+    ]
+  },
+  {
+    "standardTerm": "从阴引阳",
+    "aliases": [
+      "阴中求阳"
+    ]
+  },
+  {
+    "standardTerm": "从阳引阴",
+    "aliases": [
+      "阳中求阴"
+    ]
+  },
+  {
+    "standardTerm": "虚者补其母",
+    "aliases": []
+  },
+  {
+    "standardTerm": "实者泻其子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解表法",
+    "aliases": [
+      "发表法",
+      "汗法"
+    ]
+  },
+  {
+    "standardTerm": "调和营卫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风和营",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒和营",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化湿和营",
+    "aliases": [
+      "燥湿和营"
+    ]
+  },
+  {
+    "standardTerm": "辛温解表",
+    "aliases": [
+      "辛温发汗",
+      "发表散寒"
+    ]
+  },
+  {
+    "standardTerm": "疏风散寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风散寒解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "发汗解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛凉解表",
+    "aliases": [
+      "辛凉透表",
+      "疏散风热"
+    ]
+  },
+  {
+    "standardTerm": "疏邪解表",
+    "aliases": [
+      "疏邪透表"
+    ]
+  },
+  {
+    "standardTerm": "解肌发表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解肌透疹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风透疹",
+    "aliases": [
+      "解表透疹"
+    ]
+  },
+  {
+    "standardTerm": "解毒透疹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛湿解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "扶正解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "求汗于血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴解表",
+    "aliases": [
+      "滋阴发汗"
+    ]
+  },
+  {
+    "standardTerm": "温阳解表",
+    "aliases": [
+      "温阳发汗",
+      "助阳解表",
+      "助阳发汗"
+    ]
+  },
+  {
+    "standardTerm": "温经解表",
+    "aliases": [
+      "温经发汗"
+    ]
+  },
+  {
+    "standardTerm": "解表通经",
+    "aliases": []
+  },
+  {
+    "standardTerm": "表里双解法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "表里双解",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛凉清热",
+    "aliases": [
+      "解表清热"
+    ]
+  },
+  {
+    "standardTerm": "疏风清热",
+    "aliases": [
+      "疏风泻热"
+    ]
+  },
+  {
+    "standardTerm": "透表清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解表宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒清肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解表攻里",
+    "aliases": [
+      "发表攻里"
+    ]
+  },
+  {
+    "standardTerm": "解表清里",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解肌清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解表清肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解表温里",
+    "aliases": [
+      "发汗温里"
+    ]
+  },
+  {
+    "standardTerm": "涌吐法",
+    "aliases": [
+      "吐法",
+      "探吐法"
+    ]
+  },
+  {
+    "standardTerm": "涌吐宿食",
+    "aliases": []
+  },
+  {
+    "standardTerm": "涌吐痰食",
+    "aliases": []
+  },
+  {
+    "standardTerm": "涌吐痰诞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "涌吐风痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开关涌吐",
+    "aliases": [
+      "涌吐开关"
+    ]
+  },
+  {
+    "standardTerm": "攻下法",
+    "aliases": [
+      "下法",
+      "泻下法",
+      "通下法",
+      "攻里法"
+    ]
+  },
+  {
+    "standardTerm": "清热攻下",
+    "aliases": [
+      "清热通腑",
+      "泻火通腑",
+      "苦寒攻下",
+      "苦寒通下",
+      "峻下热结"
+    ]
+  },
+  {
+    "standardTerm": "泻结行滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "急下存阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温下实寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳通便",
+    "aliases": [
+      "温阳通下"
+    ]
+  },
+  {
+    "standardTerm": "攻下冷积",
+    "aliases": [
+      "攻下寒积"
+    ]
+  },
+  {
+    "standardTerm": "益气通下",
+    "aliases": [
+      "益气通便"
+    ]
+  },
+  {
+    "standardTerm": "润燥通便",
+    "aliases": [
+      "润肠通便"
+    ]
+  },
+  {
+    "standardTerm": "润肠泄热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "软坚润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻下逐水",
+    "aliases": [
+      "攻逐水饮",
+      "攻下逐水"
+    ]
+  },
+  {
+    "standardTerm": "泻热逐水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳逐水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "破积逐水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和解法",
+    "aliases": [
+      "和法"
+    ]
+  },
+  {
+    "standardTerm": "和解表里",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和解少阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和解透表",
+    "aliases": [
+      "和解祛邪"
+    ]
+  },
+  {
+    "standardTerm": "表里分消",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开达膜原",
+    "aliases": [
+      "透达膜原"
+    ]
+  },
+  {
+    "standardTerm": "驱邪截疟",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寒温并用",
+    "aliases": [
+      "温清并用"
+    ]
+  },
+  {
+    "standardTerm": "平调寒热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛开苦降",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清上温中",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温中清肠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温下清上",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调气和营",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调理冲任",
+    "aliases": [
+      "调摄冲任"
+    ]
+  },
+  {
+    "standardTerm": "调和肝脾",
+    "aliases": [
+      "调理肝脾"
+    ]
+  },
+  {
+    "standardTerm": "疏肝理脾",
+    "aliases": [
+      "疏肝和脾"
+    ]
+  },
+  {
+    "standardTerm": "疏肝健脾",
+    "aliases": [
+      "疏肝补脾"
+    ]
+  },
+  {
+    "standardTerm": "抑肝扶脾",
+    "aliases": [
+      "补脾泻肝",
+      "抑木扶土"
+    ]
+  },
+  {
+    "standardTerm": "疏肝和胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解郁和胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抑肝和胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泄肝和胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调理脾胃",
+    "aliases": [
+      "调和脾胃"
+    ]
+  },
+  {
+    "standardTerm": "健脾和胃",
+    "aliases": [
+      "补中安胃"
+    ]
+  },
+  {
+    "standardTerm": "养胃和中",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调中和胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和中缓急",
+    "aliases": []
+  },
+  {
+    "standardTerm": "调理肠胃",
+    "aliases": [
+      "调和肠胃"
+    ]
+  },
+  {
+    "standardTerm": "清热法",
+    "aliases": [
+      "清法"
+    ]
+  },
+  {
+    "standardTerm": "清热泻火",
+    "aliases": [
+      "清热降火"
+    ]
+  },
+  {
+    "standardTerm": "苦寒清热",
+    "aliases": [
+      "苦寒泻火"
+    ]
+  },
+  {
+    "standardTerm": "甘寒清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛寒清热",
+    "aliases": [
+      "辛寒清气"
+    ]
+  },
+  {
+    "standardTerm": "清热行滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热止痛",
+    "aliases": [
+      "泻火止痛"
+    ]
+  },
+  {
+    "standardTerm": "清热化斑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热止血",
+    "aliases": [
+      "泻火止血"
+    ]
+  },
+  {
+    "standardTerm": "清营解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒化斑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺解毒",
+    "aliases": [
+      "宣肺解毒"
+    ]
+  },
+  {
+    "standardTerm": "清肝解毒",
+    "aliases": [
+      "泻肝解毒"
+    ]
+  },
+  {
+    "standardTerm": "清胃解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肠解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒消瘴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热祛邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热透邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热透疹",
+    "aliases": [
+      "凉营透疹"
+    ]
+  },
+  {
+    "standardTerm": "清热宣痹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热凉营",
+    "aliases": [
+      "清气凉营"
+    ]
+  },
+  {
+    "standardTerm": "清营泄热",
+    "aliases": [
+      "凉营泄热"
+    ]
+  },
+  {
+    "standardTerm": "清营透热",
+    "aliases": [
+      "透营转气"
+    ]
+  },
+  {
+    "standardTerm": "清热凉血",
+    "aliases": [
+      "清气凉血"
+    ]
+  },
+  {
+    "standardTerm": "气血双清",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清营凉血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血清热",
+    "aliases": [
+      "凉血泻火"
+    ]
+  },
+  {
+    "standardTerm": "凉血止痢",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血化斑",
+    "aliases": [
+      "凉营化斑"
+    ]
+  },
+  {
+    "standardTerm": "凉血止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血养阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热散结",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热散结止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热消肿",
+    "aliases": [
+      "泻火消肿"
+    ]
+  },
+  {
+    "standardTerm": "清泄里热",
+    "aliases": [
+      "清泄脏腑"
+    ]
+  },
+  {
+    "standardTerm": "清宣郁热",
+    "aliases": [
+      "解郁泄热",
+      "清热除烦",
+      "清心除烦",
+      "清泄郁热"
+    ]
+  },
+  {
+    "standardTerm": "清心泻火",
+    "aliases": [
+      "清心泄热"
+    ]
+  },
+  {
+    "standardTerm": "清心导赤",
+    "aliases": [
+      "清泻火腑"
+    ]
+  },
+  {
+    "standardTerm": "清心凉营",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心凉血",
+    "aliases": [
+      "凉血清心"
+    ]
+  },
+  {
+    "standardTerm": "清心养阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心安神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心泻脾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心泻肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心泻肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心泻肾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热泻肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺止咳",
+    "aliases": [
+      "清热止咳"
+    ]
+  },
+  {
+    "standardTerm": "清肺平喘",
+    "aliases": [
+      "清热平喘"
+    ]
+  },
+  {
+    "standardTerm": "清泄膈热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺化瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清泻肺胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺泻肠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清脾泄热",
+    "aliases": [
+      "清泄脾胃伏火",
+      "清脾泻火"
+    ]
+  },
+  {
+    "standardTerm": "清胃泄热",
+    "aliases": [
+      "清胃泄火",
+      "清胃降火"
+    ]
+  },
+  {
+    "standardTerm": "清热和胃",
+    "aliases": [
+      "清热和中"
+    ]
+  },
+  {
+    "standardTerm": "清热止呕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胃止血",
+    "aliases": [
+      "清胃凉血"
+    ]
+  },
+  {
+    "standardTerm": "清胃滋阴",
+    "aliases": [
+      "清胃养阴"
+    ]
+  },
+  {
+    "standardTerm": "清胃行滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胃降逆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清泻肠热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肠止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肠止泻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肠止痢",
+    "aliases": [
+      "清热止痢"
+    ]
+  },
+  {
+    "standardTerm": "清泻肝胆",
+    "aliases": [
+      "清泄肝胆"
+    ]
+  },
+  {
+    "standardTerm": "清肝泄火",
+    "aliases": [
+      "清肝泻火",
+      "清肝泄热"
+    ]
+  },
+  {
+    "standardTerm": "疏肝清热",
+    "aliases": [
+      "疏肝泄热"
+    ]
+  },
+  {
+    "standardTerm": "清肝理气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝化瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝养阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肝清肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肝清胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清泄胆热",
+    "aliases": [
+      "清泄胆火"
+    ]
+  },
+  {
+    "standardTerm": "清泄相火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热通淋",
+    "aliases": [
+      "泻火通淋"
+    ]
+  },
+  {
+    "standardTerm": "清热调经",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热止带",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热安胎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清泻虚热",
+    "aliases": [
+      "清泻虚火"
+    ]
+  },
+  {
+    "standardTerm": "潜降虚火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咸寒清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热除蒸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热养阴",
+    "aliases": [
+      "泻火养阴"
+    ]
+  },
+  {
+    "standardTerm": "清热生津",
+    "aliases": [
+      "甘凉清热",
+      "泄热生津",
+      "泄热存津"
+    ]
+  },
+  {
+    "standardTerm": "清热止渴",
+    "aliases": [
+      "泻火止渴"
+    ]
+  },
+  {
+    "standardTerm": "理气法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气解郁",
+    "aliases": [
+      "行气解郁",
+      "顺气解郁",
+      "理气开郁",
+      "行气开郁"
+    ]
+  },
+  {
+    "standardTerm": "宣通气机",
+    "aliases": [
+      "宣畅气机"
+    ]
+  },
+  {
+    "standardTerm": "透邪解郁",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开郁降气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺解郁",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺通气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏肝理气",
+    "aliases": [
+      "疏肝解郁"
+    ]
+  },
+  {
+    "standardTerm": "疏肝利胆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平肝降逆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏肝养血",
+    "aliases": [
+      "舒肝养血"
+    ]
+  },
+  {
+    "standardTerm": "疏肝散结",
+    "aliases": [
+      "解郁散结",
+      "理气散结"
+    ]
+  },
+  {
+    "standardTerm": "疏肝化瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏肝通络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "行气降逆",
+    "aliases": [
+      "顺气降逆"
+    ]
+  },
+  {
+    "standardTerm": "宣肺降逆",
+    "aliases": [
+      "宣肺降气"
+    ]
+  },
+  {
+    "standardTerm": "宣肺止咳",
+    "aliases": [
+      "顺气止咳",
+      "降逆止咳"
+    ]
+  },
+  {
+    "standardTerm": "降逆平喘",
+    "aliases": [
+      "下气平喘"
+    ]
+  },
+  {
+    "standardTerm": "宣肺平喘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肺平喘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和胃降逆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "降逆止呕",
+    "aliases": [
+      "和胃止呕"
+    ]
+  },
+  {
+    "standardTerm": "降逆止呃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "降逆消痞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平冲降逆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气行滞",
+    "aliases": [
+      "理气导滞"
+    ]
+  },
+  {
+    "standardTerm": "行气和胃",
+    "aliases": [
+      "理气和胃",
+      "理气健胃",
+      "行气健胃"
+    ]
+  },
+  {
+    "standardTerm": "理气消痞",
+    "aliases": [
+      "行气散结",
+      "行气消痞"
+    ]
+  },
+  {
+    "standardTerm": "理气健脾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气消肿",
+    "aliases": [
+      "行气消肿"
+    ]
+  },
+  {
+    "standardTerm": "行气宽肠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利气疏导",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气调经",
+    "aliases": [
+      "行气调经"
+    ]
+  },
+  {
+    "standardTerm": "理气安胎",
+    "aliases": [
+      "调气安胎"
+    ]
+  },
+  {
+    "standardTerm": "理气止痛",
+    "aliases": [
+      "行气止痛"
+    ]
+  },
+  {
+    "standardTerm": "理气通络",
+    "aliases": [
+      "行气和络"
+    ]
+  },
+  {
+    "standardTerm": "理气化瘀",
+    "aliases": [
+      "理气活血",
+      "行气活血",
+      "行气化瘀",
+      "行气祛瘀"
+    ]
+  },
+  {
+    "standardTerm": "行气破血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气破积",
+    "aliases": [
+      "行气消积"
+    ]
+  },
+  {
+    "standardTerm": "补气升提",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理血法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血养血",
+    "aliases": [
+      "祛瘀养血",
+      "化瘀养血",
+      "和血养血"
+    ]
+  },
+  {
+    "standardTerm": "祛瘀生新",
+    "aliases": [
+      "化瘀生新"
+    ]
+  },
+  {
+    "standardTerm": "和营行瘀",
+    "aliases": [
+      "和营活血"
+    ]
+  },
+  {
+    "standardTerm": "和血安胎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血化瘀",
+    "aliases": [
+      "活血祛瘀",
+      "活血散瘀"
+    ]
+  },
+  {
+    "standardTerm": "活血行滞",
+    "aliases": [
+      "活血行气"
+    ]
+  },
+  {
+    "standardTerm": "化瘀宽胸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消散瘀血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "行血祛瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血散结",
+    "aliases": [
+      "化瘀散结"
+    ]
+  },
+  {
+    "standardTerm": "活血消积",
+    "aliases": [
+      "活血消癥"
+    ]
+  },
+  {
+    "standardTerm": "化瘀利水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀消积",
+    "aliases": []
+  },
+  {
+    "standardTerm": "破血行瘀",
+    "aliases": [
+      "破血逐瘀"
+    ]
+  },
+  {
+    "standardTerm": "行血逐瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "破瘀消肿",
+    "aliases": [
+      "祛瘀消肿",
+      "化瘀消肿",
+      "散瘀消肿"
+    ]
+  },
+  {
+    "standardTerm": "破瘀散结",
+    "aliases": [
+      "祛瘀散结",
+      "祛瘀软坚"
+    ]
+  },
+  {
+    "standardTerm": "破瘀消癥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "攻下逐瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛瘀下胎",
+    "aliases": [
+      "化瘀下胎",
+      "化瘀催产"
+    ]
+  },
+  {
+    "standardTerm": "活血舒筋",
+    "aliases": [
+      "祛瘀舒筋"
+    ]
+  },
+  {
+    "standardTerm": "舒筋和络",
+    "aliases": [
+      "舒筋通络"
+    ]
+  },
+  {
+    "standardTerm": "活血通经",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通经止痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血通痹",
+    "aliases": [
+      "化瘀通痹"
+    ]
+  },
+  {
+    "standardTerm": "活血祛风",
+    "aliases": [
+      "活血搜风"
+    ]
+  },
+  {
+    "standardTerm": "化瘀宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀宽心",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀理脾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀养胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀养肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血调经",
+    "aliases": [
+      "和血调经"
+    ]
+  },
+  {
+    "standardTerm": "活血通络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和络",
+    "aliases": [
+      "活络"
+    ]
+  },
+  {
+    "standardTerm": "和营通络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣痹和络",
+    "aliases": [
+      "通痹和络"
+    ]
+  },
+  {
+    "standardTerm": "消肿和络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛瘀通络",
+    "aliases": [
+      "化瘀通络",
+      "行瘀通络"
+    ]
+  },
+  {
+    "standardTerm": "化瘀通脑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀和胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀疏肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通络下乳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血止痛",
+    "aliases": [
+      "通络止痛"
+    ]
+  },
+  {
+    "standardTerm": "和营止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣痹止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通经止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒筋止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止血定痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀止痛",
+    "aliases": [
+      "祛瘀止痛",
+      "散瘀止痛"
+    ]
+  },
+  {
+    "standardTerm": "消癥止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和络止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀止血",
+    "aliases": [
+      "祛瘀止血"
+    ]
+  },
+  {
+    "standardTerm": "化瘀清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉血化瘀",
+    "aliases": [
+      "凉血散瘀",
+      "凉血破瘀"
+    ]
+  },
+  {
+    "standardTerm": "清热化瘀通络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛湿法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芳香化湿",
+    "aliases": [
+      "芳香化浊",
+      "芳香泄浊"
+    ]
+  },
+  {
+    "standardTerm": "轻清宣化",
+    "aliases": [
+      "清宣化浊",
+      "轻清芳化"
+    ]
+  },
+  {
+    "standardTerm": "宣散湿邪",
+    "aliases": [
+      "宣散湿浊"
+    ]
+  },
+  {
+    "standardTerm": "行气化湿",
+    "aliases": [
+      "理气化湿"
+    ]
+  },
+  {
+    "standardTerm": "祛湿除满",
+    "aliases": [
+      "燥湿散痞"
+    ]
+  },
+  {
+    "standardTerm": "祛湿止泻",
+    "aliases": [
+      "化湿止泻",
+      "渗湿止泻"
+    ]
+  },
+  {
+    "standardTerm": "祛湿止痢",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辟秽化浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿止带",
+    "aliases": [
+      "祛湿止带"
+    ]
+  },
+  {
+    "standardTerm": "祛湿解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛湿止痒",
+    "aliases": [
+      "除湿止痒",
+      "燥湿止痒"
+    ]
+  },
+  {
+    "standardTerm": "散寒除湿",
+    "aliases": [
+      "散寒祛湿"
+    ]
+  },
+  {
+    "standardTerm": "宣化寒湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温化寒湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热祛湿",
+    "aliases": [
+      "清热除湿"
+    ]
+  },
+  {
+    "standardTerm": "清热化湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热化湿行滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热化湿解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热化湿通络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热利湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清泄湿热",
+    "aliases": [
+      "化湿泄热"
+    ]
+  },
+  {
+    "standardTerm": "清化湿浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清利湿浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脾化湿",
+    "aliases": [
+      "扶脾化湿",
+      "扶脾醒湿"
+    ]
+  },
+  {
+    "standardTerm": "健脾渗湿",
+    "aliases": [
+      "渗湿健脾",
+      "健脾利湿"
+    ]
+  },
+  {
+    "standardTerm": "化湿和中",
+    "aliases": [
+      "化湿醒脾",
+      "化湿运脾",
+      "化湿健脾"
+    ]
+  },
+  {
+    "standardTerm": "温中化湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脾止带",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿通络",
+    "aliases": [
+      "化湿通络"
+    ]
+  },
+  {
+    "standardTerm": "祛湿宣痹",
+    "aliases": [
+      "化湿宣痹"
+    ]
+  },
+  {
+    "standardTerm": "除湿止痛",
+    "aliases": [
+      "祛湿止痛"
+    ]
+  },
+  {
+    "standardTerm": "燥湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛香燥湿",
+    "aliases": [
+      "辛燥祛湿",
+      "燥湿行气",
+      "燥湿行滞"
+    ]
+  },
+  {
+    "standardTerm": "祛风燥湿",
+    "aliases": [
+      "疏风燥湿",
+      "疏风化湿"
+    ]
+  },
+  {
+    "standardTerm": "辛香化浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛香健胃",
+    "aliases": [
+      "燥湿和胃",
+      "燥湿和中"
+    ]
+  },
+  {
+    "standardTerm": "辛香运脾",
+    "aliases": [
+      "燥湿运脾",
+      "燥湿健脾"
+    ]
+  },
+  {
+    "standardTerm": "苦温燥湿",
+    "aliases": [
+      "散寒燥湿"
+    ]
+  },
+  {
+    "standardTerm": "苦寒燥湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "燥湿化浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热燥湿解毒",
+    "aliases": [
+      "泄热燥湿解毒",
+      "泄热化湿解毒"
+    ]
+  },
+  {
+    "standardTerm": "燥湿敛疮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "渗湿",
+    "aliases": [
+      "淡味渗湿"
+    ]
+  },
+  {
+    "standardTerm": "淡渗分利",
+    "aliases": [
+      "淡渗祛湿"
+    ]
+  },
+  {
+    "standardTerm": "分清泄浊",
+    "aliases": [
+      "分清降浊"
+    ]
+  },
+  {
+    "standardTerm": "宽中利湿",
+    "aliases": [
+      "宽中化湿"
+    ]
+  },
+  {
+    "standardTerm": "清心利湿",
+    "aliases": [
+      "清心利水"
+    ]
+  },
+  {
+    "standardTerm": "清化三焦",
+    "aliases": [
+      "清化三焦湿热",
+      "清利三焦"
+    ]
+  },
+  {
+    "standardTerm": "清宣上焦湿热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清化中焦湿热",
+    "aliases": [
+      "清利中焦"
+    ]
+  },
+  {
+    "standardTerm": "清化脾胃",
+    "aliases": [
+      "清利脾胃",
+      "清利脾胃湿热"
+    ]
+  },
+  {
+    "standardTerm": "清利脾经",
+    "aliases": [
+      "清利脾经湿热"
+    ]
+  },
+  {
+    "standardTerm": "清利下焦湿热",
+    "aliases": [
+      "清利下焦"
+    ]
+  },
+  {
+    "standardTerm": "清利肝胆",
+    "aliases": [
+      "清利肝胆湿热"
+    ]
+  },
+  {
+    "standardTerm": "清胆利湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清利肝经",
+    "aliases": [
+      "清利肝经湿热"
+    ]
+  },
+  {
+    "standardTerm": "清利肠道",
+    "aliases": [
+      "清利肠道湿热"
+    ]
+  },
+  {
+    "standardTerm": "清利膀胱",
+    "aliases": [
+      "清利膀胱湿热"
+    ]
+  },
+  {
+    "standardTerm": "利湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利湿化浊",
+    "aliases": [
+      "祛湿化浊"
+    ]
+  },
+  {
+    "standardTerm": "化湿降浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利水消肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛湿消肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "渗湿利水",
+    "aliases": [
+      "利水渗湿",
+      "渗湿利尿"
+    ]
+  },
+  {
+    "standardTerm": "解表利水",
+    "aliases": [
+      "发汗行水",
+      "发表利水"
+    ]
+  },
+  {
+    "standardTerm": "疏风利水",
+    "aliases": [
+      "祛风利水"
+    ]
+  },
+  {
+    "standardTerm": "化气利水",
+    "aliases": [
+      "化气行水"
+    ]
+  },
+  {
+    "standardTerm": "散寒利水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺利水",
+    "aliases": [
+      "泻肺行水"
+    ]
+  },
+  {
+    "standardTerm": "健脾利水",
+    "aliases": [
+      "温脾制水"
+    ]
+  },
+  {
+    "standardTerm": "温肾利水",
+    "aliases": [
+      "温肾化水",
+      "温肾行水"
+    ]
+  },
+  {
+    "standardTerm": "润燥法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "轻宣润燥",
+    "aliases": [
+      "轻宣外燥"
+    ]
+  },
+  {
+    "standardTerm": "疏表润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风润燥",
+    "aliases": [
+      "疏风润燥"
+    ]
+  },
+  {
+    "standardTerm": "轻宣凉燥",
+    "aliases": [
+      "散寒润燥"
+    ]
+  },
+  {
+    "standardTerm": "清宣润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肺润燥",
+    "aliases": [
+      "清燥润肺"
+    ]
+  },
+  {
+    "standardTerm": "养血润燥",
+    "aliases": [
+      "补血润燥"
+    ]
+  },
+  {
+    "standardTerm": "养营润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血润肤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润肤止痒",
+    "aliases": [
+      "润燥止痒"
+    ]
+  },
+  {
+    "standardTerm": "滋阴润燥",
+    "aliases": [
+      "养阴润燥"
+    ]
+  },
+  {
+    "standardTerm": "生津润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生津止渴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润燥止渴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "增液润肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润燥止咳",
+    "aliases": [
+      "润肺止咳"
+    ]
+  },
+  {
+    "standardTerm": "增液通便",
+    "aliases": [
+      "增水行舟",
+      "增液润肠",
+      "增液通下",
+      "滋阴通下"
+    ]
+  },
+  {
+    "standardTerm": "润燥解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益法",
+    "aliases": [
+      "补法"
+    ]
+  },
+  {
+    "standardTerm": "补益心气",
+    "aliases": [
+      "补心益气"
+    ]
+  },
+  {
+    "standardTerm": "益气生脉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益心肺",
+    "aliases": [
+      "补心益肺"
+    ]
+  },
+  {
+    "standardTerm": "补益肝气",
+    "aliases": [
+      "补肝益气"
+    ]
+  },
+  {
+    "standardTerm": "补益中气",
+    "aliases": [
+      "补脾健胃",
+      "补中益气"
+    ]
+  },
+  {
+    "standardTerm": "补益脾气",
+    "aliases": [
+      "补脾益气",
+      "健脾益气"
+    ]
+  },
+  {
+    "standardTerm": "补脾止泻",
+    "aliases": [
+      "补脾止泄"
+    ]
+  },
+  {
+    "standardTerm": "补脾益肺",
+    "aliases": [
+      "培土生金"
+    ]
+  },
+  {
+    "standardTerm": "补益脾肾",
+    "aliases": [
+      "补脾益肾"
+    ]
+  },
+  {
+    "standardTerm": "补胃和中",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气升阳",
+    "aliases": [
+      "补脾升阳",
+      "升阳益气"
+    ]
+  },
+  {
+    "standardTerm": "升阳益气散火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益肺气",
+    "aliases": [
+      "补肺益气"
+    ]
+  },
+  {
+    "standardTerm": "补益肾气",
+    "aliases": [
+      "补肾益气"
+    ]
+  },
+  {
+    "standardTerm": "补肾纳气",
+    "aliases": [
+      "纳气平喘"
+    ]
+  },
+  {
+    "standardTerm": "补肾益肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾扶元",
+    "aliases": [
+      "补肾培元"
+    ]
+  },
+  {
+    "standardTerm": "补肾安胎",
+    "aliases": [
+      "补气安胎"
+    ]
+  },
+  {
+    "standardTerm": "益气下胎",
+    "aliases": [
+      "益气催产"
+    ]
+  },
+  {
+    "standardTerm": "补气固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气回阳",
+    "aliases": [
+      "益气回阳"
+    ]
+  },
+  {
+    "standardTerm": "补气祛邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气退热",
+    "aliases": [
+      "甘温除热"
+    ]
+  },
+  {
+    "standardTerm": "补气清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气化湿",
+    "aliases": [
+      "益气化湿",
+      "益气祛湿"
+    ]
+  },
+  {
+    "standardTerm": "补气祛痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气利水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血养心",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血养神",
+    "aliases": [
+      "补心养神"
+    ]
+  },
+  {
+    "standardTerm": "养血复脉",
+    "aliases": [
+      "养血通脉"
+    ]
+  },
+  {
+    "standardTerm": "补血养肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血舒肝",
+    "aliases": [
+      "养血疏肝"
+    ]
+  },
+  {
+    "standardTerm": "养血舒筋",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血平肝",
+    "aliases": [
+      "养血柔肝"
+    ]
+  },
+  {
+    "standardTerm": "养血调血",
+    "aliases": [
+      "养血和血"
+    ]
+  },
+  {
+    "standardTerm": "养血生津",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血生发",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血润肠",
+    "aliases": [
+      "养血通便"
+    ]
+  },
+  {
+    "standardTerm": "养血和络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血调经",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血安胎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血温阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "止血补气固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血祛邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血祛风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血止痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血祛痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血清热",
+    "aliases": [
+      "养血退热"
+    ]
+  },
+  {
+    "standardTerm": "养血清肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血宣痹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴",
+    "aliases": [
+      "滋补阴液"
+    ]
+  },
+  {
+    "standardTerm": "滋阴生津",
+    "aliases": [
+      "养阴生津"
+    ]
+  },
+  {
+    "standardTerm": "滋阴止渴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴补血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋补心阴",
+    "aliases": [
+      "滋养心阴"
+    ]
+  },
+  {
+    "standardTerm": "滋阴通脉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋补肝阴",
+    "aliases": [
+      "滋养肝阴"
+    ]
+  },
+  {
+    "standardTerm": "滋阴疏肝",
+    "aliases": [
+      "养阴舒肝"
+    ]
+  },
+  {
+    "standardTerm": "滋阴柔肝",
+    "aliases": [
+      "养阴柔肝"
+    ]
+  },
+  {
+    "standardTerm": "滋补肝肾",
+    "aliases": [
+      "滋肾养肝",
+      "滋水涵木",
+      "滋养肝肾"
+    ]
+  },
+  {
+    "standardTerm": "滋阴平肝",
+    "aliases": [
+      "养阴平肝"
+    ]
+  },
+  {
+    "standardTerm": "滋阴潜阳",
+    "aliases": [
+      "育阴潜阳"
+    ]
+  },
+  {
+    "standardTerm": "滋补脾阴",
+    "aliases": [
+      "滋养脾阴"
+    ]
+  },
+  {
+    "standardTerm": "养胃生津",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴益胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴通便",
+    "aliases": [
+      "滋阴润肠"
+    ]
+  },
+  {
+    "standardTerm": "滋补肺阴",
+    "aliases": [
+      "滋养肺阴"
+    ]
+  },
+  {
+    "standardTerm": "润肺生津",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴止咳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴清肺",
+    "aliases": [
+      "养阴清肺"
+    ]
+  },
+  {
+    "standardTerm": "滋肺清肠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋补肾阴",
+    "aliases": [
+      "滋养肾阴"
+    ]
+  },
+  {
+    "standardTerm": "滋肾纳气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "大补真阴",
+    "aliases": [
+      "填补真阴"
+    ]
+  },
+  {
+    "standardTerm": "滋阴清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴止汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴解郁清热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴清热化湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴清热化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴凉营",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴凉血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴降火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴祛邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴行气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴止呕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴化湿",
+    "aliases": [
+      "滋阴利湿"
+    ]
+  },
+  {
+    "standardTerm": "滋阴祛痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴利水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "坚阴止痢",
+    "aliases": [
+      "育阴止痢",
+      "养阴止痢"
+    ]
+  },
+  {
+    "standardTerm": "滋阴止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴通淋",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴化瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴搜邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补阳益气",
+    "aliases": [
+      "温阳益气"
+    ]
+  },
+  {
+    "standardTerm": "温阳行气",
+    "aliases": [
+      "温阳理气"
+    ]
+  },
+  {
+    "standardTerm": "温补心阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补心肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补心肾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补肝阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补脾胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补脾阳",
+    "aliases": [
+      "温运脾阳"
+    ]
+  },
+  {
+    "standardTerm": "温补胃阳",
+    "aliases": [
+      "温阳益胃"
+    ]
+  },
+  {
+    "standardTerm": "温中和胃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温中涩肠",
+    "aliases": [
+      "温脾止泄",
+      "温中止泻"
+    ]
+  },
+  {
+    "standardTerm": "温中止血",
+    "aliases": [
+      "温脾止血"
+    ]
+  },
+  {
+    "standardTerm": "温补脾肾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补肺阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肺止咳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肺平喘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补肾阳",
+    "aliases": [
+      "温肾壮阳",
+      "补肾壮阳",
+      "温补肾气"
+    ]
+  },
+  {
+    "standardTerm": "温补纳气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温补下元",
+    "aliases": [
+      "温补元阳"
+    ]
+  },
+  {
+    "standardTerm": "温补命火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳固摄",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳止汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳止遗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳止带",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳调经",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳固经",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳祛邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳宣痹",
+    "aliases": [
+      "温阳通痹"
+    ]
+  },
+  {
+    "standardTerm": "温阳散结",
+    "aliases": [
+      "温通散结"
+    ]
+  },
+  {
+    "standardTerm": "温阳活血",
+    "aliases": [
+      "温阳化瘀"
+    ]
+  },
+  {
+    "standardTerm": "温阳止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳止渴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳化斑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳止泻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾止泻",
+    "aliases": [
+      "温肾止泻"
+    ]
+  },
+  {
+    "standardTerm": "温阳止痢",
+    "aliases": [
+      "温中止痢"
+    ]
+  },
+  {
+    "standardTerm": "温阳祛痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳祛湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳消肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳利水",
+    "aliases": [
+      "温阳化水",
+      "温阳行水"
+    ]
+  },
+  {
+    "standardTerm": "补益气血",
+    "aliases": [
+      "补气养血"
+    ]
+  },
+  {
+    "standardTerm": "调补气血",
+    "aliases": [
+      "调养气血"
+    ]
+  },
+  {
+    "standardTerm": "温补气血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气摄血",
+    "aliases": [
+      "补脾统血"
+    ]
+  },
+  {
+    "standardTerm": "补气生血",
+    "aliases": [
+      "益气生血"
+    ]
+  },
+  {
+    "standardTerm": "补脾养血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气活血",
+    "aliases": [
+      "益气活血",
+      "益气祛瘀",
+      "益气行瘀"
+    ]
+  },
+  {
+    "standardTerm": "益气养营",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益肝脾",
+    "aliases": [
+      "补益肝脾气血"
+    ]
+  },
+  {
+    "standardTerm": "补益心脾",
+    "aliases": [
+      "补益心脾气血"
+    ]
+  },
+  {
+    "standardTerm": "补益心肝",
+    "aliases": [
+      "补益心肝气血"
+    ]
+  },
+  {
+    "standardTerm": "补益气阴",
+    "aliases": [
+      "滋补气阴",
+      "益气养阴",
+      "益气滋阴",
+      "养阴益气",
+      "滋阴益气"
+    ]
+  },
+  {
+    "standardTerm": "补气生津",
+    "aliases": [
+      "益气生津"
+    ]
+  },
+  {
+    "standardTerm": "滋补心肺",
+    "aliases": [
+      "滋养心肺"
+    ]
+  },
+  {
+    "standardTerm": "滋补心肾",
+    "aliases": [
+      "滋养心肾"
+    ]
+  },
+  {
+    "standardTerm": "滋补肺肾",
+    "aliases": [
+      "滋养肺肾"
+    ]
+  },
+  {
+    "standardTerm": "滋补肺胃",
+    "aliases": [
+      "滋养肺胃"
+    ]
+  },
+  {
+    "standardTerm": "滋补肝胃",
+    "aliases": [
+      "滋养肝胃"
+    ]
+  },
+  {
+    "standardTerm": "滋补脾胃",
+    "aliases": [
+      "滋养脾胃"
+    ]
+  },
+  {
+    "standardTerm": "滋阴补阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳滋阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴温阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固阴回阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生气于精",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益心肾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾调经",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益精髓",
+    "aliases": [
+      "补精益髓",
+      "补肾益髓",
+      "补精填髓",
+      "补肾填髓"
+    ]
+  },
+  {
+    "standardTerm": "补益精血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾益精",
+    "aliases": [
+      "补肾填精"
+    ]
+  },
+  {
+    "standardTerm": "温补肾精",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋补肾精",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温里法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "回阳",
+    "aliases": [
+      "回阳急救"
+    ]
+  },
+  {
+    "standardTerm": "温经回阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "回阳通脉",
+    "aliases": [
+      "回阳生脉"
+    ]
+  },
+  {
+    "standardTerm": "回阳救逆",
+    "aliases": [
+      "扶阳救逆"
+    ]
+  },
+  {
+    "standardTerm": "回阳固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳散寒",
+    "aliases": [
+      "温里散寒"
+    ]
+  },
+  {
+    "standardTerm": "散寒消肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通阳理气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒止泻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温通小肠",
+    "aliases": [
+      "散寒温肠"
+    ]
+  },
+  {
+    "standardTerm": "温肺散寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒平喘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温中散寒",
+    "aliases": [
+      "温中祛寒"
+    ]
+  },
+  {
+    "standardTerm": "温胃散寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温胃降逆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒止呕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温经散寒",
+    "aliases": [
+      "温经祛寒"
+    ]
+  },
+  {
+    "standardTerm": "温通经脉",
+    "aliases": [
+      "温通血脉"
+    ]
+  },
+  {
+    "standardTerm": "温经通阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温经止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温经活血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温经通络",
+    "aliases": [
+      "温阳通络"
+    ]
+  },
+  {
+    "standardTerm": "暖肝散寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肾散寒",
+    "aliases": [
+      "温肾祛寒"
+    ]
+  },
+  {
+    "standardTerm": "散寒宣痹",
+    "aliases": [
+      "祛寒宣痹"
+    ]
+  },
+  {
+    "standardTerm": "散寒止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暖宫散寒",
+    "aliases": [
+      "温经暖宫"
+    ]
+  },
+  {
+    "standardTerm": "暖宫止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛暑法",
+    "aliases": [
+      "解暑法"
+    ]
+  },
+  {
+    "standardTerm": "祛暑化湿",
+    "aliases": [
+      "解暑化湿"
+    ]
+  },
+  {
+    "standardTerm": "祛暑解表",
+    "aliases": [
+      "解表清暑",
+      "透表清暑"
+    ]
+  },
+  {
+    "standardTerm": "清暑辟秽",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清化暑湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "涤暑利湿",
+    "aliases": [
+      "清暑利湿"
+    ]
+  },
+  {
+    "standardTerm": "清暑解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛暑清热",
+    "aliases": [
+      "涤暑清热",
+      "清热祛暑",
+      "清热解暑"
+    ]
+  },
+  {
+    "standardTerm": "清暑宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心涤暑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清暑益气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "治风法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏散风邪",
+    "aliases": [
+      "疏散外风"
+    ]
+  },
+  {
+    "standardTerm": "祛风解肌",
+    "aliases": [
+      "疏风解肌"
+    ]
+  },
+  {
+    "standardTerm": "疏风清热解表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风清热祛湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风清热润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风清肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风生发",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风消肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风通络",
+    "aliases": [
+      "搜风通络",
+      "疏风通络"
+    ]
+  },
+  {
+    "standardTerm": "祛风宣痹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风止痛",
+    "aliases": [
+      "疏风止痛"
+    ]
+  },
+  {
+    "standardTerm": "疏风解毒",
+    "aliases": [
+      "疏散风毒",
+      "驱风解毒"
+    ]
+  },
+  {
+    "standardTerm": "疏风止痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风清热解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风祛湿解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热熄风",
+    "aliases": [
+      "泻火熄风"
+    ]
+  },
+  {
+    "standardTerm": "清肝熄风",
+    "aliases": [
+      "凉肝熄风"
+    ]
+  },
+  {
+    "standardTerm": "凉血熄风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清暑熄风",
+    "aliases": [
+      "清热祛暑熄风"
+    ]
+  },
+  {
+    "standardTerm": "清热化痰熄风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒熄风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "豁痰熄风",
+    "aliases": [
+      "涤痰熄风",
+      "化痰熄风"
+    ]
+  },
+  {
+    "standardTerm": "平肝熄风",
+    "aliases": [
+      "镇肝熄风"
+    ]
+  },
+  {
+    "standardTerm": "平肝潜阳",
+    "aliases": [
+      "平肝潜镇"
+    ]
+  },
+  {
+    "standardTerm": "潜阳熄风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "熄风解痉",
+    "aliases": [
+      "镇痉熄风",
+      "熄风定痉"
+    ]
+  },
+  {
+    "standardTerm": "祛风解痉",
+    "aliases": [
+      "祛风止痉",
+      "祛风镇痉"
+    ]
+  },
+  {
+    "standardTerm": "熄风定痫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴熄风",
+    "aliases": [
+      "养阴熄风"
+    ]
+  },
+  {
+    "standardTerm": "养血熄风",
+    "aliases": [
+      "和血熄风"
+    ]
+  },
+  {
+    "standardTerm": "柔肝熄风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气补血熄风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳补气熄风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺化痰",
+    "aliases": [
+      "宣肺祛痰"
+    ]
+  },
+  {
+    "standardTerm": "化痰宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化痰止咳",
+    "aliases": [
+      "祛痰止咳"
+    ]
+  },
+  {
+    "standardTerm": "化痰平喘",
+    "aliases": [
+      "祛痰平喘"
+    ]
+  },
+  {
+    "standardTerm": "豁痰宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气化痰",
+    "aliases": [
+      "行气化痰",
+      "行气祛痰"
+    ]
+  },
+  {
+    "standardTerm": "解郁化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "降气化痰",
+    "aliases": [
+      "化痰降气",
+      "降逆化痰",
+      "祛痰降气"
+    ]
+  },
+  {
+    "standardTerm": "祛痰理气宽膈",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰理气解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化痰消食",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风化痰",
+    "aliases": [
+      "治风化痰"
+    ]
+  },
+  {
+    "standardTerm": "清热化痰",
+    "aliases": [
+      "清热祛痰"
+    ]
+  },
+  {
+    "standardTerm": "清热行气化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热化痰宽胸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热滋阴化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热祛痰化瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻火涤痰",
+    "aliases": [
+      "清火涤痰",
+      "清火化痰"
+    ]
+  },
+  {
+    "standardTerm": "清肺化痰",
+    "aliases": [
+      "清金化痰"
+    ]
+  },
+  {
+    "standardTerm": "清热化痰宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺清热化饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心豁痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热化痰开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清胆化痰宁神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润燥化痰",
+    "aliases": [
+      "润肺化痰",
+      "润化燥痰"
+    ]
+  },
+  {
+    "standardTerm": "燥湿化痰",
+    "aliases": [
+      "祛湿化痰"
+    ]
+  },
+  {
+    "standardTerm": "渗湿化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰化浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温化痰饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳化饮",
+    "aliases": [
+      "温化寒饮",
+      "温散寒饮"
+    ]
+  },
+  {
+    "standardTerm": "散寒化饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解表化饮",
+    "aliases": [
+      "解表蠲饮"
+    ]
+  },
+  {
+    "standardTerm": "化饮宽胸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肺化饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺化饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化饮平喘",
+    "aliases": [
+      "化饮定哮"
+    ]
+  },
+  {
+    "standardTerm": "泻肺逐饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化饮宁心",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温脾化饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温胃化饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肾化饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温化寒痰",
+    "aliases": [
+      "温阳化痰"
+    ]
+  },
+  {
+    "standardTerm": "祛寒化痰",
+    "aliases": [
+      "散寒化痰"
+    ]
+  },
+  {
+    "standardTerm": "温肺化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温脾化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肾化痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化痰散结",
+    "aliases": []
+  },
+  {
+    "standardTerm": "豁痰软坚",
+    "aliases": [
+      "涤痰软坚",
+      "涤痰散结",
+      "涤痰破结"
+    ]
+  },
+  {
+    "standardTerm": "祛痰宣痹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化痰通络",
+    "aliases": [
+      "化痰搜络"
+    ]
+  },
+  {
+    "standardTerm": "化痰消瘿",
+    "aliases": [
+      "化痰消瘤"
+    ]
+  },
+  {
+    "standardTerm": "祛痰化瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰化瘀宽心",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰化瘀宽膈",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰化瘀宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开窍法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开窍通闭",
+    "aliases": [
+      "通窍开闭"
+    ]
+  },
+  {
+    "standardTerm": "宁心开窍",
+    "aliases": [
+      "宁神开窍"
+    ]
+  },
+  {
+    "standardTerm": "行气开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芳香开窍",
+    "aliases": [
+      "辟秽通窍"
+    ]
+  },
+  {
+    "standardTerm": "开窍泄浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "利湿开窍",
+    "aliases": [
+      "化湿开窍",
+      "化湿通窍"
+    ]
+  },
+  {
+    "standardTerm": "开噤通关",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒开窍",
+    "aliases": [
+      "辛温开窍",
+      "辛温通窍",
+      "散寒通窍"
+    ]
+  },
+  {
+    "standardTerm": "清热开窍",
+    "aliases": [
+      "泄热开窍"
+    ]
+  },
+  {
+    "standardTerm": "辛凉开窍",
+    "aliases": [
+      "辛凉通窍"
+    ]
+  },
+  {
+    "standardTerm": "凉营开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清心开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛暑开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛暑开闭",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒开闭",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒开肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化痰开窍",
+    "aliases": [
+      "祛痰开窍",
+      "涤痰开窍",
+      "豁痰开窍"
+    ]
+  },
+  {
+    "standardTerm": "祛痰化湿开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "搜风祛痰开窍",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消石开闭",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杀虫法",
+    "aliases": [
+      "驱虫法"
+    ]
+  },
+  {
+    "standardTerm": "驱蛔杀虫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "驱虫攻下",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温脏安蛔",
+    "aliases": [
+      "温中安蛔"
+    ]
+  },
+  {
+    "standardTerm": "清热安蛔",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安蛔止厥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风杀虫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "燥湿杀虫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰杀虫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杀虫解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杀虫止痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杀虫解毒宣肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杀虫消疳",
+    "aliases": [
+      "杀虫消积"
+    ]
+  },
+  {
+    "standardTerm": "健脾驱虫",
+    "aliases": [
+      "补脾驱虫"
+    ]
+  },
+  {
+    "standardTerm": "杀虫宁神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健脑安神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气安神",
+    "aliases": [
+      "益气定神"
+    ]
+  },
+  {
+    "standardTerm": "养血安神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安神止痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴安神",
+    "aliases": [
+      "养阴安神"
+    ]
+  },
+  {
+    "standardTerm": "养心安神",
+    "aliases": [
+      "补心安神"
+    ]
+  },
+  {
+    "standardTerm": "益肾宁神",
+    "aliases": [
+      "补肾安神"
+    ]
+  },
+  {
+    "standardTerm": "安神定志",
+    "aliases": [
+      "宁心定志",
+      "宁心定悸"
+    ]
+  },
+  {
+    "standardTerm": "解郁安神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和中安神",
+    "aliases": [
+      "和胃安神"
+    ]
+  },
+  {
+    "standardTerm": "解毒安神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "镇惊安神",
+    "aliases": [
+      "镇心安神"
+    ]
+  },
+  {
+    "standardTerm": "重镇安神",
+    "aliases": [
+      "潜镇安神"
+    ]
+  },
+  {
+    "standardTerm": "消导法",
+    "aliases": [
+      "消法"
+    ]
+  },
+  {
+    "standardTerm": "消食导滞",
+    "aliases": [
+      "消食化滞"
+    ]
+  },
+  {
+    "standardTerm": "消食和中",
+    "aliases": [
+      "消食和胃"
+    ]
+  },
+  {
+    "standardTerm": "消食止呕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消食止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消食解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热导滞",
+    "aliases": [
+      "泄热导滞"
+    ]
+  },
+  {
+    "standardTerm": "消痞化积",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泄热消痞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和中消痞",
+    "aliases": [
+      "和胃消痞"
+    ]
+  },
+  {
+    "standardTerm": "软坚散结",
+    "aliases": [
+      "软坚消结",
+      "散结软坚"
+    ]
+  },
+  {
+    "standardTerm": "益气散结",
+    "aliases": [
+      "益气消癥"
+    ]
+  },
+  {
+    "standardTerm": "养营软坚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养阴软坚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舒筋散结",
+    "aliases": []
+  },
+  {
+    "standardTerm": "软坚消瘿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宽胸散结",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通乳散结",
+    "aliases": []
+  },
+  {
+    "standardTerm": "软坚消癥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "破积散结",
+    "aliases": [
+      "破积消结",
+      "破积消癥",
+      "破积消聚"
+    ]
+  },
+  {
+    "standardTerm": "消石导滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "分消上下",
+    "aliases": []
+  },
+  {
+    "standardTerm": "分消走泄",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固涩法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气固摄",
+    "aliases": [
+      "益气固摄"
+    ]
+  },
+  {
+    "standardTerm": "固表止汗",
+    "aliases": [
+      "敛汗固表",
+      "固表敛汗"
+    ]
+  },
+  {
+    "standardTerm": "益气固表",
+    "aliases": [
+      "补气固表"
+    ]
+  },
+  {
+    "standardTerm": "补肺固表",
+    "aliases": []
+  },
+  {
+    "standardTerm": "敛阴固表",
+    "aliases": [
+      "敛阴止汗"
+    ]
+  },
+  {
+    "standardTerm": "扶阳固表",
+    "aliases": [
+      "助阳固表"
+    ]
+  },
+  {
+    "standardTerm": "敛肺止咳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "敛肺平喘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气摄精",
+    "aliases": []
+  },
+  {
+    "standardTerm": "升提固涩",
+    "aliases": [
+      "升清固涩"
+    ]
+  },
+  {
+    "standardTerm": "固摄止血",
+    "aliases": [
+      "摄血止血"
+    ]
+  },
+  {
+    "standardTerm": "固气摄血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固经止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固冲止血",
+    "aliases": [
+      "固冲摄血"
+    ]
+  },
+  {
+    "standardTerm": "固崩止血",
+    "aliases": [
+      "固崩止漏"
+    ]
+  },
+  {
+    "standardTerm": "止血安胎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "摄血固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固护阴液",
+    "aliases": [
+      "敛阴固脱"
+    ]
+  },
+  {
+    "standardTerm": "固摄敛泪",
+    "aliases": [
+      "收敛止泪"
+    ]
+  },
+  {
+    "standardTerm": "固涩敛乳",
+    "aliases": [
+      "补气敛乳",
+      "补气摄乳"
+    ]
+  },
+  {
+    "standardTerm": "涩肠止泻",
+    "aliases": [
+      "固肠止泻"
+    ]
+  },
+  {
+    "standardTerm": "涩肠止痢",
+    "aliases": [
+      "固涩止痢"
+    ]
+  },
+  {
+    "standardTerm": "涩肠固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "敛汗固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾固涩",
+    "aliases": [
+      "固摄下元",
+      "固摄肾气"
+    ]
+  },
+  {
+    "standardTerm": "温肾固涩",
+    "aliases": [
+      "温肾固下"
+    ]
+  },
+  {
+    "standardTerm": "补肾固精",
+    "aliases": [
+      "固肾摄精",
+      "补肾摄精"
+    ]
+  },
+  {
+    "standardTerm": "补肾固冲",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固冲止带",
+    "aliases": [
+      "固肾涩带",
+      "固肾止带"
+    ]
+  },
+  {
+    "standardTerm": "涩精止遗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固脬止遗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固脬止尿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固脬止淋",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固肾安胎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温肾固脱",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温阳固脱",
+    "aliases": [
+      "温涩固脱"
+    ]
+  },
+  {
+    "standardTerm": "治痈疡法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消痈散疖",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消肿散结",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消肿软坚",
+    "aliases": [
+      "软坚消肿",
+      "消肿溃坚"
+    ]
+  },
+  {
+    "standardTerm": "消散疔疮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消肿止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血消痈",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血祛腐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛瘀排脓",
+    "aliases": [
+      "散瘀排脓",
+      "逐瘀排脓"
+    ]
+  },
+  {
+    "standardTerm": "通乳消痈",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒消痈",
+    "aliases": [
+      "解毒散痈"
+    ]
+  },
+  {
+    "standardTerm": "解毒消肿",
+    "aliases": [
+      "化毒消肿",
+      "化毒散结"
+    ]
+  },
+  {
+    "standardTerm": "解毒止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "敛疮止痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "活血解毒",
+    "aliases": [
+      "解毒化瘀",
+      "解毒通络"
+    ]
+  },
+  {
+    "standardTerm": "排脓解毒",
+    "aliases": [
+      "排脓托毒"
+    ]
+  },
+  {
+    "standardTerm": "化痰解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通腑消痈",
+    "aliases": [
+      "通腑解毒消痈"
+    ]
+  },
+  {
+    "standardTerm": "祛腐消肿",
+    "aliases": [
+      "去腐消肿"
+    ]
+  },
+  {
+    "standardTerm": "祛腐泄毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "发汗解毒",
+    "aliases": [
+      "发汗驱毒"
+    ]
+  },
+  {
+    "standardTerm": "解毒护阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣泄血毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清解余毒",
+    "aliases": [
+      "清透伏邪"
+    ]
+  },
+  {
+    "standardTerm": "提脓拔毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "箍毒消肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化毒成脓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "聚毒排脓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "提脓祛腐",
+    "aliases": [
+      "祛腐排脓",
+      "祛腐提脓",
+      "提脓去腐"
+    ]
+  },
+  {
+    "standardTerm": "补益托毒",
+    "aliases": [
+      "扶正解毒",
+      "扶正托毒"
+    ]
+  },
+  {
+    "standardTerm": "托毒透邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "和营托毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "托毒护心",
+    "aliases": [
+      "托里护心"
+    ]
+  },
+  {
+    "standardTerm": "补气解毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴托毒",
+    "aliases": [
+      "滋阴清热托毒"
+    ]
+  },
+  {
+    "standardTerm": "排脓消肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热排脓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热祛腐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通腑排脓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "扶正排脓",
+    "aliases": [
+      "扶正排脓解毒"
+    ]
+  },
+  {
+    "standardTerm": "托里排脓",
+    "aliases": [
+      "托里透脓"
+    ]
+  },
+  {
+    "standardTerm": "托毒排脓",
+    "aliases": [
+      "托毒透脓"
+    ]
+  },
+  {
+    "standardTerm": "祛腐生肌",
+    "aliases": [
+      "去腐生肌"
+    ]
+  },
+  {
+    "standardTerm": "消肿生肌",
+    "aliases": []
+  },
+  {
+    "standardTerm": "去毒生肌",
+    "aliases": [
+      "排毒生肌"
+    ]
+  },
+  {
+    "standardTerm": "煨脓长肉",
+    "aliases": [
+      "煨脓生肌"
+    ]
+  },
+  {
+    "standardTerm": "透脓生肌",
+    "aliases": []
+  },
+  {
+    "standardTerm": "燥湿生肌",
+    "aliases": [
+      "生肌燥湿"
+    ]
+  },
+  {
+    "standardTerm": "和营生新",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血生肌",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养阴生肌",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气生肌",
+    "aliases": []
+  },
+  {
+    "standardTerm": "回阳生肌",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生肌收口",
+    "aliases": []
+  },
+  {
+    "standardTerm": "生肌定痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "治五官法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛邪明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛风明目",
+    "aliases": [
+      "疏风明目",
+      "搜风明目"
+    ]
+  },
+  {
+    "standardTerm": "清热明目",
+    "aliases": [
+      "泻火明目",
+      "泄热明目",
+      "清肝明目"
+    ]
+  },
+  {
+    "standardTerm": "凉血明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "化瘀明目",
+    "aliases": [
+      "活血明目",
+      "祛瘀明目"
+    ]
+  },
+  {
+    "standardTerm": "退翳明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补气明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "养血明目",
+    "aliases": [
+      "养肝明目"
+    ]
+  },
+  {
+    "standardTerm": "滋肝明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾明目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通耳",
+    "aliases": [
+      "利耳"
+    ]
+  },
+  {
+    "standardTerm": "祛邪利耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风宣耳",
+    "aliases": [
+      "祛风宣耳",
+      "祛风通耳"
+    ]
+  },
+  {
+    "standardTerm": "降火清耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒利耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿利耳",
+    "aliases": [
+      "祛湿利耳",
+      "祛湿通耳"
+    ]
+  },
+  {
+    "standardTerm": "祛痰利耳",
+    "aliases": [
+      "祛痰通耳"
+    ]
+  },
+  {
+    "standardTerm": "化浊利耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "理气通耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逐瘀通耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温化寒水利耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平肝潜阳利耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻肝清耳",
+    "aliases": [
+      "泻胆清耳"
+    ]
+  },
+  {
+    "standardTerm": "补益濡耳",
+    "aliases": [
+      "补益利耳"
+    ]
+  },
+  {
+    "standardTerm": "补气通耳",
+    "aliases": [
+      "益气通耳"
+    ]
+  },
+  {
+    "standardTerm": "补血养耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴濡耳",
+    "aliases": [
+      "养阴濡耳"
+    ]
+  },
+  {
+    "standardTerm": "滋肾濡耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋肝濡耳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛邪利鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风通鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒通鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "除湿利鼻",
+    "aliases": [
+      "化浊通鼻",
+      "化浊利鼻"
+    ]
+  },
+  {
+    "standardTerm": "清燥润鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芳香通鼻",
+    "aliases": [
+      "芳香通窍"
+    ]
+  },
+  {
+    "standardTerm": "清胆利鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒利鼻",
+    "aliases": [
+      "解毒通鼻"
+    ]
+  },
+  {
+    "standardTerm": "祛瘀通鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益利鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气煦鼻",
+    "aliases": [
+      "补气煦鼻",
+      "补气通鼻"
+    ]
+  },
+  {
+    "standardTerm": "补血滋鼻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴通鼻",
+    "aliases": [
+      "养阴通鼻",
+      "养阴润鼻"
+    ]
+  },
+  {
+    "standardTerm": "温阳通鼻",
+    "aliases": [
+      "升阳通鼻"
+    ]
+  },
+  {
+    "standardTerm": "利咽",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛邪利咽",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风利咽",
+    "aliases": [
+      "疏风利喉"
+    ]
+  },
+  {
+    "standardTerm": "散寒利咽",
+    "aliases": [
+      "散寒利喉",
+      "疏风散寒利咽"
+    ]
+  },
+  {
+    "standardTerm": "清胃利咽",
+    "aliases": [
+      "清胃利喉"
+    ]
+  },
+  {
+    "standardTerm": "理气利咽",
+    "aliases": [
+      "理气利喉"
+    ]
+  },
+  {
+    "standardTerm": "祛痰利咽",
+    "aliases": [
+      "祛痰利喉"
+    ]
+  },
+  {
+    "standardTerm": "逐瘀利咽",
+    "aliases": [
+      "活血利咽"
+    ]
+  },
+  {
+    "standardTerm": "补益利咽",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气利咽",
+    "aliases": [
+      "益气健喉"
+    ]
+  },
+  {
+    "standardTerm": "滋阴润咽",
+    "aliases": [
+      "滋阴利咽"
+    ]
+  },
+  {
+    "standardTerm": "生津利咽",
+    "aliases": [
+      "润燥利咽"
+    ]
+  },
+  {
+    "standardTerm": "滋阴润喉",
+    "aliases": [
+      "滋阴利喉"
+    ]
+  },
+  {
+    "standardTerm": "开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛邪开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣肺开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "散寒开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清热开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛痰开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "行气开音",
+    "aliases": [
+      "理气开音"
+    ]
+  },
+  {
+    "standardTerm": "祛瘀开音",
+    "aliases": [
+      "活血开音",
+      "逐瘀开音"
+    ]
+  },
+  {
+    "standardTerm": "散结开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消肿开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滋阴开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润燥开音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固齿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛邪固齿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疏风固齿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "祛湿利齿",
+    "aliases": [
+      "化浊利齿",
+      "祛痰利齿"
+    ]
+  },
+  {
+    "standardTerm": "降火固齿",
+    "aliases": [
+      "清热固齿"
+    ]
+  },
+  {
+    "standardTerm": "解毒固齿",
+    "aliases": [
+      "解毒健齿"
+    ]
+  },
+  {
+    "standardTerm": "解毒利龈",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逐瘀消龈肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补益固齿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益气固齿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补血养龈",
+    "aliases": [
+      "补血健齿"
+    ]
+  },
+  {
+    "standardTerm": "滋阴养龈",
+    "aliases": [
+      "滋阴润齿"
+    ]
+  },
+  {
+    "standardTerm": "温阳健齿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "补肾固齿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "其他治法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "壮水制阳",
+    "aliases": [
+      "滋阴抑阳"
+    ]
+  },
+  {
+    "standardTerm": "益火消阴",
+    "aliases": [
+      "壮阳消阴"
+    ]
+  },
+  {
+    "standardTerm": "引火归原",
+    "aliases": [
+      "引火归元",
+      "导龙入海"
+    ]
+  },
+  {
+    "standardTerm": "宣通三焦",
+    "aliases": []
+  },
+  {
+    "standardTerm": "交通心肾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清利头目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滑利窍道",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宽胸利膈",
+    "aliases": []
+  },
+  {
+    "standardTerm": "续筋接骨",
+    "aliases": []
+  },
+  {
+    "standardTerm": "强筋壮骨",
+    "aliases": []
+  },
+  {
+    "standardTerm": "酸甘化阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "辛甘化阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "佐金平木",
+    "aliases": []
+  },
+  {
+    "standardTerm": "益火生土",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金水相生",
+    "aliases": []
+  },
+  {
+    "standardTerm": "培土制水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泻南补北",
+    "aliases": []
+  },
+  {
+    "standardTerm": "畜鱼置介",
+    "aliases": []
+  },
+  {
+    "standardTerm": "提壶揭盖",
+    "aliases": []
+  },
+  {
+    "standardTerm": "逆流挽舟",
+    "aliases": [
+      "急流挽舟"
+    ]
+  },
+  {
+    "standardTerm": "开鬼门，洁净府",
+    "aliases": []
+  },
+  {
+    "standardTerm": "解毒安胎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "以毒攻毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "针灸疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "体针疗法",
+    "aliases": [
+      "毫针疗法"
+    ]
+  },
+  {
+    "standardTerm": "头针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "面针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眼针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳压疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舌针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脊背针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "手针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "足针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腕踝针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "皮内针疗法",
+    "aliases": [
+      "皮下埋针疗法",
+      "浅刺留针疗法"
+    ]
+  },
+  {
+    "standardTerm": "巨针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七星针疗法",
+    "aliases": [
+      "梅花针疗法",
+      "罗汉针疗法"
+    ]
+  },
+  {
+    "standardTerm": "三棱针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "挑治疗法",
+    "aliases": [
+      "挑针疗法",
+      "截根法"
+    ]
+  },
+  {
+    "standardTerm": "刺四缝疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "陶针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "芒针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "点刺疗法",
+    "aliases": [
+      "快速浅刺疗法",
+      "毛刺疗法"
+    ]
+  },
+  {
+    "standardTerm": "针刺麻醉法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "刺络拔罐疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脉冲电针疗法",
+    "aliases": [
+      "电针疗法"
+    ]
+  },
+  {
+    "standardTerm": "微波针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "激光针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "电离子导入疗法",
+    "aliases": [
+      "电离子透入疗法"
+    ]
+  },
+  {
+    "standardTerm": "水针疗法",
+    "aliases": [
+      "穴位注射疗法"
+    ]
+  },
+  {
+    "standardTerm": "火针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "麦粒灸疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疤痕灸疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "隔姜灸疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "隔蒜灸疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药饼灸疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "艾条灸疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "雷火针灸疗法",
+    "aliases": [
+      "雷火神针疗法"
+    ]
+  },
+  {
+    "standardTerm": "太乙针灸疗法",
+    "aliases": [
+      "太乙神针疗法"
+    ]
+  },
+  {
+    "standardTerm": "推拿疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小儿推拿疗法",
+    "aliases": [
+      "小儿按摩疗法"
+    ]
+  },
+  {
+    "standardTerm": "脏腑经穴推拿疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "正骨推拿疗法",
+    "aliases": [
+      "正骨推拿手法",
+      "伤科按摩手法"
+    ]
+  },
+  {
+    "standardTerm": "喉科擎拿疗法",
+    "aliases": [
+      "喉科擒拿手法"
+    ]
+  },
+  {
+    "standardTerm": "膏摩疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "内功推拿疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "一指禅推拿疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "㨰法推拿疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "捏脊疗法",
+    "aliases": [
+      "捏积疗法"
+    ]
+  },
+  {
+    "standardTerm": "点穴疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "指拨疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "推扳疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "拍击疗法",
+    "aliases": [
+      "棒击疗法"
+    ]
+  },
+  {
+    "standardTerm": "保健按摩疗法",
+    "aliases": [
+      "自我按摩疗法"
+    ]
+  },
+  {
+    "standardTerm": "鼓气吹张疗法",
+    "aliases": [
+      "咽鼓管鼓气吹张疗法"
+    ]
+  },
+  {
+    "standardTerm": "鼓膜按摩",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鸣天鼓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眼保健推拿疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "外治疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药熨疗法",
+    "aliases": [
+      "热熨疗法"
+    ]
+  },
+  {
+    "standardTerm": "敷贴疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "发泡疗法",
+    "aliases": [
+      "天灸疗法"
+    ]
+  },
+  {
+    "standardTerm": "敷脐疗法",
+    "aliases": [
+      "脐疗法"
+    ]
+  },
+  {
+    "standardTerm": "湿敷疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "湿泥疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热敷疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热蜡疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "熏蒸疗法",
+    "aliases": [
+      "汽浴疗法"
+    ]
+  },
+  {
+    "standardTerm": "熏洗疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "烟熏疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "神灯照疗法",
+    "aliases": [
+      "神火照疗法"
+    ]
+  },
+  {
+    "standardTerm": "冲洗疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "沐浴疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "浸洗疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "膏药疗法",
+    "aliases": [
+      "薄贴疗法"
+    ]
+  },
+  {
+    "standardTerm": "药膏疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "箍围疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腐蚀疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "烧灼疗法",
+    "aliases": [
+      "点灼疗法"
+    ]
+  },
+  {
+    "standardTerm": "药栓疗法",
+    "aliases": [
+      "坐药疗法"
+    ]
+  },
+  {
+    "standardTerm": "灌肠疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "握药疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药枕疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药肚疗法",
+    "aliases": [
+      "兜肚疗法"
+    ]
+  },
+  {
+    "standardTerm": "药带疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "香佩疗法",
+    "aliases": [
+      "佩药疗法"
+    ]
+  },
+  {
+    "standardTerm": "枯痔疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枯痔钉疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枯痔硬化疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "拔罐疗法",
+    "aliases": [
+      "吸筒疗法"
+    ]
+  },
+  {
+    "standardTerm": "走罐疗法",
+    "aliases": [
+      "推罐疗法"
+    ]
+  },
+  {
+    "standardTerm": "药筒疗法",
+    "aliases": [
+      "药罐疗法",
+      "药筒拔法"
+    ]
+  },
+  {
+    "standardTerm": "火烙疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "扁桃体烙治疗法",
+    "aliases": [
+      "喉核烙法"
+    ]
+  },
+  {
+    "standardTerm": "打灯火疗法",
+    "aliases": [
+      "爆灯火疗法",
+      "烧灯火疗法"
+    ]
+  },
+  {
+    "standardTerm": "切开疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "割治疗法",
+    "aliases": [
+      "割脂疗法"
+    ]
+  },
+  {
+    "standardTerm": "钩割疗法",
+    "aliases": [
+      "钩割法"
+    ]
+  },
+  {
+    "standardTerm": "鼻丘割治疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "割掌疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小针刀疗法",
+    "aliases": [
+      "针刀疗法"
+    ]
+  },
+  {
+    "standardTerm": "刺血疗法",
+    "aliases": [
+      "针刺放血疗法"
+    ]
+  },
+  {
+    "standardTerm": "扁桃体啄治疗法",
+    "aliases": [
+      "喉核啄治法"
+    ]
+  },
+  {
+    "standardTerm": "砭镰疗法",
+    "aliases": [
+      "镰洗疗法",
+      "飞针疗法"
+    ]
+  },
+  {
+    "standardTerm": "刮痧疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "撮痧疗法",
+    "aliases": [
+      "捏痧疗法",
+      "抓痧疗法"
+    ]
+  },
+  {
+    "standardTerm": "缠缚疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "引流疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "吸引疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药线疗法",
+    "aliases": [
+      "药捻疗法"
+    ]
+  },
+  {
+    "standardTerm": "拖线疗法",
+    "aliases": [
+      "拖线法"
+    ]
+  },
+  {
+    "standardTerm": "灌注疗法",
+    "aliases": [
+      "药物灌注法"
+    ]
+  },
+  {
+    "standardTerm": "垫棉疗法",
+    "aliases": [
+      "垫棉法",
+      "垫棉压迫疗法"
+    ]
+  },
+  {
+    "standardTerm": "点眼疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "敷眼疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "海螵蛸摩擦疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "金针拨障疗法",
+    "aliases": [
+      "针拨疗法"
+    ]
+  },
+  {
+    "standardTerm": "塞耳疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "吹耳疗法",
+    "aliases": [
+      "耳内吹粉疗法",
+      "药末吹耳疗法",
+      "药末喷耳疗法"
+    ]
+  },
+  {
+    "standardTerm": "滴耳疗法",
+    "aliases": [
+      "药液滴耳疗法"
+    ]
+  },
+  {
+    "standardTerm": "洗耳疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "塞鼻疗法",
+    "aliases": [
+      "药物塞鼻疗法"
+    ]
+  },
+  {
+    "standardTerm": "鼻腔填塞疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药液滴鼻疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "油剂滴鼻疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "吹鼻疗法",
+    "aliases": [
+      "散剂吸药疗法"
+    ]
+  },
+  {
+    "standardTerm": "取嚏疗法",
+    "aliases": [
+      "催嚏开窍疗法"
+    ]
+  },
+  {
+    "standardTerm": "鼻嗅疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气雾吸入疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "雾化吸入疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喷雾疗法",
+    "aliases": [
+      "蒸汽吸入疗法"
+    ]
+  },
+  {
+    "standardTerm": "噙化疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "含漱疗法",
+    "aliases": [
+      "药液漱口疗法"
+    ]
+  },
+  {
+    "standardTerm": "小儿蒂丁指压疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "吹喉疗法",
+    "aliases": [
+      "咽部涂药疗法"
+    ]
+  },
+  {
+    "standardTerm": "药液拭口疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "擦牙疗法",
+    "aliases": [
+      "擦牙开噤疗法"
+    ]
+  },
+  {
+    "standardTerm": "结扎疗法",
+    "aliases": [
+      "缠扎疗法"
+    ]
+  },
+  {
+    "standardTerm": "挂线疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "套扎疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "结扎切除疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "切开挂线疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "整复疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牵引疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "骨盆牵引法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "颈椎布兜牵引法",
+    "aliases": [
+      "枕颌带牵引法"
+    ]
+  },
+  {
+    "standardTerm": "包扎固定疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夹板固定疗法",
+    "aliases": [
+      "夹缚固定疗法"
+    ]
+  },
+  {
+    "standardTerm": "穴位埋线疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "磁穴疗法",
+    "aliases": [
+      "磁场敷贴穴位疗法",
+      "磁针疗法"
+    ]
+  },
+  {
+    "standardTerm": "饮食疗法",
+    "aliases": [
+      "食物疗法"
+    ]
+  },
+  {
+    "standardTerm": "食养",
+    "aliases": [
+      "饮食养生"
+    ]
+  },
+  {
+    "standardTerm": "食疗",
+    "aliases": [
+      "食治疗法"
+    ]
+  },
+  {
+    "standardTerm": "药膳疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药饭疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药粥疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药酒疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药茶疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脏器疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "意疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "情志疗法",
+    "aliases": [
+      "精神疗法"
+    ]
+  },
+  {
+    "standardTerm": "意示入眠疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "语言开导疗法",
+    "aliases": [
+      "劝说开导疗法"
+    ]
+  },
+  {
+    "standardTerm": "以情胜情疗法",
+    "aliases": [
+      "情志相胜疗法",
+      "情志相胜法"
+    ]
+  },
+  {
+    "standardTerm": "移情易性疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暗示解惑疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "顺意疗法",
+    "aliases": [
+      "顺情从欲疗法"
+    ]
+  },
+  {
+    "standardTerm": "习以平惊疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "音乐疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "歌吟疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "舞蹈疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "杂疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "矿泉疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "日光浴疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蜞针疗法",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蜂毒疗法",
+    "aliases": [
+      "蜂螫疗法",
+      "蜂针疗法"
+    ]
+  },
+  {
+    "standardTerm": "鳝血疗法",
+    "aliases": []
+  }
 ]

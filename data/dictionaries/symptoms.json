@@ -1,394 +1,516 @@
 [
- {
-  "standardTerm": "失眠",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "胃脘胀痛",
-  "aliases": [
-   "胃脘胀疼痛",
-   "胃脘胀满痛"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "嗳气",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "多饮多食多尿",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "消瘦",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "双下肢水肿",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "尿少",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "腰部冷痛",
-  "aliases": [
-   "腰部冷疼痛"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "下肢麻木",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "潮热盗汗",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "膝关节疼痛",
-  "aliases": [
-   "膝关节疼疼痛"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "酸软无力",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "头晕头痛",
-  "aliases": [
-   "头晕头疼痛"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "急躁易怒",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "颈前肿物",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "心悸手抖",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "心悸健忘",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "鼻痒",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "喷嚏",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "流清涕反复发作",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "发热",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "抽搐",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "谵语",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "郑声",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "错语",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "头痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "眩晕",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "晕厥",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "昏迷",
-  "aliases": [
-   "神昏"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "烦躁",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "健忘",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "嗜睡",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "目盲",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "耳鸣",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "耳聋",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "鼻衄",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "牙痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "齿衄",
-  "aliases": [
-   "牙衄"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "失音",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "咯血",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "咳嗽",
-  "aliases": [
-   "咳逆"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "气喘",
-  "aliases": [
-   "喘促"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "咳血",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "胸痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "心悸",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "心痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "呕吐",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "干呕",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "暴吐",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "呕血",
-  "aliases": [
-   "吐血"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "胃痛",
-  "aliases": [
-   "胃脘痛",
-   "脘痛"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "脘痞",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "嘈杂",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "胁痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "黄疸",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "吐酸",
-  "aliases": [
-   "吞酸",
-   "泛酸",
-   "噫酸"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "腹痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "腹胀",
-  "aliases": [
-   "腹满"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "腹泻",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "腹水",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "便秘",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "便血",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "腰痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "尿血",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "尿浊",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "水肿",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "关节痛",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "瘫痪",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "震颤",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "紫斑",
-  "aliases": [
-   "肌衄"
-  ],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "出疹",
-  "aliases": [],
-  "source": "中医临床诊疗术语 症状"
- },
- {
-  "standardTerm": "瘙痒",
-  "aliases": [
-   "皮肤瘙痒"
-  ],
-  "source": "中医临床诊疗术语 症状"
- }
+  {
+    "standardTerm": "失眠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃脘胀痛",
+    "aliases": [
+      "胃脘胀疼痛",
+      "胃脘胀满痛"
+    ]
+  },
+  {
+    "standardTerm": "嗳气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "多饮多食多尿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "消瘦",
+    "aliases": []
+  },
+  {
+    "standardTerm": "双下肢水肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿少",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰部冷痛",
+    "aliases": [
+      "腰部冷疼痛"
+    ]
+  },
+  {
+    "standardTerm": "下肢麻木",
+    "aliases": []
+  },
+  {
+    "standardTerm": "潮热盗汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "膝关节疼痛",
+    "aliases": [
+      "膝关节疼疼痛"
+    ]
+  },
+  {
+    "standardTerm": "酸软无力",
+    "aliases": []
+  },
+  {
+    "standardTerm": "头晕头痛",
+    "aliases": [
+      "头晕头疼痛"
+    ]
+  },
+  {
+    "standardTerm": "急躁易怒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "颈前肿物",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心悸手抖",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心悸健忘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喷嚏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "流清涕",
+    "aliases": [
+      "流清涕反复发作"
+    ]
+  },
+  {
+    "standardTerm": "发热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抽搐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "谵语",
+    "aliases": []
+  },
+  {
+    "standardTerm": "郑声",
+    "aliases": []
+  },
+  {
+    "standardTerm": "错语",
+    "aliases": []
+  },
+  {
+    "standardTerm": "头痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眩晕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "晕厥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "昏迷",
+    "aliases": [
+      "神昏"
+    ]
+  },
+  {
+    "standardTerm": "烦躁",
+    "aliases": []
+  },
+  {
+    "standardTerm": "健忘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "嗜睡",
+    "aliases": []
+  },
+  {
+    "standardTerm": "目盲",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳鸣",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳聋",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻衄",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牙痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "齿衄",
+    "aliases": [
+      "牙衄"
+    ]
+  },
+  {
+    "standardTerm": "失音",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咯血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳嗽",
+    "aliases": [
+      "咳逆"
+    ]
+  },
+  {
+    "standardTerm": "气喘",
+    "aliases": [
+      "喘促"
+    ]
+  },
+  {
+    "standardTerm": "咳血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胸痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心悸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "呕吐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "干呕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暴吐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "呕血",
+    "aliases": [
+      "吐血"
+    ]
+  },
+  {
+    "standardTerm": "胃痛",
+    "aliases": [
+      "胃脘痛",
+      "脘痛"
+    ]
+  },
+  {
+    "standardTerm": "脘痞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "嘈杂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胁痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄疸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "吐酸",
+    "aliases": [
+      "吞酸",
+      "泛酸",
+      "噫酸"
+    ]
+  },
+  {
+    "standardTerm": "腹痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腹胀",
+    "aliases": [
+      "腹满"
+    ]
+  },
+  {
+    "standardTerm": "腹泻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腹水",
+    "aliases": []
+  },
+  {
+    "standardTerm": "便秘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "便血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "水肿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "关节痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘫痪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "震颤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫斑",
+    "aliases": [
+      "肌衄"
+    ]
+  },
+  {
+    "standardTerm": "出疹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘙痒",
+    "aliases": [
+      "皮肤瘙痒"
+    ]
+  },
+  {
+    "standardTerm": "神疲乏力",
+    "aliases": []
+  },
+  {
+    "standardTerm": "食少纳呆",
+    "aliases": [
+      "纳呆"
+    ]
+  },
+  {
+    "standardTerm": "面色萎黄",
+    "aliases": [
+      "面色淡黄"
+    ]
+  },
+  {
+    "standardTerm": "食欲亢进",
+    "aliases": [
+      "消谷善饥"
+    ]
+  },
+  {
+    "standardTerm": "心烦易怒",
+    "aliases": [
+      "心烦",
+      "易怒"
+    ]
+  },
+  {
+    "standardTerm": "头晕头重",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口渴喜冷饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "易饥饿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小便频数",
+    "aliases": [
+      "小便频数量多"
+    ]
+  },
+  {
+    "standardTerm": "饮水不解",
+    "aliases": []
+  },
+  {
+    "standardTerm": "晨轻暮重",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰膝酸冷",
+    "aliases": []
+  },
+  {
+    "standardTerm": "面色白",
+    "aliases": [
+      "面色㿠白"
+    ]
+  },
+  {
+    "standardTerm": "尿量减少",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿中泡沫增多",
+    "aliases": []
+  },
+  {
+    "standardTerm": "多梦",
+    "aliases": []
+  },
+  {
+    "standardTerm": "面红目赤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "小便黄赤",
+    "aliases": [
+      "小便短黄",
+      "小便黄"
+    ]
+  },
+  {
+    "standardTerm": "五心烦热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰膝酸软",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口干",
+    "aliases": [
+      "口渴",
+      "口干咽燥"
+    ]
+  },
+  {
+    "standardTerm": "大便偏干",
+    "aliases": [
+      "大便干结"
+    ]
+  },
+  {
+    "standardTerm": "形体偏瘦",
+    "aliases": [
+      "形体消瘦"
+    ]
+  },
+  {
+    "standardTerm": "面色潮红",
+    "aliases": []
+  },
+  {
+    "standardTerm": "目涩",
+    "aliases": [
+      "两目干涩",
+      "目睛干涩"
+    ]
+  },
+  {
+    "standardTerm": "体重下降",
+    "aliases": []
+  },
+  {
+    "standardTerm": "头晕目眩",
+    "aliases": [
+      "头晕眼花"
+    ]
+  },
+  {
+    "standardTerm": "自汗",
+    "aliases": [
+      "自汗频作"
+    ]
+  },
+  {
+    "standardTerm": "皮肤干燥",
+    "aliases": [
+      "肌肤干燥"
+    ]
+  },
+  {
+    "standardTerm": "气短",
+    "aliases": [
+      "气短懒言"
+    ]
+  },
+  {
+    "standardTerm": "食少",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胸闷",
+    "aliases": [
+      "胸闷太息"
+    ]
+  },
+  {
+    "standardTerm": "行走不稳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "唇红",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口苦",
+    "aliases": [
+      "口苦咽干"
+    ]
+  },
+  {
+    "standardTerm": "痛连两胁",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眼球突出",
+    "aliases": [
+      "目突"
+    ]
+  },
+  {
+    "standardTerm": "吞咽时上下移动",
+    "aliases": []
+  }
 ]
