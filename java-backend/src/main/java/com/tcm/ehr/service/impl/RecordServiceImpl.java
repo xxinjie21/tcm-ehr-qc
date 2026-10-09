@@ -480,20 +480,21 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 数据域 → 用户筛选，取交集（统一走 RecordFilter，禁止手写 where）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), dto);
         // ⚠️ 列投影（性能审查 P1-2）：列表项只消费 id/grade/visitTime/gender/age/score/
-        //    summarize 三字段回退链（主诉→中医诊断→西医诊断）/structured_data（manual 标记），
-        //    其余 21 个 TEXT 列 + qc_results 不拉进堆（每行省 ~5KB）。
-        //    列名与 RecordFilter / Record 实体列一致，改动时同步维护 RecordServiceImplTest 的列名守卫。
-        //    刻意保留 structured_data：manuallyEdited 仍靠解析 _meta 取（落列方案未本轮）。
+        //    summarize 三字段回退链（主诉→中医诊断→西医诊断）/manually_edited（人工标记列），
+        //    其余 21 个 TEXT 列 + 2 个 JSON 列不拉进堆（每行省 ~5KB）。
+        //    P1-2#2 落地后列表**彻底不再触碰 structured_data**：人工标记改读标量列
+        //    （manually_edited 是 STORED 生成列，与 _meta.manuallyEdited 同源）。
+        //    列名与 RecordFilter / Record 实体列一致，改动时同步维护 RecordColumnNameGuardTest 的列名守卫。
         wrapper.select("id", "grade", "visit_time", "gender", "age", "score",
-                "chief_complaint", "tcm_diagnosis", "western_diagnosis", "structured_data");
+                "chief_complaint", "tcm_diagnosis", "western_diagnosis", "manually_edited");
         // 2. 分页查询（条件已含数据域与用户筛选）
         Page<Record> p = baseMapper.selectPage(new Page<>(page, size), wrapper);
         // 3. 组装返回：总数与当前页列表项
         SearchVO vo = new SearchVO();
         vo.setTotal(p.getTotal());
         for (Record r : p.getRecords()) {
-            // manuallyEdited 从 structured_data._meta 读：列表要能一眼看出「这条不是模型原样抽的」
-            boolean manual = StructuredDataMeta.isManuallyEdited(objectMapper, r.getStructuredData());
+            // 人工标记读标量列（性能审查 P1-2#2）：列表不再为读这一个布尔值解析 ~3.7KB JSON
+            boolean manual = Boolean.TRUE.equals(r.getManuallyEdited());
             vo.getRecords().add(new SearchVO.Item(r.getId(), summarize(r), r.getGrade(),
                     r.getVisitTime(), r.getGender(), r.getAge(), r.getScore(), manual));
         }

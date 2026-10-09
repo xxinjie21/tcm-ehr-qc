@@ -21,6 +21,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 复核服务实现。
@@ -105,11 +108,12 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         // 5. 组装返回：总数与任务列表项（关联病历缺失的跳过，不占位）
         ReviewTasksVO vo = new ReviewTasksVO();
         vo.setTotal(pg.getTotal());
-        // P5.2：关联病历已删（selectById 返回 null）的任务会跳过，计数后告知前端
+        // P5.2：关联病历已删的任务会跳过，计数后告知前端。原先每行 selectById 是 N+1
+        // （每页 20 条 → 21 次查询，且整行拉回 structured_data 大字段）；改为一次批量只取 id 集合。
+        Set<String> existingIds = existingRecordIds(pg.getRecords());
         int skippedMissing = 0;
         for (ReviewTask t : pg.getRecords()) {
-            Record r = recordMapper.selectById(t.getRecordId());
-            if (r == null) {
+            if (!existingIds.contains(t.getRecordId())) {
                 skippedMissing++;
                 continue;
             }
@@ -151,6 +155,26 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         // 复核会改写 correctedData（结构化数据）→ 统计词频过期，主动失效（B1）
         com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
         return vo;
+    }
+
+    /** 批量查询这些任务关联的病历中仍存在的 id 集合（只取 id 列，不拉 structured_data 大字段）。 */
+    private Set<String> existingRecordIds(List<ReviewTask> tasks) {
+        List<String> ids = tasks.stream()
+                .map(ReviewTask::getRecordId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> out = new HashSet<>();
+        for (Object o : recordMapper.selectObjs(
+                new QueryWrapper<Record>().select("id").in("id", ids))) {
+            if (o != null) {
+                out.add(String.valueOf(o));
+            }
+        }
+        return out;
     }
 
     private String dbStatus(String status) {

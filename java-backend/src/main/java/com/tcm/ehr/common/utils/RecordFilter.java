@@ -313,7 +313,25 @@ public final class RecordFilter {
 
     /** .1：按 filters{department,dateRange,pattern,grade} 构建（数据域→用户筛选） */
     public static QueryWrapper<Record> build(String orgId, FiltersDTO filterDto) {
-        return build(orgId, filterDto, RequestUtils.viewAllOrgs());
+        return build(orgId, filterDto, RequestUtils.viewAllOrgs(), true);
+    }
+
+    /**
+     * 聚合专用：只出 WHERE 口径，**不追加排序键**。
+     *
+     * <p>为什么单独开一个入口：看板词频已下沉到 SQL 侧（{@code JSON_TABLE} + {@code GROUP BY}，
+     * 性能审查 P0-3#3），而 {@code ORDER BY} 与 {@code GROUP BY} 在同一层不能共存 ——
+     * 排序条件留在 wrapper 里会让 {@code ${ew.customSqlSegment}} 拼出非法 SQL。</p>
+     *
+     * <p>筛选口径仍然只有这一处：本方法与 {@link #build(String, FiltersDTO)} 共用同一段组装代码，
+     * 只在最后一步不追加排序键。聚合结果本就没有「行顺序」的概念，去掉它不改变任何口径。</p>
+     *
+     * @param orgId     当前机构
+     * @param filterDto 用户筛选，可为 null（表示不限）
+     * @return 只含数据域 + 用户筛选、**无排序**的查询条件
+     */
+    public static QueryWrapper<Record> buildForAggregate(String orgId, FiltersDTO filterDto) {
+        return build(orgId, filterDto, RequestUtils.viewAllOrgs(), false);
     }
 
     /**
@@ -332,11 +350,18 @@ public final class RecordFilter {
      * @return 只含该机构、且已含用户筛选与排序键的查询条件
      */
     public static QueryWrapper<Record> buildWithinOrg(String orgId, FiltersDTO filterDto) {
-        return build(orgId, filterDto, false);
+        return build(orgId, filterDto, false, true);
     }
 
-    /** 数据域 → 用户筛选 的共用实现；viewAllOrgs 由调用方显式给定 */
-    private static QueryWrapper<Record> build(String orgId, FiltersDTO filterDto, boolean viewAllOrgs) {
+    /**
+     * 数据域 → 用户筛选 的共用实现；viewAllOrgs 与是否追加排序键由调用方显式给定。
+     *
+     * @param withOrder 是否追加排序键。列表 / 导出 / 批处理 / 范围删除都要稳定的行顺序，
+     *                  传 true；只有 SQL 侧聚合（{@link #buildForAggregate}）传 false ——
+     *                  {@code ORDER BY} 与 {@code GROUP BY} 不能共存。
+     */
+    private static QueryWrapper<Record> build(String orgId, FiltersDTO filterDto, boolean viewAllOrgs,
+                                              boolean withOrder) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
         // 1. 数据域先叠加（必须最先，用户筛选只能在其上收窄）
         operatorScope(wrapper, orgId, viewAllOrgs);
@@ -362,7 +387,10 @@ public final class RecordFilter {
         // 注意 FiltersDTO 重载的调用方多是聚合 / 批处理 / 按范围删除，排序对它们无意义，
         // 代价是这些查询多一次按 visit_time 的排序（3.5 万条量级需留意 deleteByFilter 与 clean）。
         // 次级键 id 与 SearchDTO 重载同一理由：分页要稳定
-        wrapper.orderByDesc("visit_time").orderByAsc("id");
+        // withOrder=false 只出现在 buildForAggregate（SQL 侧聚合，GROUP BY 与 ORDER BY 互斥）
+        if (withOrder) {
+            wrapper.orderByDesc("visit_time").orderByAsc("id");
+        }
         return wrapper;
     }
 

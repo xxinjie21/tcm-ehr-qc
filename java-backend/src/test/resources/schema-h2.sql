@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS records (
   org_id            VARCHAR(36) DEFAULT '',
   status            VARCHAR(20),
   governed          TINYINT NOT NULL DEFAULT 0,
+  -- 人工修改标记：线上是 MySQL STORED 生成列（由 structured_data._meta.manuallyEdited 派生，
+  -- 见 data/2026-10-08-add-records-manually-edited.sql）。H2 没有等价的 JSON 函数，
+  -- 这里退化为普通列，只为满足 MyBatis-Plus 全列 SELECT/INSERT；本测试不校验该标记。
+  manually_edited   TINYINT NOT NULL DEFAULT 0,
   create_time       DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time       DATETIME DEFAULT CURRENT_TIMESTAMP,
   text_hash         VARCHAR(32)

@@ -682,7 +682,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             if (cancelFlags.contains(id) || isCancelRequested(id)) {
                 return true;
             }
-            Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE), wrapper);
+            // searchCount=false：本循环只按页取数、从不读 total；默认每页都发一次全量 COUNT，
+            // 长任务下等于把同一 COUNT 重复执行几十次（审计 2026-10-09）
+            Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE, false), wrapper);
             List<Record> list = page.getRecords();
             if (list.isEmpty()) {
                 break;

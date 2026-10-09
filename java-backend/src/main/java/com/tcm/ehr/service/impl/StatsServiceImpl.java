@@ -2,9 +2,6 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
@@ -20,12 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -42,7 +39,20 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /** 评分分布桶（固定顺序） */
     private static final List<String> SCORE_BUCKETS = List.of("90+", "80-89", "70-79", "60-69", "60以下");
 
-    private final ObjectMapper objectMapper;
+    /** 词频 TopN */
+    private static final int TOP_N = 10;
+
+    /**
+     * 允许下推到 SQL 的实体数组路径白名单。
+     *
+     * <p>{@code RecordMapper.selectTermFreq} 的路径用 MyBatis {@code ${}} 做文本替换
+     * （MySQL 的 {@code JSON_TABLE} 要求路径是字面量，不能用绑定参数），所以这里必须挡一道：
+     * 任何非本类常量的取值都直接拒绝，杜绝外部输入进入 SQL 文本。
+     * 证候走 {@code selectPatternFreq}（多一段兜底逻辑），不在此列。</p>
+     */
+    private static final Set<String> ALLOWED_JSON_PATHS = Set.of(
+            "$.diseases[*]", "$.symptoms[*]", "$.formulaList[*]", "$.herbs[*]");
+
     // 词典真源（批次8b）：统计必须与归一读同一处，否则看板数字和实际生效词典对不上
     private final com.tcm.ehr.service.IDictionaryTermStore termStore;
     // 词频统计短 TTL 缓存（B1）：只缓 /stats/all 的词频分布，按数据域 + 筛选条件隔离
@@ -107,23 +117,21 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     @Override
     public StatsVO stats(StatsDTO dto) {
         String orgId = RequestUtils.currentOrgId();
+        // 1. 三种圈定方式：病历ID → 筛选条件 → 全域（都不给时就是数据域内全部）。
+        //    条件一律走 buildForAggregate（**无 ORDER BY**）：词频已在 SQL 侧 GROUP BY，
+        //    ORDER BY 与 GROUP BY 不能共存（性能审查 P0-3#3）。
         QueryWrapper<Record> wrapper;
-        // 1. 三种圈定方式：病历ID → 筛选条件 → 全域（都不给时就是数据域内全部）
         if (dto.getRecordIds() != null && !dto.getRecordIds().isEmpty()) {
             // 优先：按病历ID圈定；ID 由调用方给，数据域必须先叠加
-            wrapper = RecordFilter.build(orgId, new FiltersDTO()).in("id", dto.getRecordIds());
+            wrapper = RecordFilter.buildForAggregate(orgId, new FiltersDTO()).in("id", dto.getRecordIds());
         } else if (dto.getFilters() != null && !dto.getFilters().isEmpty()) {
             // 次选：按筛选条件圈定
-            wrapper = RecordFilter.build(orgId, toFilters(dto.getFilters()));
+            wrapper = RecordFilter.buildForAggregate(orgId, toFilters(dto.getFilters()));
         } else {
-            wrapper = RecordFilter.build(orgId, new FiltersDTO());
+            wrapper = RecordFilter.buildForAggregate(orgId, new FiltersDTO());
         }
-        // 列投影（性能审查 P0-3）：单类型统计只消费 structured_data（词频）与
-        //    pattern（证候回退原始列），别把 21 个文本列一起拉进堆
-        wrapper.select("id", "structured_data", "pattern");
-        List<Record> records = baseMapper.selectList(wrapper);
-        // 词频解析「解析一次、多处复用」（单类型只取一类，缓存仍传入以统一口径）
-        return statsFor(records, dto.getType(), new java.util.HashMap<>());
+        // 2. 词频在 DB 侧聚合，只把 Top10 带回 JVM（原实现把命中的全部病历物化进堆再逐条解析 JSON）
+        return statsFor(wrapper, dto.getType());
     }
 
     /**
@@ -141,16 +149,22 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         //    与词频的失效时机不同，不放进缓存）
         StatsAllVO vo = new StatsAllVO();
         vo.setOverview(overview());
-        // 2. 词频分布：结果集小、计算贵（4 万行 × 词频 JSON）→ 60s 缓存 + 写操作主动失效
-        //    （StatsCacheInvalidator）。缓存未命中/Redis 不可用都回退现算，不阻塞页面。
+        // 2. 词频分布：**聚合已在 SQL 侧**（JSON_TABLE + GROUP BY，只回各类 Top10），
+        //    但仍要全表展开 JSON，故保留 60s 缓存 + 写操作主动失效（StatsCacheInvalidator）。
+        //    缓存未命中 / Redis 不可用都回退现算，不阻塞页面。
+        //    只发两条 SQL：四类实体（疾病/症状/方剂/中药）一趟扫完，证候单独一条（带原始列兜底）。
         StatsAllVO freq = statsCache.wordFreq(filters, () -> {
-            List<Record> records = recordsFor(filters);
-            Map<String, Map<String, Object>> parsedCache = new HashMap<>();
+            QueryWrapper<Record> wrapper =
+                    RecordFilter.buildForAggregate(RequestUtils.currentOrgId(), filters);
+            Map<String, List<Map<String, Object>>> entities = entityFreq(wrapper);
             StatsAllVO f = new StatsAllVO();
-            f.setDisease(statsFor(records, "disease", parsedCache));
-            f.setSymptom(statsFor(records, "symptom", parsedCache));
-            f.setPattern(statsFor(records, "pattern", parsedCache));
-            f.setPrescription(statsFor(records, "prescription", parsedCache));
+            f.setDisease(statisticsOf(entities.get("disease")));
+            f.setSymptom(statisticsOf(entities.get("symptom")));
+            f.setPattern(distributionOf(patternFreq(wrapper)));
+            StatsVO prescription = new StatsVO();
+            prescription.setFormulaStats(entities.get("formula"));
+            prescription.setHerbStats(entities.get("herb"));
+            f.setPrescription(prescription);
             return f;
         });
         if (freq != null) {
@@ -267,34 +281,119 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         }
     }
 
-    /** 按数据域 + 用户筛选取病历（看板扩展口径） */
+    /**
+     * 按数据域 + 用户筛选取病历（**只给看板扩展用**）。
+     *
+     * <p>词频统计已改为 SQL 侧聚合（性能审查 P0-3#3），不再走这里；本方法只服务
+     * {@link #extra}，而它只消费就诊月份 / 分级 / 科室 / 评分四个标量列 ——
+     * 所以投影里连 {@code structured_data} 与 {@code pattern} 都不需要。</p>
+     */
     private List<Record> recordsFor(FiltersDTO filters) {
         // 条件组装统一走 RecordFilter：数据域与用户筛选的交集口径只有那一处
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
-        // ⚠️ 列投影（性能审查 P0-3）：本层只消费 visit_time / grade / department / score /
-        //    structured_data / pattern（词频 + 证候回退）；不投影会把 21 个 TEXT 列
-        //    + qc_results 全拉进堆（4 万行 ≈320MB）。列名与 RecordFilter / Record 实体
-        //    列一致，新增字段请同步补进列名守卫测试。
-        wrapper.select("id", "visit_time", "grade", "department", "score", "structured_data", "pattern");
+        // ⚠️ 列投影（性能审查 P0-3）：不投影会把 21 个 TEXT 列 + 2 个 JSON 列全拉进堆
+        //    （4 万行 ≈320MB）。列名与 RecordFilter / Record 实体列一致，
+        //    新增字段请同步补进 RecordColumnNameGuardTest 的列名守卫。
+        wrapper.select("id", "visit_time", "grade", "department", "score");
         return baseMapper.selectList(wrapper);
     }
 
-    /** 按类型统计词频 Top10：全部取自结构化实体（仅证候在缺失时回退原始辨证结论，中药/方剂不回退） */
-    private StatsVO statsFor(List<Record> records, String type, Map<String, Map<String, Object>> parsedCache) {
+    /**
+     * 按类型统计词频 Top10（性能审查 P0-3#3）：**全部在 SQL 侧聚合**，只把 TopN 带回 JVM。
+     *
+     * <p>原实现把命中病历整体物化进堆、再逐条解析 {@code structured_data} 后在 Java 里计数；
+     * 现在中间计数留在 DB。口径不变：中药 / 方剂不回退原始列，证候在结构化缺失时回退
+     * （见 {@link com.tcm.ehr.mapper.RecordMapper#selectPatternFreq}）。</p>
+     */
+    private StatsVO statsFor(QueryWrapper<Record> wrapper, String type) {
         StatsVO vo = new StatsVO();
         // 1. 按类型分派：中药/方剂走"处方"这一档（同时出方剂与中药两组）
         switch (type == null ? "" : type) {
-            case "disease" -> vo.setStatistics(top(agg(records, "diseases", "disease", parsedCache), 10, "disease"));
-            case "pattern" -> vo.setDistribution(top(agg(records, "patternList", "pattern", parsedCache), 10, "pattern"));
-            case "symptom" -> vo.setStatistics(top(agg(records, "symptoms", "symptom", parsedCache), 10, "symptom"));
+            case "disease" -> vo.setStatistics(termFreq(wrapper, "$.diseases[*]", "disease"));
+            case "pattern" -> vo.setDistribution(patternFreq(wrapper));
+            case "symptom" -> vo.setStatistics(termFreq(wrapper, "$.symptoms[*]", "symptom"));
             case "prescription" -> {
-                vo.setFormulaStats(top(agg(records, "formulaList", "formula", parsedCache), 10, "formula"));
-                vo.setHerbStats(top(agg(records, "herbs", "herb", parsedCache), 10, "herb"));
+                vo.setFormulaStats(termFreq(wrapper, "$.formulaList[*]", "formula"));
+                vo.setHerbStats(termFreq(wrapper, "$.herbs[*]", "herb"));
             }
             // 同理：原来把四个英文枚举值拼进报错，界面上直接显示给用户
             default -> throw new IllegalArgumentException("统计类型不合法，请选择：疾病 / 证型 / 症状 / 处方");
         }
         return vo;
+    }
+
+    /**
+     * 单类实体词频 TopN：一条 SQL 出结果（{@code JSON_TABLE} 展开 + {@code GROUP BY}）。
+     *
+     * @param jsonPath structured_data 里的数组路径；用 MyBatis {@code ${}} 进 SQL 文本，
+     *                 故必须命中 {@link #ALLOWED_JSON_PATHS} 白名单，杜绝外部输入
+     */
+    private List<Map<String, Object>> termFreq(QueryWrapper<Record> wrapper, String jsonPath, String keyName) {
+        if (!ALLOWED_JSON_PATHS.contains(jsonPath)) {
+            throw new IllegalArgumentException("非法的结构化数组路径：" + jsonPath);
+        }
+        return toTop(baseMapper.selectTermFreq(wrapper, jsonPath, TOP_N), keyName);
+    }
+
+    /** 证候词频 TopN：结构化 {@code patternList} 为主，缺失时由 SQL 侧回退切分原始 {@code pattern} 列 */
+    private List<Map<String, Object>> patternFreq(QueryWrapper<Record> wrapper) {
+        return toTop(baseMapper.selectPatternFreq(wrapper, TOP_N), "pattern");
+    }
+
+    /**
+     * 看板四类实体（疾病 / 症状 / 方剂 / 中药）各 TopN：**一趟扫完**。
+     *
+     * @return {@code kind → 该类 {键名: 词, count: 次数} 列表}，四个键恒在（无数据时为空列表）
+     */
+    private Map<String, List<Map<String, Object>>> entityFreq(QueryWrapper<Record> wrapper) {
+        // 1. SQL 回的是 {kind, term, cnt} 扁平行，先按 kind 分桶
+        Map<String, List<Map<String, Object>>> raw = new HashMap<>();
+        for (Map<String, Object> row : baseMapper.selectTermFreqMulti(wrapper, TOP_N)) {
+            raw.computeIfAbsent(String.valueOf(row.get("kind")), k -> new java.util.ArrayList<>()).add(row);
+        }
+        // 2. 归位到契约键名（与 statsFor 的单类分支同一套 keyName），缺的补空列表
+        Map<String, List<Map<String, Object>>> out = new HashMap<>();
+        out.put("disease", toTop(raw.get("disease"), "disease"));
+        out.put("symptom", toTop(raw.get("symptom"), "symptom"));
+        out.put("formula", toTop(raw.get("formula"), "formula"));
+        out.put("herb", toTop(raw.get("herb"), "herb"));
+        return out;
+    }
+
+    /** 把词频列表装成「按类型统计」档（{@code statistics}）—— 契约形状与改前一致 */
+    private static StatsVO statisticsOf(List<Map<String, Object>> rows) {
+        StatsVO vo = new StatsVO();
+        vo.setStatistics(rows);
+        return vo;
+    }
+
+    /** 把词频列表装成「证候分布」档（{@code distribution}） */
+    private static StatsVO distributionOf(List<Map<String, Object>> rows) {
+        StatsVO vo = new StatsVO();
+        vo.setDistribution(rows);
+        return vo;
+    }
+
+    /**
+     * SQL 聚合结果（{@code term} / {@code cnt}）→ 契约形态 {@code {键名: 词, count: 次数}}。
+     *
+     * <p>契约不能改：{@code StatsVO} 的三个列表字段与前端图表都按这个形状读。
+     * {@code cnt} 由 {@code COUNT(*)} 回来是 Long，这里收敛成 int —— 与改前的
+     * {@code Map<String,Integer>} 一致，避免同一接口在两种实现下给出不同类型。</p>
+     */
+    private static List<Map<String, Object>> toTop(List<Map<String, Object>> rows, String keyName) {
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        if (rows == null) {
+            return out;
+        }
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> m = new HashMap<>();
+            m.put(keyName, row.get("term"));
+            Object cnt = row.get("cnt");
+            m.put("count", cnt == null ? 0 : ((Number) cnt).intValue());
+            out.add(m);
+        }
+        return out;
     }
 
     /** 就诊月份（yyyy-MM）；接诊时间为空返回 null，该条不进趋势 */
@@ -333,95 +432,6 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /** stats 契约的 filters 是无类型 Map —— 翻译交给 RecordFilter（口径只有那一处） */
     private FiltersDTO toFilters(Map<String, Object> filters) {
         return RecordFilter.fromMap(filters);
-    }
-
-    /**
-     * 从structured_data(附录A结构)按key抽取词频计数
-     * Entity数组取content；Herb数组取name；fallback到实体原始字段（兼容未结构化病历）
-     */
-    private Map<String, Integer> agg(List<Record> records, String jsonKey, String fallbackField,
-                                     Map<String, Map<String, Object>> parsedCache) {
-        Map<String, Integer> counter = new LinkedHashMap<>();
-        // 1. 逐条抽词
-        for (Record r : records) {
-            List<String> terms = extractFromStructured(r, jsonKey, parsedCache);
-            // 2. 证候这一类特殊：结构化没抽到时回退原始辨证结论并切分多证组合串
-            //    ⚠️ 这是「未重解析的旧数据」的**过渡兜底**：裸切分不查词典，同义写法
-            //    （「肝阳上亢」vs「肝阳上亢证」）会各计一份，与归一口径不一致。
-            //    归一主链现已补上证候回补（EntityNormalizer.backfillPatterns），
-            //    病历重解析后 patternList 不再为空，本分支自然不再触发 ——
-            //    全部数据重解析后可删掉这一段。
-            if ((terms == null || terms.isEmpty()) && "pattern".equals(fallbackField) && r.getPattern() != null) {
-                // 原始辨证结论是多证候组合串（顿号/逗号分隔），切分防整串污染统计
-                terms = Arrays.stream(r.getPattern().split("[、，,；;]"))
-                        .map(String::trim).filter(s -> !s.isEmpty()).toList();
-            }
-            // 3. 方剂不回退：formulaList 空说明没推断出方剂名，处方串不是方剂名，计进去是脏数据
-            if (terms == null) continue;
-            // 4. 逐词累加
-            for (String t : terms) {
-                if (t != null && !t.isBlank()) counter.merge(t.trim(), 1, Integer::sum);
-            }
-        }
-        return counter;
-    }
-
-    /** 解析附录A结构：Entity数组取content，Herb数组取name；无数据返回null（触发fallback） */
-    private List<String> extractFromStructured(Record r, String key, Map<String, Map<String, Object>> parsedCache) {
-        // 1. 没有结构化数据直接给 null，由调用方决定是否回退原始列
-        if (r.getStructuredData() == null || r.getStructuredData().isBlank()) return null;
-        // 2. 解析结果按 record id 缓存（性能审查 P0-3）：/stats/all 的 4 个分区共享同一份
-        //    cache，同一条 JSON 每条只 readValue 一次。computeIfAbsent 在解析失败（返回
-        //    null）时不落缓存，等效于原有「解析不了按没抽到处理」。
-        Map<String, Object> data = parsedCache == null
-                ? parseStructured(r.getStructuredData())
-                : parsedCache.computeIfAbsent(r.getId(), id -> parseStructured(r.getStructuredData()));
-        if (data == null) return null;
-        Object val = data.get(key);
-        // 3. 数组：逐项取文本
-        if (val instanceof List<?> list) {
-            List<String> result = new java.util.ArrayList<>();
-            for (Object item : list) {
-                if (item instanceof Map<?, ?> m) {
-                    // Entity: {content, sourceText}；Herb: {name, dosage, sourceText}
-                    Object c = m.get("content") != null ? m.get("content") : m.get("name");
-                    if (c != null && !String.valueOf(c).isBlank()) result.add(String.valueOf(c));
-                } else if (item != null) {
-                    result.add(String.valueOf(item)); // 兼容旧字符串格式
-                }
-            }
-            return result;
-        }
-        // 4. 单值字符串：当成单元素列表
-        if (val instanceof String s) {
-            return List.of(s);
-        }
-        return null;
-    }
-
-    /** 结构化 JSON → Map；解析失败返回 null（口径同 extractFromStructured 原有行为） */
-    private Map<String, Object> parseStructured(String json) {
-        try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (JacksonException ignored) {
-            return null;
-        }
-    }
-
-    /** 词频计数取 Top N（按次数降序，同次数按名称升序保证稳定） */
-    private List<Map<String, Object>> top(Map<String, Integer> counter, int limit, String keyName) {
-        // 1. 降序取前 limit 条，装成 {keyName: 词, count: 次数}
-        return counter.entrySet().stream()
-                .sorted((a, b) -> b.getValue() - a.getValue())
-                .limit(limit)
-                .map(e -> {
-                    Map<String, Object> m = new HashMap<>();
-                    m.put(keyName, e.getKey());
-                    m.put("count", e.getValue());
-                    return m;
-                })
-                .toList();
     }
 
     private long num(Object o) {

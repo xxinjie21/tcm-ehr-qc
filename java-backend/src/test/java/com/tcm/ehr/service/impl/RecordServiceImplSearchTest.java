@@ -31,8 +31,8 @@ import static org.mockito.Mockito.when;
  *
  * <p>锁三件事：① 分页参数非法时回退 1 页 / 每页 20 条（不是抛错、也不是 0 条）；
  * ② 列表摘要的回退顺序（主诉 → 中医诊断 → 西医诊断）与 40 字截断；
- * ③ {@code manuallyEdited} 从 {@code structured_data._meta} 读出（列表要能一眼看出
- * 「这条不是模型原样抽的」）。</p>
+ * ③ {@code manuallyEdited} 读 {@code manually_edited} 标量列（性能审查 P1-2#2 落列后，
+ * 列表不再解析 {@code structured_data}）。</p>
  */
 class RecordServiceImplSearchTest {
 
@@ -155,19 +155,24 @@ class RecordServiceImplSearchTest {
     }
 
     @Test
-    @DisplayName("manuallyEdited 从 structured_data._meta 读：列表要能一眼看出「不是模型原样抽的」")
-    void manualFlagComesFromMeta() {
+    @DisplayName("manuallyEdited 读标量列：列表不再解析 structured_data（P1-2#2）")
+    void manualFlagComesFromColumn() {
         RecordMapper mapper = mock(RecordMapper.class);
+        // 1. 列 = 1 → 标出来（structured_data 为空也要标）
         Record manual = record("r1");
-        manual.setStructuredData("{\"_meta\":{\"manuallyEdited\":true},\"symptoms\":[]}");
+        manual.setManuallyEdited(true);
+        // 2. 列 = 0 → 不标。这里**故意**让 JSON 里带 _meta.manuallyEdited:true：
+        //    若实现回退成解析 JSON，这条会被误标，测试即失败 —— 用它锁住「读取源是列」
         Record model = record("r2");
-        model.setStructuredData("{\"symptoms\":[]}");
+        model.setStructuredData("{\"_meta\":{\"manuallyEdited\":true},\"symptoms\":[]}");
+        model.setManuallyEdited(false);
         stubPage(mapper, java.util.List.of(manual, model), 2);
         context();
         try {
             SearchVO vo = svc(mapper).searchRecords(null);
-            assertTrue(vo.getRecords().get(0).getManuallyEdited(), "带 _meta.manuallyEdited 的要标出来");
-            assertFalse(vo.getRecords().get(1).getManuallyEdited(), "模型原样抽的不能标");
+            assertTrue(vo.getRecords().get(0).getManuallyEdited(), "列 = 1 的要标出来");
+            assertFalse(vo.getRecords().get(1).getManuallyEdited(),
+                    "列表读 manually_edited 列，不再解析 structured_data：列 = 0 就不标");
         } finally {
             RequestContextHolder.resetRequestAttributes();
         }

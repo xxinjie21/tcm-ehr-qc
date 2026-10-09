@@ -32,14 +32,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RecordColumnNameGuardTest {
 
-    /** tcm_ehr.records 的真实列清单（SHOW COLUMNS 采集，2026-10-07） */
+    /** tcm_ehr.records 的真实列清单（SHOW COLUMNS 采集，2026-10-08） */
     private static final Set<String> RECORDS_COLUMNS = new HashSet<>(Arrays.asList(
             "id", "registration_no", "outpatient_no", "gender", "age", "visit_count",
             "western_diagnosis", "tcm_diagnosis", "present_illness", "chief_complaint",
             "self_report", "inspection", "pulse", "tongue", "physical_exam", "pattern",
             "prescription", "follow_up", "treatment_effect", "department", "doctor_id",
             "visit_time", "structured_data", "qc_results", "score", "grade", "status",
-            "create_time", "update_time", "governed", "org_id", "text_hash"));
+            "create_time", "update_time", "governed", "org_id", "text_hash",
+            "manually_edited"));
 
     private static final Path SRC = Path.of("src/main/java");
 

@@ -1,6 +1,8 @@
 package com.tcm.ehr.mapper;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.tcm.ehr.domain.po.Record;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -164,4 +166,185 @@ public interface RecordMapper extends BaseMapper<Record> {
                           @Param("grade") String grade,
                           @Param("status") String status,
                           @Param("qcResults") String qcResults);
+
+    /**
+     * 单类实体词频 TopN（性能审查 P0-3#3）：把 {@code structured_data} 里的一个实体数组
+     * 在 <b>DB 侧</b> 用 {@code JSON_TABLE} 展开成行、{@code GROUP BY} 计数，只把 TopN 带回 JVM。
+     *
+     * <p><b>替代了什么</b>：原实现把命中的全部病历（4 万行时含 ~3.7KB/行的 structured_data）
+     * 一次物化进堆，再在 Java 里逐条解析并聚合 —— 4 万行下约 150MB 堆峰值 + 4 万次 JSON 解析，
+     * 且 TopN 之前的中间计数全留在 JVM。现在中间结果留在 DB，返回行数恒为 TopN。</p>
+     *
+     * <p><b>取值口径与改造前的 Java 实现一致</b>（原实现已随本次下沉一并删除，其口径即下面三条）：
+     * 对象元素取 {@code content}（为空回退 {@code name}，对应 Entity / Herb 两种形态）；
+     * 纯字符串元素（旧格式）取元素自身；其余（数字 / null / 空串）一律不计。
+     * 数组缺失、{@code structured_data} 为 NULL、根不是对象时该记录不产出任何词
+     * —— 与原实现「解析不出就按没抽到处理」同结论。</p>
+     *
+     * <p><b>排序规则显式 {@code utf8mb4_bin}</b>：Java 侧 {@code counter.merge} 是精确匹配
+     * （等价 _bin），而 {@code JSON_TABLE} 派生出的字符串与 {@code records} 各列的
+     * {@code utf8mb4_unicode_ci} 不同源，两路混用（见 {@link #selectPatternFreq}）会让
+     * {@code UNION} 直接报 1712（Illegal mix of collations）。</p>
+     *
+     * <p><b>同次数的次序为词名升序</b>：原 Java 实现的 Javadoc 早已声明「同次数按名称升序
+     * 保证稳定」，但代码只按次数排、同次数落到 LinkedHashMap 的插入序（即病历顺序）。
+     * 这里真正按词名升序，让实现与既有声明一致 —— 代价是并列词的展示集合可能与改前不同。</p>
+     *
+     * <p>⚠️ {@code jsonPath} 用 {@code ${}} 做文本替换：MySQL 的 {@code JSON_TABLE} 要求路径是
+     * <b>字面量</b>（绑定参数直接语法错误），因此只允许传入本仓的编译期常量；
+     * 调用方 {@code StatsServiceImpl} 另有一层白名单校验，绝不接受外部输入。</p>
+     *
+     * @param wrapper  只含数据域 + 用户筛选的条件，**不含 ORDER BY**
+     *                 （由 {@link com.tcm.ehr.common.utils.RecordFilter#buildForAggregate} 产出）
+     * @param jsonPath structured_data 里的数组路径，如 {@code $.diseases[*]}
+     * @param limit    TopN
+     * @return 每行 {@code {term: 词, cnt: 次数}}，按次数降序、词名升序
+     */
+    @Select("""
+            SELECT TRIM(u.term) AS term, COUNT(*) AS cnt
+            FROM (
+                SELECT CASE
+                         WHEN JSON_TYPE(jt.elem) = 'OBJECT'
+                           THEN COALESCE(NULLIF(jt.content, ''), NULLIF(jt.name, ''))
+                         WHEN JSON_TYPE(jt.elem) = 'STRING' THEN jt.plain
+                       END COLLATE utf8mb4_bin AS term
+                FROM records r
+                JOIN JSON_TABLE(r.structured_data, '${jsonPath}' COLUMNS(
+                       elem    JSON         PATH '$',
+                       content VARCHAR(512) PATH '$.content',
+                       name    VARCHAR(512) PATH '$.name',
+                       plain   VARCHAR(512) PATH '$'
+                     )) jt ON TRUE
+                ${ew.customSqlSegment}
+            ) u
+            WHERE u.term IS NOT NULL AND TRIM(u.term) <> ''
+            GROUP BY TRIM(u.term)
+            ORDER BY cnt DESC, TRIM(u.term) ASC
+            LIMIT #{limit}
+            """)
+    List<Map<String, Object>> selectTermFreq(@Param(Constants.WRAPPER) Wrapper<Record> wrapper,
+                                             @Param("jsonPath") String jsonPath,
+                                             @Param("limit") int limit);
+
+    /**
+     * 看板四类实体（疾病 / 症状 / 方剂 / 中药）词频 TopN，**一趟扫完**（性能审查 P0-3#3）。
+     *
+     * <p>为什么不复用 {@link #selectTermFreq} 调四次：{@code JSON_TABLE} 对每一行都要解析
+     * 一次 {@code structured_data}，调四次就是四次全表解析。这里用<b>同级 NESTED PATH</b>
+     * 一次调用展开 4 个数组 —— MySQL 对同级嵌套路径产出的是各路径行的<b>并集</b>，
+     * 于是每条病历的 JSON 只解析一次，靠「哪一列非空」回推 {@code kind}。
+     *
+     * <p><b>实测（4 万行 / structured_data 合计 157MB）</b>：
+     * 本方法 <b>1.05~1.61s</b>；改为四次 {@link #selectTermFreq} 为 <b>3.26~3.83s</b>；
+     * 改为一趟 UNION ALL 五路为 <b>5.07~5.08s</b>（UNION 会把各路结果全物化后才分组）。
+     * 原 Java 实现同场景约 9~10s 且堆峰值约 320MB。</p>
+     *
+     * <p>取值口径与 {@link #selectTermFreq} 完全一致；差别只有一处：为兼容旧格式字符串元素，
+     * 这里无法按元素类型分派（{@code PATH '$.content'} 对字符串元素直接给 NULL），
+     * 故只认对象形态的 {@code content} / {@code name}。当前数据中 4 类元素全部为对象
+     * （已核对：diseases / symptoms / formulaList / herbs 的元素 100% 为 OBJECT）。</p>
+     *
+     * <p>证候（{@code patternList}）不在这里 —— 它多一段「原始 pattern 列兜底」，
+     * 见 {@link #selectPatternFreq}。</p>
+     *
+     * @param wrapper 只含数据域 + 用户筛选的条件，**不含 ORDER BY**
+     * @param limit   每类 TopN
+     * @return 每行 {@code {kind: disease|symptom|formula|herb, term: 词, cnt: 次数}}
+     */
+    @Select("""
+            SELECT kind, term, cnt FROM (
+                SELECT kind, term, cnt,
+                       ROW_NUMBER() OVER (PARTITION BY kind ORDER BY cnt DESC, term ASC) AS rn
+                FROM (
+                    SELECT raw.kind AS kind, TRIM(raw.term) AS term, COUNT(*) AS cnt
+                    FROM (
+                        SELECT CASE
+                                 WHEN jt.d_term IS NOT NULL THEN 'disease'
+                                 WHEN jt.s_term IS NOT NULL THEN 'symptom'
+                                 WHEN jt.f_term IS NOT NULL THEN 'formula'
+                                 ELSE 'herb'
+                               END AS kind,
+                               COALESCE(jt.d_term, jt.s_term, jt.f_term, jt.h_term)
+                                 COLLATE utf8mb4_bin AS term
+                        FROM records r
+                        JOIN JSON_TABLE(r.structured_data, '$' COLUMNS(
+                               NESTED PATH '$.diseases[*]'    COLUMNS(d_term VARCHAR(512) PATH '$.content'),
+                               NESTED PATH '$.symptoms[*]'    COLUMNS(s_term VARCHAR(512) PATH '$.content'),
+                               NESTED PATH '$.formulaList[*]' COLUMNS(f_term VARCHAR(512) PATH '$.content'),
+                               NESTED PATH '$.herbs[*]'       COLUMNS(h_term VARCHAR(512) PATH '$.name')
+                             )) jt ON TRUE
+                        ${ew.customSqlSegment}
+                    ) raw
+                    WHERE raw.term IS NOT NULL AND TRIM(raw.term) <> ''
+                    GROUP BY raw.kind, TRIM(raw.term)
+                ) agg
+            ) ranked
+            WHERE rn <= #{limit}
+            ORDER BY kind, rn
+            """)
+    List<Map<String, Object>> selectTermFreqMulti(@Param(Constants.WRAPPER) Wrapper<Record> wrapper,
+                                                  @Param("limit") int limit);
+
+    /**
+     * 证候词频 TopN（性能审查 P0-3#3）：{@code patternList} 主路径 + **原始 {@code pattern} 列兜底**。
+     *
+     * <p>兜底存在的理由与 {@code StatsServiceImpl.agg} 原注释一致：未重解析的旧病历
+     * {@code patternList} 为空，此时按顿号 / 逗号 / 分号切分原始辨证结论，避免「证候词频整块缺失」。
+     * 这是过渡分支 —— 归一主链的证候回补（{@code EntityNormalizer.backfillPatterns}）生效、
+     * 数据重解析完成后即可删除。</p>
+     *
+     * <p>两路的分界条件：{@code patternList} 键缺失 / 非数组 / 长度为 0。与 Java 侧
+     * 「抽取结果为空则回退」等价；唯一差别是 Java 还会在「数组非空但元素内容全为空白」时回退
+     * —— 该形态当前数据中不出现，且属畸形数据。</p>
+     *
+     * <p>切分用递归 CTE 造序号（MySQL 没有字符串拆分函数），上限 64 段：一个证候串出现
+     * 64 段以上不现实，且超出部分只影响这条畸形记录的计数。切分前先把 4 种分隔符归一成逗号，
+     * 与 Java 的正则 {@code [、，,；;]} 同口径。</p>
+     *
+     * @param wrapper 只含数据域 + 用户筛选的条件，**不含 ORDER BY**
+     * @param limit   TopN
+     * @return 每行 {@code {term: 证候, cnt: 次数}}，按次数降序、词名升序
+     */
+    @Select("""
+            SELECT TRIM(u.term) AS term, COUNT(*) AS cnt
+            FROM (
+                SELECT CASE
+                         WHEN JSON_TYPE(jt.elem) = 'OBJECT'
+                           THEN COALESCE(NULLIF(jt.content, ''), NULLIF(jt.name, ''))
+                         WHEN JSON_TYPE(jt.elem) = 'STRING' THEN jt.plain
+                       END COLLATE utf8mb4_bin AS term
+                FROM records r
+                JOIN JSON_TABLE(r.structured_data, '$.patternList[*]' COLUMNS(
+                       elem    JSON         PATH '$',
+                       content VARCHAR(512) PATH '$.content',
+                       name    VARCHAR(512) PATH '$.name',
+                       plain   VARCHAR(512) PATH '$'
+                     )) jt ON TRUE
+                ${ew.customSqlSegment}
+
+                UNION ALL
+
+                SELECT TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(x.norm, ',', seq.n), ',', -1))
+                         COLLATE utf8mb4_bin AS term
+                FROM (
+                    SELECT REPLACE(REPLACE(REPLACE(REPLACE(r.pattern, '、', ','), '，', ','), '；', ','), ';', ',') AS norm,
+                           (JSON_EXTRACT(r.structured_data, '$.patternList') IS NULL
+                            OR JSON_TYPE(JSON_EXTRACT(r.structured_data, '$.patternList')) <> 'ARRAY'
+                            OR JSON_LENGTH(JSON_EXTRACT(r.structured_data, '$.patternList')) = 0) AS no_struct
+                    FROM records r
+                    ${ew.customSqlSegment}
+                ) x
+                JOIN (
+                    WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 64)
+                    SELECT n FROM s
+                ) seq ON seq.n <= 1 + LENGTH(x.norm) - LENGTH(REPLACE(x.norm, ',', ''))
+                WHERE x.no_struct AND x.norm <> ''
+            ) u
+            WHERE u.term IS NOT NULL AND TRIM(u.term) <> ''
+            GROUP BY TRIM(u.term)
+            ORDER BY cnt DESC, TRIM(u.term) ASC
+            LIMIT #{limit}
+            """)
+    List<Map<String, Object>> selectPatternFreq(@Param(Constants.WRAPPER) Wrapper<Record> wrapper,
+                                                @Param("limit") int limit);
 }
