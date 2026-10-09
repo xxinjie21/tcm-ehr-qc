@@ -1001,10 +1001,10 @@ function onVisibilityChange() {
   margin-bottom: var(--sp-3);
 }
 .kpi {
-  /* P1-5：四张卡等分一行。旧写法 flex:1 1 200px + min-width:190 在
-     1024~1100 视口会换行且末张被 grow 拉满整行（3+1 通栏孤卡）。
-     改为按 4 等分取基宽、禁止 grow；窄屏走 2×2 断点，同行永远等宽。 */
-  flex: 0 1 calc((100% - 3 * var(--sp-3)) / 4);
+  /* 三张卡等分一行：基宽按 3 等分取（扣掉 2 个 gap），禁止 grow ——
+     此前误按 4 等分，三张卡只占 3/4 宽，右侧留出一条空白。
+     窄屏走 2 列 / 1 列断点，同行永远等宽。 */
+  flex: 0 1 calc((100% - 2 * var(--sp-3)) / 3);
   min-width: 0;
   /* P0-6：min-height 把骨架与终态钉在同一高度，加载不产生布局跳动 */
   min-height: 134px;
@@ -1016,7 +1016,7 @@ function onVisibilityChange() {
 }
 .kpi.warn { border-left: 3px solid var(--ochre); }
 .kpi.ok { border-left: 3px solid var(--success); }
-/* P1-5：<1100px 视口 2×2 等宽，不出现通栏孤卡 */
+/* 窄视口：两列等宽（最后一张独占一行的场景由 flex-grow:0 保证不被拉满，保持卡宽一致） */
 @media (max-width: 1100px) {
   .kpi { flex-basis: calc((100% - var(--sp-3)) / 2); }
 }
