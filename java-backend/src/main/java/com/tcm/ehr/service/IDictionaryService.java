@@ -23,10 +23,15 @@ public interface IDictionaryService {
      * @param keyword 搜索关键字，可为空
      * @param page    页码，从 1 开始；{@code <= 0} 表示不分页、返回全部命中
      * @param size    每页条数，仅 {@code page > 0} 时生效
+     * @param scope   词典作用域，取值见 {@link IDictionaryTermStore}：
+     *                {@code effective}（默认，基础层∪本组织）/ {@code base}（仅系统默认）
+     *                / {@code org}（仅本组自有）。<b>输入联想与下拉必须用 {@code effective}</b>，
+     *                否则会选到归一里不生效的词
      * @return 视图含 {@code terms}（词条列表）与 {@code total}（命中总数）
      * @throws IOException 词典读取失败
      */
-    Map<String, Object> searchTerms(String type, String keyword, int page, int size) throws IOException;
+    Map<String, Object> searchTerms(String type, String keyword, int page, int size, String scope)
+            throws IOException;
 
     /**
      * 导入词典文件，落库到当前组织并重建该组织的 ES 索引。

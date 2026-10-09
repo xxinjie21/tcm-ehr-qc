@@ -19,7 +19,31 @@ public interface IDictionaryTermStore {
     /** 基础层组织号：空串，不用 null（null 在唯一索引里互不相等，挡不住重复） */
     String BASE_ORG = "";
 
-    /** 读某组织某类型的有效词条（无自有词条时回落基础层） */
+    // ---- 词典作用域（查询 / 导出接口的 scope 取值）----
+    //
+    // 三档对应用户看到的三个概念，取值名与前端滑动按钮一一对应：
+    //   effective = 基础层 ∪ 本组织（归一与输入联想实际使用的口径）
+    //   base      = 仅基础层（即「系统默认词典」，由 data/dictionaries/*.json 播种）
+    //   org       = 仅本组织自有词条（「组内词典」，叠加在基础层之上的增量层）
+    //
+    // 默认一律取 effective：既有的输入联想、质控规则下拉都按「实际生效」取候选，
+    // 换成 base/org 会让它们选到归一里根本不生效的词。
+
+    /** 生效词典：基础层 ∪ 本组织（组织层同标准词覆盖基础层） */
+    String SCOPE_EFFECTIVE = "effective";
+
+    /** 系统默认词典：仅基础层 */
+    String SCOPE_BASE = "base";
+
+    /** 组内词典：仅本组织自有词条（不含基础层） */
+    String SCOPE_ORG = "org";
+
+    /**
+     * 读某组织某类型的有效词条。
+     *
+     * <p>口径是<b>叠加</b>而非回退：基础层与本组织都有词条时取并集，
+     * 同一标准词以本组织为准；只有一侧有词条时就是那一侧。</p>
+     */
     List<TermEntry> readEffective(String orgId, String type);
 
     /** 读某组织某类型的自有词条（不回落到基础层） */

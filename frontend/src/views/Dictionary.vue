@@ -48,20 +48,6 @@
         />
         <el-button type="primary" :loading="loadingTerms" @click="loadTerms()">查 询</el-button>
         <span class="tip">共 {{ total }} 条</span>
-        <!-- 批次 26.17：零信息列默认隐藏，需要时在这里勾回来 -->
-        <el-popover placement="bottom-end" :width="180" trigger="click">
-          <template #reference>
-            <el-button size="small" plain>列显示：已显示 {{ visibleCols.length }}/{{ OPTIONAL_COLS.length }} 列</el-button>
-          </template>
-          <div class="col-picker">
-            <el-checkbox-group v-model="visibleCols" @change="colTouched = true">
-              <el-checkbox v-for="c in OPTIONAL_COLS" :key="c.prop" :value="c.prop">{{ c.label }}</el-checkbox>
-            </el-checkbox-group>
-            <div class="col-picker-actions">
-              <el-button size="small" @click="resetCols">恢复默认</el-button>
-            </div>
-          </div>
-        </el-popover>
       </div>
       <!-- 高度随分页大小联动（表头 40 + 每行 40 × 当前页大小 + 余量 8）：
            固定高度的目的是「选了多少条/页就能看到多少行」——当前页整页铺开，不再有隐藏行。
@@ -71,7 +57,7 @@
 <el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" :max-height="termsTableHeight">
           <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
           <el-table-column prop="standardTerm" label="标准术语" min-width="240" />
-        <el-table-column v-if="visibleCols.includes('aliases')" label="别名">
+        <el-table-column label="别名">
           <template #default="{ row }">
             <el-tag
               v-for="a in row.aliases"
@@ -167,7 +153,6 @@
         <el-table-column label="别名" min-width="200">
           <template #default="{ row }">{{ (row.aliases || []).join('、') }}</template>
         </el-table-column>
-        <el-table-column prop="source" label="来源" min-width="120" />
         <el-table-column label="操作" width="90">
           <template #default="{ row }">
             <el-button link type="danger" size="small" @click="removeLocalTerm(row.standardTerm)">
@@ -470,8 +455,10 @@ const scopeLabel = computed(
 // 词典类型 → 界面文案；键名与后端 type 参数一致（disease / pattern / symptom / herb / formula）
 
 // ===== 布局：与其它页一致，不做整页缩放（表格内部滚动）=====
-/** 当前术语类型（页头 radio-group 的值，全局过滤） */
-const typeKey = ref('herb')
+/** 当前术语类型（页头 radio-group 的值，全局过滤）
+ *  默认取列表首项（TYPE_OPTIONS[0] = disease 疾病），而非硬编码某一类 ——
+ *  否则「点进去显示的类型」与「列表第一个」对不上（曾硬编码 herb 中药）。 */
+const typeKey = ref(TYPE_OPTIONS[0].value)
 /** 当前任务页签：baseline 小组基线 / mine 我的词典 / proposals 提案审核 / archives 归档版本 */
 const tab = ref('baseline')
 // 当前词典类型的中文名，用于面板标题、确认文案与导入提示
@@ -492,30 +479,6 @@ const size = ref(20)
 // 两个加数与 size 同源，任何一个写小都会让 max-height 矮于内容，滚动条就又回来了。
 const termsTableHeight = computed(() => 40 + (size.value || 10) * 40 + 8)
 const total = ref(0)
-
-// 批次 26.17：基线表「别名」列在当前页常常一条数据都没有，
-// 却占掉可观横向宽度（零信息量）。这里把该列做成可显隐：
-// 默认只显示「当前页确实有数据」的列；用户手动勾选后就不再自动重算（colTouched），
-// 免得翻页时列自己跳来跳去。
-const OPTIONAL_COLS = [
-  { prop: 'aliases', label: '别名' }
-]
-const colTouched = ref(false)
-const visibleCols = ref([])
-const hasAliasData = computed(() => terms.value.some((t) => t.aliases?.length > 0))
-const colsWithData = () => {
-  const cols = []
-  if (hasAliasData.value) cols.push('aliases')
-  return cols
-}
-// 数据变化（查询 / 翻页 / 换类型）后，未手动干预过就按「有数据才显示」重算
-watch([terms, typeKey], () => {
-  if (!colTouched.value) visibleCols.value = colsWithData()
-})
-const resetCols = () => {
-  colTouched.value = false
-  visibleCols.value = colsWithData()
-}
 
 // 查询当前类型下的术语（关键字命中标准词或别名）
 // resetPage：切类型 / 搜索 / 导入后 / 回滚后都应回到第 1 页（数据集合已变），
@@ -670,10 +633,7 @@ const pullBaseline = async () => {
     const res = await exportBaseline({ type: typeKey.value, scope: 'org' })
     const incoming = (res.data || []).map((t) => ({
       standardTerm: t.standardTerm,
-      aliases: t.aliases || [],
-      // source 必须带上：漏了它，新增词条的来源会变空、同名词条会错标成「本地」——
-      // 而「这条词是从哪来的」正是用户判断该不该保留它的主要依据
-      source: t.source || ''
+      aliases: t.aliases || []
     }))
     const r = mergeTermLists(localTerms.value, incoming)
     if (!r.sameTermDiff.length && !r.collisions.length) {
@@ -801,8 +761,7 @@ const addLocalTerm = async () => {
   if (owner) owner.aliases = owner.aliases.filter((a) => a !== t)
   localTerms.value.push({
     standardTerm: t,
-    aliases: splitAliases(newAliases.value, t),
-    source: '本地新增'
+    aliases: splitAliases(newAliases.value, t)
   })
   baselineTouched.value = true
   newTerm.value = ''
@@ -929,8 +888,7 @@ const doSubmitProposal = async () => {
       type: typeKey.value,
       terms: localTerms.value.map((t) => ({
         standardTerm: t.standardTerm,
-        aliases: t.aliases || [],
-        source: t.source || ''
+        aliases: t.aliases || []
       }))
     })
     ElMessage.success(res.msg || '提案已提交，等待组长审核')
@@ -1010,19 +968,6 @@ onMounted(() => {
 .dl-up { color: var(--ochre-text); }
 .dl-down { color: var(--danger); }
 .dl-flat { color: var(--text-sub-strong); }
-/* 批次 26.17：基线表「列显示」选择器（照 Governance 的列选择器样式） */
-.col-picker :deep(.el-checkbox-group) {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.col-picker :deep(.el-checkbox) { margin-right: 0; }
-.col-picker-actions {
-  margin-top: var(--sp-2);
-  padding-top: var(--sp-2);
-  border-top: 1px solid var(--line-soft);
-  text-align: right;
-}
 /* 列头 ⓘ：可聚焦，键盘用户也能读出说明 */
 .hdr-info {
   color: var(--text-sub-strong);

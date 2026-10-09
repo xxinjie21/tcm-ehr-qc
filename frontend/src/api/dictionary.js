@@ -10,11 +10,18 @@ import request from '@/utils/request'
 // 原 rollback / getBackups 已随 dictionary_backups 表废弃（回滚改为
 // 「基于归档版本生成提案」，历史列表改为 archives），故不再提供。
 
-/** 管理员直写导入；target=base 写基础层，缺省写当前组织 */
-export function importDict(formData, target) {
+/**
+ * 管理员直写导入；target=base 写基础层，缺省写当前组织。
+ *
+ * ⚠️ `type` 必须随请求发出 —— `/dictionary/import` 的 `@RequestParam("type")` 是必填，
+ * 只把文件塞进 FormData 不够（漏了就是 400「缺少必填参数：type」，界面表现为
+ * 「导入失败：缺少必填参数：type」）。与 `parseDictFile` 同一口径：
+ * **type 只放 query，表单里不再放第二份**（两处同时放会被判成 4001「术语类型非法」）。
+ */
+export function importDict(formData, type, target) {
   return request.post('/dictionary/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    params: target ? { target } : undefined,
+    params: target ? { type, target } : { type },
     timeout: 120000
   })
 }

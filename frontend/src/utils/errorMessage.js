@@ -32,7 +32,7 @@ export function apiErrorMessage(e, fallback = '请求失败') {
 const HINT_MAP = {
   '术语类型非法': '词典解析失败：术语类型无效，请确认已正确选择术语类型',
   '缺少文件参数：file': '文件未成功上传，请重新选择文件后再试',
-  '缺少必填参数：type': '词典解析失败：缺少术语类型，请刷新当前页后重试'
+  '缺少必填参数：type': '词典操作失败：缺少术语类型，请刷新当前页后重试'
 }
 
 function humanize(msg) {

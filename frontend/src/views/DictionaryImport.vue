@@ -521,8 +521,7 @@ const mergeResult = ref(null)
 function mergeIntoLocal(terms) {
   const incoming = terms.map((t) => ({
     standardTerm: t.standardTerm,
-    aliases: t.aliases || [],
-    source: t.source || '批量导入'
+    aliases: t.aliases || []
   }))
   const r = mergeTermLists(readLocalTerms(), incoming)
   if (!r.sameTermDiff.length && !r.collisions.length) {

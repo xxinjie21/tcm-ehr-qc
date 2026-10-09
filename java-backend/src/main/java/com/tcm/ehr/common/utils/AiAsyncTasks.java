@@ -81,7 +81,7 @@ public class AiAsyncTasks {
     public String submit(Supplier<AiReplyVO> work) {
         prune();
         String id = UUID.randomUUID().toString();
-        // H4（术语词典交互审查报告）：**捕获值，而不是捕获请求上下文对象**。
+        // **捕获值，而不是捕获请求上下文对象**。
         // 原实现把 RequestContextHolder 的整个 RequestAttributes 交给任务线程重绑，
         // 而该对象包装的是容器的请求对象 —— 请求结束后容器会回收并清空它；
         // 任务线程只要在提交后夹一次数据库往返（AI 服务读词典/查病历）就必然读到「未知」，

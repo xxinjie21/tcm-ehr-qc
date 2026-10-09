@@ -15,8 +15,24 @@ import java.util.List;
  */
 public interface IDictProposalService {
 
-    /** 导出某组织某类型的当前有效词典作为提案基线 */
-    List<TermEntry> exportBaseline(String orgId, String type);
+    /**
+     * 导出某组织某类型的词条，供「我的词典」存成本地副本。
+     *
+     * <p><b>两种口径别混用</b>（这是历史上被混用过的地方）：</p>
+     * <ul>
+     *   <li>{@code org} —— 只导出<b>本组织自有词条</b>。这是<b>提案的基线</b>：
+     *       审核通过走的是整快照替换本组织层（见 {@code audit}），所以基线必须是组织层本身，
+     *       不是「基础层 ∪ 组织层」。</li>
+     *   <li>{@code effective} —— 导出「基础层 ∪ 本组织」的<b>生效词典</b>，
+     *       供查看 / 导出 / 作为编辑起点。注意组织层是<b>叠加层</b>：它无法删除基础层里的词条。</li>
+     * </ul>
+     *
+     * @param orgId 组织号；空串 = 基础层
+     * @param type  术语类型
+     * @param scope 取值见 {@link IDictionaryTermStore}：{@code org}（本组自有）或
+     *              {@code effective}（生效词典）
+     */
+    List<TermEntry> exportBaseline(String orgId, String type, String scope);
 
     /** 提交一份「完整目标词典」提案 */
     DictProposalVO submit(String orgId, String type, List<TermEntry> terms, String submitUserId);
