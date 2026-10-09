@@ -31,7 +31,7 @@ class EntityNormalizerMapTest {
                 mock(EsTermNormalizer.class);
         when(term.normalize(anyString(), anyString(), anyString()))
                 .thenAnswer(inv -> new EsTermNormalizer.NormalizeResult(
-                        inv.getArgument(2), "测试词典", level, null));
+                        inv.getArgument(2), level));
         return new EntityNormalizer(term, new tools.jackson.databind.ObjectMapper());
     }
 

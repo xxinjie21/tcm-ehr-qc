@@ -25,9 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 class EntityColumnMappingTest {
 
-    /** dictionary_terms 的真实列（批次 4 建表） */
+    /** dictionary_terms 的真实列（批次 4 建表；code/source 已随「国标/来源」一并移除） */
     private static final Set<String> DICTIONARY_TERMS_COLUMNS = Set.of(
-            "id", "org_id", "type", "standard_term", "code", "source", "aliases",
+            "id", "org_id", "type", "standard_term", "aliases",
             "create_time", "update_time");
 
     @Test

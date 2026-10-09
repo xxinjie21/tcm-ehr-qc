@@ -124,15 +124,11 @@ public class StandardizationReportVO {
         /** 中文名 */
         private String label;
         /** 词条数 */
-        private int termCount;
-        /** 有编码的词条数 */
-        private int codedCount;
+private int termCount;
         /** 有别名的词条数 */
         private int aliasedCount;
         /** 别名与标准词相同的条数（归一会自命中，属数据缺陷） */
         private int selfAliasCount;
-        /** 主要来源标注 */
-        private String source;
     }
 
     /** 单类实体的归一覆盖（乙类） */

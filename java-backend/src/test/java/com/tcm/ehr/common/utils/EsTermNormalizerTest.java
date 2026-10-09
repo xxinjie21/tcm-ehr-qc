@@ -47,7 +47,6 @@ class EsTermNormalizerTest {
         TermEntry e = new TermEntry();
         e.setStandardTerm(standardTerm);
         e.setAliases(aliases);
-        e.setSource(source);
         return e;
     }
 
@@ -64,7 +63,6 @@ class EsTermNormalizerTest {
         EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, ALIAS);
 
         assertEquals(STD, r.standardTerm(), "别名应归一为标准词");
-        assertEquals("中医临床诊疗术语 症状", r.source());
         assertEquals(1, r.level(), "别名完全相等属精确命中");
     }
 
@@ -83,7 +81,6 @@ class EsTermNormalizerTest {
         EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, ALIAS);
 
         assertEquals(ALIAS, r.standardTerm(), "未召回时按原文返回，不得再从别处找补");
-        assertEquals("", r.source());
         assertEquals(0, r.level());
     }
 
@@ -164,7 +161,6 @@ class EsTermNormalizerTest {
         EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "腰部冷痛");
 
         assertEquals("腰部冷痛", r.standardTerm(), "相似度不足时应返回原词");
-        assertEquals("", r.source(), "未命中时 source 应置空");
     }
 
     // ---------------------------------------------------------------- 边界
@@ -175,7 +171,6 @@ class EsTermNormalizerTest {
         EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "   ");
 
         assertEquals("   ", r.standardTerm());
-        assertEquals("", r.source());
         Mockito.verify(es, Mockito.never()).search(anyString(), anyString(), anyInt());
     }
 

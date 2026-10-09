@@ -110,7 +110,7 @@ class DictProposalServiceImplTest {
     private static List<TermEntry> terms(String... names) {
         List<TermEntry> out = new ArrayList<>();
         for (String n : names) {
-            out.add(new TermEntry(n, List.of(), "测试"));
+            out.add(new TermEntry(n, List.of()));
         }
         return out;
     }
@@ -132,7 +132,6 @@ class DictProposalServiceImplTest {
             com.tcm.ehr.domain.po.DictProposalTerm t = new com.tcm.ehr.domain.po.DictProposalTerm();
             t.setProposalId("p1");
             t.setStandardTerm(n);
-            t.setSource("测试");
             t.setAliases("[]");
             rows.add(t);
         }
@@ -444,9 +443,9 @@ class DictProposalServiceImplTest {
         when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.PENDING));
         // 提案含：甘草(新)、人参(改)、当归(基线有、提案没有)
         snapshotContains("甘草", "人参");
-        TermEntry baselineRen = new TermEntry("人参", List.of("上党人参"), "测试");
+        TermEntry baselineRen = new TermEntry("人参", List.of("上党人参"));
         when(termStore.read("org-A", "herb")).thenReturn(
-                List.of(baselineRen, new TermEntry("当归", List.of(), "测试")));
+                List.of(baselineRen, new TermEntry("当归", List.of())));
 
         DictProposalDiffVO d = svc.diff("p1");
 
@@ -475,7 +474,7 @@ class DictProposalServiceImplTest {
     void aliasChangeCountsAsModified() {
         when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.PENDING));
         snapshotContains("甘草");
-        TermEntry base = new TermEntry("甘草", List.of("国老"), "测试");
+        TermEntry base = new TermEntry("甘草", List.of("国老"));
         when(termStore.read("org-A", "herb")).thenReturn(List.of(base));
 
         DictProposalDiffVO d = svc.diff("p1");

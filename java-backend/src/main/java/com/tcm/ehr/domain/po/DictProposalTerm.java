@@ -27,10 +27,6 @@ public class DictProposalTerm {
     /** 标准词；与基线比对新增/修改/删除的 key */
     private String standardTerm;
 
-    private String code;
-
-    private String source;
-
     /** 别名数组（JSON 字符串） */
     private String aliases;
 }

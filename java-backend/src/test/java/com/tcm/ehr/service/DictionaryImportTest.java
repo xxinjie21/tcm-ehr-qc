@@ -32,7 +32,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 /**
- * 词典导入链路测试（批A·1.4）：JSON 直传 / Excel(.xlsx,.xls) / CSV 三列（含国标代码），
+ * 词典导入链路测试（批A·1.4）：JSON 直传 / Excel(.xlsx,.xls) / CSV 两列（标准术语/别名），
  * 以及 PDF 智能转换的开关兜底文案。
  *
  * <p>用真实 POI 生成 .xls/.xlsx 字节流（不依赖外部文件），
@@ -93,25 +93,23 @@ class DictionaryImportTest {
                 body.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** 用 POI 生成两列/三列表格；xls=true 走 HSSF(.xls)，否则 XSSF(.xlsx) */
-    private static byte[] workbook(boolean xls, boolean withCodeColumn) throws IOException {
+    /** 用 POI 生成两列表格：标准术语 / 别名；xls=true 走 HSSF(.xls)，否则 XSSF(.xlsx) */
+    private static byte[] workbook(boolean xls) throws IOException {
         try (Workbook wb = xls ? new HSSFWorkbook() : new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet("术语");
             Row header = sheet.createRow(0);
             header.createCell(0).setCellValue("标准术语");
             header.createCell(1).setCellValue("别名");
-            if (withCodeColumn) header.createCell(2).setCellValue("国标代码");
 
             String[][] rows = {
-                    {"喉痹", "咽喉痛、咽痛", "A08.01"},
-                    {"鼻鼽", "过敏性鼻炎", "A09.02"},
-                    {"", "孤儿别名", "X00"},          // 标准术语为空 -> 应进 failures
+                    {"喉痹", "咽喉痛、咽痛"},
+                    {"鼻鼽", "过敏性鼻炎"},
+                    {"", "孤儿别名"},          // 标准术语为空 -> 应进 failures
             };
             for (int i = 0; i < rows.length; i++) {
                 Row r = sheet.createRow(i + 1);
                 r.createCell(0).setCellValue(rows[i][0]);
                 r.createCell(1).setCellValue(rows[i][1]);
-                if (withCodeColumn) r.createCell(2).setCellValue(rows[i][2]);
             }
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             wb.write(out);
@@ -129,13 +127,13 @@ class DictionaryImportTest {
 
     // ---------------------------------------------------------------- JSON 直传
 
-    /** JSON 直传：解析 TermEntry 数组，别名去重、code 保留 */
+    /** JSON 直传：解析 TermEntry 数组，别名去重 */
     @Test
-    void jsonImport_shouldParseAliasesAndCode() throws IOException {
+    void jsonImport_shouldParseAliases() throws IOException {
         String body = """
                 [
-                  {"standardTerm":"喉痹","aliases":["咽喉痛","咽痛"],"source":"中医临床诊疗术语 症状","code":"A08.01"},
-                  {"standardTerm":"喉痹","aliases":["咽痛"],"source":"","code":null}
+                  {"standardTerm":"喉痹","aliases":["咽喉痛","咽痛"]},
+                  {"standardTerm":"喉痹","aliases":["咽痛"]}
                 ]""";
 
         ImportResultVO vo = service.importDictionary(TYPE, json("d.json", body));
@@ -150,7 +148,6 @@ class DictionaryImportTest {
         TermEntry merged = written.get(0);
         assertEquals("喉痹", merged.getStandardTerm());
         assertEquals(List.of("咽喉痛", "咽痛"), merged.getAliases());
-        assertEquals("A08.01", merged.getCode());
     }
 
     /** JSON 里 standardTerm 为空：记入失败明细而不是整批报错 */
@@ -179,11 +176,11 @@ class DictionaryImportTest {
 
     // ---------------------------------------------------------------- Excel / CSV
 
-    /** .xls（HSSF）三列：标准术语/别名/国标代码 —— 复验老格式仍可用 */
+    /** .xls（HSSF）两列：标准术语/别名 */
     @Test
-    void xlsImport_shouldReadThreeColumns() throws IOException {
+    void xlsImport_shouldReadTwoColumns() throws IOException {
         MultipartFile file = new MockMultipartFile("file", "terms.xls",
-                "application/vnd.ms-excel", workbook(true, true));
+                "application/vnd.ms-excel", workbook(true));
 
         ImportResultVO vo = service.importDictionary(TYPE, file);
 
@@ -195,39 +192,26 @@ class DictionaryImportTest {
         assertEquals(2, written.size());
         assertEquals("喉痹", written.get(0).getStandardTerm());
         assertEquals(List.of("咽喉痛", "咽痛"), written.get(0).getAliases());
-        assertEquals("A08.01", written.get(0).getCode());
-        assertEquals("A09.02", written.get(1).getCode());
+        assertEquals("过敏性鼻炎", written.get(1).getAliases().get(0));
     }
 
-    /** .xlsx（XSSF）三列 */
+    /** .xlsx（XSSF）两列 */
     @Test
-    void xlsxImport_shouldReadThreeColumns() throws IOException {
+    void xlsxImport_shouldReadTwoColumns() throws IOException {
         MultipartFile file = new MockMultipartFile("file", "terms.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                workbook(false, true));
+                workbook(false));
 
         ImportResultVO vo = service.importDictionary(TYPE, file);
 
         assertEquals(2, vo.getImported());
-        assertEquals("A08.01", capturedWritten().get(0).getCode());
+        assertEquals("喉痹", capturedWritten().get(0).getStandardTerm());
     }
 
-    /** 无第 3 列时 code 应为 null（不报错），保持旧模板兼容 */
+    /** CSV 两列：制表符/逗号分隔 */
     @Test
-    void xlsxImport_withoutCodeColumn_shouldLeaveCodeNull() throws IOException {
-        MultipartFile file = new MockMultipartFile("file", "terms.xlsx",
-                "application/octet-stream", workbook(false, false));
-
-        ImportResultVO vo = service.importDictionary(TYPE, file);
-
-        assertEquals(2, vo.getImported());
-        assertNull(capturedWritten().get(0).getCode());
-    }
-
-    /** CSV 三列：制表符/逗号分隔，第 3 列进 code */
-    @Test
-    void csvImport_shouldReadThreeColumns() throws IOException {
-        String csv = "标准术语,别名,国标代码\n喉痹,咽喉痛、咽痛,A08.01\n鼻鼽,过敏性鼻炎,A09.02\n";
+    void csvImport_shouldReadTwoColumns() throws IOException {
+        String csv = "标准术语,别名\n喉痹,咽喉痛、咽痛\n鼻鼽,过敏性鼻炎\n";
         MultipartFile file = new MockMultipartFile("file", "terms.csv", "text/csv",
                 csv.getBytes(StandardCharsets.UTF_8));
 
@@ -236,7 +220,7 @@ class DictionaryImportTest {
         assertEquals(2, vo.getImported());
         List<TermEntry> written = capturedWritten();
         assertEquals("喉痹", written.get(0).getStandardTerm());
-        assertEquals("A08.01", written.get(0).getCode());
+        assertEquals(List.of("咽喉痛", "咽痛"), written.get(0).getAliases());
     }
 
     /** 不支持的扩展名：明确报错，不静默吞掉 */

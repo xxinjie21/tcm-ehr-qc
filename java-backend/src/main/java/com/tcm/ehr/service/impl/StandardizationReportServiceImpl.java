@@ -81,9 +81,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         rows.add(List.of("区块", "指标", "数值", "说明"));
         for (StandardizationReportVO.DictQuality d : r.getDictQuality()) {
             String label = nz(d.getLabel());
-            rows.add(List.of("词典质量", label + " 词条数", String.valueOf(d.getTermCount()), nz(d.getSource())));
+            rows.add(List.of("词典质量", label + " 词条数", String.valueOf(d.getTermCount()), "共 " + d.getTermCount() + " 条"));
             rows.add(List.of("词典质量", label + " 有别名", String.valueOf(d.getAliasedCount()), "共 " + d.getTermCount() + " 条"));
-            rows.add(List.of("词典质量", label + " 有国标编码", String.valueOf(d.getCodedCount()), "共 " + d.getTermCount() + " 条"));
             rows.add(List.of("词典质量", label + " 别名重复", String.valueOf(d.getSelfAliasCount()), "别名含标准词本身会自命中"));
         }
         rows.add(List.of("词典质量", "同名术语跨词典",
@@ -314,14 +313,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             q.setType(t.key());
             q.setLabel(t.label());
             q.setTermCount(entries.size());
-            int coded = 0;
             int aliased = 0;
             int selfAlias = 0;
-            Set<String> sources = new LinkedHashSet<>();
             for (TermEntry e : entries) {
-                if (e.getCode() != null && !e.getCode().isBlank()) {
-                    coded++;
-                }
                 if (e.getAliases() != null && !e.getAliases().isEmpty()) {
                     aliased++;
                     // 别名与标准词相同会在归一时自命中，属数据缺陷
@@ -329,15 +323,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                         selfAlias++;
                     }
                 }
-                if (e.getSource() != null && !e.getSource().isBlank()) {
-                    sources.add(e.getSource());
-                }
             }
-            q.setCodedCount(coded);
             q.setAliasedCount(aliased);
             q.setSelfAliasCount(selfAlias);
-            // 来源可能分散（如疾病来自国标、中药来自药典），取第一段做代表
-            q.setSource(sources.isEmpty() ? "" : sources.iterator().next());
             out.add(q);
         }
         return out;

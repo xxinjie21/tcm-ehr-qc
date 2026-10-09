@@ -22,10 +22,6 @@ public class DictArchiveTerm {
 
     private String standardTerm;
 
-    private String code;
-
-    private String source;
-
     /** 别名数组（JSON 字符串） */
     private String aliases;
 }

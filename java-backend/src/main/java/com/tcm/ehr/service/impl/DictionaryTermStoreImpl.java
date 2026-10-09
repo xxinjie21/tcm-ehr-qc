@@ -210,8 +210,6 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             row.setOrgId(org);
             row.setType(type);
             row.setStandardTerm(e.getStandardTerm());
-            row.setCode(e.getCode());
-            row.setSource(e.getSource());
             row.setAliases(writeJson(e.getAliases()));
             termMapper.insert(row);
         }
@@ -238,6 +236,11 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             v = new DictionaryVersion();
             v.setOrgId(org);
             v.setType(type);
+            v.setVersion(indexedVersion);
+        } else {
+            // 收敛修正：老分支只在 v != null 时写 indexed_version、不写 version，
+            // 一旦「哈希公式变更 + 强制重建」就会 version≠indexed 常驻、每次启动重建。
+            // 这里让 version 一并追平 —— 重建内容就该是当前版本，写同值无副作用。
             v.setVersion(indexedVersion);
         }
         v.setIndexedVersion(indexedVersion);
@@ -307,13 +310,12 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      */
     public String contentVersion(List<TermEntry> entries) {
         // 哈希输入必须覆盖「归一判定真正用到的字段」：只哈希标准词的话，
-        // 只改别名或编码不会换版本 —— 启动对账判「已同步」，归一继续用旧别名
+        // 只改别名不会换版本 —— 启动对账判「已同步」，归一继续用旧别名
         List<String> keys = new ArrayList<>(entries.size());
         for (TermEntry e : entries) {
             String std = e.getStandardTerm() == null ? "" : e.getStandardTerm().trim();
             String aliases = e.getAliases() == null ? "" : String.join(",", e.getAliases());
-            String code = e.getCode() == null ? "" : e.getCode().trim();
-            keys.add(std + "\u0002" + aliases + "\u0002" + code);
+            keys.add(std + "\u0002" + aliases);
         }
         keys.sort(String::compareTo);
         String joined = String.join("\u0001", keys);
@@ -443,8 +445,6 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     private TermEntry toEntry(DictionaryTerm r) {
         TermEntry e = new TermEntry();
         e.setStandardTerm(r.getStandardTerm());
-        e.setCode(r.getCode());
-        e.setSource(r.getSource() == null ? "" : r.getSource());
         e.setAliases(readAliases(r.getAliases()));
         return e;
     }

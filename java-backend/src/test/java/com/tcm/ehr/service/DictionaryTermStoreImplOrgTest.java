@@ -39,11 +39,11 @@ class DictionaryTermStoreImplOrgTest {
     void contentVersionIsOrderIndependent() {
         IDictionaryTermStore store = newStore();
         List<TermEntry> a = List.of(
-                new TermEntry("甘草", List.of("国老"), "药典"),
-                new TermEntry("人参", List.of("上党人参"), "药典"));
+                new TermEntry("甘草", List.of("国老")),
+                new TermEntry("人参", List.of("上党人参")));
         List<TermEntry> b = List.of(
-                new TermEntry("人参", List.of("上党人参"), "药典"),
-                new TermEntry("甘草", List.of("国老"), "药典"));
+                new TermEntry("人参", List.of("上党人参")),
+                new TermEntry("甘草", List.of("国老")));
         assertEquals(store.contentVersion(a), store.contentVersion(b),
                 "导入顺序不同不应产生不同版本，否则每次导入都白白触发一次 ES 全量重建");
     }
@@ -52,10 +52,10 @@ class DictionaryTermStoreImplOrgTest {
     @DisplayName("内容版本：词条增减必须改变版本")
     void contentVersionChangesWithContent() {
         IDictionaryTermStore store = newStore();
-        List<TermEntry> one = List.of(new TermEntry("甘草", List.of(), "药典"));
+        List<TermEntry> one = List.of(new TermEntry("甘草", List.of()));
         List<TermEntry> two = List.of(
-                new TermEntry("甘草", List.of(), "药典"),
-                new TermEntry("人参", List.of(), "药典"));
+                new TermEntry("甘草", List.of()),
+                new TermEntry("人参", List.of()));
         assertNotEquals(store.contentVersion(one), store.contentVersion(two),
                 "多一条词条必须换版本，否则改了词典却跳过重建");
     }

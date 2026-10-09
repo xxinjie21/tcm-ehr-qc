@@ -78,7 +78,7 @@ class ReviewServiceTest {
         Mockito.when(termNormalizer.normalize(Mockito.anyString(), Mockito.anyString(),
                         Mockito.anyString()))
                 .thenAnswer(inv -> new EsTermNormalizer.NormalizeResult(
-                        inv.getArgument(2), "测试词典", 1, null));
+                        inv.getArgument(2), 1));
         QcRuleStore ruleStore = new QcRuleStore(new ObjectMapper(),
                 org.mockito.Mockito.mock(QcRuleMapper.class));
         // 复核写库段自批次 26.4 起是独立 Bean（事务落点），入口只做归一后委托

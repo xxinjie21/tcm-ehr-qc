@@ -17,6 +17,7 @@ import com.tcm.ehr.domain.vo.ImportResultVO;
 import com.tcm.ehr.service.IDictArchiveService;
 import com.tcm.ehr.service.IDictProposalService;
 import com.tcm.ehr.service.IDictionaryService;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -64,10 +65,12 @@ public class DictionaryController {
     /**
      * 校验术语类型，非法返回 null（调用方据此回 4001）。
      *
-     * null 与空白视为「不按类型过滤」并放行。
+     * null 与空白视为「不按类型过滤」并放行 —— 这只对 type 声明为
+     * {@code required = false} 的端点（/proposals、/reindex）生效。
+     * 其余端点的 type 是必填，缺失会先被 Spring 拦成 400「缺少必填参数：type」，
+     * 根本走不到这里。
      *
      * ⚠️ 先挡 null/空白再 contains，是语义需要而非防 NPE：EntityTypes.dictKeys() 返回可含 null 查询的 LinkedHashSet，
-     * 但参数可空的端点（本类的 type 可选）省略 type 表示「不按类型过滤」，
      * 若直接 contains 就会把「省略参数」判成「传错参数」。
      */
     private static ResponseEntity<Result<String>> badType(String type) {
@@ -101,22 +104,30 @@ public class DictionaryController {
      * 词典分页查询（供词典页翻页 / 输入联想 / 质控规则下拉）。
      *
      *
-     * 【权限：登录即可】按标准词与别名模糊匹配。不传 page 返回全部命中，
+     * 【权限：登录即可】按标准词与别名模糊匹配。type 必填（缺失会被 Spring 拦成
+     * 400「缺少必填参数：type」）；不传 page 返回全部命中，传 page 则分页。
      *
-     * 传 page 则分页。
+     * @param scope 词典作用域（前端滑动按钮）：{@code effective} 默认=基础层∪本组织；
+     *              {@code base}=仅系统默认词典；{@code org}=仅本组自有词条。
+     *              <b>输入联想 / 质控下拉不要传 base/org</b> —— 那会给出归一里不生效的词
      */
     @GetMapping("/terms")
     public ResponseEntity<Result<Map<String, Object>>> terms(
             @RequestParam("type") String type,
             @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "50") int size) throws IOException {
+            @RequestParam(value = "size", defaultValue = "50") int size,
+            @RequestParam(value = "scope", defaultValue = IDictionaryTermStore.SCOPE_EFFECTIVE)
+            String scope) throws IOException {
         ResponseEntity<Result<String>> bad = badType(type);
         if (bad != null) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
+        if (!isKnownScope(scope)) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "词典作用域非法"));
+        }
         return ResponseEntity.ok(Result.ok(
-                dictionaryService.searchTerms(type, keyword, page, PageSizeGuard.clamp(size))));
+                dictionaryService.searchTerms(type, keyword, page, PageSizeGuard.clamp(size), scope)));
     }
 
     /**
@@ -126,23 +137,37 @@ public class DictionaryController {
      * 【权限：登录即可】前端拿到后可在本地编辑；改动要生效必须走提案流程
      *
      * （本地词典不会自动同步回小组基线）。
+     *
+     * @param scope {@code org}（默认）= 本组自有词条，这是<b>提案基线</b>（审核走整快照替换组织层）；
+     *              {@code effective} = 基础层 ∪ 本组织，即<b>生效词典</b>。
+     *              两者不是同一个东西，别混用 —— 详见 {@link IDictProposalService#exportBaseline}
      */
     @GetMapping("/baseline/export")
     public ResponseEntity<Result<List<Map<String, Object>>>> exportBaseline(
-            @RequestParam("type") String type) {
+            @RequestParam("type") String type,
+            @RequestParam(value = "scope", defaultValue = IDictionaryTermStore.SCOPE_ORG) String scope) {
         ResponseEntity<Result<String>> bad = badType(type);
         if (bad != null) {
             return ResponseEntity.badRequest().body(Result.error(4001, "术语类型非法"));
         }
+        if (!isKnownScope(scope)) {
+            return ResponseEntity.badRequest().body(Result.error(4001, "词典作用域非法"));
+        }
         List<Map<String, Object>> out = new ArrayList<>();
-        for (TermEntry e : proposalService.exportBaseline(RequestUtils.currentOrgId(), type)) {
+        for (TermEntry e : proposalService.exportBaseline(RequestUtils.currentOrgId(), type, scope)) {
             out.add(Map.of(
                     "standardTerm", e.getStandardTerm() == null ? "" : e.getStandardTerm(),
-                    "code", e.getCode() == null ? "" : e.getCode(),
-                    "source", e.getSource() == null ? "" : e.getSource(),
                     "aliases", e.getAliases() == null ? List.of() : e.getAliases()));
         }
         return ResponseEntity.ok(Result.ok(out));
+    }
+
+    /** scope 只认 effective / base / org 三个值；未知值按 4001 挡掉，别静默降级成别的口径 */
+    private static boolean isKnownScope(String scope) {
+        String s = scope == null ? "" : scope.trim();
+        return IDictionaryTermStore.SCOPE_EFFECTIVE.equals(s)
+                || IDictionaryTermStore.SCOPE_BASE.equals(s)
+                || IDictionaryTermStore.SCOPE_ORG.equals(s);
     }
 
     // ================================================================ 管理员直写
@@ -162,13 +187,13 @@ public class DictionaryController {
      * Excel 需服务端 POI 解析（浏览器无 xlsx 能力），故放在这里而非纯前端。
      *
      *
-     * 响应里一并带上词表体检结果（批次 21）：同名重复、别名含标准词、编码形态等
+     * 响应里一并带上词表体检结果（批次 21）：同名重复、别名含标准词等
      * 都是导入不会报错的缺陷，只在这里指出来最合适 —— 用户正准备入库，
      * 看到提示还能改；等入库后再查，脏数据已经进库并进了 ES 索引。
      *
      * @param file 词典文件（.xlsx/.xls/.csv/.json）
      * @param type 术语类型
-     * @return { terms: [{standardTerm, code, source, aliases}], failures: [{row, reason}], lint: {...} }
+     * @return { terms: [{standardTerm, aliases}], failures: [{row, reason}], lint: {...} }
      */
     @PostMapping("/parse")
     public ResponseEntity<Result<Map<String, Object>>> parse(
@@ -183,8 +208,6 @@ public class DictionaryController {
         for (TermEntry e : parsed.terms) {
             terms.add(Map.of(
                     "standardTerm", e.getStandardTerm() == null ? "" : e.getStandardTerm(),
-                    "code", e.getCode() == null ? "" : e.getCode(),
-                    "source", e.getSource() == null ? "" : e.getSource(),
                     "aliases", e.getAliases() == null ? List.of() : e.getAliases()));
         }
         return ResponseEntity.ok(Result.ok(Map.of(
@@ -444,10 +467,6 @@ public class DictionaryController {
             }
             TermEntry e = new TermEntry();
             e.setStandardTerm(std.toString().trim());
-            Object code = m.get("code");
-            e.setCode(code == null || code.toString().isBlank() ? null : code.toString().trim());
-            Object src = m.get("source");
-            e.setSource(src == null ? "" : src.toString());
             Object al = m.get("aliases");
             List<String> aliases = new ArrayList<>();
             if (al instanceof List<?> list) {

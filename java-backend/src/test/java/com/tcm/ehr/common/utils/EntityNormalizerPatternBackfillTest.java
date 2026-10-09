@@ -37,7 +37,7 @@ class EntityNormalizerPatternBackfillTest {
     private static EsTermNormalizer mockNormalizer(EsTermNormalizer n) {
         when(n.normalize(anyString(), anyString(), anyString()))
                 .thenAnswer(inv -> new EsTermNormalizer.NormalizeResult(
-                        inv.getArgument(2), "中医病证分类与代码", 1, null));
+                        inv.getArgument(2), 1));
         return n;
     }
 

@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * 实体术语归一：把抽取出的 9 类实体就地归一到国标标准术语。
+ * 实体术语归一：把抽取出的 9 类实体就地归一到标准术语。
  *
  * <p><b>与清洗链路的分工</b>：本类服务于<b>解析链路</b>（`POST /api/nlp/extract` 返回前即时归一），
  * 目的是让用户在解析页当场看到「原文 → 标准词」的对照，而不是等到清洗阶段才知道术语是否规范。
@@ -304,11 +304,12 @@ public class EntityNormalizer {
         return before - list.size();
     }
 
-    /** 该文本是否命中指定词典（命中 = NormalizeResult.source() 非空，与中药那段同口径） */
+    /** 该文本是否命中指定词典（命中 = level 落在精确~模糊，与中药那段同口径） */
     private boolean hitsDictionary(String type, String orgId, String raw) {
         try {
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
-            return r != null && r.source() != null && !r.source().isBlank();
+            return r != null && r.level() >= EsTermNormalizer.LEVEL_EXACT
+                    && r.level() <= EsTermNormalizer.LEVEL_FUZZY;
         } catch (Exception ex) {
             // 词典/ES 不可用时**不挪**：宁可少归位，也不能凭猜把症状改成脉象
             log.warn("[归一] 归位判定失败（type={}）: {}", type, ex.getMessage());
@@ -419,14 +420,11 @@ public class EntityNormalizer {
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", orgId, raw);
             // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
-            if (r.source() == null || r.source().isBlank()
-                || r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
+            if (r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
                 continue;
             }
             herb.setName(r.standardTerm());
             herb.setNormLevel(r.level());
-            herb.setNormSource(r.source());
-            herb.setNormCode(r.code());
             stat[0]++;
             stat[r.level()]++;
         }
@@ -457,14 +455,11 @@ public class EntityNormalizer {
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
             // 4. 未命中词典就保持原样，不写 normLevel
-            if (r.source() == null || r.source().isBlank()
-                || r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
+            if (r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
                 continue;
             }
             e.setContent(r.standardTerm());
             e.setNormLevel(r.level());
-            e.setNormSource(r.source());
-            e.setNormCode(r.code());
             stat[0]++;
             stat[r.level()]++;
         }

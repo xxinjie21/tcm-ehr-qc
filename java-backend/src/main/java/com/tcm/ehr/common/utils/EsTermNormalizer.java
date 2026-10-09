@@ -84,12 +84,10 @@ public class EsTermNormalizer {
      * 归一结果。
      *
      * @param standardTerm 命中的标准词（未命中时=原文）
-     * @param source 术语来源（未命中为 ""）
      * @param level 命中层级：{@link #LEVEL_EXACT}=精确 / {@link #LEVEL_CONTAIN}=包含 /
      *               {@link #LEVEL_FUZZY}=模糊 / {@link #LEVEL_NONE}=未命中
-     * @param code 国标代码（词典收录则有，否则 null）
      */
-    public record NormalizeResult(String standardTerm, String source, int level, String code) {
+    public record NormalizeResult(String standardTerm, int level) {
     }
 
     /**
@@ -100,7 +98,7 @@ public class EsTermNormalizer {
      *
      * @param type 实体类型 key（见 {@link EntityTypes}），决定查哪本词典
      * @param term 待归一的原文
-     * @return 命中层级、标准词、来源与国标代码
+     * @return 命中层级、标准词
      * @throws TermIndexUnavailableException ES 索引不可用
      */
     public NormalizeResult normalize(String type, String term) {
@@ -121,7 +119,7 @@ public class EsTermNormalizer {
         // 1. 归一原文（null 视作空串）
         String input = term == null ? "" : term.trim();
         if (input.isEmpty()) {
-            return new NormalizeResult(term, "", LEVEL_NONE, null);
+            return new NormalizeResult(term, LEVEL_NONE);
         }
 
         // ES 召回 -> 判定（命中路径只需在候选集内比较）
@@ -135,7 +133,7 @@ public class EsTermNormalizer {
         }
 
         // 2. 未召回或三级都不中 → 判未命中，standardTerm 回填原文
-        return new NormalizeResult(input, "", LEVEL_NONE, null);
+        return new NormalizeResult(input, LEVEL_NONE);
     }
 
     /**
@@ -219,10 +217,10 @@ public class EsTermNormalizer {
         // 1. 精确优先：命中即返回，不给后面的宽松规则机会
         for (TermEntry e : entries) {
             if (e.getStandardTerm().equals(input)) {
-                return new NormalizeResult(e.getStandardTerm(), e.getSource(), LEVEL_EXACT, e.getCode());
+                return new NormalizeResult(e.getStandardTerm(), LEVEL_EXACT);
             }
             if (e.getAliases() != null && e.getAliases().contains(input)) {
-                return new NormalizeResult(e.getStandardTerm(), e.getSource(), 1, e.getCode());
+                return new NormalizeResult(e.getStandardTerm(), 1);
             }
         }
 
@@ -239,8 +237,7 @@ public class EsTermNormalizer {
             }
         }
         if (bestContains != null) {
-            return new NormalizeResult(bestContains.getStandardTerm(), bestContains.getSource(), LEVEL_CONTAIN,
-                    bestContains.getCode());
+            return new NormalizeResult(bestContains.getStandardTerm(), LEVEL_CONTAIN);
         }
 
         // 三级·模糊：字符Dice相似度 ≥ 阈值，取最高分
@@ -261,8 +258,7 @@ public class EsTermNormalizer {
         }
         // 4. 最高分仍不到阈值就算未命中，给 null
         if (bestFuzzy != null && bestScore >= scoreThreshold) {
-            return new NormalizeResult(bestFuzzy.getStandardTerm(), bestFuzzy.getSource(), LEVEL_FUZZY,
-                    bestFuzzy.getCode());
+            return new NormalizeResult(bestFuzzy.getStandardTerm(), LEVEL_FUZZY);
         }
 
         return null;

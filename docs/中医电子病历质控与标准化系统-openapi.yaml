@@ -186,10 +186,8 @@ components:
               type: { type: string, description: 术语类型 key }
               label: { type: string, description: 中文名 }
               termCount: { type: integer, description: 词条数 }
-              codedCount: { type: integer, description: 有编码的词条数 }
               aliasedCount: { type: integer, description: 有别名的词条数 }
               selfAliasCount: { type: integer, description: 别名与标准词相同的条数（归一会自命中） }
-              source: { type: string, description: 主要来源标注 }
         crossTypeDuplicates:
           type: array
           description: 甲类·跨类重名术语（同一词出现在多本词典）
@@ -274,12 +272,6 @@ components:
         normLevel:
           type: integer
           description: 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中词典时不返回
-        normSource:
-          type: string
-          description: 归一命中的术语来源（词典名）；未命中不返回
-        normCode:
-          type: string
-          description: 国标代码；词典未收录时不返回
     Herb:
       type: object
       description: 中药实体（含剂量），共享模型
@@ -306,12 +298,6 @@ components:
         normLevel:
           type: integer
           description: 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中词典时不返回
-        normSource:
-          type: string
-          description: 归一命中的术语来源（词典名）；未命中不返回
-        normCode:
-          type: string
-          description: 国标代码；词典未收录时不返回
     RecordMetadata:
       type: object
       description: 病历元数据（共享模型）
@@ -841,8 +827,6 @@ components:
             type: object
             properties:
               standardTerm: { type: string }
-              code: { type: string }
-              source: { type: string }
               aliases:
                 type: array
                 items: { type: string }
@@ -1114,20 +1098,14 @@ components:
           description: 口语化/非标准术语
     NormalizeVO:
       type: object
-      description: 术语标准化响应（出参；未命中时 standardTerm 返回原词、source 返回空字符串、level=0）
+      description: 术语标准化响应（出参；未命中时 standardTerm 返回原词、level=0）
       properties:
         standardTerm:
           type: string
           description: 命中的标准术语；未命中时为原词
-        source:
-          type: string
-          description: 归一命中的术语来源（词典名）；未命中为空字符串
         level:
           type: integer
           description: 归一命中层级：1=精确 / 2=包含 / 3=模糊；0=未命中
-        code:
-          type: string
-          description: 国标代码；词典未收录时为 null
     CleanDTO:
       type: object
       description: 数据清洗请求（入参）
@@ -2340,7 +2318,7 @@ paths:
       tags:
         - NLP抽取
       summary: NLP实体抽取
-      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）。Java 端转发至 Python FastAPI 服务（:8001），服务/模型不可用时降级（modelAvailable=false）。返回前对实体做术语归一（disease/symptom/pattern/formula/herb 五类走词典，舌/脉/病因/治法四类无独立词典仅保留原文）：content 为标准术语、sourceText 为归一前原文，并附 normLevel/normSource/normCode；未命中词典时 content 保持原文且不返回归一字段
+      description: 【权限：登录即可】NLP实体抽取统一入口，一次返回完整结构化数据（症状/舌脉/证候病因治法/方剂中药）。Java 端转发至 Python FastAPI 服务（:8001），服务/模型不可用时降级（modelAvailable=false）。返回前对实体做术语归一（disease/symptom/pattern/formula/herb 五类走词典，舌/脉/病因/治法四类无独立词典仅保留原文）：content 为标准术语、sourceText 为归一前原文，并附 normLevel；未命中词典时 content 保持原文且不返回归一字段
       requestBody:
         required: true
         content:
@@ -2554,7 +2532,7 @@ paths:
       tags:
         - 清洗与导出
       summary: 术语标准化
-      description: 【权限：登录即可】将口语化/非标准中医术语归一国标标准术语。未命中时 standardTerm 返回原词、source 返回空字符串
+      description: 【权限：登录即可】将口语化/非标准中医术语归一为标准术语。未命中时 standardTerm 返回原词、level=0
       requestBody:
         required: true
         content:

@@ -27,8 +27,6 @@ import java.util.regex.Pattern;
  *       （2026-10-04 舌象词典就是这么没灌进去的，现象只是「报告里舌象 0 条」）。
  *   - 别名与标准词相同：归一时该词会自己命中自己，
  *       掩盖真正的匹配逻辑，也让「词表命中数」虚高。
- *   - 编码格式可疑：国标码有固定形态，写错了不会报错，
- *       直到对接国标库 / 医保库时才发现对不上。
  * </ol>
  *
  *
@@ -39,8 +37,6 @@ import java.util.regex.Pattern;
 @Service
 public class DictionaryLintServiceImpl implements IDictionaryLintService {
 
-    /** 国标/ICD 编码的常见形态：字母数字组合，可含 . - */
-    private static final Pattern CODE_SHAPE = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9.\\-]{2,29}$");
     /** 术语里出现句号/逗号，多半是把定义或一整句塞进了标准词 */
     private static final Pattern LOOKS_LIKE_SENTENCE = Pattern.compile("[。；;，,、]");
     /**
@@ -77,7 +73,6 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
 
         lintDuplicateTerm(entries, vo);
         lintSelfAlias(entries, vo);
-        lintCode(entries, vo);
         lintTermShape(entries, vo);
         lintAliasSanity(entries, vo);
 
@@ -169,52 +164,6 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
                     "标准词不必再写进别名（归一时本来就能精确命中）。"
                             + "导入会自动清理，但源文件留着会让后面核对的人以为还有别的别名。",
                     "warning", bad.size()));
-        }
-    }
-
-    /**
-     * 编码：形态可疑或重复时警告。
-     *
-     *
-     * 不按具体标准体系校验（国标码与 ICD 码形态本来就不同，且各词典类型可能用不同体系），
-     *
-     * 只校验「像不像一个编码」与「有没有重复」——
-     * 重复编码比格式错更危险，它会让两个术语抢同一个码。
-     */
-    private void lintCode(List<TermEntry> entries, DictionaryLintVO vo) {
-        Map<String, List<String>> codeToTerms = new LinkedHashMap<>();
-        List<String> badShape = new ArrayList<>();
-        for (TermEntry e : entries) {
-            String term = trimmed(e.getStandardTerm());
-            String code = trimmed(e.getCode());
-            if (code.isEmpty()) {
-                continue;
-            }
-            if (!CODE_SHAPE.matcher(code).matches()) {
-                badShape.add(term + "→" + code);
-            }
-            codeToTerms.computeIfAbsent(code, k -> new ArrayList<>()).add(term);
-        }
-        if (!badShape.isEmpty()) {
-            vo.getWarnings().add(issue("code-shape",
-                    "编码格式看起来不像编码",
-                    String.join("、", badShape.subList(0, Math.min(badShape.size(), 8))),
-                    "编码一般是字母数字与「.」「-」的组合（3~30 位）。"
-                            + "如果这里填的是别的东西（如来源说明），应该放到来源列而不是编码列。",
-                    "warning", badShape.size()));
-        }
-        List<String> dupCode = new ArrayList<>();
-        for (Map.Entry<String, List<String>> en : codeToTerms.entrySet()) {
-            if (en.getValue().size() > 1) {
-                dupCode.add(en.getKey() + "（" + String.join(" / ", en.getValue()) + "）");
-            }
-        }
-        if (!dupCode.isEmpty()) {
-            vo.getWarnings().add(issue("code-duplicate",
-                    "多个术语用了同一个编码",
-                    String.join("；", dupCode.subList(0, Math.min(dupCode.size(), 8))),
-                    "编码必须一对一。重复会导致按编码反查时张冠李戴，对接国标库后尤其明显。",
-                    "warning", dupCode.size()));
         }
     }
 
@@ -323,13 +272,7 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
     }
 
     private String describe(TermEntry e) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("别名").append(e.getAliases() == null ? "[]" : e.getAliases());
-        String code = trimmed(e.getCode());
-        if (!code.isEmpty()) {
-            sb.append("/码").append(code);
-        }
-        return sb.toString();
+        return "别名" + (e.getAliases() == null ? "[]" : e.getAliases());
     }
 
     private String trimmed(String s) {

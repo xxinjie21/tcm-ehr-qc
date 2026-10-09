@@ -72,14 +72,22 @@ public class DictProposalServiceImpl implements IDictProposalService {
     // ---------------------------------------------------------------- 基线导出
 
     /**
-     * 导出「小组基线」给前端存本地个人词典。
+     * 导出某组织某类型的词条给前端存本地个人词典。
+     *
+     * <p>两种口径（scope）的区别见接口 javadoc，这里只强调一点：
+     * {@code org} 是<b>提案基线</b>（审核走整快照替换组织层），
+     * {@code effective} 是<b>生效词典</b>（供查看 / 导出 / 当编辑起点）。</p>
      *
      * @param orgId 组织；"" = 基础层
      * @param type  术语类型
-     * @return 该层完整词条（与 read 一致，不是 effective：个人词典要能看出
-     *         「本组织没有自有词条」，否则用户会以为拉到的是空的）
+     * @param scope {@code org}（默认，本组自有词条）或 {@code effective}（基础层 ∪ 本组）
      */
-    public List<TermEntry> exportBaseline(String orgId, String type) {
+    public List<TermEntry> exportBaseline(String orgId, String type, String scope) {
+        // 非法/缺省一律按 org：这是提案流程依赖的口径，改动它会让「整快照替换」
+        // 把基础层整份复制进组织层（组织层是叠加层，重复写入只会造成索引冗余）
+        if (scope != null && IDictionaryTermStore.SCOPE_EFFECTIVE.equals(scope.trim())) {
+            return termStore.readEffective(orgId, type);
+        }
         return termStore.read(orgId, type);
     }
 
@@ -430,8 +438,6 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
             t.setId(newId());
             t.setProposalId(proposalId);
             t.setStandardTerm(e.getStandardTerm().trim());
-            t.setCode(e.getCode());
-            t.setSource(e.getSource() == null ? "" : e.getSource());
             t.setAliases(writeJson(e.getAliases()));
             termMapper.insert(t);
         }
@@ -445,8 +451,6 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         for (DictProposalTerm t : rows) {
             TermEntry e = new TermEntry();
             e.setStandardTerm(t.getStandardTerm());
-            e.setCode(t.getCode());
-            e.setSource(t.getSource() == null ? "" : t.getSource());
             e.setAliases(readJson(t.getAliases()));
             out.add(e);
         }
@@ -481,25 +485,16 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         return standardTerm == null ? "" : standardTerm.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** 两条例外同标准词是否内容不同（code / source / aliases 任意一项不同即算修改） */
+    /** 两条例外同标准词是否内容不同（aliases 不一致即算修改） */
     private boolean changed(TermEntry a, TermEntry b) {
-        if (!eq(a.getCode(), b.getCode()) || !eq(a.getSource(), b.getSource())) {
-            return true;
-        }
         List<String> x = a.getAliases() == null ? List.of() : a.getAliases();
         List<String> y = b.getAliases() == null ? List.of() : b.getAliases();
         return !new LinkedHashSet<>(x).equals(new LinkedHashSet<>(y));
     }
 
-    private boolean eq(String a, String b) {
-        return (a == null ? "" : a).equals(b == null ? "" : b);
-    }
-
     private Map<String, Object> toMap(TermEntry e) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("standardTerm", e.getStandardTerm());
-        m.put("code", e.getCode());
-        m.put("source", e.getSource());
         m.put("aliases", e.getAliases());
         return m;
     }

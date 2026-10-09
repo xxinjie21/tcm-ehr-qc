@@ -36,8 +36,8 @@ class EntityNormalizerPulseTongueRoutingTest {
             String raw = inv.getArgument(2);
             Set<String> hit = dict.get(type);
             return hit != null && hit.contains(raw)
-                    ? new EsTermNormalizer.NormalizeResult(raw, "标准来源", 1, null)
-                    : new EsTermNormalizer.NormalizeResult(raw, "", 0, null);
+                    ? new EsTermNormalizer.NormalizeResult(raw, 1)
+                    : new EsTermNormalizer.NormalizeResult(raw, 0);
         });
         return n;
     }

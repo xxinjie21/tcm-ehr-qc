@@ -84,8 +84,6 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
             t.setId(newId());
             t.setVersionId(v.getId());
             t.setStandardTerm(e.getStandardTerm());
-            t.setCode(e.getCode());
-            t.setSource(e.getSource());
             t.setAliases(writeJson(e.getAliases()));
             termMapper.insert(t);
         }
@@ -154,8 +152,6 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
         for (DictArchiveTerm t : rows) {
             TermEntry e = new TermEntry();
             e.setStandardTerm(t.getStandardTerm());
-            e.setCode(t.getCode());
-            e.setSource(t.getSource() == null ? "" : t.getSource());
             e.setAliases(readJson(t.getAliases()));
             out.add(e);
         }
@@ -169,17 +165,22 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
                 .last("LIMIT 1"));
     }
 
-    /** 下一个版本号 = MAX(version_no) + 1；没有记录时为 1 */
+    /**
+     * 下一个版本号 = MAX(version_no) + 1；该 {@code (org_id, type)} 还没有归档时为 1。
+     *
+     * <p><b>聚合列必须别名成 {@code version_no}</b>：结果集列名要能与实体属性对上
+     * （下划线转驼峰只认 {@code version_no} → {@code versionNo}）。换成对不上的别名，
+     * 映射后 {@code getVersionNo()} 恒为 null，每次归档都算出 1 ——
+     * 第二次同类型归档必然撞 {@code uk_org_type_no (org_id, type, version_no)}。</p>
+     *
+     * <p>该组没有记录时 MySQL 仍返回一行 {@code MAX = NULL}，映射出来是 null 元素，
+     * 所以「列表为空」与「元素为 null」都要判。</p>
+     */
     private int nextVersionNo(String org, String type) {
         List<DictArchiveVersion> rows = versionMapper.selectList(
                 new QueryWrapper<DictArchiveVersion>()
-                        .select("MAX(version_no) AS maxNo")
+                        .select("MAX(version_no) AS version_no")
                         .eq("org_id", org).eq("type", type));
-        // ⚠️ 必须同时判「元素本身为 null」：实测线上报错正是
-        //    Cannot invoke "DictArchiveVersion.getVersionNo()" because the return value
-        //    of "java.util.List.get(int)" is null —— 列表非空但首元素是 null 时，
-        //    原来那句 `rows.get(0).getVersionNo()` 直接空指针，导入因此被报成系统异常
-        //    （词条其实已经导入成功，只是归档没生成）。
         if (rows.isEmpty() || rows.get(0) == null || rows.get(0).getVersionNo() == null) {
             return 1;
         }

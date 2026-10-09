@@ -7,6 +7,7 @@ import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.ImportResultVO;
 import com.tcm.ehr.service.IDictionaryService;
+import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.IEsTermIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,11 +74,24 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * @return 命中词条视图：terms（standardTerm / aliases）+ total（命中总数）
      * @throws IOException 词典文件读取失败
      */
-    public Map<String, Object> searchTerms(String type, String keyword, int page, int size)
+    public Map<String, Object> searchTerms(String type, String keyword, int page, int size, String scope)
             throws IOException {
-        // 1. 读「当前组织生效」的词条：有自有词条读自己的，否则回退基础层
+        // 1. 按作用域取词条。三档与前端滑动按钮一一对应：
+        //    effective = 基础层 ∪ 本组织（默认口径，归一实际用的就是它）
+        //    base      = 仅基础层（系统默认词典，由 data/dictionaries/*.json 播种）
+        //    org       = 仅本组织自有词条（组内词典，叠加层，不含基础层）
+        //    默认取 effective：输入联想与质控下拉都依赖「实际生效」的候选集，
+        //    若默认成 base/org，用户会选到归一里根本不生效的词。
         String orgId = RequestUtils.currentOrgId();
-        List<TermEntry> entries = termStore.readEffective(orgId, type);
+        String scopeKey = normalizeScope(scope);
+        List<TermEntry> entries;
+        if (IDictionaryTermStore.SCOPE_BASE.equals(scopeKey)) {
+            entries = termStore.read(IDictionaryTermStore.BASE_ORG, type);
+        } else if (IDictionaryTermStore.SCOPE_ORG.equals(scopeKey)) {
+            entries = termStore.read(orgId, type);
+        } else {
+            entries = termStore.readEffective(orgId, type);
+        }
         List<Map<String, Object>> hit = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
         // 2. 逐条比对标准术语与别名，任一命中即算命中（不过滤时 kw 为空，全量收）
@@ -89,10 +103,6 @@ if (matched) {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("standardTerm", e.getStandardTerm());
                     m.put("aliases", e.getAliases());
-                    // 批次 22：带上编码，词典页与导出才能显示国标码。
-                    // 空串归 null 与 normalize 同口径：区分「没有编码」与「编码是空串」。
-                    String code = e.getCode();
-                    m.put("code", code == null || code.isBlank() ? null : code);
                     hit.add(m);
                 }
         }
@@ -109,6 +119,21 @@ if (matched) {
         out.put("terms", terms);
         out.put("total", hit.size());
         return out;
+    }
+
+    /**
+     * scope 归一：只认 {@code base} / {@code org}，其余（含 null、空白、写错的值）
+     * 一律落回 {@code effective}。
+     *
+     * <p>为什么不抛异常：这是<b>读</b>接口，scope 写错时返回「生效词典」至少还是可用数据；
+     * 抛错会让词典页整页空白。真正需要拦的非法值在 Controller 侧按 4001 挡掉。</p>
+     */
+    private static String normalizeScope(String scope) {
+        String s = scope == null ? "" : scope.trim();
+        if (IDictionaryTermStore.SCOPE_BASE.equals(s) || IDictionaryTermStore.SCOPE_ORG.equals(s)) {
+            return s;
+        }
+        return IDictionaryTermStore.SCOPE_EFFECTIVE;
     }
 
     // ---------------------------------------------------------------- 导入
@@ -300,7 +325,7 @@ if (matched) {
             });
         } catch (JacksonException e) {
             throw new IllegalArgumentException(
-                    "JSON 解析失败：需为 TermEntry 数组，形如 [{\"standardTerm\":\"消渴\",\"aliases\":[\"消渴病\"],\"source\":\"...\",\"code\":\"...\"}]");
+                    "JSON 解析失败：需为 TermEntry 数组，形如 [{\"standardTerm\":\"消渴\",\"aliases\":[\"消渴病\"]}]");
         }
         // 2. 逐条校验并规整，标准术语为空的记失败继续
         List<TermEntry> ok = new ArrayList<>();
@@ -344,17 +369,16 @@ if (matched) {
                     if (!a.isBlank()) aliases.add(a.trim());
                 }
             }
-            String code = row[2] == null || row[2].isBlank() ? null : row[2].trim();
-            // 3. 缺省来源按词典类型填，避免每行都让上传者填一遍
+            // 3. 走 normalize：剔掉「别名里写了标准词本身」的原样入库
             // #5（2026-10-05）：表格路径原先直接 new TermEntry，绕过了 normalize ——
             // 于是「别名里写了标准词本身」会原样入库，归一时自己命中自己（词表数据缺陷的入口）。
-            ok.add(normalize(new TermEntry(standard, aliases, defaultSource(type), code)));
+            ok.add(normalize(new TermEntry(standard, aliases)));
         }
         return ok;
     }
 
     /**
-     * 读 Excel 全部行（取前 3 列，空单元格补 null 以保持列位）。
+     * 读 Excel 全部行（取前 2 列：标准术语 / 别名）。
      *
      * `.xlsx` 走 SAX 流式（{@link ExcelRawStreamReader}）：内存里只留当前一行，不再整份载入 ——
      * 原先的 50MB 体积闸门只是把 OOM 阈值推后，没改变「内存 ≈ 解压后体积」这个事实。
@@ -366,13 +390,13 @@ if (matched) {
         List<String[]> rows = new ArrayList<>();
         // 1. xlsx：流式逐个工作表事件回调
         if (fileName(file).endsWith(".xlsx")) {
-            ExcelRawStreamReader.forEachXlsxRow(file.getInputStream(), 3, (rowNum, cells) -> {
+            ExcelRawStreamReader.forEachXlsxRow(file.getInputStream(), 2, (rowNum, cells) -> {
                 // 1.1 首行是表头就跳过
                 if (rowNum == 0 && isHeaderRow(cells)) {
                     return;
                 }
-                // 1.2 三列全空的行直接丢，避免尾部空行混进失败清单
-                if (cells[0] != null || cells[1] != null || cells[2] != null) {
+                // 1.2 两列全空的行直接丢，避免尾部空行混进失败清单
+                if (cells[0] != null || cells[1] != null) {
                     rows.add(cells);
                 }
             });
@@ -383,11 +407,10 @@ if (matched) {
             Sheet sheet = wb.getSheetAt(0);
             for (Row r : sheet) {
                 if (r.getRowNum() == 0 && isHeaderRow(r)) continue;
-                String[] arr = new String[3];
+                String[] arr = new String[2];
                 arr[0] = cellText(r.getCell(0));
                 arr[1] = cellText(r.getCell(1));
-                arr[2] = cellText(r.getCell(2));
-                if (arr[0] != null || arr[1] != null || arr[2] != null) rows.add(arr);
+                if (arr[0] != null || arr[1] != null) rows.add(arr);
             }
         }
         return rows;
@@ -399,12 +422,12 @@ if (matched) {
         // 1. 按行切分，空行与以「标准术语」开头的表头行都跳过
         for (String line : readTextAutoCharset(file).split("\r?\n")) {
             if (line.isBlank() || line.startsWith("标准术语")) continue;
-            // 最多切 3 段（标准术语 / 别名 / 国标代码）；别名列内部请用、 或 ; 分隔，
+            // 最多切 2 段（标准术语 / 别名）；别名列内部请用、 或 ; 分隔，
             // 用半角逗号会与列分隔符冲突
-            String[] parts = line.split("[,\t]", 3);
-            String[] arr = new String[3];
-            // 2. 补齐到三列，缺列给 null 交给上层判空
-            for (int i = 0; i < 3; i++) {
+            String[] parts = line.split("[,\t]", 2);
+            String[] arr = new String[2];
+            // 2. 补齐到两列，缺列给 null 交给上层判空
+            for (int i = 0; i < 2; i++) {
                 arr[i] = i < parts.length && !parts[i].isBlank() ? parts[i].trim() : null;
             }
             rows.add(arr);
@@ -412,7 +435,7 @@ if (matched) {
         return rows;
     }
 
-    /** 规整词条：去空白、别名去重、缺省来源按类型填 */
+    /** 规整词条：去空白、别名去重 */
     private TermEntry normalize(TermEntry e) {
         // 1. 标准术语去首尾空白
         String standard = e.getStandardTerm().trim();
@@ -425,10 +448,7 @@ if (matched) {
                 if (!t.equals(standard) && !aliases.contains(t)) aliases.add(t);
             }
         }
-        // 3. 来源与代码规整，代码为空给 null（区别于空串）
-        String source = e.getSource() == null ? "" : e.getSource().trim();
-        String code = e.getCode() == null || e.getCode().isBlank() ? null : e.getCode().trim();
-        return new TermEntry(standard, aliases, source, code);
+        return new TermEntry(standard, aliases);
     }
 
     // ---------------------------------------------------------------- 索引重建
@@ -518,14 +538,11 @@ if (matched) {
         return out;
     }
 
-    /** 合并同标准词的两条词条：别名取并集，其余字段以新条目为准 */
+    /** 合并同标准词的两条词条：别名取并集 */
     private TermEntry mergeEntries(TermEntry oldE, TermEntry newE) {
         // 1. 别名取并集（LinkedHashSet 保序去重）
         Set<String> aliases = new LinkedHashSet<>(oldE.getAliases() == null ? List.of() : oldE.getAliases());
         if (newE.getAliases() != null) aliases.addAll(newE.getAliases());
-        // 2. 来源与代码以旧条目优先：已核过的出处不该被一次导入覆盖成空
-        String source = oldE.getSource() == null || oldE.getSource().isBlank() ? newE.getSource() : oldE.getSource();
-        String code = oldE.getCode() == null || oldE.getCode().isBlank() ? newE.getCode() : oldE.getCode();
         // #5（2026-10-05）：合并也要剔除「标准词本身」—— 否则历史脏数据（或经合并不经过
         // normalize 的路径）会一直留在库里，归一时自己命中自己；合并是每次导入都会走的地方，
         // 在这里清等于「下次导入该词条时自动修复」。
@@ -536,17 +553,7 @@ if (matched) {
                 cleaned.add(a);
             }
         }
-        return new TermEntry(std, cleaned, source, code);
-    }
-
-    private String defaultSource(String type) {
-        // 批次14 · 14.1：「标准来源」这张表已搬进 EntityTypes（standardRef），这里改为查目录。
-        // 理由：它是纯数据，留在远处的结果是「新增词典类型要记得改两处」，而漏改**不会有编译错误**
-        // —— 新类型的词条会静默地没有出处标注。搬进目录后，加类型只改 EntityTypes 一处。
-        // 未登记的类型或未标出处的类型给空串（让词条由上传者自行标注），与搬走前行为一致。
-        com.tcm.ehr.common.config.EntityTypes.EntityType t =
-                com.tcm.ehr.common.config.EntityTypes.byKey(type);
-        return t == null || t.standardRef() == null ? "" : t.standardRef();
+        return new TermEntry(std, cleaned);
     }
 
     private String fileName(MultipartFile file) {
@@ -574,7 +581,7 @@ if (matched) {
      *
      * 原本这里自己写了一份，与病历导入那份在 BOOLEAN 与 FORMULA 上并不一致：
      * 同一个 .xlsx 从词典页导入和从病历页导入会读出不同文本。两份合一后，
-     * 词典侧原先的两条要求（整数不带 .0、国标代码保留 3.01 这种小数）由该实现原样满足。
+     * 词典侧的取值口径由该实现原样满足。
      */
     private String cellText(Cell cell) {
         return ExcelCellParser.cellText(cell);

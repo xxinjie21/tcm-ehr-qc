@@ -28,12 +28,6 @@ public class DictionaryTerm {
     /** 标准术语 */
     private String standardTerm;
 
-    /** 国标代码，可空 */
-    private String code;
-
-    /** 来源标准，可空 */
-    private String source;
-
     /**
      * 别名列表（JSON 数组文本，如 {@code ["国老","国老草"]}）。
      *

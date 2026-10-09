@@ -45,7 +45,7 @@ public class GovernanceController {
      * <p>【权限：登录即可】未命中词典时原样返回；{@code type} 非法返回 400 + code=4001。</p>
      *
      * @param dto type=术语类型；term=待归一术语
-     * @return standardTerm=标准词（未命中时为原文）；source=词典来源；level=命中层级；code=国标代码
+     * @return standardTerm=标准词（未命中时为原文）；level=命中层级（0=未命中）
      */
     @PostMapping("/governance/normalize")
     public ResponseEntity<Result<Map<String, Object>>> normalize(@Valid @RequestBody NormalizeDTO dto) {
@@ -57,13 +57,11 @@ public class GovernanceController {
         if (dto.type() == null || !com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(dto.type())) {
             throw new com.tcm.ehr.common.exception.BusinessException(4001, "术语类型非法");
         }
-        // 3. 归一（未命中时 standardTerm 原样返回、level 为 null）
+        // 3. 归一（未命中时 standardTerm 原样返回、level 为 0）
         var r = governanceService.normalize(dto.type(), dto.term());
         Map<String, Object> data = new java.util.LinkedHashMap<>();
         data.put("standardTerm", r.standardTerm());
-        data.put("source", r.source());
         data.put("level", r.level());
-        data.put("code", r.code());
         return ResponseEntity.ok(Result.ok(data));
     }
 

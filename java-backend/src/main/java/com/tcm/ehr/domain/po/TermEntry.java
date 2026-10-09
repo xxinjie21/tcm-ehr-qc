@@ -1,6 +1,5 @@
 package com.tcm.ehr.domain.po;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -8,11 +7,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 术语条目（词典文件与ES文档的统一模型）
+ * 术语条目（词典文件与ES文档的统一模型）。
+ *
+ * <p>不再携带来源与其编码：项目不再声明「术语来源于某国标/某标准」，
+ * 词典的参考工具书集中在项目文档里统一声明。</p>
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class TermEntry {
 
     /** 标准术语 */
@@ -21,14 +22,9 @@ public class TermEntry {
     /** 别名列表（全量入ES，用于模糊归一） */
     private List<String> aliases = new ArrayList<>();
 
-    /** 来源标准（如：中国药典2025年版） */
-    private String source = "";
-
-    /** 可选国标代码（GB/T 15657 / GB/T 16751 等）；未收录为 null，不入 ES 索引 */
-    private String code;
-
-    /** 兼容原三参调用（国标代码缺省为空） */
-    public TermEntry(String standardTerm, List<String> aliases, String source) {
-        this(standardTerm, aliases, source, null);
+    /** 常规构造（两参：标准词 + 别名） */
+    public TermEntry(String standardTerm, List<String> aliases) {
+        this.standardTerm = standardTerm;
+        this.aliases = aliases == null ? new ArrayList<>() : aliases;
     }
 }

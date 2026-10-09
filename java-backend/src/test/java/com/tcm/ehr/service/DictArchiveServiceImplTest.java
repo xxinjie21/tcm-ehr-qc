@@ -1,5 +1,6 @@
 package com.tcm.ehr.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.domain.po.DictArchiveTerm;
 import com.tcm.ehr.domain.po.DictArchiveVersion;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -8,6 +9,7 @@ import com.tcm.ehr.mapper.DictArchiveVersionMapper;
 import com.tcm.ehr.service.impl.DictArchiveServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -64,7 +66,7 @@ class DictArchiveServiceImplTest {
     private static List<TermEntry> terms(int n) {
         List<TermEntry> out = new ArrayList<>();
         for (int i = 0; i < n; i++) {
-            out.add(new TermEntry("词" + i, List.of("别名" + i), "来源"));
+            out.add(new TermEntry("词" + i, List.of("别名" + i)));
         }
         return out;
     }
@@ -78,6 +80,25 @@ class DictArchiveServiceImplTest {
         int no = svc.archive("org-A", "herb", terms(2), null, "admin", null);
 
         assertEquals(4, no);
+    }
+
+    @Test
+    @DisplayName("取 MAX 的聚合列别名必须能映射回实体属性 versionNo（否则版本号恒为 1）")
+    void maxQueryColumnAliasMapsToVersionNo() {
+        setUp();
+        maxVersionNo(3);
+
+        svc.archive("org-A", "herb", terms(1), null, "admin", null);
+
+        // 这个类里其余用例都 mock 掉了 mapper，唯独「聚合列别名」这一项只有看真实 SQL 才拦得住：
+        // 别名与实体属性对不上时 getVersionNo() 恒为 null，版本号永远是 1，第二次归档必撞
+        // uk_org_type_no —— 而且是「词条已导入成功、只报归档失败」，很容易被当成偶发问题放过去。
+        ArgumentCaptor<QueryWrapper<DictArchiveVersion>> cap =
+                ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(versionMapper, org.mockito.Mockito.atLeastOnce()).selectList(cap.capture());
+        String select = cap.getAllValues().get(0).getSqlSelect();
+        assertTrue(select.contains("AS version_no"),
+                "取 MAX(version_no) 的那条查询必须把聚合列别名成 version_no，实际列片段：" + select);
     }
 
     @Test

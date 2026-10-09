@@ -169,10 +169,6 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
             Map<String, Object> doc = new LinkedHashMap<>();
 doc.put("standard_term", e.getStandardTerm());
                 doc.put("aliases", e.getAliases() == null ? List.of() : e.getAliases());
-                doc.put("source", e.getSource() == null ? "" : e.getSource());
-                // 批次 22：编码随文档一起进索引，否则 toEntry 读不回 code、normCode 恒空。
-                // 用 nullToEmpty 与 source 同口径 —— ES 文档字段不接受 null。
-                doc.put("code", e.getCode() == null ? "" : e.getCode());
                 doc.put("org_id", org);
             bulk.add(new IndexRequest(index)
                     .id(hashId(org, e.getStandardTerm()))
@@ -197,13 +193,11 @@ doc.put("standard_term", e.getStandardTerm());
         if (cached != null) {
             return cached;
         }
-        // _source 白名单必须与写入侧（bulk 的 doc.put）逐字段对齐：
-        // 少一个 code，toEntry 里的 src.get("code") 就永远是 null，
-        // 表现为「词典页有编码、归一结果没有 normCode」，且不报错
+        // _source 白名单必须与写入侧（bulk 的 doc.put）逐字段对齐
         SearchSourceBuilder source = new SearchSourceBuilder()
                 .size(maxCandidates)
                 .query(recallQuery(org, input))
-                .fetchSource(new String[]{"standard_term", "aliases", "source", "code", "org_id"}, null);
+                .fetchSource(new String[]{"standard_term", "aliases", "org_id"}, null);
 
         SearchResponse response = client.search(new SearchRequest(indexName(type)).source(source), RequestOptions.DEFAULT);
         List<TermEntry> candidates = new ArrayList<>();
@@ -249,7 +243,7 @@ doc.put("standard_term", e.getStandardTerm());
             SearchSourceBuilder source = new SearchSourceBuilder()
                     .size(maxCandidates)
                     .query(recallQuery(org, in))
-                    .fetchSource(new String[]{"standard_term", "aliases", "source", "code", "org_id"}, null);
+                    .fetchSource(new String[]{"standard_term", "aliases", "org_id"}, null);
             req.add(new SearchRequest(indexName(type)).source(source));
         }
         SEARCH_REQUESTS.addAndGet(1);
@@ -314,12 +308,10 @@ doc.put("standard_term", e.getStandardTerm());
     }
 
     /**
-     * mapping 源里 org_id 与 code 是否都是 keyword（批次 22 起 code 也纳入判据）。
+     * mapping 源里 org_id 是否为 keyword（基础层能否被查到）。
      *
-     *
-     * 抽成纯函数是为了能脱离 ES 单测 —— 这条判据是「基础层能不能被查到」
-     *
-     * 与「编码能不能读出来」的开关，值得有一个不走集群的回归测试兜住。
+     * 抽成纯函数是为了能脱离 ES 单测 —— 这条判据是「基础层能不能被查到」的开关，
+     * 值得有一个不走集群的回归测试兜住。
      *
      * @param mappingSource mapping 的 source map（形如 {"_meta":…, "properties":…}）
      * @return 所需字段都存在且类型为 keyword 时返回 true
@@ -332,18 +324,11 @@ doc.put("standard_term", e.getStandardTerm());
         if (!(properties instanceof Map<?, ?> props)) {
             return false;
         }
-        return isKeyword(props.get("org_id")) && isKeyword(props.get("code"));
+        return isKeyword(props.get("org_id"));
     }
 
     /**
      * mapping 源里某个字段是否为 keyword。
-     *
-     *
-     * 批次 22 起，判据除 org_id 外还要求 code 存在且是 keyword：旧索引里没有
-     *
-     * code 这个字段，若只查 org_id 会判成「兼容」而跳过重建，于是
-     * 「词典页能看到编码、但归一结果里没有 normCode」——
-     * 症状是数据看着正常、实际编码链路没通。
      */
     private static boolean isKeyword(Object field) {
         return field instanceof Map<?, ?> f && "keyword".equals(String.valueOf(f.get("type")));
@@ -362,9 +347,6 @@ doc.put("standard_term", e.getStandardTerm());
         aliases.put("fields", Map.of("keyword", Map.of("type", "keyword")));
         properties.put("aliases", aliases);
 
-        properties.put("source", Map.of("type", "keyword"));
-        // 批次 22：编码用 keyword（等值查询用），不进 text 分词
-        properties.put("code", Map.of("type", "keyword"));
         properties.put("org_id", Map.of("type", "keyword"));
         return properties;
     }
@@ -384,11 +366,6 @@ private TermEntry toEntry(Map<String, Object> src) {
           TermEntry entry = new TermEntry();
           entry.setStandardTerm(nullToEmpty(src.get("standard_term")));
           entry.setAliases(toStringList(src.get("aliases")));
-          entry.setSource(nullToEmpty(src.get("source")));
-          // 批次 22：读回编码。空串要转成 null（区别于「确实没有编码」），
-          // 与 DictionaryServiceImpl.normalize 的空串归 null 同口径。
-          String code = src.get("code") == null ? null : String.valueOf(src.get("code"));
-          entry.setCode(code == null || code.isBlank() ? null : code);
           return entry;
       }
 

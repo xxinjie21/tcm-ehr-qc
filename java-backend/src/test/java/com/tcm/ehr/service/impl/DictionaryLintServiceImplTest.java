@@ -39,11 +39,7 @@ class DictionaryLintServiceImplTest {
     private final IDictionaryLintService svc = new DictionaryLintServiceImpl();
 
     private static TermEntry term(String standard, String... aliases) {
-        return new TermEntry(standard, new ArrayList<>(Arrays.asList(aliases)), "测试来源", null);
-    }
-
-    private static TermEntry coded(String standard, String code, String... aliases) {
-        return new TermEntry(standard, new ArrayList<>(Arrays.asList(aliases)), "测试来源", code);
+        return new TermEntry(standard, new ArrayList<>(Arrays.asList(aliases)));
     }
 
     private DictionaryLintVO.Issue find(DictionaryLintVO vo, String kind) {
@@ -67,16 +63,16 @@ class DictionaryLintServiceImplTest {
     }
 
     @Test
-    @DisplayName("重复项要能看到各自的别名与编码，否则无法判断该保留哪条")
+    @DisplayName("重复项要能看到各自的别名，否则无法判断该保留哪条")
     void duplicateReportsDetails() {
         DictionaryLintVO vo = svc.lint("herb", List.of(
                 term("甘草", "国老"),
-                coded("甘草", "GS-001", "国老草")));
+                term("甘草", "国老草")));
 
         DictionaryLintVO.Issue e = find(vo, "duplicate-term");
         assertTrue(e != null);
-        assertTrue(e.getTerms().contains("GS-001"),
-                "重复项里带编码的那条要能看到编码，否则不知道留哪条：" + e.getTerms());
+        assertTrue(e.getTerms().contains("国老") && e.getTerms().contains("国老草"),
+                "重复项里要能看到两条各自的别名，否则不知道留哪条：" + e.getTerms());
     }
 
     @Test
@@ -149,35 +145,11 @@ class DictionaryLintServiceImplTest {
     }
 
     @Test
-    @DisplayName("编码重复比格式错更危险（两个术语抢同一个码）")
-    void duplicateCodeIsWarned() {
-        DictionaryLintVO vo = svc.lint("herb", List.of(
-                coded("甘草", "GS-001"),
-                coded("炙甘草", "GS-001")));
-
-        DictionaryLintVO.Issue w = find(vo, "code-duplicate");
-        assertTrue(w != null, "重复编码要提示");
-        assertTrue(w.getTerms().contains("GS-001"));
-        assertTrue(w.getAdvice().contains("一对一"), "要说清编码必须一对一");
-    }
-
-    @Test
-    @DisplayName("编码填了非编码内容要提示（多半是把来源写进了编码列）")
-    void badCodeShapeIsWarned() {
-        DictionaryLintVO vo = svc.lint("herb", List.of(
-                coded("甘草", "《中国药典》2025年版 甘草项下")));
-
-        DictionaryLintVO.Issue w = find(vo, "code-shape");
-        assertTrue(w != null);
-        assertTrue(w.getAdvice().contains("来源列"), "建议要指明正确位置");
-    }
-
-    @Test
     @DisplayName("正常词表不报噪声（体检不能变成挑刺）")
     void cleanDictionaryPassesQuietly() {
         DictionaryLintVO vo = svc.lint("pattern", List.of(
                 term("肝胃不和证", "肝胃不和"),
-                coded("脾肾阳虚证", "BNF02001"),
+                term("脾肾阳虚证"),
                 term("肝郁气滞", "肝气郁结")));
 
         assertTrue(vo.passed(), "正常词表应通过：" + vo.getErrors());

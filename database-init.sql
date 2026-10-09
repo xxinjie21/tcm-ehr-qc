@@ -71,6 +71,11 @@ CREATE TABLE IF NOT EXISTS records (
   org_id VARCHAR(36) DEFAULT '' COMMENT '归属组织；空=无组织，代码层降级为“无数据”（fail-closed）',
   status VARCHAR(20) COMMENT '状态：pending/reviewing/completed/invalid',
   governed TINYINT NOT NULL DEFAULT 0 COMMENT '已清洗标记（清洗+术语归一完成后置1）',
+  -- 人工修改标记（性能审查 P1-2#2）：STORED 生成列，值由 structured_data._meta.manuallyEdited 派生，
+  -- 表达式与 StructuredDataMeta.isManuallyEdited（Java asBoolean）逐例等价。应用侧只读
+  -- （Record.manuallyEdited 的 insert/updateStrategy = NEVER），因此导入 / 单条新增 / 写回结构化数据 /
+  -- 清洗归一 / NLP 重解析 / 复核六条写入路径都无需各自维护，列值也不可能与 JSON 分叉。
+  manually_edited TINYINT GENERATED ALWAYS AS (CASE WHEN NOT JSON_VALID(structured_data) THEN 0 WHEN LOWER(JSON_UNQUOTE(JSON_EXTRACT(structured_data, '$._meta.manuallyEdited'))) = 'true' THEN 1 WHEN JSON_TYPE(JSON_EXTRACT(structured_data, '$._meta.manuallyEdited')) IN ('INTEGER', 'DOUBLE', 'DECIMAL') AND TRUNCATE(CAST(JSON_EXTRACT(structured_data, '$._meta.manuallyEdited') AS DECIMAL(65, 30)), 0) <> 0 THEN 1 ELSE 0 END) STORED NOT NULL COMMENT '是否人工修改过结构化数据（由 structured_data._meta.manuallyEdited 派生，应用侧只读）',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_registration_no (registration_no),
@@ -198,8 +203,6 @@ CREATE TABLE IF NOT EXISTS dictionary_terms (
   org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层（不用 NULL，见注 1）",
   type VARCHAR(20) NOT NULL COMMENT 'disease/pattern/symptom/herb/formula',
   standard_term VARCHAR(200) NOT NULL,
-  code VARCHAR(100) COMMENT '预留：国标代码（GB/T 15657 / 16751），当前无消费方',
-  source VARCHAR(100),
   aliases JSON,
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -226,8 +229,6 @@ CREATE TABLE IF NOT EXISTS dict_proposal_term (
   id VARCHAR(36) PRIMARY KEY,
   proposal_id VARCHAR(36) NOT NULL,
   standard_term VARCHAR(200) NOT NULL,
-  code VARCHAR(100),
-  source VARCHAR(100),
   aliases JSON,
   INDEX idx_proposal (proposal_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提案术语快照（提交时的完整目标基线）';
@@ -248,8 +249,6 @@ CREATE TABLE IF NOT EXISTS dict_archive_term (
   id VARCHAR(36) PRIMARY KEY,
   version_id VARCHAR(36) NOT NULL,
   standard_term VARCHAR(200) NOT NULL,
-  code VARCHAR(100),
-  source VARCHAR(100),
   aliases JSON,
   INDEX idx_version (version_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='基线归档术语快照（每组每 type 仅留最近 5 份）';

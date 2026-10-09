@@ -67,7 +67,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      *
      * @param type 实体类型 key
      * @param term 待归一原文
-     * @return 命中层级、标准词、来源与国标代码
+     * @return 命中层级、标准词
      * @throws IllegalArgumentException type 不属于 5 类词典类型
      */
     @Override
@@ -193,7 +193,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             //    注意：合格但 structured_data 为空/空白的病历不在此列，它保持「待清洗」，
             //    因而不会被导出条件 governed=1 选中 —— 这是刻意的（没有结构化结果不算标准数据集）。
             if ("合格".equals(grade) && r.getStructuredData() != null && !r.getStructuredData().isBlank()) {
-                if (StructuredDataMeta.isManuallyEdited(objectMapper, r.getStructuredData())) {
+                // 人工标记读标量列（性能审查 P1-2#2）：manually_edited 是 STORED 生成列，
+                // 与 _meta.manuallyEdited 同源，无需在这里再解析一遍 JSON
+                if (Boolean.TRUE.equals(r.getManuallyEdited())) {
                     vo.setManualSkipped(vo.getManualSkipped() + 1);
                     // 人工修正过的按已清洗处理：它的 structured_data 已定案（方案 A 不重跑归一），
                     // 不打标记会让它永远落在「待清洗」，并被导出条件 governed=1 永久排除
@@ -270,7 +272,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /**
      * 对结构化数据的全实体补做术语归一：content 换成标准词、sourceText 保留原文，
-     * 并写入 normLevel(1/2/3) 与 normSource 供前端溯源与三级分布统计。
+     * 并写入 normLevel(1/2/3) 供前端溯源与三级分布统计。
      *
      * @return 依次为 被替换实体数、精确数、包含数、模糊数
      */
@@ -316,14 +318,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     var result = termNormalizer.normalize(type, RequestUtils.currentOrgId(), String.valueOf(content));
                     // 只在「命中词典且词形确实变了」时才改写并记统计，
                     // 否则会把未命中的实体也标成已归一
-                    if (result.source() != null && !result.source().isBlank()
+                    if (result.level() >= EsTermNormalizer.LEVEL_EXACT
                             && !result.standardTerm().equals(String.valueOf(content))) {
                         entity.put("content", result.standardTerm());
                         entity.put("normLevel", result.level());
-                        entity.put("normSource", result.source());
-                        if (result.code() != null) {
-                            entity.put("normCode", result.code());
-                        }
                         stat[0]++;
                         if (result.level() >= EsTermNormalizer.LEVEL_EXACT
                 && result.level() <= EsTermNormalizer.LEVEL_FUZZY) stat[result.level()]++;
@@ -347,14 +345,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             Object name = herb.get("name");
             if (name == null || String.valueOf(name).isBlank()) continue;
             var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), String.valueOf(name));
-            if (result.source() != null && !result.source().isBlank()
+            if (result.level() >= EsTermNormalizer.LEVEL_EXACT
                     && !result.standardTerm().equals(String.valueOf(name))) {
                 herb.put("name", result.standardTerm());
                 herb.put("normLevel", result.level());
-                herb.put("normSource", result.source());
-                if (result.code() != null) {
-                    herb.put("normCode", result.code());
-                }
                 stat[0]++;
                 if (result.level() >= EsTermNormalizer.LEVEL_EXACT
                 && result.level() <= EsTermNormalizer.LEVEL_FUZZY) stat[result.level()]++;

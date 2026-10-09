@@ -69,10 +69,6 @@ public class NlpExtractVO {
         private String source;
         /** 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中为 null */
         private Integer normLevel;
-        /** 归一命中的术语来源（词典名），未命中为 null */
-        private String normSource;
-        /** 国标代码，词典未收录则为 null */
-        private String normCode;
     }
 
     @Data
@@ -84,9 +80,5 @@ public class NlpExtractVO {
         private String source;
         /** 归一命中层级：1=精确 / 2=包含 / 3=模糊；未归一或未命中为 null */
         private Integer normLevel;
-        /** 归一命中的术语来源（词典名），未命中为 null */
-        private String normSource;
-        /** 国标代码，词典未收录则为 null */
-        private String normCode;
     }
 }

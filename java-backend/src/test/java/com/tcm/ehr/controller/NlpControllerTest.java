@@ -71,13 +71,13 @@ class NlpControllerTest {
 
         EsTermNormalizer termNormalizer = mock(EsTermNormalizer.class);
         when(termNormalizer.normalize(eq("symptom"), anyString(), eq("咽痛")))
-                .thenReturn(new EsTermNormalizer.NormalizeResult("咽喉痛", "中医症状词典", 3, null));
+                .thenReturn(new EsTermNormalizer.NormalizeResult("咽喉痛", 3));
         when(termNormalizer.normalize(eq("herb"), anyString(), eq("双花")))
-                .thenReturn(new EsTermNormalizer.NormalizeResult("金银花", "中药词典", 1, "GS-001"));
+                .thenReturn(new EsTermNormalizer.NormalizeResult("金银花", 1));
         // 舌象自批次 20 起有词典（tongues.json），与症状/中药同款走归一；
         // 这里返回未命中，验证「查不到就保留原文、不标命中级别」而不是被丢掉
         when(termNormalizer.normalize(eq("tongue"), anyString(), eq("舌红")))
-                .thenReturn(new EsTermNormalizer.NormalizeResult("舌红", "", 0, null));
+                .thenReturn(new EsTermNormalizer.NormalizeResult("舌红", 0));
 
         ResponseEntity<Result<NlpExtractVO>> resp =
                 controller(client, termNormalizer).extract(dto("咽痛"));
@@ -87,13 +87,11 @@ class NlpControllerTest {
         assertEquals("咽喉痛", symptom.getContent());
         assertEquals("咽痛", symptom.getSourceText());
         assertEquals(Integer.valueOf(3), symptom.getNormLevel());
-        assertEquals("中医症状词典", symptom.getNormSource());
 
         NlpExtractVO.Herb herb = out.getHerbs().get(0);
         assertEquals("金银花", herb.getName());
         assertEquals("双花", herb.getSourceText());
         assertEquals(Integer.valueOf(1), herb.getNormLevel());
-        assertEquals("GS-001", herb.getNormCode());
 
         // 舌象查词未命中：content 保留原文、不标命中级别（批次 20 起舌象有词典，
         // 与从前「无词典 → 完全不查」的差别就在这里）
