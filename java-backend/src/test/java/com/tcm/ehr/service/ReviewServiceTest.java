@@ -217,7 +217,8 @@ class ReviewServiceTest {
                     page.setTotal(1);
                     return page;
                 });
-        when(recordMapper.selectById("rec-4")).thenReturn(record("rec-4", false));
+        // 列表改为批量探测病历是否仍存在（selectObjs 只取 id 列），不再逐行 selectById
+        when(recordMapper.selectObjs(ArgumentMatchers.any())).thenReturn(List.<Object>of("rec-4"));
 
         ReviewTasksVO vo = service.listTasks(1, 10, "待复核", null);
 
