@@ -25,9 +25,8 @@
             </el-table-column>
           </el-table>
           <p class="detail-note">
-            「词表缺口」是该月未归一里属于「标准词但词表没有收录」的部分 ——
-            补词表能直接解决的就是它。若某个月缺口明显比别的月多，多半是那个月的
-            数据还没重跑过解析。
+            「词表缺口」是该月未归一里「标准词但词表没有收录」的部分，补词表能直接解决的就是它；
+            某个月缺口明显偏高，多半是那个月的数据还没重跑过解析。
           </p>
         </el-collapse-item>
 
@@ -85,11 +84,8 @@
              用户不知道报告何时更新、该点哪个按钮才生效。 -->
         <div style="margin-bottom:8px; padding:var(--sp-2) var(--sp-3); font-size: var(--fs-xs); line-height:1.7;
                     color:var(--text); background:var(--ochre-light); border-left:3px solid var(--ochre); border-radius:4px;">
-          <b>本页不会自动刷新。</b>怎么让它更新：
-          <b>补了词表</b> → 点「重跑『解析 + 质控』」（新词表只对重跑过解析的病历生效）；
-          <b>只改质控规则</b> → 点「立即重跑质控」即可；
-          <b>只是想再看一遍</b> → 点右上角「刷新」。
-          下方列表里带「解析早于词表，需重跑」标记的行，就是还没吃到新词表的病历。
+          <b>本页不会自动刷新。</b>补了词表 → 重跑「解析 + 质控」；只改质控规则 → 「立即重跑质控」；
+          只是想再看一遍 → 点右上角「刷新」。下方带「解析早于词表，需重跑」标记的行，就是还没吃到新词表的病历。
         </div>
         <div class="misc-grid">
                     <FreshnessTag :time="report?.generatedAt" :stale="hasStaleRows"

@@ -1,74 +1,33 @@
 <template>
   <div class="std-report">
-    <!-- 质控未完成时先挡一道：报告里的分数分布与封顶率都来自 qc_results，
-         质控没跟上就展示结论等于拿旧数据误导人。 -->
-    <div v-if="showQcGate" class="gate">
-      <div class="gate-icon">!</div>
-      <div class="gate-body">
-        <div class="gate-title">质控评分还没跑完，现在的数字不可信</div>
-        <div class="gate-desc">
-          本组织 {{ qcTotal }} 条病历中，有 {{ qcScored }} 条已完成质控评分。
-          报告里的「评分区分度」「扣分封顶」都来自质控结果，
-          <b>质控完成后报告才有意义</b>，否则这些数字是上一次的结果。
+    <!-- 报告头：一句话结论 + 统计口径 + 时间区间 / 刷新 / 导出，全部收进一张卡。
+         此前「质控门禁条 / 加载失败条 / 数据来源条 / 时间工具条 / 结论条」是五条各自
+         带左边框的长横幅，叠在正文顶部像五道横杠。现合并为单一头部：
+         状态随「加载中 / 加载失败 / 质控未完成 / 无数据 / 短板 / 正常」变化，
+         时间区间与导出集中在右侧，异常（失败 / 质控未完成）在同处就近处理。 -->
+    <header class="rpt-head" :class="headline.tone">
+      <div class="rh-status" aria-live="polite">
+        <span class="rh-icon" aria-hidden="true">{{ headline.icon }}</span>
+        <div class="rh-text">
+          <div class="rh-title">{{ headline.title }}</div>
+          <p v-if="headline.desc" class="rh-desc">{{ headline.desc }}</p>
+          <!-- 质控未完成：补一句「哪些部分不受影响」，避免用户以为整页失效 -->
+          <p v-if="showQcGate" class="rh-note">
+            只想看词典建设进度可继续往下看 —— 那部分与质控无关。
+          </p>
+          <!-- 数据来源提示：只在真拿到报告后渲染 —— 加载中 / 失败时它会陈述「0 条病历」，
+               那是错误陈述（不是 0 条，是还没读到 / 没读到）。 -->
+          <p v-else-if="report && !loadError" class="rh-caveat">
+            当前数据共 {{ report?.dataset?.recordCount ?? 0 }} 条病历、主诉
+            {{ report?.dataset?.chiefComplaintTemplates ?? 0 }} 种写法，属测试数据；
+            下列数字用于验证词典建设进度，不代表真实病历上的准确率。
+          </p>
         </div>
-<div class="gate-ops">
-            <el-button type="primary" size="small" :loading="rerunning" @click="rerunQc">
-              立即重跑质控
-            </el-button>
-            <el-button size="small" :loading="rerunning" @click="rerunAll">
-              重跑「解析 + 质控」
-            </el-button>
-            <span v-if="qcLast" class="tip">上次完成：{{ qcLast }}</span>
-          </div>
-          <!-- 重跑进行中的进度条：没有它用户只能干等，不知道系统在不在动 -->
-          <div v-if="rerunStage !== 'idle'" class="gate-progress">
-            <span class="gp-label">{{ rerunStageLabel }}</span>
-            <el-progress
-              v-if="rerunPercent !== null"
-              :percentage="rerunPercent"
-              :stroke-width="6"
-              style="flex: 1 1 auto; min-width: 120px"
-            />
-          </div>
-          <div class="gate-note">
-            只想看词典建设进度（甲类），可继续往下看 —— 那部分与质控无关。
-          </div>
-      </div>
-    </div>
-
-    <!-- P0-4：加载失败必须是独立状态 —— 此前 catch 把 report 置 null，
-         与「加载中」共用一个值，失败被渲染成「正在读取…」+ 空态文案 + 绿色结论。
-         现在失败只走这一条横幅（带重试），下方所有结论类区块一律不渲染。 -->
-    <div v-if="loadError" class="load-fail" role="alert">
-      <span class="lf-icon">!</span>
-      <div class="lf-body">
-        <div class="lf-title">报告加载失败</div>
-        <div class="lf-desc">
-          服务没有返回数据，本页不展示任何统计结论 —— 故障不能被读成「没有数据」或「一切正常」。
-        </div>
-      </div>
-      <el-button type="primary" size="small" :loading="loading" @click="loadReport">重试</el-button>
-    </div>
-
-      <!-- 数据来源提示：放在顶部但用轻量样式，不用刺眼的告警条。
-           这批数据只有 10 个模板，数字不能当真实病历性能看，但也不该拦住用户往下读。
-           P0-4：只在真拿到报告后渲染 —— 加载中 / 失败时它会陈述「0 条病历」，
-           那是错误陈述（不是 0 条，是还没读到 / 没读到）。 -->
-      <div v-if="report && !loadError" class="src-note">
-        <span class="src-icon">i</span>
-        <span>
-          当前数据共 {{ report?.dataset?.recordCount ?? 0 }} 条病历，主诉只有
-          {{ report?.dataset?.chiefComplaintTemplates ?? 0 }} 种写法，属于测试数据。
-          下面的数字用于<strong>验证词典建设进度</strong>，不代表真实病历上的准确率。
-        </span>
       </div>
 
       <!-- 时间维度：病历接诊时间跨度大，混在一起看不出「换了词表之后有没有变好」。
-           原「统计区间」是一整张 PanelCard，1384×106 里只有 40px 内容、八成是空的
-           （审查报告 V7）。去掉卡片外壳，把 .time-row 作为顶部工具条放在正文最上方，
-           下边框与下方的结论条分隔；区间口径本来就有同排的 tip 说明，卡头标题不再需要。
            控件与事件绑定（preset / applyPreset / applyCustom / loadReport）原样保留。 -->
-      <div class="time-row panel-toolbar">
+      <div class="rh-tools">
         <el-radio-group v-model="preset" size="small" @change="applyPreset">
           <el-radio-button value="all">全部</el-radio-button>
           <el-radio-button value="1y">近一年</el-radio-button>
@@ -87,25 +46,41 @@
           style="width: 240px"
           @change="applyCustom"
         />
-        <el-button size="small" :loading="loading" @click="loadReport">刷新</el-button>
-        <span class="tip">{{ rangeTip }}</span>
+        <el-button size="small" :loading="loading" @click="loadReport">
+          {{ loadError ? '重试' : '刷新' }}
+        </el-button>
+        <el-button size="small" :loading="exporting" @click="handleExport">导出 CSV</el-button>
       </div>
 
-    <!-- 第一屏：一句话结论 + 三个关键卡。看这一屏就知道该做什么、去哪看。
-         P0-4：失败态不渲染（横幅已接管）；加载态保留「正在读取…」是合法的中间态。 -->
-    <div v-if="!loadError" class="headline" :class="headline.tone">
-      <div class="hl-icon">{{ headline.icon }}</div>
-      <div class="hl-text">
-        <div class="hl-title">{{ headline.title }}</div>
-        <div class="hl-desc">{{ headline.desc }}</div>
+      <!-- 质控未完成时的重跑入口与进度：与结论同处一卡，就近解决 -->
+      <div v-if="showQcGate" class="rh-ops">
+        <el-button type="primary" size="small" :loading="rerunning" @click="rerunQc">
+          立即重跑质控
+        </el-button>
+        <el-button size="small" :loading="rerunning" @click="rerunAll">
+          重跑「解析 + 质控」
+        </el-button>
+        <span v-if="qcLast" class="tip">上次完成：{{ qcLast }}</span>
+        <!-- 重跑进行中的进度条：没有它用户只能干等，不知道系统在不在动 -->
+        <div v-if="rerunStage !== 'idle'" class="rh-progress">
+          <span class="gp-label">{{ rerunStageLabel }}</span>
+          <el-progress
+            v-if="rerunPercent !== null"
+            :percentage="rerunPercent"
+            :stroke-width="6"
+            style="flex: 1 1 auto; min-width: 120px"
+          />
+        </div>
       </div>
-    </div>
+
+      <p v-if="rangeTip" class="rh-range">{{ rangeTip }}</p>
+    </header>
 
     <!-- P0-6：加载态给固定高度骨架（与终态同为 .kpi、同 min-height），
          KPI 区不再从 0px 一次性撑开 546px。 -->
     <div v-if="!loadError" class="kpi-row">
       <template v-if="loading">
-        <div v-for="n in 4" :key="'kpi-skel-' + n" class="kpi kpi-skel" aria-hidden="true">
+        <div v-for="n in (kpis.length || 3)" :key="'kpi-skel-' + n" class="kpi kpi-skel" aria-hidden="true">
           <span class="sk sk-label" />
           <span class="sk sk-value" />
           <span class="sk sk-note" />
@@ -122,8 +97,9 @@
 
     <!-- 28.22：归一率与缺词的图形视图。原先这两项只在下方收起区的 el-table 里，
          业务用户要先展开、再逐行读才知道短板在哪。
-         P0-4：把加载 / 失败两个状态一并传给图表组件，三态互斥渲染。 -->
+         失败态由报告头接管（不再重复渲染一屏失败文案），故这里直接不渲染。 -->
     <StandardizationCharts
+      v-if="!loadError"
       :coverage="report?.coverage || []"
       :unmatched="report?.unmatched || {}"
       :loading="loading"
@@ -176,9 +152,9 @@
       </div>
     </PanelCard>
 
-    <!-- 第三屏：明细默认收起。业务用户通常不需要逐类看，展开即可。 -->
-      <!-- 按接诊月份看趋势：补词表 + 重跑解析只会覆盖部分月份，
-           按月看才能判断「哪些月份已经吃到新词表」 -->
+    <!-- 第三屏：明细默认收起。业务用户通常不需要逐类看，展开即可。
+         按接诊月份看趋势：补词表 + 重跑解析只会覆盖部分月份，
+         按月看才能判断「哪些月份已经吃到新词表」。 -->
     <StandardizationDetails
       v-if="!loadError"
       :report="report"
@@ -190,10 +166,7 @@
       :score-range="scoreRange"
     />
 
-    <div class="foot">
-      <el-button size="small" :loading="exporting" @click="handleExport">导出 CSV</el-button>
-      <span class="tip">CSV 导出全部明细指标</span>
-    </div>
+    <!-- 导出按钮已上移到报告头右侧，页面底部不再留孤立的操作行 -->
   </div>
 </template>
 
@@ -594,8 +567,29 @@ function symRateValue(d) {
   return sym && sym.total ? sym.normalized / sym.total : 0
 }
 
-// ---------------- 一句话结论 ----------------
+// ---------------- 一句话结论（报告头状态）----------------
+// 五态互斥：加载失败 / 质控未完成 / 加载中 / 无数据 / 有话要说。
+// 前两态此前各占一条独立横幅，现统一由报告头表达，操作就近放在右侧。
 const headline = computed(() => {
+  // P0-4：失败优先于一切 —— 不读 report（它是 null，会误导成「正在读取…」）
+  if (loadError.value) {
+    return {
+      icon: '!',
+      tone: 'danger',
+      title: '报告加载失败',
+      desc: '服务没有返回数据，本页不展示任何统计结论 —— 故障不能被读成「没有数据」或「一切正常」。'
+    }
+  }
+  // 质控未完成：分数类结论不可信，先说清「为什么不可信」再给重跑入口
+  if (showQcGate.value) {
+    return {
+      icon: '!',
+      tone: 'warn',
+      title: '质控评分还没跑完，现在的数字不可信',
+      desc: `本组织 ${qcTotal.value} 条病历中，有 ${qcScored.value} 条已完成质控评分。`
+        + '报告里的「评分区分度」「扣分封顶」都来自质控结果，质控完成后报告才有意义。'
+    }
+  }
   const d = report.value
   if (!d) return { icon: '·', tone: '', title: '正在读取…', desc: '' }
   // P0-5：空数据走中性分支，不得进入 ok 分支（绿色对勾 + 「合理区间」是假绿灯）
@@ -653,9 +647,8 @@ const todos = computed(() => {
     const names = staleTypes.value.map((c) => `${c.label}（${c.termCount} 词）`).join('、')
     list.push({
       title: '重跑结构化解析',
-      desc: `${names} 的词表已经有词、也抽到了实体，却一条都没归上 —— `
-        + `说明这些结构化数据是在词表建好之前算出来的。`
-        + `不重跑解析，下面几条的效果都验证不了。`,
+      desc: `${names} 已抽到实体却一条都没归上 —— 结构化数据早于词表建立，`
+        + '不重跑解析，下面几条的效果都验证不了。',
       owner: '抽取',
       tagType: 'warning'
     })
@@ -674,17 +667,16 @@ const todos = computed(() => {
       title: b ? `补充${b.label}标准词表` : '补充标准词表',
       // 批次2：把 TOP8 词原文一并带上，供模板里的「复制待补词」按钮使用（可行动清单的出口）
       words: topPairs.map(([w]) => w),
-      desc: `按国家/行业标准术语集补录，不从现有数据反推。`
-        + `症状类现有 ${b ? b.termCount : 72} 条词，`
+      desc: `${b ? b.label : '症状'}类现有 ${b ? b.termCount : 72} 条词，`
         + (real.length > 1
-          ? `而未归一的 ${realTotal} 条分布在 ${real.map((c) => c.label).join('、')}。`
-          : `未归一的 ${u.dictionaryGap} 条属于这一类。`)
+          ? `未归一的 ${realTotal} 条分布在 ${real.map((c) => c.label).join('、')}。`
+          : `未归一的 ${u.dictionaryGap} 条均属此类。`)
         // 病因类自建库以来就没有独立词表（EntityTypes 的 8 个有词表类型里不含 cause），
         // 因此它的未归一是**结构性的**：用户看到病因近 100% 未归一，很容易以为是系统坏了。
         // 这句是恒定成立的事实，不随数据变化。
-        + `另：病因类目前没有独立词表，其未归一属词表缺口而非解析问题。`
-        + (topWords ? `最该先补的 ${topWords.split('、').length} 个（按出现次数）：${topWords}。` : '')
-        + '补完后需重跑解析才能看到效果。',
+        + '病因类无独立词表，其未归一属词表缺口而非解析问题。'
+        + (topWords ? `最该先补：${topWords}。` : '')
+        + '补完需重跑解析。',
       owner: '词表',
       tagType: 'warning'
     })
@@ -692,8 +684,7 @@ const todos = computed(() => {
   if (u.misrouted > 0) {
     list.push({
       title: '修复脉象、舌象被当成症状',
-      desc: `有 ${u.misrouted} 条「脉细数」「左尺无力」这类脉象要素被归进了症状，`
-        + '会让症状归一率被拉低，也可能影响完整性判定。',
+      desc: `${u.misrouted} 条「脉细数」这类脉象要素被归进了症状，会拉低症状归一率。`,
       owner: '抽取',
       tagType: 'warning'
     })
@@ -702,8 +693,8 @@ const todos = computed(() => {
   if (s.total && s.capped / s.total > 0.3) {
     list.push({
       title: '放宽质控扣分上限',
-      desc: `${pct(s.capped, s.total)} 的病历「未归一术语」一项被扣满上限，`
-        + '后续再扣也不增加扣分，导致分数失去区分度。建议按未归一数量分段扣分。',
+      desc: `${pct(s.capped, s.total)} 的病历「未归一术语」被扣满上限，分数失去区分度。`
+        + '建议按未归一数量分段扣分。',
       owner: '规则',
       tagType: 'warning'
     })
@@ -885,88 +876,107 @@ function onVisibilityChange() {
 </script>
 
 <style scoped>
-/* P0-4：加载失败横幅 —— 失败态唯一入口，自带重试；与 gate 同构但用告警色 */
-.load-fail {
+/* ===== 报告头：一句话结论 + 统计口径 + 时间区间 / 刷新 / 导出，单卡承载 =====
+   此前「质控门禁条 / 加载失败条 / 数据来源条 / 时间工具条 / 结论条」五条各自
+   带左边框的长横幅叠在正文顶部。现收敛为一张卡：左边是随状态变化的结论，
+   右侧是操作，异常（失败 / 质控未完成）的重跑入口与进度就近放在结论下方。
+   状态底色沿用旧结论条的三档语义：warn=赭石浅底，ok=米灰底，danger=警示浅底。 */
+.rpt-head {
   display: flex;
-  gap: var(--sp-3);
-  align-items: flex-start;
-  padding: var(--sp-3) var(--sp-4);
-  margin-bottom: var(--sp-3);
-  border-left: 3px solid var(--danger);
-  background: var(--danger-surface);
-  border-radius: 6px;
-}
-.lf-icon {
-  flex: 0 0 20px;
-  height: 20px;
-  line-height: 20px;
-  text-align: center;
-  border-radius: 50%;
-  background: var(--danger);
-  color: var(--surface);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-}
-.lf-body { flex: 1 1 auto; min-width: 0; }
-.lf-title {
-  font-size: var(--fs-base);
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 2px;
-}
-.lf-desc {
-  font-size: var(--fs-xs);
-  line-height: 1.7;
-  color: var(--text-sub-strong);
-}
-/* 质控未完成时的拦截提示：这是「结论不可信」的告知，不是报错 */
-.gate {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: flex-start;
-  padding: var(--sp-3) var(--sp-4);
-  margin-bottom: var(--sp-3);
-  border-left: 3px solid var(--ochre);
-  background: var(--ochre-surface);
-  /* P2-1：容器类统一 6px 圆角（与 PanelCard 同档），消除同页 4px/6px 并存 */
-  border-radius: 6px;
-}
-.gate-icon {
-  flex: 0 0 20px;
-  height: 20px;
-  line-height: 20px;
-  text-align: center;
-  border-radius: 50%;
-  background: var(--ochre-deep);
-  color: var(--surface);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-}
-.gate-body { flex: 1 1 auto; min-width: 0; }
-.gate-title {
-  font-size: var(--fs-base);
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 2px;
-}
-.gate-desc {
-  font-size: var(--fs-xs);
-  line-height: 1.7;
-  color: var(--text-sub-strong);
-}
-.gate-ops {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
   flex-wrap: wrap;
-  margin-top: var(--sp-2);
+  align-items: flex-start;
+  gap: var(--sp-3) var(--sp-4);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-mid);
+  /* P2-1：容器类统一 6px 圆角（与 PanelCard 同档） */
+  border-radius: 6px;
 }
-/* 重跑进度：把「在跑」可视化，否则用户只能干等 */
-.gate-progress {
+.rpt-head.warn {
+  border-left-color: var(--ochre);
+  background: var(--ochre-surface);
+}
+.rpt-head.ok {
+  border-left-color: var(--success);
+  background: var(--surface-sub);
+}
+.rpt-head.danger {
+  border-left-color: var(--danger);
+  background: var(--danger-surface);
+}
+/* 状态区：占剩余宽度，窄则换行 */
+.rh-status {
+  flex: 1 1 420px;
+  min-width: 0;
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+}
+.rh-icon {
+  flex: 0 0 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--ink-mid);
+  color: var(--surface);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.rpt-head.warn .rh-icon { background: var(--ochre-deep); }
+.rpt-head.ok .rh-icon { background: var(--success); }
+.rpt-head.danger .rh-icon { background: var(--danger); }
+.rh-text { min-width: 0; }
+.rh-title {
+  font-size: var(--fs-title);
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.rh-desc {
+  margin: 0;
+  font-size: var(--fs-base);
+  line-height: 1.7;
+  color: var(--text-sub-strong);
+}
+/* 结论下方的两条次级说明：质控未完成时的「仍可看什么」、测试数据口径提示 */
+.rh-note,
+.rh-caveat {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-sub-strong);
+}
+.rh-caveat { color: var(--text-sub); }
+/* 操作区：时间区间 / 刷新 / 导出 */
+.rh-tools {
+  flex: 0 1 auto;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin-top: var(--sp-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* 质控未完成的重跑入口 + 进度：与状态同卡，靠上边框分组 */
+.rh-ops {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-soft);
+}
+.rh-progress {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 200px;
 }
 .gp-label {
   flex: 0 0 auto;
@@ -974,104 +984,20 @@ function onVisibilityChange() {
   color: var(--text-sub-strong);
   white-space: nowrap;
 }
-.gate-note {
-  margin-top: var(--sp-2);
+/* 当前统计区间的口径说明 */
+.rh-range {
+  flex: 1 1 100%;
+  margin: 0;
   font-size: var(--fs-xs);
-  line-height: 1.7;
   color: var(--text-sub-strong);
 }
-/* 顶部工具条：原独立「统计区间」PanelCard 去壳并入正文（审查报告 V7）——
-   卡壳 + 标题行占掉的约 60px 全部让给内容，下边框与下方结论条分隔 */
-.panel-toolbar {
-  padding-bottom: var(--sp-3);
-  border-bottom: 1px solid var(--line);
-  margin-bottom: var(--sp-3);
-}
-/* 时间区间条 */
-.time-row {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: center;
-  flex-wrap: wrap;
-}
-/* 数据来源提示：轻量，不拦截阅读 */
-.src-note {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: flex-start;
-  padding: var(--sp-2) var(--sp-3);
-  margin-bottom: var(--sp-3);
-  background: var(--surface-sub);
-  /* P2-3：三种顶部提示条同构 —— 补 3px 左边框（灰系），与结论条/门禁条一致 */
-  border-left: 3px solid var(--text-sub);
-  /* P2-1：容器类 6px */
-  border-radius: 6px;
-  font-size: var(--fs-xs);
-  line-height: 1.7;
-  color: var(--text-sub-strong);
-}
-.src-icon {
-  flex: 0 0 16px;
-  height: 16px;
-  line-height: 16px;
-  text-align: center;
-  border-radius: 50%;
-  background: var(--text-sub);
-  color: var(--surface);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-}
-/* 结论条：一句话把「该做什么」说清 */
-.headline {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: flex-start;
-  padding: var(--sp-3) var(--sp-4);
-  margin-bottom: var(--sp-3);
-  /* P2-1：容器类 6px */
-  border-radius: 6px;
-  border-left: 3px solid var(--ink-mid);
-  background: var(--ink-light);
-}
-.headline.warn {
-  border-left-color: var(--ochre);
-  background: var(--ochre-surface);
-}
-.headline.ok {
-  border-left-color: var(--success, #3a7d44);
-  background: var(--surface-sub);
-}
-.hl-icon {
-  flex: 0 0 20px;
-  height: 20px;
-  line-height: 20px;
-  text-align: center;
-  border-radius: 50%;
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  color: var(--surface);
-  background: var(--ink-mid);
-}
-.headline.warn .hl-icon { background: var(--ochre-deep); }
-.headline.ok .hl-icon { background: var(--success, #3a7d44); }
-.hl-title {
-  font-size: var(--fs-title);
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 2px;
-}
-.hl-desc {
-  font-size: var(--fs-base);
-  line-height: 1.7;
-  color: var(--text-sub-strong);
-}
+
 /* 关键卡 */
 .kpi-row {
   display: flex;
   gap: var(--sp-3);
   flex-wrap: wrap;
-  /* P2-2：区块间距收口到 --sp-3 —— 与上下相邻区块（12px）同一档，
-     消除 12/16/14 三个越档值混排 */
+  /* P2-2：区块间距收口到 --sp-3 —— 与上下相邻区块同一档 */
   margin-bottom: var(--sp-3);
 }
 .kpi {
@@ -1080,7 +1006,7 @@ function onVisibilityChange() {
      改为按 4 等分取基宽、禁止 grow；窄屏走 2×2 断点，同行永远等宽。 */
   flex: 0 1 calc((100% - 3 * var(--sp-3)) / 4);
   min-width: 0;
-  /* P0-6：终态实测 134px —— min-height 把骨架与终态钉在同一高度，A9 差值 0 */
+  /* P0-6：min-height 把骨架与终态钉在同一高度，加载不产生布局跳动 */
   min-height: 134px;
   padding: var(--sp-3);
   border: 1px solid var(--line);
@@ -1089,15 +1015,15 @@ function onVisibilityChange() {
   background: var(--surface);
 }
 .kpi.warn { border-left: 3px solid var(--ochre); }
-.kpi.ok { border-left: 3px solid var(--success, #3a7d44); }
-/* P1-5：受支持视口的下半段（<1100px）走 2×2 等宽，不出现通栏孤卡 */
+.kpi.ok { border-left: 3px solid var(--success); }
+/* P1-5：<1100px 视口 2×2 等宽，不出现通栏孤卡 */
 @media (max-width: 1100px) {
   .kpi { flex-basis: calc((100% - var(--sp-3)) / 2); }
 }
 @media (max-width: 700px) {
   .kpi { flex-basis: 100%; }
 }
-/* P0-6：骨架块 —— 静态占位（全站动效令牌约束：不允许新增字面量 transition/animation） */
+/* 骨架块 —— 静态占位（全站动效令牌约束：不允许新增字面量 transition/animation） */
 .kpi-skel { display: block; }
 .sk {
   display: block;
@@ -1161,11 +1087,11 @@ function onVisibilityChange() {
   font-size: var(--fs-xs);
   line-height: 1.7;
   color: var(--text-sub-strong);
-  /* P2-5：长说明限宽 —— 1115px 单行 85+ 字远超中文长文 30~45 字/行的可读行宽 */
+  /* P2-5：长说明限宽 —— 避免单行 85+ 字远超中文长文可读行宽 */
   max-width: 88ch;
 }
 /* P1-8：右侧固定宽度操作列。无按钮的行用 .todo-act 同宽占位，
-     保证 5 条待办的标签左缘竖直成列（A17）。 */
+     保证多条待办的标签左缘竖直成列（A17）。 */
 .todo-ops {
   flex: 0 0 160px;
   display: flex;
@@ -1197,12 +1123,6 @@ function onVisibilityChange() {
   padding: var(--sp-3) 0;
   font-size: var(--fs-base);
   color: var(--text-sub-strong);
-}
-.warn { color: var(--ochre-text); font-weight: 600; }
-.foot {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
 }
 
 /*
