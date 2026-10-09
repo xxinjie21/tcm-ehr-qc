@@ -98,6 +98,12 @@
         <template v-else>
           <p class="member-note">成员在本组织只有读权限；需要拉人 / 转让等操作请联系所有者。</p>
         </template>
+
+        <!-- 多组织：已有组织时也能再建一个（创建后自动切换到新组织）。
+             放在 data.org 块内 —— 无组织时由上方空态提供「创建组织」，避免重复/漂移。 -->
+        <div class="org-create-row">
+          <el-button size="small" plain @click="createDialog = true">再创建一个组织</el-button>
+        </div>
       </div>
       </div>
 
@@ -158,6 +164,7 @@
 // 我的组织：所有者管理成员（按用户名搜索拉人 / 授权 / 移除 / 转让）、成员看组织信息、
 // 未加入组织可自助创建。批次 6 起无审批、无「待加入池」。
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import PanelCard from '@/components/PanelCard.vue'
@@ -169,6 +176,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
 
+const route = useRoute()
 const userStore = useUserStore()
 const loading = ref(true)
 const data = ref({ org: null, myRole: null })
@@ -348,7 +356,11 @@ const doLeave = async () => {
   }
 }
 
-onMounted(loadMyOrg)
+onMounted(() => {
+  // 顶栏「创建组织」跳转 /my-org?create=1 时自动打开创建弹窗
+  if (route.query.create) createDialog.value = true
+  loadMyOrg()
+})
 </script>
 
 <style scoped>
@@ -378,6 +390,11 @@ onMounted(loadMyOrg)
 .member-note {
   margin-top: var(--sp-4);
   color: var(--text-sub-strong);
+}
+/* 多组织：已有组织时也能再建一个 */
+.org-create-row {
+  margin-top: var(--sp-4);
+  text-align: right;
 }
 .is-owner {
   color: var(--text-sub-strong);

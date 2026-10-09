@@ -33,14 +33,12 @@ public class AuthController {
      * <p>角色由后端固定为「用户」，不采信前端传入的角色；用户名重复、参数非法、
      * 课题组编码被占用时返回 400。</p>
      *
-     * <p><b>① 只注册</b> → 账号进「待分配池」（{@code status=pending}），
-     * 看不到任何数据，等某个组长从池里拉入。
-     * <b>② 同时申请建组</b> → 建 {@code pending} 组 + 本人为首任组长，
-     * 等管理员审批；期间 {@code has_pending_group=1} 使其从池中隐藏，
-     * 避免被别的组长先拉走。</p>
+     * <p><b>① 只注册</b> → 账号一律 {@code active}，无组织时登录后进入「我的组织」引导页。
+     * <b>② 同时创建组织</b> → 创建者即首任所有者，组织直接生效（批次 6 起取消审核，
+     * 已无 {@code pending} 中间态，也不再使用 has_pending_group 标记）。</p>
      *
      * @param dto 用户名与密码；可选 createGroup（编码/名称/用途）
-     * @return username / role / groupSubmitted（是否已提交建组申请）
+     * @return username / role / groupSubmitted（是否已创建组织）
      */
     @PostMapping("/register")
     public Result<Map<String, String>> register(@Valid @RequestBody RegisterDTO dto) {

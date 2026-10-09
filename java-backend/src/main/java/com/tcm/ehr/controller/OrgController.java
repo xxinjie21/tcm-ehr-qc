@@ -50,6 +50,31 @@ public class OrgController {
         return Result.ok(orgService.myOrg());
     }
 
+    // ----------------------------------------------------------- 多组织（登录即可）
+
+    /**
+     * 当前用户所属的所有 active 组织（含「是否当前组织」标记）。
+     *
+     * <p>供右上角「切换组织」下拉使用。只列 active 组织。</p>
+     */
+    @GetMapping("/api/orgs/mine")
+    public Result<List<OrgVOs.MyOrgItem>> myOrgs() {
+        return Result.ok(orgService.myOrgs());
+    }
+
+    /**
+     * 切换到指定组织（多组织）。
+     *
+     * <p>【权限：登录即可，服务层校验「是该成员 且 组织 active」】
+     * 注意：<b>不能</b>加 {@code @RequireOrgRole} —— 切换前 currentOrg 仍是旧组织，
+     * 加了会被「路径机构 != 当前机构」拦掉，永远切不过去。</p>
+     */
+    @PostMapping("/api/orgs/{id}/switch")
+    public Result<Void> switchOrg(@PathVariable String id) {
+        orgService.switchOrg(id);
+        return Result.ok("已切换组织", null);
+    }
+
     // ----------------------------------------------------------- 管理员
 
     @RequireRole(roles = {"管理员"})

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -336,17 +337,33 @@ class OrgServiceTest {
         assertEquals("zhangsan", out.get(0).getUsername());
     }
 
-    /** 拉人：已在其他组织 → 拒（一人一组织） */
+    /** 多组织：已属于其它组织 → 允许拉入，is_primary=0（不抢用户当前组织） */
     @Test
-    void addMemberRejectsUserAlreadyInOrg() {
+    void addMemberAllowsUserAlreadyInOtherOrg() {
         bindOwnerOfG1();
         when(userMapper.selectById("u-busy")).thenReturn(user("u-busy", "busy", User.STATUS_ACTIVE));
-        when(memberMapper.selectCount(any())).thenReturn(1L);
+        when(memberMapper.selectCount(any())).thenReturn(1L); // 已有 primary
+
+        service.addMember("g1", "u-busy");
+
+        ArgumentCaptor<OrganizationMember> cap = ArgumentCaptor.forClass(OrganizationMember.class);
+        verify(memberMapper).insert(cap.capture());
+        assertEquals(OrganizationMember.ROLE_MEMBER, cap.getValue().getRole());
+        assertEquals(0, cap.getValue().getIsPrimary(), "已有 primary 时新成员不得抢占当前组织");
+    }
+
+    /** 多组织：同组织重复 → 拒（uk_org_user 唯一索引兜底） */
+    @Test
+    void addMemberRejectsDuplicateInSameOrg() {
+        bindOwnerOfG1();
+        when(userMapper.selectById("u-dup")).thenReturn(user("u-dup", "dup", User.STATUS_ACTIVE));
+        when(memberMapper.selectCount(any())).thenReturn(0L); // 无 primary
+        when(memberMapper.insert(any(OrganizationMember.class)))
+                .thenThrow(new DuplicateKeyException("uk_org_user"));
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> service.addMember("g1", "u-busy"));
-        assertTrue(e.getMessage().contains("已属于其他组织"), e.getMessage());
-        verify(memberMapper, never()).insert(any(OrganizationMember.class));
+                () -> service.addMember("g1", "u-dup"));
+        assertTrue(e.getMessage().contains("已在其他组织中"), e.getMessage());
     }
 
     /** 拉人：停用账号不拉（拉进来也登不了，只会让 owner 以为多了个人） */

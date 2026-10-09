@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { getMyOrg } from '@/api/org'
+import { getMyOrg, listMyOrgs, switchOrg as switchOrgApi } from '@/api/org'
 
 /**
  * 登录态（阶段2 起带组织上下文）。
  *
- * <p>orgId / orgRole / status / pendingGroup 随登录带出，<b>仅供前端渲染</b>
+ * <p>orgId / orgRole / status 随登录带出，<b>仅供前端渲染</b>
  * （菜单、引导页文案）；服务端每请求由 JwtInterceptor 重新解析组织，
  * 客户端改 localStorage 无效 —— 不要在这里做任何鉴权逻辑。</p>
  */
@@ -18,7 +18,8 @@ export const useUserStore = defineStore('user', {
     orgId: localStorage.getItem('orgId') || '',
     orgRole: localStorage.getItem('orgRole') || '',
     status: localStorage.getItem('status') || '',
-    pendingGroup: localStorage.getItem('pendingGroup') === '1',
+    // 多组织：当前用户所属的所有 active 组织（含 current 标记），供右上角切换下拉
+    orgs: [],
     // 词典 / 质控规则的写授权位：后端下发，默认 false（无授权时前端不显示写入口）
     canWriteDictionary: localStorage.getItem('canWriteDictionary') === '1',
     canWriteQcRules: localStorage.getItem('canWriteQcRules') === '1'
@@ -38,7 +39,7 @@ export const useUserStore = defineStore('user', {
 
   actions: {
     setLogin({ token, username, role, menus, orgId = '', orgRole = '', status = '',
-      pendingGroup = false, canWriteDictionary = false, canWriteQcRules = false }) {
+      canWriteDictionary = false, canWriteQcRules = false }) {
       this.token = token
       this.username = username || ''
       this.role = role
@@ -46,7 +47,6 @@ export const useUserStore = defineStore('user', {
       this.orgId = orgId || ''
       this.orgRole = orgRole || ''
       this.status = status || ''
-      this.pendingGroup = !!pendingGroup
       this.canWriteDictionary = !!canWriteDictionary
       this.canWriteQcRules = !!canWriteQcRules
       localStorage.setItem('token', this.token)
@@ -56,7 +56,6 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('orgId', this.orgId)
       localStorage.setItem('orgRole', this.orgRole)
       localStorage.setItem('status', this.status)
-      localStorage.setItem('pendingGroup', this.pendingGroup ? '1' : '0')
       localStorage.setItem('canWriteDictionary', this.canWriteDictionary ? '1' : '0')
       localStorage.setItem('canWriteQcRules', this.canWriteQcRules ? '1' : '0')
     },
@@ -83,6 +82,25 @@ export const useUserStore = defineStore('user', {
         // 保持登录时的快照
       }
     },
+    // 多组织：拉取我所属的所有 active 组织（进主框架时调一次，与 refreshOrg 同时机）
+    async loadOrgs() {
+      try {
+        const res = await listMyOrgs()
+        this.orgs = res.data || []
+      } catch {
+        // 失败保持空，切换下拉降级为只显示当前组织
+      }
+    },
+
+    // 多组织：切换到指定组织。成功后整页刷新，让各页数据按新组织重载
+    // （各页缓存了旧组织的数据，不刷新会显示错组织的病历）。
+    async switchOrg(id) {
+      await switchOrgApi(id)
+      await this.refreshOrg()
+      await this.loadOrgs()
+      location.reload()
+    },
+
     logout() {
       this.token = ''
       this.username = ''
@@ -91,7 +109,6 @@ export const useUserStore = defineStore('user', {
       this.orgId = ''
       this.orgRole = ''
       this.status = ''
-      this.pendingGroup = false
       this.canWriteDictionary = false
       this.canWriteQcRules = false
       localStorage.removeItem('token')
@@ -101,7 +118,6 @@ export const useUserStore = defineStore('user', {
       localStorage.removeItem('orgId')
       localStorage.removeItem('orgRole')
       localStorage.removeItem('status')
-      localStorage.removeItem('pendingGroup')
       localStorage.removeItem('canWriteDictionary')
       localStorage.removeItem('canWriteQcRules')
     }

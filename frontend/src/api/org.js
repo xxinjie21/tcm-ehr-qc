@@ -9,6 +9,18 @@ export function getMyOrg() {
   return request.get('/my-org', { silent: true })
 }
 
+// ---- 多组织（登录即可）----
+
+// 当前用户所属的所有 active 组织（含「是否当前组织」标记），供右上角切换下拉
+export function listMyOrgs() {
+  return request.get('/orgs/mine')
+}
+
+// 切换到指定组织（服务层校验成员身份 + 组织 active）
+export function switchOrg(id) {
+  return request.post(`/orgs/${id}/switch`)
+}
+
 // ---- 管理员 ----
 export function listOrgs(status) {
   return request.get('/orgs', { params: { status } })

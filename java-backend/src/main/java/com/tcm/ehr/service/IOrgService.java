@@ -22,6 +22,14 @@ public interface IOrgService extends IService<Organization> {
     /** GET /api/my-group */
     OrgVOs.MyOrgVO myOrg();
 
+    // ---------------------------------------------------------- 多组织
+
+    /** GET /api/orgs/mine —— 当前用户所属的所有 active 组织（含「是否当前组织」标记） */
+    List<OrgVOs.MyOrgItem> myOrgs();
+
+    /** POST /api/orgs/{id}/switch —— 切换到指定组织（校验成员身份 + 组织 active） */
+    void switchOrg(String orgId);
+
     // ---------------------------------------------------------- R5 管理员
 
     /** GET /api/orgs?status= —— 组织列表（可筛选状态） */

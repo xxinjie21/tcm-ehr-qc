@@ -38,10 +38,8 @@ public class LoginVO {
     private String orgId;
     /** 组织内角色：owner / member；无组织时为 null */
     private String orgRole;
-    /** 账号状态：pending / active / disabled */
+    /** 账号状态：active / disabled */
     private String status;
-    /** 是否已提交建组申请待审批（1=是） */
-    private boolean pendingGroup;
     /** 词典写授权位（成员级；管理员/所有者不依赖此位） */
     private boolean canWriteDictionary;
     /** 质控规则写授权位（成员级；管理员/所有者不依赖此位） */

@@ -65,6 +65,37 @@
         <el-button link class="llm-entry" @click="llmVisible = true">
           导入 LLM
         </el-button>
+        <!-- 多组织：右上角切换组织（仅非管理员；管理员「看全部数据」，切换对其数据无意义）。
+             菜单含所属组织列表（点选切换，当前项禁用并标注）+ 创建组织 + 我的组织。 -->
+        <el-dropdown
+          v-if="!isAdmin && userStore.orgs.length"
+          trigger="click"
+          placement="bottom-end"
+          @command="onSwitchOrg"
+        >
+          <button type="button" class="org-switch" :title="`当前组织：${currentOrgName}`">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <path d="M3 21V8l7-5 7 5v13h-5v-6H8v6H3z" fill="none" stroke="currentColor"
+                    stroke-width="1.6" stroke-linejoin="round" />
+            </svg>
+            <span class="org-switch__name">{{ currentOrgName }}</span>
+            <span class="org-switch__caret" aria-hidden="true">▾</span>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                v-for="o in userStore.orgs"
+                :key="o.id"
+                :command="o.id"
+                :disabled="o.current"
+              >
+                {{ o.name }}<span v-if="o.current" class="org-cur">（当前）</span>
+              </el-dropdown-item>
+              <el-dropdown-item divided command="__create">创建组织</el-dropdown-item>
+              <el-dropdown-item command="__mine">我的组织</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <!-- 右上角显示「这是谁」：用户名为主、角色为辅。
              原来只有角色标签 —— 两个管理员在页面上长得一模一样，
              操作出了问题分不清是谁做的（roleLabel 现降级为徽标）。 -->
@@ -169,6 +200,7 @@ watch(
 // 28.20：登录时的权限快照会过期（owner 改权限 / 移除成员后），进主框架时重取一次
 onMounted(() => {
   userStore.refreshOrg()
+  userStore.loadOrgs()
   loadNotices()
 })
 
@@ -258,6 +290,25 @@ const roleLabel = computed(() => {
   return '未加入组织'
 })
 const llmVisible = ref(false)
+
+// 多组织：右上角切换下拉的当前组织名
+const currentOrgName = computed(() => {
+  const cur = userStore.orgs.find((o) => o.current)
+  return cur ? cur.name : userStore.hasOrg ? '未加载' : '未加入组织'
+})
+
+// 多组织：切换下拉命令。__create / __mine 走页面跳转，其余为组织 id → 切换并整页刷新
+const onSwitchOrg = async (command) => {
+  if (command === '__create') {
+    router.push('/my-org?create=1')
+    return
+  }
+  if (command === '__mine') {
+    router.push('/my-org')
+    return
+  }
+  await userStore.switchOrg(command)
+}
 
 // ===== 28.18 全局通知中心 =====
 // 通知条目由概览接口实时推导，id 带上数量：数量一变就是新通知，徽标自动重新亮起。
@@ -432,6 +483,44 @@ const handleLogout = async () => {
 .topbar .llm-entry {
   color: #d8dfd9;
   font-size: var(--fs-base);
+}
+
+/* 组织切换下拉触发器：与 llm-entry 同排，深色底浅色字 */
+.org-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
+  margin: -4px 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #d8dfd9;
+  font-size: var(--fs-base);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.org-switch:hover,
+.org-switch:focus-visible {
+  color: var(--surface);
+  background: rgba(255, 255, 255, 0.14);
+}
+.org-switch__name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.org-switch__caret {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.org-cur {
+  margin-left: 4px;
+  font-size: var(--fs-xs);
+  opacity: 0.75;
 }
 .topbar .llm-entry:hover {
   color: var(--surface);

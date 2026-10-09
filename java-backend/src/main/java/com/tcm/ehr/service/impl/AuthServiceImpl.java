@@ -163,7 +163,6 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         //     「有组织才能登录」的旧口径依赖 pending 中间态，现在组织可自助创建、
         //     无组织用户登录后落到「我的组织」引导页，所以不需要中间态。
         user.setStatus(User.STATUS_ACTIVE);
-        user.setHasPendingGroup(0);
         // 3. 落库（唯一索引兜底并发注册竞态）
         try {
             baseMapper.insert(user);
@@ -231,7 +230,6 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         vo.setOrgId(g.hasGroup() ? g.getOrgId() : "");
         vo.setOrgRole(g.hasGroup() ? g.getGroupRole() : null);
         vo.setStatus(user.getStatus());
-        vo.setPendingGroup(user.getHasPendingGroup() != null && user.getHasPendingGroup() == 1);
         // 词典 / 质控规则写授权位：**实时查库**，不用登录时的快照。
         // 原来这里写死 false（注释说「批次 4 的 DDL 落地前恒 false」），但 DDL 早已落地、
         // organization_members 上的两列也早已在用 —— 写死导致：

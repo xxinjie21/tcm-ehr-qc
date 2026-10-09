@@ -23,8 +23,6 @@ public class User {
     /** 系统级角色：管理员 / 用户（组长、组员、待分配池都是「用户」） */
     private String role;
     private LocalDateTime createTime;
-    /** pending=待分配池或审批中 / active=有生效组 / disabled=停用 */
+    /** active=有生效组 / disabled=停用 */
     private String status;
-    /** 1=已申请建组待审批，从待分配池隐藏（避免被组长重复拉走） */
-    private Integer hasPendingGroup;
 }

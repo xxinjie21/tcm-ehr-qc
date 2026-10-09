@@ -95,7 +95,6 @@ class AuthServiceTest {
         u.setRole(role);
         // 阶段 2：默认给「有生效组」，否则否免注册用例会被当成待分配池
         u.setStatus(status);
-        u.setHasPendingGroup(0);
         return u;
     }
 
@@ -192,7 +191,6 @@ class AuthServiceTest {
         // 批次 6：注册角色固定为「用户」；取消审核后账号一律 active
         assertEquals("用户", saved.getRole());
         assertEquals(User.STATUS_ACTIVE, saved.getStatus());
-        assertEquals(0, saved.getHasPendingGroup());
         // 密码必须 BCrypt 加密存储，且与明文匹配
         assertFalse(saved.getPassword().equals("123456"));
         assertTrue(new BCryptPasswordEncoder().matches("123456", saved.getPassword()));

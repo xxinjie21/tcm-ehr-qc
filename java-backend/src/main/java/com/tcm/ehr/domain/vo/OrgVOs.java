@@ -68,6 +68,19 @@ public final class OrgVOs {
         private List<MemberInfo> members = new ArrayList<>();
     }
 
+    /** GET /api/orgs/mine 出参：当前用户所属的一个组织（切换下拉用） */
+    @Data
+    public static class MyOrgItem {
+        private String id;
+        private String code;
+        private String name;
+        private String status;
+        /** owner=所有者 / member=成员 */
+        private String myRole;
+        /** 是否当前组织（is_primary=1） */
+        private boolean current;
+    }
+
     /**
      * GET /api/orgs/users 出参：按用户名搜索到的候选人。
      *
