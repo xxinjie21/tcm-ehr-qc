@@ -11,9 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   role VARCHAR(20) NOT NULL COMMENT '角色：管理员/用户',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   status VARCHAR(20) NOT NULL DEFAULT 'active'
-    COMMENT 'active/disabled',
-  has_pending_group TINYINT NOT NULL DEFAULT 0
-    COMMENT '已废弃：组织改为自助创建、取消审核，代码侧不再读写（本列保留以免存量库回滚丢数据）'
+    COMMENT 'active/disabled'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
 CREATE TABLE IF NOT EXISTS organizations (
@@ -22,7 +20,7 @@ CREATE TABLE IF NOT EXISTS organizations (
   name VARCHAR(100) NOT NULL COMMENT '组织显示名，可重复',
   purpose VARCHAR(500) COMMENT '用途说明（可选）',
   status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active/stopped/archived',
-  owner_user_id VARCHAR(36) COMMENT '所有者冗余展示，权威以 organization_members.role=owner',
+  owner_user_id VARCHAR(36) COMMENT '所有者冗余列（权威=organization_members.role=owner）；createOrg/reassignOwner/transferOwner 三处写路径同事务同步',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_org_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织';
@@ -78,23 +76,21 @@ CREATE TABLE IF NOT EXISTS records (
   manually_edited TINYINT GENERATED ALWAYS AS (CASE WHEN NOT JSON_VALID(structured_data) THEN 0 WHEN LOWER(JSON_UNQUOTE(JSON_EXTRACT(structured_data, '$._meta.manuallyEdited'))) = 'true' THEN 1 WHEN JSON_TYPE(JSON_EXTRACT(structured_data, '$._meta.manuallyEdited')) IN ('INTEGER', 'DOUBLE', 'DECIMAL') AND TRUNCATE(CAST(JSON_EXTRACT(structured_data, '$._meta.manuallyEdited') AS DECIMAL(65, 30)), 0) <> 0 THEN 1 ELSE 0 END) STORED NOT NULL COMMENT '是否人工修改过结构化数据（由 structured_data._meta.manuallyEdited 派生，应用侧只读）',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_registration_no (registration_no),
-  INDEX idx_status (status),
-  INDEX idx_grade (grade),
-  INDEX idx_department_visit_time (department, visit_time),
-  INDEX idx_records_visit_time (visit_time),
   text_hash CHAR(32) NULL COMMENT '21 字段 MD5；NULL = 不参与唯一约束',
   UNIQUE KEY uk_records_org_text_hash (org_id, text_hash),
-  INDEX idx_records_org (org_id),
-  -- 25.4：列表/导出/统计普遍是「org_id 等值（数据域）+ visit_time 范围或排序」，
-  -- 两个单列索引同时存在时 MySQL 只能选其一，另一维回表过滤；复合索引才两维都走
-  INDEX idx_records_org_visit_time (org_id, visit_time),
-  -- 40,000 条性能审查（2026-10-07）：列表排序键 (visit_time DESC, id ASC) 的降序复合索引；
-  -- (org_id, department) 覆盖 COUNT/科室下拉；(org_id, grade, governed) 覆盖 overview/governance 聚合
+  -- 索引治理（2026-10-09）：按访问路径精简。原 13 个二级索引中，
+  -- idx_records_org / idx_records_org_visit_time 被下列复合索引的最左前缀完全覆盖；
+  -- idx_registration_no / idx_status / idx_grade 的单列场景亦被 org 前缀复合索引覆盖
+  -- （管理员「看全部」的 grade/status 过滤退化为全表扫，40k 量级可接受）。
+  -- 保留下列 7 个二级索引即可覆盖全部实际查询，显著降低批量回写的写放大。
+  INDEX idx_records_visit_time (visit_time),
+  -- 列表/导出/统计：org_id 等值（数据域）+ visit_time 范围或排序 + id 稳定序（keyset 游标）
   INDEX idx_records_org_vt_id (org_id, visit_time DESC, id ASC),
-  INDEX idx_records_org_department (org_id, department),
+  -- 科室筛选 + 默认排序（三星索引：等值 org_id/department → 排序 visit_time/id）
+  INDEX idx_records_org_dept_vt (org_id, department, visit_time DESC, id ASC),
+  -- overview / governance 聚合：org_id + grade + governed
   INDEX idx_records_org_grade_gov (org_id, grade, governed),
-  -- B3 用户可排序（2026-10-08，方案 b）：白名单 score / registration_no 的复合索引，末级 id 保稳定
+  -- 用户可排序白名单 score / registration_no，末级 id 保持稳定
   INDEX idx_records_org_score_desc_id (org_id, score DESC, id ASC),
   INDEX idx_records_org_regno_id (org_id, registration_no, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='病历表';
@@ -102,7 +98,7 @@ CREATE TABLE IF NOT EXISTS records (
 CREATE TABLE IF NOT EXISTS review_tasks (
   id VARCHAR(36) PRIMARY KEY,
   record_id VARCHAR(36) NOT NULL,
-  status VARCHAR(20) COMMENT '状态：pending/completed',
+  status VARCHAR(20) COMMENT '状态：pending/completed/obsolete',
   issue_type VARCHAR(50) COMMENT '问题类型（缺失字段/逻辑冲突/评分不达标）',
   score INT COMMENT '当前评分',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -117,7 +113,11 @@ CREATE TABLE IF NOT EXISTS review_tasks (
     (IF(is_obsolete = 0, record_id, NULL)) STORED
     COMMENT '活跃行=record_id，作废行=NULL；配合 uk_record_active 约束「一个病历至多一条待复核任务」',
   UNIQUE KEY uk_record_active (active_key),
-  INDEX idx_review_task_org (org_id),
+  -- 索引治理（2026-10-09）：复核列表 = org 等值 + is_obsolete=0 + 按 create_time 分页；
+  -- 逾期 worklist = org + is_obsolete=0 + status='pending' + deadline_time 范围。
+  -- 原单列 idx_review_task_org(org_id) 被下述复合索引最左前缀覆盖，故删除。
+  INDEX idx_review_org_obsolete_created (org_id, is_obsolete, create_time),
+  INDEX idx_review_org_obsolete_status_deadline (org_id, is_obsolete, status, deadline_time),
   CONSTRAINT fk_review_record FOREIGN KEY (record_id) REFERENCES records(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='复核任务表';
 
@@ -170,8 +170,8 @@ CREATE TABLE IF NOT EXISTS nlp_task (
 -- 与 nlp_task 同库；一行一条病历，含 seq 游标与处理状态。
 CREATE TABLE IF NOT EXISTS nlp_task_items (
   id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '自增主键',
-  task_id     VARCHAR(64)  NOT NULL                COMMENT '所属任务（nlp_task.id）',
-  record_id   VARCHAR(64)  NOT NULL                COMMENT '待处理病历（records.id）',
+  task_id     VARCHAR(36)  NOT NULL                COMMENT '所属任务（nlp_task.id，宽度与父表一致）',
+  record_id   VARCHAR(36)  NOT NULL                COMMENT '待处理病历（records.id，宽度与父表一致）',
   seq         INT          NOT NULL                COMMENT '提交顺序（0 起），进度游标按它推进',
   status      VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / DONE / FAILED',
   reason      VARCHAR(255)     NULL                COMMENT '失败原因（仅在 FAILED 时写）',
@@ -179,8 +179,10 @@ CREATE TABLE IF NOT EXISTS nlp_task_items (
   update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '状态变更时间',
   PRIMARY KEY (id),
   UNIQUE KEY uk_task_record (task_id, record_id),
-  KEY idx_task_status_seq (task_id, status, seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量解析任务的记录 ID 集合与逐条状态（批次 16 工作项 3）';
+  KEY idx_task_status_seq (task_id, status, seq),
+  -- 30 天清理：DELETE ... WHERE create_time < cutoff
+  KEY idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量解析任务的记录 ID 集合与逐条状态（批次 16 工作项 3）';
 
 
 CREATE TABLE IF NOT EXISTS qc_task (
@@ -212,22 +214,22 @@ CREATE TABLE IF NOT EXISTS qc_task (
 CREATE TABLE IF NOT EXISTS dictionary_terms (
   id VARCHAR(36) PRIMARY KEY,
   org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层（不用 NULL，见注 1）",
-  type VARCHAR(20) NOT NULL COMMENT 'disease/pattern/symptom/herb/formula',
+  type VARCHAR(20) NOT NULL COMMENT 'disease/pattern/symptom/herb/formula/tongue/pulse/treatment（见 EntityTypes.dictKeys，共 8 类）',
   standard_term VARCHAR(200) NOT NULL,
   aliases JSON,
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_org_type_term (org_id, type, standard_term),
-  INDEX idx_org_type (org_id, type)
+  UNIQUE KEY uk_org_type_term (org_id, type, standard_term)
+  -- 索引治理（2026-10-09）：原 idx_org_type(org_id,type) 被 uk_org_type_term 最左前缀覆盖，删除
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='术语词典词条';
 
 CREATE TABLE IF NOT EXISTS dict_proposal (
   id VARCHAR(36) PRIMARY KEY,
   org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层",
   type VARCHAR(20) NOT NULL,
-  submit_user_id VARCHAR(36) NOT NULL COMMENT '提交人',
+  submit_user_id VARCHAR(50) NOT NULL COMMENT '提交人用户名（登录 username，非 user.id）',
   status VARCHAR(16) NOT NULL COMMENT 'pending/approved/rejected',
-  audit_user_id VARCHAR(36) COMMENT '审核人（组长）',
+  audit_user_id VARCHAR(50) COMMENT '审核人（组长）用户名',
   audit_comment VARCHAR(500),
   create_time DATETIME NOT NULL,
   audit_time DATETIME,
@@ -251,7 +253,7 @@ CREATE TABLE IF NOT EXISTS dict_archive_version (
   version_no INT NOT NULL COMMENT '组内递增版本号',
   proposal_id VARCHAR(36) COMMENT '来源提案；管理员直写导入时为 NULL',
   merge_time DATETIME NOT NULL,
-  merge_user_id VARCHAR(36) NOT NULL,
+  merge_user_id VARCHAR(50) NOT NULL COMMENT '合并人用户名（登录 username，非 user.id）',
   comment VARCHAR(300),
   UNIQUE KEY uk_org_type_no (org_id, type, version_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='基线归档版本元信息（永久保留）';
@@ -266,8 +268,8 @@ CREATE TABLE IF NOT EXISTS dict_archive_term (
 
 CREATE TABLE IF NOT EXISTS dictionary_versions (
   org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层",
-  type VARCHAR(20) NOT NULL COMMENT 'disease/pattern/symptom/herb/formula',
-  version VARCHAR(32) NOT NULL COMMENT 'DB 侧内容版本：该 (org,type) 词条内容的 MD5 前 12 位',
+  type VARCHAR(20) NOT NULL COMMENT 'disease/pattern/symptom/herb/formula/tongue/pulse/treatment（见 EntityTypes.dictKeys，共 8 类）',
+  version VARCHAR(32) NOT NULL COMMENT 'DB 侧内容版本：该 (org,type) 词条内容的 SHA-256 前 32 位十六进制',
   indexed_version VARCHAR(32) NULL COMMENT 'ES 侧已灌入的版本；NULL 或 <> version 即「待重建」',
   indexed_at DATETIME NULL COMMENT '最近一次成功灌入 ES 的时间',
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
