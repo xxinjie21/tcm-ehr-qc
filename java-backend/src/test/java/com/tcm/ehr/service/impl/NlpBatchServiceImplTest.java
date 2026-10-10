@@ -2,6 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
+import com.tcm.ehr.common.utils.DictMeta;
 import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.PythonNlpClient;
@@ -525,7 +526,7 @@ class NlpBatchServiceImplTest {
         when(store.effectiveDictVersion("org-1")).thenReturn("v9");
         when(store.effectiveTermCount("org-1")).thenReturn(42);
 
-        NlpBatchServiceImpl.DictMeta meta = new NlpBatchServiceImpl.DictMeta(store, "org-1");
+        DictMeta meta = new DictMeta(store, "org-1");
         for (int i = 0; i < 100; i++) {
             assertEquals("v9", meta.version(), "同一批内版本戳必须一致");
             assertEquals(42, meta.termCount(), "同一批内词条数必须一致");
@@ -544,7 +545,7 @@ class NlpBatchServiceImplTest {
     void dictMetaDoesNotQueryWhenNeverUsed() {
         com.tcm.ehr.service.IDictionaryTermStore store =
                 mock(com.tcm.ehr.service.IDictionaryTermStore.class);
-        new NlpBatchServiceImpl.DictMeta(store, "org-1");
+        new DictMeta(store, "org-1");
         Mockito.verifyNoInteractions(store);
     }
 }

@@ -51,7 +51,9 @@ class RecordColumnNameGuardTest {
             "QcServiceImpl.java",
             "QcBatchServiceImpl.java",
             "RecordDeleter.java",
-            "RecordFilter.java");
+            "RecordFilter.java",
+            // C1 列投影：标准化报告页由 selectList 全列改为 8 列投影（4 万条 45MB → 约 12MB）
+            "StandardizationReportServiceImpl.java");
 
     private static final Pattern SELECT_CALL = Pattern.compile("\\.select\\(([^)]*)\\)");
     private static final Pattern TOKEN = Pattern.compile("\"([^\"]+)\"");

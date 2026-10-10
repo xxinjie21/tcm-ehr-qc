@@ -6,6 +6,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.TextUtil;
+import com.tcm.ehr.common.utils.DictMeta;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.common.utils.RecordFilter;
@@ -101,6 +102,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         vo.setTotal(baseMapper.selectCount(wrapper).intValue());
 
         Set<String> seenTextHash = new HashSet<>();
+        // T13：词典元数据一批只取一次（惰性 —— 本批没有任何归一需求时一次库都不查）。
+        // 原先 normalizeStructuredData 逐条调 effectiveDictVersion / effectiveTermCount，
+        // 每次又各自查库，4 万条就是约 16 万次 SQL；而 orgId 在整批内恒定，
+        // 同一批也不该盖上两个不同的版本戳。
+        DictMeta dictMeta = new DictMeta(termStore, RequestUtils.currentOrgId());
         for (Record r : records) {
             String status = r.getStatus();
             String grade = r.getGrade();
@@ -138,10 +144,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     .stream().filter(v -> v != null && !v.isEmpty() && v.trim().isEmpty()).count());
 
             // 4. 脏数据隔离（收紧：仅"无法修复"）——核心文本全空 或 structuredData存在但无法解析
+            //    T16：结构化数据在这里**只解析一次**，解析结果向下传给第 5 步的归一；
+            //    不再让「校验（readTree）」与「归一（readValue）」各解析同一份 JSON 一遍。
+            //    structured == null 同时覆盖「没有 structured_data」与「有但解析不了」两种情形。
+            boolean hasStructured = r.getStructuredData() != null && !r.getStructuredData().isBlank();
+            Map<String, Object> structured = hasStructured ? parseStructuredData(r.getStructuredData()) : null;
             boolean unrecoverable = (TextUtil.isBlank(r.getChiefComplaint()) && TextUtil.isBlank(r.getTcmDiagnosis())
                     && TextUtil.isBlank(r.getPresentIllness()) && TextUtil.isBlank(r.getSelfReport()))
-                    || (r.getStructuredData() != null && !r.getStructuredData().isBlank()
-                        && !isValidJson(r.getStructuredData()));
+                    || (hasStructured && structured == null);
             boolean isolatedNow = unrecoverable && !"invalid".equals(status);
             if (isolatedNow) {
                 vo.setIsolated(vo.getIsolated() + 1);
@@ -192,7 +202,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             //    人工成果优先，所以这里直接不碰它的 structured_data。
             //    注意：合格但 structured_data 为空/空白的病历不在此列，它保持「待清洗」，
             //    因而不会被导出条件 governed=1 选中 —— 这是刻意的（没有结构化结果不算标准数据集）。
-            if ("合格".equals(grade) && r.getStructuredData() != null && !r.getStructuredData().isBlank()) {
+            if ("合格".equals(grade) && structured != null) {
                 // 人工标记读标量列（性能审查 P1-2#2）：manually_edited 是 STORED 生成列，
                 // 与 _meta.manuallyEdited 同源，无需在这里再解析一遍 JSON
                 if (Boolean.TRUE.equals(r.getManuallyEdited())) {
@@ -201,7 +211,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     // 不打标记会让它永远落在「待清洗」，并被导出条件 governed=1 永久排除
                     baseMapper.markGoverned(r.getId());
                 } else {
-                    int[] norm = normalizeStructuredData(r);
+                    int[] norm = normalizeStructuredData(r, structured, dictMeta);
                     vo.setNormalized(vo.getNormalized() + norm[0]);
                     vo.getNormByLevel().setExact(vo.getNormByLevel().getExact() + norm[1]);
                     vo.getNormByLevel().setContain(vo.getNormByLevel().getContain() + norm[2]);
@@ -212,8 +222,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         }
         log.info("[清洗] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
                 vo.getTotal(), vo.getDeduped(), vo.getRepaired(), vo.getIsolated(), vo.getNormalized());
-        // 清洗改写了 structured_data / pattern / governed → 统计词频过期，主动失效（B1）
-        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+        // 清洗改写了 structured_data / pattern / governed → 统计词频过期，主动失效（B1）。
+        // W1：必须落在**事务提交之后** —— 本方法带 @Transactional，提交前清缓存会让并发读
+        // 按「未提交的旧数据」现算并回填，事务提交后缓存就持着旧值直到 TTL 到期（最长 60s）。
+        // afterCommit 在无活动事务时立即执行，故单测直调路径行为不变。
+        com.tcm.ehr.common.utils.DistLock.afterCommit(
+                com.tcm.ehr.common.cache.StatsCacheInvalidator::invalidateStats);
         return vo;
     }
 
@@ -259,14 +273,21 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         };
     }
 
-    /** 判断是否为可解析的 JSON（隔离脏数据用；不可解析即视为"无法修复"） */
-    private boolean isValidJson(String s) {
-        // 1. 能解析即有效 2. 解析不了 = 无法修复的脏数据
+    /**
+     * 解析 structured_data（T16：校验与解析合并为同一次）。
+     *
+     * <p>解析不了 = 无法修复的脏数据；此时返回 {@code null}，由调用方按「不可解析」处理，
+     * 不再另设一个 {@code isValidJson} 先 readTree 一遍。</p>
+     *
+     * @param s structured_data 列原文
+     * @return 解析后的顶层 Map；不可解析返回 {@code null}
+     */
+    private Map<String, Object> parseStructuredData(String s) {
         try {
-            objectMapper.readTree(s);
-            return true;
+            return objectMapper.readValue(s, new TypeReference<Map<String, Object>>() {
+            });
         } catch (JacksonException e) {
-            return false;
+            return null;
         }
     }
 
@@ -274,26 +295,30 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * 对结构化数据的全实体补做术语归一：content 换成标准词、sourceText 保留原文，
      * 并写入 normLevel(1/2/3) 供前端溯源与三级分布统计。
      *
+     * @param data     已解析的结构化数据（T16：由 {@code clean()} 解析一次后传入，本方法不再解析）
+     * @param dictMeta 批级词典元数据（T13：一批只查一次库）
      * @return 依次为 被替换实体数、精确数、包含数、模糊数
      */
-    private int[] normalizeStructuredData(Record r) {
+    private int[] normalizeStructuredData(Record r, Map<String, Object> data, DictMeta dictMeta) {
         int[] stat = {0, 0, 0, 0};
         try {
-            Map<String, Object> data = objectMapper.readValue(r.getStructuredData(),
-                    new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
-                    });
             // 1. 8 类 entity 逐类归一 + 同标准词去重（P3.4 拆出）
             normalizeEntityList(data, stat);
             // 2. 中药走另一套：name 归一 + 剂量单位小写（P3.4 拆出）
             normalizeHerbs(data, stat);
             // 3. 打上词典版本再写库：归一结果与当时词典版本必须成对
-            //    ⚠️ 版本源换成 IDictionaryTermStore：原先用
+            //    T16：入参已是解析好的 Map，走 Map 重载，去掉「序列化 → 解析 → 再序列化」的回环。
+            //    ⚠️ 版本源是 IDictionaryTermStore：原先用
             //    dictionaryFileService.currentVersion()（词典还在文件时代的文件哈希），
             //    批次 8b 词典入库后它已冻结 —— 清洗一次就把正确的版本戳覆盖回那个死值。
-            String json = StructuredDataMeta.stamp(objectMapper, objectMapper.writeValueAsString(data),
-                    termStore.effectiveDictVersion(RequestUtils.currentOrgId()),
-                    termStore.effectiveTermCount(RequestUtils.currentOrgId()));
-            baseMapper.updateStructuredData(r.getId(), json);
+            String json = StructuredDataMeta.stamp(objectMapper, data,
+                    dictMeta.version(), dictMeta.termCount());
+            if (json != null) {
+                baseMapper.updateStructuredData(r.getId(), json);
+            } else {
+                // 序列化失败：跳过回写而不是写 null，避免把结构化数据整列清空
+                log.warn("[清洗] structuredData 序列化失败，跳过回写 recordId={}", r.getId());
+            }
         } catch (JacksonException e) {
             // 单条解析失败只记警告：一条脏数据不该中断整批清洗
             log.warn("[清洗] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
@@ -626,9 +651,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 写一行 CSV：所有单元格加引号并转义内部引号/换行；就诊时间规整为 YYYY-MM-DD */
     private void appendCsvRow(ByteArrayOutputStream out, Record r, List<String> cols) {
+        // T1：整实体 → Map 的转换**每行只做一次**。
+        // 原先这句在下面的列循环体内，一行 22 列就要做 22 次整实体反射转换
+        // （4 万行 → 数十万次反射 + 等量临时 Map，比每行转一次慢 20 倍以上）。
+        // 转换结果与列名取值口径完全不变，故 CSV 内容逐字节一致。
+        Map<?, ?> row = objectMapper.convertValue(r, Map.class);
         List<String> cells = new ArrayList<>();
         for (String col : cols) {
-            Object v = objectMapper.convertValue(r, Map.class).get(col);
+            Object v = row.get(col);
             // visitTime格式规整：展示/导出统一为YYYY-MM-DD（文档9.5③格式规整）
             if ("visitTime".equals(col) && v != null) {
                 v = String.valueOf(v).substring(0, 10);

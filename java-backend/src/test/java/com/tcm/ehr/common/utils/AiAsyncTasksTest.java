@@ -4,10 +4,15 @@ import com.tcm.ehr.domain.vo.AiReplyVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
 import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -97,5 +102,52 @@ class AiAsyncTasksTest {
             Thread.sleep(25);
         } while (System.nanoTime() < deadline);
         return snap;
+    }
+
+    @Test
+    void 另一实例能通过共享层读到本实例提交的任务() throws Exception {
+        // 两个实例共用同一个「Redis」：模拟多实例部署（R14 / AI-28）。
+        // 改造前登记表只在进程内，B 实例轮询必然得到 null（前端看到「生成失败」）。
+        Map<String, String> store = new ConcurrentHashMap<>();
+        tools.jackson.databind.json.JsonMapper mapper =
+                tools.jackson.databind.json.JsonMapper.builder().build();
+
+        AiAsyncTasks a = new AiAsyncTasks();
+        a.setRedis(mockRedis(store));
+        a.setObjectMapper(mapper);
+
+        String taskId = a.submit(() -> {
+            AiReplyVO vo = new AiReplyVO();
+            vo.setAnswer("A 实例算出来的");
+            return vo;
+        });
+        AiAsyncTasks.Snapshot fromA = await(a, taskId, Duration.ofSeconds(10));
+        assertNotNull(fromA, "本实例应能在 10s 内出结果");
+        assertEquals(AiAsyncTasks.State.DONE, fromA.state(), "本实例应拿到成功结果：" + fromA.error());
+
+        // B 实例的进程内表是空的。真实前端也是轮询，这里同样等到终态
+        AiAsyncTasks b = new AiAsyncTasks();
+        b.setRedis(mockRedis(store));
+        b.setObjectMapper(mapper);
+
+        AiAsyncTasks.Snapshot fromB = await(b, taskId, Duration.ofSeconds(10));
+        assertNotNull(fromB, "R14：另一实例必须能从共享层读到任务，而不是当作不存在（404）");
+        assertEquals(AiAsyncTasks.State.DONE, fromB.state(), "共享层里的状态应已收敛为 DONE");
+        assertEquals("A 实例算出来的", fromB.reply().getAnswer(), "结果内容应跨实例一致");
+    }
+
+    /** 用 Map 充当 Redis 键空间；get / set(TTL) 落在同一个命名空间里 */
+    private static StringRedisTemplate mockRedis(Map<String, String> store) {
+        StringRedisTemplate redis = Mockito.mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> ops = Mockito.mock(ValueOperations.class);
+        Mockito.when(redis.opsForValue()).thenReturn(ops);
+        Mockito.when(ops.get(Mockito.anyString()))
+                .thenAnswer(inv -> store.get(inv.getArgument(0)));
+        Mockito.doAnswer(inv -> {
+            store.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(ops).set(Mockito.anyString(), Mockito.anyString(), Mockito.any(Duration.class));
+        return redis;
     }
 }

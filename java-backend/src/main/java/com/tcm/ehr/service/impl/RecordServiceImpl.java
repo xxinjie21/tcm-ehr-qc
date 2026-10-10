@@ -425,7 +425,12 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 事务仍留在本方法上：加在被调用方或私有方法上不经过代理，等于没加。
         DeleteRecordsVO vo = deleter().deleteByIds(dto);
         if (vo.getDeletedCount() > 0) {
-            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats(); // 删除 → 词频过期（B1）
+            // W2：失效必须落在**事务提交之后**。本方法带 @Transactional，提交前清缓存会让
+            // 并发读按「删除前的旧数据」现算并回填，提交后统计就持着已删病历直到 TTL 到期
+            // （最长 60s）—— 用户对「删了 4 万条图表数字没变」最敏感。
+            // afterCommit 在无活动事务时立即执行，故单测直调路径行为不变。
+            com.tcm.ehr.common.utils.DistLock.afterCommit(
+                    com.tcm.ehr.common.cache.StatsCacheInvalidator::invalidateStats); // 删除 → 词频过期（B1）
         }
         return vo;
     }
@@ -457,7 +462,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 锁等待坑掉；超时只保护「误操作长时间锁表」，不是对条数的限制。
         DeleteRecordsVO vo = deleter().deleteByFilter(filters);
         if (vo.getDeletedCount() > 0) {
-            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats(); // 范围删除 → 词频过期（B1）
+            // W2：同上，失效移到事务提交之后
+            com.tcm.ehr.common.utils.DistLock.afterCommit(
+                    com.tcm.ehr.common.cache.StatsCacheInvalidator::invalidateStats); // 范围删除 → 词频过期（B1）
         }
         return vo;
     }

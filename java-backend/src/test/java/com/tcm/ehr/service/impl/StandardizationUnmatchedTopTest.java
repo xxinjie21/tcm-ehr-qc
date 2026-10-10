@@ -37,7 +37,7 @@ class StandardizationUnmatchedTopTest {
     @Test
     void topKeepsOnlyDictionaryGapOrderedByCountCappedAtFifteen() throws Exception {
         StandardizationReportServiceImpl svc = Mockito.mock(StandardizationReportServiceImpl.class);
-        injectObjectMapper(svc);
+        ObjectMapper mapper = injectObjectMapper(svc);
 
         // 16 个不同的长词（=> 词表缺口），出现次数依次 16,15,...,1；另加 1 个短碎片（应被排除）
         List<Record> records = new ArrayList<>();
@@ -47,7 +47,7 @@ class StandardizationUnmatchedTopTest {
         records.add(recordWithRepeats("短", 9));
 
         StandardizationReportVO.UnmatchedBreakdown b =
-                invokeUnmatched(svc, records, Collections.emptySet());
+                invokeUnmatched(svc, rowsOf(mapper, records), Collections.emptySet());
 
         Map<String, Integer> top = b.getTop();
         assertNotNull(top, "top 不应为 null");
@@ -80,25 +80,44 @@ class StandardizationUnmatchedTopTest {
         return r;
     }
 
-    /** 服务用 ObjectMapper 解析 structuredData；按类型找到并注入，免依赖字段名。 */
-    private static void injectObjectMapper(StandardizationReportServiceImpl svc) throws Exception {
+    /** 服务用 ObjectMapper 解析 structuredData；按类型找到并注入，免依赖字段名。返回注入的实例供测试造行。 */
+    private static ObjectMapper injectObjectMapper(StandardizationReportServiceImpl svc) throws Exception {
+        ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builder().build();
         for (Class<?> c = StandardizationReportServiceImpl.class; c != null && c != Object.class; c = c.getSuperclass()) {
             for (Field f : c.getDeclaredFields()) {
                 if (ObjectMapper.class.isAssignableFrom(f.getType())) {
                     f.setAccessible(true);
-                    f.set(svc, tools.jackson.databind.json.JsonMapper.builder().build());
-                    return;
+                    f.set(svc, mapper);
+                    return mapper;
                 }
             }
         }
         throw new IllegalStateException("未找到 ObjectMapper 字段");
     }
 
+    /**
+     * 构造报告行：解析口径与生产入口（{@code toRows}）一致 —— 每条 structured_data 只解析一次。
+     *
+     * <p>A1/T2 之后 {@code unmatched} 收的是 {@code Row} 而不是 {@code Record}，故这里要先成行。</p>
+     */
+    @SuppressWarnings("unchecked")
+    private static List<StandardizationReportServiceImpl.Row> rowsOf(ObjectMapper mapper, List<Record> records)
+            throws Exception {
+        List<StandardizationReportServiceImpl.Row> rows = new ArrayList<>(records.size());
+        for (Record r : records) {
+            String sd = r.getStructuredData();
+            Map<String, Object> parsed = (sd == null || sd.isBlank()) ? null : mapper.readValue(sd, Map.class);
+            rows.add(new StandardizationReportServiceImpl.Row(r, parsed, null));
+        }
+        return rows;
+    }
+
     private static StandardizationReportVO.UnmatchedBreakdown invokeUnmatched(
-            StandardizationReportServiceImpl svc, List<Record> records, Set<String> symptomTerms) throws Exception {
+            StandardizationReportServiceImpl svc, List<StandardizationReportServiceImpl.Row> rows,
+            Set<String> symptomTerms) throws Exception {
         Method m = StandardizationReportServiceImpl.class
                 .getDeclaredMethod("unmatched", List.class, Set.class);
         m.setAccessible(true);
-        return (StandardizationReportVO.UnmatchedBreakdown) m.invoke(svc, records, symptomTerms);
+        return (StandardizationReportVO.UnmatchedBreakdown) m.invoke(svc, rows, symptomTerms);
     }
 }

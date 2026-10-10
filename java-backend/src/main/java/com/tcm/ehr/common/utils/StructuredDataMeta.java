@@ -69,6 +69,42 @@ public final class StructuredDataMeta {
     }
 
     /**
+     * 给<b>已解析</b>的结构化数据 Map 打上词典版本元信息（自动流程：抽取 / 清洗）。
+     *
+     * <p>与 {@link #stamp(ObjectMapper, String, String, Integer)} 的差别只在入参形态：调用方
+     * 已经持有解析结果时走这条，省掉「序列化 → 解析 → 再序列化」的一次完整往返。语义完全一致
+     * —— {@code dictVersion} 为空时同样不写 {@code _meta}，只把数据原样序列化回去。</p>
+     *
+     * @param data          已解析的结构化数据顶层 Map
+     * @param dictVersion   词典版本串；空则不打点
+     * @param dictTermCount 这次归一实际覆盖的词典词条数（可空）
+     * @return 打点后的 JSON；<b>序列化失败返回 {@code null}</b>（调用方须自行跳过回写，不得把 null 写库）
+     */
+    public static String stamp(ObjectMapper mapper, Map<String, Object> data, String dictVersion,
+                               Integer dictTermCount) {
+        // 1. 没有数据就没有可打点的对象
+        if (data == null) {
+            return null;
+        }
+        try {
+            // 2. 有版本号才塞 _meta；没有就只把已解析的结构原样序列化回去
+            if (dictVersion != null && !dictVersion.isBlank()) {
+                Map<String, Object> meta = new LinkedHashMap<>();
+                meta.put("dictVersion", dictVersion);
+                meta.put("dictCapturedAt", LocalDateTime.now().withNano(0).format(TS));
+                if (dictTermCount != null) {
+                    meta.put("dictTermCount", dictTermCount);
+                }
+                data.put(META_KEY, meta);
+            }
+            return mapper.writeValueAsString(data);
+        } catch (Exception e) {
+            // 3. 序列化失败返回 null：调用方跳过回写，绝不把 null 当结构化数据落库
+            return null;
+        }
+    }
+
+    /**
      * 给结构化数据 JSON 打上<b>人工修改</b>标记（人工流程：复核提交 / 手工改结构化数据）。
      *
      * <p><b>标记一律由后端写</b>，前端传不进来 —— 否则用户可以伪称或漏称，

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.ehr.common.exception.TermIndexUnavailableException;
+import com.tcm.ehr.common.utils.DictMeta;
 import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.NlpTextComposer;
@@ -835,47 +836,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /**
-     * 批次 25.3：一次批解析里词典元数据只取一次。
+     * 批次 25.3：一次批解析里词典元数据只取一次（{@link DictMeta}）。
      *
-     * <p>原先 {@code processOne} 对<b>每条</b>病历都调 {@code effectiveDictVersion} 与
-     * {@code effectiveTermCount}（每次又各自查库），3.5 万条就是十几万次 SQL，
-     * 而 {@code orgId} 在一批内恒定、同一批也不该盖上两个不同的版本戳。
-     * 这里按「批」持有、<b>惰性</b>取一次：没有待处理项时一次查库都不会发。</p>
-     *
-     * <p>包级可见是为了让「只取一次」能被同步测试直接钉住 —— 线程里的流程难测，
-     * 但这条缓存行为好测，而漏掉它正是要修的东西。</p>
+     * <p>实现已上提为共享组件 —— 清洗链路（{@code GovernanceServiceImpl.clean()}）存在同一问题，
+     * 两处必须共用同一份记忆化逻辑，否则「一处修了、另一处又漏」会重演。</p>
      */
-    static final class DictMeta {
-        private final com.tcm.ehr.service.IDictionaryTermStore store;
-        private final String orgId;
-        private String version;
-        private int termCount;
-        private boolean loaded;
-
-        DictMeta(com.tcm.ehr.service.IDictionaryTermStore store, String orgId) {
-            this.store = store;
-            this.orgId = orgId;
-        }
-
-        String version() {
-            load();
-            return version;
-        }
-
-        int termCount() {
-            load();
-            return termCount;
-        }
-
-        private void load() {
-            if (!loaded) {
-                version = store.effectiveDictVersion(orgId);
-                termCount = store.effectiveTermCount(orgId);
-                loaded = true;
-            }
-        }
-    }
-
     private void markFailed(String id) {
         // 1. 不存在或已是终态就不用改（终态不能被回退）
         NlpTask t = taskMapper.selectById(id);
