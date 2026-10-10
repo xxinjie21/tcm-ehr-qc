@@ -23,7 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -488,8 +492,24 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         List<OrganizationMember> rows = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
                 .eq("org_id", orgId)
                 .orderByDesc("role").orderByAsc("create_time"));
+        // P2-7：用户名一次 IN 取回，不再在循环里逐条 selectById（N+1 → 2 次查询）。
+        // 1. 去重收集本组织出现过的 userId（LinkedHashSet 保序，便于排查）
+        Set<String> userIds = new LinkedHashSet<>();
         for (OrganizationMember m : rows) {
-            User u = userMapper.selectById(m.getUserId());
+            if (m.getUserId() != null) {
+                userIds.add(m.getUserId());
+            }
+        }
+        // 2. 一次性取回 id -> User
+        Map<String, User> userById = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (User u : userMapper.selectBatchIds(userIds)) {
+                userById.put(u.getId(), u);
+            }
+        }
+        // 3. 回填；查不到（账号已删）仍给「(已注销)」，与逐条查时一致
+        for (OrganizationMember m : rows) {
+            User u = userById.get(m.getUserId());
             OrgVOs.MemberInfo mi = new OrgVOs.MemberInfo();
             mi.setUserId(m.getUserId());
             mi.setUsername(u == null ? "(已注销)" : u.getUsername());

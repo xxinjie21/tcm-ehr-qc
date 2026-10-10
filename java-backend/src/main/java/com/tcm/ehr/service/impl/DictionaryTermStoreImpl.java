@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.common.config.EntityTypes;
+import com.tcm.ehr.common.utils.BatchInsert;
 import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.DictionaryVersion;
 import com.tcm.ehr.domain.po.TermEntry;
@@ -10,6 +11,8 @@ import com.tcm.ehr.mapper.DictionaryTermMapper;
 import com.tcm.ehr.mapper.DictionaryVersionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -57,6 +60,17 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     private final com.tcm.ehr.common.utils.VersionedCache<RecallIndex> recallIndexCache =
             new com.tcm.ehr.common.utils.VersionedCache<>(64);
     private final ObjectMapper objectMapper;
+
+    /**
+     * 批写通道（P2-8）。可选装配：单测直接 {@code new} 时为 {@code null} → 退化为逐条写，
+     * 语义与改造前一致，不改既有测试的构造调用。
+     */
+    private SqlSessionFactory sqlSessionFactory;
+
+    @Autowired(required = false)
+    public void setSqlSessionFactory(SqlSessionFactory sqlSessionFactory) {
+        this.sqlSessionFactory = sqlSessionFactory;
+    }
 
     /**
      * 版本号缓存（批次 12 · 12a）：键 {@code org|type}，TTL 5 秒 + 写路径主动失效。
@@ -124,10 +138,42 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      */
     @Override
     public RecallIndex recallIndex(String orgId, String type) {
+        return recallIndex(orgId, type, SCOPE_EFFECTIVE);
+    }
+
+    /**
+     * 按作用域取召回索引（P2-9：词典页搜索复用同一份倒排表）。
+     *
+     * <p>缓存键比 2 参版多一档作用域，版本号与失效通道完全共用 —— 任一层内容变了，
+     * 三个作用域的索引一起自然失效。</p>
+     */
+    @Override
+    public RecallIndex recallIndex(String orgId, String type, String scope) {
         String org = norm(orgId);
         String version = layerVersion(org, type) + "+" + layerVersion(BASE_ORG, type);
-        return recallIndexCache.get(org + "|" + type, version,
-                () -> buildRecallIndex(readEffective(orgId, type)));
+        return recallIndexCache.get(org + "|" + type + "|" + scopeKey(scope), version,
+                () -> buildRecallIndex(entriesOfScope(orgId, type, scope)));
+    }
+
+    /** 作用域归一：只认 base / org，其余（含 null、空白、写错的值）一律按生效口径 */
+    private static String scopeKey(String scope) {
+        String s = scope == null ? "" : scope.trim();
+        if (SCOPE_BASE.equals(s) || SCOPE_ORG.equals(s)) {
+            return s;
+        }
+        return SCOPE_EFFECTIVE;
+    }
+
+    /** 作用域 → 词条表；与 {@link #read} / {@link #readEffective} 同口径（两者都走缓存） */
+    private List<TermEntry> entriesOfScope(String orgId, String type, String scope) {
+        String key = scopeKey(scope);
+        if (SCOPE_BASE.equals(key)) {
+            return read(BASE_ORG, type);
+        }
+        if (SCOPE_ORG.equals(key)) {
+            return read(orgId, type);
+        }
+        return readEffective(orgId, type);
     }
 
     /** 某一层某类型的内容版本；没有版本行时给空串（与 {@link #read} 的口径一致） */
@@ -291,6 +337,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
         termMapper.delete(new QueryWrapper<DictionaryTerm>()
                 .eq("org_id", org)
                 .eq("type", type));
+        List<DictionaryTerm> batch = new ArrayList<>(entries.size());
         for (TermEntry e : entries) {
             DictionaryTerm row = new DictionaryTerm();
             row.setId(UUID.randomUUID().toString());
@@ -298,8 +345,12 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             row.setType(type);
             row.setStandardTerm(e.getStandardTerm());
             row.setAliases(writeJson(e.getAliases()));
-            termMapper.insert(row);
+            batch.add(row);
         }
+        // P2-8：整层词条攒批插入，不再逐条 insert（疾病类上千条 = 上千次往返）。
+        // 主键仍是上面显式生成的 UUID（IdType.INPUT），唯一键 uk_org_type_term 的冲突
+        // 照常抛出、由本方法的 @Transactional 整体回滚 —— 与逐条写时同一原子性。
+        BatchInsert.insert(sqlSessionFactory, DictionaryTermMapper.class, termMapper, batch);
         // 2. 内容版本：按标准词排序后取哈希 —— 与插入顺序无关，避免「同一份内容
         //    因导入顺序不同算出两个版本」而白白触发一次 ES 全量重建
         String version = contentVersion(entries);

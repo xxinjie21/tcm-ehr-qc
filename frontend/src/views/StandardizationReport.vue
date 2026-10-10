@@ -280,11 +280,21 @@ async function confirmRerun(what, countHint) {
 // 做法与 NlpExtract.vue 的批任务轮询一致：定时拉进度，任务结束或失败即停，
 // 页面不可见时暂停（省请求）。
 const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
-const POLL_MS = 3000
+/**
+ * 轮询退避表（毫秒，P2-18）。
+ *
+ * 原来是固定 3 秒 × 最长 10 分钟 ≈ 200 次请求。重跑动辄几分钟，绝大多数请求落在
+ * 「进度没变」上；但一上来就放慢又会让短任务显得没反应（提交后前几秒正是用户
+ * 盯着屏幕判断「到底跑没跑」的阶段）。所以按「先快后慢」退避：前几次仍是 3 秒，
+ * 之后 5s → 8s → 10s 封顶。10 分钟内的请求数由约 200 降到约 60。
+ */
+const POLL_BACKOFF_MS = [3000, 5000, 8000, 10000]
 const POLL_TIMEOUT_MS = 10 * 60 * 1000
 
 const pollTimer = ref(null)
 const pollDeadline = ref(0)
+/** 当前退避档位（下标，封顶在最后一档） */
+const pollStep = ref(0)
 /** 跟踪中的任务：解析任务与质控任务，解析先跑完才轮到质控 */
 const track = ref({ nlpId: '', qcId: '', stage: 'idle' })
 /** 当前阶段与进度，供页面显示 */
@@ -306,7 +316,7 @@ const rerunPercent = computed(() => {
 
 const stopPoll = () => {
   if (pollTimer.value) {
-    clearInterval(pollTimer.value)
+    clearTimeout(pollTimer.value)
     pollTimer.value = null
   }
 }
@@ -383,14 +393,37 @@ async function pollOnce() {
   }
 }
 
+/**
+ * 排下一次轮询（P2-18）。
+ *
+ * 用 setTimeout 自排期而不是 setInterval：退避需要「每次换一个间隔」，
+ * setInterval 只能固定间隔；改成自排期后，「页面不可见就跳过」这一条必须显式重新排期
+ * —— 定时器已经触发过了，直接 return 会让轮询永久停摆（setInterval 下没这个陷阱）。
+ */
+function schedulePoll() {
+  const delay = POLL_BACKOFF_MS[Math.min(pollStep.value, POLL_BACKOFF_MS.length - 1)]
+  pollTimer.value = setTimeout(async () => {
+    // 页面不可见时暂停：后台标签页没必要持续打接口
+    if (document.visibilityState !== 'visible') {
+      schedulePoll()
+      return
+    }
+    await pollOnce()
+    // pollOnce 收尾（任务结束 / 超时 / 失败）时会 stopPoll 清空句柄；
+    // 句柄还在说明任务仍在跑，降一档继续排
+    if (pollTimer.value) {
+      pollStep.value += 1
+      schedulePoll()
+    }
+  }, delay)
+}
+
 function startPoll() {
   stopPoll()
   pollDeadline.value = Date.now() + POLL_TIMEOUT_MS
-  pollTimer.value = setInterval(() => {
-    // 页面不可见时暂停：后台标签页没必要持续打接口
-    if (document.visibilityState !== 'visible') return
-    pollOnce()
-  }, POLL_MS)
+  // 每次都从最快档开始：刚提交的几秒是「看着没反应」最明显的阶段
+  pollStep.value = 0
+  schedulePoll()
 }
 
 /** 批量重跑：质控评分 */
@@ -857,11 +890,11 @@ function copyByExecCommand(text) {
 onMounted(() => {
   loadReport()
   // 页面从后台切回来时，若重跑还在跑，立刻补一次进度检查，
-  // 否则要等下一个轮询周期才继续（间隔 3 秒，影响很小，但逻辑上更完整）
+  // 否则要等下一个轮询周期才继续（退避后最长 10 秒，逻辑上更完整）
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
-// 离开页面必须停轮询：定时器活着会每 3 秒打一次接口，
+// 离开页面必须停轮询：定时器活着会持续打接口，
 // 而这个页面可能早就被关掉了 —— 白白发请求，还可能让用户以为页面仍在忙
 onBeforeUnmount(() => {
   stopPoll()

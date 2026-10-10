@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.utils.BatchInsert;
 import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.service.IDictArchiveService;
@@ -19,6 +20,8 @@ import com.tcm.ehr.mapper.DictProposalMapper;
 import com.tcm.ehr.mapper.DictProposalTermMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -27,6 +30,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -68,6 +72,17 @@ public class DictProposalServiceImpl implements IDictProposalService {
     private final DistLock distLock;
     /** 词典写权限（批次 6 工作项 4）：授权位在 organization_members 里，不能只看 JWT 的 role */
     private final com.tcm.ehr.service.IOrgPermissionService orgPermission;
+
+    /**
+     * 批写通道（P2-8）。可选装配：单测直接 {@code new} 时为 {@code null} → 退化为逐条写，
+     * 语义与改造前一致，不改既有测试的构造调用。
+     */
+    private SqlSessionFactory sqlSessionFactory;
+
+    @Autowired(required = false)
+    public void setSqlSessionFactory(SqlSessionFactory sqlSessionFactory) {
+        this.sqlSessionFactory = sqlSessionFactory;
+    }
 
     // ---------------------------------------------------------------- 基线导出
 
@@ -182,9 +197,12 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         }
         q.orderByDesc("create_time").last("LIMIT 200");
         List<DictProposal> rows = proposalMapper.selectList(q);
+        // P2-7：快照条数一次 GROUP BY 取回，不再在循环里逐条 selectCount（N+1 → 2 次查询）
+        Map<String, Integer> countByProposal = snapshotCounts(
+                rows.stream().map(DictProposal::getId).toList());
         List<DictProposalVO> out = new ArrayList<>(rows.size());
         for (DictProposal p : rows) {
-            out.add(toVO(p, snapshotCount(p.getId())));
+            out.add(toVO(p, countByProposal.getOrDefault(p.getId(), 0)));
         }
         return out;
     }
@@ -332,8 +350,10 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
             throw new BusinessException(4003, "提案快照已被清理，无法合并；请让提交者重新提交");
         }
 
-        // 合并走与导入/重建同一把跨实例锁：避免与并发导入交错出混合索引
-        distLock.runLocked(DistLock.dictRebuildLock(p.getType(), p.getOrgId()), () -> {
+        // 合并走与导入/重建同一把跨实例锁：避免与并发导入交错出混合索引。
+        // 等待 0 秒（P2-22）：审核合并在线触发，冲突立刻回 409，不让用户干等 3 秒。
+        distLock.runLocked(DistLock.dictRebuildLock(p.getType(), p.getOrgId()),
+                DistLock.NO_WAIT, () -> {
             String version = termStore.replace(p.getOrgId(), p.getType(), terms);
             try {
                 esIndexService.rebuild(p.getType(), p.getOrgId(), terms, version);
@@ -430,6 +450,9 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
     /** 用新词条整体替换某提案的快照 */
     private void replaceSnapshot(String proposalId, List<TermEntry> terms) {
         termMapper.delete(new QueryWrapper<DictProposalTerm>().eq("proposal_id", proposalId));
+        // P2-8：先攒成列表再批量插入。快照是整份目标词典（疾病类上千条），
+        // 逐条 insert 就是上千次往返；批写通道每 500 条 flush 一次。
+        List<DictProposalTerm> batch = new ArrayList<>(terms.size());
         for (TermEntry e : terms) {
             if (e.getStandardTerm() == null || e.getStandardTerm().isBlank()) {
                 continue;
@@ -439,8 +462,9 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
             t.setProposalId(proposalId);
             t.setStandardTerm(e.getStandardTerm().trim());
             t.setAliases(writeJson(e.getAliases()));
-            termMapper.insert(t);
+            batch.add(t);
         }
+        BatchInsert.insert(sqlSessionFactory, DictProposalTermMapper.class, termMapper, batch);
     }
 
     /** 读某提案的快照词条 */
@@ -461,6 +485,31 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
     public int snapshotCount(String proposalId) {
         Long n = termMapper.selectCount(new QueryWrapper<DictProposalTerm>().eq("proposal_id", proposalId));
         return n == null ? 0 : n.intValue();
+    }
+
+    /**
+     * 多条提案的快照行数（P2-7）：一次 {@code GROUP BY proposal_id} 取回，替代循环内逐条
+     * {@code selectCount}。列表最多 200 条，原先就是 200 次查询。
+     *
+     * <p>结果里没有的提案 = 快照 0 行（被惰性清理过），调用方按 0 处理，与逐条查时一致。</p>
+     */
+    private Map<String, Integer> snapshotCounts(List<String> proposalIds) {
+        if (proposalIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Map<String, Object>> rows = termMapper.selectMaps(new QueryWrapper<DictProposalTerm>()
+                .select("proposal_id", "COUNT(*) AS cnt")
+                .in("proposal_id", proposalIds)
+                .groupBy("proposal_id"));
+        Map<String, Integer> out = new HashMap<>(rows.size());
+        for (Map<String, Object> r : rows) {
+            Object id = r.get("proposal_id");
+            Object cnt = r.get("cnt");
+            if (id != null) {
+                out.put(id.toString(), cnt == null ? 0 : ((Number) cnt).intValue());
+            }
+        }
+        return out;
     }
 
     private DictProposalVO toVO(DictProposal p, int termCount) {

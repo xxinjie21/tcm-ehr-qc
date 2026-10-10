@@ -134,6 +134,16 @@ const batchTasks = ref([])
 const taskListTruncated = ref(false)
 const taskListLimit = ref(50)
 let pollTimer = null
+/**
+ * 轮询节拍计数，用来让「进度」与「任务列表」以不同频率刷新（P2-17）。
+ *
+ * 进度必须跟得上任务推进（10 秒一次），而任务列表只是「最近提交过什么」的旁栏 ——
+ * 每次都要整表取回最多 50 条，跟着进度一起 10 秒刷一遍纯属浪费。
+ * 这里不另起一个定时器：暂停（页面不可见）、切页签、卸载三处都要各自启停一份，
+ * 两个定时器就是两套容易漏管的生命周期；同一个节拍器按次数分流更不容易出错。
+ */
+const LIST_REFRESH_EVERY_TICKS = 6
+let pollTick = 0
 
 const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
 // 任务是否仍在跑（排队 / 进行中）：决定是否显示取消按钮、是否继续轮询
@@ -197,18 +207,22 @@ const poll = async () => {
   }
 }
 
-// 启动轮询（先停旧定时器）：每 10 秒刷新任务详情与最近任务列表，供提交后与查看任务共用
+// 启动轮询（先停旧定时器）：每 10 秒刷新任务详情；任务列表每 6 个节拍（60 秒）刷一次。
 // （原先注释写「每 2 秒」与实现不符 —— 实际是 10000ms，2026-10-06 校正注释、不动间隔，
 //   避免行为变更）
 const startPoll = () => {
   stopPoll()
+  // 每次重新开始都让第一个节拍就刷新列表：用户刚提交/刚点刷新，列表必须马上是新的
+  pollTick = 0
   pollTimer = setInterval(() => {
     if (document.visibilityState !== 'visible') {
       // P4.8：页面不可见时暂停轮询（省请求），回可见后再前进度
       return
     }
     poll()
-    loadBatchList()
+    // 第 1 拍刷一次（对齐改造前「启动后 10 秒内可见」），之后每 6 拍一次
+    pollTick += 1
+    if (pollTick % LIST_REFRESH_EVERY_TICKS === 1) loadBatchList()
   }, 10000)
 }
 

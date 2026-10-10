@@ -4,16 +4,25 @@ import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.mapper.UserLlmConfigMapper;
 import com.tcm.ehr.common.config.LlmProperties;
+import com.tcm.ehr.domain.po.UserLlmConfig;
 import org.junit.jupiter.api.Test;
 
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -149,5 +158,67 @@ class LlmClientTest {
         assertThrows(IllegalStateException.class,
                 () -> client.probe(new LlmConfig(true, "openai", "", "", "", null, 0)),
                 "openai 通道缺 api-key 应抛出");
+    }
+
+    // ------------------------------------------------------------------ 失败记录上界（P2-12）
+
+    private static void loginAs(String userId) {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute("currentUserId", userId);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+    }
+
+    /** 按内存 Map 模拟 user_llm_config 的可写替身 */
+    private static UserLlmConfigMapper statefulUserMapper(Map<String, UserLlmConfig> rows) {
+        UserLlmConfigMapper mapper = org.mockito.Mockito.mock(UserLlmConfigMapper.class);
+        org.mockito.Mockito.when(mapper.selectById(org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(inv -> {
+                    // 显式 Object：String.valueOf 有 char[] 等重载，泛型推断会挑错
+                    Object id = inv.getArgument(0);
+                    return rows.get(String.valueOf(id));
+                });
+        org.mockito.Mockito.when(mapper.insert(org.mockito.ArgumentMatchers.any(UserLlmConfig.class)))
+                .thenAnswer(inv -> {
+                    UserLlmConfig r = inv.getArgument(0);
+                    rows.put(r.getUserId(), r);
+                    return 1;
+                });
+        org.mockito.Mockito.when(mapper.updateById(org.mockito.ArgumentMatchers.any(UserLlmConfig.class)))
+                .thenAnswer(inv -> {
+                    UserLlmConfig r = inv.getArgument(0);
+                    rows.put(r.getUserId(), r);
+                    return 1;
+                });
+        return mapper;
+    }
+
+    /**
+     * P2-12：装配失败的记录必须按<b>用户</b>收敛，不随配置保存次数增长。
+     *
+     * <p>原先用 {@code Set<"userId|版本">}，同一个用户每保存一次坏配置就留一个永不读取的 key，
+     * 是只增不减的慢泄漏。改成 {@code Map<userId, version>} 后，容量上界 = 用户数。</p>
+     */
+    @Test
+    void failedKeysBoundedByUserNotByConfigVersion() {
+        Map<String, UserLlmConfig> rows = new ConcurrentHashMap<>();
+        LlmConfigStore store = new LlmConfigStore(props(true, "ollama"),
+                new ObjectMapper(), statefulUserMapper(rows), cipher());
+        LlmClient client = new LlmClient(store);
+
+        // 同一用户连续保存 10 次「provider 非法」的配置：每次都装配失败并记一次
+        for (int i = 0; i < 10; i++) {
+            store.saveFor("u-leak", new LlmConfig(true, "azure-openai-typo", "", "", "", null, 0));
+            loginAs("u-leak");
+            assertFalse(client.isAvailable(), "provider 非法应判为不可用");
+        }
+        // 另一个用户也失败一次
+        store.saveFor("u-other", new LlmConfig(true, "azure-openai-typo", "", "", "", null, 0));
+        loginAs("u-other");
+        assertFalse(client.isAvailable());
+
+        Object failed = ReflectionTestUtils.getField(client, "failedKeys");
+        assertNotNull(failed);
+        assertEquals(2, ((Map<?, ?>) failed).size(),
+                "失败记录应为 2 条（两个用户各一条），而不是 11 条");
     }
 }

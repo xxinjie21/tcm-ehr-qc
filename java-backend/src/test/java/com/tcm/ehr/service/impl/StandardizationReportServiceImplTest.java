@@ -271,4 +271,47 @@ class StandardizationReportServiceImplTest {
         assertTrue(text.contains("\"声明\""), "必须带声明行，禁止前端隐藏免责声明");
         assertTrue(text.contains("\r\n"), "行尾用 CRLF，Excel 兼容");
     }
+
+    // ------------------------------------------------------------ 数据集形态（P2-11）
+
+    /** 造若干条只带主诉的病历，用于模板塌缩度测试 */
+    private void givenChiefs(String... chiefs) {
+        List<Record> list = new ArrayList<>();
+        for (int i = 0; i < chiefs.length; i++) {
+            Record r = new Record();
+            r.setId("c" + i);
+            r.setOrgId("org-A");
+            r.setScore(95);
+            r.setStructuredData("{\"symptoms\":[]}");
+            r.setChiefComplaint(chiefs[i]);
+            list.add(r);
+        }
+        when(recordMapper.selectList(any())).thenReturn(list);
+    }
+
+    @Test
+    @DisplayName("主诉里的数字被归一成 N，只剩病程月数不同的病历塌缩成同一模板")
+    void chiefComplaintNumbersCollapseIntoTemplates() {
+        // 「失眠3月」与「失眠12月」去掉数字后都是「失眠N月」→ 1 个模板；
+        // 「咳嗽2周」去掉数字后是「咳嗽N周」→ 第 2 个模板。
+        // 这正是 RegexCache 承接的那次逐行替换的语义。
+        givenChiefs("失眠3月", "失眠12月", "咳嗽2周");
+
+        StandardizationReportVO.DatasetShape s = svc.report().getDataset();
+
+        assertEquals(3, s.getRecordCount());
+        assertEquals(2, s.getChiefComplaintTemplates(),
+                "病程月数不同不算不同模板，单位不同才算");
+    }
+
+    @Test
+    @DisplayName("主诉为空/空白的病历不计入模板，但仍计入总数")
+    void blankChiefComplaintSkippedButCounted() {
+        givenChiefs("失眠3月", "   ", null);
+
+        StandardizationReportVO.DatasetShape s = svc.report().getDataset();
+
+        assertEquals(3, s.getRecordCount(), "空白主诉的病历仍属于数据集");
+        assertEquals(1, s.getChiefComplaintTemplates(), "空主诉不产生模板");
+    }
 }

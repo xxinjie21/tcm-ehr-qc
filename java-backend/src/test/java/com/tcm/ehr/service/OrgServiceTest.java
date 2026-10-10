@@ -6,6 +6,7 @@ import com.tcm.ehr.domain.dto.OrgDTOs;
 import com.tcm.ehr.domain.po.Organization;
 import com.tcm.ehr.domain.po.OrganizationMember;
 import com.tcm.ehr.domain.po.User;
+import com.tcm.ehr.domain.vo.OrgVOs;
 import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.OrgMemberMapper;
 import com.tcm.ehr.mapper.UserMapper;
@@ -312,6 +313,36 @@ class OrgServiceTest {
         assertThrows(ForbiddenException.class, () -> service.transferOwner("g2", "u-x"));
         assertThrows(ForbiddenException.class, () -> service.setPermissions("g2", "u-x", true, null));
         assertThrows(ForbiddenException.class, () -> service.leave("g2"));
+    }
+
+    /**
+     * 成员列表（P2-7 改造后）：用户名由「循环内逐条 selectById」改为「一次 IN + Map 回填」。
+     *
+     * <p>钉住两件事：① 回填的 username 与 userId 一一对应（不能错位）；② 顺序仍与成员行一致。
+     * 账号已删（IN 查不回来）时给「(已注销)」，与改造前逐条查的结果逐字一致。</p>
+     */
+    @Test
+    void membersBackfillUsernamesFromBatchLookup() {
+        bindOwnerOfG1();
+        when(memberMapper.selectList(any())).thenReturn(List.of(
+                member("m1", "g1", "u-owner", OrganizationMember.ROLE_OWNER),
+                member("m2", "g1", "u-b", OrganizationMember.ROLE_MEMBER),
+                member("m3", "g1", "u-gone", OrganizationMember.ROLE_MEMBER)));
+        // IN 批量只回两条：u-gone 查不到（账号已删）
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(
+                user("u-owner", "owner1", User.STATUS_ACTIVE),
+                user("u-b", "bob", User.STATUS_ACTIVE)));
+
+        List<OrgVOs.MemberInfo> out = service.members("g1");
+
+        assertEquals(3, out.size(), "成员条数不变");
+        assertEquals("owner1", out.get(0).getUsername());
+        assertEquals("bob", out.get(1).getUsername());
+        assertEquals("(已注销)", out.get(2).getUsername(), "IN 查不回来的账号仍给「(已注销)」");
+        // 顺序与成员行一致，不因批查而重排
+        assertEquals("u-owner", out.get(0).getUserId());
+        assertEquals("u-b", out.get(1).getUserId());
+        assertEquals("u-gone", out.get(2).getUserId());
     }
 
     // ---------------------------------------------------------------- 成员搜索 / 拉人

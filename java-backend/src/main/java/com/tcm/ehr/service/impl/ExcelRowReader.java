@@ -5,7 +5,9 @@ import com.tcm.ehr.common.utils.TextUtil;
 import org.apache.poi.ss.usermodel.Row;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 「一行怎么取值」的抽象（批次 13 · 13.3 的第四个抽取对象）。
@@ -45,16 +47,24 @@ final class ExcelRowReader {
 
     /** 流式行适配器：RawCell 同时带原始值与「是不是日期」，日期列因此不会退化成文本 */
     static RowAccess of(List<ExcelRawStreamReader.RawCell> cells) {
+        // P2-6：列号 → 单元格 一次遍历建成。原先每次取值都线性扫一遍 cells，
+        // 一行 21 列、每列最多取两次（text + dateTime）≈ 二十多次线性扫描/行 ——
+        // 4 万行就是近百万次扫描。列号可任意（空列会被跳过），故按 Map 存而不是按数组下标。
+        // putIfAbsent 保持「同列号取先出现的那一个」，与原先 find 的语义一致。
+        Map<Integer, ExcelRawStreamReader.RawCell> byCol = new HashMap<>(cells.size() * 2);
+        for (ExcelRawStreamReader.RawCell c : cells) {
+            byCol.putIfAbsent(c.col(), c);
+        }
         return new RowAccess() {
             @Override
             public String text(int col) {
-                ExcelRawStreamReader.RawCell c = find(col);
+                ExcelRawStreamReader.RawCell c = byCol.get(col);
                 return c == null ? null : c.text();
             }
 
             @Override
             public LocalDateTime dateTime(int col) {
-                ExcelRawStreamReader.RawCell c = find(col);
+                ExcelRawStreamReader.RawCell c = byCol.get(col);
                 if (c == null) {
                     return null;
                 }
@@ -71,15 +81,6 @@ final class ExcelRowReader {
                 } catch (Exception e) {
                     return null;
                 }
-            }
-
-            private ExcelRawStreamReader.RawCell find(int col) {
-                for (ExcelRawStreamReader.RawCell c : cells) {
-                    if (c.col() == col) {
-                        return c;
-                    }
-                }
-                return null;
             }
         };
     }

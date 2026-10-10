@@ -1,6 +1,7 @@
 package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.common.utils.BatchInsert;
 import com.tcm.ehr.service.IDictArchiveService;
 import com.tcm.ehr.domain.po.DictArchiveTerm;
 import com.tcm.ehr.domain.po.DictArchiveVersion;
@@ -9,13 +10,17 @@ import com.tcm.ehr.mapper.DictArchiveTermMapper;
 import com.tcm.ehr.mapper.DictArchiveVersionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 基线归档（批次 17）。
@@ -43,6 +48,17 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
     private final DictArchiveVersionMapper versionMapper;
     private final DictArchiveTermMapper termMapper;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 批写通道（P2-8）。可选装配：单测直接 {@code new} 时为 {@code null} → 退化为逐条写，
+     * 语义与改造前一致，不改既有测试的构造调用。
+     */
+    private SqlSessionFactory sqlSessionFactory;
+
+    @Autowired(required = false)
+    public void setSqlSessionFactory(SqlSessionFactory sqlSessionFactory) {
+        this.sqlSessionFactory = sqlSessionFactory;
+    }
 
     /**
      * 生成一份归档版本：写入元信息 + 当前基线全量快照，并按 5 份限额清理最老的快照。
@@ -79,14 +95,17 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
         v.setComment(comment);
         versionMapper.insert(v);
 
+        List<DictArchiveTerm> batch = new ArrayList<>(entries.size());
         for (TermEntry e : entries) {
             DictArchiveTerm t = new DictArchiveTerm();
             t.setId(newId());
             t.setVersionId(v.getId());
             t.setStandardTerm(e.getStandardTerm());
             t.setAliases(writeJson(e.getAliases()));
-            termMapper.insert(t);
+            batch.add(t);
         }
+        // P2-8：整份快照攒批插入，不再逐条 insert（疾病类上千条 = 上千次往返）
+        BatchInsert.insert(sqlSessionFactory, DictArchiveTermMapper.class, termMapper, batch);
 
         pruneSnapshots(org, type);
         log.info("[词典归档] org='{}' type={} 生成版本 v{}（{} 条），保留快照上限 {}",
@@ -120,13 +139,42 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
                 new QueryWrapper<DictArchiveVersion>()
                         .eq("org_id", org).eq("type", type)
                         .orderByDesc("version_no"));
+        // P2-7：快照条数一次 GROUP BY 取回，不再在循环里逐条 selectCount
+        // （本方法对版本数没有上界，逐条查是「版本数」次往返）
+        Map<String, Integer> countByVersion = snapshotCounts(
+                rows.stream().map(DictArchiveVersion::getId).toList());
         for (DictArchiveVersion v : rows) {
-            Long n = termMapper.selectCount(new QueryWrapper<DictArchiveTerm>()
-                    .eq("version_id", v.getId()));
-            v.setTermCount(n.intValue());
+            int n = countByVersion.getOrDefault(v.getId(), 0);
+            v.setTermCount(n);
             v.setSnapshotPresent(n > 0);
         }
         return rows;
+    }
+
+    /**
+     * 多个归档版本的快照行数（P2-7）：一次 {@code GROUP BY version_id} 取回，替代循环内
+     * 逐条 {@code selectCount}。
+     *
+     * <p>结果里没有的版本 = 快照 0 行（已被 5 份限额清理），调用方按 0 处理，
+     * 与逐条查时「{@code snapshotPresent=false}」一致。</p>
+     */
+    private Map<String, Integer> snapshotCounts(List<String> versionIds) {
+        if (versionIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Map<String, Object>> rows = termMapper.selectMaps(new QueryWrapper<DictArchiveTerm>()
+                .select("version_id", "COUNT(*) AS cnt")
+                .in("version_id", versionIds)
+                .groupBy("version_id"));
+        Map<String, Integer> out = new HashMap<>(rows.size());
+        for (Map<String, Object> r : rows) {
+            Object id = r.get("version_id");
+            Object cnt = r.get("cnt");
+            if (id != null) {
+                out.put(id.toString(), cnt == null ? 0 : ((Number) cnt).intValue());
+            }
+        }
+        return out;
     }
 
     /**

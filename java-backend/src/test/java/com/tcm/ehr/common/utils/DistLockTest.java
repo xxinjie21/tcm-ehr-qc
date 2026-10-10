@@ -9,6 +9,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -215,5 +216,47 @@ class DistLockTest {
         assertNotEquals(a, c, "不同类型必须是不同的锁");
         assertEquals(a, DistLock.dictRebuildLock("herb", "org-A"), "同名应稳定");
         assertTrue(a.contains("org-A") && a.contains("herb"), "锁名应含业务 key：" + a);
+        // P2-23：锁名同样走统一前缀，与缓存 key 一起迁到 db1
+        assertTrue(a.startsWith(RedisKeys.PREFIX), "锁名必须带统一前缀：" + a);
+    }
+
+    @Test
+    @DisplayName("在线写路径传 0：只尝试一次、不把等待时间加到响应上（P2-22）")
+    void onlinePathDoesNotWait() throws Exception {
+        RedissonClient client = redisson(true);
+        RLock lock = lockOf(client);
+
+        assertEquals("ok", new DistLock(client).runLocked("k", DistLock.NO_WAIT, () -> "ok"));
+
+        verify(lock).tryLock(0L, TimeUnit.SECONDS);
+    }
+
+    @Test
+    @DisplayName("批任务路径用默认等待 3 秒：等不到即回「已有任务在跑」（P2-22）")
+    void batchPathKeepsDefaultWait() throws Exception {
+        RedissonClient client = redisson(true);
+        RLock lock = lockOf(client);
+
+        assertEquals("ok", new DistLock(client).runLocked("k", () -> "ok"));
+
+        verify(lock).tryLock(3L, TimeUnit.SECONDS);
+    }
+
+    @Test
+    @DisplayName("传 0 且锁被占：立刻抛 409，不重试、不等待（P2-22）")
+    void zeroWaitFailsFastWhenContended() throws Exception {
+        RedissonClient client = redisson(false);
+        RLock lock = lockOf(client);
+        AtomicInteger entered = new AtomicInteger();
+
+        assertThrows(ConcurrentOperationException.class,
+                () -> new DistLock(client).runLocked("k", DistLock.NO_WAIT, () -> {
+                    entered.incrementAndGet();
+                    return "x";
+                }));
+
+        assertEquals(0, entered.get());
+        verify(lock).tryLock(0L, TimeUnit.SECONDS);
+        verify(lock, never()).unlock();
     }
 }

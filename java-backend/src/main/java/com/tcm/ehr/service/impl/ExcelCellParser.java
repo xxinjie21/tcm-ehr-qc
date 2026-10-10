@@ -38,6 +38,9 @@ final class ExcelCellParser {
 
     private static final Pattern COMPACT_DT = Pattern.compile("\\d{8}|\\d{12}|\\d{14}");
 
+    /** 连续空白 → 单个空格（P2-6：原先用 {@code String.replaceAll}，每次调用都重编译一遍） */
+    private static final Pattern WS = Pattern.compile("\\s+");
+
     private ExcelCellParser() {
     }
 
@@ -79,7 +82,7 @@ final class ExcelCellParser {
     /** 把「接诊时间」单元格文本归一为 {@code yyyy-MM-dd HH:mm:ss}（详见类注释） */
     static String normalizeDateTime(String raw) {
         // 1. 去首尾空白、ISO 的 T 换空格、连续空白压成一个
-        String s = raw.trim().replace('T', ' ').replaceAll("\\s+", " ");
+        String s = WS.matcher(raw.trim().replace('T', ' ')).replaceAll(" ");
         // 2. 纯数字紧凑串：8 位到日 / 12 位到分 / 14 位到秒
         if (COMPACT_DT.matcher(s).matches()) {
             String date = s.substring(0, 4) + "-" + s.substring(4, 6) + "-" + s.substring(6, 8);

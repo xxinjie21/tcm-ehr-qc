@@ -181,4 +181,55 @@ class AiRecallIndexTest {
         assertTrue(AiServiceImpl.recallCandidates("耳鸣", index).size() <= 1);
         assertTrue(AiServiceImpl.recallCandidates("完全不相干的词", index).isEmpty());
     }
+
+    /**
+     * 同分候选的先后必须与全表扫描一致。
+     *
+     * <p>排序是<b>稳定排序</b>，同分时保持的是「进入 hit 列表时的先后」。倒排表是按
+     * 「字符 → 串」组织的，取候选的天然顺序是「先扫到的字符先来」，与词表顺序不同 ——
+     * 这里刻意造一批<b>全部同分</b>的词条，谁进前 {@value #TOP_N} 完全由平局顺序决定。</p>
+     */
+    @Test
+    void tieOrderMatchesFullScan() {
+        List<TermEntry> all = new ArrayList<>();
+        // 以下每条与「头痛」的重叠都恰好是 2，全部同分
+        all.add(entry("头痛"));
+        all.add(entry("头胀痛"));
+        all.add(entry("头痛欲裂"));
+        all.add(entry("头痛身热"));
+        all.add(entry("头痛鼻塞"));
+        all.add(entry("头痛耳鸣"));
+        all.add(entry("头痛项强"));
+        all.add(entry("头目痛"));
+        IDictionaryTermStore.RecallIndex index = DictionaryTermStoreImpl.buildRecallIndex(all);
+
+        List<TermEntry> expected = byFullScan("头痛", all);
+        List<TermEntry> actual = AiServiceImpl.recallCandidates("头痛", index);
+
+        assertEquals(TOP_N, actual.size(), "同分时应截断到前 " + TOP_N + " 条");
+        assertEquals(stdOf(expected), stdOf(actual), "同分候选的先后与全表扫描不一致");
+    }
+
+    /**
+     * 复用的暂存区不能在查询词之间串味。
+     *
+     * <p>「一次建议请求跑 T 个词、共用一份标记数组与候选列表」是这版实现的核心省法，
+     * 而它唯一的风险就是漏复位 —— 漏了不会报错，只会静默多召回上一个词条的候选。
+     * 这里让同一个暂存区连跑多轮，每轮都要求与「各自新建暂存区」的结果逐条相同。</p>
+     */
+    @Test
+    void reusableScratchDoesNotLeakBetweenQueries() {
+        List<TermEntry> all = smallDictionary();
+        IDictionaryTermStore.RecallIndex index = DictionaryTermStoreImpl.buildRecallIndex(all);
+        boolean[] marked = new boolean[all.size()];
+        List<Integer> scratch = new ArrayList<>();
+        for (int round = 0; round < 3; round++) {
+            for (String q : SMALL_QUERIES) {
+                assertEquals(stdOf(byFullScan(q, all)),
+                        stdOf(AiServiceImpl.recallCandidates(q, index, marked, scratch)),
+                        "第 " + round + " 轮 查询「" + q + "」与全表扫描不一致（暂存区可能串味）");
+                assertTrue(scratch.isEmpty(), "候选列表应在每次召回后清空");
+            }
+        }
+    }
 }

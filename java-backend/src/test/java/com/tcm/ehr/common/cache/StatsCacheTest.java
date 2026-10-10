@@ -35,8 +35,8 @@ import static org.mockito.Mockito.when;
 /**
  * B1 词频缓存行为：命中不重算 / 未命中回填 / Redis 故障降级 / 写操作失效（按数据域 + ALL）。
  *
- * <p>失效口径已改为<b>版本号前缀</b>（R3-③ / W3）：失效只把 {@code cache:stats:ver:{scope}}
- * 自增，数据 key 形如 {@code cache:stats:{scope}:v{n}:all:{md5}}；<b>不再调用 {@code KEYS}/{@code DEL}</b>
+ * <p>失效口径已改为<b>版本号前缀</b>（R3-③ / W3）：失效只把 {@code tcm:ehr:cache:stats:ver:{scope}}
+ * 自增，数据 key 形如 {@code tcm:ehr:cache:stats:{scope}:v{n}:all:{md5}}；<b>不再调用 {@code KEYS}/{@code DEL}</b>
  * —— 那两条是 O(N) 全库扫描 + Redis 单线程阻塞，生产禁用级。本测试把「不再用 KEYS」与
  * 「失效后旧版本 key 不再被读」都钉住。</p>
  */
@@ -116,9 +116,9 @@ class StatsCacheTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Duration> ttl = ArgumentCaptor.forClass(Duration.class);
         verify(ops).set(key.capture(), anyString(), ttl.capture());
-        assertEquals("cache:stats:" + ORG + ":v0:all:",
+        assertEquals("tcm:ehr:cache:stats:" + ORG + ":v0:all:",
                 key.getValue().substring(0, key.getValue().lastIndexOf(":all:") + 5),
-                "key 必须带数据域作用域 + 版本号 + 统计类别");
+                "key 必须带统一前缀 + 数据域作用域 + 版本号 + 统计类别");
         // TTL 带抖动（R3-①）：60 ± 10s，避免全部 key 同秒过期一起回源
         long ttlSeconds = ttl.getValue().getSeconds();
         assertTrue(ttlSeconds >= 50 && ttlSeconds <= 70, "TTL 应落在 60±10s：" + ttlSeconds);
@@ -185,8 +185,8 @@ class StatsCacheTest {
         // 关键：失效路径里不得再出现 KEYS（O(N) 全库扫描 + 单线程阻塞）
         verify(redis, never()).keys(anyString());
         verify(redis, never()).delete(anyCollection());
-        assertEquals("1", store.get("cache:stats:ver:" + ORG), "当前数据域版本号应自增到 1");
-        assertEquals("1", store.get("cache:stats:ver:ALL"), "ALL 作用域版本号应自增到 1");
+        assertEquals("1", store.get("tcm:ehr:cache:stats:ver:" + ORG), "当前数据域版本号应自增到 1");
+        assertEquals("1", store.get("tcm:ehr:cache:stats:ver:ALL"), "ALL 作用域版本号应自增到 1");
     }
 
     @Test

@@ -6,7 +6,6 @@ import com.tcm.ehr.domain.vo.ScoreResultVO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * 终末质控评分。
@@ -187,7 +186,8 @@ public final class QcScorer {
             return true;
         }
         try {
-            return Pattern.compile(fr.getExpr()).matcher(v).matches();
+            // P2-1：走 RegexCache —— 表达式是配置常量，原先每条病历每条规则都现编译一次
+            return RegexCache.of(fr.getExpr()).matcher(v).matches();
         } catch (Exception e) {
             return true; // 表达式非法则该项不判，避免误伤
         }

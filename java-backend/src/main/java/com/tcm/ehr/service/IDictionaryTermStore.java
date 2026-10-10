@@ -100,4 +100,20 @@ public interface IDictionaryTermStore {
      * @param type  术语类型
      */
     RecallIndex recallIndex(String orgId, String type);
+
+    /**
+     * 取某组织某类型、<b>指定作用域</b>的召回索引。
+     *
+     * <p>作用域与词典页的三档一一对应（{@link #SCOPE_BASE} / {@link #SCOPE_ORG} / 其余一律
+     * {@link #SCOPE_EFFECTIVE}），口径与 {@link #read} / {@link #readEffective} 完全一致。</p>
+     *
+     * <p><b>调用方必须拿 {@code entries()} 当词条真源</b>，不要再单独 {@code read} 一次：
+     * 索引里的串编号指向的就是 {@code entries} 的下标，分两次取在词典刚好变更时会对不上。</p>
+     *
+     * <p>与 {@link #recallIndex(String, String)} 共用同一个 {@code VersionedCache} 与同一套版本号
+     * （本组织哈希 + 基础层哈希），只是缓存键多一档作用域 —— 不新增失效通道。</p>
+     *
+     * @param scope {@code base} = 仅基础层；{@code org} = 仅本组织；其余 = 基础层 ∪ 本组织
+     */
+    RecallIndex recallIndex(String orgId, String type, String scope);
 }

@@ -188,18 +188,24 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public StatsVO extra(FiltersDTO filters) {
-        List<Record> records = recordsFor(filters);
+        // P2-10：三块统计全部下推到 SQL 侧聚合。原实现是 recordsFor() 把命中病历（4 万行 ×
+        // 5 列投影）整份拉进堆，再对同一份 List 独立遍历三遍（月 / 科室 / 分数）。
+        // 现在中间计数留在 DB，回传行数从「病历数」降到「月份数 / 科室数 / 分档数」。
+        // 条件由 buildForAggregate 产出：只含 WHERE、**不含 ORDER BY**（与 GROUP BY 不能共存）。
+        QueryWrapper<Record> wrapper = RecordFilter.buildForAggregate(
+                RequestUtils.currentOrgId(), filters);
         StatsVO vo = new StatsVO();
 
         // 1. 质控趋势：按就诊月份聚合（升序，最多最近 12 个月）
         TreeMap<String, long[]> byMonth = new TreeMap<>();
-        for (Record r : records) {
-            String month = monthOf(r);
+        for (Map<String, Object> row : baseMapper.selectTrendByMonth(wrapper)) {
+            // 无接诊时间的行是 NULL 分组，与原实现「monthOf 返回 null 就 continue」同口径
+            Object month = row.get("month");
             if (month == null) continue;
-            long[] acc = byMonth.computeIfAbsent(month, k -> new long[3]); // total, qualified, pending
-            acc[0]++;
-            if (isGrade(r, "合格")) acc[1]++;
-            else if (isGrade(r, "待复核")) acc[2]++;
+            long[] acc = byMonth.computeIfAbsent(month.toString(), k -> new long[3]);
+            acc[0] += num(row.get("total"));
+            acc[1] += num(row.get("qualified"));
+            acc[2] += num(row.get("pendingReview"));
         }
         List<Map.Entry<String, long[]>> months = new java.util.ArrayList<>(byMonth.entrySet());
         // P5.2：超 12 个月会截断，告知前端（否则“为何只有最近 12 个月”无从判断）
@@ -217,13 +223,17 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             vo.getTrend().add(p);
         }
 
-        // 2. 科室合格率
+        // 2. 科室合格率。SQL 按 department 原样分组（含 NULL / 空白 / 带空格），
+        //    这里归一到「未填科室」与 trim 后的键再累加 —— 与改造前「先归一 key 再计数」等价，
+        //    因此 NULL / '' / '  ' 会合并成同一个桶而不是各占一行
         Map<String, long[]> byDept = new HashMap<>();
-        for (Record r : records) {
-            String dept = r.getDepartment() == null || r.getDepartment().isBlank() ? "未填科室" : r.getDepartment().trim();
-            long[] acc = byDept.computeIfAbsent(dept, k -> new long[2]); // total, qualified
-            acc[0]++;
-            if (isGrade(r, "合格")) acc[1]++;
+        for (Map<String, Object> row : baseMapper.selectDeptRates(wrapper)) {
+            Object raw = row.get("department");
+            String dept = (raw == null || raw.toString().isBlank())
+                    ? "未填科室" : raw.toString().trim();
+            long[] acc = byDept.computeIfAbsent(dept, k -> new long[2]);
+            acc[0] += num(row.get("total"));
+            acc[1] += num(row.get("qualified"));
         }
         byDept.entrySet().stream()
                 .sorted(Comparator.comparingLong((Map.Entry<String, long[]> e) -> e.getValue()[0]).reversed())
@@ -236,12 +246,13 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
                     vo.getDepartmentRates().add(d);
                 });
 
-        // 3. 评分分布直方图（固定桶顺序）
+        // 3. 评分分布直方图（固定桶顺序）。分档仍由 bucketOf 判定，避免边界在 SQL 里形成第二处真源
         Map<String, Long> dist = new LinkedHashMap<>();
         SCORE_BUCKETS.forEach(b -> dist.put(b, 0L));
-        for (Record r : records) {
-            if (r.getScore() == null) continue;
-            dist.merge(bucketOf(r.getScore()), 1L, Long::sum);
+        for (Map<String, Object> row : baseMapper.selectScoreCounts(wrapper)) {
+            Object score = row.get("score");
+            if (score == null) continue; // 无分数不计，与改造前一致
+            dist.merge(bucketOf(((Number) score).intValue()), num(row.get("cnt")), Long::sum);
         }
         dist.forEach((bucket, count) -> {
             StatsVO.Bucket b = new StatsVO.Bucket();
@@ -279,23 +290,6 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             log.warn("[统计] {} 词典读取失败，词条数按 -1 上报: {}", type, e.getMessage());
             return -1;
         }
-    }
-
-    /**
-     * 按数据域 + 用户筛选取病历（**只给看板扩展用**）。
-     *
-     * <p>词频统计已改为 SQL 侧聚合（性能审查 P0-3#3），不再走这里；本方法只服务
-     * {@link #extra}，而它只消费就诊月份 / 分级 / 科室 / 评分四个标量列 ——
-     * 所以投影里连 {@code structured_data} 与 {@code pattern} 都不需要。</p>
-     */
-    private List<Record> recordsFor(FiltersDTO filters) {
-        // 条件组装统一走 RecordFilter：数据域与用户筛选的交集口径只有那一处
-        QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
-        // ⚠️ 列投影（性能审查 P0-3）：不投影会把 21 个 TEXT 列 + 2 个 JSON 列全拉进堆
-        //    （4 万行 ≈320MB）。列名与 RecordFilter / Record 实体列一致，
-        //    新增字段请同步补进 RecordColumnNameGuardTest 的列名守卫。
-        wrapper.select("id", "visit_time", "grade", "department", "score");
-        return baseMapper.selectList(wrapper);
     }
 
     /**
@@ -394,19 +388,6 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             out.add(m);
         }
         return out;
-    }
-
-    /** 就诊月份（yyyy-MM）；接诊时间为空返回 null，该条不进趋势 */
-    private static String monthOf(Record r) {
-        // 1. 无接诊时间不进趋势（否则会多出一个空月份桶）
-        if (r.getVisitTime() == null) return null;
-        String s = r.getVisitTime().toString();
-        return s.length() >= 7 ? s.substring(0, 7) : null;
-    }
-
-    /** 分级是否等于给定值（空分级视为不等） */
-    private static boolean isGrade(Record r, String grade) {
-        return grade.equals(r.getGrade());
     }
 
     /** 百分比，分母为 0 时记 0，保留一位小数 */

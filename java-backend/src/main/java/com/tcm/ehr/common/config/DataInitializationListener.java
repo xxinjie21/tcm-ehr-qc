@@ -53,7 +53,9 @@ public class DataInitializationListener implements ApplicationRunner {
 
         // 1. 验证Redis连接
         try {
-            redisTemplate.opsForValue().set("tcm:startup:ping", "ok", java.time.Duration.ofSeconds(10));
+            redisTemplate.opsForValue().set(
+                    com.tcm.ehr.common.utils.RedisKeys.PREFIX + "startup:ping", "ok",
+                    java.time.Duration.ofSeconds(10));
             log.info("[Redis] 连接成功: ping/pong ok");
         } catch (Exception e) {
             log.warn("[Redis] 连接失败: {}", e.getMessage());

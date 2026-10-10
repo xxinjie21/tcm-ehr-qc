@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -240,14 +241,18 @@ public class EsTermNormalizer {
         }
 
         // 三级·模糊：字符Dice相似度 ≥ 阈值，取最高分
-        // 3. 模糊：标准词与各别名都算一遍，取最高分
+        // 3. 模糊：标准词与各别名都算一遍，取最高分。
+        //    输入的去重字符集在这里算**一次**、全部候选复用（P1-16 收口）：原先每个 pair 都
+        //    重算一遍 |A|，而 a 恒是同一个 input —— 候选一多就是「同一份输入被重复去重上百次」。
+        //    只在走到模糊级时才算（一二级命中会提前 return），不为没走到的分支白付成本。
+        char[] inputDistinct = distinctChars(input);
         TermEntry bestFuzzy = null;
         double bestScore = 0;
         for (TermEntry e : entries) {
-            double s = dice(input, e.getStandardTerm());
+            double s = dicePrepared(inputDistinct, e.getStandardTerm());
             if (e.getAliases() != null) {
                 for (String a : e.getAliases()) {
-                    s = Math.max(s, dice(input, a));
+                    s = Math.max(s, dicePrepared(inputDistinct, a));
                 }
             }
             if (s > bestScore) {
@@ -281,32 +286,72 @@ public class EsTermNormalizer {
      * Dice（约 50 个候选 × 标准词 + 别名），4 万病历 × 每病历约 30 个实体就是<b>上亿次</b>
      * 临时集合与 Character 装箱。单条不痛，批量全压在 GC 上。</p>
      *
-     * <p><b>为什么不用位图</b>（方案里写的是字符集位图）：中文落在 BMP，
-     * 一张覆盖 BMP 的位图是 65536 位 = <b>8KB/串</b>；就算按词典实际字种压成紧凑字母表
-     * （约 6000 字 → 94 个 long），每次比对仍要 94 次 AND+popcount，而中文术语只有 3~6 个字 ——
-     * 直接逐字符比只要 3×L 次 {@code indexOf}（L=3 时 9 次）。位图在这里是「更慢且更占内存」，
-     * 所以按同样的口径换成<b>零分配的原地比较</b>：不新建任何对象，也不改变任何一位结果。</p>
+     * <p><b>为什么不用位图</b>（方案里写的是字符集位图）。先说清楚：这不是「位图在任何输入下都更慢」。
+     * 位图要成立，必须有一个<b>共享的字符坐标</b>，而代价全在这一步：</p>
+     * <ul>
+     *   <li>覆盖 BMP 的位图 = 65536 位 = <b>8KB/串</b>；</li>
+     *   <li>按词典实际字种压成紧凑字母表（约 6000 字 → 94 个 long = 752B/串），每次比对
+     *       仍要 94 次 AND+popcount；而中文术语只有 2~6 个字，逐字符比是 3L²（L=3 时 27 次
+     *       字符比较）—— <b>L² &lt; 字母表字数</b> 时位图反而不划算；</li>
+     *   <li>而且要让位图真的「临时对象归零」，它必须<b>常驻缓存</b>：全量 30k 词条约 68MB，
+     *       只缓存 ES 召回缓存涉及的那批串也要 ~9MB，还得再挂一条版本失效通道；
+     *       不缓存、每次现建 {@code new long[94]} 的话，分配量比原来的 HashSet 还大 ——
+     *       正好把要修的东西修反。</li>
+     * </ul>
+     * <p>结论按<b>实测数据形状</b>取：术语是 2~6 个汉字，位图在 CPU 上不占优、在内存上明显更差，
+     * 还多一条会静默改变结果的失效面，故改成<b>零分配的原地比较</b>。
+     * 唯一的代价是输入很长时（抽取器给出整段 span）逐字符比会退化 —— 所以输入侧的去重字符集
+     * 由 {@link #judge} 算一次往下传，不再按 pair 重算。</p>
      *
      * <p>包级可见是为了让「与改造前逐条一致」这条性质能被同步测试直接钉住。</p>
      */
     static double dice(String a, String b) {
         // 1. 任一为空直接 0（不除零）
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) return 0;
-        // 2. |A|：a 里「首次出现」的字符个数 = 去重后的字符集大小（indexOf 从头找，等于首次出现位置）
-        int na = 0;
-        for (int i = 0; i < a.length(); i++) {
-            if (a.indexOf(a.charAt(i)) == i) na++;
-        }
-        // 3. |B| 同理
+        return dicePrepared(distinctChars(a), b);
+    }
+
+    /**
+     * 预置输入的 Dice：{@code inputDistinct} 已是去重后的输入字符集，其长度即 |A|。
+     *
+     * <p>拆出来是为了让「一次归一里对全部候选复用同一份输入字符集」成为可能 ——
+     * {@link #judge} 每轮只算一次，而不是每个候选重算一遍。口径与 {@link #dice} 完全相同。</p>
+     */
+    private static double dicePrepared(char[] inputDistinct, String b) {
+        // 1. 输入去重后为空、或候选串为空 → 0（不除零）
+        if (inputDistinct.length == 0 || b == null || b.isEmpty()) return 0;
+        // 2. |B|：b 里「首次出现」的字符个数（indexOf 从头找，等于首次出现位置）
         int nb = 0;
         for (int i = 0; i < b.length(); i++) {
             if (b.indexOf(b.charAt(i)) == i) nb++;
         }
-        // 4. |A∩B|：a 的去重字符里，能在 b 里找到的那些
+        // 3. |A∩B|：输入的去重字符里，能在 b 里找到的那些
         int inter = 0;
-        for (int i = 0; i < a.length(); i++) {
-            if (a.indexOf(a.charAt(i)) == i && b.indexOf(a.charAt(i)) >= 0) inter++;
+        for (char c : inputDistinct) {
+            if (b.indexOf(c) >= 0) inter++;
         }
-        return 2.0 * inter / (na + nb);
+        return 2.0 * inter / (inputDistinct.length + nb);
+    }
+
+    /**
+     * 取一串里的去重字符（保持首次出现的顺序）。
+     *
+     * <p>O(L²) 但 L 是个位数，且调用方一轮只调一次 —— 换来的是后面每对比较都不必再碰输入侧。</p>
+     */
+    private static char[] distinctChars(String s) {
+        char[] buf = new char[s.length()];
+        int n = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean dup = false;
+            for (int j = 0; j < n; j++) {
+                if (buf[j] == c) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup) buf[n++] = c;
+        }
+        return Arrays.copyOf(buf, n);
     }
 }

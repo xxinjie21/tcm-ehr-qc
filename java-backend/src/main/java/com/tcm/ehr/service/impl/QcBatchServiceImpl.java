@@ -2,6 +2,7 @@ package com.tcm.ehr.service.impl;
 
 import com.tcm.ehr.common.exception.BusinessException;
 import com.tcm.ehr.common.exception.ForbiddenException;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -85,7 +86,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
     private static final int LIST_LIMIT = 50;
 
     /** 提交互斥锁名：跨实例只允许一个「查重 + 入队」同时进行 */
-    private static final String SUBMIT_LOCK = "tcm:qc_batch:submit";
+    private static final String SUBMIT_LOCK = com.tcm.ehr.common.utils.RedisKeys.PREFIX + "qc_batch:submit";
 
     private final QcTaskMapper taskMapper;
     private final RecordMapper recordMapper;
@@ -534,8 +535,17 @@ public class QcBatchServiceImpl implements IQcBatchService {
      */
     private boolean isCancelRequested(String id) {
         try {
-            QcTask t = taskMapper.selectById(id);
-            return t != null && t.getCancelRequested() != null && t.getCancelRequested() == 1;
+            // P2-5：只取 cancel_requested 一列。原先 selectById 会把整行读回来，其中
+            // failure_list 是「最多 500 条失败明细」的大 JSON —— 而本方法每 PROGRESS_EVERY 条
+            // 就要调一次，4 万条病历就是上千次「为读一个 int 把整行大 JSON 拉回来」。
+            // ⚠️ 这里用 LambdaQueryWrapper 而不是 .select("cancel_requested")：本文件在
+            // RecordColumnNameGuardTest 的扫描清单里（它只认文件、不认实体），写字符串字面量
+            // 会被当成 records 的列而报错；而且列名走实体映射（EntityColumnMappingTest 已钉住）
+            // 比裸字面量更不容易写错。
+            QcTask probe = taskMapper.selectOne(new LambdaQueryWrapper<QcTask>()
+                    .select(QcTask::getCancelRequested)
+                    .eq(QcTask::getId, id));
+            return probe != null && probe.getCancelRequested() != null && probe.getCancelRequested() == 1;
         } catch (Exception e) {
             log.debug("[批重算] 读取消位失败，按未取消处理: {}", e.getMessage());
             return false;

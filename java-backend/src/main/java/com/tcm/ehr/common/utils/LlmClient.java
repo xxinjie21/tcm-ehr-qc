@@ -25,7 +25,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -93,8 +93,18 @@ public class LlmClient {
     private static final int CLIENT_CACHE_MAX = 20;
     private final VersionedCache<ChatClient> clients = new VersionedCache<>(CLIENT_CACHE_MAX);
 
-    /** 记录「已经试过但装配失败」的 key，避免坏配置被反复重试 */
-    private final Set<String> failedKeys = ConcurrentHashMap.newKeySet();
+    /**
+     * 记录「已经试过但装配失败」的配置，避免坏配置被反复重试。
+     *
+     * <p>key = userId，value = 最近一次装配失败的配置版本。原先用 {@code Set<"userId|版本">}
+     * 会随「保存配置 → 装配失败」反复累积：同一个用户改 10 次坏配置就留 10 个 key，
+     * 而这些 key 再也不会被读到 —— 是只增不减的慢泄漏。按 userId 收敛后容量天然等于用户数。</p>
+     *
+     * <p><b>为什么不换成有界 LRU</b>：逐出后那个旧版本会重新触发装配，坏配置（如 key 写错）
+     * 每次调用都打一次外部连接，变成重试风暴；而「只留最新失败版本」不会 —— 用户一旦改好配置，
+     * 版本号变化，旧记录立刻失效，无需清理。</p>
+     */
+    private final Map<String, String> failedKeys = new ConcurrentHashMap<>();
 
     // ------------------------------------------------------------------ 对外
 
@@ -286,8 +296,8 @@ public class LlmClient {
             Metrics.inc("llm.client.hit");
             return new ResolvedClient(hit, cfg);
         }
-        if (failedKeys.contains(key)) {
-            // 4. 这个配置试过且失败，不再重复装配（否则每次调用都打一次外部连接）
+        if (resolved.version().equals(failedKeys.get(userId))) {
+            // 4. 这个用户在当前版本下装配失败过，不再重复装配（否则每次调用都打一次外部连接）
             Metrics.inc("llm.client.failed");
             return new ResolvedClient(null, cfg);
         }
@@ -300,8 +310,8 @@ public class LlmClient {
                     TextUtil.isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
             return new ResolvedClient(client, cfg);
         } catch (Exception e) {
-            // 装配失败记下 key，本次配置下都降级（LLM 是增强项，不能带崩主流程）
-            failedKeys.add(key);
+            // 装配失败记下「用户 + 当前版本」，本次配置下都降级（LLM 是增强项，不能带崩主流程）
+            failedKeys.put(userId, resolved.version());
             Metrics.inc("llm.client.failed");
             log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
             return new ResolvedClient(null, cfg);

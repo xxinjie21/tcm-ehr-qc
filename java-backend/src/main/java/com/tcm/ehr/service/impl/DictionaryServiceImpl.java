@@ -76,37 +76,43 @@ public class DictionaryServiceImpl implements IDictionaryService {
      */
     public Map<String, Object> searchTerms(String type, String keyword, int page, int size, String scope)
             throws IOException {
-        // 1. 按作用域取词条。三档与前端滑动按钮一一对应：
+        // 1. 词条与它的字符倒排表一次取回（P2-9，同源，不会出现「索引与词条对不上」）。
+        //    作用域语义统一由 store 侧解释（与 read / readEffective 同口径），
+        //    这里直接把 index.entries() 当词条真源 —— 不再单独取一次。
+        //    三档与前端滑动按钮一一对应：
         //    effective = 基础层 ∪ 本组织（默认口径，归一实际用的就是它）
         //    base      = 仅基础层（系统默认词典，由 data/dictionaries/*.json 播种）
         //    org       = 仅本组织自有词条（组内词典，叠加层，不含基础层）
-        //    默认取 effective：输入联想与质控下拉都依赖「实际生效」的候选集，
-        //    若默认成 base/org，用户会选到归一里根本不生效的词。
         String orgId = RequestUtils.currentOrgId();
         String scopeKey = normalizeScope(scope);
-        List<TermEntry> entries;
-        if (IDictionaryTermStore.SCOPE_BASE.equals(scopeKey)) {
-            entries = termStore.read(IDictionaryTermStore.BASE_ORG, type);
-        } else if (IDictionaryTermStore.SCOPE_ORG.equals(scopeKey)) {
-            entries = termStore.read(orgId, type);
-        } else {
-            entries = termStore.readEffective(orgId, type);
-        }
+        IDictionaryTermStore.RecallIndex index = termStore.recallIndex(orgId, type, scopeKey);
+        List<TermEntry> entries = index.entries();
         List<Map<String, Object>> hit = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
-        // 2. 逐条比对标准术语与别名，任一命中即算命中（不过滤时 kw 为空，全量收）
-        for (TermEntry e : entries) {
-            boolean matched = kw.isEmpty()
-                    || e.getStandardTerm().contains(kw)
-                    || (e.getAliases() != null && e.getAliases().stream().anyMatch(a -> a.contains(kw)));
-if (matched) {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("standardTerm", e.getStandardTerm());
-                    m.put("aliases", e.getAliases());
-                    hit.add(m);
+        if (kw.isEmpty()) {
+            // 2. 不过滤：全量收，顺序即词条表顺序
+            for (TermEntry e : entries) {
+                hit.add(termView(e));
+            }
+        } else {
+            // 3. 逐条比对标准术语与别名，任一命中即算命中。P2-9：先用倒排表把「要跑 contains 的词条」
+            //    缩到候选超集 —— contains(kw) ⇒ kw 的每个不同字符都出现在该串里，故
+            //    「出现在 kw 各字符倒排表的交集里」是命中的**必要条件**，据此取出的候选是超集，
+            //    再在候选上跑原来的 contains 过滤 ⇒ 结果集与全表扫描逐条一致（零精度损失）。
+            //    候选下标天然升序（stringOwner 按「词条序 → 串序」分配），命中顺序也随之不变。
+            int prev = -1;
+            for (int idx : candidateEntries(index, kw)) {
+                if (idx == prev) {
+                    continue; // 同一词条的多串命中同一字符：只处理一次
                 }
+                prev = idx;
+                TermEntry e = entries.get(idx);
+                if (matches(e, kw)) {
+                    hit.add(termView(e));
+                }
+            }
         }
-        // 3. 分页切片：from/to 双向夹取，页码超出总页数时返回空列表而不是抛越界异常
+        // 4. 分页切片：from/to 双向夹取，页码超出总页数时返回空列表而不是抛越界异常
         List<Map<String, Object>> terms = hit;
         if (page > 0) {
             int step = Math.max(1, size);
@@ -114,11 +120,102 @@ if (matched) {
             int to = Math.min(from + step, hit.size());
             terms = hit.subList(from, to);
         }
-        // 4. total 一律是命中总数：分页时供词典页算总页数，不分页时一并返回供调用方判断
+        // 5. total 一律是命中总数：分页时供词典页算总页数，不分页时一并返回供调用方判断
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("terms", terms);
         out.put("total", hit.size());
         return out;
+    }
+
+    /** 命中词条的对外形态；与改造前逐字一致 */
+    private static Map<String, Object> termView(TermEntry e) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("standardTerm", e.getStandardTerm());
+        m.put("aliases", e.getAliases());
+        return m;
+    }
+
+    /**
+     * 原「包含匹配」判据（P2-9 后仍是最终裁决者，倒排只负责缩候选）。
+     *
+     * <p>对 {@code standardTerm} 加了空判：词表里理论上是 NOT NULL，但索引侧已按「非空才登记」
+     * 处理，这里同步防御，避免一条脏数据让整页搜索 500。</p>
+     */
+    private static boolean matches(TermEntry e, String kw) {
+        if (e.getStandardTerm() != null && e.getStandardTerm().contains(kw)) {
+            return true;
+        }
+        return e.getAliases() != null
+                && e.getAliases().stream().anyMatch(a -> a != null && a.contains(kw));
+    }
+
+    /**
+     * 由倒排表取候选词条下标（升序）。
+     *
+     * <p>做法：对 kw 的每个<b>不同</b>字符取倒排表（该字符 → 含它的串编号，升序），
+     * 逐次两两求交。任一字符没有倒排表 ⇒ 无任何串含它 ⇒ 直接空集。</p>
+     *
+     * <p>返回的是<b>串编号映射回词条下标</b>后的序列，可能含相邻重复（同一词条的标准词与多个别名
+     * 都含同一字符），由调用方按相邻去重。</p>
+     */
+    static int[] candidateEntries(IDictionaryTermStore.RecallIndex index, String kw) {
+        // 1. kw 的不同字符（字符种类通常个位数，线性去重比开 64K 标记数组更省）
+        char[] distinct = new char[kw.length()];
+        int n = 0;
+        for (int i = 0; i < kw.length(); i++) {
+            char c = kw.charAt(i);
+            boolean dup = false;
+            for (int j = 0; j < n; j++) {
+                if (distinct[j] == c) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup) {
+                distinct[n++] = c;
+            }
+        }
+        // 2. 逐字符求交；缺表即空集
+        int[] acc = null;
+        for (int i = 0; i < n; i++) {
+            int[] post = index.postings().get(distinct[i]);
+            if (post == null) {
+                return new int[0];
+            }
+            acc = acc == null ? post : intersect(acc, post);
+            if (acc.length == 0) {
+                return acc;
+            }
+        }
+        if (acc == null) {
+            return new int[0];
+        }
+        // 3. 串编号 → 词条下标（stringOwner 非降序，故结果非降序）
+        int[] out = new int[acc.length];
+        for (int i = 0; i < acc.length; i++) {
+            out[i] = index.stringOwner()[acc[i]];
+        }
+        return out;
+    }
+
+    /** 两个升序 int 数组求交（倒排表天然升序，两指针即可） */
+    private static int[] intersect(int[] a, int[] b) {
+        int[] tmp = new int[Math.min(a.length, b.length)];
+        int i = 0;
+        int j = 0;
+        int k = 0;
+        while (i < a.length && j < b.length) {
+            if (a[i] == b[j]) {
+                tmp[k++] = a[i];
+                i++;
+                j++;
+            } else if (a[i] < b[j]) {
+                i++;
+            } else {
+                j++;
+            }
+        }
+        return k == tmp.length ? tmp : java.util.Arrays.copyOf(tmp, k);
     }
 
     /**
@@ -233,7 +330,10 @@ if (matched) {
             // 跨实例互斥（批次16）：rebuild 是「删该组织文档 + bulk 灌入」两步，
             // 两个实例同时做会交错成混合状态（一个删掉另一个刚灌的）。
             // 锁按「类型+组织」划分，不做全局单键；拿不到锁直接拒绝，不放行。
+            // 等待 0 秒（P2-22）：导入是在线写路径，冲突时立刻回 409，
+            // 不把 3 秒等待加到用户的响应时间上 —— 等 3 秒后给的还是同一句「有并发重建」。
             distLock.runLocked(com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, orgId),
+                    com.tcm.ehr.common.utils.DistLock.NO_WAIT,
                     () -> {
                         try {
                             esTermIndexService.rebuild(type, orgId, entries, contentVersion);
@@ -518,8 +618,12 @@ if (matched) {
     private Map<String, Object> reindexOne(String type, String orgId) throws IOException {
         List<TermEntry> entries = termStore.read(orgId, type);
         String version = termStore.contentVersion(entries);
-        // 走跨实例互斥：与其它实例的导入 / 启动对账互斥
+        // 走跨实例互斥：与其它实例的导入 / 启动对账互斥。
+        // 等待 0 秒（P2-22）：这是 POST /api/dictionary/reindex 的在线路径，
+        // 且外层会对多个 (type, org) 逐个重建 —— 每个都等 3 秒会成倍放大响应时间；
+        // 拿不到锁的 (type, org) 由外层记进 failures，立即返回、可重试。
         distLock.runLocked(com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, orgId),
+                com.tcm.ehr.common.utils.DistLock.NO_WAIT,
                 () -> {
                     try {
                         esTermIndexService.rebuild(type, orgId, entries, version);

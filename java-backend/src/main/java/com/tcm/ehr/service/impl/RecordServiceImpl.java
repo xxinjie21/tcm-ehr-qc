@@ -234,7 +234,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             r.setOrgId(RequestUtils.currentOrgId());
             // 去重兜底：写 text_hash 让 DB 的 uk_records_org_text_hash 生效。
             // 不写的话该列恒 NULL，唯一键形同虚设（批次 4 随 DDL 一起补的代码路径）
-            r.setTextHash(RecordUtil.textHash(r));
+            // P2-2：复用上面那次 textHash。两次调用之间只改了 id / orgId，而 textHash 的 21 个字段
+            // （登记号 … 医生ID、就诊次数、接诊时间）**不含 id 与 orgId**，故结果必然相同；
+            // 导入 4 万行时这一处就省掉 4 万次 MD5。
+            r.setTextHash(hash);
             toInsert.add(r);
         }
     }

@@ -41,7 +41,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * 质控服务实现。
@@ -581,7 +580,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             return true;
         }
         try {
-            return Pattern.compile(fr.getExpr()).matcher(v).matches();
+            // P2-1：走 RegexCache —— 与 QcScorer.formatOk 同一份备忘，表达式是配置常量
+            return com.tcm.ehr.common.utils.RegexCache.of(fr.getExpr()).matcher(v).matches();
         } catch (Exception e) {
             // 3. 规则自身写错（表达式非法）时放行：宁可漏判也不能给病历记错
             return true;

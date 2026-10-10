@@ -155,6 +155,78 @@ public interface RecordMapper extends BaseMapper<Record> {
             """)
     List<String> selectDepartmentsOrg(@Param("orgId") String orgId);
 
+    /**
+     * 看板质控趋势：按就诊月份聚合（性能审查 P2-10，**SQL 侧聚合**）。
+     *
+     * <p><b>替代了什么</b>：原实现把命中病历（4 万行 × 5 列投影）整份物化进堆，再遍历一遍按
+     * {@code LocalDateTime.toString().substring(0,7)} 分月计数 —— 回传行数 = 病历数。现在
+     * 中间计数留在 DB，回传行数 = 月份数（≤ 记录跨度的月数）。</p>
+     *
+     * <p><b>口径与 Java 实现逐条对齐</b>：{@code visit_time} 为空的行不进趋势
+     * （{@code DATE_FORMAT(NULL,…)} 产出 NULL 分组，由调用方丢弃，等价于原来的
+     * 「{@code monthOf} 返回 null 就 continue」）；合格 / 待复核按 {@code grade} 精确等值，
+     * 与 {@code "合格".equals(r.getGrade())} 同口径（{@code grade} 为 NULL 时不匹配任何一档）。</p>
+     *
+     * <p>{@code DATE_FORMAT(visit_time,'%Y-%m')} 与 {@code LocalDateTime.toString()} 的前 7 位
+     * 同为 {@code yyyy-MM}。</p>
+     *
+     * @param wrapper 只含数据域 + 用户筛选的条件，**不含 ORDER BY**
+     *                （由 {@link com.tcm.ehr.common.utils.RecordFilter#buildForAggregate} 产出）
+     * @return 每行 {@code {month, total, qualified, pendingReview}}，按月份升序
+     */
+    @Select("""
+            SELECT DATE_FORMAT(visit_time, '%Y-%m') AS month,
+                   COUNT(*) AS total,
+                   COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualified,
+                   COALESCE(SUM(CASE WHEN grade = '待复核' THEN 1 ELSE 0 END), 0) AS pendingReview
+            FROM records
+            ${ew.customSqlSegment}
+            GROUP BY DATE_FORMAT(visit_time, '%Y-%m')
+            ORDER BY month ASC
+            """)
+    List<Map<String, Object>> selectTrendByMonth(@Param(Constants.WRAPPER) Wrapper<Record> wrapper);
+
+    /**
+     * 看板科室合格率：按科室聚合（性能审查 P2-10，**SQL 侧聚合**）。
+     *
+     * <p>{@code department} 为 NULL / 空白 / 带首尾空格的形态都按原样分组，由调用方归一到
+     * 「未填科室」与 {@code trim()} 后的键并累加 —— 与 Java 实现「先归一 key、再累加」
+     * 的结果逐位一致（SQL 侧不做归一，是为了不在 SQL 里写中文业务字面量）。</p>
+     *
+     * @param wrapper 只含数据域 + 用户筛选的条件，**不含 ORDER BY**
+     * @return 每行 {@code {department, total, qualified}}，顺序由调用方按总数降序重排
+     */
+    @Select("""
+            SELECT department AS department,
+                   COUNT(*) AS total,
+                   COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualified
+            FROM records
+            ${ew.customSqlSegment}
+            GROUP BY department
+            """)
+    List<Map<String, Object>> selectDeptRates(@Param(Constants.WRAPPER) Wrapper<Record> wrapper);
+
+    /**
+     * 看板评分分布：按分数聚合（性能审查 P2-10，**SQL 侧聚合**）。
+     *
+     * <p>只回「分数 → 条数」，分档（90+ / 80-89 / …）仍由调用方按原 {@code bucketOf} 判定 ——
+     * 分档边界写在 SQL 的 {@code CASE} 里会在改动分档时形成两处真源。行数上界是
+     * 出现过的不同分数个数（≤ 101），远小于病历数。</p>
+     *
+     * <p>{@code score} 为空的行会形成一个 NULL 分组，由调用方丢弃 ——
+     * 与原来「{@code score == null} 不计」一致。</p>
+     *
+     * @param wrapper 只含数据域 + 用户筛选的条件，**不含 ORDER BY**
+     * @return 每行 {@code {score, cnt}}
+     */
+    @Select("""
+            SELECT score AS score, COUNT(*) AS cnt
+            FROM records
+            ${ew.customSqlSegment}
+            GROUP BY score
+            """)
+    List<Map<String, Object>> selectScoreCounts(@Param(Constants.WRAPPER) Wrapper<Record> wrapper);
+
     /** 质控评分结果回写：分数 / 分级 / 状态 / 预检单 */
     @Update("""
             UPDATE records

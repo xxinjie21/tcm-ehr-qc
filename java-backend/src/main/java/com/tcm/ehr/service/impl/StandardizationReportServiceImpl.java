@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RegexCache;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
@@ -623,8 +624,10 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         for (Row row : rows) {
             String chief = row.chiefComplaint;
             if (chief != null && !chief.isBlank()) {
-                // 主诉里的病程月数每条不同，去掉数字才能看出模板数
-                chiefTemplates.add(chief.replaceAll("\\d+", "N"));
+                // 主诉里的病程月数每条不同，去掉数字才能看出模板数。
+                // 用 RegexCache 复用编译结果：这里对 4 万行逐行调用，String.replaceAll 每次都会
+                // 重新 Pattern.compile("\\d+")（P2-1 的有界备忘把它压成一次编译）。
+                chiefTemplates.add(RegexCache.of("\\d+").matcher(chief).replaceAll("N"));
             }
             if (hasColloquialUnmatchedSymptom(row)) {
                 colloquial++;

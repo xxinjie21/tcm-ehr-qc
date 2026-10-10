@@ -2,6 +2,7 @@ package com.tcm.ehr.common.cache;
 
 import com.tcm.ehr.common.metrics.Metrics;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RedisKeys;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.vo.StatsAllVO;
@@ -28,7 +29,8 @@ import java.util.regex.Pattern;
  * SQL 聚合（毫秒级），且它依赖 grade/governed，词频不依赖 —— 每次现算反而更贴合实时性。</p>
  *
  * <p><b>失效用版本号前缀，不用 {@code KEYS}</b>（R3-③ / W3）：数据 key 形如
- * {@code cache:stats:{scope}:v{n}:all:{md5}}，失效只把 {@code cache:stats:ver:{scope}} 自增。
+ * {@code tcm:ehr:cache:stats:{scope}:v{n}:all:{md5}}，失效只把
+ * {@code tcm:ehr:cache:stats:ver:{scope}} 自增。
  * 这同时解决三件事 —— ① 不再有 O(N) 全库扫描 + Redis 单线程阻塞（生产禁用级）；
  * ② key 空间不再靠通配删除清理；③ 「读-回填」竞态自然消失：并发读按旧版本算出的值会写回
  * 旧版本 key，新请求读的是新版本 key，读不到它。</p>
@@ -47,11 +49,11 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class StatsCache {
 
-    static final String KEY_PREFIX = "cache:stats:";
-    /** 版本号 key 的固定段：{@code cache:stats:ver:{scope}}，与数据 key 的 {@code {scope}:v{n}} 段不撞名 */
+    static final String KEY_PREFIX = RedisKeys.PREFIX + "cache:stats:";
+    /** 版本号 key 的固定段：{@code ...:cache:stats:ver:{scope}}，与数据 key 的 {@code {scope}:v{n}} 段不撞名 */
     private static final String VERSION_SEGMENT = "ver:";
     /** 单飞锁 key 前缀 */
-    private static final String LOCK_PREFIX = "cache:stats:lock:";
+    private static final String LOCK_PREFIX = RedisKeys.PREFIX + "cache:stats:lock:";
 
     /** TTL 基准与抖动幅度（R3-①）：固定 60s 会让一批 key 在同一秒集中过期 */
     private static final Duration TTL_BASE = Duration.ofSeconds(60);

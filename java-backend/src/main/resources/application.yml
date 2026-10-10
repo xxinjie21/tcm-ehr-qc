@@ -4,7 +4,11 @@ spring:
 
   # 数据源（连接 Docker 中的 windows-mysql 容器，宿主机端口3306）
   datasource:
-    url: jdbc:mysql://localhost:3306/tcm_ehr?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    # rewriteBatchedStatements=true 是批写能真正减少往返的前提：Connector/J 默认不合并
+    # executeBatch()，只有打开它才会把 N 条同形 INSERT 重写成一条多值 INSERT。
+    # 依赖它的有 P1-4（structured_data 批量回写）与 P2-8（词典/任务明细批量插入）——
+    # 不开则那些批处理只是「少了几次提交」，往返数仍是逐条。
+    url: jdbc:mysql://localhost:3306/tcm_ehr?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
     username: ${DB_USERNAME:root}
     # 批次17 · 17.2：口令改环境变量注入。冒号后是**本地 docker 容器**（windows-mysql）的口令，
     # 保留它是为了「本地默认可用」——拉下代码就能起；生产用 DB_PASSWORD 覆盖，仓库里不留生产口令。
@@ -30,7 +34,13 @@ spring:
       port: 6379
       # 批次17 · 17.2：同数据源口径 —— 本地 docker（windows-redis）默认值保留，生产用 REDIS_PASSWORD 覆盖
       password: ${REDIS_PASSWORD:123456}
-      database: 0
+      # P2-23：本项目独占 db1。改造前用默认的 db0，与同机其它应用的 key 混在一个库空间里，
+      # 既看不出哪些 key 是本项目的，也容易被别处的 FLUSHDB 误伤。
+      # StringRedisTemplate 与 RedissonClient 共用这一份配置（RedissonConfig 读同一个键），
+      # 因此缓存与分布式锁是一起迁移的，不存在「锁在 db0、缓存在 db1」的错位。
+      # 一次性切换：db0 里残留的旧 key 全部带 TTL（缓存 60s / 令牌版本 25h / 提交锁 30s），
+      # 不再有人读写，到期自然消失。
+      database: 1
       timeout: 5000
 
   # 文件上传限制

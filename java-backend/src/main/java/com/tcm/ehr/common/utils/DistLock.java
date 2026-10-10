@@ -34,13 +34,31 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class DistLock {
 
-    /** 拿不到锁时的等待秒数（与批次 9 质控提交一致） */
+    /**
+     * 默认等待秒数：用于<b>批任务提交</b>与<b>启动期对账</b>这类「稍等一下也没关系」的场景。
+     *
+     * <p>在线写路径（词典导入 / 提案合并 / 索引重建）应显式传 {@code 0}
+     * —— 见 {@link #runLocked(String, int, java.util.function.Supplier)}。</p>
+     */
     private static final int WAIT_SECONDS = 3;
+
+    /**
+     * 在线写路径的等待秒数：<b>不等待</b>，锁被占就立刻回 409。
+     *
+     * <p>为什么在线路径要等 0：等待时长会被直接叠加到用户的 HTTP 响应时间上，
+     * 而冲突本身就说明「有人正在做同一件事」，让用户等 3 秒再告诉他同一句话没有意义。
+     * 批任务提交不同 —— 那里的锁冲突意味着「已有任务在跑」，等一下往往就能提交上。</p>
+     */
+    public static final int NO_WAIT = 0;
 
     private final RedissonClient redisson;
 
     /**
-     * 在锁内执行；拿不到锁抛 {@link ConcurrentOperationException}（409 + code=409，可展示）。
+     * 在锁内执行，使用默认等待时长（3 秒）；拿不到锁抛
+     * {@link ConcurrentOperationException}（409 + code=409，可展示）。
+     *
+     * <p>仅用于批任务提交 / 启动期对账这类可以稍等的场景；在线写路径请用
+     * {@link #runLocked(String, int, java.util.function.Supplier)} 并传 {@link #NO_WAIT}。</p>
      *
      * @param lockName 锁名（建议格式 业务:key）
      * @param body     临界区
@@ -48,8 +66,21 @@ public class DistLock {
      * @throws ServiceNotReadyException     Redis 不可用（fail-closed，不放行）
      */
     public <T> T runLocked(String lockName, java.util.function.Supplier<T> body) {
+        return runLocked(lockName, WAIT_SECONDS, body);
+    }
+
+    /**
+     * 在锁内执行，等待时长由调用方决定。
+     *
+     * @param lockName    锁名（建议格式 业务:key）
+     * @param waitSeconds 拿不到锁时的等待秒数；传 {@link #NO_WAIT}（0）= 只尝试一次、立刻失败
+     * @param body        临界区
+     * @throws ConcurrentOperationException 等待超时未拿到锁
+     * @throws ServiceNotReadyException     Redis 不可用（fail-closed，不放行）
+     */
+    public <T> T runLocked(String lockName, int waitSeconds, java.util.function.Supplier<T> body) {
         RLock lock = redisson.getLock(lockName);
-        if (!tryLock(lock, lockName)) {
+        if (!tryLock(lock, lockName, waitSeconds)) {
             // 绝不放行：并发进入临界区会让 ES 索引出现交错删除 + 灌入的混合状态
             throw new ConcurrentOperationException("有另一个相同操作正在进行，请稍后重试");
         }
@@ -73,10 +104,15 @@ public class DistLock {
         }
     }
 
-    /** 取锁：不传 leaseTime，走 Redisson 看门狗（默认 30s，持有期间自动续期） */
-    private boolean tryLock(RLock lock, String lockName) {
+    /**
+     * 取锁：不传 leaseTime，走 Redisson 看门狗（默认 30s，持有期间自动续期）。
+     *
+     * <p>{@code waitSeconds = 0} 时 Redisson 只做一次尝试（waitTime ≤ 0 视为「不等待」），
+     * 正好对应在线写路径的「锁被占就立刻 409」。</p>
+     */
+    private boolean tryLock(RLock lock, String lockName, int waitSeconds) {
         try {
-            return lock.tryLock(WAIT_SECONDS, TimeUnit.SECONDS);
+            return lock.tryLock(waitSeconds, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ConcurrentOperationException("等待其它相同操作时被中断，请稍后重试");
@@ -126,6 +162,6 @@ public class DistLock {
 
     /** 词典索引重建的锁名：按「类型 + 组织」划分 */
     public static String dictRebuildLock(String type, String orgId) {
-        return "tcm:dict:rebuild:" + type + ":" + (orgId == null ? "" : orgId);
+        return RedisKeys.PREFIX + "dict:rebuild:" + type + ":" + (orgId == null ? "" : orgId);
     }
 }

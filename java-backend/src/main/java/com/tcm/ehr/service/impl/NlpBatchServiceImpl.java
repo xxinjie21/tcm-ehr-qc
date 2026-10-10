@@ -4,6 +4,7 @@ import com.tcm.ehr.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.tcm.ehr.common.exception.TermIndexUnavailableException;
+import com.tcm.ehr.common.utils.BatchInsert;
 import com.tcm.ehr.common.utils.DictMeta;
 import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.EntityNormalizer;
@@ -80,7 +81,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 「最近任务」列表的上限；超出时回 truncated=true，别让页面把这一页当全部 */
     private static final int LIST_LIMIT = 50;
     /** 提交互斥锁名：跨实例只允许一个「查重 + 入库」同时进行 */
-    private static final String SUBMIT_LOCK = "tcm:nlp_batch:submit";
+    private static final String SUBMIT_LOCK = com.tcm.ehr.common.utils.RedisKeys.PREFIX + "nlp_batch:submit";
     /** 无待认领任务时 worker 的轮询间隔（毫秒）；也就是「提交后最长多久开始跑」 */
     private static final long POLL_INTERVAL_MS = 1000;
     /** 一次认领扫描最多取几个候选：小批即可，避免一次把本实例的 worker 全占满 */
@@ -421,6 +422,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 与任务插入同一事务：否则会出现「任务在、ID 丢了」，那正是要修的形态。
         java.time.LocalDateTime now = java.time.LocalDateTime.now().withNano(0);
         int seq = 0;
+        List<NlpTaskItem> items = new ArrayList<>(ids.size());
         for (String recordId : ids) {
             NlpTaskItem item = new NlpTaskItem();
             item.setTaskId(t.getId());
@@ -429,8 +431,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             item.setStatus(NlpTaskItem.PENDING);
             item.setCreateTime(now);
             item.setUpdateTime(now);
-            nlpTaskItemMapper.insert(item);
+            items.add(item);
         }
+        // P2-8：明细攒批插入，不再逐条 insert —— 一次 500 条的导入就是 500 行 = 500 次往返。
+        // 主键是 IdType.AUTO，由库生成；本链路只写不读回自增 id，故批写不影响主键语义。
+        BatchInsert.insert(sqlSessionFactory, NlpTaskItemMapper.class, nlpTaskItemMapper, items);
         // 保留策略（批次 16 #3）：明细是「一行一条病历」，一次 500 条的导入就是 500 行 ——
         // 不清理会只增不减。这里在提交路径顺带清掉 30 天前的明细（不引入调度器：
         // 提交是低频写操作，够用；且按时间清理是幂等的）。任务主表 nlp_task 不动，

@@ -11,15 +11,16 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Duration;
 import java.util.Date;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * JWT 令牌工具：登录时签发，请求校验时解析出用户身份与角色。
  *
  * <p><b>令牌失效机制（批次 15）</b>：JWT 本身无状态、签发后 24h 内一直有效，
  * 改密码或退出登录都不会让已发出去的令牌立刻作废。这里给每个用户维护一个
- * <b>令牌版本号</b>（{@code tcm:auth:ver:{userId}}，存 Redis）：签发时把当前版本写进
+ * <b>令牌版本号</b>（{@code tcm:ehr:auth:ver:{userId}}，存 Redis）：签发时把当前版本写进
  * 令牌的 {@code ver} claim，请求时比对——版本对不上即视为失效。</p>
  *
  * <p>用版本号而不是「黑名单存 jti」：黑名单只增不减、Redis 内存无界；版本号
@@ -32,7 +33,17 @@ import java.util.concurrent.TimeUnit;
 public class JwtUtil {
 
     /** 令牌版本号的 Redis key 前缀 */
-    static final String VER_KEY = "tcm:auth:ver:";
+    static final String VER_KEY = RedisKeys.PREFIX + "auth:ver:";
+
+    /**
+     * 版本号 TTL 相对令牌寿命的富余量：1 小时。
+     *
+     * <p>不变式是「<b>版本号 key 的存活时间 &gt; 令牌寿命</b>」——见 {@link #versionTtl()}。</p>
+     */
+    private static final long VER_TTL_SLACK_HOURS = 1;
+
+    /** 版本号 TTL 的随机抖动上限（分钟，0 表示不加）：避免批量登出的一批 key 同时过期 */
+    private static final int VER_TTL_JITTER_MINUTES = 10;
 
     /** 签名密钥（HS256 要求至少 32 字节） */
     @Value("${jwt.secret}")
@@ -65,7 +76,11 @@ public class JwtUtil {
         Date now = new Date();
         // 1. 过期时间 = 当前时间 + 配置的有效期
         Date expiry = new Date(now.getTime() + expireHours * 3600 * 1000);
-        // 2. 装载身份信息后签名；ver claim 让「退出登录 / 改密码」能作废旧令牌
+        // 2. 先把版本号 key 的存活时间续到覆盖这张令牌（见 anchorVersion），
+        //    否则「从未作废过」的用户没有 key，等它将来过期后计数会从 1 重新开始，
+        //    让更早的 ver=1 旧令牌重新匹配上 —— 也就是「作废被撤销」。
+        anchorVersion(userId);
+        // 3. 装载身份信息后签名；ver claim 让「退出登录 / 改密码」能作废旧令牌
         return Jwts.builder()
                 .setSubject(userId)
                 .claim("username", username)
@@ -143,6 +158,58 @@ public class JwtUtil {
     }
 
     /**
+     * 把该用户的版本号 key 续期到「覆盖本次签发的令牌」，不存在则落占位值 {@code "0"}。
+     *
+     * <p><b>为什么需要占位</b>：改造前「从未作废过」的用户在 Redis 里根本没有 key，
+     * 校验时读到 {@code null} 就按「未作废」放行。可 key 一旦（因 TTL 到期）消失，
+     * 计数就会从 {@code null + 1 = 1} 重新开始；若此前已经作废过一次（版本也是 1），
+     * 那批旧令牌的 {@code ver=1} 就又对上了 —— <b>已作废的令牌复活</b>。
+     * 落一个值为 {@code "0"} 的占位 key，让「从未作废」也是一个显式状态，
+     * 计数从此只增不减。</p>
+     *
+     * <p><b>为什么已存在时只续 TTL、不写值</b>：写回「读到的值」会与并发的
+     * {@link #revokeAll} 形成「后写覆盖前写」—— 登录线程读到 1、登出线程把版本置 2、
+     * 登录线程再把 1 写回去，作废就被无声撤销了。{@code EXPIRE} 只动存活时间、不动值，
+     * 不存在这个竞态。</p>
+     *
+     * <p>Redis 不可用时不抛异常：校验路径本就有「读不到 = 降级放行」的口径，
+     * 这里写不进去也只是退回改造前的行为。</p>
+     */
+    private void anchorVersion(String userId) {
+        String key = VER_KEY + userId;
+        try {
+            // ① key 已存在（作废过）：只续期，保持「key 比任何在飞的令牌活得久」
+            if (Boolean.TRUE.equals(redis.expire(key, versionTtl()))) {
+                return;
+            }
+            // ② key 不存在（从未作废过）：落占位值 "0"，让计数有起点
+            redis.opsForValue().setIfAbsent(key, "0", versionTtl());
+        } catch (Exception e) {
+            // 降级：不写占位不影响本次登录，校验仍按「无 key = 未作废」处理
+            org.slf4j.LoggerFactory.getLogger(JwtUtil.class)
+                    .debug("[Auth] 令牌版本号占位写入失败 userId={}: {}", userId, e.getMessage());
+        }
+    }
+
+    /**
+     * 版本号 key 的 TTL：{@code expireHours + 1} 小时，再加 0–10 分钟随机抖动。
+     *
+     * <p>① {@code +1} 小时是<b>不变式</b>：TTL 必须严格大于令牌寿命，否则 key 会先于
+     * 令牌消失，计数回落又会让旧令牌复活（见 {@link #anchorVersion}）。</p>
+     *
+     * <p>② 抖动是为了拆散「批量登出」造成的同步过期：管理员一次停用一批账号时，
+     * 若 TTL 完全相同，这批 key 会在同一秒集体消失、同一秒集体回源重建。
+     * 抖动只向上取（0–10 分钟），不会破坏 ①。</p>
+     *
+     * <p>不给 TTL（永久）被明确排除：实测 Redis {@code maxmemory=0}（不设上限），
+     * 无 TTL 的 key 会无限累积。</p>
+     */
+    private Duration versionTtl() {
+        int jitterMinutes = ThreadLocalRandom.current().nextInt(0, VER_TTL_JITTER_MINUTES + 1);
+        return Duration.ofHours(expireHours + VER_TTL_SLACK_HOURS).plusMinutes(jitterMinutes);
+    }
+
+    /**
      * 作废该用户全部已签发的令牌：令牌版本 +1。
      *
      * <p>退出登录与改密码都调它——两者语义一致：让这个用户的旧令牌立刻失效。</p>
@@ -152,7 +219,9 @@ public class JwtUtil {
             String key = VER_KEY + userId;
             String cur = redis.opsForValue().get(key);
             long next = (cur == null ? 0L : Long.parseLong(cur)) + 1;
-            redis.opsForValue().set(key, String.valueOf(next), expireHours + 1, TimeUnit.HOURS);
+            // TTL 与签发路径同口径（含抖动）：作废同样会把 key 的存活时间推到
+            // 「覆盖此刻所有在飞的令牌」之后，批量登出时也不会一批 key 同时过期。
+            redis.opsForValue().set(key, String.valueOf(next), versionTtl());
         } catch (Exception e) {
             // Redis 不可用时无法作废；令牌仍在有效期内可继续用。降级记录，不抛异常阻断登出。
             org.slf4j.LoggerFactory.getLogger(JwtUtil.class)

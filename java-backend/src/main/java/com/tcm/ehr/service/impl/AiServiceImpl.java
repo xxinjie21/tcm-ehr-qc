@@ -103,7 +103,8 @@ public class AiServiceImpl implements IAiService {
         vo.setCoreMissing(core.full());
         vo.setCorePartial(core.partial());
         vo.setNormHits(normHits(data));
-        vo.setKeyHints(keyHints(data, r));
+        // 核心缺失只算一次，直接传给 keyHints —— 它要用的正是这份结果（P2-13）
+        vo.setKeyHints(keyHints(data, r, core));
 
         String template = templateNarrative(vo, r);
         vo.setAnswer(template);
@@ -285,8 +286,13 @@ public class AiServiceImpl implements IAiService {
         return n;
     }
 
-    /** 关键提示：常见空缺 + 核心要素缺失/漏抽 */
-    private List<String> keyHints(Map<String, Object> data, Record r) {
+    /**
+     * 关键提示：常见空缺 + 核心要素缺失/漏抽。
+     *
+     * <p>{@code core} 由调用方传入 —— 它与 {@code vo.coreMissing} 是同一份结果，
+     * 本方法不再自己算一遍（P2-13）。</p>
+     */
+    private List<String> keyHints(Map<String, Object> data, Record r, QcScorer.Missing core) {
         List<String> hints = new ArrayList<>();
         // 1. 先列最常见的空缺：辨证/处方/主诉/中医诊断
         if (blank(r.getPattern())) hints.add("辨证结论为空");
@@ -294,7 +300,6 @@ public class AiServiceImpl implements IAiService {
         if (blank(r.getChiefComplaint())) hints.add("主诉为空");
         if (blank(r.getTcmDiagnosis())) hints.add("中医诊断为空");
         // 2. 再把核心要素的两档缺失补进提示（与质控同一口径）
-        QcScorer.Missing core = coreMissing(data, r);
         if (!core.full().isEmpty()) {
             hints.add("核心字段真缺失 " + core.full().size() + " 项：" + join(core.full()));
         }
@@ -356,9 +361,13 @@ public class AiServiceImpl implements IAiService {
     private String buildContext(String question, String recordId) {
         // 按 5 个语义块独立取，再按固定顺序拼接（与原实现的命中顺序逐字一致）；
         // 全部未命中才回落到「功能与流程」，别让模型空答（P3.4 拆分）
+        // 病历只加载一次、只解析一次，向下传给两个用到的块（P2-14）：
+        // recordId 为空时 load 立即返回 null，不产生额外查询
+        Record r = load(recordId);
+        Map<String, Object> data = r == null ? Map.of() : structured(r);
         String all = statsBlock(question)
-                + standardBlock(question, recordId)
-                + currentRecordBlock(question, recordId)
+                + standardBlock(question, r, data)
+                + currentRecordBlock(question, r, data)
                 + knowledgeBlock(question)
                 + myLogsBlock(question);
         if (all.isEmpty()) {
@@ -380,32 +389,37 @@ public class AiServiceImpl implements IAiService {
                 .toString();
     }
 
-    /** 块 2：归一/标准类问题 → 标准依据 + 当前病历命中分布；未命中返回 "" */
-    private String standardBlock(String question, String recordId) {
+    /**
+     * 块 2：归一/标准类问题 → 标准依据 + 当前病历命中分布；未命中返回 ""。
+     *
+     * <p>{@code r}/{@code data} 由 {@link #buildContext} 加载后传入，本块不再自己查库解析（P2-14）。</p>
+     */
+    private String standardBlock(String question, Record r, Map<String, Object> data) {
         if (!containsAny(question, "归一", "命中", "标准化", "标准依据", "术语")) {
             return "";
         }
         StringBuilder sb = new StringBuilder();
         sb.append("【归一/标准】").append(KNOWLEDGE_STANDARD).append('\n');
-        if (recordId != null && !recordId.isBlank()) {
-            Record r = load(recordId);
-            if (r != null) {
-                AiReplyVO.NormHits n = normHits(structured(r));
-                sb.append("当前病历归一命中 ").append(n.getTotal()).append(" 处（精确 ")
-                        .append(n.getExact()).append(" / 包含 ").append(n.getContain())
-                        .append(" / 模糊 ").append(n.getFuzzy()).append("）。\n");
-            }
+        if (r != null) {
+            AiReplyVO.NormHits n = normHits(data);
+            sb.append("当前病历归一命中 ").append(n.getTotal()).append(" 处（精确 ")
+                    .append(n.getExact()).append(" / 包含 ").append(n.getContain())
+                    .append(" / 模糊 ").append(n.getFuzzy()).append("）。\n");
         }
         return sb.toString();
     }
 
-    /** 块 3：指向具体病历的问题 → 当前病历上下文；未命中返回 "" */
-    private String currentRecordBlock(String question, String recordId) {
+    /**
+     * 块 3：指向具体病历的问题 → 当前病历上下文；未命中返回 ""。
+     *
+     * <p>{@code r}/{@code data} 由 {@link #buildContext} 加载后传入，本块不再自己查库解析（P2-14）。
+     * 「没打开病历」与「病历不存在/无权读」都表现为 {@code r == null}，与原实现同文案。</p>
+     */
+    private String currentRecordBlock(String question, Record r, Map<String, Object> data) {
         if (!containsAny(question, "这份病历", "当前病历", "该病历", "这个病历", "本病例", "这条病历")) {
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        Record r = load(recordId);
         if (r == null) {
             sb.append("【当前病历】未在详情中打开病历，无法回答“这份病历”类问题。\n");
         } else {
@@ -413,7 +427,6 @@ public class AiServiceImpl implements IAiService {
                     .append("；辨证：").append(nz(r.getPattern()))
                     .append("；评分：").append(r.getScore() == null ? "未评分" : r.getScore())
                     .append("（").append(nz(r.getGrade())).append("）。");
-            Map<String, Object> data = structured(r);
             QcScorer.Missing core = coreMissing(data, r);
             sb.append("核心字段缺失：").append(core.full().isEmpty() ? "无" : join(core.full())).append("；");
             sb.append("未抽取到（原始病历有记录）：")
@@ -702,9 +715,13 @@ public class AiServiceImpl implements IAiService {
         // 2. 规则地基：从现有词表按字面相似度召回候选（这一步不依赖 LLM）
         //    P1-15：词条与它的字符倒排表一次取回（同源，不会出现「索引与词条对不上」）
         IDictionaryTermStore.RecallIndex index = termStore.recallIndex(RequestUtils.currentOrgId(), type);
+        // 暂存区按「一次建议请求」复用：待补词有 T 个，若每个都新分配一份标记数组，
+        // 国标全量（D≈3 万）下就是 T×30KB 的瞬时垃圾
+        boolean[] marked = new boolean[index.entries().size()];
+        List<Integer> candidates = new ArrayList<>();
         Map<String, List<TermEntry>> recalled = new LinkedHashMap<>();
         for (String t : terms) {
-            recalled.put(t, recallCandidates(t, index));
+            recalled.put(t, recallCandidates(t, index, marked, candidates));
         }
         vo.setTermSuggestions(fallbackSuggestions(terms, recalled));
 
@@ -748,9 +765,21 @@ public class AiServiceImpl implements IAiService {
      * 它正是这次改造唯一可能出错的地方。</p>
      */
     static List<TermEntry> recallCandidates(String content, IDictionaryTermStore.RecallIndex index) {
+        return recallCandidates(content, index, new boolean[index.entries().size()], new ArrayList<>());
+    }
+
+    /**
+     * 召回主实现：{@code marked} / {@code candidates} 由调用方提供并复用（见 {@link #suggestTerms}）。
+     *
+     * <p>复用它们是因为「一次建议请求要跑 T 个待补词」：国标全量（D≈3 万）下，
+     * 每个词各分配一份标记数组就是 T×30KB 的瞬时垃圾，而每个词各扫一遍全表又是 T×D 次判断。
+     * 包级可见同样是为了可测：复用的暂存区若漏复位，会静默把上一个词条的候选带进下一个。</p>
+     */
+    static List<TermEntry> recallCandidates(String content, IDictionaryTermStore.RecallIndex index,
+                                            boolean[] marked, List<Integer> candidates) {
         List<TermEntry> all = index.entries();
         // 1. 倒排表取候选：出现在原文任一字符的倒排表里的词条（超集，见方法注释）
-        boolean[] candidate = new boolean[all.size()];
+        //    只收「候选下标」而不是回扫全表 —— 候选数 C 通常比词表 D 小两个数量级
         int[] stringOwner = index.stringOwner();
         for (int i = 0; i < content.length(); i++) {
             int[] posting = index.postings().get(content.charAt(i));
@@ -758,20 +787,31 @@ public class AiServiceImpl implements IAiService {
                 continue;
             }
             for (int sid : posting) {
-                candidate[stringOwner[sid]] = true;
+                int t = stringOwner[sid];
+                if (!marked[t]) {
+                    marked[t] = true;
+                    candidates.add(t);
+                }
             }
         }
-        // 2. 候选内按原口径打分，并把分数**预计算**下来
+        // 2. 候选按下标升序 —— 必须与「全表顺序」一致：后面按重叠数排序是**稳定排序**，
+        //    同分时保持的就是这里的先后，顺序错了会让同分候选的取舍与改造前不同
+        candidates.sort(null);
+        // 3. 候选内按原口径打分，并把分数**预计算**下来
         //    （AI-7/A3：原先在排序比较器里现算 2 次 overlap，同一次召回里同一个词条被算好几遍）
         List<int[]> hit = new ArrayList<>();
-        for (int t = 0; t < all.size(); t++) {
-            if (!candidate[t]) continue;
+        for (int t : candidates) {
             int ov = overlap(content, all.get(t));
             if (ov >= RECALL_MIN_OVERLAP) {
                 hit.add(new int[]{t, ov});
             }
         }
-        // 3. 按重叠字符数降序；List.sort 是稳定排序，同分保持词表原序
+        // 4. 复位标记（只清本词标记过的那几个，不整表清零），供下一个待补词复用同一份数组
+        for (int t : candidates) {
+            marked[t] = false;
+        }
+        candidates.clear();
+        // 5. 按重叠字符数降序；List.sort 是稳定排序，同分保持词表原序
         hit.sort((a, b) -> Integer.compare(b[1], a[1]));
         int n = Math.min(hit.size(), RECALL_TOP_N);
         List<TermEntry> out = new ArrayList<>(n);

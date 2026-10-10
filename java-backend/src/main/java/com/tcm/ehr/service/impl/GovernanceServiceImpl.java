@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -40,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
  * 数据清洗服务实现：术语归一、数据清洗、标准数据集导出
@@ -147,9 +147,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (changed(r.getPrescription(), prescription)) repaired++;
             vo.setRepaired(vo.getRepaired() + repaired);
             // 3. 空值规整：非空但仅由空白字符构成（trim 后为空）的字段，计为一次"空值规整"
-            vo.setCleared(vo.getCleared()
-                    + (int) Arrays.asList(r.getGender(), r.getAge(), r.getPattern(), r.getPrescription())
-                    .stream().filter(v -> v != null && !v.isEmpty() && v.trim().isEmpty()).count());
+            //    P2-4：原先这里是 Arrays.asList(...).stream().filter(...).count() —— 每条病历都要
+            //    建一个 List 再拉一条 Stream 管线（3.5 万条就是 3.5 万套临时对象），改成直接数。
+            int clearedNow = 0;
+            if (blankOnly(r.getGender())) clearedNow++;
+            if (blankOnly(r.getAge())) clearedNow++;
+            if (blankOnly(r.getPattern())) clearedNow++;
+            if (blankOnly(r.getPrescription())) clearedNow++;
+            vo.setCleared(vo.getCleared() + clearedNow);
 
             // 4. 脏数据隔离（收紧：仅"无法修复"）——核心文本全空 或 structuredData存在但无法解析
             //    T16：结构化数据在这里**只解析一次**，解析结果向下传给第 5 步的归一；
@@ -191,7 +196,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             r.setAge(age);
             r.setPattern(pattern);
             r.setPrescription(prescription);
-            String freshHash = RecordUtil.textHash(r);
+            // P2-3：四列都没变（repaired == 0）时 r 与进循环时逐字节相同 ⇒ 哈希必然相同，
+            // 直接用第 1 步那次的结果，不再重算一遍 MD5。
+            // 「未改动 ⇒ 哈希不变」的前提已逐项核对：changed() 为假 ⟺ trim 后的值与库里的值
+            // 完全相等（含「两者都是 null」），而 textHash 的 21 个字段里只有这四列在本循环被改写。
+            String freshHash = repaired > 0 ? RecordUtil.textHash(r) : textHash;
             if (!freshHash.equals(r.getTextHash())) {
                 try {
                     baseMapper.updateTextHash(r.getId(), freshHash);
@@ -717,11 +726,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     // 「pattern OR structured_data」SQL 并集，列表/导出同一口径，不再需要 JVM 侧二次过滤。
 
     /** 敏感信息脱敏：11位手机号、18位身份证号 → *** */
-    private static final String PHONE_RE = "(?<!\\d)1[3-9]\\d{9}(?!\\d)";
-    private static final String ID_RE = "(?<!\\d)\\d{17}[\\dXx](?!\\d)";
+    // P2-4：预编译。原先用 String.replaceAll —— 它每次调用内部都要 Pattern.compile 一遍，
+    // 而这两条表达式是常量（一次导出要对整份 JSON / CSV 各打一次码）。
+    private static final Pattern PHONE_RE = Pattern.compile("(?<!\\d)1[3-9]\\d{9}(?!\\d)");
+    private static final Pattern ID_RE = Pattern.compile("(?<!\\d)\\d{17}[\\dXx](?!\\d)");
 
     private String mask(String s) {
-        return s.replaceAll(PHONE_RE, "***").replaceAll(ID_RE, "***");
+        // 两次替换的先后不能调换：先手机号后身份证，与改造前逐字节一致
+        return ID_RE.matcher(PHONE_RE.matcher(s).replaceAll("***")).replaceAll("***");
     }
 
     private byte[] maskCsv(byte[] csv) {
@@ -795,6 +807,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     private boolean changed(String oldV, String newV) {
         return oldV != null && !oldV.equals(newV);
+    }
+
+    /** 非空但仅由空白构成（trim 后为空）—— 「空值规整」的计数口径，与第 3 步逐字一致 */
+    private static boolean blankOnly(String v) {
+        return v != null && !v.isEmpty() && v.trim().isEmpty();
     }
 
     /** 导出文件名用毫秒精度：秒级会让同一秒内的两次导出得到同名文件 */

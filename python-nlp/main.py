@@ -232,7 +232,10 @@ def _ner(text: str) -> Tuple[Dict[str, List[dict]], bool]:
                          truncation=True, max_length=NER_MAX_TOKENS)
         truncated = int(enc["input_ids"].shape[-1]) >= NER_MAX_TOKENS
         offsets = enc.pop("offset_mapping")[0].tolist()
-        with torch.no_grad():
+        # inference_mode 比 no_grad 更彻底（P2-15）：除关闭自动求导外，还跳过版本计数与
+        # 视图追踪，前向的内存与少量算子开销都更低。本处只做前向 + softmax + argmax，
+        # 不产生需要参与自动求导的张量，两者数值完全一致，可放心替换。
+        with torch.inference_mode():
             logits = _model(**enc).logits[0]
         probs = torch.softmax(logits, dim=-1)
         ids = logits.argmax(-1).tolist()

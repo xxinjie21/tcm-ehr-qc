@@ -747,6 +747,15 @@ const confirmable = computed(() =>
 )
 
 /**
+ * 单次建议请求的词条上限，与后端 `AiQueryDTO.terms` 的 `@Size(max = 50)` 对齐。
+ *
+ * 超过这个数必须切批：后端在进入 Controller 前就被 Bean Validation 拦下（400），
+ * 而用户看到的是「AI 建议生成失败」，完全指不到「词条太多」这个真正原因。
+ * 词条数 ≤ 50 时只会有一批，请求体与改造前逐字一致。
+ */
+const SUGGEST_BATCH_SIZE = 50
+
+/**
  * AI 建议的入参由**调用方显式给出**：
  *   · 上传区的「开启 AI 建议」→ 该文件解析出的词条（importTerms）
  *   · 粘贴行的「AI 建议怎么补」→ 粘贴框当前的词条（parsedPasted）
@@ -760,18 +769,29 @@ const askSuggest = async (source) => {
   suggestLoading.value = true
   suggestions.value = []
   try {
-    const reply = await runTermSuggest({ terms: words, termType: type.value })
-    const list = reply?.termSuggestions || []
-    if (!list.length) {
+    // 1. 按后端上限切批、串行调用、按顺序合并（顺序影响不大，但保持稳定更好排查）
+    const merged = []
+    // 2. 只要有一批报告模型不可用，整份建议就按「词表候选」提示 —— 宁可保守
+    let llmAvailable = true
+    for (let off = 0; off < words.length; off += SUGGEST_BATCH_SIZE) {
+      const reply = await runTermSuggest({
+        terms: words.slice(off, off + SUGGEST_BATCH_SIZE),
+        termType: type.value,
+      })
+      const list = reply?.termSuggestions || []
+      for (const s of list) merged.push({ ...s, aliases: s.aliases || [] })
+      llmAvailable = llmAvailable && !!reply?.llmAvailable
+    }
+    if (!merged.length) {
       ElMessage.warning('AI 没有返回建议，请稍后重试')
       return
     }
-    suggestions.value = list.map((s) => ({ ...s, aliases: s.aliases || [] }))
+    suggestions.value = merged
     // 把「当前类型可能不对」这件事说出来：报告页复制的待补词恒来自症状类
     const typeHint = type.value === 'symptom'
       ? ''
       : `当前类型是「${typeLabel(type.value)}」，而质量报告复制的待补词属于症状类，请确认。`
-    suggestNote.value = reply.llmAvailable
+    suggestNote.value = llmAvailable
       ? `AI 建议仅供参考，标「AI 生成」的条目未经权威词表校验。${typeHint}`
       : `AI 不可用，以下是词表中字面相近的候选，需人工判断。${typeHint}`
   } catch (e) {

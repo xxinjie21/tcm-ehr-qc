@@ -6,6 +6,8 @@ import com.tcm.ehr.common.exception.BadCredentialsException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.exception.UnauthorizedException;
 import com.tcm.ehr.common.utils.JwtUtil;
+import com.tcm.ehr.common.utils.RedisKeys;
+import com.tcm.ehr.common.utils.RedisLua;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.OrgDTOs;
 import com.tcm.ehr.domain.dto.RegisterDTO;
@@ -29,8 +31,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 登录 / 注册服务实现（阶段2：加入课题组维度）。
@@ -56,7 +60,10 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
 
     /** 登录失败计数的 Redis key 前缀（批次 15） */
-    private static final String LOGIN_FAIL_KEY = "tcm:auth:fail:";
+    private static final String LOGIN_FAIL_KEY = RedisKeys.PREFIX + "auth:fail:";
+
+    /** 锁定 TTL 的随机抖动幅度（分钟）：避免一批账号的计数在同一秒集中过期 */
+    private static final int LOCK_TTL_JITTER_MINUTES = 3;
 
     /** 连续失败达到该次数即锁定 */
     @Value("${auth.login-max-fail:5}")
@@ -301,22 +308,40 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      *
      * <p>用 Redis INCR + 首次设置过期时间：进程内计数在多实例下会各算各的，
      * 挡不住并发爆破；Redis 是共享的。</p>
+     *
+     * <p><b>P2-21：{@code INCR} 与 {@code EXPIRE} 必须原子</b>。原先两条命令分开发，
+     * 若 {@code INCR} 成功而 {@code EXPIRE} 失败（超时 / 连接断开 / 进程被杀），
+     * 计数 key 就永久留在 Redis 里，该账号从此<b>无限期锁死</b>，且没有任何异常可查。
+     * 现改为一段 Lua 脚本，两条命令在 Redis 端一次执行完（见 {@link RedisLua}）。</p>
      */
     private void recordLoginFailure(String username) {
         if (username == null || username.isBlank()) {
             return;
         }
         try {
-            String key = LOGIN_FAIL_KEY + username;
-            Long n = redis.opsForValue().increment(key);
-            if (n != null && n == 1L) {
-                // 首次失败才设过期：窗口从第一次失败开始滚，而不是每次失败都续命
-                redis.expire(key, loginLockMinutes, java.util.concurrent.TimeUnit.MINUTES);
-            }
+            // 首次失败才设过期（脚本内判断 n == 1）：窗口从第一次失败开始滚，而不是每次失败都续命
+            RedisLua.incrWithTtlOnFirst(redis, LOGIN_FAIL_KEY + username, lockTtl());
         } catch (Exception e) {
             // Redis 不可用：不阻断登录。降级为「无锁定」，可用性优先。
             log.warn("[Auth] 记录登录失败计数失败 username={}: {}", username, e.getMessage());
         }
+    }
+
+    /**
+     * 锁定窗口的 TTL：{@code login-lock-minutes} ± 1–3 分钟。
+     *
+     * <p>抖动（P2-21）是为了拆散「同一时间被爆破的一批账号」的同步过期：TTL 完全相同的话，
+     * 这批 key 会在同一秒集体消失，随后一批爆破请求又在同一秒重新开始计数。</p>
+     *
+     * <p>下限兜到 1 分钟：即使 {@code auth.login-lock-minutes} 被配成很小的值，
+     * 也不会算出 0 或负数而让 {@code PEXPIRE} 变成「立刻删除」（等于不锁定）。</p>
+     */
+    private Duration lockTtl() {
+        int jitter = ThreadLocalRandom.current().nextInt(1, LOCK_TTL_JITTER_MINUTES + 1);
+        if (ThreadLocalRandom.current().nextBoolean()) {
+            jitter = -jitter;
+        }
+        return Duration.ofMinutes(Math.max(1, loginLockMinutes + jitter));
     }
 
     /** 登录成功：清零失败计数 */

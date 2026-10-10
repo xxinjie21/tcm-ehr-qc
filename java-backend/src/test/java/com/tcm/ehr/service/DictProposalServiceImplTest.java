@@ -69,12 +69,13 @@ class DictProposalServiceImplTest {
         termStore = mock(IDictionaryTermStore.class);
         archiveService = mock(IDictArchiveService.class);
         esIndexService = mock(IEsTermIndexService.class);
-        // 锁：直接执行临界区（本类测的是「临界区里做了什么」，互斥本身由 DistLockTest 负责）
+        // 锁：直接执行临界区（本类测的是「临界区里做了什么」，互斥本身由 DistLockTest 负责）。
+        // P2-22 起审核走三参重载（在线写路径传 NO_WAIT=0 快速失败），故按三参打桩。
         distLock = mock(DistLock.class);
-        when(distLock.runLocked(anyString(), any())).thenAnswer(inv -> {
+        when(distLock.runLocked(anyString(), anyInt(), any())).thenAnswer(inv -> {
             @SuppressWarnings("unchecked")
             java.util.function.Supplier<Object> body =
-                    (java.util.function.Supplier<Object>) inv.getArgument(1);
+                    (java.util.function.Supplier<Object>) inv.getArgument(2);
             return body.get();
         });
 
@@ -304,7 +305,7 @@ class DictProposalServiceImplTest {
     }
 
     @Test
-    @DisplayName("审核通过时走跨实例锁（与导入/重建互斥，避免交错出混合索引）")
+    @DisplayName("审核通过时走跨实例锁（与导入/重建互斥，避免交错出混合索引）；在线路径不等待")
     void approveTakesRebuildLock() {
         when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.PENDING));
         snapshotContains("甘草");
@@ -312,7 +313,8 @@ class DictProposalServiceImplTest {
 
         svc.audit("p1", true, null, "owner-1");
 
-        verify(distLock).runLocked(eq(DistLock.dictRebuildLock("herb", "org-A")), any());
+        verify(distLock).runLocked(eq(DistLock.dictRebuildLock("herb", "org-A")),
+                eq(DistLock.NO_WAIT), any());
     }
 
     @Test

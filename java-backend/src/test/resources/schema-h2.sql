@@ -1,4 +1,4 @@
--- 集成测试用最小 H2 模式（MODE=MySQL）。只建被测链路真正用到的三张表。
+-- 集成测试用最小 H2 模式（MODE=MySQL）。只建被测链路真正用到的表。
 -- 不用 database-init.sql：那份是 MySQL 专有（CREATE DATABASE / ENGINE=InnoDB / JSON 列 / 生成列），
 -- H2 不能直接执行。列必须与 PO 字段一一对应 —— BaseMapper 会 SELECT 出 PO 的全部映射列，
 -- 少一列就报「列不存在」。
@@ -72,4 +72,44 @@ CREATE TABLE IF NOT EXISTS nlp_task_items (
   reason      VARCHAR(255),
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 词典提案 / 归档四张表：P2-7 把「列表里逐条 selectCount」改成一次 GROUP BY 计数，
+-- 计数取值必须钉住（取错键会让 snapshotPresent 全为 false、界面显示「快照已清理」且拒绝回滚）。
+CREATE TABLE IF NOT EXISTS dict_proposal (
+  id             VARCHAR(36) PRIMARY KEY,
+  org_id         VARCHAR(36) NOT NULL DEFAULT '',
+  type           VARCHAR(32) NOT NULL,
+  submit_user_id VARCHAR(36),
+  status         VARCHAR(16) NOT NULL,
+  audit_user_id  VARCHAR(36),
+  audit_comment  VARCHAR(500),
+  create_time    DATETIME,
+  audit_time     DATETIME,
+  purge_after    DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS dict_proposal_term (
+  id            VARCHAR(36) PRIMARY KEY,
+  proposal_id   VARCHAR(36) NOT NULL,
+  standard_term VARCHAR(200) NOT NULL,
+  aliases       CLOB
+);
+
+CREATE TABLE IF NOT EXISTS dict_archive_version (
+  id            VARCHAR(36) PRIMARY KEY,
+  org_id        VARCHAR(36) NOT NULL DEFAULT '',
+  type          VARCHAR(32) NOT NULL,
+  version_no    INT NOT NULL,
+  proposal_id   VARCHAR(36),
+  merge_time    DATETIME,
+  merge_user_id VARCHAR(36),
+  comment       VARCHAR(500)
+);
+
+CREATE TABLE IF NOT EXISTS dict_archive_term (
+  id            VARCHAR(36) PRIMARY KEY,
+  version_id    VARCHAR(36) NOT NULL,
+  standard_term VARCHAR(200) NOT NULL,
+  aliases       CLOB
 );
