@@ -71,11 +71,31 @@ public class LlmConfigStore {
      * <p>没有用户上下文（后台线程 / 启动期）时返回基线 —— 那时无法判断「谁的配置」。</p>
      */
     public LlmConfig getFor(String userId) {
+        return resolveFor(userId).config();
+    }
+
+    /**
+     * 「生效配置 + 配置版本串」的组合（AI-1）。
+     *
+     * <p>{@code LlmClient} 原先分别调 {@link #getFor} 与 {@link #versionFor}，各自
+     * {@code selectById} 一次 —— 缓存只省掉了逐字段合并，没省 DB 往返。本方法一次查询
+     * 同时给出两者，调用方不必为同一用户查两次库。</p>
+     */
+    public record Resolved(LlmConfig config, String version) {
+    }
+
+    /**
+     * 一次查询同时返回<b>生效配置</b>与<b>配置版本串</b>（AI-1）。
+     *
+     * <p>版本串要由用户行算出来，故查询无法省；能省的是「同一用户查两次」。</p>
+     */
+    public Resolved resolveFor(String userId) {
         if (userId == null || userId.isBlank()) {
-            return get();
+            return new Resolved(get(), String.valueOf(version()));
         }
         UserLlmConfig row = userMapper.selectById(userId);
-        return perUser.get(userId, versionOf(row), () -> merge(row));
+        String ver = versionOf(row);
+        return new Resolved(perUser.get(userId, ver, () -> merge(row)), ver);
     }
 
     /**
@@ -124,12 +144,12 @@ public class LlmConfigStore {
 
     /**
      * 某个用户的配置版本串（基线版本 + 用户行指纹），供 LlmClient 判断是否重建客户端。
+     *
+     * <p>与 {@link #getFor} 共用同一次解析（{@link #resolveFor}）：版本与配置必须来自同一行，
+     * 分两次查库既多一次往返、又可能在两次查询之间读到不同版本。</p>
      */
     public String versionFor(String userId) {
-        if (userId == null || userId.isBlank()) {
-            return String.valueOf(version());
-        }
-        return versionOf(userMapper.selectById(userId));
+        return resolveFor(userId).version();
     }
 
     /**

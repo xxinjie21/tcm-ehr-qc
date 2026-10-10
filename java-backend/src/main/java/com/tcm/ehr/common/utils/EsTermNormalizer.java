@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -274,20 +273,40 @@ public class EsTermNormalizer {
         return false;
     }
 
-    /** 字符集合Dice系数：2*|A∩B| / (|A|+|B|) */
-    private double dice(String a, String b) {
+    /**
+     * 字符集合 Dice 系数：2*|A∩B| / (|A|+|B|)，A/B 为两串的<b>去重字符集</b>。
+     *
+     * <p><b>P1-16 / S3：口径一字未改，只把「临时对象」去掉。</b>
+     * 原实现每次 {@code new HashSet} 两个、再把每个字符装箱塞进去 —— 单次归一要算约 75 次
+     * Dice（约 50 个候选 × 标准词 + 别名），4 万病历 × 每病历约 30 个实体就是<b>上亿次</b>
+     * 临时集合与 Character 装箱。单条不痛，批量全压在 GC 上。</p>
+     *
+     * <p><b>为什么不用位图</b>（方案里写的是字符集位图）：中文落在 BMP，
+     * 一张覆盖 BMP 的位图是 65536 位 = <b>8KB/串</b>；就算按词典实际字种压成紧凑字母表
+     * （约 6000 字 → 94 个 long），每次比对仍要 94 次 AND+popcount，而中文术语只有 3~6 个字 ——
+     * 直接逐字符比只要 3×L 次 {@code indexOf}（L=3 时 9 次）。位图在这里是「更慢且更占内存」，
+     * 所以按同样的口径换成<b>零分配的原地比较</b>：不新建任何对象，也不改变任何一位结果。</p>
+     *
+     * <p>包级可见是为了让「与改造前逐条一致」这条性质能被同步测试直接钉住。</p>
+     */
+    static double dice(String a, String b) {
         // 1. 任一为空直接 0（不除零）
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) return 0;
-        // 2. 各自去重成字符集合
-        Set<Character> sa = new HashSet<>();
-        for (char c : a.toCharArray()) sa.add(c);
-        Set<Character> sb = new HashSet<>();
-        for (char c : b.toCharArray()) sb.add(c);
-        // 3. 数交集大小
-        int inter = 0;
-        for (Character c : sa) {
-            if (sb.contains(c)) inter++;
+        // 2. |A|：a 里「首次出现」的字符个数 = 去重后的字符集大小（indexOf 从头找，等于首次出现位置）
+        int na = 0;
+        for (int i = 0; i < a.length(); i++) {
+            if (a.indexOf(a.charAt(i)) == i) na++;
         }
-        return 2.0 * inter / (sa.size() + sb.size());
+        // 3. |B| 同理
+        int nb = 0;
+        for (int i = 0; i < b.length(); i++) {
+            if (b.indexOf(b.charAt(i)) == i) nb++;
+        }
+        // 4. |A∩B|：a 的去重字符里，能在 b 里找到的那些
+        int inter = 0;
+        for (int i = 0; i < a.length(); i++) {
+            if (a.indexOf(a.charAt(i)) == i && b.indexOf(a.charAt(i)) >= 0) inter++;
+        }
+        return 2.0 * inter / (na + nb);
     }
 }

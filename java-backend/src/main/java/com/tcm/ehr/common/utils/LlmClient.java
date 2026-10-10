@@ -6,6 +6,7 @@ import com.openai.core.ClientOptions;
 import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
+import com.tcm.ehr.common.metrics.Metrics;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
@@ -120,11 +121,12 @@ public class LlmClient {
      * @return 模型输出；不可用或调用失败返回 {@code null}，调用方据此走降级路径
      */
     public String chat(String systemPrompt, String userPrompt) {
-        // 1. 取客户端；不可用（未启用或配置非法）就降级，调用方据 null 走规则路径
-        ChatClient client = resolve();
+        // 1. 一次解析同时拿到客户端与生效配置（降级分支不必再查一次库）
+        ResolvedClient rc = resolveDetailed();
+        ChatClient client = rc.client();
         if (client == null) {
-            LlmConfig cfg = configStore.getFor(RequestUtils.currentUserId());
-            log.debug("[LLM] 不可用（enabled={}，provider={}），降级", cfg.enabled(), cfg.provider());
+            log.debug("[LLM] 不可用（enabled={}，provider={}），降级",
+                    rc.cfg().enabled(), rc.cfg().provider());
             return null;
         }
         try {
@@ -248,41 +250,61 @@ public class LlmClient {
 
     // ------------------------------------------------------------------ 装配
 
+    /** 解析结果：可用客户端（{@code null} = 不可用）+ 当时的生效配置（供日志/诊断，免二次查库） */
+    private record ResolvedClient(ChatClient client, LlmConfig cfg) {
+    }
+
     /**
      * 取当前生效的 {@code ChatClient}；配置版本变化时按新参数重建。
      *
      * @return 可用客户端；未启用或装配失败返回 {@code null}
      */
     private ChatClient resolve() {
+        return resolveDetailed().client();
+    }
+
+    /**
+     * 解析当前用户的客户端，并带出生效配置。
+     *
+     * <p>AI-1：配置与版本由 {@link LlmConfigStore#resolveFor} <b>一次查询</b>同时给出 ——
+     * 原来 {@code getFor} 与 {@code versionFor} 各查一次 {@code user_llm_config}，
+     * 每请求多一次 DB 往返。</p>
+     */
+    private ResolvedClient resolveDetailed() {
         // 1. 按当前用户解析配置：配置改成每人一份，客户端必须与配置成对
         String userId = RequestUtils.currentUserId();
-        LlmConfig cfg = configStore.getFor(userId);
+        LlmConfigStore.Resolved resolved = configStore.resolveFor(userId);
+        LlmConfig cfg = resolved.config();
         // 2. 未启用直接给 null，调用方走降级
         if (!cfg.enabled()) {
-            return null;
+            return new ResolvedClient(null, cfg);
         }
-        String key = userId + "|" + configStore.versionFor(userId);
-        // 3. 配置没变就复用已装配的
+        String key = userId + "|" + resolved.version();
+        // 3. 配置没变就复用已装配的（命中率埋点，P1-14）
         ChatClient hit = clients.getIfPresent(key);
         if (hit != null) {
-            return hit;
+            Metrics.inc("llm.client.hit");
+            return new ResolvedClient(hit, cfg);
         }
         if (failedKeys.contains(key)) {
             // 4. 这个配置试过且失败，不再重复装配（否则每次调用都打一次外部连接）
-            return null;
+            Metrics.inc("llm.client.failed");
+            return new ResolvedClient(null, cfg);
         }
         // 5. 装配：并发下可能重复装一次，代价是浪费一次连接，不会出错（幂等）
         try {
             ChatClient client = ChatClient.builder(buildModel(cfg)).build();
             clients.put(key, client);
+            Metrics.inc("llm.client.build");
             log.info("[LLM] 已启用：user={}，provider={}，model={}", userId, cfg.provider(),
                     TextUtil.isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
-            return client;
+            return new ResolvedClient(client, cfg);
         } catch (Exception e) {
             // 装配失败记下 key，本次配置下都降级（LLM 是增强项，不能带崩主流程）
             failedKeys.add(key);
+            Metrics.inc("llm.client.failed");
             log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
-            return null;
+            return new ResolvedClient(null, cfg);
         }
     }
 

@@ -1,8 +1,40 @@
 import request from '@/utils/request'
+import { pollAsyncTask } from '@/utils/asyncPoll'
 
 // NLP 实体抽取（转发 Python 服务，模型推理可能较慢，超时放宽）
 export function extractNlp(data) {
   return request.post('/nlp/extract', data, { timeout: 60000 })
+}
+
+// 单条抽取（异步，AI-18）：提交拿任务号，再轮询结果。
+// 同步接口会把请求线程占住最长 30 秒（Python 转发 + ES 归一），异步后请求线程只做提交与查询。
+export function submitNlpExtractAsync(data) {
+  return request.post('/nlp/extract/async', data)
+}
+
+/** 查单条抽取结果：state = RUNNING | DONE | FAILED */
+export function getNlpExtractResult(taskId) {
+  return request.get(`/nlp/extract/async/${taskId}`)
+}
+
+/**
+ * 异步跑一次单条抽取并等结果。
+ *
+ * @param {{text: string}} data
+ * @returns {Promise<object>} NlpExtractVO（结构与同步接口一致）
+ */
+export async function runNlpExtractAsync(data) {
+  const submitted = await submitNlpExtractAsync(data)
+  const taskId = submitted?.data?.taskId
+  if (!taskId) {
+    throw new Error('提交失败：未拿到任务号')
+  }
+  // 与后端 AsyncTaskRegistry 的 120s 超时对齐并留余量，保证能读到后端判定的失败原因
+  return pollAsyncTask(() => getNlpExtractResult(taskId), {
+    timeoutMs: 150000,
+    timeoutMessage: '抽取超时，请重试',
+    failureMessage: '抽取失败，请重试',
+  })
 }
 
 // 批量解析：提交后台任务（仅管理员）

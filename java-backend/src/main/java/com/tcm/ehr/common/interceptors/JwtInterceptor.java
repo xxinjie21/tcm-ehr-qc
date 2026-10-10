@@ -69,13 +69,13 @@ public class JwtInterceptor implements HandlerInterceptor {
         if (auth == null || !auth.startsWith("Bearer ")) {
             return reject(response);
         }
-        // 2. 校验 token 有效性，无效即拒绝
+        // 2. 校验 token 并取出声明（一次完成：签名 + 有效期 + 令牌版本），无效即拒绝
         String token = auth.substring(7);
-        if (!jwtUtil.isValid(token)) {
+        Claims claims = jwtUtil.parseAndVerify(token);
+        if (claims == null) {
             return reject(response);
         }
-        // 3. 解析声明并写 request 属性，供角色校验与操作日志使用
-        Claims claims = jwtUtil.parseToken(token);
+        // 3. 写 request 属性，供角色校验与操作日志使用
         String userId = claims.getSubject();
         String username = String.valueOf(claims.get("username"));
         String role = String.valueOf(claims.get("role"));

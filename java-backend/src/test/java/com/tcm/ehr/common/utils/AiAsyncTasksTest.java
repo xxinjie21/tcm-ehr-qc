@@ -66,9 +66,9 @@ class AiAsyncTasksTest {
             return vo;
         });
 
-        AiAsyncTasks.Snapshot snap = await(tasks, taskId, Duration.ofSeconds(10));
+        AsyncTaskRegistry.Snapshot<AiReplyVO> snap = await(tasks, taskId, Duration.ofSeconds(10));
         assertNotNull(snap, "任务应能在 10s 内出结果");
-        assertEquals(AiAsyncTasks.State.DONE, snap.state(), "任务应成功完成：" + snap.error());
+        assertEquals(AsyncTaskRegistry.State.DONE, snap.state(), "任务应成功完成：" + snap.error());
         assertEquals(ORG + "|" + USER + "|" + ROLE + "|" + ORG_ROLE,
                 snap.reply().getAnswer(),
                 "H4：异步线程必须读到提交时刻捕获的上下文值，而不是「未知」");
@@ -84,19 +84,20 @@ class AiAsyncTasksTest {
             return vo;
         });
 
-        AiAsyncTasks.Snapshot snap = await(tasks, taskId, Duration.ofSeconds(10));
+        AsyncTaskRegistry.Snapshot<AiReplyVO> snap = await(tasks, taskId, Duration.ofSeconds(10));
         assertNotNull(snap, "无请求上下文时提交也应正常完成任务");
-        assertEquals(AiAsyncTasks.State.DONE, snap.state(), "任务应成功完成：" + snap.error());
+        assertEquals(AsyncTaskRegistry.State.DONE, snap.state(), "任务应成功完成：" + snap.error());
     }
 
     /** 轮询到终态（RUNNING / DONE / FAILED 之外即出）或超时 */
-    private static AiAsyncTasks.Snapshot await(AiAsyncTasks tasks, String id, Duration timeout)
+    private static AsyncTaskRegistry.Snapshot<AiReplyVO> await(AiAsyncTasks tasks, String id,
+                                                               Duration timeout)
             throws InterruptedException {
         long deadline = System.nanoTime() + timeout.toNanos();
-        AiAsyncTasks.Snapshot snap;
+        AsyncTaskRegistry.Snapshot<AiReplyVO> snap;
         do {
             snap = tasks.get(id);
-            if (snap != null && snap.state() != AiAsyncTasks.State.RUNNING) {
+            if (snap != null && snap.state() != AsyncTaskRegistry.State.RUNNING) {
                 return snap;
             }
             Thread.sleep(25);
@@ -121,18 +122,18 @@ class AiAsyncTasksTest {
             vo.setAnswer("A 实例算出来的");
             return vo;
         });
-        AiAsyncTasks.Snapshot fromA = await(a, taskId, Duration.ofSeconds(10));
+        AsyncTaskRegistry.Snapshot<AiReplyVO> fromA = await(a, taskId, Duration.ofSeconds(10));
         assertNotNull(fromA, "本实例应能在 10s 内出结果");
-        assertEquals(AiAsyncTasks.State.DONE, fromA.state(), "本实例应拿到成功结果：" + fromA.error());
+        assertEquals(AsyncTaskRegistry.State.DONE, fromA.state(), "本实例应拿到成功结果：" + fromA.error());
 
         // B 实例的进程内表是空的。真实前端也是轮询，这里同样等到终态
         AiAsyncTasks b = new AiAsyncTasks();
         b.setRedis(mockRedis(store));
         b.setObjectMapper(mapper);
 
-        AiAsyncTasks.Snapshot fromB = await(b, taskId, Duration.ofSeconds(10));
+        AsyncTaskRegistry.Snapshot<AiReplyVO> fromB = await(b, taskId, Duration.ofSeconds(10));
         assertNotNull(fromB, "R14：另一实例必须能从共享层读到任务，而不是当作不存在（404）");
-        assertEquals(AiAsyncTasks.State.DONE, fromB.state(), "共享层里的状态应已收敛为 DONE");
+        assertEquals(AsyncTaskRegistry.State.DONE, fromB.state(), "共享层里的状态应已收敛为 DONE");
         assertEquals("A 实例算出来的", fromB.reply().getAnswer(), "结果内容应跨实例一致");
     }
 

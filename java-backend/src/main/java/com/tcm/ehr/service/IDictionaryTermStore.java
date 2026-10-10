@@ -4,6 +4,7 @@ import com.tcm.ehr.domain.po.DictionaryVersion;
 import com.tcm.ehr.domain.po.TermEntry;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 组织级词典存储的接口契约：词条落 {@code dictionary_terms}，版本对账落
@@ -72,4 +73,31 @@ public interface IDictionaryTermStore {
 
     /** 某组织所有类型的有效词条总数 */
     int effectiveTermCount(String orgId);
+
+    /**
+     * 术语建议召回用的字符倒排索引，连同它所索引的那份生效词条表。
+     *
+     * <p><b>为什么两者必须一起给</b>：{@code postings} 里的值指向 {@code entries} 的串编号，
+     * 分两次取（先取词条、再取索引）在词典刚好变更时会让两者对不上。一次取回就同源。</p>
+     *
+     * <p>用途是<b>把全表扫描缩成候选扫描</b>：召回门槛是「与原文重叠 ≥2 个字符」，
+     * 而重叠只可能发生在「出现在原文里的字符」上 —— 所以「出现在原文任一字符的倒排表里」
+     * 是入选的<b>必要条件</b>，据此取出的候选集是超集，结果集与全表扫描逐条一致。</p>
+     *
+     * @param entries     生效词条（基础层 ∪ 本组织，口径同 {@link #readEffective}）
+     * @param stringOwner 串编号 → 该串所属词条在 {@code entries} 中的下标
+     * @param postings    字符 → 含该字符的串编号（升序；同一字符在一个串里出现多次只登记一次）
+     */
+    record RecallIndex(List<TermEntry> entries, int[] stringOwner, Map<Character, int[]> postings) {
+    }
+
+    /**
+     * 取某组织某类型的召回索引。
+     *
+     * <p>随词典版本失效 —— 与词条缓存同一版本号，不新增失效通道。</p>
+     *
+     * @param orgId 组织号；空串/null 视为基础层
+     * @param type  术语类型
+     */
+    RecallIndex recallIndex(String orgId, String type);
 }

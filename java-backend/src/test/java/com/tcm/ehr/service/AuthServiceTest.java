@@ -104,6 +104,30 @@ class AuthServiceTest {
                 .thenReturn(OrgResolution.NONE);
     }
 
+    /**
+     * 打桩「按 id 批量取组织」。
+     *
+     * <p>{@code isOrgStopped} 已由逐成员 {@code selectById} 改为 {@code selectBatchIds}
+     * （1 + N → 2 次查询），故这里按批量接口打桩。</p>
+     */
+    private void stubOrgs(Organization... orgs) {
+        java.util.Map<String, Organization> byId = new java.util.HashMap<>();
+        for (Organization o : orgs) {
+            byId.put(o.getId(), o);
+        }
+        Mockito.when(groupMapper.selectBatchIds(Mockito.anyCollection())).thenAnswer(inv -> {
+            java.util.Collection<?> ids = inv.getArgument(0);
+            java.util.List<Organization> out = new java.util.ArrayList<>();
+            for (Object id : ids) {
+                Organization o = byId.get(String.valueOf(id));
+                if (o != null) {
+                    out.add(o);
+                }
+            }
+            return out;
+        });
+    }
+
     /** 设为已属于某组（owner / member） */
     private void resolvesToGroup(String orgId, String groupRole) {
         Mockito.when(groupService.resolvePrimaryOrg(Mockito.anyString()))
@@ -228,7 +252,7 @@ class AuthServiceTest {
         Organization g = new Organization();
         g.setId("grp-xxj");
         g.setStatus(Organization.ARCHIVED);
-        when(groupMapper.selectById("grp-xxj")).thenReturn(g);
+        stubOrgs(g);
 
         LoginVO vo = authService.login("XXJ", "123456");
 
@@ -250,7 +274,7 @@ class AuthServiceTest {
         Organization g = new Organization();
         g.setId("grp-stopped");
         g.setStatus(Organization.STOPPED);
-        when(groupMapper.selectById("grp-stopped")).thenReturn(g);
+        stubOrgs(g);
 
         ForbiddenException ex = assertThrows(ForbiddenException.class,
                 () -> authService.login("zhangsan", "123456"));

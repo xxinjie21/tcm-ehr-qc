@@ -700,10 +700,11 @@ public class AiServiceImpl implements IAiService {
         AiReplyVO vo = new AiReplyVO();
 
         // 2. 规则地基：从现有词表按字面相似度召回候选（这一步不依赖 LLM）
-        List<TermEntry> all = termStore.readEffective(RequestUtils.currentOrgId(), type);
+        //    P1-15：词条与它的字符倒排表一次取回（同源，不会出现「索引与词条对不上」）
+        IDictionaryTermStore.RecallIndex index = termStore.recallIndex(RequestUtils.currentOrgId(), type);
         Map<String, List<TermEntry>> recalled = new LinkedHashMap<>();
         for (String t : terms) {
-            recalled.put(t, recallCandidates(t, all));
+            recalled.put(t, recallCandidates(t, index));
         }
         vo.setTermSuggestions(fallbackSuggestions(terms, recalled));
 
@@ -733,15 +734,51 @@ public class AiServiceImpl implements IAiService {
      *
      * <p>只做字面、不做语义 —— 语义判断交给 LLM。召回的作用是给它一个
      * 「系统已经认这些词」的约束，避免凭空造词。</p>
+     *
+     * <p><b>P1-15 / S1：先用倒排表把候选缩出来，再在候选内按原口径打分。</b>
+     * 原实现对每个待补词全量扫一遍词表（O(T×D×L²)）：证候类 2080 条时单条约两三千次字符比对，
+     * 国标全量导入后（D≈3 万）单条约 4.5 万次、T=500 就是千万级。</p>
+     *
+     * <p><b>为什么结果集不变</b>：门槛是「与原文重叠 ≥{@value #RECALL_MIN_OVERLAP} 个字符」，
+     * 而重叠只可能发生在「出现在原文里的字符」上 ⇒「出现在原文任一字符的倒排表里」是入选的
+     * <b>必要条件</b>。按它取候选是超集，落选的那些本来重叠就是 0，过不了门槛。
+     * 过滤阶段零精度损失；打分函数（{@link #overlap}）一字未动。</p>
+     *
+     * <p>包级可见是为了让「与全表扫描逐条一致」这条性质能被同步测试直接钉住 ——
+     * 它正是这次改造唯一可能出错的地方。</p>
      */
-    private static List<TermEntry> recallCandidates(String content, List<TermEntry> all) {
-        List<TermEntry> hit = new ArrayList<>();
-        for (TermEntry e : all) {
-            if (overlap(content, e) >= RECALL_MIN_OVERLAP) hit.add(e);
+    static List<TermEntry> recallCandidates(String content, IDictionaryTermStore.RecallIndex index) {
+        List<TermEntry> all = index.entries();
+        // 1. 倒排表取候选：出现在原文任一字符的倒排表里的词条（超集，见方法注释）
+        boolean[] candidate = new boolean[all.size()];
+        int[] stringOwner = index.stringOwner();
+        for (int i = 0; i < content.length(); i++) {
+            int[] posting = index.postings().get(content.charAt(i));
+            if (posting == null) {
+                continue;
+            }
+            for (int sid : posting) {
+                candidate[stringOwner[sid]] = true;
+            }
         }
-        // 按重叠字符数降序；List.sort 是稳定排序，同分保持词表原序
-        hit.sort((a, b) -> Integer.compare(overlap(content, b), overlap(content, a)));
-        return hit.size() > RECALL_TOP_N ? new ArrayList<>(hit.subList(0, RECALL_TOP_N)) : hit;
+        // 2. 候选内按原口径打分，并把分数**预计算**下来
+        //    （AI-7/A3：原先在排序比较器里现算 2 次 overlap，同一次召回里同一个词条被算好几遍）
+        List<int[]> hit = new ArrayList<>();
+        for (int t = 0; t < all.size(); t++) {
+            if (!candidate[t]) continue;
+            int ov = overlap(content, all.get(t));
+            if (ov >= RECALL_MIN_OVERLAP) {
+                hit.add(new int[]{t, ov});
+            }
+        }
+        // 3. 按重叠字符数降序；List.sort 是稳定排序，同分保持词表原序
+        hit.sort((a, b) -> Integer.compare(b[1], a[1]));
+        int n = Math.min(hit.size(), RECALL_TOP_N);
+        List<TermEntry> out = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            out.add(all.get(hit.get(i)[0]));
+        }
+        return out;
     }
 
     /** 原文与某词条的最大字符重叠数（标准词与各别名取最大） */

@@ -367,7 +367,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import NlpBatchPanel from '@/components/NlpBatchPanel.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { extractNlp, submitNlpBatch, getNlpBatchProgress, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
+import { runNlpExtractAsync, submitNlpBatch, getNlpBatchProgress, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
 import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
@@ -612,11 +612,11 @@ const runExtract = async () => {
   extracting.value = true
   extractError.value = ''
   try {
-    // 2. 提交字段拼接文本，落抽取结果
-    const res = await extractNlp({ text: composedText.value })
-    result.value = res.data
+    // 2. 提交字段拼接文本，落抽取结果（异步：提交拿任务号后轮询，不占请求线程）
+    const data = await runNlpExtractAsync({ text: composedText.value })
+    result.value = data
     // 3. 没抽到要素时提示一句，避免一片空白自己表达
-    if (!res.data.modelAvailable) {
+    if (!data.modelAvailable) {
       ElMessage.warning('本次没有抽取到病历要素，术语归一没有可归的内容')
     }
   } catch (e) {

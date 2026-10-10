@@ -10,6 +10,7 @@ FastAPI 服务，加载 Monor/hwtcmner（RoBERTa，13 标签 BIO）做 NER，
 import logging
 import os
 import re
+import threading
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional, Tuple
 
@@ -28,6 +29,18 @@ MODEL_DIR = os.environ.get("NLP_MODEL_DIR", "model")
 MAX_TEXT_CHARS = 20000
 # NER 的 token 上限；超出部分模型看不到（规则兜底仍用全文，见 _rules）
 NER_MAX_TOKENS = 510
+
+# 推理并发上限（AI-12）：extract 是同步 def，FastAPI 会把它投进 anyio 线程池（默认上限 40）；
+# torch 推理是 CPU 密集型，40 个线程同时跑只会争抢 GIL 与内存（RSS 峰值翻倍）。
+# 用信号量把「同时在跑的推理」收在本值以内 —— 超出者排队，而不是一起挤。
+INFER_CONCURRENCY = int(os.environ.get("NLP_INFER_CONCURRENCY", "4"))
+# 每个推理允许使用的 torch 线程数；0 = 沿用 torch 默认。
+# 与 INFER_CONCURRENCY 相乘才是真实 CPU 占用，两者一起设才能避免 oversubscribe。
+TORCH_NUM_THREADS = int(os.environ.get("NLP_TORCH_THREADS", "0"))
+# 推理信号量：只包住真正吃 CPU 的「编码 + 前向」
+_infer_sem = threading.Semaphore(INFER_CONCURRENCY)
+# torch 线程数只需设置一次
+_torch_threads_set = False
 
 # NER 标签类型 → 结构化字段（来源不映射 9 类，丢弃）。
 # 这只是「模型能输出的标签集」这一维度的 5 个值，是 EntityTypes.ALL 的过滤视图，
@@ -209,17 +222,22 @@ def _ner(text: str) -> Tuple[Dict[str, List[dict]], bool]:
     """
     import torch
 
-    # 1. 编码并保留字符偏移，超长按 NER_MAX_TOKENS 截断
-    enc = _tokenizer(text, return_offsets_mapping=True, return_tensors="pt",
-                     truncation=True, max_length=NER_MAX_TOKENS)
-    truncated = int(enc["input_ids"].shape[-1]) >= NER_MAX_TOKENS
-    offsets = enc.pop("offset_mapping")[0].tolist()
-    with torch.no_grad():
-        logits = _model(**enc).logits[0]
-    probs = torch.softmax(logits, dim=-1)
-    ids = logits.argmax(-1).tolist()
+    # 1. 进程内 torch 线程数只设一次（AI-12）：避免「请求并发 × 进程内线程」双重 oversubscribe
+    _apply_torch_threads(torch)
 
-    # 2. 逐 token 做 BIO 解码：B 起新实体、I 续接同字段、其余收尾当前实体
+    # 2. 编码 + 前向都在信号量内：并发超过 INFER_CONCURRENCY 时排队，而不是一起挤 CPU。
+    #    编码并保留字符偏移，超长按 NER_MAX_TOKENS 截断
+    with _infer_sem:
+        enc = _tokenizer(text, return_offsets_mapping=True, return_tensors="pt",
+                         truncation=True, max_length=NER_MAX_TOKENS)
+        truncated = int(enc["input_ids"].shape[-1]) >= NER_MAX_TOKENS
+        offsets = enc.pop("offset_mapping")[0].tolist()
+        with torch.no_grad():
+            logits = _model(**enc).logits[0]
+        probs = torch.softmax(logits, dim=-1)
+        ids = logits.argmax(-1).tolist()
+
+    # 3. 逐 token 做 BIO 解码：B 起新实体、I 续接同字段、其余收尾当前实体
     out: Dict[str, List[dict]] = {f: [] for f in FIELDS}
     cur_field, cur_start, cur_end, cur_confs = None, None, None, []
     for ti, ((start, end), lid) in enumerate(zip(offsets, ids)):
@@ -238,9 +256,22 @@ def _ner(text: str) -> Tuple[Dict[str, List[dict]], bool]:
         else:
             _flush(out, cur_field, text, cur_start, cur_end, cur_confs)
             cur_field, cur_start, cur_end, cur_confs = None, None, None, []
-    # 3. 收尾最后一个未闭合的实体
+    # 4. 收尾最后一个未闭合的实体
     _flush(out, cur_field, text, cur_start, cur_end, cur_confs)
     return out, truncated
+
+
+def _apply_torch_threads(torch) -> None:
+    """把进程内 torch 线程数固定下来（AI-12）；只生效一次，0 = 沿用默认。"""
+    global _torch_threads_set
+    if TORCH_NUM_THREADS <= 0 or _torch_threads_set:
+        return
+    try:
+        torch.set_num_threads(TORCH_NUM_THREADS)
+        _torch_threads_set = True
+        logger.info("[nlp] torch 线程数已设为 %d", TORCH_NUM_THREADS)
+    except Exception:  # 设置失败不影响推理，只是沿用默认线程数
+        logger.exception("[nlp] 设置 torch 线程数失败（沿用默认）")
 
 
 def _flush(out: Dict[str, List[Entity]], field: str, text: str,

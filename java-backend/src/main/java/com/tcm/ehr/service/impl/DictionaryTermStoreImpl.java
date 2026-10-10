@@ -47,6 +47,15 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /** 词条读取缓存：键 `org|type`，版本用 dictionary_versions.version（内容哈希） */
     private final com.tcm.ehr.common.utils.VersionedCache<List<TermEntry>> termsCache =
             new com.tcm.ehr.common.utils.VersionedCache<>(64);
+    /**
+     * 召回索引缓存（P1-15 / S1）：键 {@code org|type}，版本 = 「本组织内容哈希 + 基础层内容哈希」。
+     *
+     * <p>与 {@code termsCache} 同一套版本号，因此失效走的是同一条通道（写路径主动失效 +
+     * 版本比对），没有新增任何失效机制。基础层变更会改变版本串的前半段，
+     * 于是所有组织的索引一并自然失效。</p>
+     */
+    private final com.tcm.ehr.common.utils.VersionedCache<RecallIndex> recallIndexCache =
+            new com.tcm.ehr.common.utils.VersionedCache<>(64);
     private final ObjectMapper objectMapper;
 
     /**
@@ -104,6 +113,81 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     }
 
     /**
+     * 取召回索引（P1-15 / S1）：生效词条表 + 它的字符倒排表，一次装载、同源返回。
+     *
+     * <p><b>为什么缓存的是「合并后的生效词条」</b>：{@link #readEffective} 每次都要把两层
+     * 合并一遍（O(D)），而召回索引本来就要遍历一遍全部词条 —— 合并与建表在同一次装载里做完，
+     * 之后按版本复用。</p>
+     *
+     * <p>版本串取「本组织哈希 + 基础层哈希」两段：任一层内容变了版本必变，
+     * 不必区分「这次变的是哪一层」。基础层为空时对应的那段是空串，不影响判等。</p>
+     */
+    @Override
+    public RecallIndex recallIndex(String orgId, String type) {
+        String org = norm(orgId);
+        String version = layerVersion(org, type) + "+" + layerVersion(BASE_ORG, type);
+        return recallIndexCache.get(org + "|" + type, version,
+                () -> buildRecallIndex(readEffective(orgId, type)));
+    }
+
+    /** 某一层某类型的内容版本；没有版本行时给空串（与 {@link #read} 的口径一致） */
+    private String layerVersion(String org, String type) {
+        DictionaryVersion v = cachedVersion(org, type);
+        return v == null || v.getVersion() == null ? "" : v.getVersion();
+    }
+
+    /**
+     * 由词条表建字符倒排索引。
+     *
+     * <p>登记范围是「标准词 + 各别名」—— 与 {@code overlap} 的比对范围一致（一个词条的多串取最大），
+     * 少登记任何一串都会让本该入选的词条漏掉。空串 / null 不登记（它们与任何原文的交集都是 0）。</p>
+     *
+     * <p>每个串的编号按「词条序 → 串序」递增分配，因此各字符的倒排表天然按下标升序，
+     * 调用方可以直接顺序扫描。</p>
+     *
+     * <p>包级可见是为了让「索引与全表扫描召回结果一致」这条性质能被同步测试直接钉住。</p>
+     */
+    static RecallIndex buildRecallIndex(List<TermEntry> entries) {
+        // 1. 逐词条登记它参与比对的串，并记下「串 → 词条」的归属
+        List<Integer> stringOwner = new ArrayList<>();
+        Map<Character, List<Integer>> postingLists = new HashMap<>();
+        for (int e = 0; e < entries.size(); e++) {
+            TermEntry entry = entries.get(e);
+            List<String> texts = new ArrayList<>(1 + (entry.getAliases() == null ? 0 : entry.getAliases().size()));
+            if (entry.getStandardTerm() != null) {
+                texts.add(entry.getStandardTerm());
+            }
+            if (entry.getAliases() != null) {
+                texts.addAll(entry.getAliases());
+            }
+            for (String s : texts) {
+                if (s == null || s.isEmpty()) {
+                    continue;
+                }
+                int sid = stringOwner.size();
+                stringOwner.add(e);
+                for (int i = 0; i < s.length(); i++) {
+                    postingLists.computeIfAbsent(s.charAt(i), k -> new ArrayList<>()).add(sid);
+                }
+            }
+        }
+        // 2. 倒排表定长化：ArrayList 装箱的代价在「每次召回都要遍历」面前不值得留
+        Map<Character, int[]> postings = new HashMap<>(postingLists.size() * 2);
+        postingLists.forEach((c, ids) -> {
+            int[] arr = new int[ids.size()];
+            for (int i = 0; i < arr.length; i++) {
+                arr[i] = ids.get(i);
+            }
+            postings.put(c, arr);
+        });
+        int[] owners = new int[stringOwner.size()];
+        for (int i = 0; i < owners.length; i++) {
+            owners[i] = stringOwner.get(i);
+        }
+        return new RecallIndex(List.copyOf(entries), owners, postings);
+    }
+
+    /**
      * 读某一层（不回落）的原始词条。
      *
      * @param orgId 组织号；空串 = 基础层
@@ -149,6 +233,9 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             // 主动失效：内容哈希相同（同一份内容重灌）时版本不变，但库里的行 ID 已经换了一批，
             // 缓存里那份 list 仍是可用的等价内容 —— 这里失效是为了让「重灌后立刻读」拿到新行
             termsCache.invalidate(org + "|" + type);
+            // 召回索引同源失效（P1-15）：它缓存的正是由 termsCache 那份词条建出来的倒排表，
+            // 只失效词条不失效索引，会让「重灌后立刻召回」用着旧表去索引新词条
+            recallIndexCache.invalidate(org + "|" + type);
             // 版本缓存同样要失效（批次 12 · 12a）：否则重灌后紧接着的读会拿旧版本号
             invalidateVersionCache(org, type);
         };

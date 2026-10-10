@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,15 +92,22 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // 批次12 · 12c（第二步）：由「整批载入」改为**惰性分页**。
         // 原实现把 3.5 万行一次读进内存，每行还带 1.3KB 的 structured_data（合计 43.8MB）——
         // 这是清洗的堆占用来源。下面保持 for-each 写法**一行不改**，只把数据源换成按页拉取。
-        QueryWrapper<Record> wrapper = recordIds != null && !recordIds.isEmpty()
-                ? RecordFilter.build(RequestUtils.currentOrgId(), new FiltersDTO()).in("id", recordIds)
-                : com.tcm.ehr.common.utils.RecordFilter.build(RequestUtils.currentOrgId(), filters);
-        Iterable<Record> records = pagedRecords(wrapper);
+        // P1-3：wrapper 改为「每页重建」的工厂 —— keyset 锚点必须追加到一份干净的条件上
+        // （QueryWrapper.and() 是原地追加，复用同一份会逐页累积 WHERE）。
+        java.util.function.Supplier<QueryWrapper<Record>> wrapperFactory = () ->
+                recordIds != null && !recordIds.isEmpty()
+                        ? RecordFilter.build(RequestUtils.currentOrgId(), new FiltersDTO()).in("id", recordIds)
+                        : RecordFilter.build(RequestUtils.currentOrgId(), filters);
+        // P1-17 / T3：本页的 structured_data 解析结果留档，供「预热」与「逐条清洗」共用 ——
+        // 预热要读同一份内容，不共用就得为预热再解析一遍（T16 的「只解析一次」不能因预热回退）。
+        Map<String, Map<String, Object>> pageParsed = new HashMap<>();
+        Iterable<Record> records = pagedRecords(wrapperFactory,
+                page -> prefetchPage(page, RequestUtils.currentOrgId(), pageParsed));
 
         CleanResultVO vo = new CleanResultVO();
-        // total 单独查一次：逐页再算总数是浪费（分页时已关闭 searchCount）。
+        // total 单独查一次：逐页再算总数是浪费。
         // 注意 selectCount 返回 Long，不能 (int) 直接强转，须 intValue()。
-        vo.setTotal(baseMapper.selectCount(wrapper).intValue());
+        vo.setTotal(baseMapper.selectCount(wrapperFactory.get()).intValue());
 
         Set<String> seenTextHash = new HashSet<>();
         // T13：词典元数据一批只取一次（惰性 —— 本批没有任何归一需求时一次库都不查）。
@@ -148,7 +156,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             //    不再让「校验（readTree）」与「归一（readValue）」各解析同一份 JSON 一遍。
             //    structured == null 同时覆盖「没有 structured_data」与「有但解析不了」两种情形。
             boolean hasStructured = r.getStructuredData() != null && !r.getStructuredData().isBlank();
-            Map<String, Object> structured = hasStructured ? parseStructuredData(r.getStructuredData()) : null;
+            // P1-17：走本页留档的解析结果（预热时已解析过），不再解析第二遍
+            Map<String, Object> structured = hasStructured ? structuredOf(pageParsed, r) : null;
             boolean unrecoverable = (TextUtil.isBlank(r.getChiefComplaint()) && TextUtil.isBlank(r.getTcmDiagnosis())
                     && TextUtil.isBlank(r.getPresentIllness()) && TextUtil.isBlank(r.getSelfReport()))
                     || (hasStructured && structured == null);
@@ -235,29 +244,56 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private static final int CLEAN_PAGE_SIZE = 1000;
 
     /**
-     * 惰性分页取病历（批次12 · 12c 的「流式」那一半）。
+     * 惰性游标分页取病历（P1-3 / AI-8 / C3）。
      *
-     * <p>3.5 万行的堆占用从「一次全驻留」降到「一页」。依赖 {@code MybatisPlusConfig} 里已注册的
-     * {@code PaginationInnerInterceptor(MYSQL)}；没有它 {@code selectPage} 会忽略分页一次返回全部。</p>
+     * <p>3.5 万行的堆占用从「一次全驻留」降到「一页」。分页本身由 keyset 承担：
+     * offset 分页的末页要扫过前 3.9 万行（4 万条 40 页，累计扫描量约为实际行数的 20 倍），
+     * 游标锚定上一页末条 {@code (visit_time, id)} 后是纯区间扫描（配
+     * {@code idx_records_org_visit_time} 后实测 4.9s → 0.2s）。</p>
      *
-     * <p><b>注意</b>：本迭代器把「取完」定义为**取到空页**。替身若每次都返回同一条非空页，
-     * 迭代器会一直认为还有数据 —— 测试里要「第一次给一条、第二次给空页」。</p>
+     * <p>⚠️ {@code wrapperFactory} 每页调用一次：{@code QueryWrapper.and()} 是原地追加，
+     * 复用同一份 wrapper 会让 WHERE 逐页累积。</p>
+     *
+     * <p><b>取完</b>定义为「取到空页」或「不满一页」——两者都表示没有下一页。</p>
+     *
+     * @param onPage 每取到一页就回调一次（**在该页任何一条被消费之前**）。
+     *               P1-17 用它做「本页术语召回预热」：预热必须早于逐条归一，否则毫无意义；
+     *               放在这里而不是循环体里，是因为循环体是按条消费的、看不到页边界。
      */
-    private Iterable<Record> pagedRecords(QueryWrapper<Record> wrapper) {
+    private Iterable<Record> pagedRecords(java.util.function.Supplier<QueryWrapper<Record>> wrapperFactory,
+                                          Consumer<List<Record>> onPage) {
         return () -> new java.util.Iterator<Record>() {
-            private int page = 1;
+            private boolean firstPage = true;
+            private boolean exhausted;
+            private LocalDateTime cursorVt;
+            private String cursorId;
             private java.util.Iterator<Record> current = java.util.Collections.emptyIterator();
 
             @Override
             public boolean hasNext() {
                 while (!current.hasNext()) {
-                    com.baomidou.mybatisplus.extension.plugins.pagination.Page<Record> p =
-                            new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page++, CLEAN_PAGE_SIZE);
-                    p.setSearchCount(false);
-                    List<Record> rows = baseMapper.selectPage(p, wrapper).getRecords();
-                    if (rows.isEmpty()) {
+                    if (exhausted) {
                         return false;
                     }
+                    QueryWrapper<Record> w = wrapperFactory.get();
+                    if (!firstPage) {
+                        RecordKeyset.anchorAfter(w, cursorVt, cursorId);
+                    }
+                    firstPage = false;
+                    List<Record> rows = baseMapper.selectList(w.last("LIMIT " + CLEAN_PAGE_SIZE));
+                    if (rows.isEmpty()) {
+                        exhausted = true;
+                        return false;
+                    }
+                    // P1-17：本页任何一条被消费之前先预热（解析留档 + 按类型批量问一次 ES）
+                    onPage.accept(rows);
+                    // 不满一页即到末尾：记下锚点后仍要把这一页发完
+                    if (rows.size() < CLEAN_PAGE_SIZE) {
+                        exhausted = true;
+                    }
+                    Record last = rows.get(rows.size() - 1);
+                    cursorVt = last.getVisitTime();
+                    cursorId = last.getId();
                     current = rows.iterator();
                 }
                 return true;
@@ -288,6 +324,90 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             });
         } catch (JacksonException e) {
             return null;
+        }
+    }
+
+    /**
+     * 取本页留档的解析结果；不在留档里（理论上不该发生）就现解析一次。
+     *
+     * <p>用 {@code containsKey} 而不是 {@code get != null} 判断：解析失败时留档的就是 {@code null}，
+     * 那同样是「已解析过」的结论，不能据此再解析一遍。</p>
+     */
+    private Map<String, Object> structuredOf(Map<String, Map<String, Object>> pageParsed, Record r) {
+        if (pageParsed.containsKey(r.getId())) {
+            return pageParsed.get(r.getId());
+        }
+        return parseStructuredData(r.getStructuredData());
+    }
+
+    /**
+     * 按页预热术语召回（P1-17 / T3）：把本页所有待归一原文按类型收集好，一类一次问完 ES。
+     *
+     * <p><b>改的是什么</b>：清洗链路原先逐实体调 {@code normalize}，每个实体一次 ES 往返 ——
+     * 一页 1000 条病历、每条十几个实体，就是上万次往返。这里在<b>本页任何一条被归一之前</b>
+     * 先批量问一次，随后逐条归一全部命中召回缓存。复用解析链路既有的
+     * {@link EsTermNormalizer#prefetch}（内部走 {@code _msearch}），不新增批量查询接口。</p>
+     *
+     * <p><b>不改的是什么</b>：预热只写召回缓存、不参与判定。命中与否仍由三级规则与 Dice 阈值决定，
+     * 预取失败也不影响正确性（逐条归一照常走 ES）。</p>
+     *
+     * <p><b>只预热有独立词典的 5 类</b>（疾病 / 证候 / 症状 / 中药 / 方剂）。舌象、脉象、病因、治法
+     * 没有词典，清洗链路对它们根本不调 ES（见 {@link #normalizeEntityList}），预热没有意义。</p>
+     *
+     * <p>预热粒度是「一页」而非整批：召回缓存本身有容量上限（{@code RECALL_CACHE_MAX}），
+     * 一次问进远超用量的术语只会把先问进来的挤出去。一页正好是「问进来就马上用掉」的窗口。</p>
+     *
+     * <p>顺带把本页的 {@code structured_data} 解析结果留在 {@code pageParsed} 里供逐条清洗复用 ——
+     * 预热要读同一份内容，不共用就得为预热再解析一遍（T16 的「只解析一次」不能因预热回退）。</p>
+     */
+    private void prefetchPage(List<Record> page, String orgId,
+                              Map<String, Map<String, Object>> pageParsed) {
+        // 0. 只留本页的解析结果：回调一定发生在上页被消费完之后，这里清掉不会影响上页；
+        //    不清的话整批 4 万条的解析结果会一直挂在内存里 —— 那正是 12c 要消掉的堆占用。
+        pageParsed.clear();
+        // 1. 逐条解析本页 structured_data（留档复用），并按类型收集待归一原文
+        Map<String, Set<String>> rawsByType = new HashMap<>();
+        for (Record r : page) {
+            String json = r.getStructuredData();
+            if (json == null || json.isBlank()) {
+                continue;
+            }
+            Map<String, Object> data = parseStructuredData(json);
+            pageParsed.put(r.getId(), data);
+            if (data == null) {
+                continue;
+            }
+            // 2. 有词典的 4 类 entity：原文取 content（与 normalizeEntityList 同口径）
+            for (String key : List.of("diseases", "symptoms", "patternList", "formulaList")) {
+                String type = mapEntityType(key);
+                if (type != null) {
+                    collectEntityRaws(rawsByType, type, data.get(key), "content");
+                }
+            }
+            // 3. 中药是另一套：原文取 name（与 normalizeHerbs 同口径）
+            collectEntityRaws(rawsByType, "herb", data.get("herbs"), "name");
+        }
+        // 4. 一类一趟 _msearch；结果写进与单条 search 相同的缓存键，随后逐条归一直接命中
+        rawsByType.forEach((type, raws) -> termNormalizer.prefetch(type, orgId, new ArrayList<>(raws)));
+    }
+
+    /** 从结构化数据的某一类实体里收集待归一原文（实体取 content、中药取 name），同批内去重 */
+    @SuppressWarnings("unchecked")
+    private void collectEntityRaws(Map<String, Set<String>> out, String type, Object listObj, String termField) {
+        // 1. 该类不是列表（缺失 / 脏数据）就没得预热
+        if (!(listObj instanceof List<?> list)) {
+            return;
+        }
+        Set<String> raws = out.computeIfAbsent(type, k -> new LinkedHashSet<>());
+        // 2. 逐条取原文：空值 / 空白跳过（归一自己会判空，预热不必带上）
+        for (Object item : list) {
+            if (!(item instanceof Map)) continue;
+            Object v = ((Map<String, Object>) item).get(termField);
+            if (v == null) continue;
+            String s = String.valueOf(v);
+            if (!s.isBlank()) {
+                raws.add(s);
+            }
         }
     }
 

@@ -62,11 +62,14 @@
             </div>
             <div v-if="!deductions.length && precheck" class="ok">无扣分项</div>
 
-            <template v-if="aiLines.length">
+            <template v-if="aiLines.length || aiLoading">
               <p class="ded-hd">AI 预检建议</p>
               <div class="ai-box">
-                <p v-for="(l, i) in aiLines" :key="i">{{ l }}</p>
-                <span class="ai-src">{{ aiSource === 'rule' ? '规则预检（LLM 未启用）' : 'AI 建议' }}</span>
+                <p v-if="aiLoading" class="ai-src">正在生成 AI 预检建议…</p>
+                <template v-else>
+                  <p v-for="(l, i) in aiLines" :key="i">{{ l }}</p>
+                  <span class="ai-src">{{ aiSource === 'rule' ? '规则预检（LLM 未启用）' : 'AI 建议' }}</span>
+                </template>
               </div>
             </template>
           </div>
@@ -221,6 +224,9 @@ const record = ref(null)
 const precheck = ref(null)
 const aiAnswer = ref('')
 const aiSource = ref('')
+// AI 预检建议独立加载态（AI-19）：原来它与「读取复核详情」共用 detailLoading，
+// LLM 慢时复核员要等最长 150s 才能看到左侧扣分明细。现在详情先出、建议异步补入。
+const aiLoading = ref(false)
 const remark = ref('')
 const submitting = ref(false)
 const result = ref(null)
@@ -394,6 +400,8 @@ const openReview = async (row) => {
   record.value = null
   precheck.value = null
   aiAnswer.value = ''
+  aiSource.value = ''
+  aiLoading.value = false
   result.value = null
   remark.value = ''
   Object.keys(editValues).forEach((k) => delete editValues[k])
@@ -406,25 +414,44 @@ const openReview = async (row) => {
     precheck.value = sr.data
     // 列表不再内联 structuredData（P5.3），一律以病历详情为准
     fillEditors(raw.data?.structuredData)
-    try {
-      // 5. 取 AI 预检建议，失败不影响复核（仅提示以扣分明细为准）。
-      //    走异步路（15.1）：提交拿任务号再轮询，生成期间不占请求线程；
-      //    返回的是 reply 本体（不是 axios 响应）。
-      const ai = await runAiAsync('review', { recordId: row.recordId })
-      aiAnswer.value = ai?.answer || ''
-      aiSource.value = ai?.source || ''
-    } catch {
-      aiAnswer.value = '（AI 预检不可用，请以左侧扣分明细为准）'
-    }
     // 展开后滚动到任务卡，避免用户以为「点了没反应」
-    // 6. 等渲染完成再滚动到任务卡
+    // 5. 等渲染完成再滚动到任务卡
     await Promise.resolve()
     document.querySelector('.task-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } catch {
     // 拦截器已提示
   } finally {
-    // 7. 无论成败都收掉加载态
+    // 6. 详情到手即收掉加载态（AI-19）：首屏耗时回到「一次查库」，
+    //    不再被 LLM 生成时长拖住
     detailLoading.value = false
+  }
+  // 7. AI 预检建议独立加载，不阻塞详情（LLM 慢时也只是右侧建议晚几秒出现）
+  loadAiSuggestion(row.recordId)
+}
+
+/**
+ * 取 AI 预检建议（AI-19）。
+ *
+ * <p>独立于 {@link openReview} 的详情加载：走异步路（15.1），提交拿任务号再轮询；
+ * 失败不影响复核，仅提示以扣分明细为准。写回前校验「当前任务仍是发起时那条」——
+ * 用户可能在生成期间切走或关闭详情，否则会把上一条病历的建议写到当前面板上。</p>
+ *
+ * @param {string} recordId 发起时的病历 ID
+ */
+const loadAiSuggestion = async (recordId) => {
+  aiLoading.value = true
+  try {
+    const ai = await runAiAsync('review', { recordId })
+    if (current.value?.recordId !== recordId) return
+    aiAnswer.value = ai?.answer || ''
+    aiSource.value = ai?.source || ''
+  } catch {
+    if (current.value?.recordId !== recordId) return
+    aiAnswer.value = '（AI 预检不可用，请以左侧扣分明细为准）'
+  } finally {
+    if (current.value?.recordId === recordId) {
+      aiLoading.value = false
+    }
   }
 }
 
@@ -434,6 +461,7 @@ const exitDetail = () => {
   precheck.value = null
   aiAnswer.value = ''
   aiSource.value = ''
+  aiLoading.value = false
   remark.value = ''
   Object.keys(editValues).forEach((k) => delete editValues[k])
   originalMap.value = {}

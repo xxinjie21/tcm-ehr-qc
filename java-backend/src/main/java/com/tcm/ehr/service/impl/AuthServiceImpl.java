@@ -273,16 +273,17 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         }
         List<OrganizationMember> members = groupMemberMapper.selectList(
                 new QueryWrapper<OrganizationMember>().eq("user_id", userId));
-        for (OrganizationMember m : members) {
-            if (m.getOrgId() == null || m.getOrgId().isBlank()) {
-                continue;
-            }
-            Organization grp = groupMapper.selectById(m.getOrgId());
-            if (grp != null && Organization.STOPPED.equals(grp.getStatus())) {
-                return true;
-            }
+        // 一次批量取回全部组织（原为逐成员 selectById：1 + N 次查询 → 2 次）
+        List<String> orgIds = members.stream()
+                .map(OrganizationMember::getOrgId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (orgIds.isEmpty()) {
+            return false;
         }
-        return false;
+        return groupMapper.selectBatchIds(orgIds).stream()
+                .anyMatch(grp -> grp != null && Organization.STOPPED.equals(grp.getStatus()));
     }
 
     // ---------------------------------------------------------------- 登出

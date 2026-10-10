@@ -3,6 +3,7 @@ package com.tcm.ehr.controller;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.AiAsyncTasks;
+import com.tcm.ehr.common.utils.AsyncTaskRegistry;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
 import com.tcm.ehr.domain.vo.AiReplyVO;
 import com.tcm.ehr.service.IAiService;
@@ -92,7 +93,7 @@ public class AiController {
      */
     @GetMapping("/async/{taskId}")
     public ResponseEntity<Result<Map<String, Object>>> asyncResult(@PathVariable String taskId) {
-        AiAsyncTasks.Snapshot s = aiAsyncTasks.get(taskId);
+        AsyncTaskRegistry.Snapshot<AiReplyVO> s = aiAsyncTasks.get(taskId);
         if (s == null) {
             return ResponseEntity.status(404).body(Result.error(1006, "任务不存在或已过期"));
         }

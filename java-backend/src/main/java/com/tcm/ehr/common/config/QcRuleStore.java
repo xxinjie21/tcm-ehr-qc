@@ -37,6 +37,12 @@ public class QcRuleStore {
     /** 组织级规则的解析结果缓存（版本一致就复用，避免批任务逐条重新解析 rules_json） */
     private final com.tcm.ehr.common.utils.VersionedCache<QcRuleSet> perOrg =
             new com.tcm.ehr.common.utils.VersionedCache<>(64);
+    /** 组织规则行的短 TTL（T14）：5s 内不重复 selectById；写路径主动清 */
+    private static final long ROW_CACHE_TTL_MS = 5_000L;
+    /** 行缓存条目；row 允许为 null（该组织没有行也是稳定事实，同样值得短缓存） */
+    private record RowCacheEntry(QcRule row, long expiresAtMs) {
+    }
+    private final java.util.Map<String, RowCacheEntry> rowCache = new java.util.concurrent.ConcurrentHashMap<>();
     /** 最近一次 normalize 的告警（不可变快照，整体替换；见 26.10） */
     private volatile List<String> warnings = List.of();
 
@@ -64,7 +70,7 @@ public class QcRuleStore {
         if (orgId == null || orgId.isBlank()) {
             return baseline();
         }
-        QcRule row = ruleMapper.selectById(orgId);
+        QcRule row = rowFor(orgId);
         if (row == null || row.getRulesJson() == null || row.getRulesJson().isBlank()) {
             return baseline();
         }
@@ -74,6 +80,26 @@ public class QcRuleStore {
         String v = version.get() + ":"
                 + (row.getUpdateTime() == null ? "" : row.getUpdateTime().toString());
         return perOrg.get(orgId, v, () -> parseOrBaseline(orgId, row));
+    }
+
+    /**
+     * 取组织规则行，5 秒内复用同一行（T14）。
+     *
+     * <p>只缓存解析结果是不够的：版本串要由行本身（{@code update_time}）算出来，
+     * 所以每次 {@code getFor} 仍要 {@code selectById} —— 批量质控 / 批解析逐条调用时
+     * 4 万条就是 4 万次查询。这里给「行」加一层短 TTL，与
+     * {@code DictionaryTermStoreImpl} 的 {@code cachedVersion} 同一范式：
+     * 靠短 TTL 兜住跨实例变更，写路径<b>主动删 key</b> 保证本实例立即生效。</p>
+     */
+    private QcRule rowFor(String orgId) {
+        long now = System.currentTimeMillis();
+        RowCacheEntry cached = rowCache.get(orgId);
+        if (cached != null && cached.expiresAtMs() > now) {
+            return cached.row();
+        }
+        QcRule row = ruleMapper.selectById(orgId);
+        rowCache.put(orgId, new RowCacheEntry(row, now + ROW_CACHE_TTL_MS));
+        return row;
     }
 
     /** 解析某组织的规则 JSON；坏数据回退默认并留告警（存量坏数据不该让质检停摆） */
@@ -159,6 +185,8 @@ public class QcRuleStore {
     /** 写路径改完必须显式失效该组织的缓存：版本串里的 update_time 只到秒，同秒两次写会撞上 */
     private void invalidate(String orgId) {
         perOrg.invalidate(orgId);
+        // 行缓存也要清：否则本实例在 5s 内仍读到旧行（写后立即读是保存接口的常规路径）
+        rowCache.remove(orgId);
     }
 
     public List<String> warnings() {

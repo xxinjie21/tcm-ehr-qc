@@ -3,7 +3,6 @@ package com.tcm.ehr.service.impl;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.ehr.common.exception.TermIndexUnavailableException;
 import com.tcm.ehr.common.utils.DictMeta;
 import com.tcm.ehr.common.utils.DistLock;
@@ -12,6 +11,7 @@ import com.tcm.ehr.common.utils.NlpTextComposer;
 import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RecordKeyset;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
 import com.tcm.ehr.domain.dto.FiltersDTO;
@@ -28,6 +28,10 @@ import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.INlpBatchService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -104,6 +108,24 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 该列由 cancel() 的运行中分支写入 —— 只置本集合的话，重启或换实例取消都无效。
      */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
+
+    /**
+     * 批写通道（P1-4）。可选装配：单测直接 {@code new} 时为 {@code null} → 退化为逐条写，
+     * 语义与改造前一致，不改既有测试的构造调用。
+     */
+    private SqlSessionFactory sqlSessionFactory;
+
+    @Autowired(required = false)
+    public void setSqlSessionFactory(SqlSessionFactory sqlSessionFactory) {
+        this.sqlSessionFactory = sqlSessionFactory;
+    }
+
+    /** 批量回写的攒批大小：500 条一次 flush，4 万条由 4 万次往返降到 80 次 */
+    private static final int WRITE_BATCH_SIZE = 500;
+
+    /** 一条待回写的 structured_data（P1-4）：先攒批，再统一 flush */
+    private record StructuredWrite(String id, String json) {
+    }
 
     private volatile boolean running;
     private ExecutorService workers;
@@ -672,43 +694,60 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 按筛选范围分页处理；返回是否被取消 */
     private boolean runByFilter(String id, NlpTask t, List<NlpTaskVO.Failure> failures,
                                 boolean[] truncated, int[] processed) {
-        // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）
+        // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）；filtersJson 只反序列化一次
         int limit = t.getTotal() == null ? 0 : t.getTotal();
-        QueryWrapper<Record> wrapper = RecordFilter.build(t.getOrgId(), readFilters(t.getFiltersJson()));
+        com.tcm.ehr.domain.dto.FiltersDTO frozenFilters = readFilters(t.getFiltersJson());
         // 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
         DictMeta dictMeta = new DictMeta(termStore, t.getOrgId());
-        int pageNo = 1;
-        // 2. 分页循环取数：每页都先看取消位，避免停得慢
-        while (true) {
-            if (cancelFlags.contains(id) || isCancelRequested(id)) {
-                return true;
-            }
-            // searchCount=false：本循环只按页取数、从不读 total；默认每页都发一次全量 COUNT，
-            // 长任务下等于把同一 COUNT 重复执行几十次（审计 2026-10-09）
-            Page<Record> page = recordMapper.selectPage(new Page<>(pageNo, PAGE_SIZE, false), wrapper);
-            List<Record> list = page.getRecords();
-            if (list.isEmpty()) {
-                break;
-            }
-            // 3. 逐条处理：内存取消位逐条查；库里的每 PROGRESS_EVERY 条查一次 ——
-            //    逐条查库在 3.5 万条量级就是 3.5 万次查询
-            for (Record r : list) {
-                if (cancelFlags.contains(id)
-                        || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
+        // 2. 游标分页循环取数（P1-3 / AI-8）：keyset 锚定上一页末条 (visit_time, id) 而非 offset ——
+        //    offset 每页都要重排剩余全表（4 万条 200 页，累计扫描量约为实际行数的 20 倍）。
+        //    id 主键唯一 → (visit_time, id) 严格全序，不漏行不重复。
+        //    ⚠️ wrapper 每页重建：QueryWrapper.and() 原地追加，复用会逐页累积 WHERE。
+        java.time.LocalDateTime cursorVt = null;
+        String cursorId = null;
+        boolean firstPage = true;
+        // 3. P1-4：回写走攒批（见 flushStructuredData）。任何出口都要刷掉尾批 ——
+        //    取消 / 中断 / 执行期异常时已算好的归一结果不能丢：重跑要重新调一次抽取服务。
+        List<StructuredWrite> pending = new ArrayList<>();
+        try {
+            while (true) {
+                if (cancelFlags.contains(id) || isCancelRequested(id)) {
                     return true;
                 }
-                if (processed[0] >= limit) {
-                    return false;
+                QueryWrapper<Record> wrapper = RecordFilter.build(t.getOrgId(), frozenFilters);
+                if (!firstPage) {
+                    RecordKeyset.anchorAfter(wrapper, cursorVt, cursorId);
                 }
-                step(id, r, t, failures, truncated, processed, dictMeta);
+                firstPage = false;
+                List<Record> list = recordMapper.selectList(wrapper.last("LIMIT " + PAGE_SIZE));
+                if (list.isEmpty()) {
+                    break;
+                }
+                // 4. 逐条处理：内存取消位逐条查；库里的每 PROGRESS_EVERY 条查一次 ——
+                //    逐条查库在 3.5 万条量级就是 3.5 万次查询
+                for (Record r : list) {
+                    if (cancelFlags.contains(id)
+                            || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
+                        return true;
+                    }
+                    if (processed[0] >= limit) {
+                        return false;
+                    }
+                    step(id, r, t, failures, truncated, processed, dictMeta, pending);
+                }
+                // 5. 不满一页即到末尾
+                if (list.size() < PAGE_SIZE) {
+                    break;
+                }
+                // 6. 记下上一页末条作为下一页锚点（取末条、必含 id）
+                Record last = list.get(list.size() - 1);
+                cursorVt = last.getVisitTime();
+                cursorId = last.getId();
             }
-            // 4. 不满一页即到末尾
-            if (list.size() < PAGE_SIZE) {
-                break;
-            }
-            pageNo++;
+            return false;
+        } finally {
+            flushStructuredData(pending);
         }
-        return false;
     }
 
     /** 按记录ID集合分块处理（导入后自动解析用）；返回是否被取消 */
@@ -742,34 +781,42 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 .stream().map(Record::getId).toList();
         // 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
         DictMeta dictMeta = new DictMeta(termStore, t.getOrgId());
-        // 1. 按页大小切块：IN 过长会让 SQL 变慢
-        for (int off = 0; off < ids.size(); off += PAGE_SIZE) {
-            // 2. 每块开始前看取消位
-            if (cancelFlags.contains(id) || isCancelRequested(id)) {
-                return true;
-            }
-            List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
-            // 3. 一次批量取回该块，再逐条处理（库里的取消位同样每 PROGRESS_EVERY 条查一次）
-            List<Record> list = recordMapper.selectBatchIds(chunk);
-            for (Record r : list) {
-                if (cancelFlags.contains(id)
-                        || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
+        // P1-4：与 runByFilter 同一套攒批回写；任何出口（含取消/异常）都要刷掉尾批
+        List<StructuredWrite> pending = new ArrayList<>();
+        try {
+            // 1. 按页大小切块：IN 过长会让 SQL 变慢
+            for (int off = 0; off < ids.size(); off += PAGE_SIZE) {
+                // 2. 每块开始前看取消位
+                if (cancelFlags.contains(id) || isCancelRequested(id)) {
                     return true;
                 }
-                step(id, r, t, failures, truncated, processed, dictMeta);
+                List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
+                // 3. 一次批量取回该块，再逐条处理（库里的取消位同样每 PROGRESS_EVERY 条查一次）
+                List<Record> list = recordMapper.selectBatchIds(chunk);
+                for (Record r : list) {
+                    if (cancelFlags.contains(id)
+                            || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
+                        return true;
+                    }
+                    step(id, r, t, failures, truncated, processed, dictMeta, pending);
+                }
             }
+            return false;
+        } finally {
+            flushStructuredData(pending);
         }
-        return false;
     }
 
     /** 处理单条并更新进度（两条取数路径共用） */
     private void step(String id, Record r, NlpTask t, List<NlpTaskVO.Failure> failures,
-                      boolean[] truncated, int[] processed, DictMeta dictMeta) {
+                      boolean[] truncated, int[] processed, DictMeta dictMeta,
+                      List<StructuredWrite> pending) {
         // 1. 处理前先计数：done 以「已尝试」为准，失败也算一条
         processed[0]++;
         try {
-            // 2. 成功则累加成功数
-            processOne(r, t.getOrgId(), dictMeta);
+            // 2. 成功则累加成功数；回写内容先进攒批队列（P1-4），不再逐条 update
+            String json = processOne(r, t.getOrgId(), dictMeta);
+            pending.add(new StructuredWrite(r.getId(), json));
             t.setSuccess(t.getSuccess() + 1);
         } catch (Exception e) {
             // 3. 失败累加并记明细；明细只留前 MAX_FAILURES 条，超出置截断标记
@@ -780,12 +827,52 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 truncated[0] = true;
             }
         }
-        // 4. 回写进度与当前条目标签（页面据此显示"正在处理第几条"）
+        // 4. 攒够一批就刷一次：逐条 autocommit 在 4 万条量级就是 4 万次提交
+        if (pending.size() >= WRITE_BATCH_SIZE) {
+            flushStructuredData(pending);
+            pending.clear();
+        }
+        // 5. 回写进度与当前条目标签（页面据此显示"正在处理第几条"）
         t.setDone(processed[0]);
         t.setCurrentLabel(labelOf(r));
-        // 5. 每 PROGRESS_EVERY 条落一次库：每条都写会把库压垮
+        // 6. 每 PROGRESS_EVERY 条落一次库：每条都写会把库压垮
         if (processed[0] % PROGRESS_EVERY == 0) {
             persistProgress(t, failures, truncated[0]);
+        }
+    }
+
+    /**
+     * 批量回写 structured_data（P1-4）。
+     *
+     * <p>走 MyBatis 的 {@code ExecutorType.BATCH} 会话：500 条一次 {@code flushStatements()}，
+     * 配合 JDBC 的 {@code rewriteBatchedStatements=true} 合并成少量往返。
+     * 原实现是逐条 {@code updateStructuredData}，每条各自 autocommit —— 4 万条 = 4 万次提交。</p>
+     *
+     * <p>未装配 {@code SqlSessionFactory}（单测直接 new）时退化为逐条写，语义与改造前一致。
+     * 批写整体失败时同样退回逐条写，保证已算好的归一结果不会因为一次批写异常而丢失。</p>
+     */
+    private void flushStructuredData(List<StructuredWrite> pending) {
+        if (pending.isEmpty()) {
+            return;
+        }
+        if (sqlSessionFactory == null) {
+            for (StructuredWrite w : pending) {
+                recordMapper.updateStructuredData(w.id(), w.json());
+            }
+            return;
+        }
+        try (SqlSession session = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
+            RecordMapper batchMapper = session.getMapper(RecordMapper.class);
+            for (StructuredWrite w : pending) {
+                batchMapper.updateStructuredData(w.id(), w.json());
+            }
+            session.flushStatements();
+            session.commit();
+        } catch (Exception e) {
+            log.warn("[批解析] 批量回写失败（{} 条），退回逐条写：{}", pending.size(), e.getMessage());
+            for (StructuredWrite w : pending) {
+                recordMapper.updateStructuredData(w.id(), w.json());
+            }
         }
     }
 
@@ -805,8 +892,15 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
-    /** 单条：拼文本 → 抽取 → 归一 → 打词典版本 → 写库（与单条抽取口径一致） */
-    private void processOne(Record r, String orgId, DictMeta dictMeta) throws Exception {
+    /**
+     * 单条：拼文本 → 抽取 → 归一 → 打词典版本；<b>只算不写</b>，返回待回写的 JSON（P1-4）。
+     *
+     * <p>写库交给调用方的攒批通道（{@link #flushStructuredData}）：逐条写在这个量级下
+     * 每条一次 autocommit，是本链路的主要 SQL 开销来源。</p>
+     *
+     * @return 打好词典版本戳的 structured_data JSON
+     */
+    private String processOne(Record r, String orgId, DictMeta dictMeta) throws Exception {
         // 1. 拼可抽取文本；空文本直接判失败，不去调抽取服务
         String text = NlpTextComposer.compose(r);
         if (text.isBlank()) {
@@ -832,15 +926,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         json = StructuredDataMeta.stamp(objectMapper, json,
                 dictMeta.version(),
                 dictMeta.termCount());
-        recordMapper.updateStructuredData(r.getId(), json);
+        return json;
     }
 
-    /**
-     * 批次 25.3：一次批解析里词典元数据只取一次（{@link DictMeta}）。
-     *
-     * <p>实现已上提为共享组件 —— 清洗链路（{@code GovernanceServiceImpl.clean()}）存在同一问题，
-     * 两处必须共用同一份记忆化逻辑，否则「一处修了、另一处又漏」会重演。</p>
-     */
     private void markFailed(String id) {
         // 1. 不存在或已是终态就不用改（终态不能被回退）
         NlpTask t = taskMapper.selectById(id);

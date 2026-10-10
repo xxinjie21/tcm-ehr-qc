@@ -70,6 +70,9 @@ class StatsCacheTest {
             store.put(k, String.valueOf(next));
             return next;
         });
+        // 单飞锁：默认当「领跑者」（拿得到锁），让既有用例保持确定性；
+        // 跟随者分支另有专门用例覆盖。
+        when(ops.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         cache = new StatsCache(redis, new ObjectMapper());
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(contextReq()));
     }
@@ -116,7 +119,46 @@ class StatsCacheTest {
         assertEquals("cache:stats:" + ORG + ":v0:all:",
                 key.getValue().substring(0, key.getValue().lastIndexOf(":all:") + 5),
                 "key 必须带数据域作用域 + 版本号 + 统计类别");
-        assertEquals(Duration.ofSeconds(60), ttl.getValue());
+        // TTL 带抖动（R3-①）：60 ± 10s，避免全部 key 同秒过期一起回源
+        long ttlSeconds = ttl.getValue().getSeconds();
+        assertTrue(ttlSeconds >= 50 && ttlSeconds <= 70, "TTL 应落在 60±10s：" + ttlSeconds);
+    }
+
+    @Test
+    @DisplayName("白名单外的过滤条件绕过缓存：照常现算，但不落 key（R3-② 键空间有界）")
+    void nonWhitelistedFiltersBypassCache() {
+        FiltersDTO weird = new FiltersDTO();
+        weird.setDepartment("随便输的科室-带奇怪字符/../x".repeat(3));
+        AtomicInteger calls = new AtomicInteger();
+        cache.wordFreq(weird, () -> {
+            calls.incrementAndGet();
+            return freq();
+        });
+        cache.wordFreq(weird, () -> {
+            calls.incrementAndGet();
+            return freq();
+        });
+        assertEquals(2, calls.get(), "白名单外必须每次现算，不能命中缓存");
+        verify(ops, never()).set(anyString(), anyString(), any(Duration.class));
+    }
+
+    @Test
+    @DisplayName("并发未命中时跟随者读领跑者写好的缓存，不重复现算（R3-③ 单飞）")
+    void followerReusesLeaderResult() {
+        // 先让「领跑者」跑一次，把结果写进缓存并拿到 key
+        assertEquals(1, computeOnce(), "领跑者现算一次");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<String> keyCap = ArgumentCaptor.forClass(String.class);
+        verify(ops).set(keyCap.capture(), anyString(), any(Duration.class));
+        String key = keyCap.getValue();
+
+        // 模拟并发：锁被别的实例占着（跟随者），但缓存里已有领跑者的结果
+        org.mockito.Mockito.clearInvocations(ops);
+        when(ops.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+        store.remove(key); // 让缓存「看起来」还没写
+        store.put(key, new ObjectMapper().writeValueAsString(freq()));
+
+        assertEquals(1, computeOnce(), "跟随者读到缓存即返回，不得再调 loader");
     }
 
     @Test

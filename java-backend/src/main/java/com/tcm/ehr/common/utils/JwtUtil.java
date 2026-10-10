@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.metrics.Metrics;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -91,20 +92,37 @@ public class JwtUtil {
     }
 
     /**
+     * 解析令牌并一次性完成「签名 / 有效期 / 令牌版本」三项校验。
+     *
+     * <p>返回 {@code null} 表示不可用（过期 / 签名不符 / 格式非法 / 已被退出登录或改密码作废）；
+     * 可用则直接返回载荷。拦截器原先「先 {@link #isValid} 再 {@link #parseToken}」会对同一 token
+     * 做两遍 HMAC 验签 + Base64 + JSON 解析（全站最热路径），本方法把它们合并为一遍。</p>
+     *
+     * @param token JWT 字符串
+     * @return 可用时返回载荷（含 subject / username / role / ver），不可用返回 {@code null}
+     */
+    public Claims parseAndVerify(String token) {
+        try {
+            Claims claims = parseToken(token);
+            // 令牌版本与当前版本不一致 = 已被退出登录 / 改密码作废
+            if (!versionMatches(claims.getSubject(), claims.get("ver"))) {
+                return null;
+            }
+            return claims;
+        } catch (Exception e) {
+            // 过期 / 签名不符 / 格式非法一律视为不可用；由拦截器统一回 401
+            return null;
+        }
+    }
+
+    /**
      * 判断令牌是否可用（签名 + 有效期 + 令牌版本）。
      *
      * @param token JWT 字符串
      * @return 可用为 true
      */
     public boolean isValid(String token) {
-        try {
-            Claims claims = parseToken(token);
-            // 令牌版本与当前版本不一致 = 已被退出登录 / 改密码作废
-            return versionMatches(claims.getSubject(), claims.get("ver"));
-        } catch (Exception e) {
-            // 过期 / 签名不符 / 格式非法一律视为不可用；此处只给布尔结果，由拦截器统一回 401
-            return false;
-        }
+        return parseAndVerify(token) != null;
     }
 
     // ------------------------------------------------------------ 令牌版本
@@ -158,6 +176,9 @@ public class JwtUtil {
             String tokenVer = verClaim == null ? "0" : String.valueOf(verClaim);
             return current.equals(tokenVer);
         } catch (Exception e) {
+            // 降级放行是「可用优先」的取舍，但它同时意味着**已作废的令牌在此期间仍可用**，
+            // 必须可观测（P1-14）：计数出现在 /api/metrics 的 auth.version.degrade 上。
+            Metrics.inc("auth.version.degrade");
             return true;
         }
     }

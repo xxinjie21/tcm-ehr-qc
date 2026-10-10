@@ -3,7 +3,9 @@ package com.tcm.ehr.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
+import com.tcm.ehr.common.utils.AsyncTaskRegistry;
 import com.tcm.ehr.common.utils.EntityNormalizer;
+import com.tcm.ehr.common.utils.NlpAsyncTasks;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.PythonNlpClient;
 import com.tcm.ehr.common.utils.RecordFilter;
@@ -26,7 +28,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * NLP 接口：单条文本抽取 + 批量异步解析任务。
@@ -47,6 +51,7 @@ public class NlpController {
     private final EntityNormalizer entityNormalizer;
     private final INlpBatchService nlpBatchService;
     private final OperationLogger operationLogger;
+    private final NlpAsyncTasks nlpAsyncTasks;
 
     /** 与 {@link PythonNlpClient} 读同一配置项，仅用于区分"没开"与"连不上" */
     @Value("${nlp.enabled:false}")
@@ -67,9 +72,59 @@ public class NlpController {
         if (text == null || text.isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入待抽取文本"));
         }
-        // 2. 转发 Python 抽取服务
+        return ResponseEntity.ok(Result.ok(doExtract(text)));
+    }
+
+    /**
+     * 异步提交单条抽取（AI-18）。
+     *
+     * <p>与 {@link #extract} 同一套入参校验，只是把「转发 Python + ES 归一」搬到专用线程池：
+     * 请求线程立即返回 202 + 任务号，前端轮询 {@link #extractAsyncResult}。原同步接口保留不动。</p>
+     *
+     * @param dto text=待抽取文本
+     * @return 202 + {taskId}
+     */
+    @PostMapping("/extract/async")
+    public ResponseEntity<Result<Map<String, String>>> submitExtractAsync(
+            @Valid @RequestBody NlpExtractDTO dto) {
+        String text = dto == null ? null : dto.text();
+        if (text == null || text.isBlank()) {
+            return ResponseEntity.badRequest().body(Result.error(400, "请输入待抽取文本"));
+        }
+        String taskId = nlpAsyncTasks.submit(() -> doExtract(text));
+        return ResponseEntity.accepted().body(Result.ok(Map.of("taskId", taskId)));
+    }
+
+    /**
+     * 查单条抽取结果（AI-18）。
+     *
+     * <p>任务不存在、已过期或不属于调用者一律返回同一个 404。</p>
+     *
+     * @return state=RUNNING|DONE|FAILED；DONE 带 reply；FAILED 带 error
+     */
+    @GetMapping("/extract/async/{taskId}")
+    public ResponseEntity<Result<Map<String, Object>>> extractAsyncResult(@PathVariable String taskId) {
+        AsyncTaskRegistry.Snapshot<NlpExtractVO> s = nlpAsyncTasks.get(taskId);
+        if (s == null) {
+            return ResponseEntity.status(404).body(Result.error(1006, "任务不存在或已过期"));
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("state", s.state().name());
+        data.put("reply", s.reply());
+        data.put("error", s.error());
+        return ResponseEntity.ok(Result.ok(data));
+    }
+
+    /**
+     * 真正的抽取动作：转发 Python → 降级兜底 → 术语归一（同步与异步共用）。
+     *
+     * @param text 待抽取文本
+     * @return 9 类实体；上游不可用时为空结构 + unavailableReason
+     */
+    private NlpExtractVO doExtract(String text) {
+        // 1. 转发 Python 抽取服务
         NlpExtractVO vo = nlpClient.extract(text);
-        // 3. 上游不可用 → 降级为空 9 类并标注原因，供页面显示降级横幅
+        // 2. 上游不可用 → 降级为空 9 类并标注原因，供页面显示降级横幅
         if (vo == null) {
             // 具体原因见 PythonNlpClient 的启动/调用日志，这里只记规模与判定结果，便于对账
             String reason = nlpEnabled
@@ -79,17 +134,17 @@ public class NlpController {
                     text.length(), reason);
             NlpExtractVO empty = NlpExtractVO.empty();
             empty.setUnavailableReason(reason);
-            return ResponseEntity.ok(Result.ok(empty));
+            return empty;
         }
-        // 4. 服务可用但模型未加载 → 规则兜底结果照常返回，只标记少了模型那一半
+        // 3. 服务可用但模型未加载 → 规则兜底结果照常返回，只标记少了模型那一半
         if (!vo.isModelAvailable()) {
             vo.setUnavailableReason(NlpExtractVO.REASON_MODEL_MISSING);
         }
-        // 5. 术语归一
+        // 4. 术语归一
         EntityNormalizer.NormStat stat = entityNormalizer.normalize(vo);
         log.debug("[NLP] 抽取完成并归一：命中 {} 条（精确 {} / 包含 {} / 模糊 {}）",
                 stat.hit(), stat.exact(), stat.contain(), stat.fuzzy());
-        return ResponseEntity.ok(Result.ok(vo));
+        return vo;
     }
 
     /**
