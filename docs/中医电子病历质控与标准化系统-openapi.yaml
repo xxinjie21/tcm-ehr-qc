@@ -2356,6 +2356,93 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorVO'
+  /api/nlp/extract/async:
+    post:
+      tags:
+        - NLP抽取
+      summary: 异步提交单条抽取
+      description: 【权限：登录即可】与 POST /api/nlp/extract 同一套入参校验，把「转发 Python + ES 归一」搬到专用线程池；请求线程立即返回 202 与 taskId，前端轮询 GET /api/nlp/extract/async/{taskId}。原同步接口保留不动
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NlpExtractDTO'
+            example:
+              text: 患者发热咽痛两天，舌红苔黄，脉浮数。
+      responses:
+        '202':
+          description: 已受理，返回 taskId
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+        '400':
+          description: 待抽取文本为空
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/nlp/extract/async/{taskId}:
+    get:
+      tags:
+        - NLP抽取
+      summary: 查询异步抽取结果
+      description: 【权限：登录即可】任务不存在、已过期或不属于调用者一律返回同一个 404（code=1006）
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 任务状态；state=RUNNING|DONE|FAILED，DONE 带 reply、FAILED 带 error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      state:
+                        type: string
+                        enum:
+                          - RUNNING
+                          - DONE
+                          - FAILED
+                      reply:
+                        $ref: '#/components/schemas/NlpExtractVO'
+                      error:
+                        type: string
+                        nullable: true
+        '404':
+          description: 任务不存在或已过期（code=1006）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/nlp/extract/batch:
     post:
       tags:
@@ -2702,6 +2789,39 @@ paths:
                     example: 200
                   data:
                     $ref: '#/components/schemas/ReviewTasksVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/review/tasks/count:
+    get:
+      tags:
+        - 复核
+      summary: 复核概览统计
+      description: 【权限：登录即可】与 GET /api/review/tasks 同一数据域口径，只 COUNT 不 SELECT，一次返回待复核 / 已完成 / 待复核超期三个数（替代原先三次 pageSize=1 列表查询）
+      responses:
+        '200':
+          description: pending / done / overdue 三个计数
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      pending:
+                        type: integer
+                        format: int64
+                      done:
+                        type: integer
+                        format: int64
+                      overdue:
+                        type: integer
+                        format: int64
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -3927,6 +4047,42 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+  /api/records/count:
+    post:
+      tags:
+        - 病历管理
+      summary: 病历命中总数
+      description: 【权限：登录即可】与 POST /api/records/search 同一数据域 / 筛选口径，只 COUNT 不 SELECT，供「只要 total」的调用替换 pageSize=1（后者会附带一次全表排序）
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchDTO'
+      responses:
+        '200':
+          description: 命中总数
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: integer
+                    format: int64
+        '400':
+          description: 参数非法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/stats/all:
     get:
       tags:
@@ -4117,6 +4273,40 @@ paths:
                       type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/metrics:
+    get:
+      tags:
+        - 统计查询
+      summary: 运行期指标快照
+      description: 【权限：仅管理员】进程内累加器的只读快照（缓存命中率、AI 任务耗时分布、LLM 客户端缓存命中率等），不触发任何计算，进程重启即归零
+      responses:
+        '200':
+          description: counters 与 timers 两组指标
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      counters:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      timers:
+                        type: object
+                        additionalProperties:
+                          type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 非管理员
         '500':
           $ref: '#/components/responses/ServerError'
   /api/ai/async/{kind}:
@@ -4507,6 +4697,83 @@ paths:
                       canWriteQcRules:
                         type: boolean
                         description: 成员级质控规则写授权位（同上）
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/orgs/mine:
+    get:
+      tags:
+        - 组织
+      summary: 我加入的组织列表
+      description: 【权限：登录即可】当前用户所属的所有 active 组织（含「是否当前组织」标记），供右上角「切换组织」下拉使用
+      responses:
+        '200':
+          description: 组织列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        code:
+                          type: string
+                        name:
+                          type: string
+                        status:
+                          type: string
+                        myRole:
+                          type: string
+                          description: owner=所有者 / member=成员
+                        current:
+                          type: boolean
+                          description: 是否当前组织
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/orgs/{id}/switch:
+    post:
+      tags:
+        - 组织
+      summary: 切换当前组织
+      description: 【权限：登录即可】服务层校验「是该成员 且 组织 active」；切换前 currentOrg 仍是旧组织，因此不能加 @RequireOrgRole，否则会被「路径机构 != 当前机构」拦掉而永远切不过去
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已切换组织
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                  data:
+                    nullable: true
+        '400':
+          description: 不是该组织成员或组织已停用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorVO'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
