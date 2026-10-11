@@ -197,6 +197,7 @@ CREATE TABLE IF NOT EXISTS qc_task (
   invalid INT NOT NULL DEFAULT 0 COMMENT '无效数',
   current_label VARCHAR(255) COMMENT '当前处理的病历标识',
   filters_json TEXT COMMENT '筛选范围(JSON)',
+  request_key VARCHAR(64) NULL COMMENT '幂等键（批次5；同组织内唯一，NULL 不参与唯一性）',
   created_by VARCHAR(50) COMMENT '提交人用户名',
   role VARCHAR(20) COMMENT '提交时角色快照，仅用于审计日志回填',
   org_id VARCHAR(36) COMMENT '提交时所属组织快照，供 worker 重建 RecordFilter（数据域）',
@@ -208,6 +209,7 @@ CREATE TABLE IF NOT EXISTS qc_task (
   INDEX idx_status (status),
   INDEX idx_create_time (create_time),
   cancel_requested TINYINT NOT NULL DEFAULT 0 COMMENT '1=已请求取消',
+  UNIQUE KEY uk_qc_task_req (org_id, request_key),
   INDEX idx_qc_task_org (org_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='质控批量重算任务表';
 
