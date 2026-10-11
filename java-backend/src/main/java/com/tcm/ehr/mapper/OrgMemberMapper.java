@@ -26,11 +26,19 @@ public interface OrgMemberMapper extends BaseMapper<OrganizationMember> {
      * <p>走 {@code INDEX idx_member_user(user_id, is_primary)}，不写这个
      * {@code @Select} 的话每请求就是一次全表扫。</p>
      *
+     * <p><b>两个写授权位不能漏</b>（{@code can_write_dictionary} / {@code can_write_qc_rules}）：
+     * {@code OrgPermissionServiceImpl} 读的正是返回对象的这两个字段。漏取时它们恒为
+     * {@code null}，判定退化成 {@code Integer.valueOf(1).equals(null)} = {@code false} ——
+     * 表现为「库里给组员开了写权限、登录返回的却是 {@code false}」，而且不报错、只是静默失效。</p>
+     *
+     * <p>列清单与 {@link OrganizationMember} 的字段一一对应，<b>加字段时要同步改这里</b>。</p>
+     *
      * @param userId 用户 ID
      * @return 主组成员行；无组 / 组已停用时返回 {@code null}
      */
     @Select("""
-            SELECT m.id, m.org_id, m.user_id, m.role, m.is_primary, m.create_time
+            SELECT m.id, m.org_id, m.user_id, m.role, m.is_primary, m.create_time,
+                   m.can_write_dictionary, m.can_write_qc_rules
               FROM organization_members m
               JOIN organizations g ON g.id = m.org_id
              WHERE m.user_id = #{userId}

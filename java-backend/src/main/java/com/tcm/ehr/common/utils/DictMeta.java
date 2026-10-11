@@ -40,10 +40,22 @@ public final class DictMeta {
         return termCount;
     }
 
-    private void load() {
+    /**
+     * 惰性装载。
+     *
+     * <p><b>必须同步</b>：批解析已支持「一个任务内多线程并行处理病历」，多个线程会同时首次
+     * 进入这里。原先用普通字段 + {@code loaded} 标志，既没有 happens-before 保证
+     * （可能读到 {@code loaded == true} 而 {@code version == null}，把版本戳打成 null），
+     * 也会并发发出重复查询。加锁一次同时解决「只查一次」与「值可见」。</p>
+     */
+    private synchronized void load() {
         if (!loaded) {
-            version = store.effectiveDictVersion(orgId);
-            termCount = store.effectiveTermCount(orgId);
+            // 先算到局部变量再赋值：赋值顺序不影响正确性（都在锁内），但能保证
+            // 不会出现「version 已写、termCount 还是默认 0」被别的线程看到的中间态
+            String v = store.effectiveDictVersion(orgId);
+            int c = store.effectiveTermCount(orgId);
+            version = v;
+            termCount = c;
             loaded = true;
         }
     }

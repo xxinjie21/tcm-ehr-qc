@@ -97,7 +97,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /** 批次 26.2：提交互斥统一走 DistLock（事务感知释放） */
     private final DistLock distLock;
 
-    @Value("${qc.batch.concurrency:1}")
+    @Value("${qc.batch.concurrency:2}")
     private int concurrency;
 
     /** 提交时的单次范围上限（§七 L4 抬到 40000）；配合异步化后它退化为「提交时校验」 */

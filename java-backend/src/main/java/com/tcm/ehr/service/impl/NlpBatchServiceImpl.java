@@ -47,18 +47,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
  * NLP 批量解析任务服务实现。
  *
  * <p><b>DB 轮询认领</b>（批次 16.2）：任务落库为 {@code QUEUED}，固定 {@code nlp.batch.concurrency}
- * （默认 2）个工作线程各自轮询 {@code nlp_task} 并用「{@code UPDATE ... WHERE status='QUEUED'}」
+ * 个工作线程各自轮询 {@code nlp_task} 并用「{@code UPDATE ... WHERE status='QUEUED'}」
  * 的原子性认领（受影响行数为 1 才算拿到）。不引入消息中间件 —— DB 是任务状态的唯一权威，
  * 多实例下同一任务只会被一个实例跑；前端可提交后离开、轮询进度。</p>
+ *
+ * <p><b>并发预算只有一份</b>：{@code nlp.batch.concurrency} 既是「可同时跑几个任务」，
+ * 也是「单个任务内并行处理几条病历」—— 两者共用同一个并行池（见 {@code recordPool}），
+ * 所以同时跑几个任务，打给 Python 的请求总数都恒定。之所以必须有任务内并行：NLP 是这条链路
+ * 唯一的吞吐瓶颈，而原先一个任务只用一个线程串行跑，单任务吞吐被钉死在「1 / 单条耗时」。</p>
  *
  * <ul>
  * <li>取数走 {@link RecordFilter}（数据域 + 筛选）与分页循环，绝不一次载入全量；</li>
@@ -99,7 +107,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /** 批次 26.2：提交互斥统一走 DistLock（事务感知释放） */
     private final DistLock distLock;
 
-    @Value("${nlp.batch.concurrency:2}")
+    /** 批解析并发：既是可同时运行的批任务数，也是单任务内并行处理病历的路数（见 init） */
+    @Value("${nlp.batch.concurrency:8}")
     private int concurrency;
 
     /**
@@ -130,6 +139,17 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     private volatile boolean running;
     private ExecutorService workers;
+
+    /**
+     * 任务内并行处理病历的线程池。
+     *
+     * <p>与 {@link #workers} 分开：workers 负责「认领任务」，本池负责「把一个任务内的病历并行跑」。
+     * 两者不能共用同一个池 —— worker 占着线程等页内结果会死锁。</p>
+     *
+     * <p>池大小 = 并发预算，且<b>被所有任务共享</b>：所以同时跑几个任务，打给 Python 的请求
+     * 总数都不超过 {@code nlp.batch.concurrency}，不会因为任务数变多而压垮 NLP 服务。</p>
+     */
+    private ExecutorService recordPool;
 
     // ------------------------------------------------------------------ 生命周期
 
@@ -166,11 +186,18 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             t.setDaemon(true);
             return t;
         });
+        // 2.1 任务内并行池（见 recordPool 字段注释）：让「一个任务」也能吃满 NLP 的吞吐上限，
+        //     而不是被单线程串行钉死在 1/单条耗时。两个池共享同一份并发预算。
+        recordPool = Executors.newFixedThreadPool(threads, r -> {
+            Thread t = new Thread(r, "nlp-record-worker");
+            t.setDaemon(true);
+            return t;
+        });
         // 3. 每个线程跑同一个「认领任务」循环
         for (int i = 0; i < threads; i++) {
             workers.submit(this::workerLoop);
         }
-        log.info("[批解析] 工作线程已启动，并发 {}", threads);
+        log.info("[批解析] 工作线程已启动，并发 {}（单任务内并行处理病历的路数相同）", threads);
     }
 
     @PreDestroy
@@ -178,6 +205,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         running = false;
         if (workers == null) {
             return;
+        }
+        // 先停任务内并行池：worker 此刻可能正阻塞在 future.get() 上等它
+        if (recordPool != null) {
+            recordPool.shutdownNow();
         }
         workers.shutdownNow();
         // 先等 worker 收尾：它们的 finally 要写库落状态。不等就可能撞上容器销毁数据源，
@@ -728,17 +759,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 if (list.isEmpty()) {
                     break;
                 }
-                // 4. 逐条处理：内存取消位逐条查；库里的每 PROGRESS_EVERY 条查一次 ——
-                //    逐条查库在 3.5 万条量级就是 3.5 万次查询
-                for (Record r : list) {
-                    if (cancelFlags.contains(id)
-                            || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
-                        return true;
-                    }
-                    if (processed[0] >= limit) {
-                        return false;
-                    }
-                    step(id, r, t, failures, truncated, processed, dictMeta, pending);
+                // 4. 并行处理本页（取消检查 / limit 截断都在 processPage 内按块完成）。
+                //    limit 是硬上限：total=0 的任务必须一条都不处理 —— 那是原来的语义，
+                //    「总数 0」不是「不限」，不能反过来跑全库。
+                if (processPage(id, list, t, dictMeta, failures, truncated, processed, pending, limit)) {
+                    return true;
                 }
                 // 5. 不满一页即到末尾
                 if (list.size() < PAGE_SIZE) {
@@ -798,12 +823,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
                 // 3. 一次批量取回该块，再逐条处理（库里的取消位同样每 PROGRESS_EVERY 条查一次）
                 List<Record> list = recordMapper.selectBatchIds(chunk);
-                for (Record r : list) {
-                    if (cancelFlags.contains(id)
-                            || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
-                        return true;
-                    }
-                    step(id, r, t, failures, truncated, processed, dictMeta, pending);
+                // ID 型任务没有「总数上限」的概念：上限给 Integer.MAX_VALUE（等价于不限）
+                if (processPage(id, list, t, dictMeta, failures, truncated, processed, pending,
+                        Integer.MAX_VALUE)) {
+                    return true;
                 }
             }
             return false;
@@ -812,37 +835,118 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
-    /** 处理单条并更新进度（两条取数路径共用） */
-    private void step(String id, Record r, NlpTask t, List<NlpTaskVO.Failure> failures,
-                      boolean[] truncated, int[] processed, DictMeta dictMeta,
-                      List<StructuredWrite> pending) {
-        // 1. 处理前先计数：done 以「已尝试」为准，失败也算一条
-        processed[0]++;
-        try {
-            // 2. 成功则累加成功数；回写内容先进攒批队列（P1-4），不再逐条 update
-            String json = processOne(r, t.getOrgId(), dictMeta);
-            pending.add(new StructuredWrite(r.getId(), json));
-            t.setSuccess(t.getSuccess() + 1);
-        } catch (Exception e) {
-            // 3. 失败累加并记明细；明细只留前 MAX_FAILURES 条，超出置截断标记
-            t.setFailed(t.getFailed() + 1);
-            if (failures.size() < MAX_FAILURES) {
-                failures.add(new NlpTaskVO.Failure(labelOf(r), reasonOf(e)));
-            } else {
-                truncated[0] = true;
+    /** 单条处理结果：成功带待回写的 JSON，失败带一句人话原因。用结果对象替代抛异常，便于并行汇总 */
+    private record StepOutcome(String json, String reason) {
+    }
+
+    /**
+     * 并行处理一批病历（两条取数路径共用）；返回 {@code true} 表示检测到取消。
+     *
+     * <p><b>为什么要并行</b>：原先这里是一个 {@code for} 循环串行调 {@code processOne}，而单条
+     * NLP 推理要数百毫秒 —— 单任务吞吐被钉死在「1 / 单条耗时」（32 核机器上实测约 7 条/s）。
+     * 把病历并行跑，才能让一个任务就吃满 NLP 服务的吞吐上限（实测约 10.3 条/s）。
+     * 注意：单纯调大 {@code nlp.batch.concurrency} 没有这个效果，它只是多起几个任务。</p>
+     *
+     * <p><b>只并行「算」</b>：{@link #processOne} 只算不写（P1-4 攒批），因此可安全并行；
+     * 进度、失败明细、攒批回写全部收敛到下面的<b>单线程汇总循环</b>里更新，
+     * 不需要给 {@code NlpTask} 加锁，也不会出现「两条同时改 done」。</p>
+     *
+     * <p><b>取消响应</b>：按 {@code concurrency} 条一块推进，块与块之间查取消位 ——
+     * 最坏等待一块（约 1 秒），不会因为并行化变成「跑完整页才发现要停」。</p>
+     *
+     * @param limit 本任务允许处理的总条数<b>硬上限</b>（筛选型任务的 {@code total}）。
+     *              {@code 0} 表示一条都不处理 —— 这是原语义，不能理解成「不限」；
+     *              ID 型任务无此概念，传 {@link Integer#MAX_VALUE}
+     */
+    private boolean processPage(String taskId, List<Record> list, NlpTask t, DictMeta dictMeta,
+                                List<NlpTaskVO.Failure> failures, boolean[] truncated,
+                                int[] processed, List<StructuredWrite> pending, int limit) {
+        // 1. 按上限裁剪：并行后不能再靠「循环内处理一条判一次」来截断，否则会超跑
+        List<Record> page = list;
+        int remain = limit - processed[0];
+        if (remain <= 0) {
+            return false;
+        }
+        if (page.size() > remain) {
+            page = page.subList(0, remain);
+        }
+        // 2. 按并发预算切块：块大小 = 并行池容量，保证「提交的并行度」不超过池子
+        int chunk = Math.max(1, concurrency);
+        for (int off = 0; off < page.size(); off += chunk) {
+            // 3. 块边界查取消：内存位每块都查（廉价），库里的权威位同样每块查一次。
+            //    并行后单块只有 chunk 条，比原先「每 25 条查一次库」更频繁，
+            //    但总量仍可忽略（4 万条约 5000 次主键/索引查询）
+            if (cancelFlags.contains(taskId) || isCancelRequested(taskId)) {
+                return true;
+            }
+            List<Record> part = page.subList(off, Math.min(off + chunk, page.size()));
+            // 4. 并行提交：orgId 取任务快照 —— worker 线程读不到请求上下文。
+            //    池未装配（单测直接 new，不走 @PostConstruct）时退化为串行，
+            //    语义与改造前一致，不让构造方式影响行为（同 sqlSessionFactory 的既有范式）。
+            List<Future<StepOutcome>> futures = new ArrayList<>(part.size());
+            for (Record r : part) {
+                futures.add(recordPool == null
+                        ? CompletableFuture.completedFuture(runOne(r, t.getOrgId(), dictMeta))
+                        : recordPool.submit(() -> runOne(r, t.getOrgId(), dictMeta)));
+            }
+            // 5. 按提交顺序单线程汇总：进度 / 失败明细 / 攒批都只在这一条路径上改
+            for (int i = 0; i < futures.size(); i++) {
+                Record r = part.get(i);
+                StepOutcome outcome = awaitOutcome(futures.get(i));
+                processed[0]++;
+                if (outcome.json() != null) {
+                    t.setSuccess(t.getSuccess() + 1);
+                    pending.add(new StructuredWrite(r.getId(), outcome.json()));
+                } else {
+                    t.setFailed(t.getFailed() + 1);
+                    if (failures.size() < MAX_FAILURES) {
+                        failures.add(new NlpTaskVO.Failure(labelOf(r), outcome.reason()));
+                    } else {
+                        truncated[0] = true;
+                    }
+                }
+                // 6. 回写进度与当前条目标签（页面据此显示"正在处理第几条"）
+                t.setDone(processed[0]);
+                t.setCurrentLabel(labelOf(r));
+                // 7. 每 PROGRESS_EVERY 条落一次库：每条都写会把库压垮
+                if (processed[0] % PROGRESS_EVERY == 0) {
+                    persistProgress(t, failures, truncated[0]);
+                }
+                // 8. 攒够一批就刷一次回写：逐条 autocommit 在 4 万条量级就是 4 万次提交
+                if (pending.size() >= WRITE_BATCH_SIZE) {
+                    flushStructuredData(pending);
+                    pending.clear();
+                }
             }
         }
-        // 4. 攒够一批就刷一次：逐条 autocommit 在 4 万条量级就是 4 万次提交
-        if (pending.size() >= WRITE_BATCH_SIZE) {
-            flushStructuredData(pending);
-            pending.clear();
+        return false;
+    }
+
+    /**
+     * 并行执行体：只调 {@link #processOne}。
+     *
+     * <p>异常一律转成失败结果而不是抛出 —— 池里的线程抛出去只会变成一个没人看的
+     * {@code ExecutionException}，而这里必须把它变成「这条病历失败」的进度。</p>
+     */
+    private StepOutcome runOne(Record r, String orgId, DictMeta dictMeta) {
+        try {
+            return new StepOutcome(processOne(r, orgId, dictMeta), null);
+        } catch (Exception e) {
+            return new StepOutcome(null, reasonOf(e));
         }
-        // 5. 回写进度与当前条目标签（页面据此显示"正在处理第几条"）
-        t.setDone(processed[0]);
-        t.setCurrentLabel(labelOf(r));
-        // 6. 每 PROGRESS_EVERY 条落一次库：每条都写会把库压垮
-        if (processed[0] % PROGRESS_EVERY == 0) {
-            persistProgress(t, failures, truncated[0]);
+    }
+
+    /** 取一个并行结果；被中断或 Error 级异常都按「该条失败」处理，绝不让整个任务崩 */
+    private StepOutcome awaitOutcome(Future<StepOutcome> f) {
+        try {
+            return f.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new StepOutcome(null, "处理被中断");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause() == null ? e : e.getCause();
+            return new StepOutcome(null,
+                    cause instanceof Exception ex ? reasonOf(ex) : "抽取失败");
         }
     }
 

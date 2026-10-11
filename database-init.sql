@@ -296,6 +296,62 @@ CREATE TABLE IF NOT EXISTS user_llm_config (
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户 LLM 配置';
 
-INSERT IGNORE INTO users (id, username, password, role) VALUES
-('admin-0001', 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '管理员'),
-('audit-0001', 'auditor', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '用户');
+-- =====================================================================
+-- 参考 / 演示数据
+-- ---------------------------------------------------------------------
+-- 只填「非病历、且非程序自动生成」的表。确定性主键 + INSERT IGNORE，可重复执行。
+-- 全部用户密码均为 123456（BCrypt 哈希见下）。
+--
+-- 本文件【不含】：
+--   病历相关      records / review_tasks / nlp_task / nlp_task_items / qc_task / operation_log
+--                 （自行导入，不入本文件）
+--   术语词典      dictionary_terms / dictionary_versions
+--                 —— 程序启动时自动从 data/dictionaries/*.json 播种基础层并重建 ES
+--                 （见 DataInitializationListener.seedBaseIfEmpty / reconcileLayer）
+--   质控规则      qc_rules —— 无行时回退 QcRuleSet.defaults()，无需播种
+--   用户私密配置  user_llm_config —— 每用户在「导入 LLM」里自行保存
+--   词典提案/归档 dict_proposal / dict_proposal_term / dict_archive_version / dict_archive_term
+--                 —— 由业务（提案/审核/归档）流程产生
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. 用户
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO users (id, username, password, role, status) VALUES
+('admin-0001',     'admin',    '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '管理员', 'active'),
+('audit-0001',     'auditor',  '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '用户',   'active'),
+('user-demo-0001', 'zhangsan', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '用户',   'active'),
+('user-demo-0002', 'lisi',     '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '用户',   'active');
+
+-- ---------------------------------------------------------------------
+-- 2. 组织（无自动播种，需填充）
+--    owner_user_id 是冗余列，权威 = 下面成员行的 role='owner'，两者必须一致。
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO organizations (id, code, name, purpose, status, owner_user_id) VALUES
+('grp-default-2026', 'DEFAULT', '默认组织', '演示与测试用组织', 'active', 'admin-0001');
+
+-- ---------------------------------------------------------------------
+-- 3. 组织成员
+--    admin 为组长（owner）；其余为普通成员。每个用户只有这一个成员身份
+--    → is_primary=1（即「当前组织」）；多组织时由程序维护「每用户至多一个 is_primary=1」。
+--
+--    一个组织只允许一个 owner：transferOwner 取 owners.get(0) 降级、leave 自动提拔继任者、
+--    removeMember 拒绝移除 owner，且 organizations.owner_user_id 必须同事务跟随。
+--    ⇒ 组长只能有一个，这里给 admin。
+--
+--    写开关只对 member 有意义（owner 本就全权，setPermissions 明确拒绝给 owner 授权）：
+--    auditor 虽为普通成员，但保留词典 / 质控规则两个写权限。
+--
+--    ⚠️ admin 必须有成员行，不能只靠 users.role='管理员'。
+--    「管理员看全部」只在**请求线程**生效（RequestUtils.viewAllOrgs）；后台 worker
+--    （NLP 批解析 / 质控批量重算）没有请求上下文，只能按任务快照的 org_id 重建数据域。
+--    若 admin 无组织，则提交侧按「看全部」数出 total=N，worker 侧按空组织 fail-closed
+--    命中 0 条 → 任务落成 INTERRUPTED；且任务详情接口按「组织必须非空」判权，会返回
+--    404「任务不存在」，而列表接口按 org_id 等值查询又能列出来 —— 三处口径自相矛盾。
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO organization_members
+  (id, org_id, user_id, role, can_write_dictionary, can_write_qc_rules, is_primary) VALUES
+('mem-default-admin',   'grp-default-2026', 'admin-0001',     'owner',  1, 1, 1),
+('mem-default-auditor', 'grp-default-2026', 'audit-0001',     'member', 1, 1, 1),
+('mem-default-zhang',   'grp-default-2026', 'user-demo-0001', 'member', 0, 0, 1),
+('mem-default-li',      'grp-default-2026', 'user-demo-0002', 'member', 0, 0, 1);

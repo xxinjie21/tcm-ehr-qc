@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -555,7 +556,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 标准数据集导出：只含质控合格病历，并对手机号/身份证号脱敏。
+     * 标准数据集导出：只含质控合格病历，文本字段已就地标准化，并对手机号/身份证号脱敏。
+     *
+     * <p><b>「标准数据集」的含义</b>：导出的不是库内原文的拷贝，而是把每条病历里
+     * 「被归一过的术语」在原文中就替换成标准词之后的版本（见 {@link #standardizeMap}）。
+     * 这样一份导出件可以直接当训练/统计语料用，不必再对一遍词典。库内原文不受影响 ——
+     * 本链路只读。</p>
+     *
+     * <p>CSV 额外带一列「标准化对照」，记录该行实际发生的替换，便于逐条回溯到原文。</p>
      *
      * <p>范围内无合格病历时返回 {@code null}，由 Controller 转 400 + code=2001。</p>
      */
@@ -573,7 +581,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         sb.append(',');
                     }
                     try {
-                        sb.append(objectMapper.writeValueAsString(r));
+                        // 标准数据集：把这条病历里「被归一过」的术语在文本中就地换成标准词。
+                        // 只改导出件，库里的原文一个字节都不动（本链路纯只读）。
+                        sb.append(objectMapper.writeValueAsString(
+                                standardizeMap(r, replacementsOf(r))));
                     } catch (JacksonException e) {
                         throw new UncheckedIOException(new IOException(e));
                     }
@@ -632,12 +643,19 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 样本按导出同一口径脱敏：先序列化、再打码、最后解析回结构，键名与类型不变。
+     * 样本按导出同一口径处理：先就地标准化、再序列化、再打码、最后解析回结构，键名与类型不变。
+     *
+     * <p>标准化必须在这里也做一遍，否则「预览里看到的还是原文、下载下来却是标准词」——
+     * 预览的意义就是让用户先确认导出件长什么样。</p>
      *
      * <p>刻意不捕获异常：脱敏失败就让这次预览失败，而不是静默返回未脱敏的样本。</p>
      */
     private Object maskedSample(List<Record> sample) {
-        String json = objectMapper.writeValueAsString(sample);
+        List<Map<String, Object>> standardized = new ArrayList<>(sample.size());
+        for (Record r : sample) {
+            standardized.add(standardizeMap(r, replacementsOf(r)));
+        }
+        String json = objectMapper.writeValueAsString(standardized);
         return objectMapper.readValue(mask(json), new TypeReference<List<Map<String, Object>>>() {
         });
     }
@@ -757,10 +775,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 流式生成 CSV：表头 + 每批行（性能审查 A7）。无任何数据时返回 null（= 导出空集） */
     private byte[] toCsvStream(ExportDTO dto) throws IOException {
-        // 1. 表头与列顺序一一对应，改一处必须改另一处
+        // 1. 表头与列顺序一一对应，改一处必须改另一处。
+        //    最后一列「标准化对照」不在 21 个原始字段内，是导出附加的溯源列（见 appendCsvRow）
         String[] headers = {"id", "挂号号", "门诊号", "性别", "年龄", "就诊次数", "西医诊断", "中医诊断",
                 "现病史", "主诉", "自述", "望诊", "脉象", "舌象", "体格检查", "辨证结论", "处方",
-                "随访", "治疗效果", "科室", "医生ID", "就诊时间"};
+                "随访", "治疗效果", "科室", "医生ID", "就诊时间", "标准化对照"};
         List<String> cols = List.of("id", "registrationNo", "outpatientNo", "gender", "age", "visitCount",
                 "westernDiagnosis", "tcmDiagnosis", "presentIllness", "chiefComplaint",
                 "selfReport", "inspection", "pulse", "tongue", "physicalExam", "pattern",
@@ -775,19 +794,25 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         forEachQualified(dto, batch -> {
             for (Record r : batch) {
                 hasRow[0] = true;
-                appendCsvRow(out, r, cols);
+                appendCsvRow(out, r, cols, replacementsOf(r));
             }
         });
         return hasRow[0] ? out.toByteArray() : null;
     }
 
-    /** 写一行 CSV：所有单元格加引号并转义内部引号/换行；就诊时间规整为 YYYY-MM-DD */
-    private void appendCsvRow(ByteArrayOutputStream out, Record r, List<String> cols) {
+    /**
+     * 写一行 CSV：所有单元格加引号并转义内部引号/换行；就诊时间规整为 YYYY-MM-DD。
+     *
+     * <p>文本单元格先按 {@code pairs} 就地标准化，最后一列固定写「标准化对照」。</p>
+     */
+    private void appendCsvRow(ByteArrayOutputStream out, Record r, List<String> cols,
+                              List<Map.Entry<String, String>> pairs) {
         // T1：整实体 → Map 的转换**每行只做一次**。
         // 原先这句在下面的列循环体内，一行 22 列就要做 22 次整实体反射转换
         // （4 万行 → 数十万次反射 + 等量临时 Map，比每行转一次慢 20 倍以上）。
         // 转换结果与列名取值口径完全不变，故 CSV 内容逐字节一致。
-        Map<?, ?> row = objectMapper.convertValue(r, Map.class);
+        // 标准化在这一步一起做掉（同一份 Map，不额外多一次转换）。
+        Map<?, ?> row = standardizeMap(r, pairs);
         List<String> cells = new ArrayList<>();
         for (String col : cols) {
             Object v = row.get(col);
@@ -798,7 +823,150 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             String s = v == null ? "" : String.valueOf(v).replace("\"", "\"\"").replace("\n", " ");
             cells.add("\"" + s + "\"");
         }
+        // 溯源列：本条病历的「归一前原文 → 标准词」对照；没有归一结果就是 {}。
+        // 单独一列而不是每字段两列 —— 21 个字段里真正会被替换的通常只有少数几个，
+        // 拆成 42 列会让表宽翻倍且绝大多数格子是空的。
+        String trace = pairsJson(pairs).replace("\"", "\"\"").replace("\n", " ");
+        cells.add("\"" + trace + "\"");
         out.writeBytes((String.join(",", cells) + "\n").getBytes(StandardCharsets.UTF_8));
+    }
+
+    // ------------------------------------------------------------------ 导出标准化
+
+    /**
+     * 取一条病历的「归一前原文 → 标准词」替换对，按原词长度<b>降序</b>。
+     *
+     * <p>只用该病历自己的 {@code structured_data}：归一结果本来就是逐条产生的，
+     * 别条病历抽到的术语在这条病历里没有对应的原文片段，硬套没有依据。
+     * 反过来这也让替换量恒定在「本条病历的实体数」量级，不会随数据集变大而变慢。</p>
+     *
+     * <p>降序是为了长词优先 —— 否则「柴胡」会先把「柴胡桂枝汤」打成「标准柴胡名+桂枝汤」。</p>
+     */
+    private List<Map.Entry<String, String>> replacementsOf(Record r) {
+        String json = r.getStructuredData();
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        Map<String, String> table = new LinkedHashMap<>();
+        try {
+            Map<String, Object> data = objectMapper.readValue(json,
+                    new TypeReference<Map<String, Object>>() {
+                    });
+            collectReplacements(data, table);
+        } catch (JacksonException e) {
+            // 单条脏数据不该让整份导出失败：这条不标准化（保持原文）即可
+            log.warn("[导出] structured_data 解析失败，该条不做标准化 recordId={}: {}",
+                    r.getId(), e.getMessage());
+            return List.of();
+        }
+        if (table.isEmpty()) {
+            return List.of();
+        }
+        List<Map.Entry<String, String>> pairs = new ArrayList<>(table.entrySet());
+        pairs.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+        return pairs;
+    }
+
+    /** 8 类实体取 {@code content}，中药取 {@code name}；两类都带 {@code sourceText} */
+    @SuppressWarnings("unchecked")
+    private static void collectReplacements(Map<String, Object> data, Map<String, String> table) {
+        for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
+                "causeList", "treatmentList", "formulaList")) {
+            collectPairs(data.get(key), "content", table);
+        }
+        collectPairs(data.get("herbs"), "name", table);
+    }
+
+    /** 从一个实体列表里收「sourceText → 标准词」；相同原文映射到不同标准词时保留先出现的 */
+    private static void collectPairs(Object listObj, String termField, Map<String, String> table) {
+        if (!(listObj instanceof List<?> list)) {
+            return;
+        }
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> m)) {
+                continue;
+            }
+            String raw = trimmed(m.get("sourceText"));
+            String std = trimmed(m.get(termField));
+            // 没有原文、没有标准词、或本来就一样（未命中词典）都不构成一次替换
+            if (raw == null || std == null || raw.equals(std)) {
+                continue;
+            }
+            // 同一原文被归一到两个不同标准词，说明该原文有歧义 —— 此时不替换比乱替换安全
+            table.putIfAbsent(raw, std);
+        }
+    }
+
+    /**
+     * 会被标准化的字段：医生手写的文本字段 —— 21 个原始字段里除编号 / 性别 / 年龄 /
+     * 就诊次数 / 科室 / 工号 / 接诊时间之外的 13 个。
+     *
+     * <p>刻意<b>不</b>做成「所有字符串字段都过一遍」：那样 {@code department} 这类短文本
+     * 会被误伤 —— 例如术语「内科 → 中医内科」会把 {@code department="中医内科"} 替换成
+     * 「中医中医内科」。漏替换只是少做一步，误替换是污染数据，两者不对等。</p>
+     *
+     * <p>顺带也把 {@code structuredData} 挡在外面：它里面的 {@code sourceText} 正是
+     * 「这条病历原本怎么写」的唯一依据，一起替换掉就等于把溯源信息抹了。</p>
+     */
+    private static final List<String> STANDARDIZABLE_FIELDS = List.of(
+            "westernDiagnosis", "tcmDiagnosis", "presentIllness", "chiefComplaint", "selfReport",
+            "inspection", "pulse", "tongue", "physicalExam", "pattern", "prescription",
+            "followUp", "treatmentEffect");
+
+    /**
+     * 把一条病历转成 Map 并对上述文本字段做就地标准化（<b>不改动入参 Record</b>）。
+     *
+     * <p>用 {@code convertValue} 而不是直接改 Record：导出的记录对象可能还在 MyBatis
+     * 一级缓存里，就地改会污染后续读取。</p>
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> standardizeMap(Record r, List<Map.Entry<String, String>> pairs) {
+        Map<String, Object> row = objectMapper.convertValue(r, Map.class);
+        if (pairs.isEmpty()) {
+            return row;
+        }
+        for (String field : STANDARDIZABLE_FIELDS) {
+            Object v = row.get(field);
+            if (v instanceof String s) {
+                row.put(field, standardizeText(s, pairs));
+            }
+        }
+        return row;
+    }
+
+    /** 按替换对做文本内替换（字面量，非正则）；没有命中就原样返回 */
+    private static String standardizeText(String s, List<Map.Entry<String, String>> pairs) {
+        if (s == null || s.isEmpty() || pairs.isEmpty()) {
+            return s;
+        }
+        String out = s;
+        for (Map.Entry<String, String> p : pairs) {
+            if (out.contains(p.getKey())) {
+                out = out.replace(p.getKey(), p.getValue());
+            }
+        }
+        return out;
+    }
+
+    /** 替换对的 JSON 形式（溯源列内容）；无替换时返回 {@code {}} */
+    private String pairsJson(List<Map.Entry<String, String>> pairs) {
+        if (pairs.isEmpty()) {
+            return "{}";
+        }
+        Map<String, String> m = new LinkedHashMap<>();
+        for (Map.Entry<String, String> p : pairs) {
+            m.put(p.getKey(), p.getValue());
+        }
+        return objectMapper.writeValueAsString(m);
+    }
+
+    /** 取字符串字段并 trim；空 / 非字符串返回 null */
+    private static String trimmed(Object o) {
+        if (o == null) {
+            return null;
+        }
+        String s = String.valueOf(o).trim();
+        return s.isEmpty() ? null : s;
     }
 
     private String trim(String s) {

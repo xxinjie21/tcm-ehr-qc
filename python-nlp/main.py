@@ -33,10 +33,24 @@ NER_MAX_TOKENS = 510
 # 推理并发上限（AI-12）：extract 是同步 def，FastAPI 会把它投进 anyio 线程池（默认上限 40）；
 # torch 推理是 CPU 密集型，40 个线程同时跑只会争抢 GIL 与内存（RSS 峰值翻倍）。
 # 用信号量把「同时在跑的推理」收在本值以内 —— 超出者排队，而不是一起挤。
-INFER_CONCURRENCY = int(os.environ.get("NLP_INFER_CONCURRENCY", "4"))
-# 每个推理允许使用的 torch 线程数；0 = 沿用 torch 默认。
+#
+# 2026-10-12 实测（32 逻辑核、263 字病历、每档 24 个请求）：
+#   torch 沿用默认 16 线程 + 信号量 4 → 吞吐恒定 ~7 条/s，加并发只涨延迟
+#     （单条一次就吃掉 16 个核，CPU 当场满，多发请求只是排队）
+#   torch 4 线程 + 信号量 8          → 峰值 10.3 条/s（并发 8），+45%
+#   torch 8 线程 + 信号量 8          → 峰值 9.6 条/s
+# 结论：小模型单条推理（batch=1）不该开大线程数 —— 线程多了全是同步开销；
+# 正确姿势是「少线程 × 多并发」。默认值据此按核数自适应，换机器不会退化；
+# 仍可用 NLP_TORCH_THREADS / NLP_INFER_CONCURRENCY 覆盖。
+_CPU = os.cpu_count() or 4
+# 单条推理的 torch 线程数：按 1/8 核数取，上限 4（实测超过 4 反而更慢）
+_DEFAULT_TORCH_THREADS = max(1, min(4, _CPU // 8))
+# 同时在跑的推理条数：用剩下的核数补满，上限 12（实测 16 并发开始掉吞吐）
+_DEFAULT_INFER_CONCURRENCY = max(2, min(12, _CPU // _DEFAULT_TORCH_THREADS))
+INFER_CONCURRENCY = int(os.environ.get("NLP_INFER_CONCURRENCY", str(_DEFAULT_INFER_CONCURRENCY)))
+# 每个推理允许使用的 torch 线程数；显式设 0 = 沿用 torch 默认（不推荐，见上）。
 # 与 INFER_CONCURRENCY 相乘才是真实 CPU 占用，两者一起设才能避免 oversubscribe。
-TORCH_NUM_THREADS = int(os.environ.get("NLP_TORCH_THREADS", "0"))
+TORCH_NUM_THREADS = int(os.environ.get("NLP_TORCH_THREADS", str(_DEFAULT_TORCH_THREADS)))
 # 推理信号量：只包住真正吃 CPU 的「编码 + 前向」
 _infer_sem = threading.Semaphore(INFER_CONCURRENCY)
 # torch 线程数只需设置一次
@@ -95,6 +109,10 @@ async def lifespan(_app: FastAPI):
 
     原先用 @app.on_event("startup") —— FastAPI 已废弃该写法（0.141 上会告警）。
     """
+    # 把并发预算打出来：这两个值决定吞吐，且默认是按核数算的 ——
+    # 不打印的话，换机器后「为什么变慢了/没变快」只能靠猜。
+    logger.info("[nlp] CPU=%d 核 → torch 线程 %d × 并发 %d（可用 NLP_TORCH_THREADS / "
+                "NLP_INFER_CONCURRENCY 覆盖）", _CPU, TORCH_NUM_THREADS, INFER_CONCURRENCY)
     _load_model()
     yield
 
