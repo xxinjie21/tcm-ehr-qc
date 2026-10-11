@@ -136,6 +136,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 触发接口限流（P2-31）。
+     *
+     * 消息已是面向用户的可展示文案（含「请稍后再试」），直接回显即可 ——
+     * 落兜底只会给追踪码，用户不知道该怎么办。
+     *
+     * @param e 携带可展示的提示文案
+     * @return HTTP 429 + code=429
+     */
+    @ExceptionHandler(RateLimitedException.class)
+    public ResponseEntity<Result<Void>> handleRateLimited(RateLimitedException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Result.error(429, e.getMessage()));
+    }
+
+    /**
      * 资源不存在（病历 ID 无效等）。
      *
      * @param e 携带资源类型与业务错误码

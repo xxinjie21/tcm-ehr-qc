@@ -4,6 +4,8 @@ import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.AiAsyncTasks;
 import com.tcm.ehr.common.utils.AsyncTaskRegistry;
+import com.tcm.ehr.common.utils.RateLimiter;
+import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
 import com.tcm.ehr.domain.vo.AiReplyVO;
 import com.tcm.ehr.service.IAiService;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +36,29 @@ public class AiController {
 
     private final IAiService aiService;
     private final AiAsyncTasks aiAsyncTasks;
+    private final RateLimiter rateLimiter;
+
+    /**
+     * AI 接口限流（P2-31 / R12）：每用户 {@value #AI_RATE_LIMIT} 次 / {@value #AI_RATE_WINDOW_MINUTES} 分钟。
+     *
+     * <p><b>为什么只限 AI、不限登录与词典导入</b>：AI 链路是「登录即可」且<b>每次请求都可能
+     * 产生一次真实的大模型调用（有成本）</b>，不限的话一个账号就能把额度打光。
+     * 另两处刻意不加，避免同一件事做两遍：登录已有「连续失败 N 次锁定」的独立机制
+     * （{@code AuthServiceImpl}），再叠一层限流只是换个名字的同一个闸门；
+     * 词典导入是管理员专属接口（{@code POST /api/dictionary/import}），不存在自助滥用面。</p>
+     *
+     * <p>限额取 60 次 / 5 分钟：AI 调用都由人手点击触发，正常使用远达不到；
+     * 撞上这个数的只可能是脚本化滥用。Redis 不可用时 {@link RateLimiter} 放行（fail-open），
+     * 不让一次 Redis 抖动把 AI 全打成 429。</p>
+     */
+    private static final int AI_RATE_LIMIT = 60;
+    private static final int AI_RATE_WINDOW_MINUTES = 5;
+
+    /** AI 限流闸门：超限抛 {@code RateLimitedException}，由全局异常出口转 HTTP 429 */
+    private void guardAiRate() {
+        rateLimiter.check("ai", RequestUtils.currentUserId(), AI_RATE_LIMIT,
+                Duration.ofMinutes(AI_RATE_WINDOW_MINUTES), "AI 请求过于频繁，请稍后再试");
+    }
 
     /**
      * 异步提交一次 AI 生成（批次 15 · 15.1）。
@@ -65,6 +91,8 @@ public class AiController {
         if ("chat".equals(kind) && (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank())) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入问题"));
         }
+        // 限流放在真正的开销之前：参数非法（400）不计额度，避免「打错字」被算成滥用
+        guardAiRate();
         String taskId = aiAsyncTasks.submit(() -> {
             AiReplyVO r = switch (kind) {
                 case "interpret" -> aiService.interpret(dto);
@@ -119,6 +147,7 @@ public class AiController {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }
         // 2. 调服务；返回 null = 病历不存在
+        guardAiRate();
         AiReplyVO vo = aiService.interpret(dto);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(1006, "病历不存在"));
@@ -140,6 +169,7 @@ public class AiController {
         if (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入问题"));
         }
+        guardAiRate();
         return ResponseEntity.ok(Result.ok(aiService.chat(dto)));
     }
 
@@ -157,6 +187,7 @@ public class AiController {
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }
+        guardAiRate();
         AiReplyVO vo = aiService.review(dto);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(1006, "病历不存在"));
