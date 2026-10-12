@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       = 真缺失 -12，原始列有 = 漏抽 -6。<b>治法与方剂已不是完整性要素</b>，缺它们不扣分
  *       （批M 把「数据源无该两列」的项退出了评分）。</li>
  *   <li><b>术语标准化</b>：实体没有 {@code normLevel} 即算未命中词典，每个 -1、上限 -5。</li>
- *   <li><b>分级</b>：真缺失 ≥3 项或分数 &lt;60 → 无效；有逻辑冲突 → 待复核；≥90 → 合格；其余待复核。</li>
+ *   <li><b>分级</b>：真缺失 ≥3 项或分数 &lt;60 → 无效；有逻辑冲突 → 待复核；≥95 → 合格；其余待复核。</li>
  * </ul>
  *
  * <p>注意 {@link #raw()} 只填了年龄/性别，所以凡结构化为空的要素在原始列也取不到值 ——
@@ -96,7 +96,7 @@ class QcScorerTest {
         ScoreResultVO vo = QcScorer.score(data, raw(), false, QcRuleSet.defaults());
 
         assertEquals(88, vo.getScore()); // 100 - 12
-        assertEquals("待复核", vo.getGrade()); // 60 ≤ 88 < 90
+        assertEquals("待复核", vo.getGrade()); // 60 ≤ 88 < 95
     }
 
     /** 结构化为空但原始列有记录 = 漏抽，扣 6 而不是 12，且不计入「真缺失」项数 */
@@ -110,7 +110,8 @@ class QcScorerTest {
         ScoreResultVO vo = QcScorer.score(data, raw, false, QcRuleSet.defaults());
 
         assertEquals(94, vo.getScore()); // 100 - 6
-        assertEquals("合格", vo.getGrade());
+        // 94 < 合格线 95 ⇒ 待复核。本条只验「漏抽扣 6 而不是 12」，分级随阈值走
+        assertEquals("待复核", vo.getGrade());
     }
 
     @Test
@@ -136,7 +137,7 @@ class QcScorerTest {
 
     /**
      * 证候命中「脾肾阳虚」的默认规则有两条（→中药、→方剂），且都未命中期望值 → 2 条冲突。
-     * 有冲突即落待复核，而不是看分数够不够 90。
+     * 有冲突即落待复核，而不是看分数够不够 95。
      */
     @Test
     void bothLogicConflictsPendingReview() {
@@ -224,6 +225,40 @@ class QcScorerTest {
 
         assertEquals(1, s5 - s10,
                 "未归一条数超过 cap 后应每满一档多扣一档：否则大量未归一时扣分触顶、分数没有区分度");
+    }
+
+    /**
+     * 年龄格式规则必须接受真实病历的<b>复合单位</b>写法。
+     *
+     * <p>原先的正则 {@code ^\d+(\.\d+)?(岁|个月|月|天)?$} 只允许<b>单个</b>单位后缀，
+     * 实测把真实数据里 92.1% 的年龄（32550/35354）判成格式错误 —— 失败形态 100% 是
+     * 「32岁6月」这类复合单位。这里把「合法写法一律不判错」钉死。</p>
+     */
+    @Test
+    void compoundAgeUnitPassesFormatRule() {
+        for (String age : List.of("45", "50岁", "32岁6月", "35岁2月", "6个月", "3天", "1.5岁", "32岁6个月")) {
+            Record raw = new Record();
+            raw.setAge(age);
+            raw.setGender("男");
+
+            ScoreResultVO vo = QcScorer.score(fullData(), raw, false, QcRuleSet.defaults());
+
+            assertTrue(vo.getDeductions().stream().noneMatch(d -> "格式错误".equals(d.getType())),
+                    () -> "年龄「" + age + "」不该被判格式错误：" + vo.getDeductions());
+        }
+    }
+
+    /** 反例：真正非法的年龄写法仍须被拒 —— 放宽不能放到「什么都放行」 */
+    @Test
+    void illegalAgeStillRejected() {
+        Record raw = new Record();
+        raw.setAge("约50岁");
+        raw.setGender("男");
+
+        ScoreResultVO vo = QcScorer.score(fullData(), raw, false, QcRuleSet.defaults());
+
+        assertTrue(vo.getDeductions().stream().anyMatch(d -> "格式错误".equals(d.getType())),
+                () -> "「约50岁」应判格式错误：" + vo.getDeductions());
     }
 
     /** 造 n 条「无 normLevel」的症状实体（无 normLevel = 未命中词典 = 计未归一） */

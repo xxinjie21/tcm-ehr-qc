@@ -54,7 +54,7 @@
          由页面把 sortBy/sortOrder 放进查询，后端走 RecordFilter 白名单）。 -->
     <el-table-column v-if="!slim" prop="score" label="评分" width="80" align="center" sortable="custom">
       <template #default="{ row }">
-        <span v-if="row.score != null" :class="scoreClass(row.score)">{{ row.score }}</span>
+        <span v-if="row.score != null" :class="scoreClass(row.grade)">{{ row.score }}</span>
         <span v-else class="tip">—</span>
       </template>
     </el-table-column>
@@ -121,7 +121,7 @@
 import { ref } from 'vue'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
-import { gradeTagType } from '@/utils/grade'
+import { gradeClass, gradeTagType } from '@/utils/grade'
 
 defineProps({
   /** 病历行数组（SearchVO.Item[]） */
@@ -168,9 +168,11 @@ const toggleRowSelection = (row, selected) => tableRef.value?.toggleRowSelection
 
 defineExpose({ clearSelection, toggleRowSelection })
 
-// 评分配色：与质控页的合格线口径一致（>=90 合格 / >=60 待复核 / 其余无效）
-// 这里只做「一眼看出高低」，阈值以后端规则为准，前端不另立标准。
-const scoreClass = (s) => (s >= 90 ? 'score-ok' : s >= 60 ? 'score-mid' : 'score-low')
+// 评分配色：按后端返回的「分级」着色，不按分数重算阈值。
+// 阈值由后端规则决定且管理员可改（utils/grade.js 明确「前端不写死数值」），
+// 此前这里写死 `s >= 90 / s >= 60`，管理员改合格线后配色就会与服务端结论矛盾。
+const SCORE_CLASS = { 'is-ok': 'score-ok', 'is-mid': 'score-mid', 'is-bad': 'score-low' }
+const scoreClass = (grade) => SCORE_CLASS[gradeClass(grade)] || 'score-mid'
 </script>
 
 <style scoped>

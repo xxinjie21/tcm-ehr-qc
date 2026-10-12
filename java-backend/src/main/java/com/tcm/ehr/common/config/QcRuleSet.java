@@ -117,8 +117,19 @@ public class QcRuleSet {
 
     @Data
     public static class Thresholds {
-        private int qualified = 90;
+        /**
+         * 合格线：<b>100 − 标准化档位(cap) = 95</b>。
+         *
+         * <p>口径 = 核心要素无真缺失 + 无逻辑冲突 + 术语未归一不超过一档。取值由规则集自身推导，
+         * 不再沿用「按演示数据集调优」的 90（那个数字无推导依据）。</p>
+         *
+         * <p>实测（35354 份真实病历离线仿真，见 docs/质控标准与报告口径改造计划.md §3.5）：
+         * 90 → 95 使合格率 69.0% → 60.7%、待复核 18.8% → 27.0%。</p>
+         */
+        private int qualified = 95;
+        /** 无效线：低于此分判无效。真实数据上由「真缺失 ≥ 3」先命中，此线通常不单独生效。 */
         private int invalid = 60;
+        /** 真缺失要素数达到此值判无效（结构性判据，与分数线相互独立） */
         private int seriousFullMissing = 3;
     }
 
@@ -133,9 +144,13 @@ public class QcRuleSet {
         }
 
         // 格式
-        QcRuleSet.FormatRule age = format("age", "regex", "^\\d+(\\.\\d+)?(岁|个月|月|天)?$",
+        // 年龄正则用 (...)+ 允许「复合单位」：「32岁6月」「35岁2月」是真实病历的常见写法。
+        // 原先的 ^\d+(\.\d+)?(岁|个月|月|天)?$ 只允许单个单位后缀，实测把真实数据里
+        // 92.1% 的年龄判成格式错误（32550/35354，失败形态 100% 为复合单位）。
+        // 单位后缀在每组内仍必须可选，否则纯数字「45」会反过来不匹配。
+        QcRuleSet.FormatRule age = format("age", "regex", "^(\\d+(\\.\\d+)?(岁|个月|月|天)?)+$",
                 List.of(), "年龄", "年龄格式不正确");
-        age.setHint("须为数字，可带 岁/个月/月/天 单位");
+        age.setHint("须为数字，可带 岁/个月/月/天 单位（可组合，如 32岁6月）");
         r.format.add(age);
         r.format.add(format("gender", "enum", null, GENDER_VALUES, "性别", "性别非 男/女"));
 

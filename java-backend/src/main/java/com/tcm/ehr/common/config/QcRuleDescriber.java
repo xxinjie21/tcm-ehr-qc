@@ -143,8 +143,8 @@ public final class QcRuleDescriber {
         // 1. 年龄：正则 + 给人看的 hint 2. 性别：枚举白名单
         // 性别白名单取 QcRuleSet.GENDER_VALUES（唯一权威），不在此处另抄一份
         List<QcRuleSet.FormatRule> list = new ArrayList<>();
-        list.add(fmt("age", "regex", "^\\d+(\\.\\d+)?(岁|个月|月|天)?$", List.of(), "年龄", "年龄格式不正确",
-                "须为数字，可带 岁/个月/月/天 单位"));
+        list.add(fmt("age", "regex", "^(\\d+(\\.\\d+)?(岁|个月|月|天)?)+$", List.of(), "年龄", "年龄格式不正确",
+                "须为数字，可带 岁/个月/月/天 单位（可组合，如 32岁6月）"));
         list.add(fmt("gender", "enum", null, QcRuleSet.GENDER_VALUES, "性别", "性别非 男/女"));
         return list;
     }
