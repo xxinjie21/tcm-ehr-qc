@@ -105,8 +105,17 @@ public class DataInitializationListener implements ApplicationRunner {
         }
     }
 
-    /** 基础层该类型为空且文件里有词时，把文件内容播种进 {@code dictionary_terms} */
+    /**
+     * 基础层该类型为空且文件里有词时，把文件内容播种进 {@code dictionary_terms}。
+     *
+     * <p><b>为什么必须加分布式锁（B2）</b>：{@code replace} 是「先删后插」。多实例同时启动时
+     * 两个实例都会读到「空」，双双播种，其中一个撞 {@code uk_org_type_term} 抛异常 ⇒
+     * 该类型整轮被 {@link #loadDictionaries} 的外层 try 跳过，归一不可用。
+     * 与 {@link #reconcileLayer} 同口径：拿不到锁就本次跳过（下一实例 / 下次启动会补上），
+     * 启动期抢不到锁不是错误。</p>
+     */
     private void seedBaseIfEmpty(String type) {
+        // 1. 锁外先快速判空：绝大多数启动都走这一条直接返回，不必每次都去抢锁
         if (!termStore.read(IDictionaryTermStore.BASE_ORG, type).isEmpty()) {
             return;
         }
@@ -120,8 +129,27 @@ public class DataInitializationListener implements ApplicationRunner {
         if (fromFile.isEmpty()) {
             return;
         }
-        String version = termStore.replace(IDictionaryTermStore.BASE_ORG, type, fromFile);
-        log.info("[词典] {} 基础层播种 {} 条（来源：词典文件，版本 {}）", type, fromFile.size(), version);
+        // 2. 抢锁后重新判空：等锁期间别的实例可能已经播完。版本号用长度 1 的数组带出锁外再打日志
+        String[] version = new String[1];
+        try {
+            distLock.runLocked(
+                    com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, IDictionaryTermStore.BASE_ORG),
+                    () -> {
+                        if (termStore.read(IDictionaryTermStore.BASE_ORG, type).isEmpty()) {
+                            version[0] = termStore.replace(IDictionaryTermStore.BASE_ORG, type, fromFile);
+                        }
+                        return null;
+                    });
+        } catch (ConcurrentOperationException e) {
+            log.info("[词典] {} 基础层播种被其它实例占用，本次跳过: {}", type, e.getMessage());
+            return;
+        } catch (ServiceNotReadyException e) {
+            log.warn("[词典] {} 基础层播种跳过：锁服务不可用 -> {}", type, e.getMessage());
+            return;
+        }
+        if (version[0] != null) {
+            log.info("[词典] {} 基础层播种 {} 条（来源：词典文件，版本 {}）", type, fromFile.size(), version[0]);
+        }
     }
 
     /** 基础层 + 所有有词条的组织，逐个比对版本对账 */

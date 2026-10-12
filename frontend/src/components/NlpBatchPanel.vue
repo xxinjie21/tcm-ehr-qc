@@ -247,19 +247,22 @@ const poll = async () => {
   const id = activeTask.value?.id
   if (!id) return
   try {
-    // 2. 取最新进度并回填当前任务
+    // 2. 取最新进度
     const res = await getNlpBatchProgress(id)
+    // 3. 回包竞态守卫：await 期间用户可能切到了别的任务（viewTask），或本次请求超过一个节拍 ——
+    //    旧响应若直接回填，会把界面拉回上一个任务、或让进度倒退。id 对不上就丢弃这次响应。
+    if (activeTask.value?.id !== id) return
     activeTask.value = res.data
     updateEta(activeTask.value)
-    // 3. 任务已结束（非排队 / 进行中）则停止轮询，并立刻刷新一次任务列表 ——
+    // 4. 任务已结束（非排队 / 进行中）则停止轮询，并立刻刷新一次任务列表 ——
     //    列表里的状态要马上与这里对上，不能等下一个 30 秒节拍
     if (!isActive(activeTask.value)) {
       stopPoll()
       loadBatchList()
     }
   } catch {
-    // 4. 请求失败也停止轮询，避免空转
-    stopPoll()
+    // 5. 请求失败也停止轮询，避免空转；但若失败的是「已切走的旧任务」，不能连累当前任务的轮询
+    if (activeTask.value?.id === id) stopPoll()
   }
 }
 

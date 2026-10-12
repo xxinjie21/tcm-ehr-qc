@@ -53,6 +53,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -219,6 +220,17 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+        // B4：再等任务内并行池收尾 —— 它是所有任务共享的，worker 退出时可能还有在途的病历在跑。
+        // 不等的话，进程会带着「已算完但没回写」的结果退出（那些归一结果要重跑才能拿回来）。
+        if (recordPool != null) {
+            try {
+                if (!recordPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                    log.warn("[批解析] 停机：任务内并行池未在 5s 内退出，在途病历的回写可能丢失");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         // 批次 16.2：停机**不再清理 QUEUED**。它们现在就是「待认领队列」，
         // 留在库里由本实例下次启动或另一个实例认领续跑；一刀切标中断会让
@@ -841,6 +853,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 if (outcome == PageOutcome.CANCELED) {
                     return true;
                 }
+                // limit 传 Integer.MAX_VALUE ⇒ remain 恒 > 0，不可能出现 LIMIT_REACHED；
+                // 剩下只可能是停机被拒（ABORTED）—— 同样收尾，由 endStatus 落 INTERRUPTED
+                if (outcome == PageOutcome.ABORTED) {
+                    break;
+                }
             }
             return false;
         } finally {
@@ -867,7 +884,15 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         /** 检测到取消请求 */
         CANCELED,
         /** 已达 {@code limit} 硬上限，后续页一条都不该再处理 */
-        LIMIT_REACHED
+        LIMIT_REACHED,
+        /**
+         * 应用正在停机、任务内并行池已拒绝提交（B4）。
+         *
+         * <p>刻意与 {@link #CANCELED} 分开：这不是用户的取消意图，不能落 {@code CANCELLED}。
+         * 调用方按「未被取消」收尾，由 {@link #endStatus} 依「已停机 + 未跑完」落
+         * {@code INTERRUPTED}（{@code endStatus} 里 {@code cancelled} 优先于停机判定）。</p>
+         */
+        ABORTED
     }
 
     /**
@@ -917,10 +942,17 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             //    池未装配（单测直接 new，不走 @PostConstruct）时退化为串行，
             //    语义与改造前一致，不让构造方式影响行为（同 sqlSessionFactory 的既有范式）。
             List<Future<StepOutcome>> futures = new ArrayList<>(part.size());
-            for (Record r : part) {
-                futures.add(recordPool == null
-                        ? CompletableFuture.completedFuture(runOne(r, t.getOrgId(), dictMeta))
-                        : recordPool.submit(() -> runOne(r, t.getOrgId(), dictMeta)));
+            try {
+                for (Record r : part) {
+                    futures.add(recordPool == null
+                            ? CompletableFuture.completedFuture(runOne(r, t.getOrgId(), dictMeta))
+                            : recordPool.submit(() -> runOne(r, t.getOrgId(), dictMeta)));
+                }
+            } catch (RejectedExecutionException e) {
+                // B4：停机时池已 shutdownNow，再提交会被拒。这是「应用要停了」而不是「任务失败」——
+                // 若让它冒到 runTask 的 catch，任务会落 FAILED，而设计意图是 INTERRUPTED。
+                log.warn("[批解析] 任务 {} 提交并行处理被拒（应用正在停机），按中断收尾", taskId);
+                return PageOutcome.ABORTED;
             }
             // 5. 按提交顺序单线程汇总：进度 / 失败明细 / 攒批都只在这一条路径上改
             for (int i = 0; i < futures.size(); i++) {

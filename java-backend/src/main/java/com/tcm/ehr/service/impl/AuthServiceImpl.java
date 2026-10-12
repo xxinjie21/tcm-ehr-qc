@@ -383,6 +383,9 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             }
             return ttl.intValue();
         } catch (Exception e) {
+            // B1：Redis 故障时按「未锁定」放行 —— 宁可让用户继续试密码，也不因缓存抖动把账号锁死。
+            // 但必须留痕：静默吞掉会让「锁为什么没生效」变成查不出的问题（与同文件其它 Redis 降级分支同口径）。
+            log.warn("[Auth] 读取登录失败锁定剩余时间失败，按未锁定处理: {}", e.getMessage());
             return 0;
         }
     }

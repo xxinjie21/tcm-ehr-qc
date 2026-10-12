@@ -125,7 +125,18 @@ public class LlmConfigStore {
         }
         UserLlmConfig existing = userMapper.selectById(userId);
         if (existing == null) {
-            userMapper.insert(row);
+            try {
+                userMapper.insert(row);
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                // B6：check-then-act 的窗口 —— 并发下两个请求都判定「没有行」并同时 insert，
+                // 一个撞主键。撞键说明行已被另一个请求建好，退化为更新，而不是给用户一个 500。
+                log.warn("[LLM] 用户 {} 的配置行并发创建撞主键，改为更新", userId);
+                UserLlmConfig fresh = userMapper.selectById(userId);
+                if (!newKey && fresh != null && fresh.getApiKey() != null) {
+                    row.setApiKey(fresh.getApiKey());
+                }
+                userMapper.updateById(row);
+            }
         } else {
             if (!newKey && existing.getApiKey() != null) {
                 // 显式回填原密文：apiKey 传空 = 「不修改」。

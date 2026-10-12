@@ -144,7 +144,14 @@ public class QcRuleStore {
         }
         row.setUpdateTime(java.time.LocalDateTime.now().withNano(0));
         if (isNew) {
-            ruleMapper.insert(row);
+            try {
+                ruleMapper.insert(row);
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                // B6：check-then-act 的窗口 —— 并发下两个请求都判定「该组织无行」并同时 insert，
+                // 一个撞主键。撞键说明行已被建好，退化为更新（内容以本次提交为准）。
+                log.warn("[质控规则] 组织 {} 的规则行并发创建撞主键，改为更新", orgId);
+                ruleMapper.updateById(row);
+            }
         } else {
             ruleMapper.updateById(row);
         }
