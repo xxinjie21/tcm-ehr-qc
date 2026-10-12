@@ -47,10 +47,39 @@ _CPU = os.cpu_count() or 4
 _DEFAULT_TORCH_THREADS = max(1, min(4, _CPU // 8))
 # 同时在跑的推理条数：用剩下的核数补满，上限 12（实测 16 并发开始掉吞吐）
 _DEFAULT_INFER_CONCURRENCY = max(2, min(12, _CPU // _DEFAULT_TORCH_THREADS))
-INFER_CONCURRENCY = int(os.environ.get("NLP_INFER_CONCURRENCY", str(_DEFAULT_INFER_CONCURRENCY)))
+
+
+def _env_int(name: str, default: int, lo: int, hi: int, allow_non_positive: bool = False) -> int:
+    """读整型环境变量并夹到合法区间；非法值退默认并告警（C4）。
+
+    C4 之前是 `int(os.environ.get(...))` 直读，两个问题：
+    1) 非数字在 **import 期** 抛 ValueError —— 服务直接起不来，报错只有一行栈、看不出是哪个变量；
+    2) 0 / 负数 / 超大值静默生效 —— `NLP_INFER_CONCURRENCY=0` 会让 Semaphore 永久阻塞（服务假死），
+       超大值把 CPU 打满反而掉吞吐（实测 16 并发开始掉）。
+    """
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        print(f"[warn] {name}={raw!r} 不是整数，改用默认值 {default}", flush=True)
+        return default
+    # NLP_TORCH_THREADS 的「<= 0 = 沿用 torch 默认」是文档化用法（见下方注释与 _apply_torch_threads），不能夹掉
+    if allow_non_positive and value <= 0:
+        return value
+    if value < lo or value > hi:
+        clamped = max(lo, min(hi, value))
+        print(f"[warn] {name}={value} 超出允许范围 [{lo}, {hi}]，已夹到 {clamped}", flush=True)
+        return clamped
+    return value
+
+
+INFER_CONCURRENCY = _env_int("NLP_INFER_CONCURRENCY", _DEFAULT_INFER_CONCURRENCY, 1, 64)
 # 每个推理允许使用的 torch 线程数；显式设 0 = 沿用 torch 默认（不推荐，见上）。
 # 与 INFER_CONCURRENCY 相乘才是真实 CPU 占用，两者一起设才能避免 oversubscribe。
-TORCH_NUM_THREADS = int(os.environ.get("NLP_TORCH_THREADS", str(_DEFAULT_TORCH_THREADS)))
+TORCH_NUM_THREADS = _env_int("NLP_TORCH_THREADS", _DEFAULT_TORCH_THREADS, 1, 64,
+                             allow_non_positive=True)
 # 推理信号量：只包住真正吃 CPU 的「编码 + 前向」
 _infer_sem = threading.Semaphore(INFER_CONCURRENCY)
 # torch 线程数只需设置一次

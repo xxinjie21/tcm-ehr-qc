@@ -1,6 +1,7 @@
 package com.tcm.ehr.service.impl;
 
 import com.tcm.ehr.common.exception.BusinessException;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.tcm.ehr.common.exception.TermIndexUnavailableException;
@@ -324,7 +325,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * @throws com.tcm.ehr.common.exception.ConcurrentOperationException 拿不到提交锁（另一提交正在进行）
      */
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public NlpTaskVO submit(NlpBatchDTO dto, String createdBy) {
         // 1. 前置校验：没开抽取就不要排任务，避免整批必然失败
         if (!nlpClient.isEnabled()) {
@@ -1058,7 +1059,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     private boolean isCancelRequested(String id) {
         try {
-            NlpTask t = taskMapper.selectById(id);
+            // C5：只取 cancel_requested 单列。原先 selectById 会把整行读回来 ——
+            // 含 failure_list（可能很长的 JSON）与 filters_json，而本方法每 PROGRESS_EVERY 条
+            // 就调一次，纯属白读。口径与 QcBatchServiceImpl 的 P2-5 写法一致。
+            // ⚠️ 用实体方法引用而不是 .select("cancel_requested") 字面量：列名走实体映射
+            // （EntityColumnMappingTest 已钉住）比裸字面量更不容易写错，也与 QC 侧统一。
+            NlpTask t = taskMapper.selectOne(new LambdaQueryWrapper<NlpTask>()
+                    .select(NlpTask::getCancelRequested)
+                    .eq(NlpTask::getId, id));
             return t != null && t.getCancelRequested() != null && t.getCancelRequested() == 1;
         } catch (Exception e) {
             log.debug("[批解析] 读取消位失败，按未取消处理: {}", e.getMessage());

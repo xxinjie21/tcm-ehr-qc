@@ -94,6 +94,7 @@ export function useUrlFilters(state, page, pageSize, options = {}) {
       if (pageSize.value !== initialPageSize) next.pageSize = String(pageSize.value)
     }
     // replace：见类注释第 ① 条，避免污染后退历史
+    // 吞掉失败：vue-router 在「导航被中止 / 重复导航」时会 reject，而 URL 同步失败不该阻断筛选交互。
     router.replace({ query: next }).catch(() => {})
   }
 

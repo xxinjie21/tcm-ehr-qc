@@ -171,14 +171,20 @@ public class QcBatchServiceImpl implements IQcBatchService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        // 还排在队列里、没被 worker 取走的任务没有 finally 可跑，在这里补标
-        int queued = taskMapper.update(null, new UpdateWrapper<QcTask>()
-                .in("status", List.of(QcTask.QUEUED))
-                .set("status", QcTask.INTERRUPTED)
-                .set("current_label", null)
-                .set("finished_at", LocalDateTime.now().withNano(0)));
-        if (queued > 0) {
-            log.warn("[批重算] 停机：{} 个排队任务已标记为『已中断』", queued);
+        // 还排在队列里、没被 worker 取走的任务没有 finally 可跑，在这里补标。
+        // C9：必须包 try/catch —— @PreDestroy 里抛出的异常会向上传播，让容器停机过程报错；
+        // 而补标失败只让这些任务留在 QUEUED，下次启动 init() 的兜底仍会把它们标成「已中断」。
+        try {
+            int queued = taskMapper.update(null, new UpdateWrapper<QcTask>()
+                    .in("status", List.of(QcTask.QUEUED))
+                    .set("status", QcTask.INTERRUPTED)
+                    .set("current_label", null)
+                    .set("finished_at", LocalDateTime.now().withNano(0)));
+            if (queued > 0) {
+                log.warn("[批重算] 停机：{} 个排队任务已标记为『已中断』", queued);
+            }
+        } catch (Exception e) {
+            log.warn("[批重算] 停机补标排队任务失败（下次启动 init() 会兜成『已中断』）: {}", e.getMessage());
         }
     }
 
@@ -219,7 +225,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
      * @throws com.tcm.ehr.common.exception.ConcurrentOperationException 拿不到提交锁（另一提交正在进行）
      */
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public QcTaskVO submit(QcBatchDTO dto) {
         FiltersDTO filters = dto == null ? null : dto.getFilters();
         // 1. 在提交线程取操作人与角色（worker 拿不到，必须现在捕获）

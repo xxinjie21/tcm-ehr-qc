@@ -18,7 +18,14 @@ import java.nio.file.StandardCopyOption;
  * 关键点：临时文件必须与目标**同目录**。跨文件系统的 move 不是原子的，
  * ATOMIC_MOVE 会直接报错；同目录下才是「要么旧内容、要么新内容」。
  *
- * 调用方负责兜异常并决定降级口径（本项目两个 store 都是「内存已生效，落盘失败只告警」）。
+ * 调用方负责兜异常并决定降级口径（内存已生效时，落盘失败只告警）。
+ *
+ * <p><b>⚠️ 当前无调用方（C7）</b>：原先的两个调用方 {@code LlmConfigStore} / {@code QcRuleStore}
+ * 都已不再回写文件 —— LLM 基线文件改为**只读**（{@code data/llm-config.json} 仅用于覆盖非密钥字段），
+ * 质控规则的权威是 {@code qc_rules} 表（原先的 {@code data/qc-rules.json} 兜底已删除）。</p>
+ *
+ * <p><b>为什么保留而不是删掉</b>：下次需要「配置文件原子落盘」时可直接复用 ——
+ * 本类踩过的三条坑（临时文件必须同目录、跨文件系统 move 非原子、失败要留原内容）重写一遍很容易漏。</p>
  */
 public final class AtomicJsonWriter {
 

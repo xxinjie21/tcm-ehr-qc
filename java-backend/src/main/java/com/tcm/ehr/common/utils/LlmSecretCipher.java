@@ -67,6 +67,9 @@ public class LlmSecretCipher {
             byte[] raw = Base64.getDecoder().decode(b64.trim());
             return raw.length * 8 == KEY_BITS ? raw : null;
         } catch (IllegalArgumentException e) {
+            // C2：区分「没配密钥」与「配了但不是合法 Base64 / 位数不对」—— 前者静默返回 null 是对的，
+            // 后者是配置写错了，不给日志的话表现完全一样（保存时报「密钥未配置」，查不出原因）。
+            log.warn("[LLM 密钥] 密钥不是合法 Base64，按「未配置」处理: {}", e.getMessage());
             return null;
         }
     }

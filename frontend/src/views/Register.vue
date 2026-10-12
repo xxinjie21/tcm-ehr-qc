@@ -84,6 +84,8 @@ watch(
   () => form.password,
   () => {
     if (form.confirmPassword) {
+      // 吞掉失败：validateField 在校验不通过时会 reject，而这里只需要「触发校验、让错误文案刷新」——
+      // 不通过本身就是要展示的结果，不是异常。
       formRef.value?.validateField('confirmPassword').catch(() => {})
     }
   }

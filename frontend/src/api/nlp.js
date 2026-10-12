@@ -70,6 +70,8 @@ let healthOk = false
 export function getNlpHealth() {
   const p = request.get('/nlp/health', { timeout: 5000, silent: !healthOk })
   // 只认「探到有效载荷」（与 useNlpStatus 判空口径一致：data 非空才缓存结论）
+  // 这里刻意吞掉异常：它只是「缓存探活结论」的旁路，调用方拿到的仍是同一个 p（可自行 catch 并提示）；
+  // 若在此处再抛一次，同一个 promise 会变成 unhandled rejection。
   p.then((res) => { healthOk = !!(res && res.data) }).catch(() => {})
   return p
 }

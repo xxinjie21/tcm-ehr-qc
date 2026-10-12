@@ -551,6 +551,7 @@ const openDetail = async (recordId) => {
       .then((r) => {
         detailStructured.value = r?.data?.structuredData ?? null
       })
+      // 吞掉失败：结构化数据只是弹窗里的补充展示，接口报错时保持「未解析」形态即可，弹窗照常打开
       .catch(() => {})
     // 4. 打开弹窗
     detailVisible.value = true

@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.BindException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -303,6 +304,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .body(Result.error(415, "请求内容类型不支持，请使用 application/json"));
+    }
+
+    /**
+     * 响应媒体类型不可接受（客户端 {@code Accept} 里没有服务端能产出的类型，
+     * 例如带 {@code Accept: text/plain} 调一个 JSON 端点）。
+     *
+     * <p><b>为什么返回空 body（C1）</b>：走到这里说明内容协商已经失败过一次 ——
+     * 再返回 {@code Result} 包装体，Spring 仍协商不出可写的媒体类型，会**再抛同一个异常**，
+     * 最终落成 500。Spring 自带的 {@code ResponseEntityExceptionHandler} 对同一异常也是
+     * 返回空 body 的 406，此处与之一致。修复前该异常没有处理器，直接落兜底的 500。</p>
+     *
+     * @param e 媒体类型异常
+     * @return HTTP 406（无 body）
+     */
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<Result<Void>> handleMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException e) {
+        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build();
     }
 
     /**

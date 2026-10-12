@@ -65,5 +65,5 @@ nodejs-global/
 # 一直没被忽略，git status 里长期挂着一个未跟踪目录；这里补上（文件本身仍在本地）。
 .workbuddy/
 
-# 前端校验产物（不入库）
-frontend/.verify-dist/
+# 前端校验产物（不入库）；通配后缀，避免每次换 outDir 都冒出一个新的未跟踪目录
+frontend/.verify-dist*/
