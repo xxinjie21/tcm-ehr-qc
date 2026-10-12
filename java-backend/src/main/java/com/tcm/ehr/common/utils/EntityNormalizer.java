@@ -511,7 +511,7 @@ public class EntityNormalizer {
         touched |= backfillPatterns(vo, orgId, pattern);
         // 1. 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
         if (touched) {
-            normalize(vo);
+            normalize(vo, orgId);
         }
     }
 

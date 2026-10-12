@@ -35,7 +35,7 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTask> {
               (id, record_id, org_id, score, issue_type, status, is_obsolete,
                create_time, deadline_time)
             VALUES
-              (REPLACE(UUID(), #{recordId}, #{orgId}, #{score}, #{issueType}, 'pending', 0,
+              (UUID(), #{recordId}, #{orgId}, #{score}, #{issueType}, 'pending', 0,
                #{now}, #{deadline})
             ON DUPLICATE KEY UPDATE
               score = VALUES(score),

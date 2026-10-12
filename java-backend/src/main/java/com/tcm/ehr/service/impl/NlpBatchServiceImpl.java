@@ -341,7 +341,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         //     不报错、只是不互斥。批次 16.1：DistLock 用 Redisson 锁；它在事务内把放锁
         //     推迟到提交之后（否则并发的查重会读到未提交的空结果，防重形同虚设）。
         return distLock.runLocked(SUBMIT_LOCK, () -> {
+            // 防重按组织隔离：A 组在排队不该挡住 B 组提交（与 QcBatchServiceImpl 同口径）。
+            // orgId 取的是当前提交人的组织快照，与下面 RecordFilter.build(orgId, …) 同一口径。
             Long active = taskMapper.selectCount(new QueryWrapper<NlpTask>()
+                    .eq("org_id", orgId)
                     .in("status", List.of(NlpTask.RUNNING, NlpTask.QUEUED)));
             if (active != null && active > 0) {
                 throw new IllegalArgumentException("已有解析任务在排队或运行中，请等它结束或先取消");
@@ -415,6 +418,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * @throws IllegalArgumentException 抽取服务未开启时抛出
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public NlpTaskVO submitIds(List<String> ids, String createdBy) {
         // 1. 空集合视为无需提交
         if (ids == null || ids.isEmpty()) {
@@ -762,8 +766,16 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 // 4. 并行处理本页（取消检查 / limit 截断都在 processPage 内按块完成）。
                 //    limit 是硬上限：total=0 的任务必须一条都不处理 —— 那是原来的语义，
                 //    「总数 0」不是「不限」，不能反过来跑全库。
-                if (processPage(id, list, t, dictMeta, failures, truncated, processed, pending, limit)) {
+                PageOutcome outcome = processPage(id, list, t, dictMeta, failures, truncated,
+                        processed, pending, limit);
+                if (outcome == PageOutcome.CANCELED) {
                     return true;
+                }
+                // limit 触顶 / 停机被拒：后面的页一条都不该再处理，直接收尾。
+                // 两者都不是「取消」—— 触顶是正常收尾，停机由 endStatus 依「已停机 + 未跑完」落 INTERRUPTED
+                // （改造前是循环内 return false，processPage 改成多态出口后必须在这里显式 break）
+                if (outcome != PageOutcome.CONTINUE) {
+                    break;
                 }
                 // 5. 不满一页即到末尾
                 if (list.size() < PAGE_SIZE) {
@@ -824,8 +836,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 // 3. 一次批量取回该块，再逐条处理（库里的取消位同样每 PROGRESS_EVERY 条查一次）
                 List<Record> list = recordMapper.selectBatchIds(chunk);
                 // ID 型任务没有「总数上限」的概念：上限给 Integer.MAX_VALUE（等价于不限）
-                if (processPage(id, list, t, dictMeta, failures, truncated, processed, pending,
-                        Integer.MAX_VALUE)) {
+                PageOutcome outcome = processPage(id, list, t, dictMeta, failures, truncated,
+                        processed, pending, Integer.MAX_VALUE);
+                if (outcome == PageOutcome.CANCELED) {
                     return true;
                 }
             }
@@ -840,7 +853,25 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /**
-     * 并行处理一批病历（两条取数路径共用）；返回 {@code true} 表示检测到取消。
+     * {@link #processPage} 的三态出口。
+     *
+     * <p><b>为什么必须是三态</b>：改造前 {@code processPage} 返回 {@code boolean}，
+     * 而外层把 {@code true} 理解成「已取消」、{@code false} 理解成「继续翻页」。
+     * 但 {@code processPage} 里还有一个出口是「已达 limit 上限」，它也返回了 {@code false} ——
+     * 于是 {@code limit} 触顶后外层继续翻页，把整个匹配集翻完（{@code total=0} 的任务同样如此）。
+     * 三态把这个歧义消掉。</p>
+     */
+    private enum PageOutcome {
+        /** 本页处理完毕，未取消、未触顶 */
+        CONTINUE,
+        /** 检测到取消请求 */
+        CANCELED,
+        /** 已达 {@code limit} 硬上限，后续页一条都不该再处理 */
+        LIMIT_REACHED
+    }
+
+    /**
+     * 并行处理一批病历（两条取数路径共用）；返回 {@link PageOutcome} 区分「继续翻页 / 被取消 / 已达 limit 上限」。
      *
      * <p><b>为什么要并行</b>：原先这里是一个 {@code for} 循环串行调 {@code processOne}，而单条
      * NLP 推理要数百毫秒 —— 单任务吞吐被钉死在「1 / 单条耗时」（32 核机器上实测约 7 条/s）。
@@ -858,14 +889,16 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      *              {@code 0} 表示一条都不处理 —— 这是原语义，不能理解成「不限」；
      *              ID 型任务无此概念，传 {@link Integer#MAX_VALUE}
      */
-    private boolean processPage(String taskId, List<Record> list, NlpTask t, DictMeta dictMeta,
-                                List<NlpTaskVO.Failure> failures, boolean[] truncated,
-                                int[] processed, List<StructuredWrite> pending, int limit) {
+    private PageOutcome processPage(String taskId, List<Record> list, NlpTask t, DictMeta dictMeta,
+                                    List<NlpTaskVO.Failure> failures, boolean[] truncated,
+                                    int[] processed, List<StructuredWrite> pending, int limit) {
         // 1. 按上限裁剪：并行后不能再靠「循环内处理一条判一次」来截断，否则会超跑
         List<Record> page = list;
         int remain = limit - processed[0];
         if (remain <= 0) {
-            return false;
+            // A2：这里是「已达上限」，不是「未取消」—— 原先返回 false 会被外层当成「继续翻页」，
+            // limit 触顶后仍把整个匹配集翻完（total=0 的任务也一样）。
+            return PageOutcome.LIMIT_REACHED;
         }
         if (page.size() > remain) {
             page = page.subList(0, remain);
@@ -877,7 +910,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             //    并行后单块只有 chunk 条，比原先「每 25 条查一次库」更频繁，
             //    但总量仍可忽略（4 万条约 5000 次主键/索引查询）
             if (cancelFlags.contains(taskId) || isCancelRequested(taskId)) {
-                return true;
+                return PageOutcome.CANCELED;
             }
             List<Record> part = page.subList(off, Math.min(off + chunk, page.size()));
             // 4. 并行提交：orgId 取任务快照 —— worker 线程读不到请求上下文。
@@ -919,7 +952,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 }
             }
         }
-        return false;
+        return PageOutcome.CONTINUE;
     }
 
     /**

@@ -125,6 +125,11 @@ public class QcRuleStore {
             throw new IllegalArgumentException("缺少组织上下文，无法保存质控规则");
         }
         QcRuleSet normalized = normalize(next);
+        // A8：写路径校验 format 规则的正则可编译。QcScorer 执行非法正则时是「静默放行」
+        // （该项不判），规则会静默失效且配置的人看不到原因 —— 存不进去比存进去不生效好。
+        // 刻意不放进 normalize()：它同时被读路径 parseOrBaseline 调用，放那里会给每次读
+        // 都加一遍正则编译，且存量非法规则会在读时被静默丢弃。
+        validateRegexRules(normalized);
         QcRule row = ruleMapper.selectById(orgId);
         boolean isNew = row == null;
         if (isNew) {
@@ -194,6 +199,44 @@ public class QcRuleStore {
     }
 
     // ------------------------------------------------------------------ 内部
+
+    /**
+     * 校验 format 规则里的正则可编译（A8）。
+     *
+     * <p><b>为什么要拦</b>：{@code QcScorer.formatOk} 对编译失败的正则是 catch 后
+     * 「该项不判」—— 规则静默失效，界面上没有任何提示，配置的人以为生效了。
+     * 写路径直接拒绝（全局处理器映射 <b>400</b>），当场告诉他是哪条规则写错了。</p>
+     *
+     * <p><b>只校验 type=regex 且 expr 非空白</b>：{@code type=enum} 走白名单不看 expr；
+     * {@code expr} 为空表示「该项不判」，是合法配置（{@code formatOk} 里同样先返回 true）。</p>
+     *
+     * <p><b>不做</b>正则超时 / 回溯上限：「合法但灾难性回溯」的正则编译是能过的，
+     * 要拦得换引擎（如 RE2J），属新增依赖与算法替换。写入者已是管理员 / owner 高信任档。</p>
+     *
+     * @throws IllegalArgumentException 存在无法编译的正则
+     */
+    private static void validateRegexRules(QcRuleSet r) {
+        if (r == null || r.getFormat() == null) {
+            return;
+        }
+        for (QcRuleSet.FormatRule fr : r.getFormat()) {
+            if (fr == null || "enum".equalsIgnoreCase(fr.getType())) {
+                continue;
+            }
+            String expr = fr.getExpr();
+            if (expr == null || expr.isBlank()) {
+                continue;
+            }
+            try {
+                java.util.regex.Pattern.compile(expr);
+            } catch (RuntimeException e) {
+                String label = fr.getLabel() == null || fr.getLabel().isBlank()
+                        ? fr.getField() : fr.getLabel();
+                throw new IllegalArgumentException(
+                        "格式规则「" + label + "」的正则无法编译：" + e.getMessage());
+            }
+        }
+    }
 
     /** 关键项兜底：空标准/非法阈值一律回默认并告警（不允许空标准导致人人满分） */
     private QcRuleSet normalize(QcRuleSet r) {

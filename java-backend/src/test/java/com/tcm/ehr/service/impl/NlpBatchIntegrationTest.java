@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import com.tcm.ehr.common.utils.DistLock;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.annotation.MapperScan;
+import org.mockito.ArgumentMatchers;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -50,6 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -82,7 +87,13 @@ class NlpBatchIntegrationTest {
     @Autowired
     private NlpBatchServiceImpl service;
 
-    @Autowired
+    /**
+     * 用 spy 包住真 Mapper：既能照常读写 H2，又能数「取了几页」。
+     *
+     * <p>这是 A2 回归唯一可观测的信号 —— 触顶后多翻页**不会**改变 done/total/success
+     * （页被裁成空、一条也不处理），只会白白多发查询。</p>
+     */
+    @MockitoSpyBean
     private RecordMapper recordMapper;
 
     @Autowired
@@ -197,6 +208,54 @@ class NlpBatchIntegrationTest {
         assertEquals(0, task.getDone());
         assertEquals(0, task.getSuccess());
         assertEquals(0, task.getFailed());
+    }
+
+    /**
+     * A2 回归守卫：筛选型任务在触到 {@code total} 上限后必须停止翻页。
+     *
+     * <p><b>被测语义</b>：{@code runByFilter} 传给 {@code processPage} 的 {@code limit}
+     * 是<b>任务的 total</b>（{@code runByFilter:738}），不是 DTO 的 limit。
+     * 处理数达到 total 之后，剩下的页一条都不该再取。</p>
+     *
+     * <p><b>为什么这条断言必须数查询次数</b>：触顶后多翻的页会被裁成空切片，一条也不处理 ——
+     * done / total / success 与「正确停止」完全一样。旧实现 {@code processPage} 返回
+     * {@code false}，而外层把 {@code false} 理解成「未取消、继续翻页」，于是把匹配集翻到底：
+     * 450 条 / PAGE_SIZE=200 时会取 3 页而不是 2 页。40k 条 + limit=1000 时是 200 页 vs 6 页。</p>
+     */
+    @Test
+    void filterTaskStopsPagingOnceTotalIsReached() {
+        // 450 条 > PAGE_SIZE(200)：触顶后仍剩整页可取，新旧实现的差别才暴露出来
+        for (int i = 0; i < 450; i++) {
+            insertRecord(ORG, "主诉：上限" + i);
+        }
+        // 直接落一条 QUEUED 的筛选型任务（total=10），由 worker 认领后走 runByFilter。
+        // 刻意不走 service.submit()：它内部的 selectCount 会带上 RecordFilter 的 ORDER BY，
+        // 而 H2 不允许「COUNT(*) + ORDER BY」（MySQL 允许）—— 本测试网的环境限制，非产品缺陷。
+        NlpTask queued = new NlpTask();
+        queued.setId(UUID.randomUUID().toString());
+        queued.setStatus(NlpTask.QUEUED);
+        queued.setTotal(10);
+        queued.setDone(0);
+        queued.setSuccess(0);
+        queued.setFailed(0);
+        queued.setOrgId(ORG);
+        queued.setFiltersJson("null");
+        queued.setFailureList("[]");
+        queued.setFailureTruncated(false);
+        queued.setCreatedBy("tester");
+        queued.setCreateTime(LocalDateTime.now().withNano(0));
+        taskMapper.insert(queued);
+
+        NlpTask task = awaitTerminal(queued.getId());
+
+        assertEquals(NlpTask.COMPLETED, task.getStatus());
+        assertEquals(10, task.getTotal());
+        assertEquals(10, task.getDone());
+        assertEquals(10, task.getSuccess(), "处理条数不得因停止翻页而改变");
+        assertEquals(0, task.getFailed());
+
+        // 第 1 页取 200 条、处理 10 条后返回 CONTINUE；第 2 页一进来就发现已触顶 → 恰好 2 次
+        verify(recordMapper, times(2)).selectList(ArgumentMatchers.<Wrapper<Record>>any());
     }
 
     private String insertRecord(String orgId, String chiefComplaint) {
