@@ -102,6 +102,40 @@ public final class RequestUtils {
         return attr(ATTR_ORG_ROLE);
     }
 
+    /**
+     * 某一行的 {@code org_id} 是否与当前操作人同一个<b>组织域</b>。
+     *
+     * <p>用于批任务详情 / 取消这类「按行判权」的地方。列表用的是
+     * {@code org_id = currentOrgId()} 等值查询，判权若另用一套更严的口径，
+     * 就会出现「列表里看得见、点进去说不存在」的自相矛盾 —— 无组织用户正是这个形状：
+     * 他的任务 {@code org_id=''}，列表查 {@code =''} 能列出来，而判权要求
+     * 「当前组织非空」恒判否，于是详情 404、取消报「任务不存在」。</p>
+     *
+     * <p><b>规则</b>：两边都空 = 同一个空组织域，放行；一边空一边非空 = 判否；
+     * 两边都非空 = 严格相等。</p>
+     *
+     * <p><b>为什么空对空要放行、而不是一律 fail-closed</b>：空组织不是「别人的组织」，
+     * 放行不构成跨组织泄露（真正的组织仍要求严格相等，边界一点没松）；而这些任务
+     * 本就列在列表里，界面理应能查看进度、能取消。反过来说，这类任务在 worker 侧
+     * 按空组织 fail-closed 命中 0 条，最终落 {@code INTERRUPTED}，给它看详情也不会
+     * 泄露任何他组数据。</p>
+     *
+     * <p><b>没有请求上下文一律判否</b>：{@link #currentOrgId()} 把「无上下文」和
+     * 「无组织」都表达成空串，单看它无法区分；而这两个调用点（批任务详情 / 取消）
+     * 只可能出现在请求线程上，那里 {@code JwtInterceptor} 必然已写入 {@code ATTR_ORG_ID}。
+     * 因此「连上下文都没有」只可能是后台线程误用，按 fail-closed 拒掉。</p>
+     */
+    public static boolean sameOrgScope(String rowOrgId) {
+        if (RequestContextHolder.getRequestAttributes() == null) {
+            return false;
+        }
+        String current = currentOrgId();
+        if (current.isEmpty()) {
+            return rowOrgId == null || rowOrgId.isEmpty();
+        }
+        return current.equals(rowOrgId);
+    }
+
     /** 本请求是否「不限组织」（管理员看全部）；false 时按 orgId 过滤，空 orgId 走 fail-closed */
     public static boolean viewAllOrgs() {
         return Boolean.TRUE.equals(rawAttr(ATTR_VIEW_ALL_ORGS));
