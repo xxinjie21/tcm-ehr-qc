@@ -242,6 +242,38 @@ class OrgServiceTest {
         assertTrue(e.getMessage().contains("已经是"), e.getMessage());
     }
 
+    /**
+     * 组长退出：继任者升 owner 时，冗余列 {@code organizations.owner_user_id}
+     * 必须同事务跟着改。
+     *
+     * <p>修复前只改了成员行：离组的原组长仍留在冗余列里，于是
+     * {@code reassignOwner} 的「该用户已经是本组织所有者」守卫会读到过期值 ——
+     * 那个人若被重新拉回组（{@code addMember} 一律给 member），管理员再想把他
+     * 指回 owner 就会被这句错的提示挡住，而界面显示他只是成员。</p>
+     */
+    @Test
+    void leaveByOwnerPromotesSuccessorAndSyncsColumn() {
+        bindOwnerOfG1();
+        OrganizationMember self = member("m-self", "g1", "u-owner", OrganizationMember.ROLE_OWNER);
+        OrganizationMember successor = member("m-s", "g1", "u-s", OrganizationMember.ROLE_MEMBER);
+        // memberOf(自己) / selectCount(其余成员数) / selectList(最早创建的继任者)
+        when(memberMapper.selectOne(any())).thenReturn(self);
+        when(memberMapper.selectCount(any())).thenReturn(1L);
+        when(memberMapper.selectList(any())).thenReturn(List.of(successor));
+
+        service.leave("g1");
+
+        ArgumentCaptor<OrganizationMember> cap = ArgumentCaptor.forClass(OrganizationMember.class);
+        verify(memberMapper).updateById(cap.capture());
+        assertEquals("u-s", cap.getValue().getUserId(), "继任者应被提升");
+        assertEquals(OrganizationMember.ROLE_OWNER, cap.getValue().getRole());
+
+        ArgumentCaptor<Organization> gcap = ArgumentCaptor.forClass(Organization.class);
+        verify(orgMapper).updateById(gcap.capture());
+        assertEquals("u-s", gcap.getValue().getOwnerUserId(),
+                "冗余列必须与成员行同事务跟随，否则 reassignOwner 的守卫会读到已离组的人");
+    }
+
     // ---------------------------------------------------------------- 授权开关
 
     /**

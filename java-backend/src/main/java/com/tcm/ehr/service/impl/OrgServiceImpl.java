@@ -604,7 +604,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void leave(String orgId) {
-        requireOrg(orgId);
+        Organization g = requireOrg(orgId);
         requireOwnOrg(orgId);
         String userId = RequestUtils.currentUserId();
         OrganizationMember m = memberOf(orgId, userId);
@@ -625,6 +625,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
                     .get(0);
             successor.setRole(OrganizationMember.ROLE_OWNER);
             memberMapper.updateById(successor);
+            // 冗余列必须同事务跟随（同 transferOwner / reassignignOwner 的口径）：
+            // 漏了它，organizations.owner_user_id 仍指向已离组的人，
+            // reassignOwner 的「该用户已经是本组织所有者」守卫会读到过期值而误判。
+            g.setOwnerUserId(successor.getUserId());
+            baseMapper.updateById(g);
         }
         memberMapper.deleteById(m.getId());
         // 多组织：删的若本是 primary，把该用户另一条 active 成员提升为 primary（避免「无当前组织」）

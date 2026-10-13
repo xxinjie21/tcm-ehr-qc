@@ -368,10 +368,18 @@ const cancelBatch = async (id) => {
   try {
     // 3. 调接口取消任务
     const res = await cancelNlpBatch(id)
-    // 4. 取消的正是当前任务则停止轮询并刷新其状态
+    // 4. 取消的正是当前任务：回填响应状态。
+    //    只有落在终态才停轮询 —— 「刚被 worker 认领」时取消接口返回的是 RUNNING
+    //    （取消位已置，worker 会在条/页边界自行收尾），此时停轮询会让顶部卡片
+    //    永远停在「进行中」，而列表里已经是「已取消」，两处对不上。
     if (activeTask.value?.id === id) {
       activeTask.value = res.data
-      stopPoll()
+      if (!isActive(res.data)) {
+        stopPoll()
+      } else if (!pollTimer) {
+        // 取消的是刚被认领的任务：轮询可能已经停过，接回去等它收敛到终态
+        startPoll()
+      }
     }
     // 5. 刷新最近任务列表
     loadBatchList()

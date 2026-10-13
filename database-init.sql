@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS review_tasks (
   issue_type VARCHAR(50) COMMENT '问题类型（缺失字段/逻辑冲突/评分不达标）',
   score INT COMMENT '当前评分',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-  deadline_time DATETIME COMMENT '复核截止时间（创建时间+7个自然日 —— 原写「工作日」有误，2026-10-05 校正；实现按自然日算）',
+  deadline_time DATETIME COMMENT '复核截止时间（创建时间+7个工作日 —— 原写「自然日」有误，2026-10-12 校正；实现走 QcServiceImpl.addWorkdays，跳周末）',
   reviewed_by VARCHAR(50) COMMENT '复核人用户名',
   completed_time DATETIME COMMENT '复核完成时间',
   is_obsolete TINYINT NOT NULL DEFAULT 0 COMMENT '作废标记：病历重新评分后不再是待复核则置1（查询/统计/看板统一过滤 is_obsolete=0）',
@@ -346,8 +346,11 @@ INSERT IGNORE INTO organizations (id, code, name, purpose, status, owner_user_id
 --    「管理员看全部」只在**请求线程**生效（RequestUtils.viewAllOrgs）；后台 worker
 --    （NLP 批解析 / 质控批量重算）没有请求上下文，只能按任务快照的 org_id 重建数据域。
 --    若 admin 无组织，则提交侧按「看全部」数出 total=N，worker 侧按空组织 fail-closed
---    命中 0 条 → 任务落成 INTERRUPTED；且任务详情接口按「组织必须非空」判权，会返回
---    404「任务不存在」，而列表接口按 org_id 等值查询又能列出来 —— 三处口径自相矛盾。
+--    命中 0 条 → 任务落成 INTERRUPTED。
+--    列表 / 详情 / 取消三处判权口径已统一（RequestUtils.sameOrgScope）：列表按
+--    org_id 等值查询，详情与取消按「同一个组织域」判 —— 两边都空（无组织用户 × 无组织任务）
+--    算同一个域、放行；真正的组织仍要求严格相等。故无组织用户能看见并取消自己的任务，
+--    不会再出现「列表里在、详情说不在」。
 -- ---------------------------------------------------------------------
 INSERT IGNORE INTO organization_members
   (id, org_id, user_id, role, can_write_dictionary, can_write_qc_rules, is_primary) VALUES

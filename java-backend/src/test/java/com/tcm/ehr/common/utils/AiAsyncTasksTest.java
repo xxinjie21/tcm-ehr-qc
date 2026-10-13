@@ -44,6 +44,8 @@ class AiAsyncTasksTest {
         attrs.setAttribute(RequestUtils.ATTR_USER_ID, USER, RequestAttributes.SCOPE_REQUEST);
         attrs.setAttribute(RequestUtils.ATTR_ROLE, ROLE, RequestAttributes.SCOPE_REQUEST);
         attrs.setAttribute(RequestUtils.ATTR_ORG_ROLE, ORG_ROLE, RequestAttributes.SCOPE_REQUEST);
+        // 「不限组织」是 JwtInterceptor 在请求线程置的独立标记，任务线程读不到它
+        attrs.setAttribute(RequestUtils.ATTR_VIEW_ALL_ORGS, Boolean.TRUE, RequestAttributes.SCOPE_REQUEST);
         RequestContextHolder.setRequestAttributes(attrs);
     }
 
@@ -60,7 +62,8 @@ class AiAsyncTasksTest {
             String echo = RequestUtils.currentOrgId() + "|"
                     + RequestUtils.currentUserId() + "|"
                     + RequestUtils.currentRole() + "|"
-                    + RequestUtils.currentOrgRole();
+                    + RequestUtils.currentOrgRole() + "|"
+                    + RequestUtils.viewAllOrgs();
             AiReplyVO vo = new AiReplyVO();
             vo.setAnswer(echo);
             return vo;
@@ -69,9 +72,39 @@ class AiAsyncTasksTest {
         AsyncTaskRegistry.Snapshot<AiReplyVO> snap = await(tasks, taskId, Duration.ofSeconds(10));
         assertNotNull(snap, "任务应能在 10s 内出结果");
         assertEquals(AsyncTaskRegistry.State.DONE, snap.state(), "任务应成功完成：" + snap.error());
-        assertEquals(ORG + "|" + USER + "|" + ROLE + "|" + ORG_ROLE,
+        assertEquals(ORG + "|" + USER + "|" + ROLE + "|" + ORG_ROLE + "|true",
                 snap.reply().getAnswer(),
                 "H4：异步线程必须读到提交时刻捕获的上下文值，而不是「未知」");
+    }
+
+    /**
+     * 「不限组织」同样要传播。
+     *
+     * <p>它只在请求线程由 {@code JwtInterceptor} 置一次，任务线程是另一根线程，
+     * 漏传就等于 false：管理员发起的异步 AI 解读 / 复核会被按他所属的那一个组织过滤，
+     * 对其它组织的病历恒返回「病历不存在」。</p>
+     */
+    @Test
+    void 提交线程未置viewAll标记时任务线程读到false() throws Exception {
+        AiAsyncTasks.ValueRequestAttributes attrs = new AiAsyncTasks.ValueRequestAttributes();
+        attrs.setAttribute(RequestUtils.ATTR_ORG_ID, ORG, RequestAttributes.SCOPE_REQUEST);
+        attrs.setAttribute(RequestUtils.ATTR_USER_ID, USER, RequestAttributes.SCOPE_REQUEST);
+        attrs.setAttribute(RequestUtils.ATTR_ROLE, ROLE, RequestAttributes.SCOPE_REQUEST);
+        attrs.setAttribute(RequestUtils.ATTR_ORG_ROLE, ORG_ROLE, RequestAttributes.SCOPE_REQUEST);
+        RequestContextHolder.setRequestAttributes(attrs);
+
+        AiAsyncTasks tasks = new AiAsyncTasks();
+        String taskId = tasks.submit(() -> {
+            AiReplyVO vo = new AiReplyVO();
+            vo.setAnswer(String.valueOf(RequestUtils.viewAllOrgs()));
+            return vo;
+        });
+
+        AsyncTaskRegistry.Snapshot<AiReplyVO> snap = await(tasks, taskId, Duration.ofSeconds(10));
+        assertNotNull(snap, "任务应能在 10s 内出结果");
+        assertEquals(AsyncTaskRegistry.State.DONE, snap.state(), "任务应成功完成：" + snap.error());
+        assertEquals("false", snap.reply().getAnswer(),
+                "提交线程没有「看全部」标记时，任务线程也必须读到 false（fail-closed，不能反向放大）");
     }
 
     @Test

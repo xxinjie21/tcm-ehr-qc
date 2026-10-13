@@ -164,18 +164,24 @@ public abstract class AsyncTaskRegistry<T> {
         // 任务线程只要在提交后夹一次数据库往返就必然读到「未知」，
         // 于是 AI 解读/复核恒定报「病历不存在」、术语建议约三成静默降级。
         // 正确写法（与 QcBatchServiceImpl 的批任务同一口径）：把本条请求会用到的
-        // 用户 / 组织 / 角色**标量**在提交线程固定下来，任务线程重建一个纯值上下文。
+        // 用户 / 组织 / 角色 / viewAll**标量**在提交线程固定下来，任务线程重建一个纯值上下文。
         String orgId = RequestUtils.currentOrgId();
         String userId = safeUserId();
         // 角色有两个维度：系统角色（管理员/用户）与组织角色（owner/member），
         // 任务线程读哪一个都不能退化成 null/unknown —— 一并捕获并在任务线程重建。
         String role = RequestUtils.safeCurrentRole();
         String orgRole = RequestUtils.safeCurrentOrgRole();
+        // 「不限组织」也必须捕获：它只在请求线程由 JwtInterceptor 置一次（见
+        // RequestUtils.ATTR_VIEW_ALL_ORGS），任务线程是另一根线程，读不到就等于 false。
+        // 漏了它，管理员发起的异步 AI 解读 / 复核会被按他所属的那一个组织过滤，
+        // 对其它组织的病历恒返回「病历不存在」（多组织部署下才暴露）。
+        boolean viewAll = RequestUtils.viewAllOrgs();
         ValueRequestAttributes ctx = new ValueRequestAttributes();
         ctx.setAttribute(RequestUtils.ATTR_ORG_ID, orgId, RequestAttributes.SCOPE_REQUEST);
         ctx.setAttribute(RequestUtils.ATTR_USER_ID, userId, RequestAttributes.SCOPE_REQUEST);
         ctx.setAttribute(RequestUtils.ATTR_ROLE, role, RequestAttributes.SCOPE_REQUEST);
         ctx.setAttribute(RequestUtils.ATTR_ORG_ROLE, orgRole, RequestAttributes.SCOPE_REQUEST);
+        ctx.setAttribute(RequestUtils.ATTR_VIEW_ALL_ORGS, viewAll, RequestAttributes.SCOPE_REQUEST);
         Task<T> running = new Task<>(orgId, userId, State.RUNNING, null, null,
                 System.currentTimeMillis());
         tasks.put(id, running);
