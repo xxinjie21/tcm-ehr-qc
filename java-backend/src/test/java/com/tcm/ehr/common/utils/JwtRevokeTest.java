@@ -6,14 +6,21 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -202,17 +209,51 @@ class JwtRevokeTest {
     @DisplayName("作废令牌：TTL 长于令牌寿命且带抖动（批量登出不同秒过期，P2-20）")
     void revokeUsesJitteredTtlLongerThanTokenLifetime() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
-        ValueOperations<String, String> v = ops(redis);
-        when(v.get(anyString())).thenReturn(null);
-        when(redis.expire(anyString(), any(Duration.class))).thenReturn(false);
+        ops(redis);
+        AtomicReference<String> keySeen = new AtomicReference<>();
+        AtomicReference<String> ttlSeen = new AtomicReference<>();
+        when(redis.execute(anyScript(), anyList(), any())).thenAnswer(inv -> {
+            Object[] a = flattenVarargs(inv);
+            keySeen.set(String.valueOf(((List<?>) a[1]).get(0)));
+            ttlSeen.set(String.valueOf(a[2]));
+            return 1L;
+        });
         JwtUtil u = newUtil(redis);
 
         u.revokeAll("u1");
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Duration> ttl = ArgumentCaptor.forClass(Duration.class);
-        verify(v).set(eq("tcm:ehr:auth:ver:u1"), eq("1"), ttl.capture());
-        assertTtlCoversTokenLifetime(ttl.getValue());
+        assertEquals("tcm:ehr:auth:ver:u1", keySeen.get(), "版本 key 必须带统一前缀 tcm:ehr:");
+        assertTtlCoversTokenLifetime(Duration.ofMillis(Long.parseLong(ttlSeen.get())));
+    }
+
+    /**
+     * 作废走<b>原子自增</b>，不再「先读当前值再写回」。
+     *
+     * <p>原实现的读-改-写会在两次并发作废时丢掉一次递增量（双设备同时登出）；
+     * 这里用一个 Map 充当 Redis 键空间、按脚本语义做 INCR，把「两次作废必须递增到 2」
+     * 钉住，并断言<b>没有再读当前值</b> —— 那个形状正是竞态的来源。</p>
+     */
+    @Test
+    @DisplayName("作废令牌：原子自增、不读当前值，两次作废递增到 2（P2-20）")
+    void revokeIncrementsAtomicallyWithoutReadModifyWrite() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> v = ops(redis);
+        Map<String, String> store = new HashMap<>();
+        when(redis.execute(anyScript(), anyList(), any())).thenAnswer(inv -> {
+            Object[] a = flattenVarargs(inv);
+            String key = String.valueOf(((List<?>) a[1]).get(0));
+            String next = String.valueOf(Long.parseLong(store.getOrDefault(key, "0")) + 1);
+            store.put(key, next);
+            return Long.valueOf(next);
+        });
+        JwtUtil u = newUtil(redis);
+
+        u.revokeAll("u1");
+        u.revokeAll("u1");
+
+        assertEquals("2", store.get("tcm:ehr:auth:ver:u1"), "两次作废必须递增到 2");
+        verify(v, never()).get(anyString());
+        verify(v, never()).set(anyString(), anyString(), any(Duration.class));
     }
 
     /** 抖动只向上取：多次取值都落在 [24h, 25h10m]，不会低于令牌寿命 */
@@ -253,6 +294,30 @@ class JwtRevokeTest {
                 .compact();
 
         assertTrue(u.isValid(legacy), "占位值 \"0\" 应与「无 ver claim」等价，不能把老令牌踢下线");
+    }
+
+    /**
+     * 把 {@code (script, keys, ttl)} 三个实参摊平。
+     *
+     * <p>{@code execute} 的第三个参数是可变参数，Mockito 各版本对
+     * 「{@code getArguments()} 是否展开可变参数」的处理不一致：有的给
+     * {@code [script, keys, Object[]{ttl}]}，有的给 {@code [script, keys, ttl]}。
+     * 这里两种都认，避免测试因 Mockito 版本而假红（与 {@code LoginFailureLockTest} 同一范式）。</p>
+     */
+    private static Object[] flattenVarargs(org.mockito.invocation.InvocationOnMock inv) {
+        Object[] raw = inv.getArguments();
+        if (raw.length >= 3 && raw[2] instanceof Object[] tail) {
+            Object[] out = new Object[raw.length - 1 + tail.length];
+            System.arraycopy(raw, 0, out, 0, raw.length - 1);
+            System.arraycopy(tail, 0, out, raw.length - 1, tail.length);
+            return out;
+        }
+        return raw;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static RedisScript<Long> anyScript() {
+        return any();
     }
 
     /** TTL 必须严格大于令牌寿命（24h），否则 key 先于令牌消失、计数回落会让旧令牌复活 */

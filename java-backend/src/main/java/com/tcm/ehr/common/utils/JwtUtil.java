@@ -213,15 +213,25 @@ public class JwtUtil {
      * 作废该用户全部已签发的令牌：令牌版本 +1。
      *
      * <p>退出登录与改密码都调它——两者语义一致：让这个用户的旧令牌立刻失效。</p>
+     *
+     * <p><b>为什么必须原子自增</b>（2026-10-13）：原实现是「get → 算 next → set」的
+     * 读-改-写。两次并发作废（双设备同时登出）会读到同一份当前值、写入同一个递增值，
+     * 其中一次作废就此丢失——若恰好有一张新令牌在两次写之间签发（它读到的也是同一个
+     * 版本号），这本该失效的令牌会继续有效到 24h。影响面仅限该用户自己的令牌
+     * （版本号按用户隔离，不构成越权），但「撤销被撤销」正是 {@link #anchorVersion}
+     * 专门规避过的同一类竞态，没有理由在这里留着一个。</p>
+     *
+     * <p>改用 {@link RedisLua#incrWithTtl}：INCR 在 Redis 端单线程执行，自增与续期
+     * 之间插不进别的命令；正确性也不再依赖「每个未来的写者都记得先拿同一把锁」。</p>
      */
     public void revokeAll(String userId) {
         try {
             String key = VER_KEY + userId;
-            String cur = redis.opsForValue().get(key);
-            long next = (cur == null ? 0L : Long.parseLong(cur)) + 1;
-            // TTL 与签发路径同口径（含抖动）：作废同样会把 key 的存活时间推到
-            // 「覆盖此刻所有在飞的令牌」之后，批量登出时也不会一批 key 同时过期。
-            redis.opsForValue().set(key, String.valueOf(next), versionTtl());
+            // 1. 原子自增 + 续期（INCR + PEXPIRE 一段脚本）。key 不存在时 INCR 直接
+            //    建成 1，与原来的「null + 1」语义一致。
+            // 2. TTL 与签发路径同口径（含抖动）：作废同样会把 key 的存活时间推到
+            //    「覆盖此刻所有在飞的令牌」之后，批量登出时也不会一批 key 同时过期。
+            RedisLua.incrWithTtl(redis, key, versionTtl());
         } catch (Exception e) {
             // Redis 不可用时无法作废；令牌仍在有效期内可继续用。降级记录，不抛异常阻断登出。
             org.slf4j.LoggerFactory.getLogger(JwtUtil.class)
