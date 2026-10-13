@@ -69,7 +69,9 @@ import java.util.concurrent.TimeUnit;
  *   {@code tcm:task:batch} 是全局单键，任意管理员的提交会让其他人排队，TTL 900s 固定
  *   还会在长任务中途过期导致并发双跑；查表更准、也没有 TTL 问题。</li>
  *   <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 {@code failure_truncated}；</li>
- *   <li>取消：QUEUED 直接置 {@code CANCELLED}；RUNNING 置取消位，worker 在页边界退出；</li>
+ *   <li>取消：QUEUED 用<b>带 {@code status='QUEUED'} 条件</b>的更新落 {@code CANCELLED}，
+ *       RUNNING 置取消位、worker 在页边界退出；认领（{@link #runTask} 第 2 步）带同样的条件，
+ *       因此取消不会被认领覆写、认领也不会把取消后的行重新拉起；</li>
  *   <li>重启：{@code RUNNING}/{@code QUEUED} 一律标 {@code INTERRUPTED}，可重跑。</li>
  * </ul>
  */
@@ -345,18 +347,17 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 任务是否属于当前组织。
      *
-     * 与 NlpBatchServiceImpl.satisfiesGroup 同口径：不含管理员特权，管理员也按组织过滤 ——
-     * 批任务带失败明细（含 recordId），沿用「与病历访问同一口径」比另开一套规则更好维护。
-     * 无组织用户 currentOrgId() 为空串，一律判否，与病历读取的 fail-closed 一致。
+     * <p>与 {@link NlpBatchServiceImpl#satisfiesGroup} 同口径（都委托
+     * {@link RequestUtils#sameOrgScope}）：不含管理员特权，管理员也按组织过滤 ——
+     * 批任务带失败明细（含 recordId），沿用「与病历访问同一口径」比另开一套规则更好维护。</p>
+     *
+     * <p>差别只在<b>空组织</b>：无组织用户的任务 {@code org_id=''}，
+     * 与他的列表查询 {@code org_id=''} 对得上，因此判权放行；若这里判否，
+     * 用户会在列表里看到任务、点进去却是「任务不存在」，取消也报「任务不存在」。
+     * 真正的组织仍要求严格相等。</p>
      */
     private boolean belongsToCurrentOrg(QcTask t) {
-        if (t == null) {
-            return false;
-        }
-        String taskOrg = t.getOrgId();
-        String currentOrg = RequestUtils.currentOrgId();
-        return taskOrg != null && currentOrg != null && !currentOrg.isBlank()
-                && taskOrg.equals(currentOrg);
+        return t != null && RequestUtils.sameOrgScope(t.getOrgId());
     }
 
     @Override
@@ -371,21 +372,41 @@ public class QcBatchServiceImpl implements IQcBatchService {
         if (!belongsToCurrentOrg(t)) {
             throw new ForbiddenException("无权操作该任务");
         }
+        boolean claimedByWorker = false;
         if (QcTask.QUEUED.equals(t.getStatus())) {
-            // 1. 排队中：还没进 worker，直接落终态
-            t.setStatus(QcTask.CANCELLED);
-            t.setFinishedAt(LocalDateTime.now().withNano(0));
-            taskMapper.updateById(t);
-            // 内存取消位一并置：worker 可能已 poll 到该任务、还没读状态，
-            // 只改库会让它拿旧对象覆写成 RUNNING（check-then-act 竞态）
+            // 1. 排队中：用**带状态条件**的原子更新落终态。
+            //    认领（runTask 第 2 步）同样是「UPDATE ... WHERE id=? AND status='QUEUED'」，
+            //    这里若沿用无条件的 updateById，取消会和认领互相覆盖 ——
+            //    cancel 已把 status 落成 CANCELLED，worker 随后用取任务时的快照写回 RUNNING，
+            //    取消被静默抹掉，任务照跑完并覆写成 COMPLETED，用户看到的取消像没发生过。
+            //    多实例下同样成立：两条 UPDATE 竞争同一行，条件一样才由库来仲裁。
+            int cancelled = taskMapper.update(null, new UpdateWrapper<QcTask>()
+                    .eq("id", id)
+                    .eq("status", QcTask.QUEUED)
+                    .set("status", QcTask.CANCELLED)
+                    .set("finished_at", LocalDateTime.now().withNano(0)));
+            if (cancelled == 1) {
+                t.setStatus(QcTask.CANCELLED);
+                t.setFinishedAt(LocalDateTime.now().withNano(0));
+                // 内存取消位一并置：本实例 worker 可能刚认领成功、还没读到库里的终态
+                cancelFlags.add(id);
+            } else {
+                // 受影响行数为 0：已被 worker 认领（或已进终态）。重读一次再决定走哪个分支
+                QcTask fresh = taskMapper.selectById(id);
+                if (fresh != null) {
+                    t = fresh;
+                    claimedByWorker = QcTask.RUNNING.equals(t.getStatus());
+                }
+            }
+        }
+        // 2. 运行中（或刚被认领）：不能直接改状态（worker 收尾还会覆写），只置取消位。
+        //    取消位必须内存与库同时置：内存只有本进程看得见，worker 也可能不在同一实例。
+        if (claimedByWorker || QcTask.RUNNING.equals(t.getStatus())) {
             cancelFlags.add(id);
-        } else if (QcTask.RUNNING.equals(t.getStatus())) {
-            // 2. 运行中：不能直接改状态（worker 还会覆写），只置取消位让它自己收尾
-            cancelFlags.add(id);
-            // 取消位落库：内存只有本进程看得见，worker 也可能不在同一实例
             taskMapper.update(null, new UpdateWrapper<QcTask>()
                     .eq("id", id)
                     .set("cancel_requested", 1));
+            t.setCancelRequested(1);
         }
         return toVO(t, false);
     }
@@ -406,19 +427,37 @@ public class QcBatchServiceImpl implements IQcBatchService {
     // ------------------------------------------------------------------ 执行
 
     private void runTask(String id) {
-        // 1. 取出任务；已取消或已不存在直接返回
+        // 1. 取出任务；已取消或已不存在直接返回。
+        //    跳过执行也要清掉内存取消位：cancel 在「排队中取消成功」时会 add 一次，
+        //    而 finally 里的 remove 只在真正跑过时执行 —— 不清就每个被取消的任务
+        //    漏一个 UUID 条目在 cancelFlags 里（只增不减）。
         QcTask t = taskMapper.selectById(id);
         if (t == null || QcTask.CANCELLED.equals(t.getStatus())) {
+            cancelFlags.remove(id);
             return;
         }
 
-        // 2. 标记运行中并记录开始时间（此刻起进度才对外可见）
-        //    先清掉取消位再落库：t 是取任务时的快照，直接 updateById 会把
-        //    cancel_requested=0 写回，抹掉这一步之间刚到达的取消请求
-        t.setCancelRequested(null);
+        // 2. 条件认领：只有库里的行还停在 QUEUED 才置 RUNNING。
+        //    与 NlpBatchServiceImpl.claimNextTask 同一口径 —— 认领必须让路于取消，
+        //    否则「worker 已 poll 到 id、用户此刻点取消」这个窗口里，
+        //    cancel 已把 status 落成 CANCELLED，而这里再拿取任务时的快照 updateById
+        //    无条件写回 RUNNING，取消请求就被静默抹掉了（任务跑完还会覆写成 COMPLETED）。
+        //    受影响行数为 0 = 已被取消（或已进终态），这条就不该再跑。
+        //    同时也不再需要 setCancelRequested(null)：本就不写这一列，
+        //    认领前后到达的取消原样留在库里，由执行期的取消位读取兜住。
+        LocalDateTime startedAt = LocalDateTime.now().withNano(0);
+        int claimed = taskMapper.update(null, new UpdateWrapper<QcTask>()
+                .eq("id", id)
+                .eq("status", QcTask.QUEUED)
+                .set("status", QcTask.RUNNING)
+                .set("started_at", startedAt));
+        if (claimed != 1) {
+            // 认领落败 = 已被取消或已进终态，这条不该再跑；取消位同样要清（同上）
+            cancelFlags.remove(id);
+            return;
+        }
         t.setStatus(QcTask.RUNNING);
-        t.setStartedAt(LocalDateTime.now().withNano(0));
-        taskMapper.updateById(t);
+        t.setStartedAt(startedAt);
 
         // 3. 复用 QcBatchResultVO 累计分级统计（与单条 processOne 的入参同一套）
         QcBatchResultVO result = new QcBatchResultVO();

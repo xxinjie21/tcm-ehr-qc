@@ -608,9 +608,13 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     // ------------------------------------------------------------------ 执行
 
     private void runTask(String id) {
-        // 1. 取出任务；已取消或已不存在直接清理内存态了事
+        // 1. 取出任务；已取消或已不存在直接清理内存态了事。
+        //    取消位也必须在这里清：cancel 在「排队中取消成功」时 add 过一次，
+        //    而 finally 里的 remove 只在真正跑过时执行 —— 不清就每个被取消的任务
+        //    漏一个 UUID 条目在 cancelFlags 里（只增不减）。
         NlpTask t = taskMapper.selectById(id);
         if (t == null || NlpTask.CANCELLED.equals(t.getStatus())) {
+            cancelFlags.remove(id);
             return;
         }
         // 批次 16 #3：ID 集合改为从明细表读 —— 内存那份在进程重启后是空的，
@@ -1243,14 +1247,16 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
-    /** § 6.3 缺点 10：任务是否属于当前组（不含管理员特权：管理员也走组过滤，与病历访问同一口径） */
+    /**
+     * § 6.3 缺点 10：任务是否属于当前组（不含管理员特权：管理员也走组过滤，与病历访问同一口径）。
+     *
+     * <p>口径委托 {@link RequestUtils#sameOrgScope}，与列表的
+     * {@code org_id = currentOrgId()} 等值查询保持一致：无组织用户的任务
+     * {@code org_id=''} 两边都空，判权放行，否则会出现「列表看得见、详情 404、
+     * 取消说任务不存在」的自相矛盾。真正的组织仍要求严格相等。</p>
+     */
     private boolean satisfiesGroup(NlpTask t) {
-        if (t == null) {
-            return false;
-        }
-        String g1 = t.getOrgId();
-        String g2 = RequestUtils.currentOrgId();
-        return g1 != null && g2 != null && !g2.isBlank() && g1.equals(g2);
+        return t != null && RequestUtils.sameOrgScope(t.getOrgId());
     }
 
     /** 任务实体 → 视图；withFailures 为 false 时不带失败清单（列表接口用，省流量） */

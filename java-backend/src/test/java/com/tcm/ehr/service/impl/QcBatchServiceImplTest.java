@@ -7,6 +7,7 @@ import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.QcTask;
+import com.tcm.ehr.domain.vo.QcTaskVO;
 import com.tcm.ehr.mapper.QcTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
@@ -235,6 +237,136 @@ class QcBatchServiceImplTest {
     }
 
     // ------------------------------------------------------------------ 序列化契约
+
+    // ------------------------------------------------------------------ 取消 / 认领互斥
+
+    /**
+     * 排队中取消必须带 {@code status='QUEUED'} 条件。
+     *
+     * <p>事故形状：worker 已 poll 到任务 id、还没落库，用户此刻点取消 ——
+     * 取消若用无条件的 {@code updateById}，随后 worker 拿取任务时的快照
+     * 无条件写回 {@code RUNNING}，取消被静默抹掉，任务跑完还会覆写成
+     * {@code COMPLETED}。多实例下同理：两条 UPDATE 竞争同一行，靠条件让库来仲裁。</p>
+     */
+    @Test
+    @DisplayName("排队中取消：条件命中才落 CANCELLED（不再无条件 updateById）")
+    void cancelQueuedTaskUsesStatusGuardedUpdate() {
+        QcTaskMapper taskMapper = mock(QcTaskMapper.class);
+        QcTask queued = new QcTask();
+        queued.setId("task-c1");
+        queued.setStatus(QcTask.QUEUED);
+        queued.setOrgId("grp-default-2026");
+        when(taskMapper.selectById("task-c1")).thenReturn(queued);
+        when(taskMapper.update(any(), any())).thenReturn(1);
+
+        QcBatchServiceImpl svc = newService(taskMapper, mock(RecordMapper.class), mock(OperationLogger.class));
+        bindRequestContext();
+        try {
+            QcTaskVO vo = svc.cancel("task-c1");
+            assertEquals(QcTask.CANCELLED, vo.getStatus());
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<UpdateWrapper<QcTask>> captor = ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(taskMapper).update(any(), captor.capture());
+        // 先渲染 where 段再取绑定值：UpdateWrapper 的 eq 值是惰性物化的
+        // （同 shutdownMarksQueuedTasksInterrupted 的处理）
+        String where = captor.getValue().getSqlSegment();
+        List<Object> bound = new ArrayList<>(captor.getValue().getParamNameValuePairs().values());
+        assertTrue(where.contains("status"), "where 必须带 status 条件：" + where);
+        assertTrue(bound.contains(QcTask.QUEUED), "条件值应为 QUEUED：" + bound);
+        assertTrue(bound.contains(QcTask.CANCELLED), "set 值应为 CANCELLED：" + bound);
+        // 无条件按主键整行覆写这条路不能再走
+        org.mockito.Mockito.verify(taskMapper, org.mockito.Mockito.never()).updateById(any(QcTask.class));
+    }
+
+    /**
+     * 反向：取消的条件更新命中 0 行 = 已被 worker 认领。
+     * 此时要重读一次、改走「只置取消位」分支，而不是把任务按 CANCELLED 返回给用户。
+     */
+    @Test
+    @DisplayName("取消时任务刚被认领：改置取消位，不谎称已取消")
+    void cancelFallsBackToCancelFlagWhenAlreadyClaimed() {
+        QcTaskMapper taskMapper = mock(QcTaskMapper.class);
+        QcTask stillQueued = new QcTask();
+        stillQueued.setId("task-c2");
+        stillQueued.setStatus(QcTask.QUEUED);
+        stillQueued.setOrgId("grp-default-2026");
+        QcTask alreadyRunning = new QcTask();
+        alreadyRunning.setId("task-c2");
+        alreadyRunning.setStatus(QcTask.RUNNING);
+        alreadyRunning.setOrgId("grp-default-2026");
+        // 第一次读是取消入口的快照，第二次读是条件更新失败后的重读
+        when(taskMapper.selectById("task-c2")).thenReturn(stillQueued, alreadyRunning);
+        when(taskMapper.update(any(), any())).thenReturn(0);
+
+        QcBatchServiceImpl svc = newService(taskMapper, mock(RecordMapper.class), mock(OperationLogger.class));
+        bindRequestContext();
+        try {
+            QcTaskVO vo = svc.cancel("task-c2");
+            assertEquals(QcTask.RUNNING, vo.getStatus(),
+                    "已被认领时不能对用户显示『已取消』；由 worker 在条/页边界自行收尾");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<UpdateWrapper<QcTask>> captor = ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(taskMapper, org.mockito.Mockito.times(2)).update(any(), captor.capture());
+        String secondWhere = captor.getAllValues().get(1).getSqlSegment();
+        List<Object> secondBound =
+                new ArrayList<>(captor.getAllValues().get(1).getParamNameValuePairs().values());
+        assertTrue(secondBound.contains(1), "第二次更新应置 cancel_requested=1：" + secondBound);
+        assertTrue(!secondWhere.contains(QcTask.CANCELLED),
+                "已被认领时不能再把行改成 CANCELLED：" + secondWhere);
+    }
+
+    /**
+     * worker 认领同样要带 {@code status='QUEUED'} 条件：认领失败（被取消 / 已进终态）
+     * 就不能再跑。这条同时保证「不再用取任务时的快照无条件写回 RUNNING」。
+     */
+    @Test
+    @DisplayName("认领竞态落败：任务不再执行，也不碰病历查询")
+    void workerSkipsTaskWhenClaimLosesTheRace() {
+        QcTaskMapper taskMapper = mock(QcTaskMapper.class);
+        RecordMapper recordMapper = mock(RecordMapper.class);
+        QcTask queued = new QcTask();
+        queued.setId("task-c3");
+        queued.setStatus(QcTask.QUEUED);
+        queued.setOrgId("grp-default-2026");
+        queued.setTotal(5);
+        when(taskMapper.selectById("task-c3")).thenReturn(queued);
+        // 条件更新命中 0 行：任务在「取出来」与「认领」之间被取消了
+        when(taskMapper.update(any(), any())).thenReturn(0);
+
+        QcBatchServiceImpl svc = newService(taskMapper, recordMapper, mock(OperationLogger.class));
+        ReflectionTestUtils.invokeMethod(svc, "runTask", "task-c3");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<UpdateWrapper<QcTask>> captor = ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(taskMapper, org.mockito.Mockito.times(1)).update(any(), captor.capture());
+        String where = captor.getValue().getSqlSegment();
+        List<Object> bound = new ArrayList<>(captor.getValue().getParamNameValuePairs().values());
+        assertTrue(where.contains("status"), "认领必须带 status 条件：" + where);
+        assertTrue(bound.contains(QcTask.QUEUED) && bound.contains(QcTask.RUNNING),
+                "where=QUEUED、set=RUNNING：" + bound);
+        // 认领失败就一条病历都不该查、也不该去读规则快照
+        org.mockito.Mockito.verify(recordMapper, org.mockito.Mockito.never()).selectList(any());
+    }
+
+    /** 模拟「请求线程」的纯值上下文（只放 cancel 判权要用的组织） */
+    private void bindRequestContext() {
+        org.springframework.mock.web.MockHttpServletRequest req =
+                new org.springframework.mock.web.MockHttpServletRequest();
+        req.setAttribute("currentUsername", "admin");
+        req.setAttribute("currentRole", "管理员");
+        req.setAttribute("currentOrgId", "grp-default-2026");
+        req.setAttribute("currentOrgRole", "owner");
+        RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(req));
+    }
 
     /** null 不是失败：序列化成 {@code "null"}、读回为 null，语义是「不限范围」 */
     @Test
