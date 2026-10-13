@@ -82,10 +82,16 @@ class DictionaryControllerDiffTest {
 
     /** 绑定一个登录上下文：userId 与 username 故意不同 */
     private void bindAs(String orgRole, String username) {
+        bindAs(orgRole, "org-A", username);
+    }
+
+    /** 绑定一个登录上下文：orgId / orgRole / username 都可指定（跨组织用例用） */
+    private void bindAs(String orgRole, String orgId, String username) {
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setAttribute(RequestUtils.ATTR_USER_ID, USER_ID);
         req.setAttribute(RequestUtils.ATTR_USERNAME, username);
-        req.setAttribute(RequestUtils.ATTR_ORG_ID, "org-A");
+        req.setAttribute(RequestUtils.ATTR_ROLE, RequestUtils.ROLE_USER);
+        req.setAttribute(RequestUtils.ATTR_ORG_ID, orgId);
         req.setAttribute(RequestUtils.ATTR_ORG_ROLE, orgRole);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
     }
@@ -138,6 +144,68 @@ class DictionaryControllerDiffTest {
 
         assertEquals(HttpStatus.OK, res.getStatusCode(),
                 "组长审核别人的提案时必须能看到差异");
+    }
+
+    /**
+     * 跨组织是这条判权真正要挡的东西。
+     *
+     * <p>修复前写的是 {@code isOrgOwner() || submitter.equals(username)}：{@code isOrgOwner()}
+     * 只说明「我在<b>我自己</b>的组织里是组长」，与提案属于哪个组织无关 ——
+     * 于是 org-B 的组长拿 org-A 的提案号就能读到别组的词条快照。
+     * 同类洞在服务端 requireAuditable 与 list 已修过，diff 是漏网的第三处。</p>
+     */
+    @Test
+    @DisplayName("别组的组长看不到本组提案的差异（跨组织读取）")
+    void ownerOfAnotherOrgCannotViewDiff() {
+        proposalSubmittedBy("bob");
+        // 调用者是 org-B 的组长，提案属于 org-A
+        bindAs(RequestUtils.ORG_ROLE_OWNER, "org-B", USERNAME);
+
+        ResponseEntity<?> res = controller.diff("p1");
+
+        assertEquals(HttpStatus.FORBIDDEN, res.getStatusCode(),
+                "组长身份必须绑定到提案自身的 org_id，否则任一组长可读任意提案");
+    }
+
+    /** 管理员跨组织可看：与 requireAuditable「管理员一律可以」同口径（此前 diff 反而不放行） */
+    @Test
+    @DisplayName("管理员可查看任意提案的差异")
+    void adminCanViewAnyDiff() {
+        proposalSubmittedBy("bob");
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_USER_ID, USER_ID);
+        req.setAttribute(RequestUtils.ATTR_USERNAME, "root");
+        req.setAttribute(RequestUtils.ATTR_ROLE, RequestUtils.ROLE_ADMIN);
+        req.setAttribute(RequestUtils.ATTR_ORG_ID, "org-B");
+        req.setAttribute(RequestUtils.ATTR_ORG_ROLE, RequestUtils.ORG_ROLE_OWNER);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+
+        ResponseEntity<?> res = controller.diff("p1");
+
+        assertEquals(HttpStatus.OK, res.getStatusCode(),
+                "管理员跨组织读提案差异是允许的（requireAuditable 同一口径）");
+    }
+
+    /**
+     * 基础层提案（{@code org_id=''}）不属于任何组织：按 org_id 等值比时
+     * 任何组织都「不等于」它，若照搬等值比较会让所有非管理员都看不到，
+     * 与「基础层仅管理员」的既定口径保持一致。
+     */
+    @Test
+    @DisplayName("基础层提案（org_id 为空）仅管理员可看差异")
+    void baseLayerProposalIsAdminOnly() {
+        DictProposal p = new DictProposal();
+        p.setId("p1");
+        p.setOrgId("");
+        p.setType("herb");
+        p.setSubmitUserId("bob");
+        p.setStatus(DictProposal.PENDING);
+        when(proposalService.get("p1")).thenReturn(p);
+        when(proposalService.diff("p1")).thenReturn(new DictProposalDiffVO());
+
+        bindAs(RequestUtils.ORG_ROLE_OWNER, USERNAME);
+        assertEquals(HttpStatus.FORBIDDEN, controller.diff("p1").getStatusCode(),
+                "org-A 的组长也不能看基础层提案的差异");
     }
 
     @Test
