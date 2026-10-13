@@ -42,8 +42,14 @@ def perm_of_openapi(path: str, method: str) -> str:
     text_map = {
         "登录即可": "登录即可", "仅管理员": "仅管理员", "公开": "公开",
         "管理员 / 审核员": "管理员 / 审核员", "所有者（本组织）": "所有者（本组织）",
-        # 批次 8c 起：配置类写入放开为「管理员 / 所有者 / 被授权成员」三档
-        "管理员 / 所有者 / 授权成员": "登录即可",
+        # 批次 8c 起：配置类写入放开为「管理员 / 所有者 / 被授权成员」三档。
+        # ⚠️ 这里**不做**「压成登录即可」的映射（曾经是这么写的）：那会让这 5 个端点
+        # （qc/rules 的 PUT 与 reset、dictionary 的 import / audit / rollback）
+        # 的权限校验**整个失效** —— 它们的判权写在方法体里（requireRuleWrite /
+        # requireDictWrite），而 collect_backend 只看注解，于是后端恒报「登录即可」，
+        # 映射一下正好"相等"。谁把 helper 删掉，闸门照样报 0 差异。
+        # 现在由 backend_method_body_permission() 把方法体判权读出来，两边都出这个档位。
+        "管理员 / 所有者 / 授权成员": "管理员 / 所有者 / 授权成员",
     }
     if not pm:
         return "未标注"
@@ -146,6 +152,93 @@ def collapse_annotations(lines):
     return out
 
 
+# 方法体判权的标志：显式抛 403，或调 Controller 自己的 requireXxx() helper。
+# 这两者是本仓库「三档写权限」的唯一实现方式（见 QcController.requireRuleWrite /
+# DictionaryController.requireDictWrite —— 它们要查 DB 里的授权列，注解表达不了）。
+BODY_PERMISSION_GUARD = re.compile(r"\brequire[A-Z]\w*\s*\(|throw\s+new\s+ForbiddenException\b")
+
+# 计数 {} 前先剥掉字符串字面量与行注释：方法体里会出现 "{}"（如 pairsJson 的返回值）
+# 这类内容，直接数字符会把括号配平算错、提前收尾。
+_LITERALS = re.compile(r'"[^"\n]*"|\'[^\'\n]*\'|//[^\n]*')
+
+
+def _brace_delta(line):
+    """一行代码的 {} 净增量（已剥掉字符串与行注释）。"""
+    s = _LITERALS.sub("", line)
+    return s.count("{") - s.count("}")
+
+
+# 判权**下沉到 Service** 的端点：Controller 层不判，权限在 Service 的 requireXxx 里。
+# 键 = (路径, 小写方法)；值 = (证据文件（相对 java 根）, 必须存在的方法名)。
+#
+# ⚠️ 为什么不是「无脑放行」：登记项带证据，脚本会去那个文件确认方法存在且抛 403。
+# 证据失效（helper 被删/改名）时脚本打警告并**退回「登录即可」**，于是与 openapi 的
+# 三档不等、照样报差异 —— 否则这里就成了新的静默漏检口子，比不登记更糟。
+#
+# 目前只有一项：提案审核要判「提案属于哪个组织」，而 Controller 手里没有提案对象
+# （{id} 是提案号、不是机构 id，也没有 @RequireOrgRole 的路径变量可比），
+# 归属判定只能放到 Service。其余 4 个三档端点（qc/rules 的 PUT 与 reset、
+# dictionary 的 import / rollback）都在 Controller 用 requireXxx() 判。
+SERVICE_LEVEL_PERMISSION = {
+    ("/api/dictionary/proposals/{id}/audit", "post"):
+        ("service/impl/DictProposalServiceImpl.java", "requireAuditable"),
+}
+
+
+def service_level_permission(perm, path, method):
+    """方法体没看出判权时，查「判权下沉到 Service」的显式登记表（带证据校验）。"""
+    # 只接管「登录即可」：注解/方法体已判出档位的，轮不到这里
+    if perm != "登录即可":
+        return perm
+    entry = SERVICE_LEVEL_PERMISSION.get((path, method))
+    if entry is None:
+        return perm
+    rel, anchor = entry
+    f = BACKEND / "com" / "tcm" / "ehr" / rel
+    try:
+        src = io.open(f, encoding="utf-8").read()
+    except OSError:
+        print(f"[警告] 判权登记的证据文件读不到：{rel}", file=sys.stderr)
+        return perm
+    if not re.search(r"\b%s\s*\(" % re.escape(anchor), src) or "ForbiddenException" not in src:
+        print(f"[警告] 判权登记的证据已失效：{rel} 里没有 {anchor}() 或它不再抛 403；"
+              f"该端点按「登录即可」比对", file=sys.stderr)
+        return perm
+    return "管理员 / 所有者 / 授权成员"
+
+
+def backend_method_body_permission(lines, i):
+    """@Mapping 行 i 所属方法的体里有没有判权；有则返回三档档位，否则 None。
+
+    ⚠️ 为什么要单独扫方法体：本仓库的「管理员 / 所有者 / 授权成员」三档判权
+    写在方法体内（`requireRuleWrite()` / `requireDictWrite()`），注解层看不出来。
+    只看注解的话这 5 个端点的权限**从未被校验过**。
+
+    ⚠️ 取方法体范围必须靠**括号配平**，不能"往后看 N 行"：相邻端点的体首尾相接，
+    定长窗口会把下一个方法的 requireXxx() 算到当前方法头上 —— 那是假阳性，
+    会让人以为权限不一致，比漏检更误导。
+
+    调用方只在注解层判定为「登录即可」时才用本函数的结论 —— @RequireRole /
+    @RequireOrgRole 是拦截器层，先于方法体执行，档位更高，不该被这里覆盖。
+    """
+    depth = 0
+    started = False
+    for j in range(i + 1, len(lines)):
+        line = lines[j]
+        if not started:
+            # 未进体：只认第一个 { （签名可能跨行，参数上的注解行不含 {，跳过即可）
+            if "{" not in _LITERALS.sub("", line):
+                continue
+            started = True
+        if BODY_PERMISSION_GUARD.search(_LITERALS.sub("", line)):
+            return "管理员 / 所有者 / 授权成员"
+        depth += _brace_delta(line)
+        if depth <= 0:
+            # 体已闭合：本方法扫完，没找到判权
+            return None
+    return None
+
+
 def collect_backend():
     out = {}
     for p in BACKEND.rglob("*.java"):
@@ -155,6 +248,14 @@ def collect_backend():
             if not method or not raw_paths:
                 continue
             perm = perm_of_nearby_annotations(lines, i)
+            if perm == "登录即可":
+                # 注解层没看出判权，再看方法体 —— 「管理员 / 所有者 / 授权成员」
+                # 三档写权限的唯一落点就在方法体里（requireRuleWrite / requireDictWrite）。
+                # 只在「登录即可」时才看：@RequireRole / @RequireOrgRole 是拦截器层、
+                # 先于方法体执行，档位更高，不能被方法体结论覆盖。
+                body_perm = backend_method_body_permission(lines, i)
+                if body_perm:
+                    perm = body_perm
             for raw in raw_paths:
                 path = raw
                 if not path.startswith("/api/"):
@@ -164,7 +265,7 @@ def collect_backend():
                             path = cm.group(1) + path
                             break
                 if path.startswith("/api/"):
-                    out[(path, method)] = perm
+                    out[(path, method)] = service_level_permission(perm, path, method)
     return out
 
 

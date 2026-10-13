@@ -175,7 +175,7 @@ public DictProposalVO submit(String orgId, String type, List<TermEntry> terms, S
  * @return 提案视图列表，按提交时间倒序，最多 200 条
  */
 public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
-        purgeExpiredSnapshots();
+        purgeExpiredSnapshotsQuietly();
         QueryWrapper<DictProposal> q = new QueryWrapper<>();
         // 组织条件必填：以前 orgId 为 null 时不加条件，组长便能看到全库提案
         // （含别组提案的完整词条快照）。要「本组 + 基础层」必须用括号把 OR 包起来，
@@ -428,6 +428,25 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         }
         int deleted = termMapper.delete(new QueryWrapper<DictProposalTerm>().in("proposal_id", ids));
         log.info("[词典提案] 惰性清理过期快照：{} 条提案 / {} 行快照（主记录保留）", ids.size(), deleted);
+    }
+
+    /**
+     * 查询路径专用的惰性清理：清理失败只降级为「本次不清理」，不能让列表查不出来。
+     *
+     * <p>与 {@link #purgeExpiredSnapshots()} 的差别只在错误处理。本方法是 {@code GET /api/dictionary/proposals}
+     * 的入口调用的，而清理（删 {@code dict_proposal_term} 里的过期快照行）是「顺手做」的附属动作 ——
+     * 它失败（DB 抖动、{@code purge_after} 脏值）不该把用户的提案列表整页打成 500。
+     * 清理是幂等的，这次跳过，下次进列表会再试一次。</p>
+     *
+     * <p>提交路径（{@link #submit}）仍直调原方法、失败随事务回滚 —— 那是刻意保留的保守行为：
+     * 它本身就在事务里，吞掉异常会让连接带着「事务已标记回滚」继续写，反而更危险。</p>
+     */
+    private void purgeExpiredSnapshotsQuietly() {
+        try {
+            purgeExpiredSnapshots();
+        } catch (RuntimeException e) {
+            log.warn("[词典提案] 惰性清理失败，本次跳过（不影响列表查询）: {}", e.getMessage());
+        }
     }
 
     // ---------------------------------------------------------------- 内部

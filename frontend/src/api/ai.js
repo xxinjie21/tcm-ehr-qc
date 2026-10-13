@@ -18,7 +18,8 @@ export function aiReview(data) {
 
 // ---- 异步（批次 15 · 15.1）----
 // 同步接口那条路会让请求线程等 LLM 几十秒。异步路：提交拿任务号，再轮询结果。
-// 好处不只是「不占线程」：用户可以离开页面，回来时任务号还在，再查一次就能拿到结论。
+// 好处不只是「不占线程」：提交后请求线程立即释放、LLM 在后台跑，页面不必卡着等。
+// ⚠️ 任务号**不持久化**：用户离开当前视图再回来是**重新提交一次**（理由见 runAiAsync）。
 
 /** 提交一次 AI 生成，立即拿到任务号 */
 function aiSubmit(kind, data) {
@@ -37,7 +38,7 @@ const POLL_TIMEOUT_MS = 150000
 /**
  * 走异步路跑一次 AI 生成并等结果。
  *
- * @param {'interpret'|'chat'|'review'} kind
+ * @param {'interpret'|'chat'|'review'|'termsuggest'} kind
  * @param {object} data 请求体（与同步接口一致）
  * @param {(state: string) => void} [onState] 每次轮询回调当前状态，用于显示「正在生成…」
  * @returns {Promise<object>} reply（结构与同步接口的返回值一致）
