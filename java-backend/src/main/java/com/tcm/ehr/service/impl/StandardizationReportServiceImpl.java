@@ -424,7 +424,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /** 各类实体：抽取数 / 已归一数 */
     private List<StandardizationReportVO.TypeCoverage> coverage(List<Row> rows) {
         Map<String, StandardizationReportVO.TypeCoverage> byField = new LinkedHashMap<>();
+        // 只列有词典的类型：无词典的类型（如 cause）归一率恒为 0，画到图上就是一根没有意义的
+        // 空条（表现为「有病因却没有对应术语库」）。与 dictQuality() / crossTypeDuplicates()
+        // 的过滤口径保持一致 —— 那两个方法本就有 if (!t.dict()) continue;
         for (EntityTypes.EntityType t : EntityTypes.all()) {
+            if (!t.dict()) {
+                continue;
+            }
             StandardizationReportVO.TypeCoverage c = new StandardizationReportVO.TypeCoverage();
             c.setField(t.structuredKey());
             c.setLabel(t.label());
