@@ -816,11 +816,21 @@ onMounted(() => {
 
 /* ===== 执行按钮区 ===== */
 .clean-actions {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--sp-4);
   margin-bottom: var(--sp-1);
+}
+
+/* 提示文字绝对定位，不参与 flex 布局，避免加载时按钮被挤偏 */
+.clean-actions .tip {
+  position: absolute;
+  left: calc(50% + 80px);
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
 }
 
 /* 28.14：不确定进度条与失败报告 */
