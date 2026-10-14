@@ -72,12 +72,13 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <!-- Flyway 数据库版本管理：版本由 spring-boot-starter-parent 统一管理。
-             flyway-mysql 是 Flyway 10+ 对 MySQL 的独立支持模块，缺它连不上 MySQL。
+        <!-- Flyway 数据库版本管理（Spring Boot 4：自动配置拆到独立模块，必须用 starter 才会生效）。
+             starter 带 flyway-core + FlywayAutoConfiguration；flyway-mysql 是 Flyway 10+ 对 MySQL
+             的独立支持模块，缺它连不上 MySQL。版本由 spring-boot-starter-parent 统一管理。
              基线方案：库由 database-init.sql 建好，Flyway 以 baseline 接管后续变更（见 application.yml）。 -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

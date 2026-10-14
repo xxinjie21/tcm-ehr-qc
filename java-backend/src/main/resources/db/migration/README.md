@@ -47,3 +47,16 @@ V3__create_xxx_table.sql
 测试不启动 Spring 全量上下文（无 `@SpringBootTest`），因此**不会触发 Flyway**；
 集成测试走 `src/test/resources/schema-h2.sql`（H2 精简 schema）。Flyway 迁移是
 MySQL 语法，不要指望它能在 H2 上跑。
+
+## 依赖说明（Spring Boot 4 的坑）
+
+Spring Boot 4 把各家技术栈的**自动配置拆成了独立模块**，Flyway 的自动配置不再在
+`spring-boot-autoconfigure` 里，而在 `org.springframework.boot:spring-boot-flyway`。
+所以 `pom.xml` 必须依赖 **`spring-boot-starter-flyway`**（它带 `spring-boot-flyway`），
+只加 `flyway-core` 是**不会**触发自动迁移的（表现为启动日志里完全没有 Flyway）。
+
+另外 Flyway 10+ 把各数据库支持拆成独立模块，MySQL 需额外加
+`org.flywaydb:flyway-mysql`（它传递 `flyway-core`）。
+
+首次启动会看到一条 `WARN ... No migrations found. Are your locations set up correctly?`
+—— 基线接管模式下属正常（目录里还没有增量脚本），不是错误。
