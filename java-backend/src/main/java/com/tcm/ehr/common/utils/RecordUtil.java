@@ -72,21 +72,48 @@ public final class RecordUtil {
      * doctorId → visitCount → visitTime</p>
      *
      * <p>原实现用 {@code String.hashCode()}（32 位 int，碰撞率高），改为 MD5(UTF-8)。</p>
+     *
+     * <p><b>每个字段按「长度:值;」拼接（长度前缀）</b>：原先用 {@code String.join("|", ...)}
+     * 无长度前缀，任一字段内含 {@code "|"} 都会让字段边界串扰 —— 两条<b>内容不同</b>的病历
+     * 可能拼出同一串、算出同一哈希，第二条被误判「重复病历」而导入失败。长度前缀让拼接
+     * 严格可逆，不同内容必得不同串。</p>
      */
     public static String textHash(Record r) {
-        String joined = String.join("|",
-                nvl(r.getRegistrationNo()), nvl(r.getOutpatientNo()), nvl(r.getGender()), nvl(r.getAge()),
-                nvl(r.getWesternDiagnosis()), nvl(r.getTcmDiagnosis()), nvl(r.getPresentIllness()),
-                nvl(r.getChiefComplaint()), nvl(r.getSelfReport()), nvl(r.getInspection()),
-                nvl(r.getPulse()), nvl(r.getTongue()), nvl(r.getPhysicalExam()), nvl(r.getPattern()),
-                nvl(r.getPrescription()), nvl(r.getFollowUp()), nvl(r.getTreatmentEffect()),
-                nvl(r.getDepartment()), nvl(r.getDoctorId()),
-                nvl(r.getVisitCount() == null ? null : String.valueOf(r.getVisitCount())),
-                // 接诊时间先截到秒再参与哈希：visit_time 列是 DATETIME（无小数秒），
-                // 直接 toString() 会把亚秒带上，于是「入库前算的哈希」与「从库读回重算的哈希」
-                // 不相等 —— 去重预筛失效，还会撞唯一键
-                nvl(r.getVisitTime() == null ? null : r.getVisitTime().withNano(0).toString()));
-        return md5Hex(joined);
+        StringBuilder sb = new StringBuilder(256);
+        appendField(sb, r.getRegistrationNo());
+        appendField(sb, r.getOutpatientNo());
+        appendField(sb, r.getGender());
+        appendField(sb, r.getAge());
+        appendField(sb, r.getWesternDiagnosis());
+        appendField(sb, r.getTcmDiagnosis());
+        appendField(sb, r.getPresentIllness());
+        appendField(sb, r.getChiefComplaint());
+        appendField(sb, r.getSelfReport());
+        appendField(sb, r.getInspection());
+        appendField(sb, r.getPulse());
+        appendField(sb, r.getTongue());
+        appendField(sb, r.getPhysicalExam());
+        appendField(sb, r.getPattern());
+        appendField(sb, r.getPrescription());
+        appendField(sb, r.getFollowUp());
+        appendField(sb, r.getTreatmentEffect());
+        appendField(sb, r.getDepartment());
+        appendField(sb, r.getDoctorId());
+        appendField(sb, r.getVisitCount() == null ? null : String.valueOf(r.getVisitCount()));
+        // 接诊时间先截到秒再参与哈希：visit_time 列是 DATETIME（无小数秒），
+        // 直接 toString() 会把亚秒带上，于是「入库前算的哈希」与「从库读回重算的哈希」
+        // 不相等 —— 去重预筛失效，还会撞唯一键
+        appendField(sb, r.getVisitTime() == null ? null : r.getVisitTime().withNano(0).toString());
+        return md5Hex(sb.toString());
+    }
+
+    /**
+     * 追加一个字段：{@code 长度:值;}。长度前缀保证拼接严格可逆 ——
+     * 值里含分隔符（{@code :} / {@code ;}）也不会造成字段边界串扰。
+     */
+    private static void appendField(StringBuilder sb, String s) {
+        String v = nvl(s);
+        sb.append(v.length()).append(':').append(v).append(';');
     }
 
     /** MD5(UTF-8) → 32 位小写十六进制 */

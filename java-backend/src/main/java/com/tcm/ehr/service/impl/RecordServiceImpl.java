@@ -128,22 +128,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
         List<Object[]> parsedRows = new ArrayList<>(); // [Record, filename]
 
-        // 「接诊时间」有原值却解析不出来的行数与前若干条样例。
-        // 这类行照旧入库（见 parseDateTime 的取舍），但必须留痕 —— 见文件循环之后的 warn
-        int[] visitTimeWarn = {0};
-        List<String> visitTimeWarnSamples = new ArrayList<>();
-
         // 4. 逐文件处理（P3.4：单文件解析抽到 parseFile）
         for (MultipartFile file : files) {
-            ExcelSheetImporter.importFile(file, summary, parsedRows, batchRegNos, visitTimeWarn, visitTimeWarnSamples);
-        }
-
-        // 「接诊时间」解析失败不阻断导入，但必须留痕：只写日志、不改接口与摘要，
-        // 因为「有值却认不出」既不是失败也不是跳过，塞进 failures 会让「失败/跳过」计数自相矛盾
-        if (visitTimeWarn[0] > 0) {
-            log.warn("[导入] {} 行的「接诊时间」格式无法识别，已按空值入库 —— 这些病历不会进就诊趋势、"
-                            + "按接诊时间筛选也筛不出来，请核对导入源。示例：{}",
-                    visitTimeWarn[0], String.join("、", visitTimeWarnSamples));
+            ExcelSheetImporter.importFile(file, summary, parsedRows, batchRegNos);
         }
 
         // 库内已存在哈希（按登记号预筛，避免全表扫描）

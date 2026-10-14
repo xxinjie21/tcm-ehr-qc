@@ -27,9 +27,6 @@ import java.util.Set;
  */
 final class ExcelSheetImporter {
 
-    /** 接诊时间告警的样例上限（只影响提示里列几行，不影响计数） */
-    static final int VISIT_TIME_WARN_SAMPLE_MAX = 10;
-
     /** 单文件上限；放在这里而不是服务类里，因为它属于「读文件」这件事本身 */
     static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
 
@@ -72,16 +69,17 @@ final class ExcelSheetImporter {
      * 解析一个文件：文件级问题（空 / 超限 / 后缀不符 / 缺表头 / 缺必需列）记失败并返回；
      * 行级问题记失败明细；成功的行列进 {@code parsedRows} 并累积待查重登记号。
      *
-     * <p>「接诊时间」有值却解析不出的行照旧入库，仅计数留痕（见调用侧 warn）。</p>
+     * <p>「接诊时间」有值却解析不出的行按<b>行级失败</b>处理、不入库（见 {@link #requireParsedVisitTime}）：
+     * 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、日期范围筛选、去重哈希
+     * 同时悄悄退化（2026-09-28 的实际故障）；更严重的是两条仅日期不同的病历会被折成同一
+     * 去重哈希，后一条被误判「重复」而导入失败。</p>
      *
      * <p>按后缀分流：{@code .xlsx} 走 SAX 流式读（大文件不整本进内存），
      * 其余（{@code .xls}）走 POI 全量读。两条路径共用 {@link ExcelRowReader} 与
      * {@link #processRow}，所以列映射口径一致。</p>
-     *
-     * @param visitTimeWarn 长度 1 的计数容器（跨文件累加）
      */
     static void importFile(MultipartFile file, ImportSummaryVO summary, List<Object[]> parsedRows,
-                           Set<String> batchRegNos, int[] visitTimeWarn, List<String> visitTimeWarnSamples) {
+                           Set<String> batchRegNos) {
         String filename = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
         if (file.isEmpty()) {
             summary.setFailed(summary.getFailed() + 1);
@@ -105,8 +103,7 @@ final class ExcelSheetImporter {
         }
         if (lower.endsWith(".xlsx")) {
             try {
-                parseXlsxStreaming(file, filename, summary, batchRegNos, parsedRows,
-                        visitTimeWarn, visitTimeWarnSamples);
+                parseXlsxStreaming(file, filename, summary, batchRegNos, parsedRows);
             } catch (Exception e) {
                 summary.setFailed(summary.getFailed() + 1);
                 summary.getFailures().add(new ImportSummaryVO.Failure(filename, "解析失败：" + e.getMessage()));
@@ -143,18 +140,10 @@ final class ExcelSheetImporter {
                     if (TextUtil.isBlank(r.getOutpatientNo())) {
                         throw new IllegalArgumentException("门诊号为空");
                     }
+                    // 「接诊时间」有原值却解析不出来 ⇒ 行级失败，不加入待入库
+                    requireParsedVisitTime(r, ExcelCellParser.cellText(row.getCell(colIndex.get("visitTime"))));
                     batchRegNos.add(r.getRegistrationNo());
                     parsedRows.add(new Object[]{r, filename});
-                    // 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕。
-                    // 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、
-                    // 日期范围筛选、去重哈希同时悄悄退化（2026-09-28 的实际故障）
-                    String rawVisit = ExcelCellParser.cellText(row.getCell(colIndex.get("visitTime")));
-                    if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
-                        visitTimeWarn[0]++;
-                        if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
-                            visitTimeWarnSamples.add("第 " + (i + 1) + " 行「" + rawVisit + "」");
-                        }
-                    }
                 } catch (Exception e) {
                     summary.setFailed(summary.getFailed() + 1);
                     summary.getFailures().add(new ImportSummaryVO.Failure(filename,
@@ -187,8 +176,7 @@ final class ExcelSheetImporter {
 
     /** 流式读 .xlsx：表头为首行，逐行回调直接走同一套映射 */
     static void parseXlsxStreaming(MultipartFile file, String filename, ImportSummaryVO summary,
-                                   Set<String> batchRegNos, List<Object[]> parsedRows,
-                                   int[] visitTimeWarn, List<String> visitTimeWarnSamples) throws IOException {
+                                   Set<String> batchRegNos, List<Object[]> parsedRows) throws IOException {
         Map<String, Integer>[] colIndex = new Map[]{null};
         // 表头校验失败要中止整份文件：用异常跳出 SAX 回调，下面就地接住
         IllegalStateException[] abort = new IllegalStateException[1];
@@ -231,7 +219,7 @@ final class ExcelSheetImporter {
             }
             // 与 POI 路径共用同一段逐行处理
             processRow(ExcelRowReader.of(cells), rowNum, colIndex[0], filename, summary, batchRegNos,
-                    parsedRows, visitTimeWarn, visitTimeWarnSamples);
+                    parsedRows);
         });
     }
 
@@ -252,8 +240,7 @@ final class ExcelSheetImporter {
 
     /** 逐行映射与记账（POI 与流式两条路径共用） */
     static void processRow(ExcelRowReader.RowAccess row, int rowNum, Map<String, Integer> colIndex, String filename,
-                           ImportSummaryVO summary, Set<String> batchRegNos, List<Object[]> parsedRows,
-                           int[] visitTimeWarn, List<String> visitTimeWarnSamples) {
+                           ImportSummaryVO summary, Set<String> batchRegNos, List<Object[]> parsedRows) {
         if (TextUtil.isBlank(row.text(colIndex.getOrDefault("registrationNo", -1)))) {
             return;
         }
@@ -263,16 +250,10 @@ final class ExcelSheetImporter {
             if (TextUtil.isBlank(r.getOutpatientNo())) {
                 throw new IllegalArgumentException("门诊号为空");
             }
+            // 「接诊时间」有原值却解析不出来 ⇒ 行级失败，不加入待入库
+            requireParsedVisitTime(r, row.text(colIndex.get("visitTime")));
             batchRegNos.add(r.getRegistrationNo());
             parsedRows.add(new Object[]{r, filename});
-            // 「接诊时间」有原值却解析不出来：该行照旧入库，但要计数留痕
-            String rawVisit = row.text(colIndex.get("visitTime"));
-            if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
-                visitTimeWarn[0]++;
-                if (visitTimeWarnSamples.size() < VISIT_TIME_WARN_SAMPLE_MAX) {
-                    visitTimeWarnSamples.add("第 " + (rowNum + 1) + " 行「" + rawVisit + "」");
-                }
-            }
         } catch (Exception e) {
             summary.setFailed(summary.getFailed() + 1);
             summary.getFailures().add(new ImportSummaryVO.Failure(filename,
@@ -280,9 +261,26 @@ final class ExcelSheetImporter {
         }
     }
 
+    /**
+     * 「接诊时间」校验：单元格有原值却解析不出 ⇒ 抛错（由调用侧记为该行失败、不入库）。
+     *
+     * <p>原来只记 warn、照旧以 null 入库，后果是：两条<b>仅接诊时间不同</b>的病历
+     * 在库里都变成 null，去重哈希相同 ⇒ 第二条被误判「重复病历（21 字段完全一致）」而导入失败。
+     * 明确报错后，用户能看到「第 N 行接诊时间无法解析：<原文>」，修正源数据即可导入。</p>
+     *
+     * <p>空单元格（原值也为空）不算失败：接诊时间允许缺失，只是不参与时间维度统计。</p>
+     *
+     * @param rawVisit 该行「接诊时间」列的原文本（可为空）
+     * @throws IllegalArgumentException 有原值但解析失败时抛出
+     */
+    static void requireParsedVisitTime(Record r, String rawVisit) {
+        if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
+            throw new IllegalArgumentException("接诊时间无法解析：「" + rawVisit.trim() + "」");
+        }
+    }
+
     /** 数据行 → 病历实体：按表头索引逐字段取值，缺列一律 null */
-    static Record mapRow(ExcelRowReader.RowAccess row, Map<String, Integer> idx) {
-        Record r = new Record();
+    static Record mapRow(ExcelRowReader.RowAccess row, Map<String, Integer> idx) {        Record r = new Record();
         // 1. 文本列按表头索引逐字段取，缺列由 get() 兜成 null
         r.setRegistrationNo(get(row, idx, "registrationNo"));
         r.setOutpatientNo(get(row, idx, "outpatientNo"));

@@ -51,7 +51,8 @@ import static org.mockito.Mockito.when;
  * <p>锁三件事：① 21 个列名都能映射到对应字段；② 「接诊时间」列的紧凑数字串
  * （{@code 20221224090613}，真实导入源的形态）能解析成正确时刻 —— 这条正是流式路径
  * 用 {@code DataFormatter} 会翻车的点（会拿到 {@code 2.02212E+13}）；
- * ③ 入库前带上组织标记与 pending 状态（导入与单条新增同口径）。</p>
+ * ③ 入库前带上组织标记与 pending 状态（导入与单条新增同口径）。
+ * 另锁「接诊时间有值却解析不出 ⇒ 行级失败、不入库」。</p>
  */
 class RecordImportExcelTest {
 
@@ -173,6 +174,25 @@ class RecordImportExcelTest {
     }
 
     /**
+     * 「接诊时间」有原值却解析不出 ⇒ 该行按<b>失败</b>上报、不入库（不能静默按 null 入库）。
+     *
+     * <p>静默入库的后果：两条仅接诊时间不同的病历在库里都变 null、去重哈希相同，
+     * 第二条被误判「重复病历」而导入失败。明确报错后，用户能看到是哪一行、原文是什么。</p>
+     */
+    @Test
+    void unparseableVisitTimeFailsRowInsteadOfImporting() throws Exception {
+        String[] data = {"REG-3", "OP-3", "男", "50", "1", "x", "y", "z", "a", "b", "c", "d",
+                "e", "f", "g", "h", "i", "j", "k", "l", "不详"};
+
+        ImportTaskVO task = svc.importRecords(new MultipartFile[]{xlsx(new String[][]{HEADER, data})}, false);
+
+        assertEquals(0, task.getSummary().getSuccess(), "日期解析失败的行不入库");
+        assertEquals(1, task.getSummary().getFailed());
+        String reason = task.getSummary().getFailures().get(0).getReason();
+        assertTrue(reason.contains("接诊时间无法解析") && reason.contains("不详"), reason);
+    }
+
+    /**
      * 25.2：单次导入的行数上限。
      *
      * 上限必须是跨文件累计的 —— 只按文件卡的话，20 个文件就把上限放大 20 倍。
@@ -203,7 +223,7 @@ class RecordImportExcelTest {
         ImportSummaryVO summary = new ImportSummaryVO();
         summary.setTotal(ExcelSheetImporter.MAX_ROWS);
         ExcelSheetImporter.importFile(xlsx(new String[][]{HEADER, data}), summary, parsed,
-                new HashSet<>(), new int[]{0}, new ArrayList<>());
+                new HashSet<>());
         assertTrue(parsed.isEmpty(), "到上限后不应再产出待入库病历");
         assertEquals(1, summary.getFailed(), "每个被拦下的文件记一条文件级失败");
     }
