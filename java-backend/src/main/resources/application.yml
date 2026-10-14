@@ -2,60 +2,39 @@ spring:
   application:
     name: tcm-ehr-qc
 
-  # 数据源（连接 Docker 中的 windows-mysql 容器，宿主机端口3306）
+  # MySQL（Docker 容器 windows-mysql → localhost:3306）
   datasource:
-    # rewriteBatchedStatements=true 是批写能真正减少往返的前提：Connector/J 默认不合并
-    # executeBatch()，只有打开它才会把 N 条同形 INSERT 重写成一条多值 INSERT。
-    # 依赖它的有 P1-4（structured_data 批量回写）与 P2-8（词典/任务明细批量插入）——
-    # 不开则那些批处理只是「少了几次提交」，往返数仍是逐条。
+    # rewriteBatchedStatements=true：批写才能合并成多值 INSERT，是批处理减少往返的前提
     url: jdbc:mysql://localhost:3306/tcm_ehr?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
     username: ${DB_USERNAME:root}
-    # 批次17 · 17.2：口令改环境变量注入。冒号后是**本地 docker 容器**（windows-mysql）的口令，
-    # 保留它是为了「本地默认可用」——拉下代码就能起；生产用 DB_PASSWORD 覆盖，仓库里不留生产口令。
+    # 默认值为本地容器口令；生产用 DB_PASSWORD 覆盖
     password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # §八 C1：不配 hikari 段时用 Hikari 默认的 maximum-pool-size=10，那是当前唯一的
-    # 并发硬瓶颈（Tomcat 200 线程、Redis 共享连接都够）。多课题组 R2 要给**每个请求**
-    # 加一次查组 DB 往返，不先抬池子的话并发能力会不升反降 —— 故 C1 是 R2 的前置条件。
     hikari:
-      # 20 而不是 50：单实例 + 每请求 1 次短查询，20 已远超实际需要；
-      # 连接数是 MySQL 端的上限（默认 max_connections=151），盲目调大会先撞库上限。
+      # 连接数是 MySQL 端上限，单实例 20 已足够，盲目调大会先撞库上限
       maximum-pool-size: 20
-      # 空闲连接回收：池长期保持 20 条会一直占着 MySQL 的连接槽
       minimum-idle: 5
-      # 连接最长存活 30min：MySQL 默认 wait_timeout 是 8h，先于它回收可避免拿到死连接
+      # 先于 MySQL wait_timeout(8h) 回收，避免拿到死连接
       max-lifetime: 1800000
       connection-timeout: 30000
 
-  # Flyway 数据库版本管理。
-  #
-  # 基线方案（保留 database-init.sql 不变）：全量建库仍由 database-init.sql 负责
-  # （含 CREATE DATABASE / USE，手工或部署时执行一次），表结构已存在且没有 Flyway 历史表。
-  # 因此开启 baseline-on-migrate：首次启动把现有库标记为基线版本 1（不重复执行历史），
-  # 之后新增的 schema 变更放进 db/migration/V2__xxx.sql、V3__xxx.sql …，应用启动时自动执行。
-  # 迁移目录只有版本化增量脚本，不含 CREATE DATABASE / USE（那是连接前提，不是 schema 版本）。
+  # 版本管理：表结构由 database-init.sql 建立，Flyway 从基线 v1 接管后续增量（db/migration/V2__*.sql）
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 1
     baseline-description: "基线：database-init.sql 建立的全量表结构"
-    # 校验脚本校验和（防止已执行过的脚本被改动）；已有库打基线后不受影响
     validate-on-migrate: true
 
-  # Redis（连接 Docker 中的 windows-redis 容器，宿主机端口6379）
+  # Redis（Docker 容器 windows-redis → localhost:6379）
   data:
     redis:
       host: localhost
       port: 6379
-      # 批次17 · 17.2：同数据源口径 —— 本地 docker（windows-redis）默认值保留，生产用 REDIS_PASSWORD 覆盖
+      # 默认值为本地容器口令；生产用 REDIS_PASSWORD 覆盖
       password: ${REDIS_PASSWORD:123456}
-      # P2-23：本项目独占 db1。改造前用默认的 db0，与同机其它应用的 key 混在一个库空间里，
-      # 既看不出哪些 key 是本项目的，也容易被别处的 FLUSHDB 误伤。
-      # StringRedisTemplate 与 RedissonClient 共用这一份配置（RedissonConfig 读同一个键），
-      # 因此缓存与分布式锁是一起迁移的，不存在「锁在 db0、缓存在 db1」的错位。
-      # 一次性切换：db0 里残留的旧 key 全部带 TTL（缓存 60s / 令牌版本 25h / 提交锁 30s），
-      # 不再有人读写，到期自然消失。
+      # 本项目独占 db1，避免与同机其它应用混用
       database: 1
       timeout: 5000
 
@@ -69,10 +48,8 @@ spring:
     default-property-inclusion: non_null
     time-zone: Asia/Shanghai
 
-  # 模型自动装配一律关掉：六个 OpenAi*AutoConfiguration 的 matchIfMissing=true，
-  # 只要 spring-ai-starter-model-openai 在类路径上就会急切构造六个 Model，
-  # 缺 api-key 时上下文刷新即抛 IllegalStateException 导致启动失败。
-  # 模型改由 LlmConfig 按需自建，故置 none 后无需填假 api-key 也能启动。
+  # 关掉模型自动装配：OpenAi*AutoConfiguration 会急切构造 Model，缺 api-key 时启动即失败；
+  # 模型改由 LlmConfig 按需自建，故这里全置 none。
   ai:
     model:
       chat: none
@@ -83,121 +60,70 @@ spring:
         transcription: none
       moderation: none
 
-# Elasticsearch（连接 Docker 中的 windows-es 容器，宿主机端口9200）
+# Elasticsearch（Docker 容器 windows-es → localhost:9200）
 elasticsearch:
   host: localhost
   port: 9200
   scheme: http
   score-threshold: 0.8
 
-# 术语词典目录（JSON文件存储，本仓库 data/dictionaries）
+# 术语词典目录（JSON 文件）
 dictionary:
   dir: D:/ZISHIKU/AI/tcm-ehr-qc/data/dictionaries
 
-# 质控（规则权威 = qc_rules 表，每组织一行；无行回退内置默认 QcRuleSet.defaults()）
+# 质控（规则权威 = qc_rules 表，每组织一行；无行回退内置默认）
 qc:
   batch:
-    # §七 L4：40000 = 目标数据集规模（实测 35355 条 × 1.13 KB/条 ≈ 40MB）。
-    # 原 30000 小于真实数据集，全库重算会直接抛「超出上限」。配合 L5 异步化后，
-    # 这个值退化为「提交时的范围校验」，不再是同步长任务的硬瓶颈。
+    # 提交时的范围上限（目标数据集约 4 万条）
     max-records: 40000
-    # §七 L5：异步重算 worker 的并发。重算写密集（每条都要回写 records），
-    # 且同一组织同时只允许一个重算任务（submit 按 org 防重），所以调大只对
-    # 「多个组织同时提交重算」有意义，对单组织没有提速作用 —— 不要指望它变快。
-    # 取 2：两个组织可并行，又不至于让写竞争明显加剧。
+    # 写密集；同一组织同时只允许一个任务，调大只对多组织并行有意义
     concurrency: 2
 
-# MyBatis-Plus（实体/Mapper由注解与BaseMapper自动管理）
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    # 刻意不设 log-impl：不指定时 MyBatis 走 slf4j，SQL 与绑定参数只在 debug 级别输出。
-    # 设成 StdOutImpl 会把每次查询的 SQL 和绑定参数打到 stdout —— 病历正文 / 主诉 / 现病史
-    # 与登录查询的用户名会整段进日志，同时显著拖慢批量操作。
-    # 需要排查 SQL 时临时加：logging.level.com.tcm.ehr.mapper=debug（用完删掉）
+    # 不设 log-impl：走 slf4j，仅在 debug 输出 SQL。StdOutImpl 会把病历正文打进日志且拖慢批处理。
 
 server:
   port: 8080
 
-# JWT配置
+# JWT：生产用 JWT_SECRET 覆盖（轮换见 tools/rotate-jwt-secret.py）
 jwt:
-  # 批次17 · 17.1：改为环境变量注入 —— 生产用 `JWT_SECRET` 覆盖即可，不必改本文件，
-  # 这也是「轮换不需要动仓库」的前提。轮换工具见 tools/rotate-jwt-secret.py（默认演练）。
-  #
-  # ⚠️ 如实说明：冒号后仍保留了一个**开发用**默认值，所以本条**尚未**满足
-  #    「全仓无明文固定 secret」这条验收。之所以没直接写成 ${JWT_SECRET:}：
-  #    那样没设环境变量时启动会直接失败，对本地开发/演示是硬中断。
-  #    要真正满足验收，需要「去掉默认值 + 读到空值时启动即报错（并提示怎么生成）+ 
-  #    在 src/test/resources 给测试一份默认值」三步一起做，那是独立的一次改动。
   secret: ${JWT_SECRET:tcm-ehr-qc-jwt-secret-key-2026-course-design}
   expire-hours: 24
 
-# NLP 抽取：Java 经 PythonNlpClient 转发到独立的 Python 服务
+# NLP 抽取：转发到独立 Python 服务（须先启动 python-nlp）
 nlp:
-  enabled: true             # 抽取总开关。开启前必须先启动 python-nlp，否则抽取要等连接超时才降级；
-                            # false 时单条抽取与批量任务都不可用。改它必须重启。
+  enabled: true             # 总开关；false 时单条与批量抽取都不可用。改动需重启
   service-url: http://localhost:8001
-  # 多实例（不引微服务框架）：逗号分隔，可配置多台 NLP 服务。留空则回退上面的 service-url。
-  # 抽取按轮询分发；某台连不上/超时/5xx 时自动顺延下一台，并进入 instance-cooldown-ms 冷却后被跳过，
-  # 因此「部分实例未启动」不影响整体（启动 1 台也能用）。想让 3 台生效就填满 3 个地址。
+  # 多实例：逗号分隔，留空回退 service-url；轮询分发，单台故障自动顺延，部分未启动不影响整体
   service-urls: http://localhost:8001,http://localhost:8002,http://localhost:8003
   timeout: 30000            # 毫秒
-  instance-cooldown-ms: 10000   # 失败实例短路冷却(毫秒)：期间跳过，到点自动恢复
+  instance-cooldown-ms: 10000   # 失败实例短路冷却（毫秒）
   batch:
-    # 批量解析的后台并发（2026-10-12 实测重定）。这个值同时是两件事：
-    #   ① 可同时运行的批任务数；② 单个任务内并行处理病历的路数。
-    # 之所以要「任务内并行」：原先一个任务只用一个 worker 串行跑，单条 NLP 推理
-    # 数百毫秒，吞吐被钉死在 ~7 条/s —— 把本值调大只会多起几个任务，单任务并不会变快。
-    # 8 的来源：Python 侧实测吞吐天花板约 10.3 条/s，对应 torch 4 线程 × 并发 8，
-    # 所以本值与 Python 侧 NLP_INFER_CONCURRENCY 对齐；再大只是在 Python 侧排队。
-    # Python 侧会按机器核数自适应，若那边低于本值，以那边为准（本值大只排队，不压垮）。
+    # 后台并发：同时运行的任务数 + 单任务内并行条数；与 Python 侧 NLP_INFER_CONCURRENCY 对齐
     concurrency: 8
 
-# LLM 增强（Spring AI 2.0；provider 二选一：ollama 本机 / openai 及兼容三方）
-# 默认关闭；关闭或调用失败时回退规则兜底，不阻塞主流程（模型装配见上方 spring.ai.model）
+# LLM 增强：默认关闭，失败回退规则兜底
 llm:
-  enabled: false              # 总控。此处只是启动基线，运行时被「导入 LLM」经 LlmConfigStore 覆盖
+  enabled: false              # 启动基线，运行时被「导入 LLM」覆盖
   provider: ollama            # ollama | openai
-  base-url: ""                # 留空用通道默认：ollama=http://localhost:11434，openai=https://api.openai.com/v1
-  api-key: ""                 # provider=openai 时必填；留空则该通道降级（不影响启动）
-  model: ""                   # 留空用通道默认模型；ollama 例 qwen2.5:7b，openai 例 gpt-4o-mini
+  base-url: ""                # 留空用通道默认
+  api-key: ""                 # openai 时必填
+  model: ""                   # 留空用通道默认模型
   temperature: 0.2
-  # 批次15 · 15.2：按场景下调到 20s 级。四个用途（AI 解读 / 助手 / 复核意见 / 对话）都是
-  # **交互式**的 —— 用户在页面上等结果，60s 的等待已经等同于「卡住了」：他既不知道该不该刷新，
-  # 也不知道还要等多久。20s 后走规则兜底（见本块上方注释）比让他干等 60s 更有用。
-  # 这是配置项，模型慢（如本地小显卡跑大模型）时改回大值即可，不需要动代码。
   timeout: 20000              # 毫秒
-
-  # 批次18 · 用户 LLM 密钥的**落库加密**密钥（AES-256-GCM，见 LlmSecretCipher）。
-  # 为什么必须有它：配置改成「每个用户一份」后，密钥会跟着每个用户落库；
-  # 没有加密密钥时服务照常启动，但「导入 LLM」保存密钥会被拒（503 + code=1011），
-  # 也就是用户看到的「未配置 LLM 加密密钥，无法保存密钥」。
-  #
-  # 口径与上方 jwt.secret 完全一致：冒号后是**开发用**默认值（32 字节 Base64，
-  # 明文是 "tcm-ehr-qc-dev-only-llm-enc-key!"），保证拉下代码就能用；
-  # 生产用环境变量 TCM_LLM_ENC_KEY 覆盖 —— 它优先级更高
-  # （LlmSecretCipher.resolveKey 先读 System.getenv，再读本项）。
-  #
-  # ⚠️ 与 jwt.secret 不同的是，换这个值的代价更重：GCM 密文绑定密钥，换掉之后
-  #    user_llm_config 里已加密的 API Key 全部解不开（decrypt 返回空串并告警一次），
-  #    用户表现为「配置看着还在、但模型调不通」，需要各自重填一次。
-  #    故生产上要把它当**持久密钥**保管；生成/轮换用 tools/init-llm-enc-key.py。
+  # 用户密钥落库加密密钥（AES-256-GCM）。换掉后已加密的 API Key 全部解不开，须当持久密钥保管；
+  # 生产用 TCM_LLM_ENC_KEY 覆盖（优先级更高）。生成/轮换见 tools/init-llm-enc-key.py
   crypto-key: ${TCM_LLM_ENC_KEY:dGNtLWVoci1xYy1kZXYtb25seS1sbG0tZW5jLWtleSE=}
+  config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化；api-key 加密落库，不写本文件
 
-  config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化（重启回显）；api-key 加密落库，不写本文件
-
-# 操作日志：§七 L2 起只入库（operation_log 表），不再落文件，故无 log.* 配置项。
-# ⚠️ 下面的 logging: 是 Spring 应用日志（另一回事），不要一起删。
-
-# 认证（阶段2 §4.4）
+# 认证
 auth:
-  # 管理员能否看到各组数据。false = 把管理员的 groupId 置空，复用 RecordFilter 的
-  # fail-closed → 管理员在任何数据页面都看不到内容。这是设计意图（“数据主权在组”），
-  # 收紧时只需改这一行；数据层 / SQL / 前端 / openapi 零改动。
+  # false = 管理员也看不到他组数据（数据主权在组），只改这一行即可收紧
   admin-can-view-data: true
 
 logging:
   level:
-    # 排查问题时才改 debug；长期开会让日志迅速变大（且 debug 里可能带业务数据）
     com.tcm.ehr: info
     org.springframework.web: info
