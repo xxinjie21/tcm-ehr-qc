@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS records (
 CREATE TABLE IF NOT EXISTS nlp_task (
   id                VARCHAR(36) PRIMARY KEY,
   status            VARCHAR(20) NOT NULL,
+  mode              VARCHAR(20),
   total             INT NOT NULL DEFAULT 0,
   done              INT NOT NULL DEFAULT 0,
   success           INT NOT NULL DEFAULT 0,
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS nlp_task (
   request_key       VARCHAR(64),
   created_by        VARCHAR(50),
   failure_list      CLOB,
+  failed_ids        CLOB,
   failure_truncated TINYINT NOT NULL DEFAULT 0,
   org_id            VARCHAR(36),
   create_time       DATETIME DEFAULT CURRENT_TIMESTAMP,

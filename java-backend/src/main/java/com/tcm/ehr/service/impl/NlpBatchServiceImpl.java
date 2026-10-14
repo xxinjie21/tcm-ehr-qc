@@ -327,8 +327,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public NlpTaskVO submit(NlpBatchDTO dto, String createdBy) {
-        // 1. 前置校验：没开抽取就不要排任务，避免整批必然失败
-        if (!nlpClient.isEnabled()) {
+        // 1. 模式：默认完整解析；「仅归一」不依赖 NLP 服务
+        final String mode = dto == null || dto.getMode() == null || dto.getMode().isBlank()
+                ? NlpTask.MODE_EXTRACT : dto.getMode().trim();
+        // 1.1 前置校验：完整解析必须开抽取（否则整批必然失败）；仅归一不调 NLP，跳过该校验
+        if (NlpTask.MODE_EXTRACT.equals(mode) && !nlpClient.isEnabled()) {
             throw new IllegalArgumentException("抽取服务未开启（nlp.enabled=false），无法执行批量解析");
         }
         // 1.05 幂等（批次 5）：同一 request_key 的重放直接返回既有任务，不新建、不重跑。
@@ -384,6 +387,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             t.setFailureTruncated(false);
             t.setCreateTime(LocalDateTime.now().withNano(0));
             t.setRequestKey(idempotencyKey);
+            t.setMode(mode);
             try {
                 taskMapper.insert(t);
             } catch (org.springframework.dao.DuplicateKeyException dup) {
@@ -870,8 +874,26 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         }
     }
 
-    /** 单条处理结果：成功带待回写的 JSON，失败带一句人话原因。用结果对象替代抛异常，便于并行汇总 */
-    private record StepOutcome(String json, String reason) {
+    /**
+     * 单条处理结果：成功带待回写的 JSON，失败带一句人话原因，跳过（人工修改优先）三态。
+     * 用结果对象替代抛异常，便于并行汇总。
+     */
+    private record StepOutcome(String json, String reason, boolean skipped) {
+        static StepOutcome ok(String json) {
+            return new StepOutcome(json, null, false);
+        }
+
+        static StepOutcome fail(String reason) {
+            return new StepOutcome(null, reason, false);
+        }
+
+        static StepOutcome skip() {
+            return new StepOutcome(null, null, true);
+        }
+    }
+
+    /** 人工修改优先：仅归一遇到 {@code manuallyEdited} 记录时抛出，由 {@link #runOne} 转成跳过。 */
+    private static final class SkipRecordException extends RuntimeException {
     }
 
     /**
@@ -950,8 +972,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             try {
                 for (Record r : part) {
                     futures.add(recordPool == null
-                            ? CompletableFuture.completedFuture(runOne(r, t.getOrgId(), dictMeta))
-                            : recordPool.submit(() -> runOne(r, t.getOrgId(), dictMeta)));
+                            ? CompletableFuture.completedFuture(runOne(r, t.getOrgId(), dictMeta, t.modeOrDefault()))
+                            : recordPool.submit(() -> runOne(r, t.getOrgId(), dictMeta, t.modeOrDefault())));
                 }
             } catch (RejectedExecutionException e) {
                 // B4：停机时池已 shutdownNow，再提交会被拒。这是「应用要停了」而不是「任务失败」——
@@ -964,7 +986,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 Record r = part.get(i);
                 StepOutcome outcome = awaitOutcome(futures.get(i));
                 processed[0]++;
-                if (outcome.json() != null) {
+                if (outcome.skipped()) {
+                    // 人工修改优先：有意跳过，不算成功也不算失败（不回写，避免撤销人工修正）
+                    t.setSuccess(t.getSuccess() + 1);
+                } else if (outcome.json() != null) {
                     t.setSuccess(t.getSuccess() + 1);
                     pending.add(new StructuredWrite(r.getId(), outcome.json()));
                 } else {
@@ -998,11 +1023,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * <p>异常一律转成失败结果而不是抛出 —— 池里的线程抛出去只会变成一个没人看的
      * {@code ExecutionException}，而这里必须把它变成「这条病历失败」的进度。</p>
      */
-    private StepOutcome runOne(Record r, String orgId, DictMeta dictMeta) {
+    private StepOutcome runOne(Record r, String orgId, DictMeta dictMeta, String mode) {
         try {
-            return new StepOutcome(processOne(r, orgId, dictMeta), null);
+            return StepOutcome.ok(processOne(r, orgId, dictMeta, mode));
+        } catch (SkipRecordException s) {
+            // 人工修改优先：仅归一主动跳过（不计失败、不回写）
+            return StepOutcome.skip();
         } catch (Exception e) {
-            return new StepOutcome(null, reasonOf(e));
+            return StepOutcome.fail(reasonOf(e));
         }
     }
 
@@ -1012,11 +1040,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             return f.get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return new StepOutcome(null, "处理被中断");
+            return StepOutcome.fail("处理被中断");
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() == null ? e : e.getCause();
-            return new StepOutcome(null,
-                    cause instanceof Exception ex ? reasonOf(ex) : "抽取失败");
+            return StepOutcome.fail(cause instanceof Exception ex ? reasonOf(ex) : "抽取失败");
         }
     }
 
@@ -1079,14 +1106,18 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /**
-     * 单条：拼文本 → 抽取 → 归一 → 打词典版本；<b>只算不写</b>，返回待回写的 JSON（P1-4）。
+     * 单条：按模式处理，<b>只算不写</b>，返回待回写的 JSON（P1-4）。
      *
      * <p>写库交给调用方的攒批通道（{@link #flushStructuredData}）：逐条写在这个量级下
      * 每条一次 autocommit，是本链路的主要 SQL 开销来源。</p>
      *
+     * @param mode {@link NlpTask#MODE_EXTRACT}（抽取+归一）或 {@link NlpTask#MODE_NORMALIZE_ONLY}（仅归一）
      * @return 打好词典版本戳的 structured_data JSON
      */
-    private String processOne(Record r, String orgId, DictMeta dictMeta) throws Exception {
+    private String processOne(Record r, String orgId, DictMeta dictMeta, String mode) throws Exception {
+        if (NlpTask.MODE_NORMALIZE_ONLY.equals(mode)) {
+            return normalizeStored(r, orgId, dictMeta);
+        }
         // 1. 拼可抽取文本；空文本直接判失败，不去调抽取服务
         String text = NlpTextComposer.compose(r);
         if (text.isBlank()) {
@@ -1106,12 +1137,46 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         String json = objectMapper.writeValueAsString(vo);
         // ⚠️ 原先打的是 dictionaryFileService.currentVersion() —— 那是词典还在文件时代
         //    的文件哈希。词典源在批次 8b 已入库，文件哈希从此冻结不变，库里 500 条记录
-        //    的 dictVersion 全是同一个值，既无法区分、也不是真正用的那版词典。
+        //   的 dictVersion 全是同一个值，既无法区分、也不是真正用的那版词典。
         //    这里改用「本组织归一实际覆盖的 5 类词典」的有效版本 + 词条数。
         // 批次 25.3：元数据走批级 DictMeta（一批只查一次库），不再逐条查
         json = StructuredDataMeta.stamp(objectMapper, json,
                 dictMeta.version(),
                 dictMeta.termCount());
+        return json;
+    }
+
+    /**
+     * 仅归一：不调 Python，读已有 {@code structured_data}，对其中每个实体重跑 ES 归一。
+     *
+     * <p>用于「补词典后让新词生效」：实体（含 {@code sourceText} 原文与 {@code normLevel}）
+     * 已在首次解析时落库，归一化只依赖 ES 词典，重跑即可命中新词，省掉整段实体抽取时间。</p>
+     *
+     * <p>复用 {@link EntityNormalizer#normalizeMap}（已有测试保证不丢 {@code _meta} 等 VO 没有的键），
+     * 再打当前词典版本戳。人工修改优先：{@code manuallyEdited} 记录跳过，不撤销人工修正。</p>
+     *
+     * @return 重新归一并打好版本戳的 structured_data JSON
+     * @throws SkipRecordException 该记录含人工修改，按跳过处理
+     */
+    private String normalizeStored(Record r, String orgId, DictMeta dictMeta) throws Exception {
+        String existing = r.getStructuredData();
+        if (existing == null || existing.isBlank()) {
+            // 从未解析过 → 没有可归一的实体；重试也不会成功，属永久失败
+            throw new IllegalArgumentException("该病历尚无结构化数据，请先批量解析");
+        }
+        if (Boolean.TRUE.equals(r.getManuallyEdited())) {
+            // 人工成果优先：跳过，避免把人工改过的术语归一回去
+            throw new SkipRecordException();
+        }
+        Map<String, Object> data = objectMapper.readValue(existing,
+                new TypeReference<Map<String, Object>>() { });
+        entityNormalizer.normalizeMap(data, orgId);
+        String json = StructuredDataMeta.stamp(objectMapper, data,
+                dictMeta.version(), dictMeta.termCount());
+        if (json == null) {
+            // 序列化失败：宁可算这条失败，也不写 null 把整列结构化数据清空
+            throw new IllegalStateException("结构化数据序列化失败");
+        }
         return json;
     }
 
@@ -1269,6 +1334,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         vo.setDone(t.getDone() == null ? 0 : t.getDone());
         vo.setSuccess(t.getSuccess() == null ? 0 : t.getSuccess());
         vo.setFailed(t.getFailed() == null ? 0 : t.getFailed());
+        vo.setMode(t.modeOrDefault());
         vo.setCurrent(t.getCurrentLabel());
         vo.setCreatedBy(t.getCreatedBy());
         vo.setCreateTime(t.getCreateTime());

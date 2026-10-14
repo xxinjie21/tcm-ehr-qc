@@ -17,6 +17,8 @@ public class NlpTaskVO extends AbstractTaskVO {
     private int done;
     private int success;
     private int failed;
+    /** 任务模式：EXTRACT（解析）/ NORMALIZE_ONLY（仅归一）；历史任务为 null 时前端按解析显示 */
+    private String mode;
     /** 失败清单是否被截断（仅保留前 500 条） */
     private boolean failureTruncated;
     /** 失败清单（label=病历标识，reason=原因） */

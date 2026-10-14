@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS operation_log (
 CREATE TABLE IF NOT EXISTS nlp_task (
   id VARCHAR(36) PRIMARY KEY COMMENT '任务ID(UUID)',
   status VARCHAR(20) NOT NULL COMMENT '状态：QUEUED/RUNNING/COMPLETED/CANCELLED/INTERRUPTED/FAILED',
+  mode VARCHAR(20) NULL COMMENT '任务模式：EXTRACT(默认,抽取+归一) / NORMALIZE_ONLY(仅归一)',
   total INT NOT NULL DEFAULT 0 COMMENT '计划处理条数',
   done INT NOT NULL DEFAULT 0 COMMENT '已处理条数',
   success INT NOT NULL DEFAULT 0 COMMENT '成功条数',
@@ -153,6 +154,7 @@ CREATE TABLE IF NOT EXISTS nlp_task (
   request_key VARCHAR(64) NULL COMMENT '幂等键（批次5；同组织内唯一，NULL 不参与唯一性）',
   created_by VARCHAR(50) COMMENT '提交人用户名',
   failure_list JSON COMMENT '失败清单(仅存前500条)',
+  failed_ids JSON NULL COMMENT '完整失败记录ID集合(用于仅重试失败，不受500条截断限制)',
   failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
   org_id VARCHAR(36) COMMENT '提交时所属组织（组织隔离查询用）',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -202,6 +204,7 @@ CREATE TABLE IF NOT EXISTS qc_task (
   role VARCHAR(20) COMMENT '提交时角色快照，仅用于审计日志回填',
   org_id VARCHAR(36) COMMENT '提交时所属组织快照，供 worker 重建 RecordFilter（数据域）',
   failure_list JSON COMMENT '失败清单(仅存前500条)',
+  failed_ids JSON NULL COMMENT '完整失败记录ID集合(用于仅重试失败，不受500条截断限制)',
   failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
   started_at DATETIME COMMENT '开始时间',

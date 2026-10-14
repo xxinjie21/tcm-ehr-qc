@@ -182,6 +182,30 @@ public class NlpController {
     }
 
     /**
+     * 提交「仅归一」任务：不调 NLP，只对已有结构化数据重跑 ES 归一。
+     *
+     * <p>用于「补词典后让新词生效」——抽取过一次的实体已落库，重跑归一即可命中新词，
+     * 省掉整段实体抽取时间。与 {@link #submitBatch} 共用同一套任务、进度与失败清单，
+     * 仅任务模式不同（{@code NORMALIZE_ONLY}）。</p>
+     *
+     * <p>【权限：登录即可】</p>
+     *
+     * @param dto filters=范围条件；limit=处理条数上限，0 表示不限
+     * @return 任务ID、状态与计划处理条数
+     */
+    @PostMapping("/extract/batch/normalize-only")
+    public Result<NlpTaskVO> submitNormalizeOnlyBatch(@Valid @RequestBody(required = false) NlpBatchDTO dto) {
+        // 1. 强制模式为仅归一（前端无需知道该字段）
+        NlpBatchDTO batch = dto == null ? new NlpBatchDTO() : dto;
+        batch.setMode(com.tcm.ehr.domain.po.NlpTask.MODE_NORMALIZE_ONLY);
+        NlpTaskVO vo = nlpBatchService.submit(batch, RequestUtils.currentUsername());
+        // 2. 留痕
+        operationLogger.log("批量归一", RecordFilter.describe(batch.getFilters()),
+                "提交任务，计划 " + vo.getTotal() + " 条");
+        return Result.ok("已提交，后台归一处理中", vo);
+    }
+
+    /**
      * 查询批量解析任务进度。
      *
      * <p>【权限：登录即可】任务不存在返回 404。</p>

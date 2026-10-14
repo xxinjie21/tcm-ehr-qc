@@ -258,6 +258,49 @@ class NlpBatchIntegrationTest {
         verify(recordMapper, times(2)).selectList(ArgumentMatchers.<Wrapper<Record>>any());
     }
 
+    /**
+     * 需求4：「仅归一」任务不调 NLP 抽取，只对已有结构化数据重跑归一。
+     *
+     * <p>直接落一条 QUEUED 的 {@code mode=NORMALIZE_ONLY} 筛选型任务（同 {@link #filterTaskStopsPagingOnceTotalIsReached}
+     * 规避 H2 的 COUNT+ORDER BY 限制），验证：抽取服务零调用、归一被调用、词典版本戳被重打。</p>
+     */
+    @Test
+    void normalizeOnlyTaskSkipsNlpAndRenormalizesStoredData() {
+        String id = insertRecordWithStructured(ORG,
+                "{\"patternList\":[{\"content\":\"肝郁气滞\",\"sourceText\":\"肝郁气滞\"}],"
+                        + "\"_meta\":{\"dictVersion\":\"old\"}}");
+
+        NlpTask queued = new NlpTask();
+        queued.setId(UUID.randomUUID().toString());
+        queued.setStatus(NlpTask.QUEUED);
+        queued.setMode(NlpTask.MODE_NORMALIZE_ONLY);
+        queued.setTotal(1);
+        queued.setDone(0);
+        queued.setSuccess(0);
+        queued.setFailed(0);
+        queued.setOrgId(ORG);
+        queued.setFiltersJson("null");
+        queued.setFailureList("[]");
+        queued.setFailureTruncated(false);
+        queued.setCreatedBy("tester");
+        queued.setCreateTime(LocalDateTime.now().withNano(0));
+        taskMapper.insert(queued);
+
+        NlpTask task = awaitTerminal(queued.getId());
+
+        assertEquals(NlpTask.COMPLETED, task.getStatus());
+        assertEquals(1, task.getSuccess());
+        assertEquals(0, task.getFailed());
+        // 仅归一绝不调 NLP 抽取 —— 这是它省时的根本
+        verify(nlpClient, org.mockito.Mockito.never()).extract(anyString());
+        // 必须走归一（对已有结构化数据）
+        verify(entityNormalizer).normalizeMap(org.mockito.ArgumentMatchers.anyMap(), anyString());
+        // 词典版本戳被重打成当前生效版本
+        String json = recordMapper.selectById(id).getStructuredData();
+        assertNotNull(json);
+        assertTrue(json.contains("dict-v1"), "仅归一后应重打当前词典版本戳：" + json);
+    }
+
     private String insertRecord(String orgId, String chiefComplaint) {
         Record record = new Record();
         record.setId(UUID.randomUUID().toString());
@@ -265,6 +308,18 @@ class NlpBatchIntegrationTest {
         record.setChiefComplaint(chiefComplaint);
         record.setVisitTime(LocalDateTime.now().withNano(0));
         record.setStatus("pending");
+        recordMapper.insert(record);
+        return record.getId();
+    }
+
+    private String insertRecordWithStructured(String orgId, String structuredData) {
+        Record record = new Record();
+        record.setId(UUID.randomUUID().toString());
+        record.setOrgId(orgId);
+        record.setChiefComplaint("主诉：仅归一");
+        record.setVisitTime(LocalDateTime.now().withNano(0));
+        record.setStatus("pending");
+        record.setStructuredData(structuredData);
         recordMapper.insert(record);
         return record.getId();
     }

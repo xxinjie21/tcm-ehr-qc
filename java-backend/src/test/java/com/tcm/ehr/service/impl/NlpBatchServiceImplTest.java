@@ -173,6 +173,61 @@ class NlpBatchServiceImplTest {
         verify(taskMapper, Mockito.never()).insert(Mockito.any(NlpTask.class));
     }
 
+    // ------------------------------------------------- 需求4：仅归一提交
+
+    /**
+     * 「仅归一」提交不依赖 NLP 服务（{@code nlp.enabled=false} 也应能提交），
+     * 且任务上必须落下 {@code mode=NORMALIZE_ONLY}，供 worker 走不调 Python 的分支。
+     *
+     * <p>这是「补词典后只重跑归一、不重抽实体」的入口判据：若这里也卡 isEnabled，
+     * 则关掉 NLP 的场景下用户无法让新词生效。</p>
+     */
+    @Test
+    void normalizeOnlySubmitSkipsNlpEnabledCheckAndStampsMode() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_ORG_ID, "org-A");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        try {
+            NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
+            when(taskMapper.selectCount(any())).thenReturn(0L);          // 无活跃任务
+            PythonNlpClient nlpClient = mock(PythonNlpClient.class);
+            when(nlpClient.isEnabled()).thenReturn(false);               // NLP 明确关闭
+            RecordMapper recordMapper = mock(RecordMapper.class);
+            when(recordMapper.selectCount(any())).thenReturn(10L);       // 计划 10 条
+            NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper, recordMapper,
+                    mock(NlpTaskItemMapper.class), nlpClient, mock(EntityNormalizer.class),
+                    mock(com.tcm.ehr.service.IDictionaryTermStore.class), new ObjectMapper(),
+                    distLock(true));
+
+            com.tcm.ehr.domain.dto.NlpBatchDTO dto = new com.tcm.ehr.domain.dto.NlpBatchDTO();
+            dto.setMode(NlpTask.MODE_NORMALIZE_ONLY);
+            com.tcm.ehr.domain.vo.NlpTaskVO vo = svc.submit(dto, "tester");
+
+            assertEquals(NlpTask.MODE_NORMALIZE_ONLY, vo.getMode());
+            ArgumentCaptor<NlpTask> cap = ArgumentCaptor.forClass(NlpTask.class);
+            verify(taskMapper).insert(cap.capture());
+            assertEquals(NlpTask.MODE_NORMALIZE_ONLY, cap.getValue().getMode(),
+                    "任务必须带上仅归一模式，否则 worker 会又去调 NLP 抽取");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    /** 默认（不带 mode）按完整解析：NLP 关闭时必须拒绝，避免整批必然失败。 */
+    @Test
+    void extractSubmitStillRequiresNlpEnabled() {
+        PythonNlpClient nlpClient = mock(PythonNlpClient.class);
+        when(nlpClient.isEnabled()).thenReturn(false);
+        NlpBatchServiceImpl svc = new NlpBatchServiceImpl(mock(NlpTaskMapper.class),
+                mock(RecordMapper.class), mock(NlpTaskItemMapper.class), nlpClient,
+                mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
+                new ObjectMapper(), distLock(true));
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> svc.submit(new com.tcm.ehr.domain.dto.NlpBatchDTO(), "tester"));
+        assertTrue(e.getMessage().contains("抽取服务未开启"), e.getMessage());
+    }
+
     // ------------------------------------------------- B1：导入后自动解析的组织标记
 
     /**

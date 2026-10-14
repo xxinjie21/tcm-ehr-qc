@@ -34,4 +34,11 @@ public class NlpBatchDTO {
      * 只有客户端知道这两次请求是不是同一个动作。这也是 Stripe 等平台要求调用方传幂等键的原因。</p>
      */
     private String requestKey;
+
+    /**
+     * 任务模式：{@code EXTRACT}（默认，实体抽取 + 归一）或 {@code NORMALIZE_ONLY}（仅归一，不调 NLP）。
+     *
+     * <p>由「仅归一」端点强制置 {@code NORMALIZE_ONLY}；普通解析端点留空即 {@code EXTRACT}。</p>
+     */
+    private String mode;
 }
