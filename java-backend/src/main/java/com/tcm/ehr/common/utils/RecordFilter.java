@@ -87,6 +87,8 @@ public final class RecordFilter {
                 wrapper.ge("visit_time", dto.getDateRange().get(0).trim() + " 00:00:00");
                 wrapper.le("visit_time", dto.getDateRange().get(1).trim() + " 23:59:59");
             }
+            // 5. 仅未解析：structured_data 为 SQL NULL（用 IS NULL —— 该列是 JSON 类型，不能与 '' 比较）
+            andOnlyUnparsed(wrapper, dto.getOnlyUnparsed());
         }
 // 排序键必须是列表实际展示的那一列（visit_time 接诊时间）。
         // 原先按 create_time 排，但批量导入/灌库场景下 create_time 会大量同值 ——
@@ -146,6 +148,19 @@ public final class RecordFilter {
             return null;
         }
         return SORT_WHITELIST.get(sortBy.trim());
+    }
+
+    /**
+     * 仅未解析过滤：{@code structured_data IS NULL}（缺省/为 false 不加条件）。
+     *
+     * <p>列类型是 MySQL {@code JSON}，<b>不能</b>写成 {@code structured_data = ''}（会触发
+     * “Invalid JSON text”，且空串在 JSON 列里本就存不进去）。已解析的记录该列必为一段合法 JSON，
+     * 故「未解析 ⇔ IS NULL」。</p>
+     */
+    private static void andOnlyUnparsed(QueryWrapper<Record> wrapper, Boolean onlyUnparsed) {
+        if (Boolean.TRUE.equals(onlyUnparsed)) {
+            wrapper.isNull("structured_data");
+        }
     }
 
     /**
@@ -386,6 +401,8 @@ public final class RecordFilter {
             if (filterDto.getIds() != null && !filterDto.getIds().isEmpty()) {
                 wrapper.in("id", filterDto.getIds());
             }
+            // 5. 仅未解析：structured_data 为 SQL NULL（该列是 JSON 类型，不能与 '' 比较）
+            andOnlyUnparsed(wrapper, filterDto.getOnlyUnparsed());
         }
         // 与 SearchDTO 重载同一个排序键：本工具的两种入参不该给出不同顺序（审查报告 L8）。
         // 注意 FiltersDTO 重载的调用方多是聚合 / 批处理 / 按范围删除，排序对它们无意义，

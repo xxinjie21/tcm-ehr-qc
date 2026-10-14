@@ -28,6 +28,13 @@
       <span class="tip">条数多时后台跑得久，可关闭页面稍后回来</span>
     </div>
 
+    <div class="batch-row">
+      <!-- 只对「批量解析」生效：只抽从未解析过的病历，不重跑已解析的几万条 -->
+      <el-checkbox v-model="onlyUnparsed" :disabled="submitting" size="small">
+        只解析未解析的（跳过已有结构化数据的病历）
+      </el-checkbox>
+    </div>
+
     <div class="actions">
       <el-button type="primary" :loading="submitting" @click="submitBatch">开始批量解析</el-button>
       <el-button :loading="submitting" @click="submitNormalizeOnly">开始批量归一</el-button>
@@ -152,6 +159,8 @@ const batchMode = ref('all')
 const submitting = ref(false)
 // 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选
 const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+// 只解析未解析的（仅对「批量解析」生效；默认开，避免重跑已解析的几万条）
+const onlyUnparsed = ref(true)
 const activeTask = ref(null)
 const batchTasks = ref([])
 // 列表是否被服务端截断（true = 还有更早的任务没返回）；上限条数由后端下发，别在前端写死
@@ -350,7 +359,7 @@ watch(() => props.active, (on) => {
  * 「开始批量解析」与行内「按当前范围重新提交」是同一个动作、两个入口，
  * 原来都没有二次确认，而空范围等于全库（约 90 秒、覆盖已有结构化数据）。
  */
-const describeBatchScope = async () => {
+const describeBatchScope = async (isNormalize) => {
   // 1. 把已设的筛选条件拼成一句可读范围
   const parts = []
   if (batchFilters.department) parts.push(`科室＝${batchFilters.department}`)
@@ -359,10 +368,12 @@ const describeBatchScope = async () => {
   }
   if (batchFilters.pattern) parts.push(`证候＝${batchFilters.pattern}`)
   if (batchFilters.grade) parts.push(`分级＝${batchFilters.grade}`)
-  // 2. 查该范围条数，取不到就退化成「未知」，不阻塞确认
+  // 2. 查该范围条数（未解析过滤只对解析生效，口径与提交一致），取不到退化为「未知」
   let count = '未知'
   try {
-    const res = await countRecords({ ...batchFilters })
+    const countPayload = { ...batchFilters }
+    if (!isNormalize && onlyUnparsed.value) countPayload.onlyUnparsed = true
+    const res = await countRecords(countPayload)
     count = res.data ?? '未知'
   } catch {
     // 取不到条数不阻塞确认，退化成「未知」
@@ -381,13 +392,14 @@ const submitNormalizeOnly = () => submitBatchTask('NORMALIZE_ONLY')
 const submitBatchTask = async (mode) => {
   const isNormalize = mode === 'NORMALIZE_ONLY'
   const actionName = isNormalize ? '批量归一' : '批量解析'
+  const skipParsed = !isNormalize && onlyUnparsed.value
   // 1. 先算出当前范围的可读描述与条数
-  const { scope, count } = await describeBatchScope()
+  const { scope, count } = await describeBatchScope(isNormalize)
   const limited = batchMode.value === 'limit' ? `（本次只处理前 ${batchLimit.value} 条）` : ''
   // 2. 二次确认：空范围等于全库，代价大
   const detail = isNormalize
     ? '这是仅归一：不重新抽取实体，只对已有结构化数据重跑词典归一，耗时较短；尚无结构化数据的病历会被记为失败。'
-    : '耗时较长，且会覆盖这些病历已有的结构化数据。'
+    : (skipParsed ? '只解析尚未解析的病历（已有结构化数据的会跳过）。' : '耗时较长，且会覆盖这些病历已有的结构化数据。')
   const ok = await confirmBox(
     `将对「${scope}」范围内约 ${count} 条病历执行${actionName}${limited}。${detail}确定提交？`,
     actionName
@@ -402,8 +414,10 @@ const submitBatchTask = async (mode) => {
     // 5. 提交异步任务并提示计划条数
     //    批次5：带幂等键。用户的一次「开始」= 一个键；网关/代理重放同一个请求时会沿用同一个键，
     //    服务端据此返回同一条任务，不会又建一条。用户再主动点一次属于新意图，故本函数每次执行都新生成。
+    const filters = { ...batchFilters }
+    if (skipParsed) filters.onlyUnparsed = true
     const payload = {
-      filters: { ...batchFilters },
+      filters,
       limit: batchMode.value === 'limit' ? batchLimit.value : 0,
       requestKey: crypto.randomUUID()
     }

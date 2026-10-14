@@ -25,6 +25,13 @@ public class SearchDTO {
     private Integer page;
 
     /**
+     * 仅处理「尚未结构化解析」的病历（{@code structured_data IS NULL}）。
+     *
+     * <p>供「只解析未解析的」的提交前计数（{@code POST /records/count}）与列表复用之。缺省不生效。</p>
+     */
+    private Boolean onlyUnparsed;
+
+    /**
      * 排序列（B3 用户可排序 · 方案 b）。**值永远只进白名单映射**，绝不能拼进 SQL：
      * 白名单见 {@code RecordFilter.SORT_WHITELIST}（score / visit_time / registration_no）。
      * 任意其它值（含注入串）一律回落默认排序，不报错。

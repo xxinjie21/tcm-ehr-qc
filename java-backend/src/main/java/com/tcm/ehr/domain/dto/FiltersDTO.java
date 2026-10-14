@@ -23,4 +23,11 @@ public class FiltersDTO {
      * <p>为空/缺省时不影响任何现有调用；非空时在数据域之上再收窄到这些 ID。</p>
      */
     private List<String> ids;
+
+    /**
+     * 仅处理「尚未结构化解析」的病历（{@code structured_data IS NULL}）。
+     *
+     * <p>用于「只解析未解析的」：避免把已解析过的几万条再重抽一遍。缺省/为 false 时不加条件。</p>
+     */
+    private Boolean onlyUnparsed;
 }
