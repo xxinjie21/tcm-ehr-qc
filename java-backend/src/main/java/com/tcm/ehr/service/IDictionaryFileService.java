@@ -3,25 +3,15 @@ package com.tcm.ehr.service;
 import com.tcm.ehr.domain.po.TermEntry;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 /**
- * 词典文件**只读**：每类术语一个 JSON 文件，仅用于基础层首次播种。
+ * 词典文件**只读**：每类术语一个 JSON（默认打包在 classpath:dictionaries）。
  *
- * <p>批次 17 起本接口<b>只保留 read()</b>：词典真源已入库
- * （{@code dictionary_terms}），备份/回滚/版本列表改由归档版本体系承担
- * （{@code dict_archive_version} / {@code dict_archive_term}）。
- * 保留 {@code read()} 是因为基础层 3580 条术语只此一份可重建的来源。</p>
- *
- * <p>只管文件，解析与校验在 {@link IDictionaryService}。</p>
+ * <p>词典真源已入库（{@code dictionary_terms}），本接口只保留 {@code read()} 用于基础层首次播种，
+ * 以及 {@code fileNameOf()} 的文件名映射。备份/回滚/版本由归档版本体系承担。</p>
  */
 public interface IDictionaryFileService {
-
-    /** @return 词典文件所在目录 */
-    Path dir();
-
 
     /**
      * 取词典文件名。
@@ -38,20 +28,4 @@ public interface IDictionaryFileService {
      * @return 词条列表；文件不存在视为空
      */
     List<TermEntry> read(String type) throws IOException;
-
-    /**
-     * 覆盖写入整类词典。
-     *
-     * @param type    术语类型
-     * @param entries 词条列表
-     */
-    void write(String type, List<TermEntry> entries) throws IOException;
-
-    /**
-     * 读文本文件内容。
-     *
-     * @param path 文件路径
-     * @return 文件文本
-     */
-    String readText(Path path) throws IOException;
 }

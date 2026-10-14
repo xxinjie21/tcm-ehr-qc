@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 
@@ -18,7 +16,7 @@ import java.util.Map;
  * LLM 配置存储：<b>系统基线</b> + <b>每人一份私有配置</b>。
  *
  * <p><b>基线</b>：启动时以 {@link LlmProperties}（{@code application.yml} 的 {@code llm} 段）为准，
- * 再用旧版遗留的 {@code data/llm-config.json}（若存在）覆盖非密钥字段 —— 只读，不再回写。</p>
+ * 再用可选的 {@code classpath:llm-config.json}（若打包了）覆盖非密钥字段 —— 只读，不回写。</p>
  *
  * <p><b>私有配置</b>：{@code user_llm_config} 每人一行，密钥经
  * {@link LlmSecretCipher} 以 AES-256-GCM 加密落库；用户没配则回落到基线。</p>
@@ -235,13 +233,21 @@ public class LlmConfigStore {
 
     private Map<String, Object> readFile(String path) {
         try {
-            Path f = Paths.get(path);
-            // 1. 文件不存在是正常状态（还没保存过），不是错误
-            if (!Files.exists(f)) {
+            if (path == null || path.isBlank()) {
                 return null;
             }
-            return mapper.readValue(f.toFile(), new TypeReference<Map<String, Object>>() {
-            });
+            // 支持 classpath:（默认，随 jar 发布）与文件系统路径
+            org.springframework.core.io.Resource res = path.startsWith("classpath:")
+                    ? new org.springframework.core.io.ClassPathResource(path.substring("classpath:".length()))
+                    : new org.springframework.core.io.FileSystemResource(Paths.get(path));
+            // 1. 文件不存在是正常状态（还没保存过/未打包基线），不是错误
+            if (!res.exists()) {
+                return null;
+            }
+            try (java.io.InputStream in = res.getInputStream()) {
+                return mapper.readValue(in, new TypeReference<Map<String, Object>>() {
+                });
+            }
         } catch (Exception e) {
             // 2. 坏了就用 yml 基线继续跑，不让配置问题拦住服务启动
             log.warn("[LLM] 读取运行时配置失败（用 yml 基线）: {}", e.getMessage());

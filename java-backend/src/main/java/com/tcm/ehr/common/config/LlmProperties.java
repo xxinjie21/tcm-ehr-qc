@@ -46,10 +46,8 @@ public class LlmProperties {
     private int timeout = 60000;
 
     /**
-     * 运行时"非密钥"配置的持久化文件。
-     *
-     * <p>「导入 LLM」保存后，enabled/provider/baseUrl/model/temperature/timeout 会写入此文件，
-     * 重启后回显；<b>api-key 不写入</b>（只存内存，需每次填写）。</p>
+     * 可选的「非密钥」基线配置文件：默认打包在 classpath（{@code classpath:llm-config.json}），
+     * 不存在即用本 yml 基线。用户的运行期配置（含加密 api-key）已按用户落库，不写本文件。
      */
-    private String configFile = "data/llm-config.json";
+    private String configFile = "classpath:llm-config.json";
 }

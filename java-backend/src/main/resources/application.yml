@@ -67,9 +67,9 @@ elasticsearch:
   scheme: http
   score-threshold: 0.8
 
-# 术语词典目录（JSON 文件）
+# 术语词典目录（JSON 已打包进 jar，无需服务器另放文件；可改外部目录覆盖）
 dictionary:
-  dir: D:/ZISHIKU/AI/tcm-ehr-qc/data/dictionaries
+  dir: classpath:dictionaries
 
 # 质控（规则权威 = qc_rules 表，每组织一行；无行回退内置默认）
 qc:
@@ -116,7 +116,6 @@ llm:
   # 用户密钥落库加密密钥（AES-256-GCM）。换掉后已加密的 API Key 全部解不开，须当持久密钥保管；
   # 生产用 TCM_LLM_ENC_KEY 覆盖（优先级更高）。生成/轮换见 tools/init-llm-enc-key.py
   crypto-key: ${TCM_LLM_ENC_KEY:dGNtLWVoci1xYy1kZXYtb25seS1sbG0tZW5jLWtleSE=}
-  config-file: D:/ZISHIKU/AI/tcm-ehr-qc/data/llm-config.json   # 非密钥字段持久化；api-key 加密落库，不写本文件
 
 # 认证
 auth:

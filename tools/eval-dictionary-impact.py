@@ -28,7 +28,7 @@ import sys
 from collections import Counter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DICT_DIR = os.path.join(ROOT, 'data', 'dictionaries')
+DICT_DIR = os.path.join(ROOT, 'java-backend', 'src', 'main', 'resources', 'dictionaries')
 
 # 判定为「抽取碎片」的长度上限：归一失败且术语短到不可能是完整标准词
 FRAGMENT_MAX_LEN = 2
