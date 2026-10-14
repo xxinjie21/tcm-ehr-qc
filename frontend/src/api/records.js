@@ -12,6 +12,11 @@ export function createRecord(data) {
   return request.post('/records', data)
 }
 
+// 仅重传失败行：把（可能已编辑的）失败行按导入同一套口径重新入库
+export function importRows(rows) {
+  return request.post('/records/import-rows', rows, { timeout: 120000 })
+}
+
 // F·7.2 原始病历只读查看
 export function getRawRecord(recordId) {
   return request.get(`/records/raw/${recordId}`)

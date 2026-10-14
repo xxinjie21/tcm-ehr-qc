@@ -30,16 +30,19 @@
 
     <div class="actions">
       <el-button type="primary" :loading="submitting" @click="submitBatch">开始批量解析</el-button>
+      <el-button :loading="submitting" @click="submitNormalizeOnly">开始批量归一</el-button>
       <el-button :disabled="submitting" @click="loadBatchList">刷新任务列表</el-button>
+    </div>
+
+    <div class="tip">
+      <b>批量解析</b>＝实体抽取 + 术语归一（会重新调用 NLP 服务）；
+      <b>批量归一</b>＝只按最新词典重跑归一，不重新抽取实体（补词典后用，快很多）。
     </div>
 
     <!-- 当前 / 选中任务 -->
     <div v-if="activeTask" class="batch-progress">
       <div class="bp-hd"><b>{{ statusText(activeTask) }}</b></div>
-      <el-progress
-        :percentage="activeTask.total ? Math.round((activeTask.done / activeTask.total) * 100) : 0"
-        :stroke-width="10"
-      />
+      <el-progress v-bind="progressBar" :stroke-width="10" />
       <div class="bp-sub">
         共 {{ activeTask.total }} 条 · 已处理 {{ activeTask.done }} · 成功 {{ activeTask.success }} · 失败 {{ activeTask.failed }}
         <span v-if="activeTask.current"> · 当前 {{ activeTask.current }}</span>
@@ -62,7 +65,19 @@
         <el-table :data="activeTask.failures" border size="small">
           <el-table-column prop="label" label="病历" width="200" show-overflow-tooltip />
           <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+          <el-table-column label="详情" width="90">
+            <template #default="{ row }">
+              <el-button v-if="row.recordId" link type="primary" @click="openRecordDetail(row.recordId)">查看</el-button>
+              <span v-else class="bf-muted">—</span>
+            </template>
+          </el-table-column>
         </el-table>
+        <div v-if="!isActive(activeTask) && activeTask.failed > 0" class="actions">
+          <!-- 仅重跑失败那批（复用原任务模式），不重跑全部 -->
+          <el-button type="warning" :loading="submitting" @click="retryFailed(activeTask.id)">
+            仅重试失败（{{ activeTask.failed }} 条）
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -83,21 +98,27 @@
         <el-table-column label="提交时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
         </el-table-column>
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">{{ row.mode === 'NORMALIZE_ONLY' ? '仅归一' : '解析' }}</template>
+        </el-table-column>
         <el-table-column label="状态" min-width="240">
           <template #default="{ row }">{{ statusText(row) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="230">
           <template #default="{ row }">
             <el-button v-if="isActive(row)" link type="danger" @click="cancelBatch(row.id)">取消</el-button>
             <template v-else>
               <el-button link type="primary" @click="viewTask(row.id)">查看</el-button>
+              <el-button v-if="row.failed > 0" link type="warning" @click="retryFailed(row.id)">重试失败</el-button>
               <!-- 与「开始批量解析」同一条路径：按当前表单范围重新提交，不是重跑那一条任务 -->
-              <el-button link type="primary" @click="submitBatch">按当前范围重新提交</el-button>
+              <el-button link type="primary" @click="submitBatch">重新提交</el-button>
             </template>
           </template>
         </el-table-column>
       </el-table>
     </div>
+
+    <RecordDetailDialog v-model="detailVisible" :record="detailRecord" />
   </PanelCard>
 </template>
 
@@ -105,12 +126,13 @@
 // 批量结构化解析面板（从 NlpExtract.vue 页内抽出，28.16）：
 // 提交后台批量任务、轮询进度、列出最近任务。页签用 lazy 挂载，
 // 因此组件挂载即首屏加载任务列表，切走时由 active 属性停掉轮询。
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { submitNlpBatch, getNlpBatchProgress, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
-import { searchRecords, countRecords } from '@/api/records'
+import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
+import { submitNlpBatch, submitNlpNormalizeBatch, getNlpBatchProgress, cancelNlpBatch, retryNlpBatchFailed, listNlpBatch } from '@/api/nlp'
+import { searchRecords, countRecords, getRawRecord } from '@/api/records'
 import { fmtDateTime } from '@/utils/format'
 import { confirmBox } from '@/utils/confirm'
 
@@ -165,6 +187,36 @@ let lastSample = null
 const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
 // 任务是否仍在跑（排队 / 进行中）：决定是否显示取消按钮、是否继续轮询
 const isActive = (t) => !!t && ACTIVE_STATUS.includes(t.status)
+
+/**
+ * 进度条的两态配置（统一口径见 Governance.vue 的清洗进度条）。
+ *
+ * 排队中（total 还没算出来）、或一条都还没处理完时，percentage 会算成 0 ⇒
+ * 填充宽度就是 0（el-progress 的填充宽度恒等于 percentage%，见 Element Plus
+ * progress.vue 的 barStyle），条子静止且什么都看不见。这段时间改用不确定流动条
+ * 只表达「在推进」，不显示百分比数字，避免暗示一个并不存在的精确进度。
+ *
+ * 有可信数字后切回真实百分比，条纹继续流动表示仍在处理；
+ * 终态任务（从任务列表回看历史任务）不加任何动画 —— 已经结束的条不该还在动。
+ */
+const progressBar = computed(() => {
+  const t = activeTask.value
+  const active = isActive(t)
+  const done = (t && t.done) || 0
+  // 1. 仍在跑但还没有任何推进 ⇒ 没有可信数字，走不确定态
+  if (active && !done) {
+    // percentage 必须给 100：不确定动画是在「100% 宽」的填充上左右滑动，给 0 就看不见
+    return { percentage: 100, indeterminate: true, striped: false, stripedFlow: false, showText: false }
+  }
+  // 2. 有数字（或任务已结束）⇒ 真实百分比；只有仍在跑时才让条纹流动
+  return {
+    percentage: t && t.total ? Math.min(100, Math.round((done / t.total) * 100)) : 0,
+    indeterminate: false,
+    striped: active,
+    stripedFlow: active,
+    showText: true
+  }
+})
 
 // 状态文案：一句一个事实，精确到数字/原因
 const statusText = (t) => {
@@ -319,16 +371,26 @@ const describeBatchScope = async () => {
   return { scope: parts.length ? parts.join(' · ') : '全部病历（未设筛选）', count }
 }
 
+// 提交批量解析任务（实体抽取 + 归一）
+const submitBatch = () => submitBatchTask('EXTRACT')
+
+// 提交「仅归一」任务：不重新抽取实体，只对已有结构化数据重跑归一（补词典后让新词生效）
+const submitNormalizeOnly = () => submitBatchTask('NORMALIZE_ONLY')
+
 // 提交批量任务：先算出范围描述与条数做二次确认（空范围等于全库，代价大），确认后提交并开始轮询
-const submitBatch = async () => {
+const submitBatchTask = async (mode) => {
+  const isNormalize = mode === 'NORMALIZE_ONLY'
+  const actionName = isNormalize ? '批量归一' : '批量解析'
   // 1. 先算出当前范围的可读描述与条数
   const { scope, count } = await describeBatchScope()
   const limited = batchMode.value === 'limit' ? `（本次只处理前 ${batchLimit.value} 条）` : ''
-  // 2. 二次确认：空范围等于全库，代价大且会覆盖已有数据
+  // 2. 二次确认：空范围等于全库，代价大
+  const detail = isNormalize
+    ? '这是仅归一：不重新抽取实体，只对已有结构化数据重跑词典归一，耗时较短；尚无结构化数据的病历会被记为失败。'
+    : '耗时较长，且会覆盖这些病历已有的结构化数据。'
   const ok = await confirmBox(
-    `将对「${scope}」范围内约 ${count} 条病历执行批量解析${limited}，耗时较长，`
-      + '且会覆盖这些病历已有的结构化数据。确定提交？',
-    '批量解析'
+    `将对「${scope}」范围内约 ${count} 条病历执行${actionName}${limited}。${detail}确定提交？`,
+    actionName
   )
   // 3. 用户取消则直接返回，不提交
   if (!ok) {
@@ -340,11 +402,14 @@ const submitBatch = async () => {
     // 5. 提交异步任务并提示计划条数
     //    批次5：带幂等键。用户的一次「开始」= 一个键；网关/代理重放同一个请求时会沿用同一个键，
     //    服务端据此返回同一条任务，不会又建一条。用户再主动点一次属于新意图，故本函数每次执行都新生成。
-    const res = await submitNlpBatch({
+    const payload = {
       filters: { ...batchFilters },
       limit: batchMode.value === 'limit' ? batchLimit.value : 0,
       requestKey: crypto.randomUUID()
-    })
+    }
+    const res = isNormalize
+      ? await submitNlpNormalizeBatch(payload)
+      : await submitNlpBatch(payload)
     ElMessage.success(`已提交，计划 ${res.data.total} 条`)
     // 6. 把新任务设为当前任务并开始轮询进度
     activeTask.value = res.data
@@ -402,6 +467,42 @@ const viewTask = async (id) => {
   }
 }
 
+// 病历详情弹窗（失败行「查看」用）
+const detailVisible = ref(false)
+const detailRecord = ref(null)
+
+// 打开失败病历详情：按 ID 取原始病历（含结构化数据），拿不到就不打开
+const openRecordDetail = async (recordId) => {
+  try {
+    const res = await getRawRecord(recordId)
+    detailRecord.value = res?.data ?? null
+    if (detailRecord.value) {
+      detailVisible.value = true
+    }
+  } catch {
+    // 拦截器已提示（病历可能已被删除）
+  }
+}
+
+// 仅重试失败：对原任务失败那批记录重新提交（沿用原任务模式），随后轮询新任务
+const retryFailed = async (id) => {
+  if (!(await confirmBox('将对本次失败的那批病历重新提交任务（不重跑已成功的），确定？', '仅重试失败'))) {
+    return
+  }
+  submitting.value = true
+  try {
+    const res = await retryNlpBatchFailed(id)
+    ElMessage.success(`已提交，计划重试 ${res.data.total} 条`)
+    activeTask.value = res.data
+    loadBatchList()
+    startPoll()
+  } catch {
+    // 拦截器已提示（无失败记录 / 已有任务在跑）
+  } finally {
+    submitting.value = false
+  }
+}
+
 onMounted(() => {
   loadBatchList()
 })
@@ -436,4 +537,5 @@ onBeforeUnmount(stopPoll)
 .bf-hd { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
 /* 截断提示：用的是次要色而不是警示色 —— 列表被截断是正常上限行为，不是错误 */
 .bf-trunc { margin-left: var(--sp-2); color: var(--ochre-text); }
+.bf-muted { color: var(--text-sub-strong); }
 </style>

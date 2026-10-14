@@ -55,9 +55,37 @@
           <el-progress
             v-if="isActiveTask(recomputeProgress)"
             class="recompute-progress"
-            :percentage="recomputePercent"
+            v-bind="recomputeBar"
             :stroke-width="10"
           />
+          <!-- 失败清单 + 仅重试失败：终态且确有失败时显示（用户要看到失败的是哪条、为什么、并可只重试失败） -->
+          <div
+            v-if="!isActiveTask(recomputeProgress) && recomputeProgress && recomputeProgress.failures && recomputeProgress.failures.length"
+            class="recompute-failures"
+          >
+            <div class="rf-hd">
+              失败清单（{{ recomputeProgress.failures.length }} 条{{ recomputeProgress.failureTruncated ? '，仅显示前 500 条' : '' }}）
+            </div>
+            <el-table :data="recomputeProgress.failures" border size="small" max-height="240">
+              <el-table-column prop="recordId" label="病历ID" width="290" show-overflow-tooltip />
+              <el-table-column prop="reason" label="失败原因" show-overflow-tooltip />
+              <el-table-column label="操作" width="100">
+                <template #default="{ row }">
+                  <el-button link type="primary" @click="openDetail(row.recordId)">查看详情</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="rf-actions">
+              <el-button
+                type="warning"
+                size="small"
+                :loading="retrying"
+                @click="retryFailed(recomputeProgress.id)"
+              >
+                仅重试失败（{{ recomputeProgress.failed }} 条）
+              </el-button>
+            </div>
+          </div>
         </div>
         <div v-loading="dedLoading" element-loading-text="正在统计扣分分布…">
           <template v-if="dedStats">
@@ -234,7 +262,7 @@ import QcRulesDialog from '@/components/QcRulesDialog.vue'
 import QcDeductionDialog from '@/components/QcDeductionDialog.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { recomputeQc, getQcBatch, cancelQcBatch, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
+import { recomputeQc, getQcBatch, cancelQcBatch, retryQcBatchFailed, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
 import { searchRecords, getRawRecord } from '@/api/records'
 import { GRADE_OK } from '@/utils/grade'
 import { useUserStore } from '@/stores/user'
@@ -408,6 +436,8 @@ const resetFilters = () => {
 const recomputing = ref(false)
 // 取消请求在途：按钮进入 loading，避免连点发出第二次 cancel
 const cancelling = ref(false)
+// 仅重试失败请求在途
+const retrying = ref(false)
 // 当前任务进度：{ done, total, status, ... }，用于按钮上的进度文案
 const recomputeProgress = ref(null)
 // 轮询句柄；null 表示当前没有在轮询
@@ -429,6 +459,34 @@ const recomputePercent = computed(() => {
   const t = recomputeProgress.value
   if (!t || !t.total) return 0
   return Math.min(100, Math.round((t.done / t.total) * 100))
+})
+
+/**
+ * 进度条的两态配置（统一口径见 Governance.vue 的清洗进度条）。
+ *
+ * 排队中（total 还没算出来）、或一条都还没处理完时，recomputePercent 为 0 ⇒
+ * 填充宽度就是 0（el-progress 的填充宽度恒等于 percentage%，见 Element Plus
+ * progress.vue 的 barStyle），条子静止且什么都看不见。这段时间改用不确定流动条
+ * 只表达「在推进」，不显示百分比数字，避免暗示一个并不存在的精确进度；
+ * 有可信数字后切回真实百分比，条纹继续流动表示仍在处理。
+ *
+ * 本条只在任务运行时渲染（模板里的 v-if），故不必再判终态。
+ */
+const recomputeBar = computed(() => {
+  const t = recomputeProgress.value
+  // 1. 还没有任何推进 ⇒ 没有可信数字，走不确定态
+  if (!t || !t.done) {
+    // percentage 必须给 100：不确定动画是在「100% 宽」的填充上左右滑动，给 0 就看不见
+    return { percentage: 100, indeterminate: true, striped: false, stripedFlow: false, showText: false }
+  }
+  // 2. 有可信数字 ⇒ 真实百分比 + 条纹流动
+  return {
+    percentage: recomputePercent.value,
+    indeterminate: false,
+    striped: true,
+    stripedFlow: true,
+    showText: true
+  }
 })
 
 // 停掉轮询并清空句柄，防止重复启动或组件卸载后继续发请求
@@ -528,6 +586,27 @@ const handleCancelRecompute = async () => {
   }
 }
 
+// 仅重试失败：按原任务失败集合重新提交一个只跑这批病历的重算任务，随后轮询新任务
+const retryFailed = async (taskId) => {
+  if (!(await confirmBox('将对本次失败的那批病历重新提交重算（不重跑已成功的），确定？', '仅重试失败'))) {
+    return
+  }
+  retrying.value = true
+  try {
+    const res = await retryQcBatchFailed(taskId)
+    const t = res.data || {}
+    recomputeProgress.value = t
+    if (isActiveTask(t)) {
+      pollTask(t.id)
+    }
+    ElMessage.success(`已提交，计划重试 ${t.total} 条`)
+  } catch {
+    // 拦截器已提示（无失败记录 / 已有任务在跑）
+  } finally {
+    retrying.value = false
+  }
+}
+
 // 组件卸载时停掉轮询，避免离开页面后还在发请求
 onBeforeUnmount(stopPoll)
 
@@ -588,6 +667,20 @@ onMounted(() => {
 /* 重算进度条：贴在按钮行下方，限宽避免横贯整块面板 */
 .recompute-progress {
   max-width: 420px;
+  margin-top: var(--sp-2);
+}
+/* 失败清单：终态后展示失败的是哪条、为什么，并提供「仅重试失败」入口 */
+.recompute-failures {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px dashed var(--line-soft);
+}
+.recompute-failures .rf-hd {
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+  margin-bottom: var(--sp-2);
+}
+.recompute-failures .rf-actions {
   margin-top: var(--sp-2);
 }
 /* 扣分构成与 AI 预检左右并排（写法照抄 Dashboard 的 .grid-2）：

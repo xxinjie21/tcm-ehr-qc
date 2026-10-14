@@ -42,9 +42,19 @@ export function submitNlpBatch(data) {
   return request.post('/nlp/extract/batch', data, { timeout: 60000 })
 }
 
+// 批量归一：不调 NLP，只对已有结构化数据重跑 ES 归一（补词典后让新词生效）
+export function submitNlpNormalizeBatch(data) {
+  return request.post('/nlp/extract/batch/normalize-only', data, { timeout: 60000 })
+}
+
 // 批量任务进度
 export function getNlpBatchProgress(id) {
   return request.get(`/nlp/extract/batch/${id}`)
+}
+
+// 仅重试失败的记录：按原任务模式重跑失败那批病历
+export function retryNlpBatchFailed(id) {
+  return request.post(`/nlp/extract/batch/${id}/retry-failed`)
 }
 
 // 取消批量任务

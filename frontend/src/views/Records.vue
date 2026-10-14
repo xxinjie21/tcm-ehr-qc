@@ -117,10 +117,8 @@
               正在导入第 {{ Math.min(progress.done + 1, progress.total) }}/{{ progress.total }} 个文件：
               <b>{{ progress.current || '准备中…' }}</b>
             </div>
-            <el-progress
-              :percentage="progress.total ? Math.round((progress.done / progress.total) * 100) : 0"
-              :stroke-width="10"
-            />
+            <!-- 两态配置见 importBar：还无可信数字时用不确定流动条，有文件完成后再给真实百分比 -->
+            <el-progress v-bind="importBar" :stroke-width="10" />
             <div class="ip-sub">
               已入库 {{ progress.success }} 条，失败/跳过 {{ progress.failed }} 条；导入期间请勿关闭或刷新页面
             </div>
@@ -137,6 +135,17 @@
               <div class="stat-item"><div class="num">{{ summary.total }}</div><div class="lbl">有效数据行</div></div>
               <div class="stat-item green"><div class="num">{{ summary.success }}</div><div class="lbl">成功入库</div></div>
               <div class="stat-item red"><div class="num">{{ summary.failed }}</div><div class="lbl">失败 / 跳过</div></div>
+            </div>
+            <div v-if="summary.failures && summary.failures.length" class="fail-head">
+              <span class="tip">失败行可「编辑并重传」修正后单独重传，不必重传整份文件（重复类失败无法重传）</span>
+              <el-button
+                v-if="retryableFailures.length"
+                size="small"
+                type="warning"
+                @click="openRetry"
+              >
+                编辑并重传失败行（{{ retryableFailures.length }}）
+              </el-button>
             </div>
             <el-table v-if="summary.failures && summary.failures.length" :data="summary.failures" border size="small" max-height="260">
               <el-table-column prop="filename" label="文件" width="240" show-overflow-tooltip />
@@ -212,6 +221,24 @@
       </el-tab-pane>
     </el-tabs>
   </div>
+
+  <!-- 失败行编辑并重传：字段名与导入列一致，可逐字段修正后单独重传 -->
+  <el-dialog v-model="retryVisible" title="重传失败行" width="min(1000px, 94vw)" top="6vh">
+    <div class="tip">下面是失败的行（可修改后重传）。空字段会被忽略，重复类失败无法重传。</div>
+    <div v-for="(row, i) in retryRows" :key="i" class="retry-row">
+      <div class="rr-hd">第 {{ i + 1 }} 行</div>
+      <div class="rr-fields">
+        <div v-for="f in failFields" :key="f.key" class="rr-field">
+          <label>{{ f.label }}</label>
+          <el-input v-model="row[f.key]" size="small" clearable />
+        </div>
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="retryVisible = false">取消</el-button>
+      <el-button type="primary" :loading="retrying" @click="submitRetry">重传（{{ retryRows.length }} 行）</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -228,7 +255,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import {
-  importRecords, createRecord, searchRecords, countRecords, getRawRecord, deleteRecords, deleteRecordsByFilter
+  importRecords, createRecord, searchRecords, countRecords, getRawRecord, deleteRecords, deleteRecordsByFilter, importRows
 } from '@/api/records'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { useAiContextStore } from '@/stores/ai'
@@ -500,9 +527,70 @@ const importing = ref(false)
 const summary = ref(null)
 const resultBlock = ref(null)  // M19：导入结果块，导入后滚入视野
 const importFailed = ref(false)
+// 失败行编辑并重传：把带原始数据的失败行（可编辑）单独重传，免重传整份文件
+const retryVisible = ref(false)
+const retryRows = ref([])
+const retrying = ref(false)
+const failFields = fieldsWithWide([])
+// 可重传的失败行：仅带 row 数据的（重复 / 并发类失败没有行数据，重传必然再失败，不列）
+const retryableFailures = computed(() => (summary.value?.failures || []).filter((f) => f.row))
+// 打开重传弹窗：拷贝行数据供编辑
+const openRetry = () => {
+  retryRows.value = retryableFailures.value.map((f) => ({ ...f.row }))
+  retryVisible.value = true
+}
+// 提交重传：走导入同一套口径；仍有失败则把最新失败行填回弹窗继续修正
+const submitRetry = async () => {
+  retrying.value = true
+  try {
+    const res = await importRows(retryRows.value)
+    const s = res.data || {}
+    ElMessage.success(`重传完成：成功 ${s.success} 条，失败 ${s.failed} 条`)
+    const stillFailed = (s.failures || []).filter((f) => f.row)
+    if (s.failed > 0 && stillFailed.length) {
+      retryRows.value = stillFailed.map((f) => ({ ...f.row }))
+    } else {
+      retryVisible.value = false
+    }
+  } catch {
+    // 拦截器已提示
+  } finally {
+    retrying.value = false
+  }
+}
 // 逐文件分批上传的进度：后端导入是同步接口，拿不到中间 taskId，
 // 因此按「文件」粒度推进度 —— 既真实可取消，也避免单次超大请求
 const progress = reactive({ done: 0, total: 0, current: '', success: 0, failed: 0 })
+
+/**
+ * 导入进度条的两态配置（统一口径见 Governance.vue 的清洗进度条）。
+ *
+ * 为什么不能一直用真实百分比：done 只在**整个文件的请求返回之后**才 +1
+ * （见 uploadOneFile 末尾），所以「第一个文件还在传」的整段时间里 done 恒为 0
+ * ⇒ percentage 为 0 ⇒ 填充宽度就是 0（el-progress 的填充宽度恒等于 percentage%，
+ * 见 Element Plus progress.vue 的 barStyle），条子看起来完全是死的 —— 单文件
+ * 导入（最常见的情况）全程如此。
+ *
+ * 因此：一个文件都还没完成时切不确定流动条，只表达「在推进」且不显示百分比数字，
+ * 避免暗示一个并不存在的精确进度；已经有文件完成时才切回真实的文件级百分比，
+ * 并让条纹继续流动，表示当前这个文件仍在处理中。
+ */
+const importBar = computed(() => {
+  // 1. 没有任何一个文件完成 ⇒ 没有任何可信数字，走不确定态
+  if (!progress.done) {
+    // percentage 必须给 100：不确定动画是在「100% 宽」的填充上左右滑动，给 0 就看不见
+    return { percentage: 100, indeterminate: true, striped: false, stripedFlow: false, showText: false }
+  }
+  // 2. 已有文件完成 ⇒ 文件级百分比是可信的，切回真实值 + 条纹流动
+  return {
+    percentage: progress.total ? Math.round((progress.done / progress.total) * 100) : 0,
+    indeterminate: false,
+    striped: true,
+    stripedFlow: true,
+    showText: true
+  }
+})
+
 const cancelled = ref(false)
 
 // 超过单次上传数量上限（20 个）时的兜底提示：limit 拦截不会走到 on-change，
@@ -778,6 +866,25 @@ onMounted(async () => {
   color: var(--text-sub-strong);
 }
 .result { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: 14px; }
+/* 失败清单标题行：左侧说明、右侧「编辑并重传」入口 */
+.fail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+  flex-wrap: wrap;
+}
+/* 重传弹窗：每行一段可编辑字段 */
+.retry-row { margin-bottom: var(--sp-3); }
+.retry-row .rr-hd { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
+.retry-row .rr-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--sp-2) var(--sp-3);
+}
+.retry-row .rr-field { display: flex; flex-direction: column; gap: 2px; }
+.retry-row .rr-field label { font-size: var(--fs-xs); color: var(--text-sub-strong); }
 .import-failed {
   margin-top: 14px;
   padding: var(--sp-2) var(--sp-3);

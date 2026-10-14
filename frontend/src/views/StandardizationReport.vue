@@ -64,9 +64,9 @@
         <!-- 重跑进行中的进度条：没有它用户只能干等，不知道系统在不在动 -->
         <div v-if="rerunStage !== 'idle'" class="rh-progress">
           <span class="gp-label">{{ rerunStageLabel }}</span>
+          <!-- 两态配置见 rerunBar：分母还没算出来时也不再整条不渲染，改走不确定流动条 -->
           <el-progress
-            v-if="rerunPercent !== null"
-            :percentage="rerunPercent"
+            v-bind="rerunBar"
             :stroke-width="6"
             style="flex: 1 1 auto; min-width: 120px"
           />
@@ -307,11 +307,33 @@ const rerunStageLabel = computed(() => {
 })
 const rerunProgress = ref({ done: 0, total: 0 })
 
-/** 进度百分比；拿不到 total 时返回 null（不显示进度条，避免显示 0% 误导） */
+/** 进度百分比；拿不到 total 时返回 null（表示「数字不可知」，不是「进度为 0」） */
 const rerunPercent = computed(() => {
   const { done, total } = rerunProgress.value
   if (!total || total <= 0) return null
   return Math.min(100, Math.round((done / total) * 100))
+})
+
+/**
+ * 进度条的两态配置（统一口径见 Governance.vue 的清洗进度条）。
+ *
+ * 原先 rerunPercent 为 null（解析阶段刚提交、分母还没算出来）时整条不渲染，
+ * 只剩左边一句文字 —— 用户看不到任何「在动」的信号。改为这段时间走不确定流动条，
+ * 只表达「在推进」且不显示百分比数字，避免暗示一个并不存在的精确进度；
+ * 拿到分母后切回真实百分比，条纹继续流动表示仍在处理。
+ *
+ * 注意 percentage 在不明确状态下必须给 100：不确定动画是在「100% 宽」的填充上
+ * 左右滑动（见 Element Plus progress.vue 的 barStyle，填充宽度恒等于 percentage%），
+ * 给 0 则填充宽度为 0，动画完全看不见。
+ */
+const rerunBar = computed(() => {
+  const pct = rerunPercent.value
+  // 1. 分母不可知，或一条都还没处理完 ⇒ 没有可信数字，走不确定态
+  if (pct === null || pct === 0) {
+    return { percentage: 100, indeterminate: true, striped: false, stripedFlow: false, showText: false }
+  }
+  // 2. 有可信数字 ⇒ 真实百分比 + 条纹流动
+  return { percentage: pct, indeterminate: false, striped: true, stripedFlow: true, showText: true }
 })
 
 const stopPoll = () => {

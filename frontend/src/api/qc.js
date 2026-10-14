@@ -41,3 +41,8 @@ export function getQcBatch(id) {
 export function cancelQcBatch(id) {
   return request.post(`/qc/score/batch/${id}/cancel`)
 }
+
+// 仅重试失败的记录：按原任务失败集合重新提交一个只跑这批病历的重算任务
+export function retryQcBatchFailed(id) {
+  return request.post(`/qc/score/batch/${id}/retry-failed`)
+}
