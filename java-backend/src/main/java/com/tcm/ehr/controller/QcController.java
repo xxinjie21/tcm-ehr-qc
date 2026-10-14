@@ -152,6 +152,19 @@ public class QcController {
     }
 
     /**
+     * 仅重试失败的记录：按原任务失败集合重新提交一个只跑这批病历的重算任务。
+     *
+     * <p>【权限：登录即可】任务不存在返回 404；无失败记录返回 400。</p>
+     *
+     * @param id 原任务ID
+     * @return 新任务的进度视图
+     */
+    @PostMapping("/score/batch/{id}/retry-failed")
+    public Result<QcTaskVO> retryFailedScoreBatch(@PathVariable String id) {
+        return Result.ok("已提交，后台重试失败记录", qcBatchService.retryFailed(id));
+    }
+
+    /**
      * 读取当前生效的质控规则。
      *
      * <p>【权限：登录即可】返回<b>当前组织</b>生效的规则。</p>

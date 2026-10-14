@@ -63,6 +63,24 @@ public class RecordController {
     }
 
     /**
+     * 仅重传失败行。
+     *
+     * <p>【权限：登录即可】把（可能已编辑的）失败行按导入同一套口径重新入库，
+     * 免去重传整份文件。每行为「字段名 → 文本」，字段名与失败明细里的 {@code row} 一致。</p>
+     *
+     * @param rows 失败行集合
+     * @return summary=本轮成功/失败条数与失败明细
+     */
+    @PostMapping("/import-rows")
+    public Result<com.tcm.ehr.domain.vo.ImportSummaryVO> importRows(
+            @RequestBody java.util.List<Map<String, String>> rows) {
+        com.tcm.ehr.domain.vo.ImportSummaryVO summary = recordService.importRows(rows);
+        operationLogger.log("病历重传失败行", rows == null ? "0行" : rows.size() + "行",
+                "成功" + summary.getSuccess() + "条，失败" + summary.getFailed() + "条");
+        return Result.ok(summary);
+    }
+
+    /**
      * 单条新增病历。
      *
      * <p>【权限：登录即可】</p>

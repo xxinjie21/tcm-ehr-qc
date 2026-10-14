@@ -32,6 +32,17 @@ public interface IRecordService extends IService<Record> {
     ImportTaskVO importRecords(MultipartFile[] files, boolean autoExtract);
 
     /**
+     * 仅重传失败行：把前端（可能已编辑）回传的字段键值表当作病历重新入库。
+     *
+     * <p>复用导入同一套映射 / 去重 / 批量插入口径，便于用户修正后重传失败的那几条，
+     * 而不必重传整份文件。</p>
+     *
+     * @param rows 每行的「字段名 → 文本」表（字段名与前端失败明细的 row 一致）
+     * @return 成功/失败条数与失败明细
+     */
+    com.tcm.ehr.domain.vo.ImportSummaryVO importRows(java.util.List<java.util.Map<String, String>> rows);
+
+    /**
      * 单条新增病历。
      *
      * @param dto 21 个原始字段，登记号必填

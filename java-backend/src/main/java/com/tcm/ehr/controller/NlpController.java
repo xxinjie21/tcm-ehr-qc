@@ -237,6 +237,21 @@ public class NlpController {
     }
 
     /**
+     * 仅重试失败的记录：按原任务模式，对失败那批病历重新提交一个任务。
+     *
+     * <p>【权限：登录即可】任务不存在 / 不属于本组织 / 无失败记录时报错。</p>
+     *
+     * @param id 原任务ID
+     * @return 新任务的进度视图
+     */
+    @PostMapping("/extract/batch/{id}/retry-failed")
+    public Result<NlpTaskVO> retryFailed(@PathVariable String id) {
+        NlpTaskVO vo = nlpBatchService.retryFailed(id, RequestUtils.currentUsername());
+        operationLogger.log("批量解析-重试失败", "原任务 " + id, "重试失败 " + vo.getTotal() + " 条");
+        return Result.ok("已提交，后台重试失败记录", vo);
+    }
+
+    /**
      * 查询最近的批量解析任务。
      *
      * <p>【权限：登录即可】最多返回 {@code limit} 条（默认 50），不含失败明细；

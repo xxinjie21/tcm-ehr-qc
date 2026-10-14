@@ -509,6 +509,50 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /**
+     * 仅重试失败：读原任务的完整失败记录 ID，按同一模式重新提交一个只含这批 ID 的任务。
+     *
+     * <p>复用 {@link #submit}（因此沿用同一套幂等/防重/执行路径）；范围用 {@code filters.ids}
+     * 收窄到失败集合，数据域仍由 {@link RecordFilter} 兜住（不越权）。新任务同样会记录自己的
+     * 失败集合，可继续「重试的重试」。</p>
+     */
+    @Override
+    public NlpTaskVO retryFailed(String id, String createdBy) {
+        NlpTask t = taskMapper.selectById(id);
+        if (t == null) {
+            throw new IllegalArgumentException("任务不存在");
+        }
+        if (!satisfiesGroup(t)) {
+            throw new ForbiddenException("无权操作该任务");
+        }
+        List<String> failed = readFailedIds(t.getFailedIds());
+        if (failed.isEmpty()) {
+            throw new IllegalArgumentException("该任务没有失败记录，无需重试");
+        }
+        // 组织化为 filters.ids：只重跑失败那批；模式沿用原任务（解析 / 仅归一）
+        FiltersDTO filters = new FiltersDTO();
+        filters.setIds(failed);
+        NlpBatchDTO dto = new NlpBatchDTO();
+        dto.setFilters(filters);
+        dto.setMode(t.modeOrDefault());
+        dto.setRequestKey(UUID.randomUUID().toString());
+        log.info("[批解析] 仅重试失败：原任务 {} 失败 {} 条，提交新任务", id, failed.size());
+        return submit(dto, createdBy);
+    }
+
+    /** 解析任务的完整失败 ID 集合（JSON 数组）；损坏/空返回空列表。 */
+    private List<String> readFailedIds(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() { });
+        } catch (Exception e) {
+            log.warn("[批解析] 失败ID集合解析失败（按空处理）: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
      * 查询任务详情（含失败明细），只读。
      *
      * @param id 任务 ID
@@ -641,14 +685,16 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
         // 3. 按取数来源分派：导入来的按 ID 集合，其余按筛选范围
         List<NlpTaskVO.Failure> failures = new ArrayList<>();
+        // 需求3：完整失败记录 ID（不受 failure_list 500 条截断），供「仅重试失败」按完整集合重跑
+        List<String> failedIds = new ArrayList<>();
         boolean[] truncated = {false};
         int[] processed = {0};
         boolean cancelled = false;
         boolean failed = false;
         try {
             cancelled = idSource != null
-                    ? runByIds(id, idSource, t, failures, truncated, processed)
-                    : runByFilter(id, t, failures, truncated, processed);
+                    ? runByIds(id, idSource, t, failures, failedIds, truncated, processed)
+                    : runByFilter(id, t, failures, failedIds, truncated, processed);
             // 批量解析改写 structured_data → 统计词频过期，主动失效（B1）
             if (!cancelled) {
                 com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
@@ -674,6 +720,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             t.setStatus(terminalStatus(failed, nothingDone, running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
+            // 需求3：完整失败 ID 集合先落库，供「仅重试失败」取用（不受 500 条截断）
+            t.setFailedIds(writeJson(failedIds));
             persistProgress(t, failures, truncated[0]);
             // 批次 16 #3：任务**真正跑完**时，把该任务剩下的待处理明细批量标为 DONE。
             // 否则重启后会把已处理过的再跑一遍（至少一次语义 → 重复抽取会覆盖同一份结构化数据）。
@@ -754,7 +802,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     /** 按筛选范围分页处理；返回是否被取消 */
     private boolean runByFilter(String id, NlpTask t, List<NlpTaskVO.Failure> failures,
-                                boolean[] truncated, int[] processed) {
+                                List<String> failedIds, boolean[] truncated, int[] processed) {
         // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）；filtersJson 只反序列化一次
         int limit = t.getTotal() == null ? 0 : t.getTotal();
         com.tcm.ehr.domain.dto.FiltersDTO frozenFilters = readFilters(t.getFiltersJson());
@@ -787,7 +835,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 // 4. 并行处理本页（取消检查 / limit 截断都在 processPage 内按块完成）。
                 //    limit 是硬上限：total=0 的任务必须一条都不处理 —— 那是原来的语义，
                 //    「总数 0」不是「不限」，不能反过来跑全库。
-                PageOutcome outcome = processPage(id, list, t, dictMeta, failures, truncated,
+                PageOutcome outcome = processPage(id, list, t, dictMeta, failures, failedIds, truncated,
                         processed, pending, limit);
                 if (outcome == PageOutcome.CANCELED) {
                     return true;
@@ -815,7 +863,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
     /** 按记录ID集合分块处理（导入后自动解析用）；返回是否被取消 */
     private boolean runByIds(String id, List<String> ids, NlpTask t, List<NlpTaskVO.Failure> failures,
-                             boolean[] truncated, int[] processed) {
+                             List<String> failedIds, boolean[] truncated, int[] processed) {
         // 0. 组织为空 = 处理范围无法确定：直接抛，由 run() 的 catch 落 FAILED。
         //    不能继续往下走 —— 下面那句是 eq("org_id", t.getOrgId())，org_id 为 NULL 时
         //    恒不成立，筛出空集，任务会「跑完 0 条还落 COMPLETED」，看起来像成功。
@@ -857,7 +905,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 // 3. 一次批量取回该块，再逐条处理（库里的取消位同样每 PROGRESS_EVERY 条查一次）
                 List<Record> list = recordMapper.selectBatchIds(chunk);
                 // ID 型任务没有「总数上限」的概念：上限给 Integer.MAX_VALUE（等价于不限）
-                PageOutcome outcome = processPage(id, list, t, dictMeta, failures, truncated,
+                PageOutcome outcome = processPage(id, list, t, dictMeta, failures, failedIds, truncated,
                         processed, pending, Integer.MAX_VALUE);
                 if (outcome == PageOutcome.CANCELED) {
                     return true;
@@ -942,7 +990,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      *              ID 型任务无此概念，传 {@link Integer#MAX_VALUE}
      */
     private PageOutcome processPage(String taskId, List<Record> list, NlpTask t, DictMeta dictMeta,
-                                    List<NlpTaskVO.Failure> failures, boolean[] truncated,
+                                    List<NlpTaskVO.Failure> failures, List<String> failedIds,
+                                    boolean[] truncated,
                                     int[] processed, List<StructuredWrite> pending, int limit) {
         // 1. 按上限裁剪：并行后不能再靠「循环内处理一条判一次」来截断，否则会超跑
         List<Record> page = list;
@@ -994,8 +1043,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                     pending.add(new StructuredWrite(r.getId(), outcome.json()));
                 } else {
                     t.setFailed(t.getFailed() + 1);
+                    // 完整失败 ID 集合：供「仅重试失败」按完整集合重跑，不受 500 条截断
+                    failedIds.add(r.getId());
                     if (failures.size() < MAX_FAILURES) {
-                        failures.add(new NlpTaskVO.Failure(labelOf(r), outcome.reason()));
+                        failures.add(new NlpTaskVO.Failure(labelOf(r), outcome.reason(), r.getId()));
                     } else {
                         truncated[0] = true;
                     }

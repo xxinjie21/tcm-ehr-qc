@@ -56,6 +56,13 @@ public abstract class AbstractBatchTask {
     /** 失败清单 JSON 数组（仅存前 500 条） */
     private String failureList;
     private Boolean failureTruncated;
+    /**
+     * 完整失败记录 ID 集合（JSON 数组），任务收尾时写一次。
+     *
+     * <p>与 {@link #failureList} 的分工：后者只存<b>前 500 条</b>失败明细（供界面展示），
+     * 本列存<b>全部</b>失败记录 ID —— 「仅重试失败」要按完整集合重跑，不能被 500 条截断漏掉。</p>
+     */
+    private String failedIds;
     private LocalDateTime createTime;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;

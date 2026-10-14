@@ -48,6 +48,16 @@ public interface INlpBatchService {
     NlpTaskVO cancel(String id);
 
     /**
+     * 只看任务失败的那批记录，按原任务模式重新提交一个任务（仅重试失败）。
+     *
+     * @param id        原任务ID
+     * @param createdBy 提交人
+     * @return 新任务视图
+     * @throws IllegalArgumentException 任务不存在 / 不属于本组织 / 无失败记录时抛出
+     */
+    NlpTaskVO retryFailed(String id, String createdBy);
+
+    /**
      * 最近任务列表（最多 {@code limit} 条，超出时 {@code truncated = true}）。
      *
      * @return 按提交时间倒序的包装体：任务列表 + 截断标记 + 上限条数

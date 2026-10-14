@@ -382,6 +382,10 @@ public final class RecordFilter {
                 wrapper.ge("visit_time", filterDto.getDateRange().get(0).trim() + " 00:00:00");
                 wrapper.le("visit_time", filterDto.getDateRange().get(1).trim() + " 23:59:59");
             }
+            // 4. 仅按指定病历 ID 收窄（用于「仅重试失败」）：在数据域之上再取交集，不越权
+            if (filterDto.getIds() != null && !filterDto.getIds().isEmpty()) {
+                wrapper.in("id", filterDto.getIds());
+            }
         }
         // 与 SearchDTO 重载同一个排序键：本工具的两种入参不该给出不同顺序（审查报告 L8）。
         // 注意 FiltersDTO 重载的调用方多是聚合 / 批处理 / 按范围删除，排序对它们无意义，

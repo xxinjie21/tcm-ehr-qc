@@ -134,47 +134,13 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         }
 
         // 库内已存在哈希（按登记号预筛，避免全表扫描）
-        Set<String> existingHash = new HashSet<>();
-        if (!batchRegNos.isEmpty()) {
-            // § 6.3 缺点 12：查重必须限定本组。否则组 A 已有登记号 X，
-            // 组 B 导入同号会被判为重复，两个组无法使用相同登记号。
-            List<Record> existing = baseMapper.selectList(
-                    new QueryWrapper<Record>()
-                            .in("registration_no", batchRegNos)
-                            .eq("org_id", RequestUtils.currentOrgId()));
-            for (Record r : existing) {
-                existingHash.add(RecordUtil.textHash(r));
-            }
-        }
+        Set<String> existingHash = existingHashFor(batchRegNos);
 
         // 6. 逐行去重并收进待插入列表（P3.4 拆出 dedupeAndCollect）
         dedupeAndCollect(parsedRows, existingHash, summary, toInsert);
 
-        // 7. 批量落库并回填成功数。
-        //    并发导入同一份文件时，上面的「先查后插」会双双通过，其中一个撞
-        //    uk_records_org_text_hash —— 整批抛出去会让「已入库的前若干行」与回执对不上
-        //    （用户看到失败，库里却已有数据）。这里退化为逐行插入：撞键的行计入失败明细，
-        //    其余行照常入库，成功数与库内实际新增一致。
-        if (!toInsert.isEmpty()) {
-            try {
-                saveBatch(toInsert);
-                summary.setSuccess(toInsert.size());
-            } catch (DataIntegrityViolationException e) {
-                log.warn("[病历导入] 批量插入撞唯一键，退化为逐行插入并逐行记失败: {}", e.getMessage());
-                int inserted = 0;
-                for (Record r : toInsert) {
-                    try {
-                        baseMapper.insert(r);
-                        inserted++;
-                    } catch (DataIntegrityViolationException dup) {
-                        summary.setFailed(summary.getFailed() + 1);
-                        summary.getFailures().add(new ImportSummaryVO.Failure("(并发导入)",
-                                "重复病历（撞唯一键）：登记号 " + r.getRegistrationNo()));
-                    }
-                }
-                summary.setSuccess(inserted);
-            }
-        }
+        // 7. 批量落库并回填成功数（P3.4 拆出 insertRecords）
+        insertRecords(summary, toInsert);
 
         // 导入后自动结构化解析（用户开关，默认关）：投后台批任务，导入本身不阻塞
         String autoTaskId = null;
@@ -227,6 +193,101 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             r.setTextHash(hash);
             toInsert.add(r);
         }
+    }
+
+    /** 库内已存在哈希（按登记号 + 本组预筛，避免全表扫描）。 */
+    private Set<String> existingHashFor(Set<String> batchRegNos) {
+        Set<String> existingHash = new HashSet<>();
+        if (batchRegNos == null || batchRegNos.isEmpty()) {
+            return existingHash;
+        }
+        // § 6.3 缺点 12：查重必须限定本组。否则组 A 已有登记号 X，组 B 导入同号会被判为重复，
+        // 两个组无法使用相同登记号。
+        List<Record> existing = baseMapper.selectList(
+                new QueryWrapper<Record>()
+                        .in("registration_no", batchRegNos)
+                        .eq("org_id", RequestUtils.currentOrgId()));
+        for (Record r : existing) {
+            existingHash.add(RecordUtil.textHash(r));
+        }
+        return existingHash;
+    }
+
+    /**
+     * 批量落库并回填成功数。
+     *
+     * <p>并发导入同一份文件时，上面的「先查后插」会双双通过，其中一个撞
+     * {@code uk_records_org_text_hash} —— 整批抛出去会让「已入库的前若干行」与回执对不上
+     * （用户看到失败，库里却已有数据）。这里退化为逐行插入：撞键的行计入失败明细，
+     * 其余行照常入库，成功数与库内实际新增一致。</p>
+     */
+    private void insertRecords(ImportSummaryVO summary, List<Record> toInsert) {
+        if (toInsert.isEmpty()) {
+            return;
+        }
+        try {
+            saveBatch(toInsert);
+            summary.setSuccess(toInsert.size());
+        } catch (DataIntegrityViolationException e) {
+            log.warn("[病历导入] 批量插入撞唯一键，退化为逐行插入并逐行记失败: {}", e.getMessage());
+            int inserted = 0;
+            for (Record r : toInsert) {
+                try {
+                    baseMapper.insert(r);
+                    inserted++;
+                } catch (DataIntegrityViolationException dup) {
+                    summary.setFailed(summary.getFailed() + 1);
+                    summary.getFailures().add(new ImportSummaryVO.Failure("(并发导入)",
+                            "重复病历（撞唯一键）：登记号 " + r.getRegistrationNo()));
+                }
+            }
+            summary.setSuccess(inserted);
+        }
+    }
+
+    /**
+     * 仅重传失败行：把前端（可能已编辑）回传的字段键值表当病历重新入库，复用导入同一套去重 / 插入口径。
+     *
+     * <p>失败明细里的 {@code row} 就是回传载荷；用户改正后点「重传失败行」即走这里。
+     * 永久失败（如仍缺少门诊号 / 日期仍无法解析）会再次计入失败，不会静默丢。</p>
+     */
+    @Override
+    public ImportSummaryVO importRows(List<Map<String, String>> rows) {
+        if (rows == null || rows.isEmpty()) {
+            throw new IllegalArgumentException("没有需要重传的失败行");
+        }
+        ImportSummaryVO summary = new ImportSummaryVO();
+        List<Record> toInsert = new ArrayList<>();
+        List<Object[]> parsedRows = new ArrayList<>(); // [Record, filename]
+        Set<String> batchRegNos = new HashSet<>();
+
+        for (Map<String, String> fields : rows) {
+            summary.setTotal(summary.getTotal() + 1);
+            try {
+                Record r = ExcelSheetImporter.fromFields(fields);
+                if (TextUtil.isBlank(r.getRegistrationNo())) {
+                    throw new IllegalArgumentException("登记号为空");
+                }
+                if (TextUtil.isBlank(r.getOutpatientNo())) {
+                    throw new IllegalArgumentException("门诊号为空");
+                }
+                ExcelSheetImporter.requireParsedVisitTime(r, fields.get("visitTime"));
+                batchRegNos.add(r.getRegistrationNo());
+                parsedRows.add(new Object[]{r, "(重传)"});
+            } catch (Exception e) {
+                summary.setFailed(summary.getFailed() + 1);
+                summary.getFailures().add(new ImportSummaryVO.Failure("(重传)", e.getMessage(), fields));
+            }
+        }
+
+        Set<String> existingHash = existingHashFor(batchRegNos);
+        dedupeAndCollect(parsedRows, existingHash, summary, toInsert);
+        insertRecords(summary, toInsert);
+        if (summary.getSuccess() > 0) {
+            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+        }
+        log.info("[病历重传] 行={} 成功={} 失败={}", summary.getTotal(), summary.getSuccess(), summary.getFailed());
+        return summary;
     }
 
     /**

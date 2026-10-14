@@ -228,6 +228,72 @@ class NlpBatchServiceImplTest {
         assertTrue(e.getMessage().contains("抽取服务未开启"), e.getMessage());
     }
 
+    // ------------------------------------------------- 需求3：仅重试失败
+
+    /** 重试失败：只把失败那批 ID 作为范围、沿用原任务模式，提交一个新任务。 */
+    @Test
+    void retryFailedResubmitsOnlyFailedIdsWithSameMode() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_ORG_ID, "org-A");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        try {
+            NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
+            NlpTask orig = new NlpTask();
+            orig.setId("orig-1");
+            orig.setOrgId("org-A");
+            orig.setMode(NlpTask.MODE_NORMALIZE_ONLY);
+            orig.setFailedIds("[\"r-1\",\"r-2\"]");
+            when(taskMapper.selectById("orig-1")).thenReturn(orig);
+            when(taskMapper.selectCount(any())).thenReturn(0L);
+            PythonNlpClient nlpClient = mock(PythonNlpClient.class);
+            when(nlpClient.isEnabled()).thenReturn(false);   // 仅归一不要求开启
+            RecordMapper recordMapper = mock(RecordMapper.class);
+            when(recordMapper.selectCount(any())).thenReturn(2L);
+            NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper, recordMapper,
+                    mock(NlpTaskItemMapper.class), nlpClient, mock(EntityNormalizer.class),
+                    mock(com.tcm.ehr.service.IDictionaryTermStore.class), new ObjectMapper(), distLock(true));
+
+            svc.retryFailed("orig-1", "tester");
+
+            ArgumentCaptor<NlpTask> cap = ArgumentCaptor.forClass(NlpTask.class);
+            verify(taskMapper).insert(cap.capture());
+            NlpTask created = cap.getValue();
+            assertEquals(NlpTask.MODE_NORMALIZE_ONLY, created.getMode(), "必须沿用原任务模式");
+            assertTrue(created.getFiltersJson().contains("r-1") && created.getFiltersJson().contains("r-2"),
+                    "新任务范围必须收窄到失败那批 ID：" + created.getFiltersJson());
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    /** 无失败记录时重试应明确报错，而不是建一个空任务。 */
+    @Test
+    void retryFailedWithNoFailuresRejected() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setAttribute(RequestUtils.ATTR_ORG_ID, "org-A");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        try {
+            NlpTaskMapper taskMapper = mock(NlpTaskMapper.class);
+            NlpTask orig = new NlpTask();
+            orig.setId("orig-2");
+            orig.setOrgId("org-A");
+            orig.setMode(NlpTask.MODE_EXTRACT);
+            orig.setFailedIds("[]");
+            when(taskMapper.selectById("orig-2")).thenReturn(orig);
+            NlpBatchServiceImpl svc = new NlpBatchServiceImpl(taskMapper, mock(RecordMapper.class),
+                    mock(NlpTaskItemMapper.class), mock(PythonNlpClient.class),
+                    mock(EntityNormalizer.class), mock(com.tcm.ehr.service.IDictionaryTermStore.class),
+                    new ObjectMapper(), distLock(true));
+
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> svc.retryFailed("orig-2", "tester"));
+            assertTrue(e.getMessage().contains("没有失败记录"), e.getMessage());
+            verify(taskMapper, Mockito.never()).insert(Mockito.any(NlpTask.class));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
     // ------------------------------------------------- B1：导入后自动解析的组织标记
 
     /**

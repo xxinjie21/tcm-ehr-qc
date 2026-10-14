@@ -10,6 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -136,7 +137,8 @@ final class ExcelSheetImporter {
                 }
                 summary.setTotal(summary.getTotal() + 1);
                 try {
-                    Record r = mapRow(ExcelRowReader.of(row), colIndex);
+                    ExcelRowReader.RowAccess rowAccess = ExcelRowReader.of(row);
+                    Record r = mapRow(rowAccess, colIndex);
                     if (TextUtil.isBlank(r.getOutpatientNo())) {
                         throw new IllegalArgumentException("门诊号为空");
                     }
@@ -147,7 +149,8 @@ final class ExcelSheetImporter {
                 } catch (Exception e) {
                     summary.setFailed(summary.getFailed() + 1);
                     summary.getFailures().add(new ImportSummaryVO.Failure(filename,
-                            "第 " + (i + 1) + " 行：" + e.getMessage()));
+                            "第 " + (i + 1) + " 行：" + e.getMessage(),
+                            dumpRow(ExcelRowReader.of(row), colIndex)));
                 }
             }
         } catch (Exception e) {
@@ -257,8 +260,25 @@ final class ExcelSheetImporter {
         } catch (Exception e) {
             summary.setFailed(summary.getFailed() + 1);
             summary.getFailures().add(new ImportSummaryVO.Failure(filename,
-                    "第 " + (rowNum + 1) + " 行：" + e.getMessage()));
+                    "第 " + (rowNum + 1) + " 行：" + e.getMessage(), dumpRow(row, colIndex)));
         }
+    }
+
+    /**
+     * 把一行按「字段名 → 文本」导出（仅非空字段）。
+     *
+     * <p>供失败明细携带原始数据（让用户看到「失败的是哪一条、内容是什么」），
+     * 也是「仅重传失败行」编辑后回传的载荷形态。</p>
+     */
+    static Map<String, String> dumpRow(ExcelRowReader.RowAccess row, Map<String, Integer> idx) {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> e : idx.entrySet()) {
+            String v = row.text(e.getValue());
+            if (!TextUtil.isBlank(v)) {
+                out.put(e.getKey(), v);
+            }
+        }
+        return out;
     }
 
     /**
@@ -309,6 +329,52 @@ final class ExcelSheetImporter {
         // 导入与单条新增同口径：新入库一律 pending（还没跑质控），别留空
         r.setStatus("pending");
         return r;
+    }
+
+    /**
+     * 「字段名 → 文本」→ 病历实体（用于「仅重传失败行」：前端编辑失败行后回传的载荷）。
+     *
+     * <p>与 {@link #mapRow} 同一套字段口径，只是数据源从 Excel 行换成前端回传的键值表。</p>
+     */
+    static Record fromFields(Map<String, String> f) {
+        Record r = new Record();
+        r.setRegistrationNo(f.get("registrationNo"));
+        r.setOutpatientNo(f.get("outpatientNo"));
+        r.setGender(f.get("gender"));
+        r.setAge(f.get("age"));
+        r.setVisitCount(parseInt(f.get("visitCount")));
+        r.setWesternDiagnosis(f.get("westernDiagnosis"));
+        r.setTcmDiagnosis(f.get("tcmDiagnosis"));
+        r.setPresentIllness(f.get("presentIllness"));
+        r.setChiefComplaint(f.get("chiefComplaint"));
+        r.setSelfReport(f.get("selfReport"));
+        r.setInspection(f.get("inspection"));
+        r.setPulse(f.get("pulse"));
+        r.setTongue(f.get("tongue"));
+        r.setPhysicalExam(f.get("physicalExam"));
+        r.setPattern(f.get("pattern"));
+        r.setPrescription(f.get("prescription"));
+        r.setFollowUp(f.get("followUp"));
+        r.setTreatmentEffect(f.get("treatmentEffect"));
+        r.setDepartment(f.get("department"));
+        r.setDoctorId(f.get("doctorId"));
+        r.setVisitTime(parseVisitTime(f.get("visitTime")));
+        // 导入与单条新增同口径：新入库一律 pending（还没跑质控），别留空
+        r.setStatus("pending");
+        return r;
+    }
+
+    /** 「接诊时间」文本 → LocalDateTime；认不出给 null（由 {@link #requireParsedVisitTime} 判失败） */
+    private static java.time.LocalDateTime parseVisitTime(String raw) {
+        if (TextUtil.isBlank(raw)) {
+            return null;
+        }
+        try {
+            return java.time.LocalDateTime.parse(ExcelCellParser.normalizeDateTime(raw),
+                    ExcelCellParser.formatter());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** 按字段标识取单元格文本；该列在表头里不存在时返回 null */

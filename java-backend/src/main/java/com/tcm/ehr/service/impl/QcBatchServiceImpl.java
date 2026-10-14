@@ -411,6 +411,48 @@ public class QcBatchServiceImpl implements IQcBatchService {
         return toVO(t, false);
     }
 
+    /**
+     * 仅重试失败：读原任务的完整失败记录 ID，按同一范围重新提交一个只含这批 ID 的任务。
+     *
+     * <p>复用 {@link #submit}（沿用幂等/防重/执行路径）；范围用 {@code filters.ids} 收窄到失败集合，
+     * 数据域仍由 {@link RecordFilter} 兜住（不越权）。</p>
+     */
+    @Override
+    public QcTaskVO retryFailed(String id) {
+        QcTask t = taskMapper.selectById(id);
+        if (t == null) {
+            throw new ResourceNotFoundException(1008, "任务不存在");
+        }
+        if (!belongsToCurrentOrg(t)) {
+            throw new ForbiddenException("无权操作该任务");
+        }
+        List<String> failed = readFailedIds(t.getFailedIds());
+        if (failed.isEmpty()) {
+            throw new IllegalArgumentException("该任务没有失败记录，无需重试");
+        }
+        FiltersDTO filters = new FiltersDTO();
+        filters.setIds(failed);
+        QcBatchDTO dto = new QcBatchDTO();
+        dto.setFilters(filters);
+        dto.setRequestKey(UUID.randomUUID().toString());
+        log.info("[批重算] 仅重试失败：原任务 {} 失败 {} 条，提交新任务", id, failed.size());
+        return submit(dto);
+    }
+
+    /** 解析任务的完整失败 ID 集合（JSON 数组）；损坏/空返回空列表。 */
+    private List<String> readFailedIds(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+        } catch (Exception e) {
+            log.warn("[批重算] 失败ID集合解析失败（按空处理）: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
     @Override
     public List<QcTaskVO> list() {
         // 只列本组织的任务：任务行带失败明细（含 recordId），跨组织可见等于泄露他组病历标识
@@ -468,12 +510,14 @@ public class QcBatchServiceImpl implements IQcBatchService {
         // 整批若用 get()（进程内基线）就会与单条结论分叉
         QcRuleSet rules = ruleStore.getFor(t.getOrgId());
         List<QcTaskVO.Failure> failures = new ArrayList<>();
+        // 需求3：完整失败记录 ID（不受 failure_list 500 条截断），供「仅重试失败」按完整集合重跑
+        List<String> failedIds = new ArrayList<>();
         boolean[] truncated = {false};
         int[] processed = {0};
         boolean cancelled = false;
         boolean failed = false;
         try {
-            cancelled = run(id, t, result, seenHash, rules, failures, truncated, processed);
+            cancelled = run(id, t, result, seenHash, rules, failures, failedIds, truncated, processed);
             // 质控重算完成后会改写 grade/qc_results（清洗与看板都读它）→ 统计缓存主动失效（B1）
             if (!cancelled) {
                 com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
@@ -499,6 +543,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
             t.setPendingReview(result.getPendingReview());
             t.setInvalid(result.getInvalid());
             t.setFailureList(writeJson(failures));
+            // 需求3：完整失败 ID 集合（不受 500 条截断），供「仅重试失败」
+            t.setFailedIds(writeJson(failedIds));
             t.setFailureTruncated(truncated[0]);
             // 不把库里的取消位写回：t 是任务开始时的快照，updateById 会带上 cancel_requested=0，
             // 抹掉并发取消。置 null 后 MyBatis-Plus 的 NOT_NULL 策略会跳过该列。
@@ -524,7 +570,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
      * worker 是后台线程，后者会拿到空串 → fail-closed → 一条也处理不了（静默失败）。</p>
      */
     private boolean run(String id, QcTask t, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules,
-                        List<QcTaskVO.Failure> failures, boolean[] truncated, int[] processed) {
+                        List<QcTaskVO.Failure> failures, List<String> failedIds,
+                        boolean[] truncated, int[] processed) {
         // 1. 还原落库时的筛选条件（提交时冻结，不随数据变化）；filtersJson 只反序列化一次
         com.tcm.ehr.domain.dto.FiltersDTO frozenFilters = readFilters(t.getFiltersJson());
         // 2. 游标分页循环取数（性能审查 P0-2）：每页都先看取消位，避免停不下来。
@@ -554,7 +601,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
                         || (processed[0] % PROGRESS_EVERY == 0 && isCancelRequested(id))) {
                     return true;
                 }
-                step(id, r, t, result, seenHash, rules, failures, truncated, processed);
+                step(id, r, t, result, seenHash, rules, failures, failedIds, truncated, processed);
             }
             // 4. 不满一页即到末尾
             if (list.size() < PAGE_SIZE) {
@@ -598,7 +645,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
     }
 
     private void step(String id, Record r, QcTask t, QcBatchResultVO result, Set<String> seenHash,
-                      QcRuleSet rules, List<QcTaskVO.Failure> failures, boolean[] truncated, int[] processed) {
+                      QcRuleSet rules, List<QcTaskVO.Failure> failures, List<String> failedIds,
+                      boolean[] truncated, int[] processed) {
         // 1. 处理前先计数：done 以「已尝试」为准，失败也算一条
         processed[0]++;
         try {
@@ -607,6 +655,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
         } catch (Exception e) {
             // 3. 失败累加并记明细；明细只留前 MAX_FAILURES 条，超出置截断标记
             result.setFailed(result.getFailed() + 1);
+            // 完整失败 ID 集合：供「仅重试失败」按完整集合重跑，不受 500 条截断
+            failedIds.add(r.getId());
             if (failures.size() < MAX_FAILURES) {
                 failures.add(new QcTaskVO.Failure(r.getId(), reasonOf(e)));
             } else {
@@ -671,7 +721,15 @@ public class QcBatchServiceImpl implements IQcBatchService {
                 || QcTask.INTERRUPTED.equals(status) || QcTask.FAILED.equals(status);
     }
 
+    /**
+     * 失败原因转「人话」：常见环境类异常给可读结论，其余回落到异常原文。
+     *
+     * <p>原来是裸 {@code e.getMessage()}（常是技术栈的英文串），用户看不出「该找谁、能不能重试」。</p>
+     */
     private static String reasonOf(Exception e) {
+        if (e instanceof com.tcm.ehr.common.exception.TermIndexUnavailableException) {
+            return "术语索引不可用（ES），归一无法完成，请稍后重试";
+        }
         String m = e.getMessage();
         return m == null || m.isBlank() ? "重算失败" : m;
     }

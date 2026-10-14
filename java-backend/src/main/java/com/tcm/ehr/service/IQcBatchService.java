@@ -43,6 +43,15 @@ public interface IQcBatchService {
     QcTaskVO cancel(String id);
 
     /**
+     * 仅重试失败的记录：读原任务的完整失败记录 ID，按同一范围条件重新提交一个只含这批 ID 的任务。
+     *
+     * @param id 原任务 ID
+     * @return 新任务的进度视图
+     * @throws IllegalArgumentException 任务不存在 / 无失败记录时抛出
+     */
+    QcTaskVO retryFailed(String id);
+
+    /**
      * 列出最近任务（最多 50 条，按创建时间倒序），只读。
      *
      * @return 任务进度视图列表（不含失败明细）

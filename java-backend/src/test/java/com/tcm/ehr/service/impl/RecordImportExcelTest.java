@@ -174,6 +174,31 @@ class RecordImportExcelTest {
     }
 
     /**
+     * 仅重传失败行：把（可能已编辑的）失败行键值表按导入同一套口径重新入库。
+     *
+     * <p>用同一条 R1（可解析日期）与 R2（日期无法解析）验证：好的入库、差的仍按行失败并给出原因。</p>
+     */
+    @Test
+    void importRowsReimportsGoodRowsAndRejectsBadOnes() {
+        java.util.Map<String, String> good = new java.util.LinkedHashMap<>();
+        good.put("registrationNo", "REG-R1");
+        good.put("outpatientNo", "OP-R1");
+        good.put("visitTime", "20221224090613");
+        java.util.Map<String, String> bad = new java.util.LinkedHashMap<>();
+        bad.put("registrationNo", "REG-R2");
+        bad.put("outpatientNo", "OP-R2");
+        bad.put("visitTime", "不详");
+
+        ImportSummaryVO s = svc.importRows(java.util.List.of(good, bad));
+
+        assertEquals(2, s.getTotal());
+        assertEquals(1, s.getSuccess(), "可解析的行应入库");
+        assertEquals(1, s.getFailed(), "日期仍无法解析的行应再次失败");
+        assertTrue(s.getFailures().get(0).getReason().contains("接诊时间无法解析"),
+                s.getFailures().get(0).getReason());
+    }
+
+    /**
      * 「接诊时间」有原值却解析不出 ⇒ 该行按<b>失败</b>上报、不入库（不能静默按 null 入库）。
      *
      * <p>静默入库的后果：两条仅接诊时间不同的病历在库里都变 null、去重哈希相同，

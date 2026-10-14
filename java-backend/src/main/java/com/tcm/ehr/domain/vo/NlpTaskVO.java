@@ -28,6 +28,8 @@ public class NlpTaskVO extends AbstractTaskVO {
     public static class Failure {
         private String label;
         private String reason;
+        /** 失败病历 ID：供前端「查看详情」跳转与「仅重试失败」；历史 JSON 无此字段时为 null */
+        private String recordId;
 
         public Failure() {
         }
@@ -35,6 +37,12 @@ public class NlpTaskVO extends AbstractTaskVO {
         public Failure(String label, String reason) {
             this.label = label;
             this.reason = reason;
+        }
+
+        public Failure(String label, String reason, String recordId) {
+            this.label = label;
+            this.reason = reason;
+            this.recordId = recordId;
         }
     }
 }
