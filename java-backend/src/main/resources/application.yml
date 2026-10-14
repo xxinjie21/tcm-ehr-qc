@@ -121,7 +121,12 @@ nlp:
   enabled: true             # 抽取总开关。开启前必须先启动 python-nlp，否则抽取要等连接超时才降级；
                             # false 时单条抽取与批量任务都不可用。改它必须重启。
   service-url: http://localhost:8001
+  # 多实例（不引微服务框架）：逗号分隔，可配置多台 NLP 服务。留空则回退上面的 service-url。
+  # 抽取按轮询分发；某台连不上/超时/5xx 时自动顺延下一台，并进入 instance-cooldown-ms 冷却后被跳过，
+  # 因此「部分实例未启动」不影响整体（启动 1 台也能用）。想让 3 台生效就填满 3 个地址。
+  service-urls: http://localhost:8001,http://localhost:8002,http://localhost:8003
   timeout: 30000            # 毫秒
+  instance-cooldown-ms: 10000   # 失败实例短路冷却(毫秒)：期间跳过，到点自动恢复
   batch:
     # 批量解析的后台并发（2026-10-12 实测重定）。这个值同时是两件事：
     #   ① 可同时运行的批任务数；② 单个任务内并行处理病历的路数。
