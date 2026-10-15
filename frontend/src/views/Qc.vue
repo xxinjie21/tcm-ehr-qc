@@ -262,7 +262,7 @@ import QcRulesDialog from '@/components/QcRulesDialog.vue'
 import QcDeductionDialog from '@/components/QcDeductionDialog.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
-import { recomputeQc, getQcBatch, cancelQcBatch, retryQcBatchFailed, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
+import { recomputeQc, listQcBatch, getQcBatch, cancelQcBatch, retryQcBatchFailed, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
 import { searchRecords, getRawRecord } from '@/api/records'
 import { GRADE_OK } from '@/utils/grade'
 import { useUserStore } from '@/stores/user'
@@ -607,6 +607,31 @@ const retryFailed = async (taskId) => {
   }
 }
 
+// 回到本页时接上正在跑的重算任务。
+//
+// 重算是长任务（几千条要跑几分钟），用户切到别的页面再回来时本组件已重新挂载，
+// recomputeProgress 回到 null —— 不接的话页面看起来「什么都没发生」，而任务其实还在后台跑，
+// 且此时点「重算」只会被幂等保护拒绝（「已有重算任务在排队或运行中」），用户无从知道它跑到哪了。
+// 列表接口本就只返回本组织的任务，直接找状态为排队/进行中的那条接着轮询即可
+// （后端保证同一组织同时只有一条重算任务在跑，故取首条即可）。
+const resumeRunningTask = async () => {
+  try {
+    // 1. 取本组织最近任务
+    const res = await listQcBatch()
+    // 2. 找正在跑的那条（最多一条）
+    const running = (res.data || []).find((t) => isActiveTask(t))
+    // 3. 没有在跑的任务就什么都不做，保持页面原样
+    if (!running) {
+      return
+    }
+    // 4. 回填进度并接上轮询，进度条与按钮文案随即恢复显示
+    recomputeProgress.value = running
+    pollTask(running.id)
+  } catch {
+    // 拿不到列表不影响页面其余部分（拦截器已提示）
+  }
+}
+
 // 组件卸载时停掉轮询，避免离开页面后还在发请求
 onBeforeUnmount(stopPoll)
 
@@ -641,11 +666,12 @@ const openDetail = async (recordId) => {
 
 // 只收起弹窗、不清 detail，避免关闭动画期间内容闪空
 
-// 进页面：规则 + 预检列表 + 扣分构成并行拉取
+// 进页面：规则 + 预检列表 + 扣分构成并行拉取；另接上可能仍在跑的重算任务
 onMounted(() => {
   loadRules()
   loadPrecheck(1)
   loadDedStats()
+  resumeRunningTask()
 })
 </script>
 
