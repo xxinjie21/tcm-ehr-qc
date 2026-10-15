@@ -92,6 +92,12 @@ CREATE TABLE IF NOT EXISTS records (
   INDEX idx_records_vt_desc_id (visit_time DESC, id ASC),
   -- 列表/导出/统计：org_id 等值（数据域）+ visit_time 范围或排序 + id 稳定序（keyset 游标）
   INDEX idx_records_org_vt_id (org_id, visit_time DESC, id ASC),
+  -- 导入时间范围筛选（RangeFilter 的「导入时间」/「今天」）：create_time 此前无任何索引，
+  -- 筛「今天导入的」只能全表扫。org_id 等值 + create_time 范围 + id 稳定序，
+  -- 与默认序（visit_time DESC, id ASC）同构 —— 排序键仍是 visit_time，故本索引只服务 WHERE。
+  -- 这是第 8 个二级索引：新维度没有可复用的最左前缀，不是重复建设。
+  -- 已有库由 Flyway V5__add_records_create_time_index.sql 升级。
+  INDEX idx_records_org_ct_id (org_id, create_time DESC, id ASC),
   -- 科室筛选 + 默认排序（三星索引：等值 org_id/department → 排序 visit_time/id）
   INDEX idx_records_org_dept_vt (org_id, department, visit_time DESC, id ASC),
   -- overview / governance 聚合：org_id + grade + governed

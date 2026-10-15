@@ -18,6 +18,14 @@ public class SearchDTO {
     private String doctorId;
     /** [开始日期, 结束日期]（yyyy-MM-dd） */
     private List<String> dateRange;
+    /**
+     * [开始日期, 结束日期]（yyyy-MM-dd），按病历**导入时间**（{@code records.create_time}）过滤。
+     *
+     * <p>与 {@link #dateRange}（接诊时间 {@code visit_time}）是两个独立维度，可同时生效、取交集。
+     * 用途：刚导入一批数据后，直接筛出「今天导入的」来复核 / 解析 / 清洗，不必按接诊时间去猜。
+     * 缺省或两端不齐时不生效（与 dateRange 同一判据）。</p>
+     */
+    private List<String> importRange;
     private String pattern;
     /** 分级：合格/待复核/无效 */
     private String grade;

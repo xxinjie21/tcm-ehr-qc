@@ -194,6 +194,21 @@
           />
         </div>
         <div>
+          <label for="ex-import-start">导入时间</label>
+          <!-- 与上方 RangeFilter 的「导入时间」同一字段（filters.importRange），
+               这里只是同一份状态的第二个入口：导出卡片有自己的控件排布，不能只靠上方那个。 -->
+          <el-date-picker
+            :id="['ex-import-start', 'ex-import-end']"
+            aria-label="导入时间"
+            v-model="filters.importRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            start-placeholder="开始"
+            end-placeholder="截止"
+            style="width: 240px"
+          />
+        </div>
+        <div>
           <label for="ex-pattern">证候</label>
           <TermInput id="ex-pattern" v-model="filters.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
         </div>
@@ -339,6 +354,7 @@ const scopeText = computed(() => {
   const parts = []
   if (filters.department) parts.push(filters.department)
   if (filters.dateRange && filters.dateRange.length === 2) parts.push(`${filters.dateRange[0]}~${filters.dateRange[1]}`)
+  if (filters.importRange && filters.importRange.length === 2) parts.push(`导入 ${filters.importRange[0]}~${filters.importRange[1]}`)
   if (filters.pattern) parts.push(filters.pattern)
   return parts.length ? parts.join(' · ') : '全部'
 })
@@ -421,8 +437,8 @@ const handleClean = async () => {
 }
 
 // 清洗范围：只作用于「质控合格」病历（后端同样强制合格），故不带分级维度。
-// 科室 / 就诊区间 / 证候 三个维度对清洗和导出都有效。
-const filters = reactive({ department: '', dateRange: null, pattern: '' })
+// 科室 / 就诊区间 / 导入区间 / 证候 四个维度对清洗和导出都有效。
+const filters = reactive({ department: '', dateRange: null, pattern: '', importRange: null })
 const format = ref('csv')
 const exporting = ref(false)
 // 导出文件名去重序号：Date.now() 是毫秒级，同一毫秒内连点两次导出仍会同名
@@ -447,13 +463,14 @@ const pushExportHistory = (payload) => {
   catch { /* 存不下（隐私模式/配额满）就只在本次会话内保留 */ }
 }
 
-// 组装预览 / 导出共用的请求体：只带后端约定的 department / dateRange / pattern 三个维度，
-// 刻意不含 grade —— 分级只作用于数据清洗，导出恒为质控合格病历
+// 组装预览 / 导出共用的请求体：只带后端约定的 department / dateRange / importRange / pattern
+// 四个维度，刻意不含 grade —— 分级只作用于数据清洗，导出恒为质控合格病历
 const buildPayload = () => ({
   format: format.value,
   filters: {
     department: filters.department || '',
     dateRange: filters.dateRange || [],
+    importRange: filters.importRange || [],
     pattern: filters.pattern || ''
   }
 })

@@ -386,7 +386,7 @@ const activeTab = ref('single')
 // P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
 const loadedAt = ref(new Date().toLocaleString())
 // ===== 病历列表=====
-const query = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+const query = reactive({ department: '', dateRange: null, pattern: '', grade: '', importRange: null })
 const page = ref(1)
 const pageSize = ref(10)
 // 列表加载失败：与「确实没有匹配」区分开（三态统一）
@@ -421,6 +421,7 @@ const handleSizeChange = () => {
 const resetFilters = () => {
   query.department = ''
   query.dateRange = null
+  query.importRange = null
   query.pattern = ''
   query.grade = ''
   search(1)

@@ -217,6 +217,8 @@ public class QcController {
      * @param end        接诊时间上界（yyyy-MM-dd）
      * @param pattern    证候关键字，模糊匹配
      * @param grade      分级
+     * @param importStart 导入时间下界（yyyy-MM-dd），与 importEnd 同时给才生效；与接诊时间独立
+     * @param importEnd   导入时间上界（yyyy-MM-dd）
      * @return scanned=统计条数；byType/byItem=维度与明细扣分；gradeDist=分级分布
      */
     @GetMapping("/deduction-stats")
@@ -225,12 +227,16 @@ public class QcController {
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
             @RequestParam(required = false) String pattern,
-            @RequestParam(required = false) String grade) {
-        return Result.ok(qcService.deductionStats(filters(department, start, end, pattern, grade)));
+            @RequestParam(required = false) String grade,
+            @RequestParam(required = false) String importStart,
+            @RequestParam(required = false) String importEnd) {
+        return Result.ok(qcService.deductionStats(
+                filters(department, start, end, pattern, grade, importStart, importEnd)));
     }
 
-    /** GET 查询参数 → 统一的范围过滤对象（时间需上下界同时存在） */
-    private FiltersDTO filters(String department, String start, String end, String pattern, String grade) {
+    /** GET 查询参数 → 统一的范围过滤对象（两个时间维度都需上下界同时存在） */
+    private FiltersDTO filters(String department, String start, String end, String pattern, String grade,
+                               String importStart, String importEnd) {
         // 1. 三个标量条件直接搬
         FiltersDTO f = new FiltersDTO();
         f.setDepartment(department);
@@ -242,6 +248,13 @@ public class QcController {
             range.add(start);
             range.add(end);
             f.setDateRange(range);
+        }
+        // 3. 导入时间（records.create_time）同理：与接诊时间是两个独立维度，可同时生效
+        if (importStart != null && !importStart.isBlank() && importEnd != null && !importEnd.isBlank()) {
+            List<String> importRange = new ArrayList<>(2);
+            importRange.add(importStart);
+            importRange.add(importEnd);
+            f.setImportRange(importRange);
         }
         return f;
     }

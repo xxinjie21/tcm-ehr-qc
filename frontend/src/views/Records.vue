@@ -306,12 +306,14 @@ const GROUP_FIELDS = new Map(
 const groupFields = (group) => GROUP_FIELDS.get(group) || []
 
 // ===== F·7.4 查询 =====
-const query = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '' })
+const query = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '', importRange: null })
 // 范围删除要求至少一个筛选条件（与后端一致，防误删全库）
 const hasFilter = computed(() => {
   const r = query.dateRange
   const range = Array.isArray(r) && r.length === 2 && r[0] && r[1]
-  return !!(query.department || query.pattern || query.grade || range)
+  const ir = query.importRange
+  const importRange = Array.isArray(ir) && ir.length === 2 && ir[0] && ir[1]
+  return !!(query.department || query.pattern || query.grade || range || importRange)
 })
 const page = ref(1)
 const pageSize = ref(10)
@@ -357,9 +359,10 @@ const handleSizeChange = () => {
 
 // 重置筛选：清空全部查询条件并回到第 1 页，随后再查一次让列表与筛选框同步回到初始态
 const resetFilters = () => {
-  // 1. 清空全部查询条件，四个筛选字段一起归零
+  // 1. 清空全部查询条件，各筛选字段一起归零
   query.department = ''
   query.dateRange = null
+  query.importRange = null
   query.pattern = ''
   query.grade = ''
   // 2. 回到第 1 页，避免停在不存在的页码

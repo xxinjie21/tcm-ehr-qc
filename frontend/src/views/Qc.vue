@@ -314,7 +314,7 @@ const userStore = useUserStore()
 const canWriteRules = computed(() => userStore.canWriteQcRulesEntry)
 
 // 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护
-const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '' })
+const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '', importRange: null })
 
 // ===== 评分标准 / 扣分构成=====
 // 评分标准：rules 为当前生效规则，descriptions 为自然语言说明，catalog* 为可选项目录
@@ -377,11 +377,15 @@ const barWidth = (points) => Math.round((points / maxDeductPoints.value) * 100) 
 const params = () => {
   // 1. 取日期区间（RangeFilter 给出的是 [起, 止] 两元素数组）
   const d = filters.dateRange
+  // 1.1 取导入时间区间：独立维度，同样两端齐全才发
+  const ir = filters.importRange
   // 2. 组装接口参数：起止缺任一端都按未选处理，空串交给后端忽略
   return {
     department: filters.department || '',
     start: d && d.length === 2 ? d[0] : '',
     end: d && d.length === 2 ? d[1] : '',
+    importStart: ir && ir.length === 2 ? ir[0] : '',
+    importEnd: ir && ir.length === 2 ? ir[1] : '',
     pattern: filters.pattern || '',
     grade: filters.grade || ''
   }
@@ -465,6 +469,7 @@ const applyFilters = () => {
 const resetFilters = () => {
   filters.department = ''
   filters.dateRange = null
+  filters.importRange = null
   filters.pattern = ''
   filters.grade = ''
   applyFilters()

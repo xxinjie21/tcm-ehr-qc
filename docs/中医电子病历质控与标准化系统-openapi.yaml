@@ -704,13 +704,18 @@ components:
       properties:
         filters:
           type: object
-          description: 数据范围过滤条件（科室 / 时间区间 / 证候 / 分级）；不设条件 = 全部病历
+          description: 数据范围过滤条件（科室 / 就诊时间区间 / 导入时间区间 / 证候 / 分级）；不设条件 = 全部病历
           properties:
             department:
               type: string
             dateRange:
               type: array
               description: '[开始日期, 结束日期]（yyyy-MM-dd）'
+              items:
+                type: string
+            importRange:
+              type: array
+              description: '[开始日期, 结束日期]（yyyy-MM-dd），按病历导入时间（records.create_time）过滤；与 dateRange 是独立维度，可同时生效'
               items:
                 type: string
             pattern:
@@ -746,6 +751,12 @@ components:
             type: string
             format: date
           description: [开始日期, 结束日期]
+        importRange:
+          type: array
+          items:
+            type: string
+            format: date
+          description: '[开始日期, 结束日期]，按病历导入时间（records.create_time）过滤；与 dateRange 独立，可同时生效'
         pattern:
           type: string
           description: 辨证结论关键词
@@ -863,7 +874,7 @@ components:
       properties:
         filters:
           type: object
-          description: 筛选范围（与病历查询同口径：科室 / 时间区间 / 证候 / 分级）
+          description: 筛选范围（与病历查询同口径：科室 / 就诊时间区间 / 导入时间区间 / 证候 / 分级）
           properties:
             department:
               type: string
@@ -872,6 +883,12 @@ components:
               items:
                 type: string
                 format: date
+            importRange:
+              type: array
+              items:
+                type: string
+                format: date
+              description: 按病历导入时间（records.create_time）过滤；与 dateRange 独立
             pattern:
               type: string
             grade:
@@ -2184,6 +2201,11 @@ paths:
                   items:
                     type: string
                     format: date
+                importRange:
+                  type: array
+                  items:
+                    type: string
+                    format: date
                 pattern:
                   type: string
                 grade:
@@ -3335,7 +3357,7 @@ paths:
       tags:
         - 质控
       summary: 范围扣分维度聚合
-      description: 【权限：登录即可】按范围（filters：department/start/end/pattern/grade）聚合各病历扣分明细：按维度（byType）与明细项（byItem）汇总次数/扣分，另附分级分布；优先读 records.qc_results，缺失则现算，扫描上限超出时 truncated=true
+      description: 【权限：登录即可】按范围（filters：department/start/end/pattern/grade/importStart/importEnd）聚合各病历扣分明细：按维度（byType）与明细项（byItem）汇总次数/扣分，另附分级分布；优先读 records.qc_results，缺失则现算，扫描上限超出时 truncated=true
       parameters:
         - name: department
           in: query
@@ -3364,6 +3386,20 @@ paths:
           required: false
           schema:
             type: string
+        - name: importStart
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: 导入时间下界（yyyy-MM-dd），与 importEnd 同时给才生效；与接诊时间独立
+        - name: importEnd
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: 导入时间上界（yyyy-MM-dd）
       responses:
         '200':
           description: 扣分聚合

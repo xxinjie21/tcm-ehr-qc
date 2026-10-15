@@ -1,5 +1,5 @@
 <template>
-  <!-- 病历检索筛选条：科室 / 就诊时间 / 证候 / 分级。
+  <!-- 病历检索筛选条：科室 / 就诊时间 / 导入时间 / 证候 / 分级。
        与 StatsFilter 的分工：本组件用 v-model 双向绑定（受控 + 自更新），
        供病历数据、复核等列表页复用；StatsFilter 只读展示 + 向上抛动作事件。 -->
   <div class="range-filter">
@@ -29,6 +29,25 @@
         style="width: 240px"
       />
     </div>
+    <div v-if="showImport" class="rf-item">
+      <!-- 导入时间：与「就诊时间」是两个独立维度（后者筛 visit_time，本项筛 create_time），
+           可同时设置、取交集。典型用法是刚导入一批数据后，点「今天」只看这批新数据。
+           id 同样必须是数组（范围选择器内部是两个 input），aria-label 由 Picker 透传到两个框。 -->
+      <label for="rf-import-start">导入时间</label>
+      <div class="rf-import">
+        <el-date-picker
+          :id="['rf-import-start', 'rf-import-end']"
+          aria-label="导入时间"
+          v-model="inner.importRange"
+          type="daterange"
+          value-format="YYYY-MM-DD"
+          start-placeholder="开始"
+          end-placeholder="截止"
+          style="width: 240px"
+        />
+        <el-button size="small" @click="todayImport">今天</el-button>
+      </div>
+    </div>
     <div class="rf-item">
       <label for="rf-pattern">证候</label>
       <TermInput id="rf-pattern" v-model="inner.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
@@ -52,15 +71,23 @@ import { computed, onMounted, ref } from 'vue'
 import TermInput from '@/components/TermInput.vue'
 
 const props = defineProps({
-  // 筛选值对象，字段：department / dateRange / pattern / grade。
+  // 筛选值对象，字段：department / dateRange / pattern / grade / importRange。
   // 默认值给出完整空结构，父组件少传字段时子控件也不会取到 undefined。
+  // importRange 筛的是「导入时间」（后端 records.create_time），dateRange 筛的是「就诊时间」。
   modelValue: {
     type: Object,
-    default: () => ({ department: '', dateRange: null, pattern: '', grade: '' })
+    default: () => ({ department: '', dateRange: null, pattern: '', grade: '', importRange: null })
   },
   // 是否显示「分级」选择器。清洗页传 false —— 清洗只作用于「质控合格」，
   // 分级对清洗没有意义，留着只会让用户以为能把整库都洗一遍。
   showGrade: {
+    type: Boolean,
+    default: true
+  },
+  // 是否显示「导入时间」。标准化报告页传 false —— 它的时间语义走独立的 start/end
+  // 参数（Java 侧按 visit_time 过滤并算 excluded），后端并不认 importRange，
+  // 显示出来会变成「填了但没生效」的静默失效，故在该页隐藏。
+  showImport: {
     type: Boolean,
     default: true
   }
@@ -74,6 +101,16 @@ const inner = computed({
   set: (v) => emit('update:modelValue', v)
 })
 
+/** 「今天」快捷：把导入时间设成今天一整天，便于只看刚导进来的那批病历 */
+const todayImport = () => {
+  const d = new Date()
+  const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  // 就地改 props.modelValue（与模板里 inner.xxx = 的写法同一路径）：
+  // 不能走 inner.value = {...} —— 父组件用 const filters = reactive({...}) 接 v-model，
+  // 整体赋值会编译成对 const 的赋值而抛错。父对象是 reactive，新键同样是响应式的。
+  inner.value.importRange = [s, s]
+}
+
 // U11：科室选项由后端动态获取（records.department DISTINCT），缓存收敛到 useDepartments
 const { departments, reload } = useDepartments()
 onMounted(reload)
@@ -84,4 +121,6 @@ onMounted(reload)
 .range-filter { display: flex; gap: var(--sp-4); align-items: flex-end; flex-wrap: wrap; }
 /* 标签压在各自控件上方（与 StatsFilter 一致） */
 .rf-item label { display: block; font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: 3px; }
+/* 导入时间：日期区间与「今天」按钮同一行，按钮与 32px 输入框底对齐 */
+.rf-import { display: flex; align-items: center; gap: var(--sp-2); }
 </style>

@@ -87,6 +87,13 @@ public final class RecordFilter {
                 wrapper.ge("visit_time", dto.getDateRange().get(0).trim() + " 00:00:00");
                 wrapper.le("visit_time", dto.getDateRange().get(1).trim() + " 23:59:59");
             }
+            // 导入时间区间（records.create_time）：与就诊时间是两个独立维度，可同时生效取交集。
+            // 判据与上一条完全一致 —— 两端齐全才成立，含首尾两天（补 00:00:00 / 23:59:59）。
+            if (dto.getImportRange() != null && dto.getImportRange().size() == 2
+                    && notBlank(dto.getImportRange().get(0)) && notBlank(dto.getImportRange().get(1))) {
+                wrapper.ge("create_time", dto.getImportRange().get(0).trim() + " 00:00:00");
+                wrapper.le("create_time", dto.getImportRange().get(1).trim() + " 23:59:59");
+            }
             // 5. 仅未解析：structured_data 为 SQL NULL（用 IS NULL —— 该列是 JSON 类型，不能与 '' 比较）
             andOnlyUnparsed(wrapper, dto.getOnlyUnparsed());
         }
@@ -235,6 +242,11 @@ public final class RecordFilter {
                 && text(dateRange.get(0)) != null && text(dateRange.get(1)) != null) {
             filterDto.setDateRange(List.of(text(dateRange.get(0)), text(dateRange.get(1))));
         }
+        // 4. 导入时间区间同判据（与 dateRange 是两个独立维度，可同时生效）
+        if (filters.get("importRange") instanceof List<?> importRange && importRange.size() == 2
+                && text(importRange.get(0)) != null && text(importRange.get(1)) != null) {
+            filterDto.setImportRange(List.of(text(importRange.get(0)), text(importRange.get(1))));
+        }
         return filterDto;
     }
 
@@ -254,6 +266,8 @@ public final class RecordFilter {
         String pattern = null;
         String start = null;
         String end = null;
+        String importStart = null;
+        String importEnd = null;
         // 1. 两种契约形态都要支持：DTO（列表/批量）与 Map（导出）
         if (filters instanceof FiltersDTO filterDto) {
             department = filterDto.getDepartment();
@@ -263,6 +277,10 @@ public final class RecordFilter {
                 start = filterDto.getDateRange().get(0);
                 end = filterDto.getDateRange().get(1);
             }
+            if (filterDto.getImportRange() != null && filterDto.getImportRange().size() == 2) {
+                importStart = filterDto.getImportRange().get(0);
+                importEnd = filterDto.getImportRange().get(1);
+            }
         } else if (filters instanceof Map<?, ?> rawFilters) {
             department = text(rawFilters.get("department"));
             grade = text(rawFilters.get("grade"));
@@ -270,6 +288,10 @@ public final class RecordFilter {
             if (rawFilters.get("dateRange") instanceof List<?> dateRange && dateRange.size() == 2) {
                 start = text(dateRange.get(0));
                 end = text(dateRange.get(1));
+            }
+            if (rawFilters.get("importRange") instanceof List<?> importRange && importRange.size() == 2) {
+                importStart = text(importRange.get(0));
+                importEnd = text(importRange.get(1));
             }
         }
 
@@ -287,6 +309,12 @@ public final class RecordFilter {
         // 3. 只给一端时写「不限」，别让审计看不出这是半区间
         if (notBlank(start) || notBlank(end)) {
             parts.add((notBlank(start) ? start.trim() : "不限") + " 至 " + (notBlank(end) ? end.trim() : "不限"));
+        }
+        // 3.1 导入时间单独成段并带「导入」前缀 —— 与就诊时间区间同形，
+        //     不加前缀的话日志里会出现两段日期，看不出哪段是哪个维度
+        if (notBlank(importStart) || notBlank(importEnd)) {
+            parts.add("导入 " + (notBlank(importStart) ? importStart.trim() : "不限")
+                    + " 至 " + (notBlank(importEnd) ? importEnd.trim() : "不限"));
         }
         return parts.isEmpty() ? "全部病历" : String.join(" · ", parts);
     }
@@ -396,6 +424,12 @@ public final class RecordFilter {
                     && notBlank(filterDto.getDateRange().get(0)) && notBlank(filterDto.getDateRange().get(1))) {
                 wrapper.ge("visit_time", filterDto.getDateRange().get(0).trim() + " 00:00:00");
                 wrapper.le("visit_time", filterDto.getDateRange().get(1).trim() + " 23:59:59");
+            }
+            // 3.1 导入时间区间（records.create_time）：与就诊时间独立、可同时生效，判据同上
+            if (filterDto.getImportRange() != null && filterDto.getImportRange().size() == 2
+                    && notBlank(filterDto.getImportRange().get(0)) && notBlank(filterDto.getImportRange().get(1))) {
+                wrapper.ge("create_time", filterDto.getImportRange().get(0).trim() + " 00:00:00");
+                wrapper.le("create_time", filterDto.getImportRange().get(1).trim() + " 23:59:59");
             }
             // 4. 仅按指定病历 ID 收窄（用于「仅重试失败」）：在数据域之上再取交集，不越权
             if (filterDto.getIds() != null && !filterDto.getIds().isEmpty()) {

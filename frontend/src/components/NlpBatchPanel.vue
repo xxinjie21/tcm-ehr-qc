@@ -161,7 +161,7 @@ const batchLimit = ref(40000)
 const batchMode = ref('all')
 const submitting = ref(false)
 // 批量范围条件（科室 / 就诊时间 / 证候 / 分级），与病历数据页同一套筛选
-const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+const batchFilters = reactive({ department: '', dateRange: null, pattern: '', grade: '', importRange: null })
 // 只解析未解析的（仅对「批量解析」生效；默认开，避免重跑已解析的几万条）
 const onlyUnparsed = ref(true)
 const activeTask = ref(null)
@@ -374,6 +374,9 @@ const describeBatchScope = async (isNormalize) => {
   if (batchFilters.department) parts.push(`科室＝${batchFilters.department}`)
   if (batchFilters.dateRange && batchFilters.dateRange.length === 2) {
     parts.push(`${batchFilters.dateRange[0]}~${batchFilters.dateRange[1]}`)
+  }
+  if (batchFilters.importRange && batchFilters.importRange.length === 2) {
+    parts.push(`导入 ${batchFilters.importRange[0]}~${batchFilters.importRange[1]}`)
   }
   if (batchFilters.pattern) parts.push(`证候＝${batchFilters.pattern}`)
   if (batchFilters.grade) parts.push(`分级＝${batchFilters.grade}`)
