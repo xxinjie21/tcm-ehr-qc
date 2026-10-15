@@ -26,10 +26,11 @@
       </div>
 
       <!-- 范围查询：科室 / 就诊时间 / 证候，与病历数据、质控等页同一套 RangeFilter。
-           报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器。
-           近一年 / 近三年是时间快捷按钮，只改写 filters.dateRange，改完立即查询。 -->
+           报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器；
+           也不按导入时间收窄 —— 本页时间语义走独立的 start/end（Java 侧按 visit_time
+           过滤并算 excluded），后端不认 importRange，显示了就是静默失效。 -->
       <div class="rh-tools">
-        <RangeFilter v-model="filters" :show-grade="false" />
+        <RangeFilter v-model="filters" :show-grade="false" :show-import="false" />
         <el-button size="default" :disabled="loading" @click="quickRange(1)">近一年</el-button>
         <el-button size="default" :disabled="loading" @click="quickRange(3)">近三年</el-button>
         <el-button type="primary" size="default" :loading="loading" @click="loadReport">
@@ -39,25 +40,20 @@
         <el-button size="default" :loading="exporting" @click="handleExport">导出 CSV</el-button>
       </div>
 
-      <!-- 质控未完成时的重跑入口与进度：与结论同处一卡，就近解决 -->
+      <!-- 质控未完成时的引导：本页只读，不提供重跑入口。
+           重跑是「质控校验」与「结构化解析」两页的职责，本页再实现一套提交 + 轮询属重复；
+           2026-10-15 按用户要求把两个重跑按钮改为提示 + 跳转。 -->
       <div v-if="showQcGate" class="rh-ops">
-        <el-button type="primary" size="small" :loading="rerunning" @click="rerunQc">
-          立即重跑质控
+        <span class="tip">
+          本页只读。重跑请到「质控校验」或「结构化解析」页发起，完成后回到本页刷新即可。
+        </span>
+        <el-button type="primary" size="small" @click="$router.push('/qc-check')">
+          去质控校验
         </el-button>
-        <el-button size="small" :loading="rerunning" @click="rerunAll">
-          重跑「解析 + 质控」
+        <el-button size="small" @click="$router.push('/nlp-extract')">
+          去结构化解析
         </el-button>
         <span v-if="qcLast" class="tip">上次完成：{{ qcLast }}</span>
-        <!-- 重跑进行中的进度条：没有它用户只能干等，不知道系统在不在动 -->
-        <div v-if="rerunStage !== 'idle'" class="rh-progress">
-          <span class="gp-label">{{ rerunStageLabel }}</span>
-          <!-- 两态配置见 rerunBar：分母还没算出来时也不再整条不渲染，改走不确定流动条 -->
-          <el-progress
-            v-bind="rerunBar"
-            :stroke-width="6"
-            style="flex: 1 1 auto; min-width: 120px"
-          />
-        </div>
       </div>
 
       <p v-if="rangeTip" class="rh-range">{{ rangeTip }}</p>
@@ -163,15 +159,13 @@
 //   ② 把「多少条没归一」翻译成「该做什么、归谁管」；
 //   ③ 明细默认收起，需要时再展开。
 // 技术口径（甲类/乙类、normLevel、可归一实体）只在本文件内部使用，不出现在界面上。
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import StandardizationDetails from '@/components/StandardizationDetails.vue'
 import StandardizationCharts from '@/components/StandardizationCharts.vue'
 import { getStandardizationReport, exportStandardizationReport } from '@/api/stats'
-import { submitNlpBatch as submitExtractBatch, getNlpBatchProgress, listNlpBatch } from '@/api/nlp'
-import { recomputeQc as submitQcBatch, getQcBatch, listQcBatch } from '@/api/qc'
 import { saveBlob } from '@/utils/download'
 import { useDepartments } from '@/composables/useDepartments'
 
@@ -181,10 +175,8 @@ const loading = ref(false)
 // 否则失败会被渲染成「正在读取…」+ 空态 + 绿色结论（把故障读成了一切正常）。
 const loadError = ref(false)
 const exporting = ref(false)
-const rerunning = ref(false)
 
 const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
-const rerunFilters = ref(null)
 const { departments, reload: reloadDepartments } = useDepartments()
 
 const fmtDate = (d) => {
@@ -221,23 +213,6 @@ const params = () => {
   }
 }
 
-/** 批量重跑的过滤载荷（不含 grade，showGrade=false） */
-const batchFilterPayload = () => {
-  return {
-    department: filters.department || '',
-    dateRange: filters.dateRange && filters.dateRange.length === 2 ? [...filters.dateRange] : null,
-    pattern: filters.pattern || ''
-  }
-}
-
-const scopeText = () => {
-  const parts = []
-  if (filters.department) parts.push(`科室＝${filters.department}`)
-  if (filters.dateRange && filters.dateRange.length === 2) parts.push(`${filters.dateRange[0]}~${filters.dateRange[1]}`)
-  if (filters.pattern) parts.push(`证候＝${filters.pattern}`)
-  return parts.length ? parts.join(' · ') : '本组织全部病历'
-}
-
 const rangeTip = computed(() => {
   const r = report.value?.range
   if (!r) return ''
@@ -272,287 +247,6 @@ const qcLast = computed(() => qc.value?.lastScoredAt || '')
 // 结果恒为 false ⇒ 徽标永不进入过期态。
 const hasStaleRows = computed(() => (report.value?.coverage || [])
   .some((c) => c.suspectedStaleExtraction))
-
-const confirmRerun = async (what, countHint) => {
-  try {
-    await ElMessageBox.confirm(
-      `将对「${scopeText()}」范围内重跑${what}。${countHint ? `当前范围约 ${countHint} 条。` : ''}`
-      + '任务在后台执行，本页会自动跟进进度并在完成后刷新报告；'
-      + '中途可以离开页面。',
-      `确认重跑${what}`,
-      { type: 'warning', confirmButtonText: `重跑${what}`, cancelButtonText: '取消' }
-    )
-    return true
-  } catch {
-    return false
-  }
-}
-
-// ---- 重跑任务的进度跟踪 ----
-// 重跑是异步的（提交即返回，进度靠轮询）。不轮询的话，用户点了「重跑」却看到
-// 页面数字纹丝不动，会以为没生效 —— 实测确认过：提交后页面数据确实不会自己变。
-// 做法与 NlpExtract.vue 的批任务轮询一致：定时拉进度，任务结束或失败即停，
-// 页面不可见时暂停（省请求）。
-const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
-/**
- * 轮询退避表（毫秒，P2-18）。
- *
- * 原来是固定 3 秒 × 最长 10 分钟 ≈ 200 次请求。重跑动辄几分钟，绝大多数请求落在
- * 「进度没变」上；但一上来就放慢又会让短任务显得没反应（提交后前几秒正是用户
- * 盯着屏幕判断「到底跑没跑」的阶段）。所以按「先快后慢」退避：前几次仍是 3 秒，
- * 之后 5s → 8s → 10s 封顶。10 分钟内的请求数由约 200 降到约 60。
- */
-const POLL_BACKOFF_MS = [3000, 5000, 8000, 10000]
-const POLL_TIMEOUT_MS = 10 * 60 * 1000
-
-const pollTimer = ref(null)
-const pollDeadline = ref(0)
-/** 当前退避档位（下标，封顶在最后一档） */
-const pollStep = ref(0)
-/** 跟踪中的任务：解析任务与质控任务，解析先跑完才轮到质控 */
-const track = ref({ nlpId: '', qcId: '', stage: 'idle' })
-/** 当前阶段与进度，供页面显示 */
-const rerunStage = computed(() => track.value.stage)
-const rerunStageLabel = computed(() => {
-  const s = track.value.stage
-  if (s === 'parse') return '结构化解析进行中'
-  if (s === 'qc') return '质控评分进行中'
-  return ''
-})
-const rerunProgress = ref({ done: 0, total: 0 })
-
-/** 进度百分比；拿不到 total 时返回 null（表示「数字不可知」，不是「进度为 0」） */
-const rerunPercent = computed(() => {
-  const { done, total } = rerunProgress.value
-  if (!total || total <= 0) return null
-  return Math.min(100, Math.round((done / total) * 100))
-})
-
-/**
- * 进度条的两态配置（统一口径见 Governance.vue 的清洗进度条）。
- *
- * 原先 rerunPercent 为 null（解析阶段刚提交、分母还没算出来）时整条不渲染，
- * 只剩左边一句文字 —— 用户看不到任何「在动」的信号。改为这段时间走不确定流动条，
- * 只表达「在推进」且不显示百分比数字，避免暗示一个并不存在的精确进度；
- * 拿到分母后切回真实百分比，条纹继续流动表示仍在处理。
- *
- * 注意 percentage 在不明确状态下必须给 100：不确定动画是在「100% 宽」的填充上
- * 左右滑动（见 Element Plus progress.vue 的 barStyle，填充宽度恒等于 percentage%），
- * 给 0 则填充宽度为 0，动画完全看不见。
- */
-const rerunBar = computed(() => {
-  const pct = rerunPercent.value
-  // 1. 分母不可知，或一条都还没处理完 ⇒ 没有可信数字，走不确定态
-  if (pct === null || pct === 0) {
-    return { percentage: 100, indeterminate: true, striped: false, stripedFlow: false, showText: false }
-  }
-  // 2. 有可信数字 ⇒ 真实百分比 + 条纹流动
-  return { percentage: pct, indeterminate: false, striped: true, stripedFlow: true, showText: true }
-})
-
-const stopPoll = () => {
-  if (pollTimer.value) {
-    clearTimeout(pollTimer.value)
-    pollTimer.value = null
-  }
-}
-
-const isActiveStatus = (t) => !!t && ACTIVE_STATUS.includes(t.status)
-
-/** 任务结束的统一收尾：停轮询、刷一次报告、提示结果 */
-async function finishRerun(message) {
-  stopPoll()
-  track.value = { nlpId: '', qcId: '', stage: 'idle' }
-  rerunProgress.value = { done: 0, total: 0 }
-  await loadReport()
-  if (message) {
-    ElMessage.success(message)
-  }
-}
-
-/** 单次轮询：先看解析任务，再看质控任务；任一阶段结束即推进或收尾 */
-async function pollOnce() {
-  const { nlpId, qcId, stage } = track.value
-  if (!nlpId && !qcId) {
-    stopPoll()
-    return
-  }
-  // 超过时限就停：任务可能因数据量大跑很久，不该让页面一直发请求
-  if (Date.now() > pollDeadline.value) {
-    stopPoll()
-    ElMessage.info('重跑仍在后台进行，稍后点「刷新」查看最新结果')
-    return
-  }
-  try {
-    if (stage === 'parse' && nlpId) {
-      const res = await getNlpBatchProgress(nlpId)
-      rerunProgress.value = { done: res.data?.done ?? 0, total: res.data?.total ?? 0 }
-      if (!isActiveStatus(res.data)) {
-      // 解析结束才能接着算质控：质控读的是 structured_data，解析没完它算的还是旧的。
-      // 这里提交质控也可能撞上「另一个任务正在提交」的幂等拒绝 —— 解析刚结束时
-      // 它的 cancel/收尾还在占位，所以要容错，不能因为一次拒绝就整条链路断掉。
-      let qcId = ''
-      try {
-        const qc = await submitQcBatch({ filters: rerunFilters.value, requestKey: crypto.randomUUID() })
-        qcId = qc.data?.id || ''
-        rerunProgress.value = { done: 0, total: qc.data?.total || 0 }
-        ElMessage.info('结构化解析已完成，质控评分已接着开始')
-      } catch (e) {
-        if (!isAlreadyRunning(e)) {
-          await finishRerun('结构化解析已完成，但质控重跑未能启动，请在「质控校验」页手动发起')
-          return
-        }
-        // 已有任务在跑：直接切到盯它，不再重复提交
-        qcId = ''
-      }
-        track.value = { nlpId: '', qcId, stage: qcId ? 'qc' : 'idle' }
-        if (!qcId) stopPoll()
-      }
-      return
-    }
-    if (stage === 'qc' && qcId) {
-      const res = await getQcBatch(qcId)
-      rerunProgress.value = { done: res.data?.done ?? 0, total: res.data?.total ?? 0 }
-      if (!isActiveStatus(res.data)) {
-        const failed = res.data?.failed ?? 0
-        await finishRerun(
-          failed > 0
-            ? `重跑完成，但有 ${failed} 条失败，可在「质控校验」页查看`
-            : '重跑完成，报告已刷新'
-        )
-      }
-    }
-  } catch {
-    // 请求失败即停，避免空转；任务本身可能仍在后台跑
-    stopPoll()
-    ElMessage.warning('读取重跑进度失败，可稍后点「刷新」查看最新结果')
-  }
-}
-
-/**
- * 排下一次轮询（P2-18）。
- *
- * 用 setTimeout 自排期而不是 setInterval：退避需要「每次换一个间隔」，
- * setInterval 只能固定间隔；改成自排期后，「页面不可见就跳过」这一条必须显式重新排期
- * —— 定时器已经触发过了，直接 return 会让轮询永久停摆（setInterval 下没这个陷阱）。
- */
-function schedulePoll() {
-  const delay = POLL_BACKOFF_MS[Math.min(pollStep.value, POLL_BACKOFF_MS.length - 1)]
-  pollTimer.value = setTimeout(async () => {
-    // 页面不可见时暂停：后台标签页没必要持续打接口
-    if (document.visibilityState !== 'visible') {
-      schedulePoll()
-      return
-    }
-    await pollOnce()
-    // pollOnce 收尾（任务结束 / 超时 / 失败）时会 stopPoll 清空句柄；
-    // 句柄还在说明任务仍在跑，降一档继续排
-    if (pollTimer.value) {
-      pollStep.value += 1
-      schedulePoll()
-    }
-  }, delay)
-}
-
-function startPoll() {
-  stopPoll()
-  pollDeadline.value = Date.now() + POLL_TIMEOUT_MS
-  // 每次都从最快档开始：刚提交的几秒是「看着没反应」最明显的阶段
-  pollStep.value = 0
-  schedulePoll()
-}
-
-/** 批量重跑：质控评分 */
-/**
- * 接管「已经在跑」的那个任务。
- *
- * <p>为什么需要：提交时会撞上后端的两道幂等保护（实测 400 有两种 msg ——
- * 「已有重算任务在排队或运行中」「有另一个重算任务正在提交」）。这不是错误，
- * 而是「你来晚了，任务已经在跑」。此时最合理的响应不是报错让用户干等，
- * 而是从任务列表里找到它、接着盯它的进度 —— 用户看到进度条在走，目标就达到了。</p>
- */
-const adoptRunningTask = async (stage) => {
-  try {
-    const res = stage === 'parse' ? await listNlpBatch() : await listQcBatch()
-    // 两个列表接口回包都是 { tasks, truncated, limit }（不是裸数组）：NLP 侧一直如此，
-    // QC 侧本次改为同一形状。取错会静默退化成「提示稍后刷新」，故显式走 .tasks
-    const active = (res.data?.tasks || []).find((t) => ACTIVE_STATUS.includes(t.status))
-    if (!active) {
-      return false
-    }
-    track.value = stage === 'parse'
-      ? { nlpId: active.id, qcId: '', stage: 'parse' }
-      : { nlpId: '', qcId: active.id, stage: 'qc' }
-    rerunProgress.value = { done: active.done ?? 0, total: active.total ?? 0 }
-    startPoll()
-    return true
-  } catch {
-    // 列表都拿不到（接口异常）就退化为「提示用户稍后刷新」
-    return false
-  }
-}
-
-const submitAndTrack = async (submitFn, stage, startMsg, payload) => {
-  try {
-    const res = await submitFn(payload)
-    const id = res.data?.id || ''
-    track.value = stage === 'parse'
-      ? { nlpId: id, qcId: '', stage: 'parse' }
-      : { nlpId: '', qcId: id, stage: 'qc' }
-    rerunProgress.value = { done: 0, total: res.data?.total || 0 }
-    startPoll()
-    ElMessage.info(startMsg)
-  } catch (e) {
-    // 「已有任务在跑」是正常状态：不报错，改为接管它并继续显示进度
-    if (isAlreadyRunning(e)) {
-      const adopted = await adoptRunningTask(stage)
-      ElMessage.info(adopted
-        ? '已有重跑任务在进行，已接管它的进度'
-        : '已有重跑任务在进行，完成后点「刷新」查看最新结果')
-    }
-    // 其余错误由拦截器提示
-  }
-}
-
-/** 判断是不是「已有任务在提交/运行」这类幂等拒绝 */
-const isAlreadyRunning = (e) => {
-  const msg = e?.response?.data?.msg || e?.msg || ''
-  return String(msg).includes('另一个重算任务') || String(msg).includes('已有重算任务')
-}
-
-/** 批量重跑：质控评分 */
-const rerunQc = async () => {
-  if (!(await confirmRerun('质控评分', qcTotal.value))) return
-  rerunning.value = true
-  rerunFilters.value = batchFilterPayload()
-  try {
-    await submitAndTrack(
-      submitQcBatch,
-      'qc',
-      '质控重跑已开始，完成后本页会自动刷新',
-      { filters: rerunFilters.value, requestKey: crypto.randomUUID() }
-    )
-  } finally {
-    rerunning.value = false
-  }
-}
-
-/** 批量重跑：先结构化解析、再质控评分 */
-const rerunAll = async () => {
-  if (!(await confirmRerun('结构化解析与质控', qcTotal.value))) return
-  rerunning.value = true
-  rerunFilters.value = batchFilterPayload()
-  try {
-    await submitAndTrack(
-      submitExtractBatch,
-      'parse',
-      '结构化解析已开始，完成后会自动接着重跑质控',
-      { filters: rerunFilters.value, limit: 0, requestKey: crypto.randomUUID() }
-    )
-  } finally {
-    rerunning.value = false
-  }
-}
 
 /**
  * 找出「最该补词表」的类型。
@@ -945,29 +639,14 @@ onMounted(async () => {
     // 科室加载失败不阻断页面加载，仍按当前过滤条件（可能为空=全部）查询
   }
   await loadReport()
-  // 页面从后台切回来时，若重跑还在跑，立刻补一次进度检查
-  document.addEventListener('visibilitychange', onVisibilityChange)
 })
-
-// 离开页面必须停轮询：定时器活着会持续打接口，
-// 而这个页面可能早就被关掉了 —— 白白发请求，还可能让用户以为页面仍在忙
-onBeforeUnmount(() => {
-  stopPoll()
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-})
-
-function onVisibilityChange() {
-  if (document.visibilityState === 'visible' && pollTimer.value) {
-    pollOnce()
-  }
-}
 </script>
 
 <style scoped>
 /* ===== 报告头：一句话结论 + 统计口径 + 时间区间 / 刷新 / 导出，单卡承载 =====
    此前「质控门禁条 / 加载失败条 / 数据来源条 / 时间工具条 / 结论条」五条各自
    带左边框的长横幅叠在正文顶部。现收敛为一张卡：左边是随状态变化的结论，
-   右侧是操作，异常（失败 / 质控未完成）的重跑入口与进度就近放在结论下方。
+   右侧是操作，异常（失败 / 质控未完成）的引导与跳转就近放在结论下方。
    状态底色沿用旧结论条的三档语义：warn=赭石浅底，ok=米灰底，danger=警示浅底。 */
 .rpt-head {
   display: flex;
@@ -1048,7 +727,7 @@ function onVisibilityChange() {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-/* 质控未完成的重跑入口 + 进度：与状态同卡，靠上边框分组 */
+/* 质控未完成时的引导与跳转：与状态同卡，靠上边框分组 */
 .rh-ops {
   flex: 1 1 100%;
   display: flex;
@@ -1058,19 +737,6 @@ function onVisibilityChange() {
   margin-top: var(--sp-1);
   padding-top: var(--sp-3);
   border-top: 1px solid var(--line-soft);
-}
-.rh-progress {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 200px;
-}
-.gp-label {
-  flex: 0 0 auto;
-  font-size: var(--fs-xs);
-  color: var(--text-sub-strong);
-  white-space: nowrap;
 }
 /* 当前统计区间的口径说明 */
 .rh-range {
