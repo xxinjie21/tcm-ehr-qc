@@ -1,103 +1,199 @@
 [
   {
     "standardTerm": "肝气郁结",
-    "aliases": []
+    "aliases": [
+      "肝郁气滞",
+      "肝郁",
+      "肝气郁",
+      "肝气郁结证"
+    ]
   },
   {
     "standardTerm": "横逆犯胃",
-    "aliases": []
+    "aliases": [
+      "肝气横逆犯胃",
+      "肝气横逆"
+    ]
   },
   {
     "standardTerm": "胃失和降",
-    "aliases": []
+    "aliases": [
+      "胃气上逆",
+      "胃失和降证"
+    ]
   },
   {
     "standardTerm": "胃热炽盛",
-    "aliases": []
+    "aliases": [
+      "胃热",
+      "胃火炽盛",
+      "胃热证",
+      "胃火"
+    ]
   },
   {
     "standardTerm": "耗伤津液",
-    "aliases": []
+    "aliases": [
+      "津液耗伤",
+      "伤津",
+      "津液亏损"
+    ]
   },
   {
     "standardTerm": "气阴两伤",
-    "aliases": []
+    "aliases": [
+      "气阴两虚",
+      "气阴耗伤"
+    ]
   },
   {
     "standardTerm": "脾肾阳虚",
-    "aliases": []
+    "aliases": [
+      "脾肾两虚",
+      "脾肾阳亏",
+      "脾肾阳虚证"
+    ]
   },
   {
     "standardTerm": "水湿内停",
-    "aliases": []
+    "aliases": [
+      "水湿停聚",
+      "水湿内停证",
+      "水湿停"
+    ]
   },
   {
     "standardTerm": "气化不利",
-    "aliases": []
+    "aliases": [
+      "膀胱气化不利",
+      "气化失常"
+    ]
   },
   {
     "standardTerm": "寒湿痹阻",
-    "aliases": []
+    "aliases": [
+      "寒湿痹",
+      "寒湿阻络",
+      "风寒湿痹"
+    ]
   },
   {
     "standardTerm": "经络不通",
-    "aliases": []
+    "aliases": [
+      "经络阻滞",
+      "经络痹阻",
+      "不通则痛"
+    ]
   },
   {
     "standardTerm": "气血运行不畅",
-    "aliases": []
+    "aliases": [
+      "气血不畅",
+      "气血阻滞",
+      "气血不和"
+    ]
   },
   {
     "standardTerm": "肾阴亏虚",
-    "aliases": []
+    "aliases": [
+      "肾阴虚",
+      "肾阴不足",
+      "真阴不足",
+      "肾水不足"
+    ]
   },
   {
     "standardTerm": "水不涵木",
-    "aliases": []
+    "aliases": [
+      "水不生木",
+      "肝肾阴虚"
+    ]
   },
   {
     "standardTerm": "虚阳上亢",
-    "aliases": []
+    "aliases": [
+      "虚阳上浮",
+      "虚阳上越"
+    ]
   },
   {
     "standardTerm": "肝肾亏虚",
-    "aliases": []
+    "aliases": [
+      "肝肾阴虚",
+      "肝肾不足",
+      "肝肾两虚"
+    ]
   },
   {
     "standardTerm": "筋骨失养",
-    "aliases": []
+    "aliases": [
+      "筋骨失濡养",
+      "筋脉失养"
+    ]
   },
   {
     "standardTerm": "风寒湿痹阻经络",
-    "aliases": []
+    "aliases": [
+      "风寒湿痹",
+      "痹阻经络"
+    ]
   },
   {
     "standardTerm": "肝阳上亢",
-    "aliases": []
+    "aliases": [
+      "肝阳偏亢",
+      "阴虚阳亢",
+      "肝阳上扰",
+      "肝阳上亢证"
+    ]
   },
   {
     "standardTerm": "肝火上炎",
-    "aliases": []
+    "aliases": [
+      "肝火炽盛",
+      "肝火",
+      "肝火上炎证",
+      "肝经火旺"
+    ]
   },
   {
     "standardTerm": "上扰清窍",
-    "aliases": []
+    "aliases": [
+      "上扰清阳",
+      "上扰头目"
+    ]
   },
   {
     "standardTerm": "肝郁气滞",
-    "aliases": []
+    "aliases": [
+      "肝气郁结",
+      "肝郁",
+      "肝郁证",
+      "肝气郁"
+    ]
   },
   {
     "standardTerm": "痰气互结",
-    "aliases": []
+    "aliases": [
+      "痰气交阻",
+      "梅核气",
+      "痰气郁结"
+    ]
   },
   {
     "standardTerm": "郁而化热",
-    "aliases": []
+    "aliases": [
+      "郁久化热",
+      "五志化火"
+    ]
   },
   {
     "standardTerm": "心脾两虚",
-    "aliases": []
+    "aliases": [
+      "心脾不足",
+      "心脾气血两虚",
+      "心脾两虚证"
+    ]
   },
   {
     "standardTerm": "气血不足",
@@ -105,39 +201,64 @@
   },
   {
     "standardTerm": "心神失养",
-    "aliases": []
+    "aliases": [
+      "心血失养",
+      "心神不安"
+    ]
   },
   {
     "standardTerm": "肺气虚寒",
-    "aliases": []
+    "aliases": [
+      "肺虚寒",
+      "肺阳不足",
+      "肺气虚寒证"
+    ]
   },
   {
     "standardTerm": "卫表不固",
-    "aliases": []
+    "aliases": [
+      "表虚不固",
+      "肺卫不固",
+      "卫气不固"
+    ]
   },
   {
     "standardTerm": "寒邪犯鼻",
-    "aliases": []
+    "aliases": [
+      "风寒犯鼻",
+      "鼻窍受寒"
+    ]
   },
   {
     "standardTerm": "阴证",
-    "aliases": []
+    "aliases": [
+      "阴寒证"
+    ]
   },
   {
     "standardTerm": "阳证",
-    "aliases": []
+    "aliases": [
+      "阳热证"
+    ]
   },
   {
     "standardTerm": "表证",
-    "aliases": []
+    "aliases": [
+      "表证候"
+    ]
   },
   {
     "standardTerm": "表虚证",
-    "aliases": []
+    "aliases": [
+      "表虚",
+      "卫虚"
+    ]
   },
   {
     "standardTerm": "表实证",
-    "aliases": []
+    "aliases": [
+      "表实"
+    ]
   },
   {
     "standardTerm": "表闭水停证",
@@ -145,28 +266,39 @@
   },
   {
     "standardTerm": "里证",
-    "aliases": []
+    "aliases": [
+      "里证候"
+    ]
   },
   {
     "standardTerm": "里虚证",
-    "aliases": []
+    "aliases": [
+      "里虚"
+    ]
   },
   {
     "standardTerm": "里实证",
-    "aliases": []
+    "aliases": [
+      "里实"
+    ]
   },
   {
     "standardTerm": "寒证",
-    "aliases": []
+    "aliases": [
+      "寒证候"
+    ]
   },
   {
     "standardTerm": "表寒证",
-    "aliases": []
+    "aliases": [
+      "表寒"
+    ]
   },
   {
     "standardTerm": "里寒证",
     "aliases": [
-      "内寒证"
+      "内寒证",
+      "里寒"
     ]
   },
   {
@@ -187,11 +319,15 @@
   },
   {
     "standardTerm": "热证",
-    "aliases": []
+    "aliases": [
+      "热证候"
+    ]
   },
   {
     "standardTerm": "表热证",
-    "aliases": []
+    "aliases": [
+      "表热"
+    ]
   },
   {
     "standardTerm": "里热证",
@@ -216,7 +352,9 @@
   },
   {
     "standardTerm": "虚证",
-    "aliases": []
+    "aliases": [
+      "虚证候"
+    ]
   },
   {
     "standardTerm": "虚寒证",
@@ -228,7 +366,9 @@
   },
   {
     "standardTerm": "虚热证",
-    "aliases": []
+    "aliases": [
+      "虚热"
+    ]
   },
   {
     "standardTerm": "表里俱虚证",
@@ -240,7 +380,9 @@
   },
   {
     "standardTerm": "实证",
-    "aliases": []
+    "aliases": [
+      "实证候"
+    ]
   },
   {
     "standardTerm": "表里俱实证",

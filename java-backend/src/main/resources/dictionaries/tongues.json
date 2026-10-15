@@ -75,37 +75,48 @@
     "standardTerm": "舌强硬",
     "aliases": [
       "舌强",
-      "强硬舌"
+      "强硬舌",
+      "舌强直"
     ]
   },
   {
     "standardTerm": "舌痿软",
     "aliases": [
-      "痿软舌"
+      "痿软舌",
+      "舌痿",
+      "舌萎软"
     ]
   },
   {
     "standardTerm": "舌颤动",
     "aliases": [
-      "颤动舌"
+      "颤动舌",
+      "舌颤",
+      "舌体颤动"
     ]
   },
   {
     "standardTerm": "舌歪斜",
     "aliases": [
-      "歪斜舌"
+      "歪斜舌",
+      "舌偏斜",
+      "舌歪"
     ]
   },
   {
     "standardTerm": "舌吐弄",
     "aliases": [
-      "吐弄舌"
+      "吐弄舌",
+      "吐舌",
+      "弄舌"
     ]
   },
   {
     "standardTerm": "舌短缩",
     "aliases": [
-      "短缩舌"
+      "短缩舌",
+      "舌短",
+      "舌缩"
     ]
   },
   {
@@ -116,15 +127,21 @@
   },
   {
     "standardTerm": "舌红苔",
-    "aliases": []
+    "aliases": [
+      "舌红苔黄"
+    ]
   },
   {
     "standardTerm": "舌绛苔",
-    "aliases": []
+    "aliases": [
+      "绛舌苔"
+    ]
   },
   {
     "standardTerm": "舌青紫苔",
-    "aliases": []
+    "aliases": [
+      "青紫舌"
+    ]
   },
   {
     "standardTerm": "白苔",
@@ -260,39 +277,66 @@
   },
   {
     "standardTerm": "淡紫舌",
-    "aliases": []
+    "aliases": [
+      "舌质淡紫",
+      "舌色淡紫"
+    ]
   },
   {
     "standardTerm": "绛紫舌",
-    "aliases": []
+    "aliases": [
+      "舌质绛紫",
+      "舌绛紫"
+    ]
   },
   {
     "standardTerm": "紫暗舌",
-    "aliases": []
+    "aliases": [
+      "舌质紫暗",
+      "舌紫暗"
+    ]
   },
   {
     "standardTerm": "紫斑舌",
-    "aliases": []
+    "aliases": [
+      "舌紫斑",
+      "舌有紫斑"
+    ]
   },
   {
     "standardTerm": "地图舌",
-    "aliases": []
+    "aliases": [
+      "花剥舌",
+      "地图舌样苔"
+    ]
   },
   {
     "standardTerm": "黄白相兼苔",
-    "aliases": []
+    "aliases": [
+      "苔黄白相兼",
+      "黄白苔"
+    ]
   },
   {
     "standardTerm": "淡黄苔",
-    "aliases": []
+    "aliases": [
+      "苔淡黄",
+      "薄黄苔"
+    ]
   },
   {
     "standardTerm": "深黄苔",
-    "aliases": []
+    "aliases": [
+      "苔深黄",
+      "黄苔深"
+    ]
   },
   {
     "standardTerm": "焦黄苔",
-    "aliases": []
+    "aliases": [
+      "苔焦黄",
+      "黄焦苔"
+    ]
   },
   {
     "standardTerm": "荣舌",
@@ -344,54 +388,280 @@
   },
   {
     "standardTerm": "舌体",
-    "aliases": []
+    "aliases": [
+      "舌之形体"
+    ]
   },
   {
     "standardTerm": "舌神",
-    "aliases": []
+    "aliases": [
+      "舌之神气"
+    ]
   },
   {
     "standardTerm": "舌色",
-    "aliases": []
+    "aliases": [
+      "舌体颜色"
+    ]
   },
   {
     "standardTerm": "舌形",
-    "aliases": []
+    "aliases": [
+      "舌之形状"
+    ]
   },
   {
     "standardTerm": "舌态",
-    "aliases": []
+    "aliases": [
+      "舌之动态"
+    ]
   },
   {
     "standardTerm": "舌下络脉",
-    "aliases": []
+    "aliases": [
+      "舌下青筋",
+      "舌下脉络"
+    ]
   },
   {
     "standardTerm": "舌苔",
-    "aliases": []
+    "aliases": [
+      "舌之苔垢"
+    ]
   },
   {
     "standardTerm": "苔质",
-    "aliases": []
+    "aliases": [
+      "苔之质地"
+    ]
   },
   {
     "standardTerm": "苔色",
-    "aliases": []
+    "aliases": [
+      "苔之颜色"
+    ]
   },
   {
     "standardTerm": "滑苔",
-    "aliases": []
+    "aliases": [
+      "苔滑",
+      "苔水滑"
+    ]
   },
   {
     "standardTerm": "糙苔",
-    "aliases": []
+    "aliases": [
+      "苔糙",
+      "苔粗糙"
+    ]
   },
   {
     "standardTerm": "花剥苔",
-    "aliases": []
+    "aliases": [
+      "苔花剥",
+      "花剥"
+    ]
   },
   {
     "standardTerm": "光剥苔",
-    "aliases": []
+    "aliases": [
+      "苔光剥",
+      "镜面舌",
+      "光莹舌"
+    ]
+  },
+  {
+    "standardTerm": "舌绛紫",
+    "aliases": [
+      "舌紫绛",
+      "舌质紫绛"
+    ]
+  },
+  {
+    "standardTerm": "舌淡紫",
+    "aliases": [
+      "舌质淡紫"
+    ]
+  },
+  {
+    "standardTerm": "舌青",
+    "aliases": [
+      "舌质青"
+    ]
+  },
+  {
+    "standardTerm": "舌瘀斑",
+    "aliases": [
+      "舌有瘀斑",
+      "舌质瘀斑"
+    ]
+  },
+  {
+    "standardTerm": "舌瘀点",
+    "aliases": [
+      "舌有瘀点",
+      "舌质瘀点"
+    ]
+  },
+  {
+    "standardTerm": "舌红星",
+    "aliases": [
+      "舌起红星",
+      "舌红星点"
+    ]
+  },
+  {
+    "standardTerm": "舌胖",
+    "aliases": [
+      "舌质胖",
+      "舌体胖"
+    ]
+  },
+  {
+    "standardTerm": "舌胖嫩",
+    "aliases": [
+      "舌质胖嫩"
+    ]
+  },
+  {
+    "standardTerm": "舌肿胀",
+    "aliases": [
+      "舌肿",
+      "舌体肿胀"
+    ]
+  },
+  {
+    "standardTerm": "舌瘦",
+    "aliases": [
+      "舌质瘦",
+      "舌体瘦"
+    ]
+  },
+  {
+    "standardTerm": "舌麻痹",
+    "aliases": [
+      "舌麻木",
+      "舌不知味"
+    ]
+  },
+  {
+    "standardTerm": "苔薄白",
+    "aliases": [
+      "薄白苔"
+    ]
+  },
+  {
+    "standardTerm": "苔薄黄",
+    "aliases": [
+      "薄黄苔"
+    ]
+  },
+  {
+    "standardTerm": "苔白厚",
+    "aliases": [
+      "白厚苔"
+    ]
+  },
+  {
+    "standardTerm": "苔白腻",
+    "aliases": [
+      "白腻苔"
+    ]
+  },
+  {
+    "standardTerm": "苔白滑",
+    "aliases": [
+      "白滑苔"
+    ]
+  },
+  {
+    "standardTerm": "苔黄厚",
+    "aliases": [
+      "黄厚苔"
+    ]
+  },
+  {
+    "standardTerm": "苔黄腻",
+    "aliases": [
+      "黄腻苔"
+    ]
+  },
+  {
+    "standardTerm": "苔黄燥",
+    "aliases": [
+      "黄燥苔"
+    ]
+  },
+  {
+    "standardTerm": "苔焦黄",
+    "aliases": [
+      "焦黄苔"
+    ]
+  },
+  {
+    "standardTerm": "苔灰黑",
+    "aliases": [
+      "灰黑苔"
+    ]
+  },
+  {
+    "standardTerm": "苔少",
+    "aliases": [
+      "少苔",
+      "苔偏少"
+    ]
+  },
+  {
+    "standardTerm": "苔无",
+    "aliases": [
+      "无苔",
+      "苔净"
+    ]
+  },
+  {
+    "standardTerm": "苔花剥",
+    "aliases": [
+      "花剥苔",
+      "地图舌"
+    ]
+  },
+  {
+    "standardTerm": "苔光剥",
+    "aliases": [
+      "光剥苔",
+      "镜面舌"
+    ]
+  },
+  {
+    "standardTerm": "苔中根厚",
+    "aliases": [
+      "苔根厚",
+      "苔中后部厚"
+    ]
+  },
+  {
+    "standardTerm": "苔白如积粉",
+    "aliases": [
+      "积粉苔"
+    ]
+  },
+  {
+    "standardTerm": "舌下静脉怒张",
+    "aliases": [
+      "舌下青筋粗",
+      "舌下络脉曲张"
+    ]
+  },
+  {
+    "standardTerm": "舌下瘀点",
+    "aliases": [
+      "舌下有瘀点"
+    ]
+  },
+  {
+    "standardTerm": "重舌",
+    "aliases": [
+      "子舌"
+    ]
   }
 ]

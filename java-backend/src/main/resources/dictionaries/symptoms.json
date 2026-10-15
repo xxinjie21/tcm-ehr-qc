@@ -1,952 +1,3373 @@
 [
   {
     "standardTerm": "失眠",
-    "aliases": []
+    "aliases": [
+      "不寐",
+      "不得眠",
+      "不得卧",
+      "睡不着",
+      "入睡困难",
+      "失眠多梦"
+    ]
   },
   {
     "standardTerm": "胃脘胀痛",
     "aliases": [
       "胃脘胀疼痛",
-      "胃脘胀满痛"
+      "胃脘胀满痛",
+      "胃胀痛",
+      "上腹胀痛"
     ]
   },
   {
     "standardTerm": "嗳气",
-    "aliases": []
+    "aliases": [
+      "噫气",
+      "打饱嗝",
+      "嗳气频作"
+    ]
   },
   {
     "standardTerm": "多饮多食多尿",
-    "aliases": []
+    "aliases": [
+      "三多",
+      "多饮多尿多食"
+    ]
   },
   {
     "standardTerm": "消瘦",
-    "aliases": []
+    "aliases": [
+      "形体消瘦",
+      "肌肉消瘦",
+      "体重下降"
+    ]
   },
   {
     "standardTerm": "双下肢水肿",
-    "aliases": []
+    "aliases": [
+      "下肢浮肿",
+      "足胫肿",
+      "两脚肿",
+      "双下肢浮肿"
+    ]
   },
   {
     "standardTerm": "尿少",
-    "aliases": []
+    "aliases": [
+      "小便少",
+      "小便短少",
+      "尿量减少"
+    ]
   },
   {
     "standardTerm": "腰部冷痛",
     "aliases": [
-      "腰部冷疼痛"
+      "腰部冷疼痛",
+      "腰冷痛",
+      "腰腹冷痛"
     ]
   },
   {
     "standardTerm": "下肢麻木",
-    "aliases": []
+    "aliases": [
+      "下肢麻",
+      "腿麻",
+      "下肢麻木不仁"
+    ]
   },
   {
     "standardTerm": "潮热盗汗",
-    "aliases": []
+    "aliases": [
+      "潮热",
+      "盗汗",
+      "潮热汗出",
+      "骨蒸盗汗"
+    ]
   },
   {
     "standardTerm": "膝关节疼痛",
     "aliases": [
-      "膝关节疼疼痛"
+      "膝关节疼疼痛",
+      "膝痛",
+      "膝关节痛",
+      "膝部疼痛"
     ]
   },
   {
     "standardTerm": "酸软无力",
-    "aliases": []
+    "aliases": [
+      "腰膝酸软",
+      "四肢无力",
+      "酸软"
+    ]
   },
   {
     "standardTerm": "头晕头痛",
     "aliases": [
-      "头晕头疼痛"
+      "头晕头疼痛",
+      "头痛头晕",
+      "眩晕头痛"
     ]
   },
   {
     "standardTerm": "急躁易怒",
-    "aliases": []
+    "aliases": [
+      "急躁",
+      "易怒",
+      "易怒急躁"
+    ]
   },
   {
     "standardTerm": "颈前肿物",
-    "aliases": []
+    "aliases": [
+      "颈部肿物",
+      "颈前瘿肿",
+      "甲状腺肿大"
+    ]
   },
   {
     "standardTerm": "心悸手抖",
-    "aliases": []
+    "aliases": [
+      "心慌手抖",
+      "心悸",
+      "手抖"
+    ]
   },
   {
     "standardTerm": "心悸健忘",
-    "aliases": []
+    "aliases": [
+      "心慌健忘",
+      "心悸善忘"
+    ]
   },
   {
     "standardTerm": "鼻痒",
-    "aliases": []
+    "aliases": [
+      "鼻子痒",
+      "鼻内作痒"
+    ]
   },
   {
     "standardTerm": "喷嚏",
-    "aliases": []
+    "aliases": [
+      "打喷嚏",
+      "嚏喷"
+    ]
   },
   {
     "standardTerm": "流清涕",
     "aliases": [
-      "流清涕反复发作"
+      "流清涕反复发作",
+      "流清鼻涕",
+      "清涕",
+      "鼻流清涕"
     ]
   },
   {
     "standardTerm": "发热",
-    "aliases": []
+    "aliases": [
+      "发烧",
+      "身热",
+      "发热恶寒"
+    ]
   },
   {
     "standardTerm": "抽搐",
-    "aliases": []
+    "aliases": [
+      "抽风",
+      "抽搐动风",
+      "四肢抽搐",
+      "四肢抽掣"
+    ]
   },
   {
     "standardTerm": "谵语",
-    "aliases": []
+    "aliases": [
+      "谵言",
+      "胡言乱语",
+      "神昏谵语"
+    ]
   },
   {
     "standardTerm": "郑声",
-    "aliases": []
+    "aliases": [
+      "语言重复",
+      "郑声难语"
+    ]
   },
   {
     "standardTerm": "错语",
-    "aliases": []
+    "aliases": [
+      "语言错乱",
+      "错言乱语"
+    ]
   },
   {
     "standardTerm": "头痛",
-    "aliases": []
+    "aliases": [
+      "头疼",
+      "头疼痛"
+    ]
   },
   {
     "standardTerm": "眩晕",
-    "aliases": []
+    "aliases": [
+      "头晕",
+      "眼花",
+      "头晕目眩",
+      "眩冒"
+    ]
   },
   {
     "standardTerm": "晕厥",
-    "aliases": []
+    "aliases": [
+      "昏厥",
+      "晕绝",
+      "晕厥仆倒"
+    ]
   },
   {
     "standardTerm": "昏迷",
     "aliases": [
-      "神昏"
+      "神昏",
+      "不省人事",
+      "神志昏迷"
     ]
   },
   {
     "standardTerm": "烦躁",
-    "aliases": []
+    "aliases": [
+      "心烦",
+      "烦躁不安",
+      "躁扰"
+    ]
   },
   {
     "standardTerm": "健忘",
-    "aliases": []
+    "aliases": [
+      "善忘",
+      "记忆力减退",
+      "健忘失眠"
+    ]
   },
   {
     "standardTerm": "嗜睡",
-    "aliases": []
+    "aliases": [
+      "多寐",
+      "嗜眠",
+      "神倦欲睡",
+      "多卧"
+    ]
   },
   {
     "standardTerm": "目盲",
-    "aliases": []
+    "aliases": [
+      "失明",
+      "目不明",
+      "盲"
+    ]
   },
   {
     "standardTerm": "耳鸣",
-    "aliases": []
+    "aliases": [
+      "耳内鸣响",
+      "耳鸣如蝉",
+      "耳鸣有声"
+    ]
   },
   {
     "standardTerm": "耳聋",
-    "aliases": []
+    "aliases": [
+      "耳闭",
+      "耳无闻",
+      "听力下降"
+    ]
   },
   {
     "standardTerm": "鼻衄",
-    "aliases": []
+    "aliases": [
+      "鼻出血",
+      "鼻红",
+      "衄血"
+    ]
   },
   {
     "standardTerm": "牙痛",
-    "aliases": []
+    "aliases": [
+      "齿痛",
+      "牙齿痛"
+    ]
   },
   {
     "standardTerm": "齿衄",
     "aliases": [
-      "牙衄"
+      "牙衄",
+      "牙龈出血",
+      "齿缝出血"
     ]
   },
   {
     "standardTerm": "失音",
-    "aliases": []
+    "aliases": [
+      "音哑",
+      "声哑",
+      "音失",
+      "声音嘶哑"
+    ]
   },
   {
     "standardTerm": "咯血",
-    "aliases": []
+    "aliases": [
+      "咳血",
+      "嗽血",
+      "咯血痰"
+    ]
   },
   {
     "standardTerm": "咳嗽",
     "aliases": [
-      "咳逆"
+      "咳逆",
+      "咳",
+      "咳嗽不止",
+      "干咳"
     ]
   },
   {
     "standardTerm": "气喘",
     "aliases": [
-      "喘促"
+      "喘促",
+      "喘息",
+      "气急",
+      "喘"
     ]
   },
   {
     "standardTerm": "咳血",
-    "aliases": []
+    "aliases": [
+      "咯血",
+      "嗽血",
+      "咳鲜血"
+    ]
   },
   {
     "standardTerm": "胸痛",
-    "aliases": []
+    "aliases": [
+      "胸膺痛",
+      "胸作痛",
+      "胸部疼痛"
+    ]
   },
   {
     "standardTerm": "心悸",
-    "aliases": []
+    "aliases": [
+      "心慌",
+      "心跳",
+      "怔忡",
+      "惊悸"
+    ]
   },
   {
     "standardTerm": "心痛",
-    "aliases": []
+    "aliases": [
+      "胸心痛",
+      "心痛彻背",
+      "真心痛"
+    ]
   },
   {
     "standardTerm": "呕吐",
-    "aliases": []
+    "aliases": [
+      "吐",
+      "呕",
+      "呕吐物"
+    ]
   },
   {
     "standardTerm": "干呕",
-    "aliases": []
+    "aliases": [
+      "干呕有声",
+      "呕而无物"
+    ]
   },
   {
     "standardTerm": "暴吐",
-    "aliases": []
+    "aliases": [
+      "突然呕吐",
+      "呕甚"
+    ]
   },
   {
     "standardTerm": "呕血",
     "aliases": [
-      "吐血"
+      "吐血",
+      "呕血出"
     ]
   },
   {
     "standardTerm": "胃痛",
     "aliases": [
       "胃脘痛",
-      "脘痛"
+      "脘痛",
+      "心窝痛"
     ]
   },
   {
     "standardTerm": "脘痞",
-    "aliases": []
+    "aliases": [
+      "胃脘痞满",
+      "心下痞",
+      "胸脘痞闷"
+    ]
   },
   {
     "standardTerm": "嘈杂",
-    "aliases": []
+    "aliases": [
+      "心嘈",
+      "脘中嘈杂",
+      "似饥非饥"
+    ]
   },
   {
     "standardTerm": "胁痛",
-    "aliases": []
+    "aliases": [
+      "胁肋痛",
+      "季肋痛",
+      "胁痛连背"
+    ]
   },
   {
     "standardTerm": "黄疸",
-    "aliases": []
+    "aliases": [
+      "黄瘅",
+      "身目俱黄",
+      "面目发黄"
+    ]
   },
   {
     "standardTerm": "吐酸",
     "aliases": [
       "吞酸",
       "泛酸",
-      "噫酸"
+      "噫酸",
+      "吐酸水"
     ]
   },
   {
     "standardTerm": "腹痛",
-    "aliases": []
+    "aliases": [
+      "肚子痛",
+      "脐腹痛",
+      "少腹痛"
+    ]
   },
   {
     "standardTerm": "腹胀",
     "aliases": [
-      "腹满"
+      "腹满",
+      "腹部胀满",
+      "脘腹胀"
     ]
   },
   {
     "standardTerm": "腹泻",
-    "aliases": []
+    "aliases": [
+      "泄泻",
+      "拉肚子",
+      "便稀",
+      "下利"
+    ]
   },
   {
     "standardTerm": "腹水",
-    "aliases": []
+    "aliases": [
+      "腹大如鼓",
+      "水鼓",
+      "腹部膨隆"
+    ]
   },
   {
     "standardTerm": "便秘",
-    "aliases": []
+    "aliases": [
+      "大便难",
+      "大便不通",
+      "便结",
+      "大便干结"
+    ]
   },
   {
     "standardTerm": "便血",
-    "aliases": []
+    "aliases": [
+      "下血",
+      "便鲜血",
+      "黑便"
+    ]
   },
   {
     "standardTerm": "腰痛",
-    "aliases": []
+    "aliases": [
+      "腰背痛",
+      "腰酸痛",
+      "腰府作痛"
+    ]
   },
   {
     "standardTerm": "尿血",
-    "aliases": []
+    "aliases": [
+      "溲血",
+      "溺血",
+      "小便出血"
+    ]
   },
   {
     "standardTerm": "尿浊",
-    "aliases": []
+    "aliases": [
+      "小便浑浊",
+      "尿白浊",
+      "白浊"
+    ]
   },
   {
     "standardTerm": "水肿",
-    "aliases": []
+    "aliases": [
+      "浮肿",
+      "肌肤浮肿",
+      "通身浮肿"
+    ]
   },
   {
     "standardTerm": "关节痛",
-    "aliases": []
+    "aliases": [
+      "关节疼痛",
+      "骨节疼痛",
+      "痹痛"
+    ]
   },
   {
     "standardTerm": "瘫痪",
-    "aliases": []
+    "aliases": [
+      "半身不遂",
+      "痿痹",
+      "瘫痪不仁"
+    ]
   },
   {
     "standardTerm": "震颤",
-    "aliases": []
+    "aliases": [
+      "颤抖",
+      "震颤动风",
+      "手足颤动",
+      "抖动",
+      "振颤"
+    ]
   },
   {
     "standardTerm": "紫斑",
     "aliases": [
-      "肌衄"
+      "肌衄",
+      "紫癜",
+      "皮肤紫斑"
     ]
   },
   {
     "standardTerm": "出疹",
-    "aliases": []
+    "aliases": [
+      "发疹",
+      "疹出",
+      "皮肤出疹"
+    ]
   },
   {
     "standardTerm": "瘙痒",
     "aliases": [
-      "皮肤瘙痒"
+      "皮肤瘙痒",
+      "痒",
+      "痒甚",
+      "痒难忍"
     ]
   },
   {
     "standardTerm": "神疲乏力",
-    "aliases": []
+    "aliases": [
+      "乏力",
+      "神疲",
+      "疲乏",
+      "倦怠无力"
+    ]
   },
   {
     "standardTerm": "食少纳呆",
     "aliases": [
-      "纳呆"
+      "纳呆",
+      "食欲不振",
+      "纳差",
+      "食少",
+      "不思饮食"
     ]
   },
   {
     "standardTerm": "面色萎黄",
     "aliases": [
-      "面色淡黄"
+      "面色淡黄",
+      "萎黄",
+      "面色黄"
     ]
   },
   {
     "standardTerm": "食欲亢进",
     "aliases": [
-      "消谷善饥"
+      "消谷善饥",
+      "多食易饥",
+      "食欲旺"
     ]
   },
   {
     "standardTerm": "心烦易怒",
     "aliases": [
       "心烦",
-      "易怒"
+      "易怒",
+      "心烦急躁"
     ]
   },
   {
     "standardTerm": "头晕头重",
-    "aliases": []
+    "aliases": [
+      "头重如裹",
+      "头晕沉重",
+      "头重"
+    ]
   },
   {
     "standardTerm": "口渴喜冷饮",
-    "aliases": []
+    "aliases": [
+      "口渴",
+      "喜冷饮",
+      "渴喜饮冷"
+    ]
   },
   {
     "standardTerm": "易饥饿",
-    "aliases": []
+    "aliases": [
+      "易饥",
+      "饥不欲食",
+      "知饥"
+    ]
   },
   {
     "standardTerm": "小便频数",
     "aliases": [
-      "小便频数量多"
+      "小便频数量多",
+      "小便频",
+      "尿频",
+      "小便次数多"
     ]
   },
   {
     "standardTerm": "饮水不解",
-    "aliases": []
+    "aliases": [
+      "饮水不解渴",
+      "渴欲饮水不解"
+    ]
   },
   {
     "standardTerm": "晨轻暮重",
-    "aliases": []
+    "aliases": [
+      "朝轻暮重",
+      "晨起轻暮时重"
+    ]
   },
   {
     "standardTerm": "腰膝酸冷",
-    "aliases": []
+    "aliases": [
+      "腰膝冷",
+      "腰府酸冷",
+      "膝冷"
+    ]
   },
   {
     "standardTerm": "面色白",
     "aliases": [
-      "面色㿠白"
+      "面色㿠白",
+      "面色皓白",
+      "面白"
     ]
   },
   {
     "standardTerm": "尿量减少",
-    "aliases": []
+    "aliases": [
+      "尿少",
+      "小便不利",
+      "尿量少"
+    ]
   },
   {
     "standardTerm": "尿中泡沫增多",
-    "aliases": []
+    "aliases": [
+      "尿泡沫多",
+      "小便泡沫"
+    ]
   },
   {
     "standardTerm": "多梦",
-    "aliases": []
+    "aliases": [
+      "梦多",
+      "夜寐多梦",
+      "多梦纷纭"
+    ]
   },
   {
     "standardTerm": "面红目赤",
-    "aliases": []
+    "aliases": [
+      "面红",
+      "目赤",
+      "面红耳赤"
+    ]
   },
   {
     "standardTerm": "小便黄赤",
     "aliases": [
       "小便短黄",
-      "小便黄"
+      "小便黄",
+      "尿黄赤"
     ]
   },
   {
     "standardTerm": "五心烦热",
-    "aliases": []
+    "aliases": [
+      "五心热",
+      "手足心热",
+      "胸中烦热"
+    ]
   },
   {
     "standardTerm": "腰膝酸软",
-    "aliases": []
+    "aliases": [
+      "腰酸膝软",
+      "腰膝无力",
+      "腰脊酸软"
+    ]
   },
   {
     "standardTerm": "口干",
     "aliases": [
       "口渴",
-      "口干咽燥"
+      "口干咽燥",
+      "口干舌燥"
     ]
   },
   {
     "standardTerm": "大便偏干",
     "aliases": [
-      "大便干结"
+      "大便干结",
+      "便干",
+      "大便燥"
     ]
   },
   {
     "standardTerm": "形体偏瘦",
     "aliases": [
-      "形体消瘦"
+      "形体消瘦",
+      "体瘦",
+      "瘦"
     ]
   },
   {
     "standardTerm": "面色潮红",
-    "aliases": []
+    "aliases": [
+      "面赤",
+      "面部潮红",
+      "午后两颧潮红"
+    ]
   },
   {
     "standardTerm": "目涩",
     "aliases": [
       "两目干涩",
-      "目睛干涩"
+      "目睛干涩",
+      "眼干"
     ]
   },
   {
     "standardTerm": "体重下降",
-    "aliases": []
+    "aliases": [
+      "消瘦",
+      "体重减轻",
+      "形体渐瘦"
+    ]
   },
   {
     "standardTerm": "头晕目眩",
     "aliases": [
-      "头晕眼花"
+      "头晕眼花",
+      "眩冒",
+      "头旋眼黑"
     ]
   },
   {
     "standardTerm": "自汗",
     "aliases": [
-      "自汗频作"
+      "自汗频作",
+      "自汗出",
+      "动则汗出"
     ]
   },
   {
     "standardTerm": "皮肤干燥",
     "aliases": [
-      "肌肤干燥"
+      "肌肤干燥",
+      "皮燥",
+      "皮肤枯"
     ]
   },
   {
     "standardTerm": "气短",
     "aliases": [
-      "气短懒言"
+      "气短懒言",
+      "气怯",
+      "气不足"
     ]
   },
   {
     "standardTerm": "食少",
-    "aliases": []
+    "aliases": [
+      "纳少",
+      "进食少",
+      "饮食减少"
+    ]
   },
   {
     "standardTerm": "胸闷",
     "aliases": [
-      "胸闷太息"
+      "胸闷太息",
+      "胸痞",
+      "胸中闷"
     ]
   },
   {
     "standardTerm": "行走不稳",
-    "aliases": []
+    "aliases": [
+      "步态不稳",
+      "行步不正",
+      "步履不稳"
+    ]
   },
   {
     "standardTerm": "唇红",
-    "aliases": []
+    "aliases": [
+      "唇色红",
+      "口唇红"
+    ]
   },
   {
     "standardTerm": "口苦",
     "aliases": [
-      "口苦咽干"
+      "口苦咽干",
+      "口内味苦"
     ]
   },
   {
     "standardTerm": "痛连两胁",
-    "aliases": []
+    "aliases": [
+      "胁肋牵痛",
+      "痛引两胁"
+    ]
   },
   {
     "standardTerm": "眼球突出",
     "aliases": [
-      "目突"
+      "目突",
+      "突眼",
+      "眼球胀突"
     ]
   },
   {
     "standardTerm": "吞咽时上下移动",
-    "aliases": []
+    "aliases": [
+      "吞咽移动",
+      "随吞咽移动"
+    ]
   },
   {
     "standardTerm": "鼻塞",
-    "aliases": []
+    "aliases": [
+      "鼻堵",
+      "鼻不通",
+      "鼻塞流涕"
+    ]
   },
   {
     "standardTerm": "咽痛",
-    "aliases": []
+    "aliases": [
+      "咽喉痛",
+      "咽痛红肿",
+      "咽肿痛"
+    ]
   },
   {
     "standardTerm": "咽痒",
-    "aliases": []
+    "aliases": [
+      "咽喉痒",
+      "咽中作痒"
+    ]
   },
   {
     "standardTerm": "腰酸",
-    "aliases": []
+    "aliases": [
+      "腰部酸楚",
+      "腰酸痛",
+      "腰膂酸"
+    ]
   },
   {
     "standardTerm": "恶寒",
-    "aliases": []
+    "aliases": [
+      "怕冷",
+      "畏寒",
+      "恶寒发热"
+    ]
   },
   {
     "standardTerm": "能食",
-    "aliases": []
+    "aliases": [
+      "食量大",
+      "食欲佳",
+      "纳可"
+    ]
   },
   {
     "standardTerm": "心慌",
-    "aliases": []
+    "aliases": [
+      "心悸",
+      "心跳",
+      "怔忡"
+    ]
   },
   {
     "standardTerm": "恶风",
-    "aliases": []
+    "aliases": [
+      "怕风",
+      "畏风",
+      "遇风则恶"
+    ]
   },
   {
     "standardTerm": "知饥",
-    "aliases": []
+    "aliases": [
+      "知饥欲食",
+      "饥而欲食"
+    ]
   },
   {
     "standardTerm": "反酸",
-    "aliases": []
+    "aliases": [
+      "吞酸",
+      "吐酸",
+      "泛酸"
+    ]
   },
   {
     "standardTerm": "汗出",
-    "aliases": []
+    "aliases": [
+      "出汗",
+      "汗出溱溱",
+      "汗大出"
+    ]
   },
   {
     "standardTerm": "口粘",
-    "aliases": []
+    "aliases": [
+      "口黏腻",
+      "口中粘腻",
+      "口粘不爽"
+    ]
   },
   {
     "standardTerm": "流涕",
-    "aliases": []
+    "aliases": [
+      "流鼻水",
+      "鼻流清涕",
+      "流涕不止"
+    ]
   },
   {
     "standardTerm": "怕冷",
-    "aliases": []
+    "aliases": [
+      "畏寒",
+      "恶寒",
+      "畏冷"
+    ]
   },
   {
     "standardTerm": "夜尿",
-    "aliases": []
+    "aliases": [
+      "夜尿频",
+      "夜起小便",
+      "夜尿多"
+    ]
   },
   {
     "standardTerm": "口臭",
-    "aliases": []
+    "aliases": [
+      "口气臭",
+      "口气秽臭",
+      "口臭秽"
+    ]
   },
   {
     "standardTerm": "肠鸣",
-    "aliases": []
+    "aliases": [
+      "腹中肠鸣",
+      "肠鸣漉漉"
+    ]
   },
   {
     "standardTerm": "纳可",
-    "aliases": []
+    "aliases": [
+      "纳食可",
+      "食欲可",
+      "纳正常"
+    ]
   },
   {
     "standardTerm": "胃胀",
-    "aliases": []
+    "aliases": [
+      "胃脘胀",
+      "腹部胀满",
+      "胃中胀"
+    ]
   },
   {
     "standardTerm": "恶心",
-    "aliases": []
+    "aliases": [
+      "泛恶",
+      "恶心欲吐",
+      "心中愠愠欲吐"
+    ]
   },
   {
     "standardTerm": "怯寒",
-    "aliases": []
+    "aliases": [
+      "怕冷",
+      "畏寒",
+      "怯寒肢冷"
+    ]
   },
   {
     "standardTerm": "矢气",
-    "aliases": []
+    "aliases": [
+      "放屁",
+      "出气",
+      "矢气频作"
+    ]
   },
   {
     "standardTerm": "梦呓",
-    "aliases": []
+    "aliases": [
+      "说梦话",
+      "梦语",
+      "睡中呢喃"
+    ]
   },
   {
     "standardTerm": "头昏",
-    "aliases": []
+    "aliases": [
+      "头晕",
+      "头沉",
+      "头昏沉"
+    ]
   },
   {
     "standardTerm": "唇干",
-    "aliases": []
+    "aliases": [
+      "口唇干",
+      "唇燥",
+      "唇干少津"
+    ]
   },
   {
     "standardTerm": "恶热",
-    "aliases": []
+    "aliases": [
+      "怕热",
+      "畏热",
+      "恶热喜凉"
+    ]
   },
   {
     "standardTerm": "无汗",
-    "aliases": []
+    "aliases": [
+      "不出汗",
+      "无汗出",
+      "汗不得出"
+    ]
   },
   {
     "standardTerm": "鼻干",
-    "aliases": []
+    "aliases": [
+      "鼻腔干燥",
+      "鼻燥",
+      "鼻干少津"
+    ]
   },
   {
     "standardTerm": "疲倦",
-    "aliases": []
+    "aliases": [
+      "疲乏",
+      "倦怠",
+      "神疲"
+    ]
   },
   {
     "standardTerm": "耳痒",
-    "aliases": []
+    "aliases": [
+      "耳内作痒",
+      "耳痒难忍"
+    ]
   },
   {
     "standardTerm": "怕热",
-    "aliases": []
+    "aliases": [
+      "恶热",
+      "畏热",
+      "喜凉"
+    ]
   },
   {
     "standardTerm": "流涎",
-    "aliases": []
+    "aliases": [
+      "流口水",
+      "口涎自流",
+      "涎多"
+    ]
   },
   {
     "standardTerm": "白带",
-    "aliases": []
+    "aliases": [
+      "带下",
+      "白带多",
+      "带下量多"
+    ]
   },
   {
     "standardTerm": "疲劳",
-    "aliases": []
+    "aliases": [
+      "疲乏",
+      "倦怠",
+      "劳累"
+    ]
   },
   {
     "standardTerm": "手凉",
-    "aliases": []
+    "aliases": [
+      "手足凉",
+      "手冷",
+      "四肢凉"
+    ]
   },
   {
     "standardTerm": "畏寒",
-    "aliases": []
+    "aliases": [
+      "怕冷",
+      "恶寒",
+      "畏冷肢凉"
+    ]
   },
   {
     "standardTerm": "干咳",
-    "aliases": []
+    "aliases": [
+      "咳而无痰",
+      "干咳无痰",
+      "呛咳"
+    ]
   },
   {
     "standardTerm": "纳差",
-    "aliases": []
+    "aliases": [
+      "纳呆",
+      "食欲不振",
+      "食少纳差",
+      "食少"
+    ]
   },
   {
     "standardTerm": "欲呕",
-    "aliases": []
+    "aliases": [
+      "欲吐",
+      "泛恶欲呕",
+      "心中愠愠"
+    ]
   },
   {
     "standardTerm": "目痒",
-    "aliases": []
+    "aliases": [
+      "眼睛痒",
+      "目内作痒",
+      "双目痒"
+    ]
   },
   {
     "standardTerm": "磨牙",
-    "aliases": []
+    "aliases": [
+      "齘齿",
+      "夜磨牙"
+    ]
   },
   {
     "standardTerm": "灼热",
-    "aliases": []
+    "aliases": [
+      "烧灼",
+      "灼热感",
+      "痛如火烧"
+    ]
   },
   {
     "standardTerm": "易醒",
-    "aliases": []
+    "aliases": [
+      "寐而易醒",
+      "睡浅易醒",
+      "眠浅易醒"
+    ]
   },
   {
     "standardTerm": "鼻涕",
-    "aliases": []
+    "aliases": [
+      "鼻内分泌物",
+      "鼻涕多"
+    ]
   },
   {
     "standardTerm": "出汗",
-    "aliases": []
+    "aliases": [
+      "汗出",
+      "汗多",
+      "自汗"
+    ]
   },
   {
     "standardTerm": "手麻",
-    "aliases": []
+    "aliases": [
+      "手指麻木",
+      "手麻木",
+      "上肢麻"
+    ]
   },
   {
     "standardTerm": "眼干",
-    "aliases": []
+    "aliases": [
+      "目涩",
+      "两目干涩",
+      "眼干涩"
+    ]
   },
   {
     "standardTerm": "出血",
-    "aliases": []
+    "aliases": [
+      "血溢",
+      "出血不止",
+      "动则出血"
+    ]
   },
   {
     "standardTerm": "尿频",
-    "aliases": []
+    "aliases": [
+      "小便频数",
+      "小便频",
+      "尿次数多"
+    ]
   },
   {
     "standardTerm": "咽阻",
-    "aliases": []
+    "aliases": [
+      "咽中梗阻",
+      "咽中如有物阻",
+      "梅核气"
+    ]
   },
   {
     "standardTerm": "口淡",
-    "aliases": []
+    "aliases": [
+      "口淡无味",
+      "口中无味",
+      "纳谷不香"
+    ]
   },
   {
     "standardTerm": "眠浅",
-    "aliases": []
+    "aliases": [
+      "寐浅",
+      "睡眠浅",
+      "易醒"
+    ]
   },
   {
     "standardTerm": "经期",
-    "aliases": []
+    "aliases": [
+      "月经周期",
+      "经期腹痛",
+      "经行"
+    ]
   },
   {
     "standardTerm": "尿黄",
-    "aliases": []
+    "aliases": [
+      "小便黄",
+      "尿色黄",
+      "小便黄赤"
+    ]
   },
   {
     "standardTerm": "痰多",
-    "aliases": []
+    "aliases": [
+      "痰量多",
+      "痰粘",
+      "痰多色白"
+    ]
   },
   {
     "standardTerm": "打鼾",
-    "aliases": []
+    "aliases": [
+      "打呼",
+      "鼾眠",
+      "夜鼾声"
+    ]
   },
   {
     "standardTerm": "欲食",
-    "aliases": []
+    "aliases": [
+      "思食",
+      "欲进食",
+      "知味"
+    ]
   },
   {
     "standardTerm": "咯痰",
-    "aliases": []
+    "aliases": [
+      "咳痰",
+      "咳出痰",
+      "痰出"
+    ]
   },
   {
     "standardTerm": "身痒",
-    "aliases": []
+    "aliases": [
+      "身上痒",
+      "皮肤瘙痒",
+      "遍身痒"
+    ]
   },
   {
     "standardTerm": "呃逆",
-    "aliases": []
+    "aliases": [
+      "打呃",
+      "哕逆",
+      "呃逆连声"
+    ]
   },
   {
     "standardTerm": "便溏",
-    "aliases": []
+    "aliases": [
+      "大便溏",
+      "大便稀",
+      "便稀溏"
+    ]
   },
   {
     "standardTerm": "脱皮",
-    "aliases": []
+    "aliases": [
+      "脱屑",
+      "皮脱",
+      "皮肤脱屑"
+    ]
   },
   {
     "standardTerm": "眼痒",
-    "aliases": []
+    "aliases": [
+      "目痒",
+      "眼睛痒",
+      "双目作痒"
+    ]
   },
   {
     "standardTerm": "皮疹",
-    "aliases": []
+    "aliases": [
+      "皮损",
+      "皮肤上起疹",
+      "发疹"
+    ]
   },
   {
     "standardTerm": "脱发",
-    "aliases": []
+    "aliases": [
+      "掉发",
+      "发落",
+      "头发脱落",
+      "斑秃",
+      "油风"
+    ]
   },
   {
     "standardTerm": "欲饮",
-    "aliases": []
+    "aliases": [
+      "口渴欲饮",
+      "思饮",
+      "欲饮水"
+    ]
   },
   {
     "standardTerm": "脱屑",
-    "aliases": []
+    "aliases": [
+      "脱皮",
+      "鳞屑",
+      "皮肤脱屑"
+    ]
   },
   {
     "standardTerm": "腰胀",
-    "aliases": []
+    "aliases": [
+      "腰部胀",
+      "腰腹胀",
+      "腰府胀"
+    ]
   },
   {
     "standardTerm": "尿多",
-    "aliases": []
+    "aliases": [
+      "小便多",
+      "尿次多",
+      "夜尿多"
+    ]
   },
   {
     "standardTerm": "带下",
-    "aliases": []
+    "aliases": [
+      "白带",
+      "带下量多",
+      "赤白带下",
+      "白带多"
+    ]
   },
   {
     "standardTerm": "咳痰",
-    "aliases": []
+    "aliases": [
+      "咯痰",
+      "咳出痰",
+      "痰稠"
+    ]
   },
   {
     "standardTerm": "身痛",
-    "aliases": []
+    "aliases": [
+      "身体痛",
+      "一身尽痛",
+      "肢体痛"
+    ]
   },
   {
     "standardTerm": "有汗",
-    "aliases": []
+    "aliases": [
+      "汗出",
+      "有汗出",
+      "自汗"
+    ]
   },
   {
     "standardTerm": "刺痛",
-    "aliases": []
+    "aliases": [
+      "痛如针刺",
+      "刺痛难忍",
+      "针刺样痛"
+    ]
   },
   {
     "standardTerm": "口涩",
-    "aliases": []
+    "aliases": [
+      "口内涩",
+      "口舌涩",
+      "口干涩"
+    ]
   },
   {
     "standardTerm": "短气",
-    "aliases": []
+    "aliases": [
+      "气短",
+      "少气",
+      "呼吸短"
+    ]
   },
   {
     "standardTerm": "背痛",
-    "aliases": []
+    "aliases": [
+      "背部痛",
+      "脊背痛",
+      "背痛连项"
+    ]
   },
   {
     "standardTerm": "隐痛",
-    "aliases": []
+    "aliases": [
+      "隐隐作痛",
+      "绵绵作痛",
+      "隐痛不适"
+    ]
   },
   {
     "standardTerm": "足冷",
-    "aliases": []
+    "aliases": [
+      "两足冷",
+      "足下凉",
+      "两足不温"
+    ]
   },
   {
     "standardTerm": "鼾声",
-    "aliases": []
+    "aliases": [
+      "打鼾",
+      "鼾声如雷",
+      "夜鼾"
+    ]
   },
   {
     "standardTerm": "焦虑",
-    "aliases": []
+    "aliases": [
+      "忧虑",
+      "焦躁",
+      "焦虑不安"
+    ]
   },
   {
     "standardTerm": "寐可",
-    "aliases": []
+    "aliases": [
+      "睡眠可",
+      "寐安",
+      "夜寐安"
+    ]
   },
   {
     "standardTerm": "头胀",
-    "aliases": []
+    "aliases": [
+      "头部胀",
+      "头胀重",
+      "头胀如裹"
+    ]
   },
   {
     "standardTerm": "口甜",
-    "aliases": []
+    "aliases": [
+      "口内甜",
+      "口中甜",
+      "口甜粘腻",
+      "口中甜腻"
+    ]
   },
   {
     "standardTerm": "口酸",
-    "aliases": []
+    "aliases": [
+      "口内酸",
+      "口酸馊",
+      "吐酸"
+    ]
   },
   {
     "standardTerm": "身热",
-    "aliases": []
+    "aliases": [
+      "发热",
+      "身灼热",
+      "身热不扬"
+    ]
   },
   {
     "standardTerm": "黄汗",
-    "aliases": []
+    "aliases": [
+      "汗出色黄",
+      "黄汗染衣"
+    ]
   },
   {
     "standardTerm": "尿急",
-    "aliases": []
+    "aliases": [
+      "尿急迫",
+      "欲小便急",
+      "尿意频数"
+    ]
   },
   {
     "standardTerm": "头汗",
-    "aliases": []
+    "aliases": [
+      "但头汗出",
+      "头额汗",
+      "头面汗"
+    ]
   },
   {
     "standardTerm": "昏沉",
-    "aliases": []
+    "aliases": [
+      "头昏沉",
+      "神昏",
+      "头重昏蒙"
+    ]
   },
   {
     "standardTerm": "畏光",
-    "aliases": []
+    "aliases": [
+      "怕光",
+      "恶光",
+      "见光则不适",
+      "羞明"
+    ]
   },
   {
     "standardTerm": "鼻鸣",
-    "aliases": []
+    "aliases": [
+      "鼻鸣漉漉",
+      "鼻塞声重"
+    ]
   },
   {
     "standardTerm": "少气",
-    "aliases": []
+    "aliases": [
+      "气短",
+      "气怯",
+      "少气懒言"
+    ]
   },
   {
     "standardTerm": "烧心",
-    "aliases": []
+    "aliases": [
+      "胃中灼热",
+      "心口烧灼感",
+      "烧心反酸"
+    ]
   },
   {
     "standardTerm": "低热",
-    "aliases": []
+    "aliases": [
+      "低热缠绵",
+      "潮热",
+      "低热不退"
+    ]
   },
   {
     "standardTerm": "手冷",
-    "aliases": []
+    "aliases": [
+      "手凉",
+      "手足冷",
+      "上肢不温"
+    ]
   },
   {
     "standardTerm": "鼻痠",
-    "aliases": []
+    "aliases": [
+      "鼻酸",
+      "鼻内酸",
+      "鼻酸痒"
+    ]
   },
   {
     "standardTerm": "鼻堵",
-    "aliases": []
+    "aliases": [
+      "鼻塞",
+      "鼻不通",
+      "鼻窍不利"
+    ]
   },
   {
     "standardTerm": "早醒",
-    "aliases": []
+    "aliases": [
+      "醒来早",
+      "黎明即醒",
+      "醒后难再眠"
+    ]
   },
   {
     "standardTerm": "膝痛",
-    "aliases": []
+    "aliases": [
+      "膝关节痛",
+      "膝部痛",
+      "膝酸疼"
+    ]
   },
   {
     "standardTerm": "寐差",
-    "aliases": []
+    "aliases": [
+      "睡眠差",
+      "寐不安",
+      "夜寐差"
+    ]
   },
   {
     "standardTerm": "多汗",
-    "aliases": []
+    "aliases": [
+      "汗多",
+      "自汗多",
+      "盗汗多"
+    ]
   },
   {
     "standardTerm": "喘息",
-    "aliases": []
+    "aliases": [
+      "喘促",
+      "气喘",
+      "呼多吸少"
+    ]
   },
   {
     "standardTerm": "困倦",
-    "aliases": []
+    "aliases": [
+      "疲乏欲睡",
+      "困倦嗜睡",
+      "困倦乏力"
+    ]
   },
   {
     "standardTerm": "欲吐",
-    "aliases": []
+    "aliases": [
+      "欲呕",
+      "恶心欲吐",
+      "心中愠愠"
+    ]
   },
   {
     "standardTerm": "燥热",
-    "aliases": []
+    "aliases": [
+      "干燥灼热",
+      "燥热口渴",
+      "燥热不安"
+    ]
   },
   {
     "standardTerm": "阴痒",
-    "aliases": []
+    "aliases": [
+      "外阴痒",
+      "阴门痒",
+      "阴中痒"
+    ]
   },
   {
     "standardTerm": "抽筋",
-    "aliases": []
+    "aliases": [
+      "转筋",
+      "筋脉拘急",
+      "四肢抽筋"
+    ]
   },
   {
     "standardTerm": "眠差",
-    "aliases": []
+    "aliases": [
+      "寐差",
+      "睡眠差",
+      "夜寐不安"
+    ]
+  },
+  {
+    "standardTerm": "头重如裹",
+    "aliases": [
+      "首如裹",
+      "头沉重"
+    ]
+  },
+  {
+    "standardTerm": "头摇",
+    "aliases": [
+      "头颤",
+      "头部摇动"
+    ]
+  },
+  {
+    "standardTerm": "头响",
+    "aliases": [
+      "脑鸣",
+      "头内作响"
+    ]
+  },
+  {
+    "standardTerm": "项强",
+    "aliases": [
+      "颈项强",
+      "项背强"
+    ]
+  },
+  {
+    "standardTerm": "面赤",
+    "aliases": [
+      "面部发红",
+      "两颧发红"
+    ]
+  },
+  {
+    "standardTerm": "面白",
+    "aliases": [
+      "面色苍白",
+      "面色㿠白"
+    ]
+  },
+  {
+    "standardTerm": "面黄",
+    "aliases": [
+      "面色萎黄"
+    ]
+  },
+  {
+    "standardTerm": "面青",
+    "aliases": [
+      "面色发青"
+    ]
+  },
+  {
+    "standardTerm": "面黑",
+    "aliases": [
+      "面色晦暗",
+      "面色黧黑"
+    ]
+  },
+  {
+    "standardTerm": "面浮",
+    "aliases": [
+      "面目浮肿",
+      "眼睑浮肿"
+    ]
+  },
+  {
+    "standardTerm": "目赤",
+    "aliases": [
+      "目睛红",
+      "结膜充血"
+    ]
+  },
+  {
+    "standardTerm": "目黄",
+    "aliases": [
+      "巩膜黄染",
+      "目睛发黄"
+    ]
+  },
+  {
+    "standardTerm": "目翳",
+    "aliases": [
+      "目生翳",
+      "翳膜"
+    ]
+  },
+  {
+    "standardTerm": "目痛",
+    "aliases": [
+      "眼球痛",
+      "目珠痛"
+    ]
+  },
+  {
+    "standardTerm": "目昏",
+    "aliases": [
+      "视物昏花",
+      "视物模糊"
+    ]
+  },
+  {
+    "standardTerm": "夜盲",
+    "aliases": [
+      "雀目",
+      "鸡盲眼"
+    ]
+  },
+  {
+    "standardTerm": "视歧",
+    "aliases": [
+      "视一为二",
+      "复视"
+    ]
+  },
+  {
+    "standardTerm": "暴盲",
+    "aliases": [
+      "视力骤降"
+    ]
+  },
+  {
+    "standardTerm": "耳痛",
+    "aliases": [
+      "耳内疼痛"
+    ]
+  },
+  {
+    "standardTerm": "耳脓",
+    "aliases": [
+      "耳内流脓",
+      "聤耳"
+    ]
+  },
+  {
+    "standardTerm": "鼻煽",
+    "aliases": [
+      "鼻翼煽动"
+    ]
+  },
+  {
+    "standardTerm": "鼻臭",
+    "aliases": [
+      "鼻内臭气"
+    ]
+  },
+  {
+    "standardTerm": "口歪",
+    "aliases": [
+      "口眼歪斜",
+      "口角歪斜"
+    ]
+  },
+  {
+    "standardTerm": "口噤",
+    "aliases": [
+      "牙关紧闭"
+    ]
+  },
+  {
+    "standardTerm": "口疮",
+    "aliases": [
+      "口腔溃破",
+      "口糜"
+    ]
+  },
+  {
+    "standardTerm": "口咸",
+    "aliases": [
+      "口中咸味"
+    ]
+  },
+  {
+    "standardTerm": "口腻",
+    "aliases": [
+      "口中粘腻"
+    ]
+  },
+  {
+    "standardTerm": "牙宣",
+    "aliases": [
+      "牙龈萎缩",
+      "齿宣"
+    ]
+  },
+  {
+    "standardTerm": "牙动",
+    "aliases": [
+      "牙齿松动"
+    ]
+  },
+  {
+    "standardTerm": "咽肿",
+    "aliases": [
+      "咽喉红肿"
+    ]
+  },
+  {
+    "standardTerm": "咽中炙脔",
+    "aliases": [
+      "咽中如有物阻",
+      "梅核气"
+    ]
+  },
+  {
+    "standardTerm": "声重",
+    "aliases": [
+      "声浊",
+      "鼻塞声重"
+    ]
+  },
+  {
+    "standardTerm": "颈肿",
+    "aliases": [
+      "颈部肿大"
+    ]
+  },
+  {
+    "standardTerm": "瘿肿",
+    "aliases": [
+      "甲状腺肿大"
+    ]
+  },
+  {
+    "standardTerm": "瘰疬",
+    "aliases": [
+      "颈部淋巴结结核"
+    ]
+  },
+  {
+    "standardTerm": "痰核",
+    "aliases": [
+      "皮下痰核",
+      "痰核流注"
+    ]
+  },
+  {
+    "standardTerm": "乳房胀痛",
+    "aliases": [
+      "乳胀",
+      "乳房作胀"
+    ]
+  },
+  {
+    "standardTerm": "乳汁自出",
+    "aliases": [
+      "漏乳",
+      "乳汁自溢"
+    ]
+  },
+  {
+    "standardTerm": "善太息",
+    "aliases": [
+      "太息",
+      "长吁短叹"
+    ]
+  },
+  {
+    "standardTerm": "息粗",
+    "aliases": [
+      "呼吸气粗"
+    ]
+  },
+  {
+    "standardTerm": "息微",
+    "aliases": [
+      "呼吸微弱"
+    ]
+  },
+  {
+    "standardTerm": "哮鸣",
+    "aliases": [
+      "痰鸣",
+      "喉中哮鸣"
+    ]
+  },
+  {
+    "standardTerm": "不能平卧",
+    "aliases": [
+      "倚息",
+      "平卧则喘"
+    ]
+  },
+  {
+    "standardTerm": "唾血",
+    "aliases": [
+      "唾液带血"
+    ]
+  },
+  {
+    "standardTerm": "怔忡",
+    "aliases": [
+      "心跳剧烈",
+      "怔忡不安"
+    ]
+  },
+  {
+    "standardTerm": "喜悲",
+    "aliases": [
+      "善悲",
+      "悲伤欲哭"
+    ]
+  },
+  {
+    "standardTerm": "善怒",
+    "aliases": [
+      "易怒",
+      "急躁易怒"
+    ]
+  },
+  {
+    "standardTerm": "善恐",
+    "aliases": [
+      "恐惧",
+      "善恐易惊"
+    ]
+  },
+  {
+    "standardTerm": "善忧",
+    "aliases": [
+      "忧虑",
+      "忧思不解"
+    ]
+  },
+  {
+    "standardTerm": "善思",
+    "aliases": [
+      "思虑过度"
+    ]
+  },
+  {
+    "standardTerm": "梦游",
+    "aliases": [
+      "夜游症"
+    ]
+  },
+  {
+    "standardTerm": "梦交",
+    "aliases": [
+      "梦中与异性交"
+    ]
+  },
+  {
+    "standardTerm": "梦魇",
+    "aliases": [
+      "恶梦",
+      "梦魇惊怖"
+    ]
+  },
+  {
+    "standardTerm": "梦遗",
+    "aliases": [
+      "梦泄"
+    ]
+  },
+  {
+    "standardTerm": "滑精",
+    "aliases": [
+      "滑泄",
+      "无梦而遗"
+    ]
+  },
+  {
+    "standardTerm": "早泄",
+    "aliases": [
+      "房事早泄"
+    ]
+  },
+  {
+    "standardTerm": "阳痿",
+    "aliases": [
+      "阴痿",
+      "阴器不举"
+    ]
+  },
+  {
+    "standardTerm": "少腹痛",
+    "aliases": [
+      "小腹痛",
+      "脐腹痛"
+    ]
+  },
+  {
+    "standardTerm": "绕脐痛",
+    "aliases": [
+      "脐周痛"
+    ]
+  },
+  {
+    "standardTerm": "心下痞",
+    "aliases": [
+      "胃脘痞满",
+      "心下痞满"
+    ]
+  },
+  {
+    "standardTerm": "心下悸",
+    "aliases": [
+      "胃脘跳动",
+      "脐下悸"
+    ]
+  },
+  {
+    "standardTerm": "腹中雷鸣",
+    "aliases": [
+      "腹中漉漉鸣响"
+    ]
+  },
+  {
+    "standardTerm": "气上冲心",
+    "aliases": [
+      "气从少腹上冲",
+      "奔豚"
+    ]
+  },
+  {
+    "standardTerm": "反胃",
+    "aliases": [
+      "翻胃",
+      "朝食暮吐"
+    ]
+  },
+  {
+    "standardTerm": "噎膈",
+    "aliases": [
+      "噎塞",
+      "吞咽梗阻"
+    ]
+  },
+  {
+    "standardTerm": "饥不欲食",
+    "aliases": [
+      "知饥不食"
+    ]
+  },
+  {
+    "standardTerm": "渴不多饮",
+    "aliases": [
+      "口干少饮"
+    ]
+  },
+  {
+    "standardTerm": "但欲漱水不欲咽",
+    "aliases": [
+      "漱水不欲咽"
+    ]
+  },
+  {
+    "standardTerm": "下利清谷",
+    "aliases": [
+      "完谷不化",
+      "洞泄"
+    ]
+  },
+  {
+    "standardTerm": "五更泄",
+    "aliases": [
+      "肾泄",
+      "五更泻"
+    ]
+  },
+  {
+    "standardTerm": "滑泄",
+    "aliases": [
+      "滑泻不禁"
+    ]
+  },
+  {
+    "standardTerm": "遗矢",
+    "aliases": [
+      "大便失禁"
+    ]
+  },
+  {
+    "standardTerm": "里急后重",
+    "aliases": [
+      "腹痛即泻",
+      "下利后重"
+    ]
+  },
+  {
+    "standardTerm": "肛门灼热",
+    "aliases": [
+      "肛热"
+    ]
+  },
+  {
+    "standardTerm": "肛门重坠",
+    "aliases": [
+      "里急后重",
+      "肛门下坠"
+    ]
+  },
+  {
+    "standardTerm": "膏淋",
+    "aliases": [
+      "小便乳白"
+    ]
+  },
+  {
+    "standardTerm": "石淋",
+    "aliases": [
+      "尿砂",
+      "砂淋"
+    ]
+  },
+  {
+    "standardTerm": "气淋",
+    "aliases": [
+      "气淋涩痛"
+    ]
+  },
+  {
+    "standardTerm": "血淋",
+    "aliases": [
+      "尿血涩痛"
+    ]
+  },
+  {
+    "standardTerm": "劳淋",
+    "aliases": [
+      "劳则小便淋沥"
+    ]
+  },
+  {
+    "standardTerm": "癃闭",
+    "aliases": [
+      "小便不通",
+      "尿闭"
+    ]
+  },
+  {
+    "standardTerm": "遗尿",
+    "aliases": [
+      "尿床",
+      "夜尿"
+    ]
+  },
+  {
+    "standardTerm": "小便不禁",
+    "aliases": [
+      "小便失禁"
+    ]
+  },
+  {
+    "standardTerm": "尿后余沥",
+    "aliases": [
+      "小便余沥",
+      "尿后滴沥"
+    ]
+  },
+  {
+    "standardTerm": "阴冷",
+    "aliases": [
+      "阴器寒冷"
+    ]
+  },
+  {
+    "standardTerm": "阴汗",
+    "aliases": [
+      "阴部多汗"
+    ]
+  },
+  {
+    "standardTerm": "阴缩",
+    "aliases": [
+      "阴茎阴囊内缩"
+    ]
+  },
+  {
+    "standardTerm": "阴挺",
+    "aliases": [
+      "子宫脱垂"
+    ]
+  },
+  {
+    "standardTerm": "崩漏",
+    "aliases": [
+      "崩中漏下"
+    ]
+  },
+  {
+    "standardTerm": "经早",
+    "aliases": [
+      "月经先期"
+    ]
+  },
+  {
+    "standardTerm": "经迟",
+    "aliases": [
+      "月经后期"
+    ]
+  },
+  {
+    "standardTerm": "经乱",
+    "aliases": [
+      "月经先后无定期"
+    ]
+  },
+  {
+    "standardTerm": "经闭",
+    "aliases": [
+      "闭经"
+    ]
+  },
+  {
+    "standardTerm": "妊娠恶阻",
+    "aliases": [
+      "恶阻",
+      "妊娠呕吐"
+    ]
+  },
+  {
+    "standardTerm": "胎动不安",
+    "aliases": [
+      "胎动下血"
+    ]
+  },
+  {
+    "standardTerm": "滑胎",
+    "aliases": [
+      "习惯性流产"
+    ]
+  },
+  {
+    "standardTerm": "缺乳",
+    "aliases": [
+      "产后乳少",
+      "乳汁不下"
+    ]
+  },
+  {
+    "standardTerm": "寒热往来",
+    "aliases": [
+      "往来寒热"
+    ]
+  },
+  {
+    "standardTerm": "壮热",
+    "aliases": [
+      "高热"
+    ]
+  },
+  {
+    "standardTerm": "微热",
+    "aliases": [
+      "低热"
+    ]
+  },
+  {
+    "standardTerm": "骨蒸潮热",
+    "aliases": [
+      "骨蒸",
+      "骨热"
+    ]
+  },
+  {
+    "standardTerm": "身热不扬",
+    "aliases": [
+      "湿温发热"
+    ]
+  },
+  {
+    "standardTerm": "寒战",
+    "aliases": [
+      "寒战栗"
+    ]
+  },
+  {
+    "standardTerm": "战汗",
+    "aliases": [
+      "战栗汗出"
+    ]
+  },
+  {
+    "standardTerm": "绝汗",
+    "aliases": [
+      "汗出如油",
+      "脱汗"
+    ]
+  },
+  {
+    "standardTerm": "半身汗出",
+    "aliases": [
+      "但头汗出",
+      "半身无汗",
+      "偏身汗出"
+    ]
+  },
+  {
+    "standardTerm": "手足心汗",
+    "aliases": [
+      "手心汗",
+      "足心汗"
+    ]
+  },
+  {
+    "standardTerm": "身重",
+    "aliases": [
+      "身体困重"
+    ]
+  },
+  {
+    "standardTerm": "肌肤不仁",
+    "aliases": [
+      "皮肤麻木不知痛痒"
+    ]
+  },
+  {
+    "standardTerm": "瘛疭",
+    "aliases": [
+      "抽搐",
+      "抽风"
+    ]
+  },
+  {
+    "standardTerm": "拘急",
+    "aliases": [
+      "拘挛",
+      "筋脉拘急"
+    ]
+  },
+  {
+    "standardTerm": "僵直",
+    "aliases": [
+      "强直",
+      "角弓反张"
+    ]
+  },
+  {
+    "standardTerm": "痿弱",
+    "aliases": [
+      "痿软无力"
+    ]
+  },
+  {
+    "standardTerm": "口眼歪斜",
+    "aliases": [
+      "口眼㖞斜",
+      "面瘫"
+    ]
+  },
+  {
+    "standardTerm": "语言不利",
+    "aliases": [
+      "言语不清",
+      "失语"
+    ]
+  },
+  {
+    "standardTerm": "舌强不语",
+    "aliases": [
+      "舌痖",
+      "失语"
+    ]
+  },
+  {
+    "standardTerm": "历节风",
+    "aliases": [
+      "痛风",
+      "白虎历节"
+    ]
+  },
+  {
+    "standardTerm": "鹤膝风",
+    "aliases": [
+      "膝关节肿大"
+    ]
+  },
+  {
+    "standardTerm": "腰如带五千钱",
+    "aliases": [
+      "腰重如带五千钱"
+    ]
+  },
+  {
+    "standardTerm": "背冷",
+    "aliases": [
+      "背恶寒",
+      "背冷如掌大"
+    ]
+  },
+  {
+    "standardTerm": "足跟痛",
+    "aliases": [
+      "足跟作痛",
+      "跟骨痛"
+    ]
+  },
+  {
+    "standardTerm": "下肢痿软",
+    "aliases": [
+      "下肢痿弱",
+      "痿躄"
+    ]
+  },
+  {
+    "standardTerm": "肌肉瞤动",
+    "aliases": [
+      "筋惕肉瞤",
+      "肉瞤"
+    ]
+  },
+  {
+    "standardTerm": "振掉",
+    "aliases": [
+      "振颤",
+      "抖动"
+    ]
+  },
+  {
+    "standardTerm": "战栗",
+    "aliases": [
+      "寒战",
+      "鼓颔"
+    ]
+  },
+  {
+    "standardTerm": "四肢厥冷",
+    "aliases": [
+      "手足厥冷",
+      "四逆"
+    ]
+  },
+  {
+    "standardTerm": "皮肤甲错",
+    "aliases": [
+      "肌肤甲错",
+      "甲错"
+    ]
+  },
+  {
+    "standardTerm": "疮疡",
+    "aliases": [
+      "疮肿",
+      "痈疽"
+    ]
+  },
+  {
+    "standardTerm": "斑疹",
+    "aliases": [
+      "斑",
+      "疹"
+    ]
+  },
+  {
+    "standardTerm": "疣目",
+    "aliases": [
+      "千日疣",
+      "寻常疣"
+    ]
+  },
+  {
+    "standardTerm": "湿疹",
+    "aliases": [
+      "湿疮",
+      "浸淫疮"
+    ]
+  },
+  {
+    "standardTerm": "粉刺",
+    "aliases": [
+      "痤疮",
+      "青春痘"
+    ]
+  },
+  {
+    "standardTerm": "白发",
+    "aliases": [
+      "须发早白"
+    ]
+  },
+  {
+    "standardTerm": "胀痛",
+    "aliases": [
+      "胀而痛",
+      "胀满作痛"
+    ]
+  },
+  {
+    "standardTerm": "绞痛",
+    "aliases": [
+      "绞着痛",
+      "绞痛难忍"
+    ]
+  },
+  {
+    "standardTerm": "灼痛",
+    "aliases": [
+      "烧灼痛",
+      "痛如火灼"
+    ]
+  },
+  {
+    "standardTerm": "冷痛",
+    "aliases": [
+      "痛处觉冷",
+      "遇冷加重"
+    ]
+  },
+  {
+    "standardTerm": "酸痛",
+    "aliases": [
+      "酸而作痛",
+      "酸楚疼痛"
+    ]
+  },
+  {
+    "standardTerm": "重痛",
+    "aliases": [
+      "沉重而痛",
+      "痛而沉重"
+    ]
+  },
+  {
+    "standardTerm": "游走痛",
+    "aliases": [
+      "痛无定处",
+      "窜痛",
+      "游走性疼痛"
+    ]
+  },
+  {
+    "standardTerm": "固定痛",
+    "aliases": [
+      "痛有定处",
+      "固定不移痛"
+    ]
+  },
+  {
+    "standardTerm": "夜间痛",
+    "aliases": [
+      "入夜痛甚",
+      "夜痛",
+      "半夜痛醒"
+    ]
+  },
+  {
+    "standardTerm": "静息痛",
+    "aliases": [
+      "休息时痛",
+      "夜间静卧痛"
+    ]
+  },
+  {
+    "standardTerm": "牵涉痛",
+    "aliases": [
+      "放射痛",
+      "牵痛",
+      "引痛"
+    ]
+  },
+  {
+    "standardTerm": "眉棱骨痛",
+    "aliases": [
+      "眉骨痛",
+      "眼眶痛"
+    ]
+  },
+  {
+    "standardTerm": "颞侧痛",
+    "aliases": [
+      "侧头痛",
+      "太阳穴痛"
+    ]
+  },
+  {
+    "standardTerm": "巅顶痛",
+    "aliases": [
+      "头顶痛",
+      "巅顶作痛"
+    ]
+  },
+  {
+    "standardTerm": "后头痛",
+    "aliases": [
+      "后脑痛",
+      "枕后痛"
+    ]
+  },
+  {
+    "standardTerm": "前额痛",
+    "aliases": [
+      "眉上前额痛"
+    ]
+  },
+  {
+    "standardTerm": "麻木",
+    "aliases": [
+      "肌肤麻木",
+      "麻木不仁",
+      "肢体麻木"
+    ]
+  },
+  {
+    "standardTerm": "蚁行感",
+    "aliases": [
+      "如蚁爬行",
+      "虫爬感"
+    ]
+  },
+  {
+    "standardTerm": "烧灼感",
+    "aliases": [
+      "灼热感"
+    ]
+  },
+  {
+    "standardTerm": "发凉",
+    "aliases": [
+      "肢凉",
+      "怕凉",
+      "局部发凉"
+    ]
+  },
+  {
+    "standardTerm": "拘挛",
+    "aliases": [
+      "拘急",
+      "筋脉拘挛",
+      "转筋"
+    ]
+  },
+  {
+    "standardTerm": "痿软",
+    "aliases": [
+      "痿弱无力",
+      "肢体痿软"
+    ]
+  },
+  {
+    "standardTerm": "颈项强痛",
+    "aliases": [
+      "项强痛",
+      "颈痛连背"
+    ]
+  },
+  {
+    "standardTerm": "肩背痛",
+    "aliases": [
+      "肩背酸痛",
+      "肩背拘急"
+    ]
+  },
+  {
+    "standardTerm": "腰痛如折",
+    "aliases": [
+      "腰痛欲折",
+      "腰沉痛"
+    ]
+  },
+  {
+    "standardTerm": "腰膝冷痛",
+    "aliases": [
+      "腰膝冷",
+      "腰以下冷"
+    ]
+  },
+  {
+    "standardTerm": "下肢沉重",
+    "aliases": [
+      "腿沉",
+      "下肢困重"
+    ]
+  },
+  {
+    "standardTerm": "关节酸痛",
+    "aliases": [
+      "肢节酸痛",
+      "骨节酸痛"
+    ]
+  },
+  {
+    "standardTerm": "关节肿胀",
+    "aliases": [
+      "关节肿",
+      "关节红肿"
+    ]
+  },
+  {
+    "standardTerm": "屈伸不利",
+    "aliases": [
+      "活动受限",
+      "关节屈伸不利"
+    ]
+  },
+  {
+    "standardTerm": "头皮麻木",
+    "aliases": [
+      "头皮发麻",
+      "头皮木"
+    ]
+  },
+  {
+    "standardTerm": "嗅觉减退",
+    "aliases": [
+      "嗅觉不灵",
+      "不闻香臭"
+    ]
+  },
+  {
+    "standardTerm": "鼻塞流涕",
+    "aliases": [
+      "鼻塞",
+      "流涕不止"
+    ]
+  },
+  {
+    "standardTerm": "耳鸣如蝉",
+    "aliases": [
+      "蝉鸣",
+      "耳内蝉鸣"
+    ]
+  },
+  {
+    "standardTerm": "耳聋失聪",
+    "aliases": [
+      "听力下降",
+      "耳背"
+    ]
+  },
+  {
+    "standardTerm": "目珠疼痛",
+    "aliases": [
+      "眼球痛",
+      "目痛"
+    ]
+  },
+  {
+    "standardTerm": "迎风流泪",
+    "aliases": [
+      "泪下",
+      "目泪出"
+    ]
+  },
+  {
+    "standardTerm": "口舌生疮",
+    "aliases": [
+      "口腔溃疡",
+      "口糜",
+      "口腔糜烂"
+    ]
+  },
+  {
+    "standardTerm": "口中异味",
+    "aliases": [
+      "口有异味",
+      "口气秽"
+    ]
+  },
+  {
+    "standardTerm": "咽喉不利",
+    "aliases": [
+      "咽中不适",
+      "咽喉异物感"
+    ]
+  },
+  {
+    "standardTerm": "声音嘶哑",
+    "aliases": [
+      "声嘶",
+      "音哑",
+      "失音"
+    ]
+  },
+  {
+    "standardTerm": "颈前肿大",
+    "aliases": [
+      "瘿肿",
+      "甲状腺肿大"
+    ]
+  },
+  {
+    "standardTerm": "胁肋胀痛",
+    "aliases": [
+      "胁胀",
+      "胁肋胀"
+    ]
+  },
+  {
+    "standardTerm": "脘腹坠胀",
+    "aliases": [
+      "腹部坠胀",
+      "少腹坠胀"
+    ]
+  },
+  {
+    "standardTerm": "少腹冷痛",
+    "aliases": [
+      "少腹冷",
+      "小腹冷痛"
+    ]
+  },
+  {
+    "standardTerm": "脐周痛",
+    "aliases": [
+      "绕脐痛",
+      "脐腹痛"
+    ]
+  },
+  {
+    "standardTerm": "气顶",
+    "aliases": [
+      "气上冲",
+      "气撞心疼"
+    ]
+  },
+  {
+    "standardTerm": "嗳气频作",
+    "aliases": [
+      "嗳气连连",
+      "噫气"
+    ]
+  },
+  {
+    "standardTerm": "呃逆连声",
+    "aliases": [
+      "呃逆频繁",
+      "打呃不止"
+    ]
+  },
+  {
+    "standardTerm": "吞酸嘈杂",
+    "aliases": [
+      "嘈杂吞酸",
+      "胃中嘈杂"
+    ]
+  },
+  {
+    "standardTerm": "食后腹胀",
+    "aliases": [
+      "食后胀甚",
+      "饱胀"
+    ]
+  },
+  {
+    "standardTerm": "厌油",
+    "aliases": [
+      "厌油腻",
+      "恶油腻"
+    ]
+  },
+  {
+    "standardTerm": "嗜杂",
+    "aliases": [
+      "嗜异",
+      "喜食异物"
+    ]
+  },
+  {
+    "standardTerm": "大便粘滞",
+    "aliases": [
+      "大便粘马桶",
+      "便粘不爽"
+    ]
+  },
+  {
+    "standardTerm": "大便不爽",
+    "aliases": [
+      "排便不畅",
+      "便出不爽"
+    ]
+  },
+  {
+    "standardTerm": "五更泻",
+    "aliases": [
+      "黎明泄泻",
+      "肾泄"
+    ]
+  },
+  {
+    "standardTerm": "肛门下坠",
+    "aliases": [
+      "肛门重坠",
+      "里急后重"
+    ]
+  },
+  {
+    "standardTerm": "小便余沥",
+    "aliases": [
+      "尿后余沥",
+      "小便滴沥"
+    ]
+  },
+  {
+    "standardTerm": "夜尿频",
+    "aliases": [
+      "夜尿多",
+      "夜起小便"
+    ]
+  },
+  {
+    "standardTerm": "尿等待",
+    "aliases": [
+      "排尿等待",
+      "尿无力"
+    ]
+  },
+  {
+    "standardTerm": "尿分叉",
+    "aliases": [
+      "尿线分叉"
+    ]
+  },
+  {
+    "standardTerm": "小便短赤",
+    "aliases": [
+      "尿黄赤",
+      "小便黄"
+    ]
+  },
+  {
+    "standardTerm": "小便清长",
+    "aliases": [
+      "尿清长",
+      "小便清"
+    ]
+  },
+  {
+    "standardTerm": "尿道涩痛",
+    "aliases": [
+      "尿痛",
+      "小便涩痛"
+    ]
+  },
+  {
+    "standardTerm": "尿中带血",
+    "aliases": [
+      "血尿",
+      "溲血"
+    ]
+  },
+  {
+    "standardTerm": "经期延长",
+    "aliases": [
+      "行经期长",
+      "经期延长至7天以上"
+    ]
+  },
+  {
+    "standardTerm": "经量多",
+    "aliases": [
+      "月经过多",
+      "经多"
+    ]
+  },
+  {
+    "standardTerm": "经量少",
+    "aliases": [
+      "月经过少",
+      "经少"
+    ]
+  },
+  {
+    "standardTerm": "经色暗",
+    "aliases": [
+      "经血色暗",
+      "经色紫暗"
+    ]
+  },
+  {
+    "standardTerm": "经血块",
+    "aliases": [
+      "经行血块",
+      "经血夹块"
+    ]
+  },
+  {
+    "standardTerm": "经行乳胀",
+    "aliases": [
+      "经前乳胀",
+      "经期乳房胀痛"
+    ]
+  },
+  {
+    "standardTerm": "经行头痛",
+    "aliases": [
+      "经期头痛",
+      "经前头痛"
+    ]
+  },
+  {
+    "standardTerm": "经行泄泻",
+    "aliases": [
+      "经前泄泻"
+    ]
+  },
+  {
+    "standardTerm": "带下量多",
+    "aliases": [
+      "带下清稀",
+      "白带多"
+    ]
+  },
+  {
+    "standardTerm": "带下色黄",
+    "aliases": [
+      "黄带",
+      "带下黄稠"
+    ]
+  },
+  {
+    "standardTerm": "阴中瘙痒",
+    "aliases": [
+      "阴痒",
+      "外阴瘙痒"
+    ]
+  },
+  {
+    "standardTerm": "皮肤瘙痒",
+    "aliases": [
+      "身痒",
+      "遍身瘙痒"
+    ]
+  },
+  {
+    "standardTerm": "风团",
+    "aliases": [
+      "风疹块",
+      "荨麻疹样皮疹"
+    ]
+  },
+  {
+    "standardTerm": "抓痕",
+    "aliases": [
+      "抓痂",
+      "血痂"
+    ]
+  },
+  {
+    "standardTerm": "苔藓样变",
+    "aliases": [
+      "皮肤增厚",
+      "革化"
+    ]
+  },
+  {
+    "standardTerm": "浸渍",
+    "aliases": [
+      "皮肤湿软",
+      "浸渍发白"
+    ]
+  },
+  {
+    "standardTerm": "糜烂",
+    "aliases": [
+      "皮肤糜烂",
+      "湿烂"
+    ]
+  },
+  {
+    "standardTerm": "结痂",
+    "aliases": [
+      "脓痂",
+      "血痂"
+    ]
+  },
+  {
+    "standardTerm": "色素沉着",
+    "aliases": [
+      "皮肤色暗",
+      "色素加深"
+    ]
+  },
+  {
+    "standardTerm": "皮肤干燥脱屑",
+    "aliases": [
+      "皮屑",
+      "脱屑"
+    ]
+  },
+  {
+    "standardTerm": "皮下结节",
+    "aliases": [
+      "痰核",
+      "皮下结块"
+    ]
+  },
+  {
+    "standardTerm": "自汗盗汗",
+    "aliases": [
+      "动则汗出",
+      "夜卧汗出"
+    ]
+  },
+  {
+    "standardTerm": "头汗出",
+    "aliases": [
+      "但头汗出",
+      "头额汗"
+    ]
+  },
+  {
+    "standardTerm": "腋下汗多",
+    "aliases": [
+      "腋汗",
+      "狐臭"
+    ]
+  },
+  {
+    "standardTerm": "情志抑郁",
+    "aliases": [
+      "情绪低落",
+      "郁郁寡欢"
+    ]
+  },
+  {
+    "standardTerm": "烦躁易怒",
+    "aliases": [
+      "急躁易怒",
+      "心烦易怒"
+    ]
+  },
+  {
+    "standardTerm": "喜太息",
+    "aliases": [
+      "善太息",
+      "长吁短叹"
+    ]
+  },
+  {
+    "standardTerm": "焦虑不安",
+    "aliases": [
+      "焦虑",
+      "坐立不安"
+    ]
+  },
+  {
+    "standardTerm": "多疑",
+    "aliases": [
+      "疑虑",
+      "多疑善虑"
+    ]
+  },
+  {
+    "standardTerm": "入睡困难",
+    "aliases": [
+      "难入睡",
+      "入睡难"
+    ]
+  },
+  {
+    "standardTerm": "多梦易醒",
+    "aliases": [
+      "寐多恶梦",
+      "眠浅易醒"
+    ]
+  },
+  {
+    "standardTerm": "晨寤",
+    "aliases": [
+      "早醒",
+      "黎明即醒"
+    ]
+  },
+  {
+    "standardTerm": "但欲寐",
+    "aliases": [
+      "嗜卧",
+      "神昏嗜睡"
+    ]
+  },
+  {
+    "standardTerm": "倦怠懒言",
+    "aliases": [
+      "倦怠乏力",
+      "懒言",
+      "语声低怯"
+    ]
+  },
+  {
+    "standardTerm": "神疲",
+    "aliases": [
+      "疲乏",
+      "精神不振"
+    ]
+  },
+  {
+    "standardTerm": "嗜卧",
+    "aliases": [
+      "多卧",
+      "嗜睡"
+    ]
+  },
+  {
+    "standardTerm": "知饥不食",
+    "aliases": [
+      "饥不欲食",
+      "知饥"
+    ]
+  },
+  {
+    "standardTerm": "口干粘苦",
+    "aliases": [
+      "口苦粘",
+      "口干苦"
+    ]
+  },
+  {
+    "standardTerm": "口渴引饮",
+    "aliases": [
+      "大渴引饮",
+      "渴欲饮水"
+    ]
+  },
+  {
+    "standardTerm": "消谷善饥",
+    "aliases": [
+      "多食易饥",
+      "食欲亢进"
+    ]
   }
 ]

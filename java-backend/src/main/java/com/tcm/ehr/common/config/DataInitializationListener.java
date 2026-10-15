@@ -6,6 +6,7 @@ import com.tcm.ehr.service.IDictionaryFileService;
 import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.IEsTermIndexService;
+import com.tcm.ehr.domain.po.DictionaryVersion;
 import com.tcm.ehr.domain.po.TermEntry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +22,14 @@ import java.util.List;
 /**
  * 启动监听器：
  * 1. 验证Redis/ES连接
- * 2. 加载data/dictionaries/*.json -> ES索引重建（术语库"提前内置"）
+ * 2. 加载 {@code classpath:dictionaries/*.json} -> 基础层({@code dictionary_terms}) -> ES 索引重建
  *
- * 2026-09-23 起不再往内存里塞一份词典缓存 —— 归一改为只认 ES 索引，
- * 加载只做「文件 -> ES」这一步。
+ * <p>2026-09-23 起不再往内存里塞一份词典缓存 —— 归一改为只认 ES 索引，
+ * 加载只做「文件 -> 库 -> ES」这几步。</p>
+ *
+ * <p>2026-10-15 起基础层<b>以文件为准</b>：每次启动都比对文件内容指纹与库内基础层版本，
+ * 不一致就整层重播。故改完 {@code resources/dictionaries/*.json} <b>重启即生效</b>，
+ * 不再需要手工清库。组织层（{@code org_id <> ''}）不受影响。</p>
  */
 @Slf4j
 @Component
@@ -83,12 +88,11 @@ public class DataInitializationListener implements ApplicationRunner {
     }
 
     /**
-     * 词典启动对账：播种基础层 → 逐个 (类型, 组织) 比对版本 → 落后才重建。
+     * 词典启动对账：基础层与文件对齐 → 逐个 (类型, 组织) 比对版本 → 落后才重建。
      *
-     * 为什么先播种：词典源已从 JSON 文件改为 dictionary_terms。若不做这一步，
-     * 库里 org_id='' 基础层是空的，词典页会一片空白、归一全部落空 ——
-     * 而文件里的词还在，只是没人读它了。判定「尚未播种」用「基础层该类型行数为 0」，
-     * 不看版本号：文件里已被人删空的类型也该保持空。
+     * 为什么先对基础层：词典的实际读取源是 dictionary_terms，ES 也从它重建。
+     * 基础层若与文件不一致（文件改过、或库里被清空），词典页会与文件对不上、
+     * 归一也会用旧词。故每轮启动先比对文件指纹（见 {@link #syncBaseFromFile}）。
      *
      * 为什么逐组织对账：ES 的 _meta.version 是索引级的，分不清组织。
      * 权威是 dictionary_versions.indexed_version —— 只有它追上 version
@@ -97,7 +101,7 @@ public class DataInitializationListener implements ApplicationRunner {
     private void loadDictionaries() {
         for (String type : EntityTypes.dictKeys()) {
             try {
-                seedBaseIfEmpty(type);
+                syncBaseFromFile(type);
                 reconcileOne(type);
             } catch (Exception e) {
                 log.error("[词典] {} 启动加载失败（该类术语的归一将不可用）: {}", type, e.getMessage());
@@ -106,36 +110,49 @@ public class DataInitializationListener implements ApplicationRunner {
     }
 
     /**
-     * 基础层该类型为空且文件里有词时，把文件内容播种进 {@code dictionary_terms}。
+     * 基础层与词典文件对账：文件内容指纹与库内基础层版本不一致时整层重播。
+     *
+     * <p><b>为什么不再「只播种空基础层」</b>：原实现只在基础层为空时读文件，于是
+     * {@code resources/dictionaries/*.json} 改完后重启<b>不生效</b> —— 基础层非空就早退，
+     * 而 ES 又是从库里的旧内容重建的，文件改动永远进不来。现改为每轮启动都拿文件指纹
+     * 与 {@code dictionary_versions} 里的基础层内容版本比对：不一致才
+     * {@code replace}（先删后插），随后 {@link #reconcileLayer} 顺理成章地重建 ES；
+     * 一致则直接返回，不产生任何写操作（绝大多数启动走这条）。</p>
+     *
+     * <p><b>语义</b>：基础层以文件为准。经应用（导入 / 归档回滚）改过的基础层会在下次启动
+     * 被文件覆盖；组织层（{@code org_id <> ''}）不受影响。文件为空视为「不播种」而非
+     * 「清空」，避免误删。</p>
      *
      * <p><b>为什么必须加分布式锁（B2）</b>：{@code replace} 是「先删后插」。多实例同时启动时
-     * 两个实例都会读到「空」，双双播种，其中一个撞 {@code uk_org_type_term} 抛异常 ⇒
-     * 该类型整轮被 {@link #loadDictionaries} 的外层 try 跳过，归一不可用。
-     * 与 {@link #reconcileLayer} 同口径：拿不到锁就本次跳过（下一实例 / 下次启动会补上），
-     * 启动期抢不到锁不是错误。</p>
+     * 两个实例若都判定「需重播」会交错删/插，其中一个撞 {@code uk_org_type_term} 抛异常 ⇒
+     * 该类型整轮被 {@link #loadDictionaries} 的外层 try 跳过，归一不可用。</p>
      */
-    private void seedBaseIfEmpty(String type) {
-        // 1. 锁外先快速判空：绝大多数启动都走这一条直接返回，不必每次都去抢锁
-        if (!termStore.read(IDictionaryTermStore.BASE_ORG, type).isEmpty()) {
-            return;
-        }
+    private void syncBaseFromFile(String type) {
+        // 1. 锁外先读文件、算指纹：绝大多数启动文件没变，走下面这条直接返回，不必抢锁
         List<TermEntry> fromFile;
         try {
             fromFile = fileService.read(type);
         } catch (Exception e) {
-            log.warn("[词典] {} 读取词典文件失败，跳过播种: {}", type, e.getMessage());
+            log.warn("[词典] {} 读取词典文件失败，跳过播种（保留库内现状）: {}", type, e.getMessage());
             return;
         }
         if (fromFile.isEmpty()) {
+            log.warn("[词典] {} 词典文件为空，跳过播种（不据此清空库内基础层）", type);
             return;
         }
-        // 2. 抢锁后重新判空：等锁期间别的实例可能已经播完。版本号用长度 1 的数组带出锁外再打日志
+        String fileVersion = termStore.contentVersion(fromFile);
+        DictionaryVersion stored = termStore.findVersion(IDictionaryTermStore.BASE_ORG, type);
+        if (stored != null && fileVersion.equals(stored.getVersion())) {
+            return; // 文件与库内基础层一致，无需动
+        }
+        // 2. 抢锁后复查：等锁期间别的实例可能已同步过。版本号用长度 1 的数组带出锁外再打日志
         String[] version = new String[1];
         try {
             distLock.runLocked(
                     com.tcm.ehr.common.utils.DistLock.dictRebuildLock(type, IDictionaryTermStore.BASE_ORG),
                     () -> {
-                        if (termStore.read(IDictionaryTermStore.BASE_ORG, type).isEmpty()) {
+                        DictionaryVersion v = termStore.findVersion(IDictionaryTermStore.BASE_ORG, type);
+                        if (v == null || !fileVersion.equals(v.getVersion())) {
                             version[0] = termStore.replace(IDictionaryTermStore.BASE_ORG, type, fromFile);
                         }
                         return null;
@@ -148,7 +165,7 @@ public class DataInitializationListener implements ApplicationRunner {
             return;
         }
         if (version[0] != null) {
-            log.info("[词典] {} 基础层播种 {} 条（来源：词典文件，版本 {}）", type, fromFile.size(), version[0]);
+            log.info("[词典] {} 基础层按词典文件重播 {} 条（版本 {}）", type, fromFile.size(), version[0]);
         }
     }
 

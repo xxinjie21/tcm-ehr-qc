@@ -36,7 +36,9 @@
   },
   {
     "standardTerm": "一捻金",
-    "aliases": []
+    "aliases": [
+      "一捻金散"
+    ]
   },
   {
     "standardTerm": "一捻金胶囊",
@@ -44,7 +46,9 @@
   },
   {
     "standardTerm": "一清胶囊",
-    "aliases": []
+    "aliases": [
+      "一清"
+    ]
   },
   {
     "standardTerm": "一清颗粒",
@@ -92,15 +96,21 @@
   },
   {
     "standardTerm": "二至丸",
-    "aliases": []
+    "aliases": [
+      "二至"
+    ]
   },
   {
     "standardTerm": "二陈丸",
-    "aliases": []
+    "aliases": [
+      "二陈汤"
+    ]
   },
   {
     "standardTerm": "二妙丸",
-    "aliases": []
+    "aliases": [
+      "二妙散"
+    ]
   },
   {
     "standardTerm": "十一味参芪片",
@@ -132,7 +142,10 @@
   },
   {
     "standardTerm": "十全大补丸",
-    "aliases": []
+    "aliases": [
+      "十全大补汤",
+      "十全"
+    ]
   },
   {
     "standardTerm": "十味消渴胶囊",
@@ -176,7 +189,9 @@
   },
   {
     "standardTerm": "七味都气丸",
-    "aliases": []
+    "aliases": [
+      "都气丸"
+    ]
   },
   {
     "standardTerm": "七味铁屑丸",
@@ -196,7 +211,9 @@
   },
   {
     "standardTerm": "七宝美髯颗粒",
-    "aliases": []
+    "aliases": [
+      "七宝美髯丹"
+    ]
   },
   {
     "standardTerm": "七珍丸",
@@ -212,7 +229,9 @@
   },
   {
     "standardTerm": "八正合剂",
-    "aliases": []
+    "aliases": [
+      "八正散"
+    ]
   },
   {
     "standardTerm": "八味沉香散",
@@ -228,7 +247,9 @@
   },
   {
     "standardTerm": "八珍丸",
-    "aliases": []
+    "aliases": [
+      "八珍汤"
+    ]
   },
   {
     "standardTerm": "八珍丸-浓缩丸",
@@ -240,7 +261,9 @@
   },
   {
     "standardTerm": "八珍益母丸",
-    "aliases": []
+    "aliases": [
+      "八珍益母汤"
+    ]
   },
   {
     "standardTerm": "八珍益母胶囊",
@@ -252,7 +275,9 @@
   },
   {
     "standardTerm": "人参养荣丸",
-    "aliases": []
+    "aliases": [
+      "人参养荣汤"
+    ]
   },
   {
     "standardTerm": "人参首乌胶囊",
