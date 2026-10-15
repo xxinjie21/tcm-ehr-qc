@@ -174,6 +174,46 @@ class EsTermNormalizerTest {
         Mockito.verify(es, Mockito.never()).search(anyString(), anyString(), anyInt());
     }
 
+    // ---------------------------------------------------------------- 标点规整（2026-10）
+
+    /**
+     * 待归一术语带重复/游离标点时先规整再匹配：「咽痛。。」→「咽痛」精确命中。
+     *
+     * <p>钉住两件事：①判定用规整后的词；②真正发给 ES 的检索词也是规整后的「咽痛」
+     * （否则 ES 那边仍按带标点的串召回，结算口径与缓存键都会漂移）。</p>
+     */
+    @Test
+    void punctuationSuffix_shouldNormalizeExactly() throws IOException {
+        esRecalls(List.of(entry(STD, List.of(ALIAS), "症状")));
+
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "咽痛。。");
+
+        assertEquals(STD, r.standardTerm(), "重复句号规整后应精确命中标准词");
+        assertEquals(1, r.level());
+        Mockito.verify(es).search(Mockito.eq(TYPE), Mockito.anyString(), Mockito.eq(STD), anyInt());
+    }
+
+    /** 半角句号结尾（紧邻汉字）：也应转全角并去尾，命中标准词 */
+    @Test
+    void halfWidthPeriodSuffix_shouldNormalize() throws IOException {
+        esRecalls(List.of(entry(STD, List.of(ALIAS), "症状")));
+
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "咽喉痛.");
+
+        assertEquals(STD, r.standardTerm());
+        assertEquals(1, r.level());
+    }
+
+    /** 纯标点输入：规整为空串，判未命中且不触发 ES */
+    @Test
+    void punctuationOnly_shouldBeNoHitWithoutSearch() throws IOException {
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "。。");
+
+        assertEquals("。。", r.standardTerm(), "整不出术语时按原文回填");
+        assertEquals(0, r.level());
+        Mockito.verify(es, Mockito.never()).search(anyString(), anyString(), anyString(), anyInt());
+    }
+
     // ---------------------------------------------------------------- scan（§九 ③）
 
     /**

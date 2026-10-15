@@ -169,4 +169,25 @@ class GovernanceServiceImplExportTest {
         assertEquals(3L, preview.get("total"));
         assertEquals(3, ((List<?>) preview.get("sample")).size());
     }
+
+    @Test
+    @DisplayName("导出时规整病历文本标点：合并重复、半角转全角，且不改动原文 Record")
+    void exportCleansPunctuationInTextFields() throws Exception {
+        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
+        Record r = rec("p1", t, null);
+        r.setChiefComplaint("发热。。伴咳嗽,加重 ");
+        r.setPresentIllness("晨起加重 ，夜间缓解");
+        when(mapper.selectList(any())).thenReturn(List.of(r));
+
+        IGovernanceService.ExportedFile file = svc.export(csv());
+        String text = new String(file.content(), StandardCharsets.UTF_8);
+
+        assertTrue(text.contains("发热。伴咳嗽，加重"),
+                "重复句号应合并、紧邻汉字的半角逗号应转全角: " + text);
+        assertTrue(text.contains("晨起加重，夜间缓解"),
+                "标点前的游离空格应去掉: " + text);
+        // 关键：导出链路纯只读，原文一个字节都不动
+        assertEquals("发热。。伴咳嗽,加重 ", r.getChiefComplaint());
+        assertEquals("晨起加重 ，夜间缓解", r.getPresentIllness());
+    }
 }

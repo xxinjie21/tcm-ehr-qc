@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,8 +71,14 @@ public class EsTermNormalizer {
         if (raws == null || raws.isEmpty()) {
             return;
         }
+        // 用与 normalize 逐字一致的 cleanTerm 规整后再预取：否则缓存键是「带标点的原文」，
+        // 而 normalize 查的是「规整后的术语」，两者对不上 —— 预取白做，逐条又各自回源 ES。
+        List<String> cleaned = new ArrayList<>(raws.size());
+        for (String raw : raws) {
+            cleaned.add(cleanTerm(raw));
+        }
         try {
-            esTermIndexService.searchBatch(type, orgId == null ? "" : orgId, raws, RECALL_SIZE);
+            esTermIndexService.searchBatch(type, orgId == null ? "" : orgId, cleaned, RECALL_SIZE);
         } catch (Exception e) {
             log.debug("[归一] 预取失败（不影响逐条归一）：{}", e.getMessage());
         }
@@ -116,13 +123,15 @@ public class EsTermNormalizer {
      * @param term  待归一的原文
      */
     public NormalizeResult normalize(String type, String orgId, String term) {
-        // 1. 归一原文（null 视作空串）
-        String input = term == null ? "" : term.trim();
+        // 1. 归一原文：trim + 标点规整（合并重复标点、去首尾标点）。
+        //    「咽痛。。」/「咽痛。」这类带游离或重复标点的候选，规整成「咽痛」才能精确命中；
+        //    规整口径与导出/清洗共用 TextUtil，只影响匹配与回填，不改库里原文。
+        String input = cleanTerm(term);
         if (input.isEmpty()) {
             return new NormalizeResult(term, LEVEL_NONE);
         }
 
-        // ES 召回 -> 判定（命中路径只需在候选集内比较）
+        // 2. ES 召回 -> 判定（命中路径只需在候选集内比较）
         List<TermEntry> recalled = recall(type, orgId, input);
         if (!recalled.isEmpty()) {
             NormalizeResult hit = judge(recalled, input);
@@ -132,8 +141,22 @@ public class EsTermNormalizer {
             }
         }
 
-        // 2. 未召回或三级都不中 → 判未命中，standardTerm 回填原文
+        // 3. 未召回或三级都不中 → 判未命中，standardTerm 回填规整后的原文
         return new NormalizeResult(input, LEVEL_NONE);
+    }
+
+    /**
+     * 术语输入规整：trim → 合并重复标点 / 半角转全角 / 去标点两侧空白 → 去首尾标点。
+     *
+     * <p>与 {@code GovernanceServiceImpl} 导出标准化共用 {@link TextUtil} 的同一套标点口径，
+     * 保证「归一怎么对，导出的文本就怎么整」。纯标点（如「。。」）归一为空串，
+     * 由调用方按未命中处理。</p>
+     */
+    private static String cleanTerm(String term) {
+        if (term == null) {
+            return "";
+        }
+        return TextUtil.stripPunctuationBoundary(TextUtil.normalizePunctuation(term.trim()));
     }
 
     /**
@@ -185,7 +208,12 @@ public class EsTermNormalizer {
         if (text == null || text.isBlank()) {
             return out;
         }
-        String input = text.trim();
+        // 与 normalize 同口径先规整标点：扫描的整段文本（处方/诊断）常常句尾带「。」或重复标点，
+        // 规整后再比子串，命中口径与逐术语归一一致。
+        String input = cleanTerm(text);
+        if (input.isEmpty()) {
+            return out;
+        }
         // 1. 复用同一套召回（同样不静默降级：ES 挂了就该报 503，不是「没命中」）
         for (TermEntry e : recall(type, orgId, input)) {
             String std = e.getStandardTerm();

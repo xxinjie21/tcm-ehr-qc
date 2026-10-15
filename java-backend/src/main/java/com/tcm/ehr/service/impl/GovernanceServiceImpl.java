@@ -945,19 +945,25 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 把一条病历转成 Map 并对上述文本字段做就地标准化（<b>不改动入参 Record</b>）。
      *
+     * <p>两步都只作用于导出的副本：① 术语替换（把归一过的原文换成标准词）；② <b>标点规整</b>
+     * （{@link TextUtil#normalizePunctuation}：合并重复标点、半角转全角、去标点两侧空白）。
+     * 库里的病历原文一个字节都不动 —— 与清洗同理，这是「导出标准数据集」而非「改写病历」。</p>
+     *
+     * <p>顺序不能反：先术语替换、后标点规整。若先规整，半角逗号会被转成全角，
+     * {@link #standardizeText} 的 {@code contains(原文)} 就落空、漏掉替换。</p>
+     *
      * <p>用 {@code convertValue} 而不是直接改 Record：导出的记录对象可能还在 MyBatis
      * 一级缓存里，就地改会污染后续读取。</p>
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> standardizeMap(Record r, List<Map.Entry<String, String>> pairs) {
         Map<String, Object> row = objectMapper.convertValue(r, Map.class);
-        if (pairs.isEmpty()) {
-            return row;
-        }
         for (String field : STANDARDIZABLE_FIELDS) {
             Object v = row.get(field);
             if (v instanceof String s) {
-                row.put(field, standardizeText(s, pairs));
+                String out = pairs.isEmpty() ? s : standardizeText(s, pairs);
+                // 无论有没有术语替换，标点都要规整（因此不能像原先那样在有 pairs 时才进这个循环）
+                row.put(field, TextUtil.normalizePunctuation(out));
             }
         }
         return row;
