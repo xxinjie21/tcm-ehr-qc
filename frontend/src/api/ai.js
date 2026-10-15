@@ -6,11 +6,6 @@ export function aiInterpret(data) {
   return request.post('/ai/interpret', data)
 }
 
-// AI 助手问答：业务问题 LLM+规则检索；技术实现问题兜底拒答
-export function aiChat(data) {
-  return request.post('/ai/chat', data)
-}
-
 // AI 复核预检意见：基于规则预检单生成复核建议
 export function aiReview(data) {
   return request.post('/ai/review', data)
@@ -38,7 +33,7 @@ const POLL_TIMEOUT_MS = 150000
 /**
  * 走异步路跑一次 AI 生成并等结果。
  *
- * @param {'interpret'|'chat'|'review'|'termsuggest'} kind
+ * @param {'interpret'|'review'|'termsuggest'} kind
  * @param {object} data 请求体（与同步接口一致）
  * @param {(state: string) => void} [onState] 每次轮询回调当前状态，用于显示「正在生成…」
  * @returns {Promise<object>} reply（结构与同步接口的返回值一致）

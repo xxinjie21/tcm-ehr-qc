@@ -47,10 +47,6 @@
                 <span>AI 解读</span>
               </label>
               <label class="llm-feat">
-                <el-switch v-model="form.chatEnabled" :disabled="!form.enabled" />
-                <span>助手</span>
-              </label>
-              <label class="llm-feat">
                 <el-switch v-model="form.reviewEnabled" :disabled="!form.enabled" />
                 <span>复核意见</span>
               </label>
@@ -187,7 +183,6 @@ const form = reactive({
   timeout: 60000,
   // 分功能的局部开关：仅在总开关开启时生效；默认沿用服务端值
   interpretEnabled: true,
-  chatEnabled: true,
   reviewEnabled: true,
   termSuggestEnabled: true
 })
@@ -213,7 +208,6 @@ async function loadConfig() {
     form.timeout = data.timeout || 60000
     // 功能开关回传的是原始值，直接回填（总开关关闭时也原样保留，便于恢复）
     form.interpretEnabled = data.interpretEnabled ?? true
-    form.chatEnabled = data.chatEnabled ?? true
     form.reviewEnabled = data.reviewEnabled ?? true
     form.termSuggestEnabled = data.termSuggestEnabled ?? true
     config.apiKeySet = !!data.apiKeySet
@@ -240,7 +234,6 @@ function payload() {
     temperature: form.temperature,
     timeout: form.timeout,
     interpretEnabled: form.interpretEnabled,
-    chatEnabled: form.chatEnabled,
     reviewEnabled: form.reviewEnabled,
     termSuggestEnabled: form.termSuggestEnabled
   }

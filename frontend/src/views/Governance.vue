@@ -313,10 +313,7 @@ import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import { clean as cleanApi, governanceStats } from '@/api/governance'
 import { exportDataset, previewDataset } from '@/api/export'
 import { saveBlob } from '@/utils/download'
-import { useAiContextStore } from '@/stores/ai'
 import { LEVEL_TINY } from '@/utils/structured'
-
-const aiStore = useAiContextStore()
 
 // 28.18：每步补 detail（点开看的详述）与 where（结果落在结果区哪一项），
 // 步骤卡据此从「只能看」变成「可点开」。
@@ -359,7 +356,7 @@ const scopeText = computed(() => {
   return parts.length ? parts.join(' · ') : '全部'
 })
 
-// 拉取治理统计（质控合格 / 待清洗 / 已清洗）并同步给 aiStore 供 AI 助手引用；
+// 拉取治理统计（质控合格 / 待清洗 / 已清洗）；
 // 失败时保留旧值但置失败态，状态行据此提示「数字可能不是最新」
 const loadStats = async () => {
   // 1. 置加载态并清空上次失败态
@@ -369,15 +366,13 @@ const loadStats = async () => {
     // 2. 拉取三项统计并覆盖本地状态
     const res = await governanceStats()
     Object.assign(stats, res.data)
-    // 3. 同步给 aiStore，供 AI 助手引用
-    aiStore.setStats(res.data)
-    // 4. 记下本次成功时间，失败提示里可回显
+    // 3. 记下本次成功时间，失败提示里可回显
     statsLoadedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
-  // 5. 保留旧值但置失败态，提示「数字可能不是最新」
+  // 4. 保留旧值但置失败态，提示「数字可能不是最新」
   } catch {
     // 标记失败态，状态行据此提示「显示的可能不是最新值」
     statsFailed.value = true
-  // 6. 无论成败都关掉 loading
+  // 5. 无论成败都关掉 loading
   } finally {
     statsLoading.value = false
   }
@@ -414,9 +409,8 @@ const handleClean = async () => {
   try {
     // 4. 按当前范围提交清洗
     const res = await cleanApi({ filters: { ...filters } })
-    // 5. 写入分步结果，并把三级命中分布同步给 AI 助手
+    // 5. 写入分步结果（三级命中分布由结果区自己渲染）
     clean.result = res.data
-    aiStore.setNormByLevel(res.data.normByLevel || { exact: 0, contain: 0, fuzzy: 0 })
     // 6. 提示归一命中数；含人工修改被跳过时一并说明，避免「归一数变少」看起来像出错
     const skipped = res.data.manualSkipped || 0
     ElMessage.success(skipped > 0
@@ -529,13 +523,11 @@ const preview = reactive({ loading: false, result: null })
 const detail = ref(null)
 const detailVisible = ref(false)
 
-// 点详情：写入共享状态，供 AI 助手"这份病历…"类问题使用
+// 点详情：打开该行的病历详情弹窗
 const openDetail = (row) => {
   // 1. 记下当前行作为弹窗数据
   detail.value = row
-  // 2. 写入共享状态，供 AI 助手「这份病历…」类提问引用
-  aiStore.setActiveRecord(row)
-  // 3. 数据就绪后再打开弹窗
+  // 2. 数据就绪后再打开弹窗
   detailVisible.value = true
 }
 

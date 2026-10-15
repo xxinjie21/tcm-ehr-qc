@@ -258,13 +258,10 @@ import {
   importRecords, createRecord, searchRecords, countRecords, getRawRecord, deleteRecords, deleteRecordsByFilter, importRows
 } from '@/api/records'
 import { fmtDateTime, fieldOf } from '@/utils/format'
-import { useAiContextStore } from '@/stores/ai'
 import { fieldsWithWide, MULTI_AUTOSIZE } from '@/utils/recordFields'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
-
-const aiStore = useAiContextStore()
 
 // 当前标签页；导入与新增懒加载，首屏只渲染查询表
 const activeTab = ref('query')
@@ -379,8 +376,8 @@ const activeId = ref('')
 // 当前查看行高亮，便于在长表里对上号
 const rowClass = ({ row }) => (row.id === activeId.value ? 'row-active' : '')
 
-// 打开详情弹窗：按 id 回查原始病历（列表行只有摘要，完整字段不在列表数据里），
-// 同时写入 aiStore 供 AI 助手「这份病历…」类提问引用；失败不弹窗，由拦截器提示
+// 打开详情弹窗：按 id 回查原始病历（列表行只有摘要，完整字段不在列表数据里）；
+// 失败不弹窗，由拦截器提示
 const openDetail = async (id) => {
   try {
     // 1. 按 id 回查原始病历（列表行只有摘要，完整字段不在列表数据里）
@@ -388,10 +385,7 @@ const openDetail = async (id) => {
     raw.value = res.data
     // 2. 记下当前 id，供列表行高亮对上号
     activeId.value = id
-    // 写入共享状态，供 AI 助手"这份病历…"与解读卡使用
-    // 3. 写入共享状态，供 AI 助手「这份病历…」与解读卡使用
-    aiStore.setActiveRecord(res.data)
-    // 4. 数据就绪后才打开弹窗；失败不弹窗
+    // 3. 数据就绪后才打开弹窗；失败不弹窗
     detailVisible.value = true
   } catch {
     // 拦截器已提示

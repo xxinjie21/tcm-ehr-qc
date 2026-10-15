@@ -160,9 +160,6 @@
       </main>
     </div>
 
-    <!-- 全局 AI 助手悬浮窗-->
-    <AiAssistant />
-
     <!-- LLM 运行时配置；属「短平快的一次性配置」，按「短平快的一次性配置」的既有口径用弹窗 -->
     <LlmConfigDialog v-model="llmVisible" />
   </div>
@@ -175,7 +172,6 @@ import { governanceStats } from '@/api/governance'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import AiAssistant from '@/components/AiAssistant.vue'
 import LlmConfigDialog from '@/components/LlmConfigDialog.vue'
 
 const route = useRoute()
@@ -705,7 +701,7 @@ main {
      文档层不出现滚动条 → 通栏且切页不偏移 */
   overflow-y: auto;
   padding: var(--sp-4) 20px 84px;
-  /* 给右下角 AI 助手悬浮球留出安全间距，避免遮挡表格底部内容 */
+  /* 底部留白：长页滚到底时与视口底边保持呼吸位 */
 }
 /* 内层内容仍限宽居中，但滚动容器保持通宽 */
 main > * {
