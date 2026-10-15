@@ -35,7 +35,31 @@
         <el-form label-position="top" class="llm-form">
           <el-form-item label="启用 LLM">
             <el-switch v-model="form.enabled" />
-            <span class="llm-hint">关闭时 AI 解读 / 助手 / 复核意见全部回退规则输出</span>
+            <span class="llm-hint">总开关：关闭时所有 AI 功能一律回退规则输出</span>
+          </el-form-item>
+
+          <!-- 总开关开启后仍可逐项单独启停：关闭项回退规则输出，其余项不受影响。
+               总开关关闭时整体置灰，但保留各开关的值，便于重新开启后原样恢复 -->
+          <el-form-item label="AI 功能">
+            <div class="llm-feats">
+              <label class="llm-feat">
+                <el-switch v-model="form.interpretEnabled" :disabled="!form.enabled" />
+                <span>AI 解读</span>
+              </label>
+              <label class="llm-feat">
+                <el-switch v-model="form.chatEnabled" :disabled="!form.enabled" />
+                <span>助手</span>
+              </label>
+              <label class="llm-feat">
+                <el-switch v-model="form.reviewEnabled" :disabled="!form.enabled" />
+                <span>复核意见</span>
+              </label>
+              <label class="llm-feat">
+                <el-switch v-model="form.termSuggestEnabled" :disabled="!form.enabled" />
+                <span>术语建议</span>
+              </label>
+            </div>
+            <span class="llm-hint">总开关开启时，可单独关闭某一项；关闭项回退规则输出</span>
           </el-form-item>
 
           <el-form-item label="通道">
@@ -160,7 +184,12 @@ const form = reactive({
   apiKey: '',
   model: '',
   temperature: 0.2,
-  timeout: 60000
+  timeout: 60000,
+  // 分功能的局部开关：仅在总开关开启时生效；默认沿用服务端值
+  interpretEnabled: true,
+  chatEnabled: true,
+  reviewEnabled: true,
+  termSuggestEnabled: true
 })
 
 // 下拉候选：按当前通道给常用模型
@@ -182,6 +211,11 @@ async function loadConfig() {
     form.model = data.model || ''
     form.temperature = data.temperature ?? 0.2
     form.timeout = data.timeout || 60000
+    // 功能开关回传的是原始值，直接回填（总开关关闭时也原样保留，便于恢复）
+    form.interpretEnabled = data.interpretEnabled ?? true
+    form.chatEnabled = data.chatEnabled ?? true
+    form.reviewEnabled = data.reviewEnabled ?? true
+    form.termSuggestEnabled = data.termSuggestEnabled ?? true
     config.apiKeySet = !!data.apiKeySet
     config.apiKeyMask = data.apiKeyMask || ''
     config.available = !!data.available
@@ -204,7 +238,11 @@ function payload() {
     apiKey: form.apiKey,
     model: form.model,
     temperature: form.temperature,
-    timeout: form.timeout
+    timeout: form.timeout,
+    interpretEnabled: form.interpretEnabled,
+    chatEnabled: form.chatEnabled,
+    reviewEnabled: form.reviewEnabled,
+    termSuggestEnabled: form.termSuggestEnabled
   }
 }
 
@@ -324,6 +362,30 @@ async function handleSave() {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
   line-height: 1.7;
+}
+/* 四个功能开关：两列网格，窄屏自动收一列，避免长文案挤在一起 */
+.llm-feats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px var(--sp-4);
+  width: 100%;
+}
+/* 每组「开关 + 名称」横向排布，点名称也能切换 */
+.llm-feat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  color: var(--ink);
+}
+.llm-feat :deep(.el-switch.is-disabled) {
+  cursor: not-allowed;
+}
+@media (max-width: 480px) {
+  .llm-feats {
+    grid-template-columns: 1fr;
+  }
 }
 /* 温度与超时并排一行 */
 .llm-row {

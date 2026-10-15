@@ -117,6 +117,10 @@ public class LlmConfigStore {
         row.setModel(cfg.model());
         row.setTemperature(cfg.temperature());
         row.setTimeout(cfg.timeout());
+        row.setInterpretEnabled(cfg.interpretEnabled());
+        row.setChatEnabled(cfg.chatEnabled());
+        row.setReviewEnabled(cfg.reviewEnabled());
+        row.setTermSuggestEnabled(cfg.termSuggestEnabled());
         boolean newKey = cfg.apiKey() != null && !cfg.apiKey().isBlank();
         if (newKey) {
             row.setApiKey(cipher.encrypt(cfg.apiKey()));
@@ -180,7 +184,14 @@ public class LlmConfigStore {
                 + (row.getUpdateTime() == null ? "" : row.getUpdateTime().toString())
                 + "|" + row.getEnabled() + "|" + row.getProvider() + "|" + row.getBaseUrl()
                 + "|" + row.getModel() + "|" + row.getTemperature() + "|" + row.getTimeout()
-                + "|" + (row.getApiKey() == null ? 0 : row.getApiKey().length());
+                + "|" + (row.getApiKey() == null ? 0 : row.getApiKey().length())
+                + "|" + row.getInterpretEnabled() + "|" + row.getChatEnabled()
+                + "|" + row.getReviewEnabled() + "|" + row.getTermSuggestEnabled();
+    }
+
+    /** 用户行没配（迁移前的历史行留着 NULL）时沿用基线 */
+    private static boolean flag(Boolean value, boolean base) {
+        return value == null ? base : value;
     }
 
     /** 用户行覆盖基线；用户没配就返回基线本身 */
@@ -196,7 +207,11 @@ public class LlmConfigStore {
                 cipher.decrypt(row.getApiKey()),
                 row.getModel() != null ? row.getModel() : base.model(),
                 row.getTemperature() != null ? row.getTemperature() : base.temperature(),
-                row.getTimeout() != null ? row.getTimeout() : base.timeout());
+                row.getTimeout() != null ? row.getTimeout() : base.timeout(),
+                flag(row.getInterpretEnabled(), base.interpretEnabled()),
+                flag(row.getChatEnabled(), base.chatEnabled()),
+                flag(row.getReviewEnabled(), base.reviewEnabled()),
+                flag(row.getTermSuggestEnabled(), base.termSuggestEnabled()));
     }
 
     /** 当前生效配置 */
@@ -228,7 +243,11 @@ public class LlmConfigStore {
                 base.apiKey(),
                 m.get("model") != null ? String.valueOf(m.get("model")) : base.model(),
                 m.get("temperature") instanceof Number n ? n.doubleValue() : base.temperature(),
-                m.get("timeout") instanceof Number n ? n.intValue() : base.timeout());
+                m.get("timeout") instanceof Number n ? n.intValue() : base.timeout(),
+                m.get("interpretEnabled") instanceof Boolean b ? b : base.interpretEnabled(),
+                m.get("chatEnabled") instanceof Boolean b ? b : base.chatEnabled(),
+                m.get("reviewEnabled") instanceof Boolean b ? b : base.reviewEnabled(),
+                m.get("termSuggestEnabled") instanceof Boolean b ? b : base.termSuggestEnabled());
     }
 
     private Map<String, Object> readFile(String path) {

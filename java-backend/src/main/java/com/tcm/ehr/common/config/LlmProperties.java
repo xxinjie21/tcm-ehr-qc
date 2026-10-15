@@ -46,6 +46,17 @@ public class LlmProperties {
     private int timeout = 60000;
 
     /**
+     * 分功能的局部开关：<b>启动基线默认全部开启</b>（只受总开关控制）。
+     *
+     * <p>关掉其中任意一项，该项 AI 能力回退规则/模板兜底，其余项不受影响 ——
+     * 用户只想让助手问答走模型、而复核意见一律走规则时，不必把整个 LLM 关掉。</p>
+     */
+    private boolean interpretEnabled = true;
+    private boolean chatEnabled = true;
+    private boolean reviewEnabled = true;
+    private boolean termSuggestEnabled = true;
+
+    /**
      * 可选的「非密钥」基线配置文件：默认打包在 classpath（{@code classpath:llm-config.json}），
      * 不存在即用本 yml 基线。用户的运行期配置（含加密 api-key）已按用户落库，不写本文件。
      */

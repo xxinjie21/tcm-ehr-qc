@@ -32,4 +32,16 @@ public class LlmConfigVO {
 
     /** 当前是否已按生效配置装配成功（enabled 且参数合法） */
     private boolean available;
+
+    /** 病历解读是否用 LLM（原始开关值；是否真正生效还取决于 enabled） */
+    private boolean interpretEnabled;
+
+    /** 助手问答是否用 LLM（原始开关值；是否真正生效还取决于 enabled） */
+    private boolean chatEnabled;
+
+    /** 复核意见是否用 LLM（原始开关值；是否真正生效还取决于 enabled） */
+    private boolean reviewEnabled;
+
+    /** 术语建议是否用 LLM（原始开关值；是否真正生效还取决于 enabled） */
+    private boolean termSuggestEnabled;
 }

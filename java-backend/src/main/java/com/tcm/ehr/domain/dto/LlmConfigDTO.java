@@ -48,4 +48,16 @@ public class LlmConfigDTO {
     @Min(value = 1000, message = "超时不能小于 1000 毫秒")
     @Max(value = 600000, message = "超时不能大于 600000 毫秒（10 分钟）")
     private Integer timeout;
+
+    /** 病历解读是否用 LLM；null = 沿用当前 */
+    private Boolean interpretEnabled;
+
+    /** 助手问答是否用 LLM；null = 沿用当前 */
+    private Boolean chatEnabled;
+
+    /** 复核意见是否用 LLM；null = 沿用当前 */
+    private Boolean reviewEnabled;
+
+    /** 术语建议是否用 LLM；null = 沿用当前 */
+    private Boolean termSuggestEnabled;
 }

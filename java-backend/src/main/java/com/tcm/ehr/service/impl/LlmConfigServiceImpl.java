@@ -136,11 +136,16 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         }
 
         // 4. 密钥单独走 resolveApiKey：回传的掩码不该被当成新密钥存下来
+        // 5. 四个功能开关同样「给了才改」：前端只提交用户拨过的那一个
         return new LlmConfig(enabled, normProvider,
                 dto.getBaseUrl() == null ? cur.baseUrl() : dto.getBaseUrl().trim(),
                 resolveApiKey(dto.getApiKey(), cur.apiKey()),
                 dto.getModel() == null ? cur.model() : dto.getModel().trim(),
-                temperature, timeout);
+                temperature, timeout,
+                dto.getInterpretEnabled() == null ? cur.interpretEnabled() : dto.getInterpretEnabled(),
+                dto.getChatEnabled() == null ? cur.chatEnabled() : dto.getChatEnabled(),
+                dto.getReviewEnabled() == null ? cur.reviewEnabled() : dto.getReviewEnabled(),
+                dto.getTermSuggestEnabled() == null ? cur.termSuggestEnabled() : dto.getTermSuggestEnabled());
     }
 
     /** 空串 / 回传的掩码 = 不修改，其余视为新密钥 */
@@ -165,6 +170,12 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         vo.setModel(cfg.model());
         vo.setTemperature(cfg.temperature());
         vo.setTimeout(cfg.timeout());
+        // 6. 功能开关：回传原始值（不按总开关掩盖）——弹窗能把用户的选择原样带回，
+        //    总开关关着时前端自行置灰；是否真正生效由后端 featureEnabled 再判一次
+        vo.setInterpretEnabled(cfg.interpretEnabled());
+        vo.setChatEnabled(cfg.chatEnabled());
+        vo.setReviewEnabled(cfg.reviewEnabled());
+        vo.setTermSuggestEnabled(cfg.termSuggestEnabled());
         vo.setAvailable(llmClient.isAvailable());
         return vo;
     }
