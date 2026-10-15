@@ -129,7 +129,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     @Override
     public StandardizationReportVO report() {
-        return report(null, null);
+        return report(new FiltersDTO());
+    }
+
+    @Override
+    public StandardizationReportVO report(String start, String end) {
+        return report(dateRangeFilters(start, end));
     }
 
     /**
@@ -140,7 +145,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     @Override
     public byte[] reportCsv(String start, String end) {
-        StandardizationReportVO r = report(start, end);
+        return reportCsv(dateRangeFilters(start, end));
+    }
+
+    @Override
+    public byte[] reportCsv(FiltersDTO filters) {
+        StandardizationReportVO r = report(filters);
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("区块", "指标", "数值", "说明"));
         for (StandardizationReportVO.DictQuality d : r.getDictQuality()) {
@@ -205,13 +215,21 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /**
-     * 按接诊时间区间出报告。
+     * 按范围出报告（科室 / 就诊时间 / 证候）。
      *
-     * @param start 起（yyyy-MM-dd），为空表示不限
-     * @param end   止（yyyy-MM-dd），为空表示不限；与 start 必须同时给或同时不给
+     * <p>甲类（词典质量 / 跨类重名）看的是词表本身，与病历无关，**不随范围收窄**；
+     * 只有乙类（病历相关统计）按范围过滤。时间过滤仍放在 Java 侧
+     * （{@link #filterByVisitTime}），而不是下沉到 SQL —— 因为 {@code range.excluded}
+     * （「已排除 N 条区间外数据」）要的是「范围内但因时间被排除的条数」，
+     * 只有保留「先取范围全集、再按时间筛」两步才能算出来。</p>
      */
     @Override
-    public StandardizationReportVO report(String start, String end) {
+    public StandardizationReportVO report(FiltersDTO filters) {
+        FiltersDTO f = filters == null ? new FiltersDTO() : filters;
+        // 时间上下界必须同时给才生效，与 report(String, String) 及 StatsController 同一口径
+        String start = rangeBound(f, true);
+        String end = rangeBound(f, false);
+
         StandardizationReportVO vo = new StandardizationReportVO();
         vo.setDictQuality(dictQuality());
         vo.setCrossTypeDuplicates(crossTypeDuplicates());
@@ -219,7 +237,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         // A1/T2 + C1：这里**一次遍历、一次解析**，抽扁平中间结构（Row）向下传给各统计器。
         // 原实现里同一条 structured_data 被 7 处统计器各自解析一遍（4 万条 ≈ 28 万次 Jackson 解析），
         // 且 selectList 无列投影（21 TEXT + 2 JSON 全量进堆，4 万条约 45MB）。
-        List<Row> all = rowsInDomain();
+        // 科室 / 证候下沉到 SQL（RecordFilter），时间留在 Java 侧（见方法注释）。
+        List<Row> all = rowsInDomain(withoutDateRange(f));
         List<Row> rows = filterByVisitTime(all, start, end);
         vo.setRange(rangeOf(all, rows, start, end));
         vo.setByMonth(byMonth(rows));
@@ -309,6 +328,36 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return s != null && !s.isBlank();
     }
 
+    /** 单端区间 → FiltersDTO：只有上下界同时给才落到 dateRange，只给一端按「未给」处理 */
+    private FiltersDTO dateRangeFilters(String start, String end) {
+        FiltersDTO f = new FiltersDTO();
+        if (notBlankDate(start) && notBlankDate(end)) {
+            f.setDateRange(List.of(start, end));
+        }
+        return f;
+    }
+
+    /** 取 dateRange 的一端；两端不齐（含只给一端）一律按「未给」返回 null */
+    private String rangeBound(FiltersDTO f, boolean start) {
+        List<String> dr = f.getDateRange();
+        if (dr == null || dr.size() != 2
+                || !notBlankDate(dr.get(0)) || !notBlankDate(dr.get(1))) {
+            return null;
+        }
+        return start ? dr.get(0) : dr.get(1);
+    }
+
+    /** 复制一份去掉 dateRange 的范围：时间由 Java 侧过滤，避免与 SQL 重复并保留 excluded 口径 */
+    private FiltersDTO withoutDateRange(FiltersDTO f) {
+        FiltersDTO copy = new FiltersDTO();
+        copy.setDepartment(f.getDepartment());
+        copy.setPattern(f.getPattern());
+        copy.setGrade(f.getGrade());
+        copy.setIds(f.getIds());
+        copy.setOnlyUnparsed(f.getOnlyUnparsed());
+        return copy;
+    }
+
     private StandardizationReportVO.TimeRange rangeOf(List<Row> all, List<Row> picked,
                                                      String start, String end) {
         StandardizationReportVO.TimeRange r = new StandardizationReportVO.TimeRange();
@@ -370,9 +419,34 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             }
             b.setSymptomRate(symTotal == 0 ? null : pct(symHit, symTotal));
 
-            StandardizationReportVO.ScoreDistribution sd2 = scoreDistribution(rs);
-            b.setAvgScore(sd2.getAvg());
-            b.setCapped(sd2.getCapped());
+            // 计算月度评分统计（避免每月都重新跑整桶 scoreDistribution）
+            int mCount = 0;
+            int mCapped = 0;
+            double mSum = 0.0;
+            Integer mMin = null;
+            Integer mMax = null;
+            int mCappedThreshold = 10; // scoreDistribution 用的阈值：<=10 视为封顶
+            for (Row row : rs) {
+                Integer s = row.score;
+                if (s == null) {
+                    continue;
+                }
+                mCount++;
+                if (s <= mCappedThreshold) {
+                    mCapped++;
+                }
+                mSum += s;
+                if (mMin == null || s < mMin) {
+                    mMin = s;
+                }
+                if (mMax == null || s > mMax) {
+                    mMax = s;
+                }
+            }
+            // avgScore 是基本类型 double：空桶给 0.0（与原 scoreDistribution 的默认一致），
+            // 不能给 null —— 三元里混入 null 会把表达式提升成 Double，setAvgScore 拆箱即 NPE
+            b.setAvgScore(mCount == 0 ? 0.0 : Math.round(mSum * 10.0 / mCount) / 10.0);
+            b.setCapped(mCapped);
             out.add(b);
         }
         // 「未知」永远排最后；其余按月份倒序（最近的在最前）
@@ -397,7 +471,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     // ------------------------------------------------------------ 甲类 · 词典质量
 
-    /** 各类型词表的规模、编码覆盖、别名质量 */
+    /** 各类型词表的规模、别名质量 */
     private List<StandardizationReportVO.DictQuality> dictQuality() {
         String orgId = RequestUtils.currentOrgId();
         List<StandardizationReportVO.DictQuality> out = new ArrayList<>();
@@ -463,8 +537,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 且刻意内联书写（不传数组变量）：守卫按源码里的引号 token 逐个比对真实列清单，
      * 传变量会让它一个都扫不到，守卫就形同虚设。</p>
      */
-    private List<Row> rowsInDomain() {
-        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.domainOrgId(), new FiltersDTO());
+    private List<Row> rowsInDomain(FiltersDTO filters) {
+        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.domainOrgId(), filters);
         wrapper.select("id", "visit_time", "score", "update_time", "chief_complaint", "self_report", "structured_data", "qc_results");
         return toRows(recordMapper.selectList(wrapper));
     }

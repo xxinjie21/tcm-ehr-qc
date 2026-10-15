@@ -1,5 +1,6 @@
 package com.tcm.ehr.service;
 
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.vo.StandardizationReportVO;
 
 /**
@@ -34,6 +35,18 @@ public interface IStandardizationReportService {
     StandardizationReportVO report(String start, String end);
 
     /**
+     * 按范围过滤生成报告（科室 / 就诊时间 / 证候）。
+     *
+     * <p>未知字段（分级等）不影响口径；时间仍要求 {@code dateRange} 两端齐全才生效，
+     * 只给一端按「未给」处理，与 {@link #report(String, String)} 同一约定。甲类
+     * （词典质量）字典全域、不随范围收窄，只有乙类（病历相关）按范围过滤。</p>
+     *
+     * @param filters 范围过滤；为空表示不限
+     * @return 同上
+     */
+    StandardizationReportVO report(FiltersDTO filters);
+
+    /**
      * 把报告导出为 CSV（批次 28 · 28.23）。
      *
      * <p>与 {@link #report(String, String)} 同一数据源、同一数据域，走同一套
@@ -46,4 +59,12 @@ public interface IStandardizationReportService {
      * @return 带 UTF-8 BOM 的 CSV 字节；列固定为 区块 / 指标 / 数值 / 说明
      */
     byte[] reportCsv(String start, String end);
+
+    /**
+     * 按范围过滤导出 CSV，与页面 {@link #report(FiltersDTO)} 同源同域。
+     *
+     * @param filters 范围过滤（科室 / 就诊时间 / 证候）；为空表示不限
+     * @return 带 UTF-8 BOM 的 CSV 字节
+     */
+    byte[] reportCsv(FiltersDTO filters);
 }

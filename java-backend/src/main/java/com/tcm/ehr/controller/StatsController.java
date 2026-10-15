@@ -47,15 +47,19 @@ public class StatsController {
      * （只用于验证词表建全与否，<b>不代表真实病历准确率</b>）。响应里的
      * disclaimer 会原样带到页面，禁止前端隐藏。</p>
      *
+     * @param department 科室，空表示不限
      * @param start 接诊时间起（yyyy-MM-dd），空表示不限
      * @param end   接诊时间止（yyyy-MM-dd），空表示不限；只给一端按「未给」处理
+     * @param pattern 证候关键字，模糊匹配，空表示不限
      * @return 甲类标准符合度 + 乙类数据集覆盖度 + 按月分组
      */
     @GetMapping("/standardization-report")
     public Result<StandardizationReportVO> standardizationReport(
+            @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,
-            @RequestParam(required = false) String end) {
-        return Result.ok(reportService.report(start, end));
+            @RequestParam(required = false) String end,
+            @RequestParam(required = false) String pattern) {
+        return Result.ok(reportService.report(filters(department, start, end, pattern, null)));
     }
 
     /**
@@ -64,15 +68,19 @@ public class StatsController {
      * <p>【权限：登录即可 + 数据域】与页面同源同域。改由后端生成并与另外两条导出
      * （数据集 / 日志）一样返回文件流，前端不再自行拼 CSV。</p>
      *
+     * @param department 科室，空表示不限
      * @param start 接诊时间起（yyyy-MM-dd），空表示不限
      * @param end   接诊时间止（yyyy-MM-dd），空表示不限
+     * @param pattern 证候关键字，空表示不限
      * @return CSV 文件流（UTF-8 BOM，Excel 可直接打开）
      */
     @GetMapping("/standardization-report/export")
     public ResponseEntity<byte[]> standardizationReportExport(
+            @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,
-            @RequestParam(required = false) String end) {
-        byte[] content = reportService.reportCsv(start, end);
+            @RequestParam(required = false) String end,
+            @RequestParam(required = false) String pattern) {
+        byte[] content = reportService.reportCsv(filters(department, start, end, pattern, null));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=standardization-report.csv")
                 .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))

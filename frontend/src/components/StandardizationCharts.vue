@@ -66,7 +66,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import echarts from '@/utils/echarts'
 
 const props = defineProps({
-  /** 父页 coverageRows：[{ label, total, normalized, termCount, stale }] */
+  /** 后端 TypeCoverage：{ field, label, total, normalized, termCount, suspectedStaleExtraction } */
   coverage: { type: Array, default: () => [] },
   /** 后端 unmatched 口径：{ total, dictionaryGap, top: { 词: 次数 } } */
   unmatched: { type: Object, default: () => ({}) },

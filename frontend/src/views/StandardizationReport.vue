@@ -25,31 +25,18 @@
         </div>
       </div>
 
-      <!-- 时间维度：病历接诊时间跨度大，混在一起看不出「换了词表之后有没有变好」。
-           控件与事件绑定（preset / applyPreset / applyCustom / loadReport）原样保留。 -->
+      <!-- 范围查询：科室 / 就诊时间 / 证候，与病历数据、质控等页同一套 RangeFilter。
+           报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器。
+           近一年 / 近三年是时间快捷按钮，只改写 filters.dateRange，改完立即查询。 -->
       <div class="rh-tools">
-        <el-radio-group v-model="preset" size="small" @change="applyPreset">
-          <el-radio-button value="all">全部</el-radio-button>
-          <el-radio-button value="1y">近一年</el-radio-button>
-          <el-radio-button value="3y">近三年</el-radio-button>
-          <el-radio-button value="custom">自定义</el-radio-button>
-        </el-radio-group>
-        <el-date-picker
-          v-if="preset === 'custom'"
-          v-model="customRange"
-          type="daterange"
-          size="small"
-          value-format="YYYY-MM-DD"
-          range-separator="至"
-          start-placeholder="开始"
-          end-placeholder="结束"
-          style="width: 240px"
-          @change="applyCustom"
-        />
-        <el-button size="small" :loading="loading" @click="loadReport">
-          {{ loadError ? '重试' : '刷新' }}
+        <RangeFilter v-model="filters" :show-grade="false" />
+        <el-button size="default" :disabled="loading" @click="quickRange(1)">近一年</el-button>
+        <el-button size="default" :disabled="loading" @click="quickRange(3)">近三年</el-button>
+        <el-button type="primary" size="default" :loading="loading" @click="loadReport">
+          {{ loadError ? '重试' : '查 询' }}
         </el-button>
-        <el-button size="small" :loading="exporting" @click="handleExport">导出 CSV</el-button>
+        <el-button size="default" :disabled="loading" @click="resetFilters">重置</el-button>
+        <el-button size="default" :loading="exporting" @click="handleExport">导出 CSV</el-button>
       </div>
 
       <!-- 质控未完成时的重跑入口与进度：与结论同处一卡，就近解决 -->
@@ -152,13 +139,11 @@
       </div>
     </PanelCard>
 
-    <!-- 第三屏：明细默认收起。业务用户通常不需要逐类看，展开即可。
-         按接诊月份看趋势：补词表 + 重跑解析只会覆盖部分月份，
-         按月看才能判断「哪些月份已经吃到新词表」。 -->
+    <!-- 第三屏：明细默认收起，只剩「诊断明细」一项（2026-10-15 删去按月份 / 各词典明细 /
+         各类术语归一情况三项：业务侧不需要，归一率已有上方图表）。 -->
     <StandardizationDetails
       v-if="!loadError"
       :report="report"
-      :coverage-rows="coverageRows"
       :has-stale-rows="hasStaleRows"
       :qc-scored="qcScored"
       :qc-total="qcTotal"
@@ -178,15 +163,17 @@
 //   ② 把「多少条没归一」翻译成「该做什么、归谁管」；
 //   ③ 明细默认收起，需要时再展开。
 // 技术口径（甲类/乙类、normLevel、可归一实体）只在本文件内部使用，不出现在界面上。
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
+import RangeFilter from '@/components/RangeFilter.vue'
 import StandardizationDetails from '@/components/StandardizationDetails.vue'
 import StandardizationCharts from '@/components/StandardizationCharts.vue'
 import { getStandardizationReport, exportStandardizationReport } from '@/api/stats'
 import { submitNlpBatch as submitExtractBatch, getNlpBatchProgress, listNlpBatch } from '@/api/nlp'
 import { recomputeQc as submitQcBatch, getQcBatch, listQcBatch } from '@/api/qc'
 import { saveBlob } from '@/utils/download'
+import { useDepartments } from '@/composables/useDepartments'
 
 const report = ref(null)
 const loading = ref(false)
@@ -196,11 +183,9 @@ const loadError = ref(false)
 const exporting = ref(false)
 const rerunning = ref(false)
 
-// ---- 时间区间 ----
-// 病历接诊时间跨度大（实测 2019-01 ~ 2025-12），必须能按时间切：
-// 新词表只对重跑过解析的病历生效，而这些病历的接诊时间往往集中在某几个月。
-const preset = ref('all')
-const customRange = ref(null)
+const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+const rerunFilters = ref(null)
+const { departments, reload: reloadDepartments } = useDepartments()
 
 const fmtDate = (d) => {
   const y = d.getFullYear()
@@ -209,37 +194,63 @@ const fmtDate = (d) => {
   return `${y}-${m}-${day}`
 }
 
-/** 当前生效的区间；null 表示不限 */
-function currentRange() {
-  if (preset.value === 'custom') {
-    const r = customRange.value
-    if (Array.isArray(r) && r.length === 2 && r[0] && r[1]) {
-      return { start: r[0], end: r[1] }
-    }
-    return null
+/** 时间快捷按钮：只改写 dateRange，随后立即查询 */
+function quickRange(years) {
+  const end = new Date()
+  const start = new Date(end.getFullYear() - years + 1, 0, 1)
+  filters.dateRange = [fmtDate(start), fmtDate(end)]
+  loadReport()
+}
+
+const resetFilters = () => {
+  filters.department = ''
+  filters.dateRange = null
+  filters.pattern = ''
+  filters.grade = ''
+  loadReport()
+}
+
+/** 报告 / 导出参数：dateRange 必须两端齐全才生效；department/pattern 为空发空串 */
+const params = () => {
+  const d = filters.dateRange
+  return {
+    department: filters.department || '',
+    start: d && d.length === 2 ? d[0] : '',
+    end: d && d.length === 2 ? d[1] : '',
+    pattern: filters.pattern || ''
   }
-  if (preset.value === '1y' || preset.value === '3y') {
-    const years = preset.value === '1y' ? 1 : 3
-    const end = new Date()
-    const start = new Date(end.getFullYear() - years + 1, 0, 1)
-    return { start: fmtDate(start), end: fmtDate(end) }
+}
+
+/** 批量重跑的过滤载荷（不含 grade，showGrade=false） */
+const batchFilterPayload = () => {
+  return {
+    department: filters.department || '',
+    dateRange: filters.dateRange && filters.dateRange.length === 2 ? [...filters.dateRange] : null,
+    pattern: filters.pattern || ''
   }
-  return null
+}
+
+const scopeText = () => {
+  const parts = []
+  if (filters.department) parts.push(`科室＝${filters.department}`)
+  if (filters.dateRange && filters.dateRange.length === 2) parts.push(`${filters.dateRange[0]}~${filters.dateRange[1]}`)
+  if (filters.pattern) parts.push(`证候＝${filters.pattern}`)
+  return parts.length ? parts.join(' · ') : '本组织全部病历'
 }
 
 const rangeTip = computed(() => {
   const r = report.value?.range
   if (!r) return ''
+  const scope = []
+  if (filters.department) scope.push(`科室＝${filters.department}`)
+  if (filters.pattern) scope.push(`证候＝${filters.pattern}`)
+  const scopeTxt = scope.length ? scope.join(' · ') + '；' : ''
   if (r.start || r.end) {
-    return `当前统计 ${r.start || '不限'} ~ ${r.end || '不限'}，`
-      + `区间内 ${r.records} 条`
+    return `${scopeTxt}当前统计 ${r.start || '不限'} ~ ${r.end || '不限'}，区间内 ${r.records} 条`
       + (r.excluded > 0 ? `（已排除 ${r.excluded} 条区间外数据）` : '')
   }
-  return `当前统计全部 ${r.records} 条`
+  return `${scopeTxt}当前统计全部 ${r.records} 条`
 })
-
-const applyPreset = () => loadReport()
-const applyCustom = () => loadReport()
 
 const pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : '—')
 
@@ -255,14 +266,17 @@ const showQcGate = computed(() => qcLoaded.value && !qcComplete.value)
 const qcTotal = computed(() => qc.value?.total ?? report.value?.dataset?.recordCount ?? 0)
 const qcScored = computed(() => qc.value?.scored ?? 0)
 const qcLast = computed(() => qc.value?.lastScoredAt || '')
-// P2-9：是否存在「解析早于词表」的行 —— 新鲜度徽标的过期态取这里
-const hasStaleRows = computed(() => (report.value?.monthly || []).some((r) => r.stale))
+// P2-9：是否存在「解析早于词表」的类型 —— 新鲜度徽标的过期态取这里。
+// 判据用 coverage 的 suspectedStaleExtraction，与下方 staleTypes 同源。
+// 原先误读 report.monthly（后端字段叫 byMonth，且 MonthlyBucket 根本没有 stale 字段），
+// 结果恒为 false ⇒ 徽标永不进入过期态。
+const hasStaleRows = computed(() => (report.value?.coverage || [])
+  .some((c) => c.suspectedStaleExtraction))
 
-/** 批量重跑：质控 / 解析都可能有几千条，必须先让人确认范围 */
-async function confirmRerun(what, countHint) {
+const confirmRerun = async (what, countHint) => {
   try {
     await ElMessageBox.confirm(
-      `将对本组织全部病历重跑${what}。${countHint ? `当前数据域内约 ${countHint} 条。` : ''}`
+      `将对「${scopeText()}」范围内重跑${what}。${countHint ? `当前范围约 ${countHint} 条。` : ''}`
       + '任务在后台执行，本页会自动跟进进度并在完成后刷新报告；'
       + '中途可以离开页面。',
       `确认重跑${what}`,
@@ -374,23 +388,23 @@ async function pollOnce() {
       const res = await getNlpBatchProgress(nlpId)
       rerunProgress.value = { done: res.data?.done ?? 0, total: res.data?.total ?? 0 }
       if (!isActiveStatus(res.data)) {
-        // 解析结束才能接着算质控：质控读的是 structured_data，解析没完它算的还是旧的。
-        // 这里提交质控也可能撞上「另一个任务正在提交」的幂等拒绝 —— 解析刚结束时
-        // 它的 cancel/收尾还在占位，所以要容错，不能因为一次拒绝就整条链路断掉。
-        let qcId = ''
-        try {
-          const qc = await submitQcBatch()
-          qcId = qc.data?.id || ''
-          rerunProgress.value = { done: 0, total: qc.data?.total || 0 }
-          ElMessage.info('结构化解析已完成，质控评分已接着开始')
-        } catch (e) {
-          if (!isAlreadyRunning(e)) {
-            await finishRerun('结构化解析已完成，但质控重跑未能启动，请在「质控校验」页手动发起')
-            return
-          }
-          // 已有任务在跑：直接切到盯它，不再重复提交
-          qcId = ''
+      // 解析结束才能接着算质控：质控读的是 structured_data，解析没完它算的还是旧的。
+      // 这里提交质控也可能撞上「另一个任务正在提交」的幂等拒绝 —— 解析刚结束时
+      // 它的 cancel/收尾还在占位，所以要容错，不能因为一次拒绝就整条链路断掉。
+      let qcId = ''
+      try {
+        const qc = await submitQcBatch({ filters: rerunFilters.value, requestKey: crypto.randomUUID() })
+        qcId = qc.data?.id || ''
+        rerunProgress.value = { done: 0, total: qc.data?.total || 0 }
+        ElMessage.info('结构化解析已完成，质控评分已接着开始')
+      } catch (e) {
+        if (!isAlreadyRunning(e)) {
+          await finishRerun('结构化解析已完成，但质控重跑未能启动，请在「质控校验」页手动发起')
+          return
         }
+        // 已有任务在跑：直接切到盯它，不再重复提交
+        qcId = ''
+      }
         track.value = { nlpId: '', qcId, stage: qcId ? 'qc' : 'idle' }
         if (!qcId) stopPoll()
       }
@@ -460,7 +474,9 @@ function startPoll() {
 const adoptRunningTask = async (stage) => {
   try {
     const res = stage === 'parse' ? await listNlpBatch() : await listQcBatch()
-    const active = (res.data || []).find((t) => ACTIVE_STATUS.includes(t.status))
+    // 两个列表接口回包都是 { tasks, truncated, limit }（不是裸数组）：NLP 侧一直如此，
+    // QC 侧本次改为同一形状。取错会静默退化成「提示稍后刷新」，故显式走 .tasks
+    const active = (res.data?.tasks || []).find((t) => ACTIVE_STATUS.includes(t.status))
     if (!active) {
       return false
     }
@@ -476,9 +492,9 @@ const adoptRunningTask = async (stage) => {
   }
 }
 
-const submitAndTrack = async (submitFn, stage, startMsg) => {
+const submitAndTrack = async (submitFn, stage, startMsg, payload) => {
   try {
-    const res = await submitFn()
+    const res = await submitFn(payload)
     const id = res.data?.id || ''
     track.value = stage === 'parse'
       ? { nlpId: id, qcId: '', stage: 'parse' }
@@ -508,8 +524,14 @@ const isAlreadyRunning = (e) => {
 const rerunQc = async () => {
   if (!(await confirmRerun('质控评分', qcTotal.value))) return
   rerunning.value = true
+  rerunFilters.value = batchFilterPayload()
   try {
-    await submitAndTrack(submitQcBatch, 'qc', '质控重跑已开始，完成后本页会自动刷新')
+    await submitAndTrack(
+      submitQcBatch,
+      'qc',
+      '质控重跑已开始，完成后本页会自动刷新',
+      { filters: rerunFilters.value, requestKey: crypto.randomUUID() }
+    )
   } finally {
     rerunning.value = false
   }
@@ -519,8 +541,14 @@ const rerunQc = async () => {
 const rerunAll = async () => {
   if (!(await confirmRerun('结构化解析与质控', qcTotal.value))) return
   rerunning.value = true
+  rerunFilters.value = batchFilterPayload()
   try {
-    await submitAndTrack(submitExtractBatch, 'parse', '结构化解析已开始，完成后会自动接着重跑质控')
+    await submitAndTrack(
+      submitExtractBatch,
+      'parse',
+      '结构化解析已开始，完成后会自动接着重跑质控',
+      { filters: rerunFilters.value, limit: 0, requestKey: crypto.randomUUID() }
+    )
   } finally {
     rerunning.value = false
   }
@@ -790,16 +818,6 @@ const emptyTip = computed(() => (isEmptyReport.value
   : '当前没有明显短板。词典规模、归一与评分都处在合理区间。'))
 
 // ---------------- 明细 ----------------
-const coverageRows = computed(() =>
-  (report.value?.coverage || []).map((c) => ({
-    label: c.label,
-    total: c.total,
-    normalized: c.normalized,
-    termCount: c.termCount,
-    stale: c.suspectedStaleExtraction,
-    rate: c.total ? pct(c.normalized, c.total) : '未抽取'
-  }))
-)
 /** 词表非空、也抽到了实体，却一条都没归上 —— 这是解析早于词表建立，补词表无效 */
 const staleTypes = computed(() =>
   (report.value?.coverage || []).filter((c) => c.suspectedStaleExtraction)
@@ -820,9 +838,8 @@ const loadReport = async () => {
 loading.value = true
 loadError.value = false
 try {
-      // 时间区间为空时把参数省略，不发 start=undefined 这类脏参数
-      const range = currentRange()
-      const res = await getStandardizationReport(range || undefined)
+      // 范围为空时各参数为 ''，后端按「未给」处理
+      const res = await getStandardizationReport(params())
       report.value = res.data || null
     } catch {
       // 拦截器已提示，这里不叠加泛化文案；
@@ -841,7 +858,7 @@ const handleExport = async () => {
   if (!r) return
   exporting.value = true
   try {
-    const blob = await exportStandardizationReport(currentRange() || undefined)
+    const blob = await exportStandardizationReport(params())
     if (blob && blob.type && blob.type.includes('application/json')) {
       let msg = '导出失败'
       try {
@@ -917,10 +934,18 @@ function copyByExecCommand(text) {
   }
 }
 
-onMounted(() => {
-  loadReport()
-  // 页面从后台切回来时，若重跑还在跑，立刻补一次进度检查，
-  // 否则要等下一个轮询周期才继续（退避后最长 10 秒，逻辑上更完整）
+onMounted(async () => {
+  // 预选第一个科室以减轻初始全量查询压力；用户仍可清空回全部
+  try {
+    await reloadDepartments()
+    if (!filters.department && departments.value && departments.value.length > 0) {
+      filters.department = departments.value[0]
+    }
+  } catch {
+    // 科室加载失败不阻断页面加载，仍按当前过滤条件（可能为空=全部）查询
+  }
+  await loadReport()
+  // 页面从后台切回来时，若重跑还在跑，立刻补一次进度检查
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
