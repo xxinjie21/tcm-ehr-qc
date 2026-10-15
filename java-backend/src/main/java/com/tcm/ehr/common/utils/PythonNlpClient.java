@@ -7,12 +7,13 @@ import com.tcm.ehr.domain.vo.NlpHealthVO;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
 
@@ -23,6 +24,16 @@ import java.util.Map;
  * 服务未启动 / 调用异常 / {@code nlp.enabled=false} 时返回 {@code null}，
  * 由调用方降级为空 9 类（{@code modelAvailable=false}），不阻塞主流程。</p>
  *
+ * <p><b>HTTP 走 Spring {@link RestClient}</b>（《自研组件替换计划》#3）：原实现直接用
+ * {@code java.net.http} 手拼 {@code HttpRequest}/{@code HttpResponse}，属重复实现通用能力。
+ * 传输层仍是 JDK 客户端（{@link JdkClientHttpRequestFactory}），这是 Spring Boot 在没有
+ * httpclient5 时的默认选择，不是自研。</p>
+ *
+ * <p><b>三条必须保留的行为</b>：① <b>HTTP/1.1</b> —— uvicorn 不认 h2c upgrade，
+ * 用默认协议会先试 HTTP/2 再退回，白等一轮；② <b>两种超时</b> —— 抽取 30s、
+ * 健康探测 2s，故建两个 {@code RestClient}（JDK 请求工厂的读超时是工厂级的，不能按请求改）；
+ * ③ <b>绝不抛异常</b> —— 一律降级为 {@code null} / 探测失败，NLP 挂掉不能让主流程报错。</p>
+ *
  * <p>本机单实例即可：torch 推理是 CPU 密集型，同一台机器多起实例只是把同样的核拆着用、
  * 吞吐不增反而内存翻倍，也没有跨机故障转移可言。并发靠
  * {@code nlp.batch.concurrency}（批量侧线程池）与 Python 侧的
@@ -32,29 +43,37 @@ import java.util.Map;
 @Component
 public class PythonNlpClient {
 
-    private final HttpClient httpClient;
+    /** 连接超时：与抽取/探测共用，建连本身很快，3s 足够 */
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
+
     private final ObjectMapper mapper;
+    private final RestClient extractClient;
+    private final RestClient probeClient;
 
     /** NLP 实例地址 */
     @Value("${nlp.service-url:http://localhost:8001}")
     private String serviceUrl;
 
-    @Value("${nlp.timeout:30000}")
-    private int timeoutMs;
-
     @Value("${nlp.enabled:false}")
     private boolean enabled;
 
-    /** 健康探测超时（毫秒）。探测是页面加载时顺带问一句，不能照抽取的 30s 等，默认 2s */
-    @Value("${nlp.probe-timeout:2000}")
-    private int probeTimeoutMs;
-
-    public PythonNlpClient(ObjectMapper mapper) {
+    public PythonNlpClient(ObjectMapper mapper,
+                           @Value("${nlp.timeout:30000}") int timeoutMs,
+                           @Value("${nlp.probe-timeout:2000}") int probeTimeoutMs) {
         this.mapper = mapper;
-        this.httpClient = HttpClient.newBuilder()
+        this.extractClient = buildClient(timeoutMs);
+        this.probeClient = buildClient(probeTimeoutMs);
+    }
+
+    /** 建一个绑定固定读超时的 RestClient；传输层固定 HTTP/1.1（uvicorn 只支持 1.1） */
+    private static RestClient buildClient(int readTimeoutMs) {
+        HttpClient httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)   // uvicorn 仅 HTTP/1.1，禁用默认的 h2c upgrade
-                .connectTimeout(Duration.ofSeconds(3))
+                .connectTimeout(CONNECT_TIMEOUT)
                 .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+        return RestClient.builder().requestFactory(factory).build();
     }
 
     /** 抽取总开关（供导入链路判断是否触发抽取） */
@@ -107,23 +126,21 @@ public class PythonNlpClient {
         }
         String url = serviceUrl.trim();
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url + "/api/nlp/extract"))
-                    .timeout(Duration.ofMillis(timeoutMs))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            int code = response.statusCode();
-            if (code == 200) {
-                return mapper.readValue(response.body(), NlpExtractVO.class);
-            }
+            String response = extractClient.post()
+                    .uri(url + "/api/nlp/extract")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(String.class);
+            return mapper.readValue(response, NlpExtractVO.class);
+        } catch (RestClientResponseException e) {
+            int code = e.getStatusCode().value();
             // 4xx 是请求本身的问题（如文本超长 422），重试也没用 —— 立即降级
             if (code >= 400 && code < 500) {
                 log.warn("[NLP] 调用失败: HTTP {}（{}），请求本身有问题，降级为空 9 类", code, url);
-                return null;
+            } else {
+                log.warn("[NLP] 实例 {} 返回 HTTP {}，降级为空 9 类", url, code);
             }
-            log.warn("[NLP] 实例 {} 返回 HTTP {}，降级为空 9 类", url, code);
             return null;
         } catch (Exception e) {
             log.warn("[NLP] 实例 {} 调用失败（{}），降级为空 9 类", url, e.getMessage());
@@ -173,19 +190,16 @@ public class PythonNlpClient {
      */
     private Boolean probeOne(String url) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url + "/health"))
-                    .timeout(Duration.ofMillis(probeTimeoutMs))
-                    .GET()
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                log.debug("[NLP] 健康探测 HTTP {}（{}），按连不上处理", response.statusCode(), url);
-                return null;
-            }
-            Map<String, Object> body = mapper.readValue(response.body(),
+            String response = probeClient.get()
+                    .uri(url + "/health")
+                    .retrieve()
+                    .body(String.class);
+            Map<String, Object> body = mapper.readValue(response,
                     new TypeReference<Map<String, Object>>() { });
             return Boolean.TRUE.equals(body.get("modelAvailable"));
+        } catch (RestClientResponseException e) {
+            log.debug("[NLP] 健康探测 HTTP {}（{}），按连不上处理", e.getStatusCode().value(), url);
+            return null;
         } catch (Exception e) {
             log.debug("[NLP] 健康探测失败（{}）: {}", url, e.getMessage());
             return null;

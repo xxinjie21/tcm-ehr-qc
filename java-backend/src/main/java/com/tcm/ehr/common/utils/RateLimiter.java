@@ -2,21 +2,36 @@ package com.tcm.ehr.common.utils;
 
 import com.tcm.ehr.common.exception.RateLimitedException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.redisson.api.RRateLimiter;
+import org.redisson.api.RateType;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 接口限流 / 防刷（P2-31 / R12）。
  *
- * <p><b>为什么用滑动窗口而不是「{@code INCR} + {@code EXPIRE}」</b>：固定窗口在窗口边界会出现
- * 「两倍突发」—— 第 59 秒打满一轮、第 61 秒又打满一轮，两秒内实际放过 2×limit。
- * 登录爆破与「每次调 LLM 都有成本」的 AI 建议都不能容忍这个缺口。滑动窗口把「计数 + 判定 +
- * 记录」放进同一段 Lua，在 Redis 端单线程执行，天然没有边界突发。</p>
+ * <p><b>为什么用 Redisson {@link RRateLimiter} 而不是自己写 Lua</b>：限流是通用能力，
+ * Redisson 已提供经过验证的实现，自写 ZSET 滑动窗口只是把同一件事再实现一遍
+ * （《自研组件替换计划》#1）。原实现的 key 前缀、fail-open、空身份放行三条对外契约不变。</p>
+ *
+ * <p><b>语义已实测为「等价」，不是「令牌桶换滑动窗口」</b>：Redisson 的 acquire 脚本
+ * 把每次许可记进 ZSET（score = 时刻），下次取用时先 {@code zrangebyscore} 淘汰
+ * 「早于 now − interval」的许可并把额度加回，因此<b>任意 interval 内最多 rate 次</b>，
+ * 与原实现的滑动窗口同口径。实测（rate=3 / interval=5s，Redisson 3.52.0 + 本机 Redis）：
+ * 连打 4 次 → {@code true,true,true,false}；t=3s 再打 → {@code false}（令牌桶此时会放行，
+ * 因为按 0.6/s 已补 1.8 个）；t=6s → {@code true}。</p>
+ *
+ * <p><b>每次调用都要重设 rate 与 TTL，两件事都不能省</b>（都实测过）：
+ * ① {@code trySetRate} 内部是 {@code hsetnx}，只在配置缺失时写入，
+ * <b>不会重置已消耗的额度</b> —— 所以每次调用是幂等的、安全的；
+ * 反过来它也<b>不会更新已存在的配置</b>，因此若不设 TTL，改了限额（如 60 → 30）
+ * 对老 key 永远不生效，必须手工删 key。② Redisson 只在「key 自身有 TTL」时
+ * 才把 TTL 传给内部子 key（脚本里的 {@code if ttl > 0}），而 {@code trySetRate}
+ * 不设 TTL → 实测 key 的 {@code ttlMs = -1}（永不过期）。原实现每次
+ * {@code PEXPIRE key window}，故这里补一次 {@link RRateLimiter#expire(Duration)}
+ * 保持同样的「窗口内无请求即回收」语义，否则每个 (scope, identity) 都会在 Redis 里永久留痕。</p>
  *
  * <p><b>降级方向：fail-open（Redis 不可用即放行）</b>。限流是「防滥用」的增强项，
  * 不是业务正确性的前提；把它做成 fail-closed 会让一次 Redis 抖动把登录、导入、AI 全打成 429 ——
@@ -30,35 +45,10 @@ import java.util.concurrent.ThreadLocalRandom;
 @Component
 public class RateLimiter {
 
-    /**
-     * 滑动窗口：清理过期成员 → 取当前计数 → 未达上限则记一条并返回 1。
-     *
-     * <p>用 ZSET 而不是「计数器 + 首次过期」：ZSET 的 score 是请求时刻，
-     * {@code ZREMRANGEBYSCORE} 精确淘汰窗口外的成员，因此窗口是真正滑动的。
-     * member 用「毫秒 + 随机数」保证同一毫秒内的多次请求不会互相覆盖（ZSET 同 member 只算一条）。</p>
-     */
-    private static final String SLIDING_WINDOW =
-            "local key = KEYS[1] "
-                    + "local now = tonumber(ARGV[1]) "
-                    + "local window = tonumber(ARGV[2]) "
-                    + "local limit = tonumber(ARGV[3]) "
-                    + "local member = ARGV[4] "
-                    + "redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window) "
-                    + "local n = redis.call('ZCARD', key) "
-                    + "if n < limit then "
-                    + "  redis.call('ZADD', key, now, member) "
-                    + "  redis.call('PEXPIRE', key, window) "
-                    + "  return 1 "
-                    + "end "
-                    + "return 0";
+    private final RedissonClient redisson;
 
-    private static final DefaultRedisScript<Long> SLIDING_WINDOW_SCRIPT =
-            new DefaultRedisScript<>(SLIDING_WINDOW, Long.class);
-
-    private final StringRedisTemplate redis;
-
-    public RateLimiter(StringRedisTemplate redis) {
-        this.redis = redis;
+    public RateLimiter(RedissonClient redisson) {
+        this.redisson = redisson;
     }
 
     /**
@@ -75,14 +65,13 @@ public class RateLimiter {
             return true;
         }
         String key = RedisKeys.PREFIX + "rl:" + scope + ":" + identity;
-        long now = System.currentTimeMillis();
-        String member = now + "-" + ThreadLocalRandom.current().nextLong(Long.MAX_VALUE);
         try {
-            Long ok = redis.execute(SLIDING_WINDOW_SCRIPT, List.of(key),
-                    String.valueOf(now), String.valueOf(window.toMillis()),
-                    String.valueOf(limit), member);
-            // 脚本固定返回 1/0；返回 null（客户端异常吞掉）按放行处理
-            return ok == null || ok == 1L;
+            RRateLimiter limiter = redisson.getRateLimiter(key);
+            // 顺序有意：先写配置（缺失才写，不重置额度），再补 TTL，最后取许可。
+            // TTL 放在 acquire 之前，acquire 脚本才能读到正的 pttl 并把 TTL 传播给内部子 key。
+            limiter.trySetRate(RateType.OVERALL, limit, window);
+            limiter.expire(window);
+            return limiter.tryAcquire();
         } catch (Exception e) {
             // 见类注释：fail-open。限流不能成为「Redis 一抖全站 429」的原因。
             log.warn("[限流] Redis 不可用，放行 scope={} id={}: {}", scope, identity, e.getMessage());

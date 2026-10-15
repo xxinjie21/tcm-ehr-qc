@@ -57,12 +57,13 @@ class LlmClientTest {
         return p;
     }
 
-    /** 测试用加密密钥：固定 32 字节 Base64，便于复现 */
+    /** 测试用加密口令与盐：固定值，便于复现（实现为 Encryptors.delux(password, salt)） */
     private static final String TEST_KEY =
             "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    private static final String TEST_SALT = "9f2c7a41b3e58d60";
 
     private static LlmSecretCipher cipher() {
-        return new LlmSecretCipher(TEST_KEY);
+        return new LlmSecretCipher(TEST_KEY, TEST_SALT);
     }
 
     /** 存储层测试替身：按内存 Map 模拟 user_llm_config（不碰数据库） */

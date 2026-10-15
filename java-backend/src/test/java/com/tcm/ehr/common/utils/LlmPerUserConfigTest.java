@@ -33,6 +33,8 @@ class LlmPerUserConfigTest {
             "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
     private static final String KEY_B =
             "YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    /** 加密盐（十六进制偶数长度）；口令/盐任一不同即解不开，见 wrongKeyDegradesToEmptyInsteadOfThrowing */
+    private static final String SALT = "9f2c7a41b3e58d60";
 
     /** 内存版 user_llm_config：用 mock 支撑，不连库，专心验证「取谁的值 / 存到哪」 */
     private Map<String, UserLlmConfig> rows;
@@ -80,7 +82,7 @@ class LlmPerUserConfigTest {
     @BeforeEach
     void setUp() {
         userMapper = newUserMapper();
-        cipher = new LlmSecretCipher(KEY_A);
+        cipher = new LlmSecretCipher(KEY_A, SALT);
         LlmProperties p = new LlmProperties();
         p.setEnabled(false);
         p.setProvider("ollama");
@@ -120,7 +122,7 @@ class LlmPerUserConfigTest {
     @Test
     void wrongKeyDegradesToEmptyInsteadOfThrowing() {
         String cipherText = cipher.encrypt("sk-secret");
-        LlmSecretCipher other = new LlmSecretCipher(KEY_B);
+        LlmSecretCipher other = new LlmSecretCipher(KEY_B, SALT);
 
         assertEquals("", other.decrypt(cipherText));
     }
@@ -134,12 +136,29 @@ class LlmPerUserConfigTest {
      */
     @Test
     void withoutKeySavingSecretIsRejectedNotDowngradedToPlain() {
-        LlmSecretCipher none = new LlmSecretCipher("");
+        LlmSecretCipher none = new LlmSecretCipher("", SALT);
         assertFalse(none.available());
         com.tcm.ehr.common.exception.ServiceNotReadyException e = org.junit.jupiter.api.Assertions.assertThrows(
                 com.tcm.ehr.common.exception.ServiceNotReadyException.class,
                 () -> none.encrypt("sk-secret"));
         assertTrue(e.getMessage().contains("TCM_LLM_ENC_KEY"), e.getMessage());
+    }
+
+    /**
+     * 只配了口令、没配盐：同样按「未配置」处理（口令/盐缺一不可），且不阻塞启动。
+     *
+     * <p>加密实现换成 {@code Encryptors.delux(password, salt)} 后新增的分支 —— 盐缺失时
+     * 不能抛异常让应用起不来，只能降级成「未就绪 + 告警」。</p>
+     */
+    @Test
+    void withoutSaltIsUnavailableAndDoesNotThrow() {
+        LlmSecretCipher noSalt = new LlmSecretCipher(KEY_A, "");
+        assertFalse(noSalt.available());
+        assertEquals("", noSalt.decrypt("deadbeef"));
+
+        // 盐非法（奇数长度 hex）也不能让构造失败
+        LlmSecretCipher badSalt = new LlmSecretCipher(KEY_A, "abc");
+        assertFalse(badSalt.available());
     }
 
     // ------------------------------------------------------------------ 每人一份

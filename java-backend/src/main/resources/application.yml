@@ -114,9 +114,13 @@ llm:
   interpret-enabled: true     # AI 解读
   review-enabled: true        # 复核意见
   term-suggest-enabled: true  # 术语建议
-  # 用户密钥落库加密密钥（AES-256-GCM）。换掉后已加密的 API Key 全部解不开，须当持久密钥保管；
-  # 生产用 TCM_LLM_ENC_KEY 覆盖（优先级更高）。生成/轮换见 tools/init-llm-enc-key.py
-  crypto-key: ${TCM_LLM_ENC_KEY:dGNtLWVoci1xYy1kZXYtb25seS1sbG0tZW5jLWtleSE=}
+  # 用户密钥落库加密（AES-256-GCM，spring-security-crypto Encryptors.delux）：
+  # 密钥由「口令 + 盐」经 PBKDF2 派生，密文为 hex(IV‖密文‖tag)。
+  # 口令/盐任一换掉，已加密的 API Key 全部解不开（用户需重填一次），须当持久密钥保管。
+  # 生产用 TCM_LLM_ENC_KEY / TCM_LLM_ENC_SALT 覆盖（优先级更高）。
+  # 盐必须是偶数长度的十六进制串；生成/轮换见 tools/init-llm-enc-key.py
+  crypto-password: ${TCM_LLM_ENC_KEY:dGNtLWVoci1xYy1kZXYtb25seS1sbG0tZW5jLWtleSE=}
+  crypto-salt: ${TCM_LLM_ENC_SALT:9f2c7a41b3e58d60}
 
 # 认证
 auth:
