@@ -83,7 +83,13 @@ CREATE TABLE IF NOT EXISTS records (
   -- idx_registration_no / idx_status / idx_grade 的单列场景亦被 org 前缀复合索引覆盖
   -- （管理员「看全部」的 grade/status 过滤退化为全表扫，40k 量级可接受）。
   -- 保留下列 7 个二级索引即可覆盖全部实际查询，显著降低批量回写的写放大。
-  INDEX idx_records_visit_time (visit_time),
+  -- 2026-10-15 修正：上句的「40k 量级可接受」只适用于 grade/status 过滤，**不适用于默认序**。
+  -- 默认序 visit_time DESC, id ASC 是混合方向；单列 (visit_time) 正扫两列升序、反扫两列降序，
+  -- 都凑不出「一降一升」⇒ 管理员（不带 org_id，用不上下面的 org 前缀）只能全表读整行再排序
+  -- （EXPLAIN: Table scan + Sort cost=14209，实测 POST /records/search 2.8~3.1s / 35352 行）。
+  -- 改成同序复合索引后可直接索引扫描；它是 (visit_time) 的超集，索引数仍是 7 条，未加写放大。
+  -- 已有库由 Flyway V4__replace_records_visit_time_index.sql 升级。
+  INDEX idx_records_vt_desc_id (visit_time DESC, id ASC),
   -- 列表/导出/统计：org_id 等值（数据域）+ visit_time 范围或排序 + id 稳定序（keyset 游标）
   INDEX idx_records_org_vt_id (org_id, visit_time DESC, id ASC),
   -- 科室筛选 + 默认排序（三星索引：等值 org_id/department → 排序 visit_time/id）
