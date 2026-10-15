@@ -49,8 +49,8 @@ tags:
     description: 症状频次/证候分布/方剂中药频次
   - name: 日志
     description: 操作日志导出
-  - name: AI助手
-    description: AI 质控解读与业务问答（规则出结论 + LLM 叙述，LLM 不可用降级）
+  - name: AI辅助
+    description: AI 质控解读、复核预检与术语补词（规则出结论 + LLM 叙述，LLM 不可用降级）
   - name: LLM配置
     description: 运行时 LLM 通道配置（ollama / openai 兼容），保存即生效
 security:
@@ -1591,27 +1591,29 @@ components:
           $ref: '#/components/schemas/StatsVO'
         prescription:
           $ref: '#/components/schemas/StatsVO'
-    # ========== AI 助手 DTO / VO（interpret / chat / review 共享） ==========
+    # ========== AI DTO / VO（interpret / review / termsuggest 共享） ==========
     AiQueryDTO:
       type: object
-      description: AI 解读/问答/复核请求（入参，共享）：interpret 用 recordId；chat 用 question（+ 可选 recordId）；review 用 recordId + correctedData（批D）
+      description: AI 解读/复核/术语补词请求（入参，共享）：interpret / review 用 recordId；termsuggest 用 terms（+ 可选 termType）
       properties:
         recordId:
           type: string
-          description: 病历ID（interpret 必填；chat 可选，"这份病历…"类问题需要）
-        question:
+          description: 病历ID（interpret / review 必填）
+        terms:
+          type: array
+          items:
+            type: string
+          description: 待规范的术语原文（termsuggest 必填，单次最多 50 个）
+        termType:
           type: string
-          description: 使用者业务问题（chat 必填）
-        history:
-          type: string
-          description: 追问上下文（chat 可选）：本会话近期问答，前端拼好后传入，用于多轮追问
+          description: 术语类型（termsuggest 可选，如 symptom / disease / pattern）；留空按 symptom
     AiReplyVO:
       type: object
       description: AI 结果（出参，共享）；规则出结论 + LLM 叙述，LLM 不可用降级且规则结论保留
       properties:
         answer:
           type: string
-          description: 自然语言回答/叙述（interpret 的报告叙述 或 chat 的问答回复，恒非空）
+          description: 自然语言回答/叙述（interpret 的报告叙述 / review 的预检建议 / termsuggest 的概述，恒非空）
         source:
           type: string
           description: 来源：llm（模型）/ rule（降级规则）
@@ -1624,7 +1626,7 @@ components:
         summary:
           type: object
           nullable: true
-          description: 病历要点摘要（interpret，LLM 生成）；LLM 不可用或 chat 时为 null
+          description: 病历要点摘要（interpret，LLM 生成）；LLM 不可用或非 interpret 时为 null
           properties:
             chiefComplaint:
               type: string
@@ -1641,7 +1643,7 @@ components:
         completeness:
           type: object
           nullable: true
-          description: 完整性分析（interpret，21 字段口径）；chat 时为 null
+          description: 完整性分析（interpret，21 字段口径）；非 interpret 时为 null
           properties:
             total:
               type: integer
@@ -1665,7 +1667,7 @@ components:
         normHits:
           type: object
           nullable: true
-          description: 归一命中分布（interpret；精确/包含/模糊）；chat 时为 null
+          description: 归一命中分布（interpret；精确/包含/模糊）；非 interpret 时为 null
           properties:
             exact:
               type: integer
@@ -4348,12 +4350,12 @@ paths:
   /api/ai/async/{kind}:
     post:
       tags:
-        - AI助手
+        - AI辅助
       summary: 异步提交 AI 生成
       description: |
-        【权限：登录即可】（批次 15 · 15.1）与三个同步接口同一套校验，只是把「等 LLM 生成」搬到专用线程池：
+        【权限：登录即可】（批次 15 · 15.1）与同步接口同一套校验，只是把「等 LLM 生成」搬到专用线程池：
         请求线程立即返回 202 + 任务号，前端轮询 GET /api/ai/async/{taskId}，用户可离开页面再回来取结果。
-        同步接口保留不动（向后兼容）。kind=interpret/review 需 recordId；kind=chat 需 question。
+        同步接口保留不动（向后兼容）。kind=interpret/review 需 recordId；kind=termsuggest 需 terms。
       parameters:
         - name: kind
           in: path
@@ -4361,7 +4363,7 @@ paths:
           description: AI 动作
           schema:
             type: string
-            enum: [interpret, chat, review]
+            enum: [interpret, review, termsuggest]
       requestBody:
         required: true
         content:
@@ -4387,7 +4389,7 @@ paths:
                       taskId:
                         type: string
         '400':
-          description: kind 不在 interpret/chat/review 内；或非 chat 缺 recordId、chat 缺 question（code=400）
+          description: kind 不在 interpret/review/termsuggest 内；或 interpret/review 缺 recordId、termsuggest 缺 terms（code=400）
           content:
             application/json:
               schema:
@@ -4399,7 +4401,7 @@ paths:
   /api/ai/async/{taskId}:
     get:
       tags:
-        - AI助手
+        - AI辅助
       summary: 查异步任务结果
       description: |
         【权限：登录即可】（批次 15 · 15.1）任务不存在、已过期、或不属于调用者，一律返回同一个 404 ——
@@ -4445,7 +4447,7 @@ paths:
   /api/ai/interpret:
     post:
       tags:
-        - AI助手
+        - AI辅助
       summary: AI质控解读
       description: 【权限：登录即可】对单条病历生成可解释质控解读：规则出结论（完整性/缺项重点/归一命中/关键提示），再由 LlmClient 生成叙述与要点摘要；LLM 不可用降级模板叙述。读取受组织数据域约束
       requestBody:
@@ -4485,51 +4487,10 @@ paths:
                 $ref: '#/components/schemas/ErrorVO'
         '500':
           $ref: '#/components/responses/ServerError'
-  /api/ai/chat:
-    post:
-      tags:
-        - AI助手
-      summary: AI助手问答
-      description: |
-        【权限：登录即可】面向使用者的项目业务问答（数据/功能/流程/判定原因），不回答技术实现问题。
-        路由：数据类问题→stats；归一/分布→归一命中；"这份病历…"→recordId 活跃详情；功能/流程/标准依据→知识注入；
-        技术实现问题→兜底拒答。LLM 不可用→降级规则问答（source=rule）。单轮问答，无会话历史。
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AiQueryDTO'
-            example:
-              question: 当前合格率与待复核构成
-              recordId: 3f2a1b0c-...
-      responses:
-        '200':
-          description: 回答
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    example: 200
-                  data:
-                    $ref: '#/components/schemas/AiReplyVO'
-        '400':
-          description: question 为空（code=400）
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorVO'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
   /api/ai/review:
     post:
       tags:
-        - AI助手
+        - AI辅助
       summary: AI复核预检意见
       description: |
         【权限：登录即可】基于规则预检单（qc_results / 重算）与 structuredData 生成复核建议
