@@ -1,6 +1,5 @@
 package com.tcm.ehr.common.utils;
 
-import com.tcm.ehr.common.metrics.Metrics;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -255,9 +254,7 @@ public class JwtUtil {
             String tokenVer = verClaim == null ? "0" : String.valueOf(verClaim);
             return current.equals(tokenVer);
         } catch (Exception e) {
-            // 降级放行是「可用优先」的取舍，但它同时意味着**已作废的令牌在此期间仍可用**，
-            // 必须可观测（P1-14）：计数出现在 /api/metrics 的 auth.version.degrade 上。
-            Metrics.inc("auth.version.degrade");
+            // 降级放行是「可用优先」的取舍，但它同时意味着**已作废的令牌在此期间仍可用**。
             return true;
         }
     }

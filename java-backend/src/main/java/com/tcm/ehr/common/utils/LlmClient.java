@@ -7,7 +7,6 @@ import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.config.AiFeature;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
-import com.tcm.ehr.common.metrics.Metrics;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
@@ -312,29 +311,25 @@ public class LlmClient {
             return new ResolvedClient(null, cfg);
         }
         String key = userId + "|" + resolved.version();
-        // 3. 配置没变就复用已装配的（命中率埋点，P1-14）
+        // 3. 配置没变就复用已装配的
         ChatClient hit = clients.getIfPresent(key);
         if (hit != null) {
-            Metrics.inc("llm.client.hit");
             return new ResolvedClient(hit, cfg);
         }
         if (resolved.version().equals(failedKeys.get(userId))) {
             // 4. 这个用户在当前版本下装配失败过，不再重复装配（否则每次调用都打一次外部连接）
-            Metrics.inc("llm.client.failed");
             return new ResolvedClient(null, cfg);
         }
         // 5. 装配：并发下可能重复装一次，代价是浪费一次连接，不会出错（幂等）
         try {
             ChatClient client = ChatClient.builder(buildModel(cfg)).build();
             clients.put(key, client);
-            Metrics.inc("llm.client.build");
             log.info("[LLM] 已启用：user={}，provider={}，model={}", userId, cfg.provider(),
                     TextUtil.isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
             return new ResolvedClient(client, cfg);
         } catch (Exception e) {
             // 装配失败记下「用户 + 当前版本」，本次配置下都降级（LLM 是增强项，不能带崩主流程）
             failedKeys.put(userId, resolved.version());
-            Metrics.inc("llm.client.failed");
             log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
             return new ResolvedClient(null, cfg);
         }

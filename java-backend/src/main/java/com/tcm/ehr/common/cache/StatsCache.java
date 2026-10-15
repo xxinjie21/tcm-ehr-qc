@@ -1,6 +1,5 @@
 package com.tcm.ehr.common.cache;
 
-import com.tcm.ehr.common.metrics.Metrics;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RedisKeys;
 import com.tcm.ehr.common.utils.RequestUtils;
@@ -83,23 +82,19 @@ public class StatsCache {
         String scope = scope();
         // ① 白名单外的过滤条件不缓存（R3-②）：否则 key 空间无界、命中率趋零
         if (!cacheable(filters)) {
-            Metrics.inc("stats.cache.bypass");
             return loader.get();
         }
         String key = keyOf(scope, currentVersion(scope), filters);
         String json = readQuietly(key);
         if (json != null) {
             if (NULL_SENTINEL.equals(json)) {
-                Metrics.inc("stats.cache.hit");
                 return null;
             }
             StatsAllVO cached = parseQuietly(json);
             if (cached != null) {
-                Metrics.inc("stats.cache.hit");
                 return cached;
             }
         }
-        Metrics.inc("stats.cache.miss");
         // ② 单飞（R3-③）：同一 key 失效瞬间只让一个请求现算
         return loadSingleFlight(key, loader);
     }
@@ -119,7 +114,6 @@ public class StatsCache {
             leader = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", LOCK_TTL));
         } catch (Exception e) {
             // Redis 不可用：不参与单飞，直接现算（缓存只是加速项，不能因此报错）
-            Metrics.inc("stats.cache.error");
             return loader.get();
         }
         if (leader) {
@@ -170,7 +164,6 @@ public class StatsCache {
         try {
             return redis.opsForValue().get(key);
         } catch (Exception e) {
-            Metrics.inc("stats.cache.error");
             log.debug("[统计缓存] 读失效，走现算: {}", e.getMessage());
             return null;
         }
