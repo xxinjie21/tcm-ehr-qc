@@ -1,6 +1,7 @@
 package com.tcm.ehr.common.cache;
 
 import com.tcm.ehr.common.utils.RecordFilter;
+import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RedisKeys;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
@@ -11,8 +12,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -265,13 +264,11 @@ public class StatsCache {
     private String keyOf(String scope, long version, FiltersDTO filters) {
         String digest;
         try {
+            // 摘要口径收敛到 RecordUtil.md5Hex（《自研组件替换计划》#12），不再手写转 hex 循环。
+            // 外层 try 仍必须留：它兜的是 Jackson 序列化失败，与 md5Hex 内部兜的
+            // NoSuchAlgorithmException 不是一回事，降级口径也不同（这里退空串）。
             String json = filters == null ? "null" : objectMapper.writeValueAsString(filters);
-            byte[] d = MessageDigest.getInstance("MD5").digest(json.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : d) {
-                sb.append(String.format("%02x", b));
-            }
-            digest = sb.toString();
+            digest = RecordUtil.md5Hex(json);
         } catch (Exception e) {
             // 摘不出哈希就退回空串，所有无筛选请求共用一个 key（仍作用域隔离，可接受）
             digest = "";

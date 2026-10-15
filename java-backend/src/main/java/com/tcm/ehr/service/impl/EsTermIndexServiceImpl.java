@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.VersionedCache;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.service.IEsTermIndexService;
@@ -26,8 +27,6 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -402,14 +401,12 @@ private TermEntry toEntry(Map<String, Object> src) {
     private String hashId(String orgId, String standardTerm) {
         String key = (orgId == null ? "" : orgId) + "|" + (standardTerm == null ? "" : standardTerm);
         try {
-            byte[] digest = MessageDigest.getInstance("MD5")
-                    .digest(key.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : digest) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (java.security.NoSuchAlgorithmException e) {
+            // 摘要口径收敛到 RecordUtil.md5Hex（《自研组件替换计划》#12）。
+            // 外层 try 仍必须留且必须接 RuntimeException：md5Hex 取不到 MD5 时抛的是
+            // IllegalStateException（不是原来手写版的 NoSuchAlgorithmException），
+            // 这里要把它降级成 hashCode —— 与 StatsCache.keyOf 退空串是两套有意的取舍，不能统一。
+            return RecordUtil.md5Hex(key);
+        } catch (RuntimeException e) {
             return Integer.toHexString(key.hashCode());
         }
     }
