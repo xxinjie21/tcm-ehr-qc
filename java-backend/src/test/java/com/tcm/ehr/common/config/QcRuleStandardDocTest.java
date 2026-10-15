@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * 守卫：改质控规则必须同步改书面标准文档。
  *
  * <p>权威书面标准 = {@code docs/质控规则与评分标准.md}。本测试断言该文档覆盖了默认规则集
- * 的全部条目（完整性要素名 / 格式规则 label / 一致性规则名 / 三个阈值），把「更新规则就要
+ * 的全部条目（完整性要素名 / 格式规则 label / 一致性规则名 / 两个分级阈值），把「更新规则就要
  * 更新规则标准」从口头约定变成 CI 会拦的硬约束。</p>
  *
  * <p>规则一改、文档没跟上 → 本测试失败，并在失败信息里列出缺哪几条，直接可照着补。</p>
@@ -53,11 +53,10 @@ class QcRuleStandardDocTest {
             }
         }
 
-        // 4. 分级阈值：三个配置项名与取值都要出现
+        // 4. 分级阈值：两个配置项名与取值都要出现
         QcRuleSet.Thresholds th = rules.getThresholds();
-        assertDocHas(doc, missing, "qualified", th.getQualified());
+        assertDocHas(doc, missing, "reviewUpper", th.getReviewUpper());
         assertDocHas(doc, missing, "invalid", th.getInvalid());
-        assertDocHas(doc, missing, "seriousFullMissing", th.getSeriousFullMissing());
 
         // 5. 一处不齐就报全量缺口，不逐条 fail 浪费时间
         if (!missing.isEmpty()) {

@@ -283,8 +283,8 @@ public class QcRuleStore {
         }
         // 4. 分级阈值非法（合格线 ≤ 无效线等）→ 回默认并告警
         QcRuleSet.Thresholds t = r.getThresholds();
-        if (t == null || t.getQualified() <= t.getInvalid() || t.getInvalid() < 0 || t.getSeriousFullMissing() < 1) {
-            w.add("分级阈值非法，已回默认 90/60/3");
+        if (t == null || t.getReviewUpper() <= t.getInvalid() || t.getInvalid() < 0) {
+            w.add("分级阈值非法，已回默认 80/60");
             r.setThresholds(new QcRuleSet.Thresholds());
         }
         this.warnings = List.copyOf(w);

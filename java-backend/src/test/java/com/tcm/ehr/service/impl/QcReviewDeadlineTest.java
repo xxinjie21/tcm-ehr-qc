@@ -44,11 +44,10 @@ class QcReviewDeadlineTest {
         ReflectionTestUtils.setField(svc, "baseMapper", recordMapper);
 
         // 阈值调成「必落待复核」：invalid=0（分数不可能低于它）、
-        // seriousFullMissing=99（真缺失规则不触发）、qualified=101（分数不可能达标）
+        // reviewUpper=101（分数不可能达标）
         QcRuleSet rules = QcRuleSet.defaults();
         rules.getThresholds().setInvalid(0);
-        rules.getThresholds().setSeriousFullMissing(99);
-        rules.getThresholds().setQualified(101);
+        rules.getThresholds().setReviewUpper(101);
 
         Record r = new Record();
         r.setId("r-dl");

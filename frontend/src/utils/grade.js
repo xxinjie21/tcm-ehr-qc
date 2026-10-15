@@ -3,7 +3,7 @@
  *
  * <p>此前同一件事在两处各写一遍：{@code Qc.vue} 用
  * {@code grade === '合格' ? 'is-ok' : ...} 判配色，{@code Review.vue} 用
- * {@code score >= qualified ? '合格 → 进入数据清洗' : ...} 判分级 ——
+ * {@code score >= reviewUpper ? '合格 → 进入数据清洗' : ...} 判分级 ——
  * 后者把「下一步动作」混进了分级名，于是同一条病历在质控页显示「合格」、
  * 在复核页显示「合格 → 进入数据清洗」。改动其中一处，另一处不会跟着变。</p>
  *
@@ -48,14 +48,14 @@ const GRADE_HINT = {
  * 按后端阈值判定分级。
  *
  * @param {number} score 评分
- * @param {{qualified:number, invalid:number}|null} thresholds 后端规则里的阈值
+ * @param {{reviewUpper:number, invalid:number}|null} thresholds 后端规则里的阈值
  * @returns {string} 分级名；阈值未就绪时返回空串（调用方应显示「—」而不是猜一个）
  */
 export function gradeOf(score, thresholds) {
-  if (!thresholds || thresholds.qualified == null || thresholds.invalid == null) {
+  if (!thresholds || thresholds.reviewUpper == null || thresholds.invalid == null) {
     return ''
   }
-  if (score >= thresholds.qualified) return GRADE_OK
+  if (score >= thresholds.reviewUpper) return GRADE_OK
   if (score >= thresholds.invalid) return GRADE_REVIEW
   return GRADE_INVALID
 }

@@ -125,12 +125,10 @@
       </div>
       <div class="rc-line">
         合格线
-        <el-input-number v-model="form.rules.thresholds.qualified" size="small" :min="0" :max="100" :controls="false" />
+        <el-input-number v-model="form.rules.thresholds.reviewUpper" size="small" :min="0" :max="100" :controls="false" />
         分；无效线
         <el-input-number v-model="form.rules.thresholds.invalid" size="small" :min="0" :max="100" :controls="false" />
-        分；核心真缺失
-        <el-input-number v-model="form.rules.thresholds.seriousFullMissing" size="small" :min="1" :controls="false" />
-        项判无效。
+        分。
       </div>
     </div>
     <template #footer>
@@ -206,8 +204,8 @@ const initForm = () => {
     expectValues: c.expectValues || [],
     weight: c.weight ?? 10
   }))
-  // ⚠️ 这里**不许再写业务数字**：原先写成 `r.thresholds || { qualified: 90, invalid: 60,
-  //    seriousFullMissing: 3 }`、`weightEach: 1, cap: 5`、`duplicateWeight ?? 5`。
+  // ⚠️ 这里**不许再写业务数字**：原先写成 `r.thresholds || { reviewUpper: 80, invalid: 60 }`、
+  //    `weightEach: 1, cap: 5`、`duplicateWeight ?? 5`。
   //    后端正常都会下发这些值，所以那些字面量平时是死分支；一旦真走到（后端漏字段 /
   //    版本不齐），表单会显示一套「后端没说过」的数字，用户一保存就把它们写进本组织规则 ——
   //    静默改口径。故缺失时退到本页已从后端取到的生效规则，仍无则留空让用户看见。

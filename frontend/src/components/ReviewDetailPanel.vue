@@ -509,7 +509,7 @@ const loadThresholds = async () => {
     // 2. 定位到分级阈值
     const t = res.data?.rules?.thresholds
     // 3. 取到则覆盖兜底阈值，取不到沿用初值
-    if (t) thresholds.value = { qualified: t.qualified, invalid: t.invalid }
+    if (t) thresholds.value = { reviewUpper: t.reviewUpper, invalid: t.invalid }
   } catch {
     // 拦截器已提示；沿用兜底阈值，不阻塞复核
   }

@@ -97,8 +97,8 @@ public final class QcRuleDescriber {
 
         // 分级
         QcRuleSet.Thresholds t = r.getThresholds();
-        out.add("分级：≥ " + t.getQualified() + " 分且无逻辑冲突为合格；< " + t.getInvalid()
-                + " 分或核心要素真缺失 ≥ " + t.getSeriousFullMissing() + " 项为无效；其余为待复核。");
+        out.add("分级：< " + t.getInvalid() + " 分为无效；存在逻辑冲突为待复核；≥ "
+                + t.getReviewUpper() + " 分为合格；其余为待复核。");
         return out;
     }
 

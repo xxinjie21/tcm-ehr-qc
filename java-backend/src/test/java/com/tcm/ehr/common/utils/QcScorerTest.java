@@ -25,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       = 真缺失 -12，原始列有 = 漏抽 -6。<b>治法与方剂已不是完整性要素</b>，缺它们不扣分
  *       （批M 把「数据源无该两列」的项退出了评分）。</li>
  *   <li><b>术语标准化</b>：实体没有 {@code normLevel} 即算未命中词典，每个 -1、上限 -5。</li>
- *   <li><b>分级</b>：真缺失 ≥3 项或分数 &lt;60 → 无效；有逻辑冲突 → 待复核；≥95 → 合格；其余待复核。</li>
+ *   <li><b>分级</b>：分数 &lt;60 → 无效；有逻辑冲突 → 待复核；≥80 → 合格；其余待复核
+ *       （核心要素真缺失只作扣分项，不再有独立的「真缺失 ≥3 判无效」计数条）。</li>
  * </ul>
  *
  * <p>注意 {@link #raw()} 只填了年龄/性别，所以凡结构化为空的要素在原始列也取不到值 ——
@@ -89,14 +90,14 @@ class QcScorerTest {
     }
 
     @Test
-    void onlyPulseMissingPendingReview() {
+    void onlyPulseMissingQualified() {
         Map<String, Object> data = new HashMap<>(fullData());
         data.remove("pulseList"); // 原始列也没填脉象 → 真缺失 -12
 
         ScoreResultVO vo = QcScorer.score(data, raw(), false, QcRuleSet.defaults());
 
         assertEquals(88, vo.getScore()); // 100 - 12
-        assertEquals("待复核", vo.getGrade()); // 60 ≤ 88 < 95
+        assertEquals("合格", vo.getGrade()); // 88 ≥ 80（缺 1 项仍合格）
     }
 
     /** 结构化为空但原始列有记录 = 漏抽，扣 6 而不是 12，且不计入「真缺失」项数 */
@@ -110,34 +111,76 @@ class QcScorerTest {
         ScoreResultVO vo = QcScorer.score(data, raw, false, QcRuleSet.defaults());
 
         assertEquals(94, vo.getScore()); // 100 - 6
-        // 94 < 合格线 95 ⇒ 待复核。本条只验「漏抽扣 6 而不是 12」，分级随阈值走
-        assertEquals("待复核", vo.getGrade());
+        // 本条只验「漏抽扣 6 而不是 12」，分级随阈值走（94 ≥ 80 ⇒ 合格）
+        assertEquals("合格", vo.getGrade());
     }
 
     @Test
     void allCoreMissingInvalid() {
         ScoreResultVO vo = QcScorer.score(Map.of(), raw(), false, QcRuleSet.defaults());
 
-        assertEquals("无效", vo.getGrade());
+        assertEquals("无效", vo.getGrade()); // 28 < 60
         assertEquals(28, vo.getScore()); // 100 - 6×12
     }
 
+    /** 缺 3 项真缺失 = 64 分：只作扣分，落在「待复核」而非「无效」（旧口径按 真缺失≥3 判无效） */
     @Test
-    void coreMissingThreeInvalid() {
+    void coreMissingThreePendingReview() {
         Map<String, Object> data = new HashMap<>(fullData());
         data.remove("herbs");
         data.remove("tongueList");
-        data.remove("pulseList"); // 恰好 3 项真缺失 = 严重线
+        data.remove("pulseList"); // 恰好 3 项真缺失
 
         ScoreResultVO vo = QcScorer.score(data, raw(), false, QcRuleSet.defaults());
 
-        assertEquals("无效", vo.getGrade());
         assertEquals(64, vo.getScore()); // 100 - 3×12
+        assertEquals("待复核", vo.getGrade()); // 60 ≤ 64 < 80
+    }
+
+    /** 缺 4 项真缺失 = 52 分：跨过低无效线，判「无效」 */
+    @Test
+    void coreMissingFourInvalid() {
+        Map<String, Object> data = new HashMap<>(fullData());
+        data.remove("herbs");
+        data.remove("tongueList");
+        data.remove("pulseList");
+        data.remove("patternList"); // 4 项真缺失
+
+        ScoreResultVO vo = QcScorer.score(data, raw(), false, QcRuleSet.defaults());
+
+        assertEquals(52, vo.getScore()); // 100 - 4×12
+        assertEquals("无效", vo.getGrade()); // 52 < 60
+    }
+
+    /** 分级边界闭合：score == reviewUpper 判合格、score == invalid 判待复核、invalid-1 判无效 */
+    @Test
+    void gradeBoundariesAreInclusive() {
+        // 满分 100：合格线抬到 100 → 恰好达标 ⇒ 合格
+        QcRuleSet ok = QcRuleSet.defaults();
+        ok.getThresholds().setReviewUpper(100);
+        assertEquals("合格", QcScorer.score(fullData(), raw(), false, ok).getGrade());
+        // 抬到 101 → 100 < 101 ⇒ 待复核
+        QcRuleSet near = QcRuleSet.defaults();
+        near.getThresholds().setReviewUpper(101);
+        assertEquals("待复核", QcScorer.score(fullData(), raw(), false, near).getGrade());
+
+        // 缺 1 项 = 88 分。为单独验证无效线，抬高合格线使 88 不落合格：
+        // invalid=88 → 恰好不低于 ⇒ 待复核；invalid=89 → 88 < 89 ⇒ 无效
+        Map<String, Object> data = new HashMap<>(fullData());
+        data.remove("pulseList");
+        QcRuleSet low = QcRuleSet.defaults();
+        low.getThresholds().setReviewUpper(100);
+        low.getThresholds().setInvalid(88);
+        assertEquals("待复核", QcScorer.score(data, raw(), false, low).getGrade());
+        QcRuleSet lower = QcRuleSet.defaults();
+        lower.getThresholds().setReviewUpper(100);
+        lower.getThresholds().setInvalid(89);
+        assertEquals("无效", QcScorer.score(data, raw(), false, lower).getGrade());
     }
 
     /**
      * 证候命中「脾肾阳虚」的默认规则有两条（→中药、→方剂），且都未命中期望值 → 2 条冲突。
-     * 有冲突即落待复核，而不是看分数够不够 95。
+     * 有冲突即落待复核 —— 即便分数 80 已 ≥ 合格线，冲突仍把它拉回待复核。
      */
     @Test
     void bothLogicConflictsPendingReview() {

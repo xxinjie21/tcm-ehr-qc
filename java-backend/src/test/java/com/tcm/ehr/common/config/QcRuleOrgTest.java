@@ -60,8 +60,8 @@ class QcRuleOrgTest {
     void orgWithoutOwnRulesFallsBackToDefaults() {
         QcRuleSet d = store.getFor("org-none");
         assertNotNull(d, "无自有规则时必须回退内置默认，而不是返回 null");
-        assertEquals(QcRuleSet.defaults().getThresholds().getQualified(),
-                d.getThresholds().getQualified(), "回退应与内置默认一致");
+        assertEquals(QcRuleSet.defaults().getThresholds().getReviewUpper(),
+                d.getThresholds().getReviewUpper(), "回退应与内置默认一致");
     }
 
     @Test
@@ -69,8 +69,8 @@ class QcRuleOrgTest {
         store.updateFor("org-a", QcRuleSet.defaults());
 
         assertNotNull(store.getFor("org-a"), "A 自己的规则应能读回");
-        assertEquals(QcRuleSet.defaults().getThresholds().getQualified(),
-                store.getFor("org-b").getThresholds().getQualified(),
+        assertEquals(QcRuleSet.defaults().getThresholds().getReviewUpper(),
+                store.getFor("org-b").getThresholds().getReviewUpper(),
                 "B 没配过，回退默认而不是继承 A");
         // B 无行 => 不会把 A 的内容带过去
         assertTrue(!rows.containsKey("org-b"), "读取不应为无行的组织落库");
@@ -100,9 +100,9 @@ class QcRuleOrgTest {
     void warningsAreReplacedNotAccumulated() {
         // 26.10：normalize 的告警是「整体替换」的快照；第二次 normalize 不得把上一次的累加进来
         QcRuleSet bad = QcRuleSet.defaults();
-        bad.getThresholds().setQualified(10); // 合格线(10) <= 无效线(60) → 非法
+        bad.getThresholds().setReviewUpper(10); // 合格线(10) <= 无效线(60) → 非法
         store.updateFor("org-a", bad);
-        assertTrue(store.warnings().contains("分级阈值非法，已回默认 90/60/3"),
+        assertTrue(store.warnings().contains("分级阈值非法，已回默认 80/60"),
                 "非法阈值应产生告警");
 
         store.updateFor("org-b", QcRuleSet.defaults());

@@ -22,14 +22,14 @@ public final class QcScorer {
      * 对单份病历做终末质控评分，输出得分、分级与逐条扣分。
      *
      * <p>依次累计五类扣分：完整性（要素缺失分真缺失 / 漏抽两档）、逻辑一致性、格式、
-     * 术语标准化、重复；分级取「严重缺失 / 低于无效线 / 存在逻辑冲突 / 达到合格线」中
-     * 优先级最高的一档。规则集为 {@code null} 时回退到内置默认规则。</p>
+     * 术语标准化、重复；分级取「低于无效线 / 存在逻辑冲突 / 达到合格线」中优先级最高的一档。
+     * 规则集为 {@code null} 时回退到内置默认规则。</p>
      *
      * @param data 结构化抽取结果，{@code null} 表示未结构化（标记为缺失）
      * @param rawRecord 原始病历，{@code null} 时跳过格式规则
      * @param duplicate 是否与已有病历重复
      * @param rules 质控规则集，可为 {@code null}
-     * @return 评分结果（得分、分级、是否严重、扣分明细）
+     * @return 评分结果（得分、分级、扣分明细）
      */
     public static ScoreResultVO score(Map<String, Object> data, Record rawRecord, boolean duplicate,
                                       com.tcm.ehr.common.config.QcRuleSet rules) {
@@ -41,16 +41,12 @@ public final class QcScorer {
         vo.setStructuredMissing(structuredMissing);
 
         // 1. 完整性（两档）
-        int fullMissing = 0;
         for (com.tcm.ehr.common.config.QcRuleSet.Element el : rs.getCompleteness().getElements()) {
             if (structuredPresent(el.getSource(), data)) {
                 continue;
             }
             boolean rawHas = rawPresent(el.getFallback(), rawRecord);
             int points = rawHas ? el.getWeightPartial() : el.getWeightFull();
-            if (!rawHas) {
-                fullMissing++;
-            }
             ded.add(new ScoreResultVO.Deduction("核心字段缺失", el.getName(), points, reasonFor(el, rawHas)));
         }
 
@@ -110,13 +106,12 @@ public final class QcScorer {
         int score = Math.max(0, 100 - totalDeduct);
 
         com.tcm.ehr.common.config.QcRuleSet.Thresholds th = rs.getThresholds();
-        boolean serious = fullMissing >= th.getSeriousFullMissing();
         String grade;
-        if (serious || score < th.getInvalid()) {
+        if (score < th.getInvalid()) {
             grade = "无效";
         } else if (!conflicts.isEmpty()) {
             grade = "待复核";
-        } else if (score >= th.getQualified()) {
+        } else if (score >= th.getReviewUpper()) {
             grade = "合格";
         } else {
             grade = "待复核";
