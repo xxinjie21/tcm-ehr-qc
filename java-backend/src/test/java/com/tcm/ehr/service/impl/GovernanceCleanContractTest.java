@@ -1,6 +1,8 @@
 package com.tcm.ehr.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.CleanResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -8,11 +10,13 @@ import com.tcm.ehr.mapper.ReviewTaskMapper;
 import com.tcm.ehr.service.IDictionaryTermStore;
 import com.tcm.ehr.service.IDictionaryFileService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -76,5 +80,25 @@ class GovernanceCleanContractTest {
         verify(mapper, never()).updateTextHash(anyString(), eq("old-hash"));
 
         org.junit.jupiter.api.Assertions.assertEquals(1, vo.getTotal());
+    }
+
+    @Test
+    void cleanScopeForcesQualifiedEvenIfCallerAsksOtherwise() {
+        RecordMapper mapper = mock(RecordMapper.class);
+        when(mapper.selectCount(any())).thenReturn(0L);
+        when(mapper.selectList(any())).thenReturn(List.of());
+
+        // 调用方显式要「待复核」也应被忽略：清洗只作用于「合格」
+        FiltersDTO filters = new FiltersDTO();
+        filters.setGrade("待复核");
+        service(mapper).clean(null, filters);
+
+        ArgumentCaptor<QueryWrapper<Record>> captor = ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(mapper).selectCount(captor.capture());
+        QueryWrapper<Record> wrapper = captor.getValue();
+        assertTrue(wrapper.getSqlSegment().toUpperCase().contains("GRADE"),
+                "清洗条件必须带分级收窄：" + wrapper.getSqlSegment());
+        assertTrue(wrapper.getParamNameValuePairs().containsValue("合格"),
+                "清洗范围必须落到「合格」：" + wrapper.getParamNameValuePairs());
     }
 }

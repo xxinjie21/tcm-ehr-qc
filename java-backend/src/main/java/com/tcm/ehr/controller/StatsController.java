@@ -80,15 +80,21 @@ public class StatsController {
     }
 
     /**
-     * 首页四个指标卡。
+     * 首页指标卡。
      *
-     * <p>【权限：登录即可 + 数据域】</p>
+     * <p>【权限：登录即可 + 数据域】3 张指标卡（总数 / 合格率 / 无效）随 department + start/end
+     * 收窄；待复核数仍为全量口径（待办条入口须与全量列表一致）。不传参即全量总览。</p>
      *
+     * @param department 科室，空表示不限
+     * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
+     * @param end        接诊时间上界（yyyy-MM-dd）
      * @return total=病历总数；qualified=合格数；pendingReview=待复核数；invalid=无效数
      */
     @GetMapping("/overview")
-    public Result<OverviewVO> overview() {
-        return Result.ok(statsService.overview());
+    public Result<OverviewVO> overview(@RequestParam(required = false) String department,
+                                       @RequestParam(required = false) String start,
+                                       @RequestParam(required = false) String end) {
+        return Result.ok(statsService.overview(filters(department, start, end, null, null)));
     }
 
     /**

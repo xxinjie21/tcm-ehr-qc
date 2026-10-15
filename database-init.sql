@@ -301,6 +301,10 @@ CREATE TABLE IF NOT EXISTS user_llm_config (
   model VARCHAR(100),
   temperature DOUBLE,
   timeout INT,
+  interpret_enabled TINYINT NOT NULL DEFAULT 1 COMMENT 'AI 解读是否单独用 LLM（0=回退规则）',
+  chat_enabled TINYINT NOT NULL DEFAULT 1 COMMENT 'AI 助手问答是否单独用 LLM（0=回退规则）',
+  review_enabled TINYINT NOT NULL DEFAULT 1 COMMENT '复核意见是否单独用 LLM（0=回退规则）',
+  term_suggest_enabled TINYINT NOT NULL DEFAULT 1 COMMENT '术语建议是否单独用 LLM（0=回退规则）',
   api_key VARCHAR(1000) COMMENT 'AES-256-GCM 加密后的密文（Base64）',
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户 LLM 配置';

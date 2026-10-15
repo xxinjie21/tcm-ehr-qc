@@ -61,30 +61,33 @@
         <el-button size="small" @click="cancelBatch(activeTask.id)">取消任务</el-button>
       </div>
 
-      <div v-if="activeTask.failures && activeTask.failures.length" class="batch-failures">
-        <div class="bf-hd">
-          失败清单（{{ activeTask.failures.length }} 条{{ activeTask.failureTruncated ? '，仅显示前 500 条' : '' }}）
+      <!-- 失败清单：任务运行中只给一行计数（此时后端也不回传明细），
+           结束后改为**折叠**展示 —— 避免长任务每 2 秒轮询重渲染整张长表、把页面撑得很长；
+           需要看时点开即可，条数与截断说明在标题里一直可见。 -->
+      <div v-if="activeTask.failed > 0" class="batch-failures">
+        <div v-if="isActive(activeTask)" class="bf-hd">
+          已失败 {{ activeTask.failed }} 条 · 任务结束后显示清单并支持重试
         </div>
-        <!-- V8b：去掉原先写死的 max-height="240" —— 卡内再开一层滚动，与 main 的页内滚动
-             叠成「两层嵌套」：失败清单内容高可达上千 px，卡内却只能滚 5 屏，且滚动条
-             藏在卡片底部很难发现。改为随内容撑高，由页面（main）统一滚动；
-             上方计数与截断说明保留，不丢信息。 -->
-        <el-table :data="activeTask.failures" border size="small">
-          <el-table-column prop="label" label="病历" width="200" show-overflow-tooltip />
-          <el-table-column prop="reason" label="原因" show-overflow-tooltip />
-          <el-table-column label="详情" width="90">
-            <template #default="{ row }">
-              <el-button v-if="row.recordId" link type="primary" @click="openRecordDetail(row.recordId)">查看</el-button>
-              <span v-else class="bf-muted">—</span>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div v-if="!isActive(activeTask) && activeTask.failed > 0" class="actions">
-          <!-- 仅重跑失败那批（复用原任务模式），不重跑全部 -->
-          <el-button type="warning" :loading="submitting" @click="retryFailed(activeTask.id)">
-            仅重试失败（{{ activeTask.failed }} 条）
-          </el-button>
-        </div>
+        <el-collapse v-else>
+          <el-collapse-item :title="failureTitle(activeTask)">
+            <el-table :data="activeTask.failures || []" border size="small">
+              <el-table-column prop="label" label="病历" width="200" show-overflow-tooltip />
+              <el-table-column prop="reason" label="原因" show-overflow-tooltip />
+              <el-table-column label="详情" width="90">
+                <template #default="{ row }">
+                  <el-button v-if="row.recordId" link type="primary" @click="openRecordDetail(row.recordId)">查看</el-button>
+                  <span v-else class="bf-muted">—</span>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="actions">
+              <!-- 仅重跑失败那批（复用原任务模式），不重跑全部 -->
+              <el-button type="warning" :loading="submitting" @click="retryFailed(activeTask.id)">
+                仅重试失败（{{ activeTask.failed }} 条）
+              </el-button>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
       </div>
     </div>
 
@@ -196,6 +199,12 @@ let lastSample = null
 const ACTIVE_STATUS = ['QUEUED', 'RUNNING']
 // 任务是否仍在跑（排队 / 进行中）：决定是否显示取消按钮、是否继续轮询
 const isActive = (t) => !!t && ACTIVE_STATUS.includes(t.status)
+
+// 失败清单折叠标题：条数 + 截断说明常驻标题，无需展开即可看到规模
+const failureTitle = (t) => {
+  const n = t && t.failures ? t.failures.length : 0
+  return `失败清单（${n} 条${t && t.failureTruncated ? '，仅显示前 500 条' : ''}）`
+}
 
 /**
  * 进度条的两态配置（统一口径见 Governance.vue 的清洗进度条）。
@@ -547,6 +556,8 @@ onBeforeUnmount(stopPoll)
 .bp-hd b { color: var(--ink); }
 .bp-sub { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); }
 .batch-failures { margin-top: 14px; border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
+/* 折叠面板默认自带上下边框，会与外层虚线分隔叠成双线 —— 去掉其顶边 */
+.batch-failures :deep(.el-collapse) { border-top: none; }
 .batch-list { margin-top: var(--sp-4); border-top: 1px dashed var(--line-soft); padding-top: var(--sp-3); }
 .bf-hd { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
 /* 截断提示：用的是次要色而不是警示色 —— 列表被截断是正常上限行为，不是错误 */

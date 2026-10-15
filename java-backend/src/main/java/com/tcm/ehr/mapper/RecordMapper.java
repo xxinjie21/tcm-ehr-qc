@@ -57,6 +57,27 @@ public interface RecordMapper extends BaseMapper<Record> {
     Map<String, Object> selectOverviewOrg(@Param("orgId") String orgId);
 
     /**
+     * 指标卡聚合（随筛选路径）：在数据域之上再叠加用户筛选（科室 / 就诊区间），
+     * 供首页 3 张指标卡「随上方筛选变化」。
+     *
+     * <p>只算 <b>总数 / 合格数 / 无效数</b>三项 —— 待复核数仍走无参口径
+     * （{@link #selectOverviewAll} / {@link #selectOverviewOrg}）：待复核是待办条入口，
+     * 点击跳到全量复核列表，数字必须与列表一致，不能随筛选漂移。</p>
+     *
+     * @param wrapper 只含数据域 + 用户筛选的条件，**不含 ORDER BY**
+     *                （由 {@link com.tcm.ehr.common.utils.RecordFilter#buildForAggregate} 产出）
+     */
+    @Select("""
+            SELECT
+                COUNT(*) AS totalRecords,
+                COALESCE(SUM(CASE WHEN grade = '合格' THEN 1 ELSE 0 END), 0) AS qualifiedCount,
+                COALESCE(SUM(CASE WHEN grade = '无效' THEN 1 ELSE 0 END), 0) AS invalidCount
+            FROM records
+            ${ew.customSqlSegment}
+            """)
+    Map<String, Object> selectOverviewFiltered(@Param(Constants.WRAPPER) Wrapper<Record> wrapper);
+
+    /**
      * 清洗状态统计（管理员「看全部」路径）：全部机构的合格/已清洗/待清洗。
      */
     @Select("""

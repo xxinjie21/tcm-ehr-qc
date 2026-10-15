@@ -33,7 +33,7 @@
       <label for="rf-pattern">证候</label>
       <TermInput id="rf-pattern" v-model="inner.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
     </div>
-    <div class="rf-item">
+    <div v-if="showGrade" class="rf-item">
       <label for="rf-grade">分级</label>
       <el-select id="rf-grade" v-model="inner.grade" placeholder="全部" clearable style="width: 110px">
         <el-option label="合格" value="合格" />
@@ -57,6 +57,12 @@ const props = defineProps({
   modelValue: {
     type: Object,
     default: () => ({ department: '', dateRange: null, pattern: '', grade: '' })
+  },
+  // 是否显示「分级」选择器。清洗页传 false —— 清洗只作用于「质控合格」，
+  // 分级对清洗没有意义，留着只会让用户以为能把整库都洗一遍。
+  showGrade: {
+    type: Boolean,
+    default: true
   }
 })
 const emit = defineEmits(['update:modelValue'])

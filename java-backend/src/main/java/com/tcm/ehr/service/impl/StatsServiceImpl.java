@@ -75,34 +75,41 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
                 : baseMapper.selectDepartmentsOrg(domainOrgId());
     }
 
+    /** 指标卡总览（不筛选口径）：等价 {@link #overview(FiltersDTO)} 传 null。 */
+    @Override
+    public OverviewVO overview() {
+        return overview(null);
+    }
+
     /**
      * 指标卡总览，只读。
      *
-     * <p>按数据域一次性聚合总数、合格数、待复核数与无效数；合格率保留一位小数（百分数），
-     * 总数为 0 时记 0。</p>
+     * <p>3 张指标卡（总数 / 合格率 / 无效）在数据域之上叠加用户筛选（科室 + 就诊区间）；
+     * 待复核数仍是全量口径 —— 它是待办条入口，点击跳到全量复核列表，数字须与列表一致。
+     * 合格率保留一位小数（百分数），总数为 0 时记 0。</p>
      *
+     * @param filters 范围条件，null 表示不限
      * @return 总览指标
      */
     @Override
-    public OverviewVO overview() {
-        // 1. 指标在库里聚合，只按数据域过滤（总览不受页面筛选影响）。
-        //    viewAllOrgs 必须一并下推：同一次响应里的词频走 RecordFilter.build（认看全部），
-        //    指标卡若不认，管理员的卡片数字与词频/列表就对不上。
-        //    性能审查 P1-6 / A5：拆成两条 SQL（All/Org），Java 侧二选一，让
-        //    (org_id, grade, governed) 覆盖索引对非管理员路径稳定生效。
-        Map<String, Object> row = RequestUtils.viewAllOrgs()
+    public OverviewVO overview(FiltersDTO filters) {
+        // 1. 3 张卡：数据域 + 用户筛选（buildForAggregate 只出 WHERE，不含 ORDER BY）。
+        //    viewAllOrgs 由 RecordFilter 内部认，管理员与词频/列表同域。
+        Map<String, Object> card = baseMapper.selectOverviewFiltered(
+                RecordFilter.buildForAggregate(RequestUtils.currentOrgId(), filters));
+        // 2. 待复核数：全量口径（不随筛选），拆两条 SQL 让 (org_id, grade, governed) 覆盖索引生效。
+        Map<String, Object> pendingRow = RequestUtils.viewAllOrgs()
                 ? baseMapper.selectOverviewAll()
                 : baseMapper.selectOverviewOrg(domainOrgId());
         OverviewVO vo = new OverviewVO();
-        vo.setTotalRecords(num(row.get("totalRecords")));
-        vo.setQualifiedCount(num(row.get("qualifiedCount")));
-        // 2. 合格率保留一位小数；总数为 0 时给 0 而不是除零
+        vo.setTotalRecords(num(card.get("totalRecords")));
+        vo.setQualifiedCount(num(card.get("qualifiedCount")));
+        // 3. 合格率保留一位小数；总数为 0 时给 0 而不是除零
         vo.setQualifiedRate(vo.getTotalRecords() == 0 ? 0.0
                 : Math.round(vo.getQualifiedCount() * 1000.0 / vo.getTotalRecords()) / 10.0);
-        vo.setPendingReviewCount(num(row.get("pendingReviewCount")));
-        vo.setInvalidCount(num(row.get("invalidCount")));
-        // 3. 血缘与新鲜度（对标 A5/A3）：数字出自哪一版词典、什么时候算的。
-        //    同一响应里同时给出两者，前端才能在下钻时回答「换词表前后为什么变了」。
+        vo.setPendingReviewCount(num(pendingRow.get("pendingReviewCount")));
+        vo.setInvalidCount(num(card.get("invalidCount")));
+        // 4. 血缘与新鲜度（对标 A5/A3）：数字出自哪一版词典、什么时候算的。
         vo.setSourceVersion(termStore.effectiveDictVersion(domainOrgId()));
         vo.setGeneratedAt(java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));

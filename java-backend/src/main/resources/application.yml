@@ -96,10 +96,7 @@ jwt:
 nlp:
   enabled: true             # 总开关；false 时单条与批量抽取都不可用。改动需重启
   service-url: http://localhost:8001
-  # 多实例：逗号分隔，留空回退 service-url；轮询分发，单台故障自动顺延，部分未启动不影响整体
-  service-urls: http://localhost:8001,http://localhost:8002,http://localhost:8003
   timeout: 30000            # 毫秒
-  instance-cooldown-ms: 10000   # 失败实例短路冷却（毫秒）
   batch:
     # 后台并发：同时运行的任务数 + 单任务内并行条数；与 Python 侧 NLP_INFER_CONCURRENCY 对齐
     concurrency: 8
@@ -113,6 +110,11 @@ llm:
   model: ""                   # 留空用通道默认模型
   temperature: 0.2
   timeout: 20000              # 毫秒
+  # 分功能的局部开关（启动基线）：总开关开启时逐项生效，关闭项回退规则输出
+  interpret-enabled: true     # AI 解读
+  chat-enabled: true          # 助手问答
+  review-enabled: true        # 复核意见
+  term-suggest-enabled: true  # 术语建议
   # 用户密钥落库加密密钥（AES-256-GCM）。换掉后已加密的 API Key 全部解不开，须当持久密钥保管；
   # 生产用 TCM_LLM_ENC_KEY 覆盖（优先级更高）。生成/轮换见 tools/init-llm-enc-key.py
   crypto-key: ${TCM_LLM_ENC_KEY:dGNtLWVoci1xYy1kZXYtb25seS1sbG0tZW5jLWtleSE=}

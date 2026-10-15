@@ -138,10 +138,16 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
             "清洗与导出", DICT_TITLE, "标准化质量报告", "日志审计", "我的组织");
 
-    /** 成员菜单：本组数据 + 共用只读（术语词典/日志审计），无成员管理 */
+    /**
+     * 成员菜单：本组数据 + 共用只读（术语词典/日志审计）+ 「我的组织」。
+     *
+     * <p>「我的组织」对所有<b>有组</b>用户开放：该页对成员是只读的（看组织信息 / 成员名录，
+     * 管理动作按 {@code myRole=owner} 才显示），后端的成员管理接口仍由
+     * {@code @RequireOrgRole("owner")} 把关 —— 菜单入口不再等同写权限。</p>
+     */
     private static final List<MenuNode> MEMBER_MENUS = menus(true,
             "首页看板", "病历数据", "结构化解析", "质控校验", "人工复核",
-            "清洗与导出", DICT_TITLE, "标准化质量报告", "日志审计");
+            "清洗与导出", DICT_TITLE, "标准化质量报告", "日志审计", "我的组织");
 
     /**
      * 待分配池 / 审批中的菜单：<b>空列表</b>。
@@ -258,6 +264,15 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      */
     private List<MenuNode> menusOf(User user, OrgResolution g) {
         if (RequestUtils.ROLE_ADMIN.equals(user.getRole())) {
+            // 管理员只要有生效组就给「我的组织」（与组员口径一致）：本组成员管理
+            // （拉人 / 移除 / 授权 / 转让）后端本就放行（@RequireOrgRole 只认组内 owner，
+            // 不看系统角色），原先只在菜单层被 role 短路掉了，导致管理员拿不到入口、
+            // 无法从 UI 看/管自己那一个组。无组的管理员维持 ADMIN_MENUS（无处可管）。
+            if (g.hasGroup()) {
+                List<MenuNode> menus = new ArrayList<>(ADMIN_MENUS);
+                menus.add(new MenuNode("我的组织", pathOf("我的组织")));
+                return menus;
+            }
             return ADMIN_MENUS;
         }
         if (!g.hasGroup()) {

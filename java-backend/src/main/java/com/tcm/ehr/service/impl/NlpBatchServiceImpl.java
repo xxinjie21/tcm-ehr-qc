@@ -566,7 +566,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (t != null && !satisfiesGroup(t)) {
             return null;
         }
-        return t == null ? null : toVO(t, true);
+        if (t == null) {
+            return null;
+        }
+        // 运行中（排队/进行中）不回传失败明细：明细每轮询都在变，前端此时也不展示，
+        // 却要每 2 秒把整包 JSON 回传一次。终态才带上 —— 省流量，也避免前端反复重渲染长表。
+        boolean terminal = !NlpTask.QUEUED.equals(t.getStatus())
+                && !NlpTask.RUNNING.equals(t.getStatus());
+        return toVO(t, terminal);
     }
 
     /**

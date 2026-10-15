@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.config.AiFeature;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.mapper.UserLlmConfigMapper;
@@ -158,6 +159,32 @@ class LlmClientTest {
         assertThrows(IllegalStateException.class,
                 () -> client.probe(new LlmConfig(true, "openai", "", "", "", null, 0)),
                 "openai 通道缺 api-key 应抛出");
+    }
+
+    // ------------------------------------------------------------------ 功能开关门控
+
+    /**
+     * 总开关开着、模型也装配成功，但某项功能被单独关闭时：
+     * 该功能的调用必须直接降级返回 {@code null}（调用方走规则兜底），不得打到模型。
+     */
+    @Test
+    void featureSwitchOffDegradesOnlyThatFeature() {
+        Map<String, UserLlmConfig> rows = new ConcurrentHashMap<>();
+        UserLlmConfig row = new UserLlmConfig();
+        row.setUserId("u-feat");
+        row.setEnabled(true);
+        row.setProvider("ollama");
+        row.setBaseUrl("http://127.0.0.1:1"); // 必然连不上，但装配不依赖网络
+        row.setChatEnabled(false);            // 只关掉「助手」
+        rows.put("u-feat", row);
+
+        LlmClient client = new LlmClient(new LlmConfigStore(props(true, "ollama"),
+                new ObjectMapper(), statefulUserMapper(rows), cipher()));
+        loginAs("u-feat");
+
+        assertTrue(client.isAvailable(), "总开关开着、参数合法，应可装配");
+        assertNull(client.chat(AiFeature.CHAT, "系统", "你好"),
+                "被单独关闭的功能应降级返回 null");
     }
 
     // ------------------------------------------------------------------ 失败记录上界（P2-12）

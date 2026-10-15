@@ -4,6 +4,7 @@ import com.openai.client.OpenAIClientAsyncImpl;
 import com.openai.client.OpenAIClientImpl;
 import com.openai.core.ClientOptions;
 import com.tcm.ehr.common.utils.TextUtil;
+import com.tcm.ehr.common.config.AiFeature;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.common.metrics.Metrics;
@@ -131,23 +132,44 @@ public class LlmClient {
      * @return 模型输出；不可用或调用失败返回 {@code null}，调用方据此走降级路径
      */
     public String chat(String systemPrompt, String userPrompt) {
+        return chat(null, systemPrompt, userPrompt);
+    }
+
+    /**
+     * 单轮对话，并按<b>这个 AI 功能自己的开关</b>门控。
+     *
+     * <p>与 {@link #chat(String, String)} 的唯一差别：额外判定该功能有没有被单独关掉。
+     * 关掉时同样返回 {@code null} —— 调用方本就有「LLM 不可用就走规则」的分支，
+     * 两种降级同路，调用方不必再判一次。</p>
+     *
+     * <p>{@code feature} 传 {@code null} 表示不关心功能维度（如探测、未归类的调用），
+     * 行为等同 {@link #chat(String, String)}。</p>
+     *
+     * @param feature 哪个 AI 功能，可为 {@code null}
+     * @param systemPrompt 系统提示词，可为 {@code null}
+     * @param userPrompt 用户输入
+     * @return 模型输出；不可用、调用失败或<b>该功能被单独关掉</b>都返回 {@code null}
+     */
+    public String chat(AiFeature feature, String systemPrompt, String userPrompt) {
         // 1. 一次解析同时拿到客户端与生效配置（降级分支不必再查一次库）
         ResolvedClient rc = resolveDetailed();
         ChatClient client = rc.client();
-        if (client == null) {
-            log.debug("[LLM] 不可用（enabled={}，provider={}），降级",
+        // 2. 整个 LLM 不能用，或这项功能被单独关掉 —— 都走降级
+        if (client == null || (feature != null && !rc.cfg().featureEnabled(feature))) {
+            log.debug("[LLM] 不可用（功能={}，enabled={}，provider={}），降级",
+                    feature == null ? "(未指定)" : feature.key(),
                     rc.cfg().enabled(), rc.cfg().provider());
             return null;
         }
         try {
-            // 2. 系统提示词可空，传空串而不是 null（部分模型不接受 null）
+            // 3. 系统提示词可空，传空串而不是 null（部分模型不接受 null）
             return client.prompt()
                     .system(systemPrompt == null ? "" : systemPrompt)
                     .user(userPrompt)
                     .call()
                     .content();
         } catch (Exception e) {
-            // 3. 调用失败也降级：LLM 是增强项，不能让它把主流程带崩
+            // 4. 调用失败也降级：LLM 是增强项，不能让它把主流程带崩
             log.warn("[LLM] 调用失败，降级：{}", e.getMessage());
             return null;
         }

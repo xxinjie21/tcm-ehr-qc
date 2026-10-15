@@ -18,11 +18,20 @@ import java.util.List;
 public interface IStatsService extends IService<Record> {
 
     /**
-     * 首页四个指标卡。
+     * 首页指标卡（不筛选口径）。
      *
      * @return total/qualified/pendingReview/invalid=各分级条数
      */
     OverviewVO overview();
+
+    /**
+     * 首页指标卡（随筛选）：总数 / 合格率 / 无效数按科室 + 就诊区间收窄；
+     * 待复核数仍为全量（待办条入口须与全量列表一致）。
+     *
+     * @param filters 范围条件，null 表示不限（等价 {@link #overview()}）
+     * @return 总览指标
+     */
+    OverviewVO overview(FiltersDTO filters);
 
     /**
      * 按类型统计。

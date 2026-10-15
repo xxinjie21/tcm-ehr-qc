@@ -2,8 +2,10 @@ package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.cache.StatsCache;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.StatsDTO;
 import com.tcm.ehr.domain.po.Record;
+import com.tcm.ehr.domain.vo.OverviewVO;
 import com.tcm.ehr.domain.vo.StatsAllVO;
 import com.tcm.ehr.domain.vo.StatsVO;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -173,6 +175,8 @@ class StatsServiceImplAggregateTest {
     @DisplayName("看板 /stats/all：四类实体只发一条 selectTermFreqMulti（一趟扫完）")
     void allSendsOneMultiQueryForFourKinds() {
         RecordMapper mapper = mock(RecordMapper.class);
+        when(mapper.selectOverviewFiltered(any())).thenReturn(Map.of(
+                "totalRecords", 500L, "qualifiedCount", 480L, "invalidCount", 5L));
         when(mapper.selectOverviewOrg(anyString())).thenReturn(Map.of(
                 "totalRecords", 500L, "qualifiedCount", 480L,
                 "pendingReviewCount", 15L, "invalidCount", 5L));
@@ -202,6 +206,7 @@ class StatsServiceImplAggregateTest {
         RecordMapper mapper = mock(RecordMapper.class);
         when(mapper.selectTermFreqMulti(any(), eq(10))).thenReturn(List.of());
         when(mapper.selectPatternFreq(any(), eq(10))).thenReturn(List.of());
+        when(mapper.selectOverviewFiltered(any())).thenReturn(Map.of("totalRecords", 0L));
         when(mapper.selectOverviewOrg(anyString())).thenReturn(Map.of("totalRecords", 0L));
         context();
 
@@ -249,5 +254,34 @@ class StatsServiceImplAggregateTest {
             assertTrue(ite.getCause() instanceof IllegalArgumentException,
                     "非白名单路径必须抛 IllegalArgumentException，实际: " + ite.getCause());
         }
+    }
+
+    @Test
+    @DisplayName("指标卡随筛选：3 张卡走 selectOverviewFiltered（带科室+区间），待复核仍取全量")
+    void overviewAppliesFiltersButKeepsPendingGlobal() {
+        RecordMapper mapper = mock(RecordMapper.class);
+        when(mapper.selectOverviewFiltered(any())).thenReturn(Map.of(
+                "totalRecords", 40L, "qualifiedCount", 30L, "invalidCount", 2L));
+        when(mapper.selectOverviewOrg(anyString())).thenReturn(Map.of("pendingReviewCount", 15L));
+        context();
+
+        FiltersDTO filters = new FiltersDTO();
+        filters.setDepartment("内科");
+        filters.setDateRange(List.of("2024-01-01", "2024-06-30"));
+        OverviewVO vo = svc(mapper).overview(filters);
+
+        // 1. 3 张卡取筛选口径
+        assertEquals(40L, vo.getTotalRecords());
+        assertEquals(2L, vo.getInvalidCount());
+        assertEquals(75.0, vo.getQualifiedRate(), 1e-9, "合格率 = 30/40");
+        // 2. 待复核取全量口径，不随筛选
+        assertEquals(15L, vo.getPendingReviewCount(), "待复核是待办条入口，须与全量复核列表同口径");
+        // 3. 交给 SQL 的条件确实带上了科室与就诊区间，且不含 ORDER BY（GROUP BY 与之互斥）
+        ArgumentCaptor<QueryWrapper<Record>> captor = ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(mapper).selectOverviewFiltered(captor.capture());
+        String sql = captor.getValue().getSqlSegment();
+        assertTrue(sql.contains("department"), sql);
+        assertTrue(sql.contains("visit_time"), sql);
+        assertFalse(sql.toUpperCase().contains("ORDER BY"), sql);
     }
 }

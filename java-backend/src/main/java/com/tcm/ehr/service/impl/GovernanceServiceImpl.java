@@ -95,10 +95,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // 这是清洗的堆占用来源。下面保持 for-each 写法**一行不改**，只把数据源换成按页拉取。
         // P1-3：wrapper 改为「每页重建」的工厂 —— keyset 锚点必须追加到一份干净的条件上
         // （QueryWrapper.and() 是原地追加，复用同一份会逐页累积 WHERE）。
-        java.util.function.Supplier<QueryWrapper<Record>> wrapperFactory = () ->
-                recordIds != null && !recordIds.isEmpty()
-                        ? RecordFilter.build(RequestUtils.currentOrgId(), new FiltersDTO()).in("id", recordIds)
-                        : RecordFilter.build(RequestUtils.currentOrgId(), filters);
+        java.util.function.Supplier<QueryWrapper<Record>> wrapperFactory = () -> {
+            boolean byIds = recordIds != null && !recordIds.isEmpty();
+            // 清洗只作用于「质控合格」：按范围或按病历 ID，都在数据域之上叠加 grade=合格。
+            // 按 ID 时不用范围条件（与原行为一致），只保留 ID 收窄。
+            QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(),
+                    qualifiedScope(byIds ? null : filters));
+            return byIds ? wrapper.in("id", recordIds) : wrapper;
+        };
         // P1-17 / T3：本页的 structured_data 解析结果留档，供「预热」与「逐条清洗」共用 ——
         // 预热要读同一份内容，不共用就得为预热再解析一遍（T16 的「只解析一次」不能因预热回退）。
         Map<String, Map<String, Object>> pageParsed = new HashMap<>();
@@ -248,6 +252,31 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         com.tcm.ehr.common.utils.DistLock.afterCommit(
                 com.tcm.ehr.common.cache.StatsCacheInvalidator::invalidateStats);
         return vo;
+    }
+
+    /**
+     * 清洗范围条件：只作用于「质控合格」病历，<b>无视</b>传入的分级。
+     *
+     * <p>设计口径是「对合格数据做清洗、归一，产出标准数据集」——待复核 / 无效既不归一、
+     * 也不参与导出。调用方传了别的分级也一律按「合格」收窄：范围里若按「全部」扫，
+     * 「清洗总病历」会是整库条数，远大于页面顶部「质控合格病历」卡，用户看到的就是
+     * 「明明只有几千合格，却清洗了几万」。</p>
+     *
+     * <p>刻意<b>不</b>改动入参 {@code filters}：Controller 在 {@code clean()} 之后还要用它写
+     * 操作日志（{@link RecordFilter#describe}），就地改分级会让日志范围与实际执行的不一致。
+     * 故这里复制一份再覆盖分级。</p>
+     */
+    private FiltersDTO qualifiedScope(FiltersDTO filters) {
+        FiltersDTO scope = new FiltersDTO();
+        if (filters != null) {
+            scope.setDepartment(filters.getDepartment());
+            scope.setDateRange(filters.getDateRange());
+            scope.setPattern(filters.getPattern());
+            scope.setIds(filters.getIds());
+            scope.setOnlyUnparsed(filters.getOnlyUnparsed());
+        }
+        scope.setGrade("合格");
+        return scope;
     }
 
     /** 清洗分页大小：单页驻留多少行。1000 足够摊薄每页一次查询的开销，又不会让堆占用重新长起来 */

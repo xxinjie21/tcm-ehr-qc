@@ -4,6 +4,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.exception.ForbiddenException;
+import com.tcm.ehr.common.config.AiFeature;
 import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.utils.LlmClient;
 import com.tcm.ehr.common.utils.QcScorer;
@@ -110,7 +111,7 @@ public class AiServiceImpl implements IAiService {
         vo.setAnswer(template);
 
         // 2. 再让 LLM 改写叙述并给要点摘要；不可用或异常都保留上一步的模板叙述
-        String raw = llmClient.chat(LlmClient.AI_INTERPRET_SYSTEM_PROMPT, interpretPrompt(vo, r, data));
+        String raw = llmClient.chat(AiFeature.INTERPRET, LlmClient.AI_INTERPRET_SYSTEM_PROMPT, interpretPrompt(vo, r, data));
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);
         vo.setSource(llmOk ? "llm" : "rule");
@@ -342,7 +343,7 @@ public class AiServiceImpl implements IAiService {
         String history = dto == null ? null : dto.getHistory();
         String historyBlock = (history == null || history.isBlank())
                 ? "" : "\n\n【上文对话】\n" + history.trim();
-        String raw = llmClient.chat(LlmClient.AI_CHAT_SYSTEM_PROMPT,
+        String raw = llmClient.chat(AiFeature.CHAT, LlmClient.AI_CHAT_SYSTEM_PROMPT,
                 "【业务上下文】\n" + context + historyBlock + "\n\n【使用者问题】\n" + question);
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);
@@ -522,7 +523,7 @@ public class AiServiceImpl implements IAiService {
         }
 
         // 3. LLM 只补建议，失败就直接回规则预检单
-        String raw = llmClient.chat(LlmClient.AI_REVIEW_SYSTEM_PROMPT, reviewPrompt(precheck, r, data));
+        String raw = llmClient.chat(AiFeature.REVIEW, LlmClient.AI_REVIEW_SYSTEM_PROMPT, reviewPrompt(precheck, r, data));
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);
         vo.setSource(llmOk ? "llm" : "rule");
@@ -726,7 +727,7 @@ public class AiServiceImpl implements IAiService {
         vo.setTermSuggestions(fallbackSuggestions(terms, recalled));
 
         // 3. LLM 判断；不可用或输出不可解析，都保留上一步的兜底
-        String raw = llmClient.chat(LlmClient.AI_TERM_SUGGEST_SYSTEM_PROMPT,
+        String raw = llmClient.chat(AiFeature.TERM_SUGGEST, LlmClient.AI_TERM_SUGGEST_SYSTEM_PROMPT,
                 termSuggestPrompt(terms, recalled, type));
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);

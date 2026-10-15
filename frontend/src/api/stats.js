@@ -1,7 +1,9 @@
 import request from '@/utils/request'
 
-export function getOverview() {
-  return request.get('/stats/overview')
+// 首页指标卡。params 可传 { department, start, end }：3 张卡（总数/合格率/无效）随筛选收窄，
+// 不传即全量口径（顶栏铃铛等无参调用不受影响）。待复核数恒为全量。
+export function getOverview(params) {
+  return request.get('/stats/overview', { params })
 }
 
 // 科室动态选项

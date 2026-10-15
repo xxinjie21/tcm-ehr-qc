@@ -144,13 +144,13 @@ class AuthServiceTest {
 
         assertNotNull(vo.getToken());
         assertEquals("管理员", vo.getRole());
-        // 阶段2：管理员菜单 = 原 8 项 + 「组织管理」= 9 项
-        // （注：计划 §八 的侧栏图同时列了「组织管理」与「我的组织」，但那条写的是
-        //  管理员 8 项 → 9 项；管理员从「我的组织」页看的就是自己的组织信息，
-        //  与 Orgs 页的组织列表是同一诉求，故只加 1 项以对上计划的数量）
+        // 阶段2：管理员菜单 = 原 8 项 + 「组织管理」= 9 项；有生效组时再给「我的组织」= 10 项
+        // （含词典子项计 11）。管理员只要有组就看得到「我的组织」（与组员口径一致），
+        // 该页对管理员/成员是只读视图，写动作仍由后端 @RequireOrgRole 把关。
         List<MenuNode> menus = vo.getMenus();
-        assertEquals(10, menus.size(), menus.toString());
+        assertEquals(11, menus.size(), menus.toString());
         assertTrue(titlesOf(menus).contains("组织管理"));
+        assertTrue(titlesOf(menus).contains("我的组织"), menus.toString());
         assertTrue(titlesOf(menus).contains("人工复核"));
         assertTrue(titlesOf(menus).contains("清洗与导出"));
         assertFalse(titlesOf(menus).contains("数据清洗"));
@@ -164,6 +164,43 @@ class AuthServiceTest {
         assertEquals("admin-0001", claims.getSubject());
         assertEquals("admin", claims.get("username"));
         assertEquals("管理员", claims.get("role"));
+    }
+
+    /**
+     * 管理员同时是本组组长时，除 ADMIN_MENUS 外还要有「我的组织」。
+     *
+     * <p>种子数据里 admin 就是 DEFAULT 组的 owner（database-init.sql）；成员管理接口
+     * （@RequireOrgRole("owner")）本就放行，缺的只是菜单入口。</p>
+     */
+    @Test
+    void adminOwnerAlsoGetsMyGroupMenu() {
+        when(userMapper.findByUsername("admin"))
+                .thenReturn(user("admin-0001", "admin", "管理员"));
+        resolvesToGroup("grp-default-2026", "owner");
+
+        LoginVO vo = authService.login("admin", "123456");
+
+        assertEquals("管理员", vo.getRole());
+        // ADMIN_MENUS 10 项 + 「我的组织」= 11
+        assertEquals(11, vo.getMenus().size(), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("组织管理"), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
+    }
+
+    /** 无生效组的管理员：没有本组可看/可管，维持 ADMIN_MENUS（无「我的组织」） */
+    @Test
+    void adminWithoutGroupGetsNoMyGroupMenu() {
+        when(userMapper.findByUsername("admin"))
+                .thenReturn(user("admin-0001", "admin", "管理员"));
+        resolvesToNoGroup();
+
+        LoginVO vo = authService.login("admin", "123456");
+
+        assertEquals("管理员", vo.getRole());
+        // ADMIN_MENUS 10 项，无「我的组织」
+        assertEquals(10, vo.getMenus().size(), vo.getMenus().toString());
+        assertTrue(titlesOf(vo.getMenus()).contains("组织管理"), vo.getMenus().toString());
+        assertFalse(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
     }
 
     @Test
@@ -305,9 +342,9 @@ class AuthServiceTest {
         assertTrue(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
     }
 
-    /** 成员菜单：同样可用术语词典/日志审计，但无成员管理页 */
+    /** 成员菜单：同样可用术语词典/日志审计，且看得到「我的组织」（只读视图，无成员管理动作） */
     @Test
-    void memberMenuHasDictionaryAndLogsButNotMyGroup() {
+    void memberMenuHasDictionaryLogsAndMyGroup() {
         when(userMapper.findByUsername("yu")).thenReturn(user("u-yu", "yu", "用户"));
         resolvesToGroup("grp-a", "member");
 
@@ -315,7 +352,9 @@ class AuthServiceTest {
 
         assertTrue(titlesOf(vo.getMenus()).contains("术语词典"), vo.getMenus().toString());
         assertTrue(titlesOf(vo.getMenus()).contains("日志审计"), vo.getMenus().toString());
-        assertFalse(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
+        // 有组就有「我的组织」入口；管理动作由 MyGroup.vue 按 myRole=owner 隐藏、后端 @RequireOrgRole 把关
+        assertTrue(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
+        assertFalse(titlesOf(vo.getMenus()).contains("组织管理"), vo.getMenus().toString());
         // 「术语批量导入」对所有身份可见：普通成员走它会**导入本机个人词典**
         // （POST /dictionary/parse 只解析、不落库），不写小组基线，
         // 所以不破坏「成员不能直接改基线、必须走提案审核」的约定。

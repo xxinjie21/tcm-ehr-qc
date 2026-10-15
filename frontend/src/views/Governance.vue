@@ -7,7 +7,7 @@
          给整条加 loading 遮罩会让统计刷新期间范围筛选也点不了。 -->
     <section class="scope-bar">
       <div v-loading="statsLoading" element-loading-text="正在统计标准化情况…" class="gs-group">
-        <span class="gs" title="这三张卡只统计「质控合格」的病历；清洗范围若包含待复核/无效，条数会对不上">
+        <span class="gs" title="三张卡只统计「质控合格」的病历；清洗也默认在合格范围内进行（可在下方「分级」里改），因此「清洗总病历」不会超过合格数">
           <b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
         <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
         <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已清洗</span>
@@ -20,7 +20,7 @@
 
       <!-- 当前范围（先选范围 → 后续操作只作用于范围内） -->
       <div class="scope-ctrls">
-        <RangeFilter v-model="filters" />
+        <RangeFilter v-model="filters" :show-grade="false" />
         <div class="scope-row">
           <span class="scope-tip">当前范围：<b>{{ scopeText }}</b></span>
         </div>
@@ -339,7 +339,6 @@ const scopeText = computed(() => {
   if (filters.department) parts.push(filters.department)
   if (filters.dateRange && filters.dateRange.length === 2) parts.push(`${filters.dateRange[0]}~${filters.dateRange[1]}`)
   if (filters.pattern) parts.push(filters.pattern)
-  if (filters.grade) parts.push(filters.grade)
   return parts.length ? parts.join(' · ') : '全部'
 })
 
@@ -420,7 +419,9 @@ const handleClean = async () => {
   }
 }
 
-const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
+// 清洗范围：只作用于「质控合格」病历（后端同样强制合格），故不带分级维度。
+// 科室 / 就诊区间 / 证候 三个维度对清洗和导出都有效。
+const filters = reactive({ department: '', dateRange: null, pattern: '' })
 const format = ref('csv')
 const exporting = ref(false)
 // 导出文件名去重序号：Date.now() 是毫秒级，同一毫秒内连点两次导出仍会同名

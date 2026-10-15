@@ -52,18 +52,17 @@
       <div class="stats stagger-in">
         <!-- note：口径说明，文案取自本页既有 .stats-note（不编造业务数字） -->
         <StatCard label="病历总数" :value="overview.totalRecords" icon="record"
-          note="全部病历 · 不受筛选影响" clickable @click="drill('')" />
+          note="当前筛选范围" clickable @click="drill('')" />
         <StatCard label="质控合格率" :value="overview.qualifiedRate" tone="green" suffix="%" icon="rate"
           note="分级「合格」的病历占比" clickable @click="drill('合格')" />
         <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid"
           note="质控判定无有效内容" clickable @click="drill('无效')" />
       </div>
 
-      <!-- 28.18：指标口径提示 —— 页面上有三个「率/数」，不写清怎么算、算哪些病历，
-           用户看到与列表页对不上的数字时无从判断谁错。 -->
+      <!-- 只有「待复核」与其余数字口径不同（卡片随筛选、它恒全量），不点明会让用户
+           以为筛选没生效。合格率/无效的定义已由各卡自带的 note 说明，此处不再重复。 -->
       <p class="stats-note">
-        口径：三张指标卡取<b>全部病历</b>，不受上方筛选影响；合格率 = 质控分级为「合格」的病历占比，
-        「无效数据」为质控判定无有效内容的病历。待办条的数字与指标卡同一口径；下方图表区间随筛选变化。
+        待办条的「待复核」为全量（点击进入全量复核列表），不随上方筛选变化；其余数字与下方图表均随筛选收窄。
       </p>
 
       <!-- 质控趋势（跨整行） -->
@@ -146,10 +145,18 @@ const router = useRouter()
  * <p>筛选写进 URL 而不是页面内部状态 —— 病历数据页已接入 useUrlFilters（对标 E5），
  * 所以下钻后的视图可以刷新、可以发给同事，而不是只有当前这次点击有效。</p>
  *
+ * <p>3 张卡已随上方筛选收窄，下钻必须带上同一组条件（科室 + 就诊区间），
+ * 否则「卡上是这个数、点进去却是全量列表」，两边对不上。</p>
+ *
  * @param {string} grade 空串=不限；否则为 '合格' / '无效'
  */
 const drill = (grade) => {
-  router.push(grade ? { path: '/records', query: { grade } } : { path: '/records' })
+  const q = {}
+  if (grade) q.grade = grade
+  if (filter.department) q.department = filter.department
+  // 病历页的日期区间 URL 键是 dateRange（"起,止"），与 stats 接口的 start/end 不同名
+  if (filter.start && filter.end) q.dateRange = `${filter.start},${filter.end}`
+  router.push({ path: '/records', query: q })
 }
 const userStore = useUserStore()
 
@@ -263,15 +270,26 @@ const renderTrend = () => {
       {
         name: '合格率', type: 'line', smooth: true, yAxisIndex: 0,
         // L1：180px 高的图里折线几乎无起伏，加数据点标记让每个月的取值可指认
-        showSymbol: true, symbolSize: 5,
+        showSymbol: true, symbolSize: 6,
+        // ⚠️ 必须用字面色值，不能写 var(--…)：ECharts 走 canvas，zrender 解析不了 CSS 变量，
+        //    之前 itemStyle.color:'var(--ink-mid)' 被判为非法色 → 折线描边失效，看着「很淡」，
+        //    hover 触发重绘后直接消失；两条线的非法色还会一起回退成同一个颜色，区分度自然为零。
         data: t.map((p) => p.qualifiedRate),
-        itemStyle: { color: 'var(--ink-mid)' }, areaStyle: { color: 'rgba(61,90,76,0.10)' }
+        itemStyle: { color: '#3d5a4c', borderColor: '#fff', borderWidth: 1.5 },
+        lineStyle: { color: '#3d5a4c', width: 3 },
+        areaStyle: { color: 'rgba(61,90,76,0.12)' },
+        // hover 只加粗、不做焦点模糊：避免非当前系列被压暗到看不见
+        emphasis: { focus: 'none', lineStyle: { width: 3.5 } }
       },
       {
         name: '待复核', type: 'line', smooth: true, yAxisIndex: 1,
-        showSymbol: true, symbolSize: 5,
+        showSymbol: true, symbolSize: 6,
+        // 亮赭石（赭石族更亮一档）：与墨绿在色相 + 明度两个维度都拉开，
+        // 比默认 --ochre(#96714f) 更容易和绿色线区分开
         data: t.map((p) => p.pendingReview),
-        itemStyle: { color: 'var(--ochre)' }, lineStyle: { type: 'dashed' }
+        itemStyle: { color: '#b8772f', borderColor: '#fff', borderWidth: 1.5 },
+        lineStyle: { color: '#b8772f', type: 'dashed', width: 3 },
+        emphasis: { focus: 'none', lineStyle: { width: 3.5 } }
       }
     ]
   })
@@ -318,7 +336,7 @@ const renderDist = () => {
   })
 }
 
-// 图表接口的查询参数（指标卡走无参的 /stats/overview，所以这里只喂趋势 / 分布）
+// 指标卡与图表接口的查询参数（两者都随上方筛选收窄；待复核数在卡片接口里另行保持全量）
 const params = () => ({
   department: filter.department || '',
   start: filter.start || '',
@@ -336,7 +354,7 @@ const loadAll = async () => {
     const govTask = userStore.role === '管理员'
       ? governanceStats().catch(() => ({ data: { pendingGovern: 0 } }))
       : Promise.resolve(null)
-    const [ov, ex, gc] = await Promise.all([getOverview(), getExtraStats(params()), govTask])
+    const [ov, ex, gc] = await Promise.all([getOverview(params()), getExtraStats(params()), govTask])
     // 3. 分别回填指标卡与图表数据；清洗统计失败/非管理员不影响其余看板
     overview.value = ov.data
     extra.value = ex.data

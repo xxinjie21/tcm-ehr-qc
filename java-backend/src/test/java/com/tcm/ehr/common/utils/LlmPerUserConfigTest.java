@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.utils;
 
+import com.tcm.ehr.common.config.AiFeature;
 import com.tcm.ehr.common.config.LlmConfig;
 import com.tcm.ehr.common.config.LlmConfigStore;
 import com.tcm.ehr.common.config.LlmProperties;
@@ -173,5 +174,45 @@ class LlmPerUserConfigTest {
 
         assertEquals("sk-first", store.getFor("u-c").apiKey(), "空密钥不得覆盖已有密文");
         assertEquals("m2", store.getFor("u-c").model());
+    }
+
+    // ------------------------------------------------------------------ 分功能开关
+
+    /** 四个功能开关随配置落库、按用户隔离，且都受总开关约束 */
+    @Test
+    void featureSwitchesRoundTripAndRespectMasterSwitch() {
+        loginAs("u-f");
+        store.saveFor("u-f", new LlmConfig(true, "ollama", "", "", "", 0.2D, 60000,
+                true, false, true, false));
+
+        LlmConfig got = store.getFor("u-f");
+        assertTrue(got.interpretEnabled());
+        assertFalse(got.chatEnabled());
+        assertTrue(got.reviewEnabled());
+        assertFalse(got.termSuggestEnabled());
+        assertTrue(got.featureEnabled(AiFeature.INTERPRET));
+        assertFalse(got.featureEnabled(AiFeature.CHAT));
+
+        // 另一个用户没配自己的开关，应回落到基线（全开），不继承 u-f 的选择
+        LlmConfig other = store.getFor("u-g");
+        assertTrue(other.chatEnabled(), "他人不得继承 u-f 的功能开关");
+
+        // 总开关关掉后，单项即使是 true 也不生效
+        store.saveFor("u-f", new LlmConfig(false, "ollama", "", "", "", 0.2D, 60000,
+                true, true, true, true));
+        assertFalse(store.getFor("u-f").featureEnabled(AiFeature.INTERPRET),
+                "总开关关闭时单项开关不得越过");
+    }
+
+    /** 拨动单项开关会推进配置版本，触发 LlmClient 重建（否则改了不生效） */
+    @Test
+    void changingFeatureSwitchBumpsVersion() {
+        loginAs("u-v");
+        store.saveFor("u-v", new LlmConfig(true, "ollama", "", "", "", 0.2D, 60000));
+        String before = store.versionFor("u-v");
+
+        store.saveFor("u-v", new LlmConfig(true, "ollama", "", "", "", 0.2D, 60000,
+                true, false, true, true));
+        assertNotEquals(before, store.versionFor("u-v"));
     }
 }
