@@ -1,5 +1,7 @@
 # 性能优化与 Redis 应用审查报告
 
+> **收口状态**：✅ **已收口**（2026-10-15）。A/B/C/D/W 类 + R 系列全部纳入《优化方案与待修复清单》归口，已落地 49 条、不做 9 条（单实例部署无跨实例一致性需求）。本文作为审查记录保留，不再单独维护。
+
 > **审查对象**：`java-backend`（Spring Boot 4.1 + MyBatis-Plus + Redis/Redisson + Elasticsearch）、`python-nlp`（FastAPI + RoBERTa）。全仓只读，代码结论附文件与行号。
 > **数据规模基准**：目标数据集 **40,000 条病历**，`structured_data` 约 **1.13 KB/条**（合计约 45 MB）。行号对应工作区文件（含未提交 WIP）。
 > **实测环境**：`windows-redis`（redis:7.4）、`windows-mysql`（mysql:9）、`windows-es`（7.17.22）；3.6 节为连真实实例查询所得。
