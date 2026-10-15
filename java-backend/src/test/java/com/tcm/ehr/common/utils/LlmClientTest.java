@@ -175,7 +175,7 @@ class LlmClientTest {
         row.setEnabled(true);
         row.setProvider("ollama");
         row.setBaseUrl("http://127.0.0.1:1"); // 必然连不上，但装配不依赖网络
-        row.setChatEnabled(false);            // 只关掉「助手」
+        row.setReviewEnabled(false);          // 只关掉「复核意见」
         rows.put("u-feat", row);
 
         LlmClient client = new LlmClient(new LlmConfigStore(props(true, "ollama"),
@@ -183,7 +183,7 @@ class LlmClientTest {
         loginAs("u-feat");
 
         assertTrue(client.isAvailable(), "总开关开着、参数合法，应可装配");
-        assertNull(client.chat(AiFeature.CHAT, "系统", "你好"),
+        assertNull(client.chat(AiFeature.REVIEW, "系统", "你好"),
                 "被单独关闭的功能应降级返回 null");
     }
 

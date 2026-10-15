@@ -178,28 +178,27 @@ class LlmPerUserConfigTest {
 
     // ------------------------------------------------------------------ 分功能开关
 
-    /** 四个功能开关随配置落库、按用户隔离，且都受总开关约束 */
+    /** 三个功能开关随配置落库、按用户隔离，且都受总开关约束 */
     @Test
     void featureSwitchesRoundTripAndRespectMasterSwitch() {
         loginAs("u-f");
         store.saveFor("u-f", new LlmConfig(true, "ollama", "", "", "", 0.2D, 60000,
-                true, false, true, false));
+                true, false, false));
 
         LlmConfig got = store.getFor("u-f");
         assertTrue(got.interpretEnabled());
-        assertFalse(got.chatEnabled());
-        assertTrue(got.reviewEnabled());
+        assertFalse(got.reviewEnabled());
         assertFalse(got.termSuggestEnabled());
         assertTrue(got.featureEnabled(AiFeature.INTERPRET));
-        assertFalse(got.featureEnabled(AiFeature.CHAT));
+        assertFalse(got.featureEnabled(AiFeature.REVIEW));
 
         // 另一个用户没配自己的开关，应回落到基线（全开），不继承 u-f 的选择
         LlmConfig other = store.getFor("u-g");
-        assertTrue(other.chatEnabled(), "他人不得继承 u-f 的功能开关");
+        assertTrue(other.reviewEnabled(), "他人不得继承 u-f 的功能开关");
 
         // 总开关关掉后，单项即使是 true 也不生效
         store.saveFor("u-f", new LlmConfig(false, "ollama", "", "", "", 0.2D, 60000,
-                true, true, true, true));
+                true, true, true));
         assertFalse(store.getFor("u-f").featureEnabled(AiFeature.INTERPRET),
                 "总开关关闭时单项开关不得越过");
     }
@@ -212,7 +211,7 @@ class LlmPerUserConfigTest {
         String before = store.versionFor("u-v");
 
         store.saveFor("u-v", new LlmConfig(true, "ollama", "", "", "", 0.2D, 60000,
-                true, false, true, true));
+                true, false, true));
         assertNotEquals(before, store.versionFor("u-v"));
     }
 }

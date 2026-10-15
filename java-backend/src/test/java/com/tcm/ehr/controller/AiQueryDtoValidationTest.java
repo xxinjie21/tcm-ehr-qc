@@ -7,20 +7,24 @@ import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * AI 三端点共用 DTO 的必填约束归属。
  *
- * <p>事故背景：{@code AiQueryDTO} 被 interpret / chat / review <b>三个端点共用</b>，
- * 而 {@code question} 上打了 {@code @NotBlank}。interpret（AI 预检）与 review
- * 只传 recordId、不传 question —— 于是它们<b>在进入 Controller 之前</b>就被
- * Bean Validation 拦掉，页面上反复弹「请输入你的问题」。用户根本没提问，
- * 他点的是「AI 预检」，报错却说他没填问题。</p>
+ * <p>事故背景：{@code AiQueryDTO} 被多个端点共用，而「某个端点必填」的约束
+ * （如 {@code @NotBlank} / {@code @NotEmpty}）一旦打在共用字段上，
+ * 只传其它字段的端点就会<b>在进入 Controller 之前</b>被 Bean Validation 拦掉 ——
+ * 用户点的是「AI 预检」，报错却说他没填问题。</p>
  *
- * <p>教训：「某个端点必填」的约束属于<b>该端点</b>，不能放在共用 DTO 上。
- * 本测试把这条钉死。</p>
+ * <p>教训：「某个端点必填」的约束属于<b>该端点</b>，不能放在共用 DTO 上；
+ * 跨端点真实存在的上限约束（{@code @Size}）才该留在 DTO。本测试把这条钉死 ——
+ * 当前 DTO 上仍在生效的活例子是 {@code terms}（仅 termsuggest 必填，
+ * 但「单次最多 50 个」是任何调用方都该守的上限）。</p>
  */
 class AiQueryDtoValidationTest {
 
@@ -29,14 +33,22 @@ class AiQueryDtoValidationTest {
         return f.getValidator();
     }
 
+    private static List<String> terms(int n) {
+        List<String> out = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            out.add("词" + i);
+        }
+        return out;
+    }
+
     @Test
     @DisplayName("interpret / review 的入参（只有 recordId）必须通过校验")
     void recordIdOnlyRequestPassesValidation() {
         AiQueryDTO dto = new AiQueryDTO();
         dto.setRecordId("rec-1");
-        // 没有 question —— interpret 与 review 就是这样调的
+        // 没有 terms —— interpret 与 review 就是这样调的
         assertTrue(validator().validate(dto).isEmpty(),
-                "只传 recordId 的请求不应被判为「请输入你的问题」；"
+                "只传 recordId 的请求不应被判为「请输入待补词」；"
                         + "实际校验错误: " + validator().validate(dto));
     }
 
@@ -49,22 +61,22 @@ class AiQueryDtoValidationTest {
     }
 
     @Test
-    @DisplayName("question 超长仍被拦（@Size 保留 —— 这是跨端点的真实约束）")
-    void oversizedQuestionStillRejected() {
+    @DisplayName("terms 超过 50 个仍被拦（@Size 保留 —— 这是跨调用方的真实上限）")
+    void oversizedTermsStillRejected() {
         AiQueryDTO dto = new AiQueryDTO();
         dto.setRecordId("rec-1");
-        dto.setQuestion("问".repeat(2001));
+        dto.setTerms(terms(51));
         assertEquals(1, validator().validate(dto).size(),
-                "超长问题应由 @Size 拦下，只是消息文案随语种调整");
+                "单次待补词超过 50 个应由 @Size 拦下");
     }
 
     @Test
-    @DisplayName("question 为空时不再由 Bean Validation 拦截（改由 chat 端点自己判）")
-    void emptyQuestionNotBlockedByBeanValidation() {
+    @DisplayName("terms 为空时不由 Bean Validation 拦截（改由 termsuggest 端点自己判）")
+    void emptyTermsNotBlockedByBeanValidation() {
         AiQueryDTO dto = new AiQueryDTO();
         dto.setRecordId("rec-1");
-        // chat 的必填由 AiController.chat 判（回 400「请输入问题」）与
-        // AiServiceImpl 再判一次；DTO 不再重复要求
+        // termsuggest 的必填由 AiController.submitAsync 判（回 400「请提供待规范的术语」）；
+        // DTO 不再重复要求，否则 interpret / review 会被误伤
         assertTrue(validator().validate(dto).isEmpty());
     }
 }
