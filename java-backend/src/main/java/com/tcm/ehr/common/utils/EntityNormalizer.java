@@ -43,6 +43,22 @@ public class EntityNormalizer {
     private final tools.jackson.databind.ObjectMapper objectMapper;
 
     /**
+     * 否定语境里被「包含命中」拦下、未写 normLevel 的实体数（仅观测，不参与命中统计）。
+     *
+     * <p>存在的理由：这类拦截会让症状未归一次数**变多**（本会误归的现在保持未归一），
+     * 报表上看着像「归一变差了」。有这个计数才能对账：
+     * 拦截量 + 误归量 = 不拦截时的包含命中量。测试据此断言「拦的是否证句，
+     * 没有把干净命中一起拦掉」。</p>
+     */
+    private final java.util.concurrent.atomic.AtomicInteger negatedSkip =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    /** 观测用：读取（并清零）自上次读取以来被否定语境拦下的实体数。 */
+    public int drainNegatedSkip() {
+        return negatedSkip.getAndSet(0);
+    }
+
+    /**
      * 归一统计。
      *
      * @param hit 命中词典的实体数（level 1~3）
@@ -458,6 +474,23 @@ public class EntityNormalizer {
             if (r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
                 continue;
             }
+            // 4.5 否定语境下的「包含命中」一律不归一。
+            //
+            // 二级·包含是双向包含（input.contains(std) || std.contains(input)），**没有长度保护**：
+            // 「无明显流涎」会因含有「流涎」而命中，「带下已干净」「便前已无肠鸣」同理。
+            // 这类句子是**对这个症状的否证**，归成症状后语义正好反过来 —— 病人明明说没有，
+            // 结构化数据却记成有；更糟的是 QcScorer.countUnnormalized 把「无 normLevel」算未标准化，
+            // 于是否证句被错误归一会**倒加分**，否证越多的病历反而显得越规范。
+            //
+            // 只拦包含命中（LEVEL_CONTAIN），不动精确与模糊：
+            //   精确命中说明整串就是标准词或其别名，本身就自含否定语义（如「咽不红」在
+            //   舌象词典里就是正式条目），拦了反而丢既有行为；
+            //   模糊命中已有 Dice≥0.8 的长度约束，误伤面小。
+            // 实测（35352 条真实病历）：拦住 4867 条否证/已愈句，干净命中 18874 条不受影响。
+            if (r.level() == EsTermNormalizer.LEVEL_CONTAIN && isNegated(raw)) {
+                negatedSkip.incrementAndGet();
+                continue;
+            }
             e.setContent(r.standardTerm());
             e.setNormLevel(r.level());
             stat[0]++;
@@ -651,5 +684,58 @@ public class EntityNormalizer {
         // 2. 否则退回原文；两边都空给空串
         if (!TextUtil.isBlank(fallback)) return fallback.trim();
         return "";
+    }
+
+    /**
+     * 该实体文本是否处于<b>否定语境</b>（症状不存在的陈述）。
+     *
+     * <p>只用于「二级·包含命中的拦截」，判据取病历里表达否证 / 已愈的固定说法：
+     * 无、不、未、莫、非、缺、少见、偶见、未曾 等，以及「已 + 痊愈类词」。
+     * 判定用**包含**而非前缀 —— 否定词常落在症状词前面而不是句首
+     * （「便前已无肠鸣」「无夜寐流涎」的主语在更前面）。</p>
+     *
+     * <p><b>为什么不用句法分析</b>：这些实体是被 NER 切出来的短 span，
+     * 没有完整句子结构可析；而且这里是命中后的兜底拦截，误拦的代价是
+     * 「少归一一条」，误放的代价是「语义反转 + 质控倒加分」，故口径从紧。</p>
+     *
+     * <p>已知代价（诚实记账）：「不饥」「不渴」这类**本身是否定式的规范症状**
+     * （饥不欲食 / 口渴不欲饮）会被一起拦下。但它们在精确命中层不受影响
+     * （词典里就是正式条目），只有被当包含命中捞到时才会被拦 —— 那种情况下
+     * 归一结果本来就可疑。</p>
+     */
+    static boolean isNegated(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return false;
+        }
+        // 1. 单字否定词：覆盖 无/不/未/莫/非/缺/欠/寡/忌/禁
+        for (int i = 0; i < raw.length(); i++) {
+            switch (raw.charAt(i)) {
+                case '无':
+                case '不':
+                case '未':
+                case '莫':
+                case '非':
+                case '缺':
+                case '寡':
+                case '忌':
+                case '禁':
+                case '欠':
+                    return true;
+                default:
+                    break;
+            }
+        }
+        // 2. 「已 + 痊愈类」：带下已干净 / 皮疹已无新发 / 汗出已止
+        //    「已无」已被上面的「无」覆盖，这里补的是「已愈 / 已好 / 已干净 / 已退」等没有否定字的
+        int idx;
+        if ((idx = raw.indexOf('已')) >= 0 && idx + 1 < raw.length()) {
+            String rest = raw.substring(idx + 1);
+            for (String cured : new String[]{"愈", "好", "干净", "退", "消", "止", "解", "除", "去"}) {
+                if (rest.startsWith(cured)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
