@@ -52,9 +52,6 @@ public class LlmConfigDTO {
     /** 病历解读是否用 LLM；null = 沿用当前 */
     private Boolean interpretEnabled;
 
-    /** 助手问答是否用 LLM；null = 沿用当前 */
-    private Boolean chatEnabled;
-
     /** 复核意见是否用 LLM；null = 沿用当前 */
     private Boolean reviewEnabled;
 

@@ -9,8 +9,7 @@ package com.tcm.ehr.common.config;
  */
 public record LlmConfig(boolean enabled, String provider, String baseUrl, String apiKey,
                         String model, Double temperature, int timeout,
-                        boolean interpretEnabled, boolean chatEnabled,
-                        boolean reviewEnabled, boolean termSuggestEnabled) {
+                        boolean interpretEnabled, boolean reviewEnabled, boolean termSuggestEnabled) {
 
     public static final String PROVIDER_OLLAMA = "ollama";
     public static final String PROVIDER_OPENAI = "openai";
@@ -19,18 +18,18 @@ public record LlmConfig(boolean enabled, String provider, String baseUrl, String
      * 不含功能开关的构造：所有功能默认跟随总开关开启。
      *
      * <p>保留它是为了让「只关心连接参数」的调用点（连通性探测、单元测试）
-     * 不必为四个开关操心 —— 它们本来就不该管功能维度的启停。</p>
+     * 不必为三个开关操心 —— 它们本来就不该管功能维度的启停。</p>
      */
     public LlmConfig(boolean enabled, String provider, String baseUrl, String apiKey,
                      String model, Double temperature, int timeout) {
-        this(enabled, provider, baseUrl, apiKey, model, temperature, timeout, true, true, true, true);
+        this(enabled, provider, baseUrl, apiKey, model, temperature, timeout, true, true, true);
     }
 
     /** 从配置文件基线取值 */
     public static LlmConfig from(LlmProperties p) {
         return new LlmConfig(p.isEnabled(), p.getProvider(), p.getBaseUrl(), p.getApiKey(),
                 p.getModel(), p.getTemperature(), p.getTimeout(),
-                p.isInterpretEnabled(), p.isChatEnabled(), p.isReviewEnabled(), p.isTermSuggestEnabled());
+                p.isInterpretEnabled(), p.isReviewEnabled(), p.isTermSuggestEnabled());
     }
 
     /**
@@ -42,7 +41,6 @@ public record LlmConfig(boolean enabled, String provider, String baseUrl, String
         }
         return switch (feature) {
             case INTERPRET -> interpretEnabled;
-            case CHAT -> chatEnabled;
             case REVIEW -> reviewEnabled;
             case TERM_SUGGEST -> termSuggestEnabled;
         };

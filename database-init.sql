@@ -145,8 +145,8 @@ CREATE TABLE IF NOT EXISTS operation_log (
   detail TEXT COMMENT '操作明细',
   org_id VARCHAR(36) COMMENT '操作时所属组织，留痕用（按它做三档可见性）',
   INDEX idx_log_time (log_time),
-  -- idx_operator_time 覆盖 AI 助手的 listRecentByOperator
-  -- （WHERE operator=? ORDER BY log_time DESC），故单列 idx_operator 已被取代
+  -- idx_operator_time 覆盖「按操作人取最近 n 条」（WHERE operator=? ORDER BY log_time DESC），
+  -- 故单列 idx_operator 已被取代
   INDEX idx_action (action),
   INDEX idx_log_object (org_id, object_type, object_id, log_time),
   INDEX idx_group_time (org_id, log_time),
@@ -308,7 +308,6 @@ CREATE TABLE IF NOT EXISTS user_llm_config (
   temperature DOUBLE,
   timeout INT,
   interpret_enabled TINYINT NOT NULL DEFAULT 1 COMMENT 'AI 解读是否单独用 LLM（0=回退规则）',
-  chat_enabled TINYINT NOT NULL DEFAULT 1 COMMENT 'AI 助手问答是否单独用 LLM（0=回退规则）',
   review_enabled TINYINT NOT NULL DEFAULT 1 COMMENT '复核意见是否单独用 LLM（0=回退规则）',
   term_suggest_enabled TINYINT NOT NULL DEFAULT 1 COMMENT '术语建议是否单独用 LLM（0=回退规则）',
   api_key VARCHAR(1000) COMMENT 'AES-256-GCM 加密后的密文（Base64）',

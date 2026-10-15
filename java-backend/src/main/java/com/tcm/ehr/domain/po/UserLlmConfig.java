@@ -40,11 +40,9 @@ public class UserLlmConfig {
     private Integer timeout;
 
     /**
-     * 分功能的局部开关，缺省为开启。分别对应：病历解读 / 助手问答 / 复核意见 / 术语建议。
+     * 分功能的局部开关，缺省为开启。分别对应：病历解读 / 复核意见 / 术语建议。
      */
     private Boolean interpretEnabled;
-
-    private Boolean chatEnabled;
 
     private Boolean reviewEnabled;
 

@@ -112,7 +112,6 @@ llm:
   timeout: 20000              # 毫秒
   # 分功能的局部开关（启动基线）：总开关开启时逐项生效，关闭项回退规则输出
   interpret-enabled: true     # AI 解读
-  chat-enabled: true          # 助手问答
   review-enabled: true        # 复核意见
   term-suggest-enabled: true  # 术语建议
   # 用户密钥落库加密密钥（AES-256-GCM）。换掉后已加密的 API Key 全部解不开，须当持久密钥保管；

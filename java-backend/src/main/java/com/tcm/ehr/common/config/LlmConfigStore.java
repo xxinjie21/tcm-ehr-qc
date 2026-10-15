@@ -118,7 +118,6 @@ public class LlmConfigStore {
         row.setTemperature(cfg.temperature());
         row.setTimeout(cfg.timeout());
         row.setInterpretEnabled(cfg.interpretEnabled());
-        row.setChatEnabled(cfg.chatEnabled());
         row.setReviewEnabled(cfg.reviewEnabled());
         row.setTermSuggestEnabled(cfg.termSuggestEnabled());
         boolean newKey = cfg.apiKey() != null && !cfg.apiKey().isBlank();
@@ -185,7 +184,7 @@ public class LlmConfigStore {
                 + "|" + row.getEnabled() + "|" + row.getProvider() + "|" + row.getBaseUrl()
                 + "|" + row.getModel() + "|" + row.getTemperature() + "|" + row.getTimeout()
                 + "|" + (row.getApiKey() == null ? 0 : row.getApiKey().length())
-                + "|" + row.getInterpretEnabled() + "|" + row.getChatEnabled()
+                + "|" + row.getInterpretEnabled()
                 + "|" + row.getReviewEnabled() + "|" + row.getTermSuggestEnabled();
     }
 
@@ -209,7 +208,6 @@ public class LlmConfigStore {
                 row.getTemperature() != null ? row.getTemperature() : base.temperature(),
                 row.getTimeout() != null ? row.getTimeout() : base.timeout(),
                 flag(row.getInterpretEnabled(), base.interpretEnabled()),
-                flag(row.getChatEnabled(), base.chatEnabled()),
                 flag(row.getReviewEnabled(), base.reviewEnabled()),
                 flag(row.getTermSuggestEnabled(), base.termSuggestEnabled()));
     }
@@ -245,7 +243,6 @@ public class LlmConfigStore {
                 m.get("temperature") instanceof Number n ? n.doubleValue() : base.temperature(),
                 m.get("timeout") instanceof Number n ? n.intValue() : base.timeout(),
                 m.get("interpretEnabled") instanceof Boolean b ? b : base.interpretEnabled(),
-                m.get("chatEnabled") instanceof Boolean b ? b : base.chatEnabled(),
                 m.get("reviewEnabled") instanceof Boolean b ? b : base.reviewEnabled(),
                 m.get("termSuggestEnabled") instanceof Boolean b ? b : base.termSuggestEnabled());
     }

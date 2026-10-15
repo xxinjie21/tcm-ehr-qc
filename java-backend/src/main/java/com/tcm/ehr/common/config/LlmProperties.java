@@ -49,10 +49,9 @@ public class LlmProperties {
      * 分功能的局部开关：<b>启动基线默认全部开启</b>（只受总开关控制）。
      *
      * <p>关掉其中任意一项，该项 AI 能力回退规则/模板兜底，其余项不受影响 ——
-     * 用户只想让助手问答走模型、而复核意见一律走规则时，不必把整个 LLM 关掉。</p>
+     * 用户只想让解读走模型、而复核意见一律走规则时，不必把整个 LLM 关掉。</p>
      */
     private boolean interpretEnabled = true;
-    private boolean chatEnabled = true;
     private boolean reviewEnabled = true;
     private boolean termSuggestEnabled = true;
 
