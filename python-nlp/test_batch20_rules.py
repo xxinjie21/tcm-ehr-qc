@@ -92,6 +92,13 @@ check('舌红有瘀点',
       [e.content for e in _rules('舌红有瘀点')['tongueList']],
       ['舌红有瘀点'])
 
+# ①b 皮肤病名不得被当舌象（苔藓与舌苔同首字）。2026-10-15 实测存量里有 9 条
+#     苔藓样* 误落进 tongueList，根因就是正则只要求首字是「舌」或「苔」。
+for text in ('苔藓样皮疹', '苔藓样皮损', '苔藓样大减', '苔藓', '扁平苔藓'):
+    check(f'{text}（皮肤病名，不应命中舌象）',
+          [e.content for e in _rules(text)['tongueList']],
+          [])
+
 print()
 print('② 脉位与脉象分开成段')
 check('脉细数，左尺无力',
@@ -184,6 +191,16 @@ _reroute_pulse_tongue(_r)
 check('重复执行不产生重复项',
       ([e.content for e in _r.symptoms], [e.content for e in _r.pulseList]),
       ([], ['脉细数']))
+
+# ⑥ 皮肤病名不许被当舌脉搬走（_PT_BLACKLIST 的「苔藓」前缀）。
+#    模型若把「苔藓样皮疹」标成症状，归位必须把它留在症状里 —— 它是皮肤病，
+#    归到 tongueList 反而会被 EntityTypes 的 countsUnnormalized=false 摘出扣分。
+check('苔藓样皮疹留在症状里',
+      reroute(['苔藓样皮疹', '瘙痒'], tongue=[]),
+      (['苔藓样皮疹', '瘙痒'], [], []))
+check('股藓/扁平苔藓留在症状里',
+      reroute(['股藓', '扁平苔藓', '咽痛']),
+      (['股藓', '扁平苔藓', '咽痛'], [], []))
 
 print()
 if failures:
