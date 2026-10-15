@@ -170,7 +170,13 @@ private int termCount;
         public void setTop(java.util.Map<String, Integer> top) { this.top = top; }
         /** 未归一总数 */
         private int total;
-        /** 抽取碎片：长度过短的残词，责任在抽取侧 */
+        /**
+         * 长度 ≤ 2 的未归一实体。
+         *
+         * <p><b>不是「抽取残字」的判定结果</b> —— 实测这批词里单字 0 条、也没有截断痕迹，
+         * 主体是词表未收录的完整二字症状词（鼻塞、咽痛…）。归属词表侧，见
+         * {@code StandardizationReportServiceImpl.unmatched(...)}。</p>
+         */
         private int fragment;
         /** 分类错放：脉/舌要素进了症状，责任在抽取侧 */
         private int misrouted;

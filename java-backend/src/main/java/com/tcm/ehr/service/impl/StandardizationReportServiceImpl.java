@@ -49,7 +49,15 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class StandardizationReportServiceImpl implements IStandardizationReportService {
 
-    /** 抽取碎片的判定：长度 ≤ 2 的残词（归一不可能命中标准词） */
+    /**
+     * 分桶阈值：长度 ≤ 2 的未归一实体。
+     *
+     * <p><b>它只回答「这条实体短不短」，不回答「是不是抽取截断的残字」。</b>
+     * 原注释写的是「残词（归一不可能命中标准词）」，这个前提已被实测推翻：
+     * 症状词典只有 110 条标准词，而高频未归一 2 字实体恰恰是「鼻塞」「咽痛」「咽痒」
+     * 这类**完整**的症状词 —— 它们是词表没收录，不是归一命不中。分项归属见
+     * {@code unmatched(...)} 的 fragment 分支。</p>
+     */
     private static final int FRAGMENT_MAX_LEN = 2;
     /** 分类错放的前缀：脉/舌 要素不该出现在症状里 */
     private static final String[] MISROUTED_PREFIX = {"脉", "舌"};
@@ -507,7 +515,14 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                         b.setMisrouted(b.getMisrouted() + 1);
                     }
                 } else if (content.length() <= FRAGMENT_MAX_LEN) {
-                    // ② 剩下的短词才是抽取碎片
+                    // ② 长度 ≤ 2 的未归一实体。
+                    //    ⚠️ 这一桶**不是**「抽取截断的残字」—— 2026-10-15 实测：36739 条里
+                    //    单字 0 条、全部 2 字，且每条的 content 与 sourceText 长度完全相等
+                    //    （没有截断痕迹）；去重后 2642 个词一个都不在症状词典，高频项是
+                    //    鼻塞(1473)、咽痛(949)、咽痒(806)、腰酸(780) 这类完整规范的症状词。
+                    //    ⇒ 主体是**词表缺口**（补词即可归一），低频长尾里才混着真残字。
+                    //    按词频硬切两桶不可靠（阈值 3 时残字桶里仍有 遗精/厌食/气促 这类正常词），
+                    //    故保持单桶，由前端如实描述两段构成。
                     b.setFragment(b.getFragment() + 1);
                 } else {
                     // ③ 多为标准词但词表没有 → 词表侧
