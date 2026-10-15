@@ -191,6 +191,11 @@ public interface RecordMapper extends BaseMapper<Record> {
      * <p>{@code DATE_FORMAT(visit_time,'%Y-%m')} 与 {@code LocalDateTime.toString()} 的前 7 位
      * 同为 {@code yyyy-MM}。</p>
      *
+     * <p><b>只留已质控的月份</b>：{@code HAVING COUNT(grade) > 0} —— 某月全部病历都还没质控
+     * （{@code grade} 全 NULL）时该月不出现在趋势里。否则一批刚导入、日期落在更近月份的病历
+     * 会把「最近 12 个月」窗口整体顶到那批未质控的月份上，两条线全压 0、看着像没数据
+     * （2026-10-15 导入 500 条 visit_time 散落到 2025 各月即此况）。</p>
+     *
      * @param wrapper 只含数据域 + 用户筛选的条件，**不含 ORDER BY**
      *                （由 {@link com.tcm.ehr.common.utils.RecordFilter#buildForAggregate} 产出）
      * @return 每行 {@code {month, total, qualified, pendingReview}}，按月份升序
@@ -203,6 +208,7 @@ public interface RecordMapper extends BaseMapper<Record> {
             FROM records
             ${ew.customSqlSegment}
             GROUP BY DATE_FORMAT(visit_time, '%Y-%m')
+            HAVING COUNT(grade) > 0
             ORDER BY month ASC
             """)
     List<Map<String, Object>> selectTrendByMonth(@Param(Constants.WRAPPER) Wrapper<Record> wrapper);
