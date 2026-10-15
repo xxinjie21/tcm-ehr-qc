@@ -43,6 +43,11 @@
           <div class="owner-actions">
             <el-button type="primary" size="small" @click="loadMembers">刷新成员</el-button>
             <el-button size="small" @click="addDialog = true">按用户名拉人</el-button>
+            <!-- 写权限改为「先改后保存」：勾选只改本地暂存，点这里才落库 -->
+            <el-button type="success" size="small" :disabled="!pendingCount" :loading="saving"
+                       @click="savePermissions">
+              保存写权限{{ pendingCount ? `（${pendingCount}）` : '' }}
+            </el-button>
             <!-- 28.19-06：退出组织是破坏性操作，右置并加分隔线，与左侧管理操作分开 -->
             <span class="danger-zone">
               <el-button size="small" type="danger" :loading="leaving" @click="doLeave">退出组织</el-button>
@@ -57,7 +62,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="写权限" width="220">
+            <el-table-column label="写权限" width="260">
               <template #default="{ row }">
                 <template v-if="row.role !== 'owner'">
                   <el-checkbox
@@ -68,6 +73,7 @@
                     :model-value="row.canWriteQcRules === 1"
                     @change="(v) => togglePermission(row, 'qcRules', v)"
                   >质控规则</el-checkbox>
+                  <el-tag v-if="pending[row.userId]" size="small" type="warning" effect="plain">未保存</el-tag>
                 </template>
                 <span v-else class="is-owner">全部</span>
               </template>
@@ -163,7 +169,7 @@
 <script setup>
 // 我的组织：所有者管理成员（按用户名搜索拉人 / 授权 / 移除 / 转让）、成员看组织信息、
 // 未加入组织可自助创建。批次 6 起无审批、无「待加入池」。
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
@@ -190,6 +196,10 @@ const membersForbidden = ref(false)
 const members = ref([])
 const membersLoading = ref(false)
 const leaving = ref(false)
+// 写权限暂存：userId -> { canWriteDictionary?, canWriteQcRules? }，点「保存写权限」才提交
+const pending = reactive({})
+const saving = ref(false)
+const pendingCount = computed(() => Object.keys(pending).length)
 
 const createDialog = ref(false)
 const creating = ref(false)
@@ -229,6 +239,8 @@ const loadMembers = async () => {
   try {
     const res = await listMembers(data.value.org.id)
     members.value = res.data || []
+    // 列表以服务端为准：刷掉未保存的暂存，避免刷新后还挂着「未保存」标记
+    for (const k of Object.keys(pending)) delete pending[k]
   } catch (e) {
     // 拦截器已提示；403 是权限问题（不是网络/服务故障），单独落一格
     if (e?.response?.status === 403) {
@@ -297,17 +309,30 @@ const doAdd = async () => {
   }
 }
 
-const togglePermission = async (row, which, checked) => {
+// 勾选只改本地（行数据 + 暂存），不请求接口；点「保存写权限」才落库。
+const togglePermission = (row, which, checked) => {
+  const field = which === 'dictionary' ? 'canWriteDictionary' : 'canWriteQcRules'
+  row[field] = checked ? 1 : 0
+  const dirty = pending[row.userId] || (pending[row.userId] = {})
+  dirty[field] = checked
+}
+
+// 提交所有暂存的写权限改动；失败保留暂存供重试（拦截器已提示）。
+// 成功后不 loadMembers()：列表接口与授权接口是两条路径，回读会把刚保存的勾冲掉。
+const savePermissions = async () => {
+  const entries = Object.entries(pending)
+  if (!entries.length) return
+  saving.value = true
   try {
-    const body = which === 'dictionary'
-      ? { canWriteDictionary: checked }
-      : { canWriteQcRules: checked }
-    await setPermissions(data.value.org.id, row.userId, body)
-    ElMessage.success('权限已更新')
-    loadMembers()
+    for (const [userId, body] of entries) {
+      await setPermissions(data.value.org.id, userId, body)
+    }
+    ElMessage.success('写权限已保存')
+    for (const k of Object.keys(pending)) delete pending[k]
   } catch {
-    // 拦截器已提示
-    loadMembers()
+    // 拦截器已提示；保留暂存
+  } finally {
+    saving.value = false
   }
 }
 

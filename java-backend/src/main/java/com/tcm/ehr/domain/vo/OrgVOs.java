@@ -53,6 +53,10 @@ public final class OrgVOs {
         private String username;
         private String role;
         private LocalDateTime joinTime;
+        /** 词典写授权：1=已授权 / 0=未授权（前端按 {@code === 1} 渲染开关，缺了它开关永远不亮） */
+        private Integer canWriteDictionary;
+        /** 质控规则写授权：1=已授权 / 0=未授权 */
+        private Integer canWriteQcRules;
     }
 
 

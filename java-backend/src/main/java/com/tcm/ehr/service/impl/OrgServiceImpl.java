@@ -515,6 +515,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             mi.setUsername(u == null ? "(已注销)" : u.getUsername());
             mi.setRole(m.getRole());
             mi.setJoinTime(m.getCreateTime());
+            // 写授权位必须回带：前端开关的 model-value 依赖它，缺了开关永远显示未开启
+            mi.setCanWriteDictionary(m.getCanWriteDictionary());
+            mi.setCanWriteQcRules(m.getCanWriteQcRules());
             out.add(mi);
         }
         return out;

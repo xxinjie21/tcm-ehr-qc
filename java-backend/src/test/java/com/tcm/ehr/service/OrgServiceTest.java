@@ -356,10 +356,16 @@ class OrgServiceTest {
     @Test
     void membersBackfillUsernamesFromBatchLookup() {
         bindOwnerOfG1();
+        OrganizationMember bob = member("m2", "g1", "u-b", OrganizationMember.ROLE_MEMBER);
+        bob.setCanWriteDictionary(1);
+        bob.setCanWriteQcRules(0);
+        OrganizationMember gone = member("m3", "g1", "u-gone", OrganizationMember.ROLE_MEMBER);
+        gone.setCanWriteDictionary(0);
+        gone.setCanWriteQcRules(0);
         when(memberMapper.selectList(any())).thenReturn(List.of(
                 member("m1", "g1", "u-owner", OrganizationMember.ROLE_OWNER),
-                member("m2", "g1", "u-b", OrganizationMember.ROLE_MEMBER),
-                member("m3", "g1", "u-gone", OrganizationMember.ROLE_MEMBER)));
+                bob,
+                gone));
         // IN 批量只回两条：u-gone 查不到（账号已删）
         when(userMapper.selectBatchIds(any())).thenReturn(List.of(
                 user("u-owner", "owner1", User.STATUS_ACTIVE),
@@ -368,6 +374,9 @@ class OrgServiceTest {
         List<OrgVOs.MemberInfo> out = service.members("g1");
 
         assertEquals(3, out.size(), "成员条数不变");
+        // 写授权位必须回带，否则前端开关 model-value 永远是 false（永远显示未开启）
+        assertEquals(1, out.get(1).getCanWriteDictionary(), "成员词典写授权应回带给前端");
+        assertEquals(0, out.get(1).getCanWriteQcRules(), "成员质控规则写授权应回带给前端");
         assertEquals("owner1", out.get(0).getUsername());
         assertEquals("bob", out.get(1).getUsername());
         assertEquals("(已注销)", out.get(2).getUsername(), "IN 查不回来的账号仍给「(已注销)」");
