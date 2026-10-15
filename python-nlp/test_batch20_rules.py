@@ -13,6 +13,7 @@
 ② 脉位与脉象分开成段（`脉细数，左尺无力` → 两条）
 ③ 词典对真实片段**精确命中**，不出现有损的二层包含匹配
    （`苔黄燥少津` → `黄苔` 会把「燥、少津」两个子要素丢掉）
+④ 脉象 / 舌象要素不留在 `symptoms` 里（`_reroute_pulse_tongue`）
 """
 import json
 import os
@@ -22,9 +23,11 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'python-nlp'))
 
-from main import _rules  # noqa: E402
+from main import Entity, ExtractResponse, _reroute_pulse_tongue, _rules  # noqa: E402
 
-DICT_DIR = os.path.join(ROOT, 'data', 'dictionaries')
+# 词典的权威位置在 Java 侧 resources 下（原 data/dictionaries 已不存在，
+# 路径没跟着搬导致本文件的 ⑤ 段长期以 FileNotFoundError 中断）。
+DICT_DIR = os.path.join(ROOT, 'java-backend', 'src', 'main', 'resources', 'dictionaries')
 failures = []
 
 
@@ -132,6 +135,55 @@ for text in ('脉细数，左尺无力', '脉弦劲有力，左关尤甚', '脉�
         if lv != 1:
             failures.append(f'脉象 {e.content} 非精确命中 -> {std} (L{lv})')
         print(f'  {"OK " if lv == 1 else "BAD"} 脉象 {e.content!r} -> {std!r} (L{lv})')
+
+print()
+print('⑥ 脉象 / 舌象要素不留在 symptoms 里（_reroute_pulse_tongue）')
+
+
+def _ent(content, source='model'):
+    return Entity(content=content, sourceText=content, source=source)
+
+
+def reroute(symptoms, pulse=(), tongue=()):
+    """构造一个只含三类的响应，跑一遍归位，返回 (symptoms, pulseList, tongueList)。"""
+    r = ExtractResponse()
+    r.symptoms = [_ent(c) for c in symptoms]
+    r.pulseList = [_ent(c, 'rule') for c in pulse]
+    r.tongueList = [_ent(c, 'rule') for c in tongue]
+    _reroute_pulse_tongue(r)
+    return ([e.content for e in r.symptoms],
+            [e.content for e in r.pulseList],
+            [e.content for e in r.tongueList])
+
+
+# ① 模型把脉/舌标成「症状」，规则侧也抽到了同一个词 → 只留脉象/舌象一处，不重复
+check('脉细数已在脉象里 + 症状里也有',
+      reroute(['脉细数', '胸闷'], pulse=['脉细数']),
+      (['胸闷'], ['脉细数'], []))
+
+# ② 规则没抽到（模型漏放）：移动而不是丢弃 —— 实测这类占错放项的 59%
+check('脉沉细只在症状里（规则没抽到）',
+      reroute(['脉沉细', '纳差']),
+      (['纳差'], ['脉沉细'], []))
+
+# ③ 舌象同理
+check('舌红少苔只在症状里',
+      reroute(['舌红少苔', '咽痛']),
+      (['咽痛'], [], ['舌红少苔']))
+
+# ④ 正常症状一个都不能少（不能被误伤）
+check('正常症状全部保留',
+      reroute(['鼻塞', '咽痛', '腰酸', '恶寒']),
+      (['鼻塞', '咽痛', '腰酸', '恶寒'], [], []))
+
+# ⑤ 已归位过的不会二次重复（幂等）
+_r = ExtractResponse()
+_r.symptoms = [_ent('脉细数')]
+_r.pulseList = [_ent('脉细数', 'rule')]
+_reroute_pulse_tongue(_r)
+check('重复执行不产生重复项',
+      ([e.content for e in _r.symptoms], [e.content for e in _r.pulseList]),
+      ([], ['脉细数']))
 
 print()
 if failures:

@@ -1,7 +1,9 @@
 """中医电子病历 NLP 结构化抽取服务（成员B）。
 
 FastAPI 服务，加载 Monor/hwtcmner（RoBERTa，13 标签 BIO）做 NER，
-叠加规则兜底（舌象 / 脉象 / 病因 / 治法）与中药剂量正则，输出 9 类结构化结果。
+叠加规则兜底（舌象 / 脉象 / 病因 / 治法）与中药剂量正则，输出 9 类结构化结果；
+最后把误落进「症状」的脉象 / 舌象要素归位到 `pulseList` / `tongueList`
+（模型没有这两类标签，见 `_reroute_pulse_tongue`）。
 
 运行：
     uvicorn main:app --host 127.0.0.1 --port 8001
@@ -388,4 +390,45 @@ def extract(req: ExtractRequest):
     rules = _rules(text)
     for f in ("tongueList", "pulseList", "causeList", "treatmentList"):
         getattr(resp, f).extend(rules[f])
+    # 3. 症状去脉/舌：把误落进 symptoms 的脉象 / 舌象要素归位
+    _reroute_pulse_tongue(resp)
     return resp
+
+
+def _reroute_pulse_tongue(resp: ExtractResponse) -> None:
+    """把落在 `symptoms` 里的脉象 / 舌象要素移回 `pulseList` / `tongueList`。
+
+    为什么需要这一步：`LABEL_FIELD` 只有 病名/症状/证型/方剂/本草 五个模型标签
+    （模型能输出的标签集就是这 5 个，见其注释），**没有「脉象」「舌象」** ——
+    模型遇到「脉细数」只能把它标成「症状」。而规则侧（`_rules`）又会把同一批词
+    收进 `pulseList` / `tongueList`，于是同一条要素两处都有：
+
+    * 症状归一率的分子分母被这批词拉低（它们本不属于症状）；
+    * 后端质量报告会把它统计成「脉象、舌象被当成症状」的错放（实测 3978 条）；
+    * `EntityTypes` 声明舌象/脉象 `countsUnnormalized=false`（不该计未归一扣分），
+      可它们落在 `symptoms` 里（该列是 true）⇒ 反而被算进了「术语未标准化」扣分。
+
+    **移动而不是丢弃**：规则没抽到的那部分脉/舌要素（实测占错放项的 59%）原本
+    只存在于 `symptoms`，直接删会连抽取结果一起丢掉。
+
+    判据「以『脉』/『舌』开头」与 Java 侧报告
+    `StandardizationReportServiceImpl.MISROUTED_PREFIX` 保持一致 —— 同一件事
+    不能在两侧各写一套口径。
+    """
+    kept: List[Entity] = []
+    for e in resp.symptoms:
+        c = (e.content or e.sourceText or "").strip()
+        if c.startswith("脉"):
+            _append_unique_by_content(resp.pulseList, e, c)
+        elif c.startswith("舌"):
+            _append_unique_by_content(resp.tongueList, e, c)
+        else:
+            kept.append(e)
+    resp.symptoms = kept
+
+
+def _append_unique_by_content(target: List[Entity], entity: Entity, content: str) -> None:
+    """按 `content` 去重追加：规则侧已经抽到的同一个脉/舌要素不再重复登记。"""
+    if any((x.content or x.sourceText or "").strip() == content for x in target):
+        return
+    target.append(entity)
