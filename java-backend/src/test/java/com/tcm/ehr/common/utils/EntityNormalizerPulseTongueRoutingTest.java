@@ -113,4 +113,41 @@ class EntityNormalizerPulseTongueRoutingTest {
 
         assertEquals(2, vo.getSymptoms().size(), "词典里的单字标准词不能被当成残词删掉");
     }
+
+    /**
+     * 2026-10-15 补：省略「脉」「舌」前缀的舌脉要素（尺沉、尖红）同样要归位。
+     *
+     * <p>实测这批在存量里还有 850 条 / 799 条记录。Python 侧抓不到前缀之外的写法，
+     * 落库后只能靠这里按词典命中兜底 —— 若这条守护失效，症状归一率会被它们无谓拉低。</p>
+     */
+    @Test
+    void prefixlessPulseTongueTermIsMovedToo() {
+        NlpExtractVO vo = voWithSymptoms("尺沉", "尖红", "头晕");
+        svc(Map.of("pulse", Set.of("尺沉"), "tongue", Set.of("尖红"), "symptom", Set.of("头晕")))
+                .normalize(vo, ORG);
+
+        assertEquals(List.of("尺沉"), contents(vo.getPulseList()),
+                "尺/寸/关 打头的是脉诊三部，命中脉典就该归位");
+        assertEquals(List.of("尖红"), contents(vo.getTongueList()),
+                "尖/根/苔 打头的是舌诊专名，命中舌典就该归位");
+        assertEquals(List.of("头晕"), contents(vo.getSymptoms()), "真症状必须留在 symptoms");
+    }
+
+    /**
+     * 省略前缀的舌脉要素**不限两字**：实测存量里 3~7 字的描述性短语占多数
+     * （根部厚腻 129、尺后偏沉 62）。同时守住两个实测踩出来的前缀撞车坑 ——
+     * 尺肤热是尺部皮肤（诊断体征，非脉象），关节痛是规范症状。
+     */
+    @Test
+    void longPrefixlessPulseTongueTermIsMovedToo() {
+        NlpExtractVO vo = voWithSymptoms("根部略厚腻", "尺肤热", "关节痛", "头晕");
+        svc(Map.of("tongue", Set.of("根部略厚腻"), "symptom", Set.of("头晕")))
+                .normalize(vo, ORG);
+
+        assertEquals(List.of("根部略厚腻"), contents(vo.getTongueList()),
+                "舌诊专名打头的长短语同样是舌象，应归位");
+        assertEquals(List.of("尺肤热", "关节痛", "头晕"), contents(vo.getSymptoms()),
+                "尺肤热/关节痛 是症状域真词，不许被当舌脉挪走");
+        assertEquals(0, vo.getPulseList().size(), "pulseList 不该凭空多出内容");
+    }
 }

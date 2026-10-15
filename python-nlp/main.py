@@ -395,6 +395,40 @@ def extract(req: ExtractRequest):
     return resp
 
 
+# ---- 舌脉要素判据（与 Java 侧 StandardizationReportServiceImpl.MISROUTED_PREFIX
+#      + tools/reroute-pulse-tongue-stored.py 三处同口径：同一件事不能各写一套）----
+# 模型没有脉象/舌象标签，这两类要素会落进 symptoms。带「脉」「舌」前缀的自不必说，
+# 还有一批**书写时省略了前缀**的：
+#   脉诊三部 —— 尺/寸/关 打头（尺沉、寸浮、关缓）。三部是脉诊专名，症状域不会用，
+#              故可无歧义判定。
+#   舌诊专名 —— 尖/根/苔 打头（尖红=舌尖红、根苔=舌根苔、苔平）。同理。
+# 这类省略写法**不限两字**：实测存量里 3~7 字的描述性短语反而居多
+# （尺偏沉 124、根部厚腻 129、寸后及关前反中取明显 6），只判两字会漏掉 3057 条。
+_PULSE_HEADS = ("尺", "寸", "关")
+_TONGUE_HEADS = ("尖", "根", "苔")
+_PT_HEADS = _PULSE_HEADS + _TONGUE_HEADS
+# 既无前缀、首字也不属于上述专名的脉象组合词，逐个列（都是「脉象」的固定合称）
+_PT_WHITELIST = ("动惕", "动剔", "弦滑", "浮滑", "浮数")
+# 首字撞上专名但**语义不是舌脉**的前缀，一律排除（踩过的坑，均为症状域真词）：
+#   关节 —— 关节痛/关节怕冷/关节屈伸不利 等，实测 90+ 个不同写法都在症状里；
+#   尺肤 —— 尺部皮肤（诊断体征），尺肤热/尺肤凉/尺肤粘，与脉象是两回事；
+#   苔藓 —— 皮肤病（苔藓/苔藓样皮损），不是舌苔；
+#   尖锐 —— 声音/湿疣等义（尖锐声），脉象里没有「尖锐」。
+_PT_BLACKLIST = ("关节", "尺肤", "苔藓", "尖锐")
+
+
+def _is_pulse_tongue(content: str) -> bool:
+    """该实体是不是脉象/舌象要素（不管带不带「脉」「舌」前缀）。"""
+    if not content or content.startswith(_PT_BLACKLIST):
+        return False
+    if content.startswith(("脉", "舌")):
+        return True
+    if content.startswith(_PT_HEADS):
+        # 抽取噪声（如 "尺>"、"寸及"、"关尺>寸"）：含非汉字的一律不当舌脉
+        return all("\u4e00" <= ch <= "\u9fff" for ch in content)
+    return content in _PT_WHITELIST
+
+
 def _reroute_pulse_tongue(resp: ExtractResponse) -> None:
     """把落在 `symptoms` 里的脉象 / 舌象要素移回 `pulseList` / `tongueList`。
 
@@ -411,19 +445,20 @@ def _reroute_pulse_tongue(resp: ExtractResponse) -> None:
     **移动而不是丢弃**：规则没抽到的那部分脉/舌要素（实测占错放项的 59%）原本
     只存在于 `symptoms`，直接删会连抽取结果一起丢掉。
 
-    判据「以『脉』/『舌』开头」与 Java 侧报告
-    `StandardizationReportServiceImpl.MISROUTED_PREFIX` 保持一致 —— 同一件事
-    不能在两侧各写一套口径。
+    判据见 {@code _is_pulse_tongue}：除「脉」「舌」前缀外，还覆盖书写时省略前缀的
+    脉诊三部（尺/寸/关）与舌诊专名（尖/根/苔），且不限于两字 —— 2026-10-15 实测
+    这批无前缀的共 3057 条 / 2384 条记录（其中 2 字词 850 条，3 字以上 2207 条），
+    只判两字会漏掉三分之二。
     """
     kept: List[Entity] = []
     for e in resp.symptoms:
         c = (e.content or e.sourceText or "").strip()
-        if c.startswith("脉"):
-            _append_unique_by_content(resp.pulseList, e, c)
-        elif c.startswith("舌"):
+        if not _is_pulse_tongue(c):
+            kept.append(e)
+        elif c.startswith(("舌", "尖", "根", "苔")):
             _append_unique_by_content(resp.tongueList, e, c)
         else:
-            kept.append(e)
+            _append_unique_by_content(resp.pulseList, e, c)
     resp.symptoms = kept
 
 

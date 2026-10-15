@@ -59,8 +59,62 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * {@code unmatched(...)} 的 fragment 分支。</p>
      */
     private static final int FRAGMENT_MAX_LEN = 2;
-    /** 分类错放的前缀：脉/舌 要素不该出现在症状里 */
-    private static final String[] MISROUTED_PREFIX = {"脉", "舌"};
+    /**
+     * 分类错放：脉象/舌象要素不该出现在症状里。
+     *
+     * <p>判据除「脉」「舌」前缀外，还覆盖<b>书写时省略了前缀</b>的两类 ——
+     * 脉诊三部（尺/寸/关 打头：尺沉、寸浮、关缓）与舌诊专名（尖/根/苔 打头：
+     * 尖红=舌尖红、根苔=舌根苔、苔平）。三部与舌诊专名都是脉诊/舌诊的固定用语，
+     * 症状域不会出现，故可无歧义判定，且**不限字数**（实测 3~7 字的描述性短语
+     * 反而居多：根部厚腻 129、尺后偏沉 62）。2026-10-15 实测这批无前缀的共
+     * 3057 条 / 2384 条记录。只判前缀时它们会掉进 {@link #unmatched} 的
+     * fragment 桶与 dictionaryGap 桶，被误当成「词表缺口的二字症状词」——
+     * 而那两桶其实是舌脉要素，补症状词是补错了方向。</p>
+     *
+     * <p>与 Python 侧 {@code python-nlp/main.py#_is_pulse_tongue} 及
+     * {@code tools/reroute-pulse-tongue-stored.py} 三处同口径：同一件事不能各写一套。
+     * 那里额外排除了「关节」「尺肤」「苔藓」「尖锐」四个首字撞上的症状域真词，
+     * 以及含非汉字的抽取噪声 —— 本处同样排除，见 {@link #MISROUTED_EXCLUDE}。</p>
+     */
+    private static final String[] MISROUTED_PREFIX = {
+            "脉", "舌",                 // 带前缀
+            "尺", "寸", "关",           // 脉诊三部（省略「脉」）
+            "尖", "根", "苔"            // 舌诊专名（省略「舌」）
+    };
+    /**
+     * 首字撞上脉诊三部 / 舌诊专名，但<b>确实是症状</b>的前缀，一律不当错放。
+     *
+     * <p>四个都是实测踩出来的坑（首字撞上，语义却属症状域）：</p>
+     * <ul>
+     *   <li><b>关节</b> —— 关节痛 / 关节怕冷 / 关节屈伸不利 …… 实测症状里有 90+
+     *       个不同写法（关节痛 一条 164 次），是量最大的一类；</li>
+     *   <li><b>尺肤</b> —— 尺部皮肤，诊断体征（尺肤热 / 尺肤凉 / 尺肤粘），
+     *       与脉象是两回事；</li>
+     *   <li><b>苔藓</b> —— 皮肤病（苔藓 / 苔藓样皮损），不是舌苔；</li>
+     *   <li><b>尖锐</b> —— 声音 / 湿疣等义（尖锐声），脉象里没有「尖锐」。</li>
+     * </ul>
+     * <p>误判会把真症状判成「不可归一」：症状归一率虚高、错放数虚高，
+     * 两边都是假信号。口径与 Python 侧 {@code _PT_BLACKLIST} 完全一致。</p>
+     */
+    private static final String[] MISROUTED_EXCLUDE = {"关节", "尺肤", "苔藓", "尖锐"};
+
+    /**
+     * 该未归一症状实体是否是「脉象/舌象要素错放进了症状」。
+     *
+     * <p>与抽取侧 {@code _is_pulse_tongue} 同口径（都不限字数），
+     * 只多一层保险：抽取侧靠第二字是否汉字挡噪声，统计侧靠
+     * {@link #MISROUTED_EXCLUDE} 挡首字撞车的症状域真词。</p>
+     */
+    private boolean isMisrouted(String content) {
+        if (startsWithAny(content, MISROUTED_EXCLUDE)
+                || !startsWithAny(content, MISROUTED_PREFIX)) {
+            return false;
+        }
+        // 含非汉字的抽取噪声（实测「关尺>寸」这类夹了比较符号的）不当舌脉，
+        // 与抽取侧 _is_pulse_tongue 的汉字门同口径 —— 否则报告会把它算成错放，
+        // 而抽取侧又不会去修，两边数字永远对不上。
+        return content.chars().allMatch(ch -> ch >= 0x4e00 && ch <= 0x9fff);
+    }
     /** 体征错放的关键字：属体征而非症状 */
     private static final String[] PHYSICAL_SIGN = {"压痛", "触痛", "叩痛", "反跳痛"};
     /** 有意保留在页面上的声明，防止报告被当成科研级准确率引用 */
@@ -333,7 +387,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         if (content.isEmpty() || content.length() <= FRAGMENT_MAX_LEN) {
             return false;
         }
-        return !startsWithAny(content, MISROUTED_PREFIX) && !containsAny(content, PHYSICAL_SIGN);
+        return !isMisrouted(content) && !containsAny(content, PHYSICAL_SIGN);
     }
 
     private String pct(int part, int total) {
@@ -505,9 +559,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     content = str(m.get("sourceText"));
                 }
                 b.setTotal(b.getTotal() + 1);
-                // ① 具名错放优先：含体征关键字，或以脉/舌开头
+                // ① 具名错放优先：含体征关键字，或判为脉/舌错放
                 boolean namedMisroute = containsAny(content, PHYSICAL_SIGN)
-                        || startsWithAny(content, MISROUTED_PREFIX);
+                        || isMisrouted(content);
                 if (namedMisroute) {
                     if (containsAny(content, PHYSICAL_SIGN)) {
                         b.setPhysicalSign(b.getPhysicalSign() + 1);
@@ -558,7 +612,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 if (content.isEmpty()) {
                     continue;
                 }
-                boolean defect = startsWithAny(content, MISROUTED_PREFIX)
+                boolean defect = isMisrouted(content)
                         || containsAny(content, PHYSICAL_SIGN)
                         || content.length() <= FRAGMENT_MAX_LEN;
                 if (defect || !isInDict(content, symptomDict)) {

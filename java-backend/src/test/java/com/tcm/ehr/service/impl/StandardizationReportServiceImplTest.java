@@ -138,6 +138,42 @@ class StandardizationReportServiceImplTest {
     }
 
     @Test
+    @DisplayName("无前缀舌脉要素归分类错放，但前缀撞车的真症状不能误判")
+    void prefixlessPulseTongueIsMisroutedButOverlappingPrefixesAreNot() {
+        // 尺/寸/关、尖/根/苔 是脉诊三部与舌诊专名，症状域不会出现，且不限字数；
+        // 但 关节/尺肤/苔藓/尖锐 是首字撞上的症状域真词，一律不能误判
+        givenRecords("{\"symptoms\":["
+                + entity("尺沉", "尺沉", false) + ","
+                + entity("寸浮", "寸浮", false) + ","
+                + entity("尖红", "尖红", false) + ","
+                + entity("苔薄白", "苔薄白", false) + ","
+                + entity("根部略厚腻", "根部略厚腻", false) + ","
+                + entity("关节痛", "关节痛", false) + ","
+                + entity("关节屈伸不利", "关节屈伸不利", false) + ","
+                + entity("尺肤热", "尺肤热", false) + ","
+                + entity("苔藓", "苔藓", false) + ","
+                + entity("尖锐声", "尖锐声", false) + "]}");
+
+        StandardizationReportVO.UnmatchedBreakdown b = svc.report().getUnmatched();
+
+        assertEquals(5, b.getMisrouted(), "省略前缀的脉舌要素（含 3 字以上）应归分类错放");
+        assertEquals(4, b.getDictionaryGap(),
+                "关节痛/关节屈伸不利/尺肤热/尖锐声 是规范症状，应归词表缺口而非错放");
+        assertEquals(1, b.getFragment(), "「苔藓」只有 2 字落入碎片桶，但绝不能算错放");
+    }
+
+    /** 含非汉字的抽取噪声（实测「关尺>寸」这类夹了比较符号的）不算错放，与抽取侧同口径 */
+    @Test
+    @DisplayName("夹了比较符号的抽取噪声不算脉/舌错放")
+    void noisyContentWithSymbolIsNotMisrouted() {
+        givenRecords("{\"symptoms\":[" + entity("关尺>寸", "关尺>寸", false) + "]}");
+
+        StandardizationReportVO.UnmatchedBreakdown b = svc.report().getUnmatched();
+
+        assertEquals(0, b.getMisrouted(), "非汉字噪声不是舌脉要素，算错放会让报告数字虚高");
+    }
+
+    @Test
     @DisplayName("可归一实体归一率：词表里没有的标准词不进分母")
     void normalizableRateExcludesDictionaryGap() {
         // 词表为空（mock 返回空），所以「发热」也不在词表内 → 分母应为 0
