@@ -15,9 +15,6 @@ public enum AiFeature {
     /** 病历解读 */
     INTERPRET("interpret", "AI 解读"),
 
-    /** 业务助手问答 */
-    CHAT("chat", "助手"),
-
     /** 复核预检意见 */
     REVIEW("review", "复核意见"),
 

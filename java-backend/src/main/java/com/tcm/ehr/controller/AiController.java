@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AI 消费端接口：质控解读、助手问答、复核预检。
+ * AI 消费端接口：质控解读、复核预检、术语补词。
  *
  * <p>读病历受组织数据域约束；LLM 不可用时降级为规则输出，不阻塞也不外泄底层异常。</p>
  */
@@ -63,40 +63,35 @@ public class AiController {
     /**
      * 异步提交一次 AI 生成（批次 15 · 15.1）。
      *
-     * <p>与三个同步接口**同一套校验**，只是把「等 LLM 生成」搬到专用线程池：请求线程立即返回
+     * <p>与同步接口**同一套校验**，只是把「等 LLM 生成」搬到专用线程池：请求线程立即返回
      * 202 + 任务号，前端轮询 {@code GET /api/ai/async/{taskId}}。这样长响应不再占请求线程，
      * 用户也可以离开页面再回来取结果（15.2 的「可离开页面」）。</p>
      *
-     * <p>同步接口保留不动：调用方按需选择，向后兼容。</p>
+     * <p>同步接口保留不动：调用方按需选择，向后兼容。termsuggest 只有异步这一条路。</p>
      *
-     * @param kind interpret | chat | review | termsuggest
+     * @param kind interpret | review | termsuggest
      * @return 202 + {taskId}
      */
     @PostMapping("/async/{kind}")
     public ResponseEntity<Result<Map<String, String>>> submitAsync(@PathVariable String kind,
                                                                   @Valid @RequestBody AiQueryDTO dto) {
-        if (!List.of("interpret", "chat", "review", "termsuggest").contains(kind)) {
+        if (!List.of("interpret", "review", "termsuggest").contains(kind)) {
             return ResponseEntity.badRequest().body(Result.error(400, "不支持的 AI 动作"));
         }
         // 与同步接口同一套必填校验：缺参数当场 400，不丢进任务里让用户等一轮才知道。
-        // termsuggest 不看病历，校验的是待规范词表；其余三个端点必填 recordId。
+        // termsuggest 不看病历，校验的是待规范词表；interpret / review 必填 recordId。
         if ("termsuggest".equals(kind)) {
             if (dto == null || dto.getTerms() == null || dto.getTerms().isEmpty()) {
                 return ResponseEntity.badRequest().body(Result.error(400, "请提供待规范的术语"));
             }
-        } else if (!"chat".equals(kind)
-                && (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank())) {
+        } else if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
-        }
-        if ("chat".equals(kind) && (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank())) {
-            return ResponseEntity.badRequest().body(Result.error(400, "请输入问题"));
         }
         // 限流放在真正的开销之前：参数非法（400）不计额度，避免「打错字」被算成滥用
         guardAiRate();
         String taskId = aiAsyncTasks.submit(() -> {
             AiReplyVO r = switch (kind) {
                 case "interpret" -> aiService.interpret(dto);
-                case "chat" -> aiService.chat(dto);
                 case "termsuggest" -> aiService.suggestTerms(dto);
                 default -> aiService.review(dto);
             };
@@ -153,24 +148,6 @@ public class AiController {
             return ResponseEntity.status(404).body(Result.error(1006, "病历不存在"));
         }
         return ResponseEntity.ok(Result.ok(vo));
-    }
-
-    /**
-     * 业务问答。
-     *
-     * <p>【权限：登录即可】技术实现类问题按兜底拒答，不回答系统内部细节；问题为空返回 400。</p>
-     *
-     * @param dto question=问题文本（必填）；recordId=可选，命中"这份病历…"类问题时带上下文
-     * @return answer=回答正文；source=rule/llm；llmAvailable=LLM 是否可用
-     */
-    @PostMapping("/chat")
-    public ResponseEntity<Result<AiReplyVO>> chat(@Valid @RequestBody AiQueryDTO dto) {
-        // 1. 问题必填；2. 问答永不返回 null，兜底答案也是结果
-        if (dto == null || dto.getQuestion() == null || dto.getQuestion().isBlank()) {
-            return ResponseEntity.badRequest().body(Result.error(400, "请输入问题"));
-        }
-        guardAiRate();
-        return ResponseEntity.ok(Result.ok(aiService.chat(dto)));
     }
 
     /**

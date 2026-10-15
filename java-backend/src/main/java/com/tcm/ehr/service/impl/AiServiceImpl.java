@@ -12,7 +12,6 @@ import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.EsTermNormalizer;
 import com.tcm.ehr.domain.dto.AiQueryDTO;
-import com.tcm.ehr.domain.po.OperationLog;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.AiReplyVO;
@@ -20,8 +19,6 @@ import com.tcm.ehr.domain.vo.ScoreResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IAiService;
 import com.tcm.ehr.service.IDictionaryTermStore;
-import com.tcm.ehr.service.ILogService;
-import com.tcm.ehr.service.IStatsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,12 +27,11 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.time.format.DateTimeFormatter;
 
 /**
  * AI 消费端服务实现。
  *
- * <p>规则优先：解读结论、降级问答由规则产出；LLM 只做叙述增强，异常/不可用一律降级，
+ * <p>规则优先：解读结论由规则产出；LLM 只做叙述增强，异常/不可用一律降级，
  * 绝不阻塞主流程（与 LlmClient 约定一致）。读取受组织数据域约束。</p>
  */
 @Slf4j
@@ -48,31 +44,10 @@ public class AiServiceImpl implements IAiService {
             "diseases", "symptoms", "tongueList", "pulseList", "patternList",
             "causeList", "treatmentList", "formulaList", "herbs");
 
-    /** 技术实现类问题关键词——命中即兜底拒答（面向使用者，不答实现细节） */
-    private static final List<String> TECH_KEYWORDS = List.of(
-            "技术实现", "实现细节", "怎么实现", "如何实现", "代码", "源码", "框架", "spring", "vue",
-            "数据库", "sql", "表结构", "接口", "api", "部署", "docker", "redis", "nginx", "架构", "算法实现");
-
-    private static final String TECH_REFUSAL = "这属于系统实现细节，建议查看设计文档或咨询开发同学。";
-
-    /** 操作日志时间格式*/
-    private static final DateTimeFormatter LOG_TS = DateTimeFormatter.ofPattern("MM-dd HH:mm");
-
-    private static final String KNOWLEDGE_FLOW =
-            "业务主线：原始病历 → 接入 → 结构化解析 → 术语归一 → 质控判定 → 人工复核 → 清洗导出 → 统计评估。";
-    private static final String KNOWLEDGE_FUNCTION =
-            "系统功能：病历导入/查询、NLP 结构化解析、质控评分（完整性/逻辑冲突/格式/术语标准化/重复五类扣分，分级为合格/待复核/无效）、"
-            + "人工复核（7 个工作日时限）、数据清洗与术语归一（精确/包含/模糊三级）、标准数据集导出、术语词典管理、日志审计。";
-    private static final String KNOWLEDGE_STANDARD =
-            "术语标准化依据：系统内置术语词典（疾病/证候/症状/中药/方剂/舌象/脉象/治法各一本参考工具书，"
-            + "出处见项目文档统一声明）；归一命中分精确/包含/模糊三级。";
-
     /** 病历只读表：按统一口径命名为 baseMapper（附录 A.1 #21） */
     private final RecordMapper baseMapper;
-    private final IStatsService statsService;
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
-    private final ILogService logService;
     private final com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
     /** 词表读取（术语补词建议的召回来源）；与词典页、归一链路同一份 effective 视图 */
     private final IDictionaryTermStore termStore;
@@ -310,188 +285,6 @@ public class AiServiceImpl implements IAiService {
         return hints;
     }
 
-    // ------------------------------------------------------------------ 3.2 问答
-
-    /**
-     * 问答：命中技术实现类关键词直接兜底拒答；否则拼业务上下文交给 LLM，失败降级为规则答案。
-     *
-     * <p>支持追问：{@code history} 为上文对话，一并进 prompt。</p>
-     *
-     * @param dto 含 question（必填）与可选 history / recordId
-     * @return 回答与来源（rule / llm）
-     */
-    @Override
-    public AiReplyVO chat(AiQueryDTO dto) {
-        String question = dto == null ? "" : nz(dto.getQuestion()).trim();
-        AiReplyVO vo = new AiReplyVO();
-
-        if (question.isEmpty()) {
-            throw new IllegalArgumentException("question不能为空");
-        }
-
-        // 1. 命中技术实现类关键词就兜底拒答：这类问题不该由业务助手回答
-        String lower = question.toLowerCase();
-        if (TECH_KEYWORDS.stream().anyMatch(k -> lower.contains(k.toLowerCase()))) {
-            vo.setAnswer(TECH_REFUSAL);
-            vo.setSource("rule");
-            vo.setLlmAvailable(llmClient.isAvailable());
-            return vo;
-        }
-
-        // 2. 拼业务上下文 + 上文对话，一起交给模型
-        String context = buildContext(question, dto == null ? null : dto.getRecordId());
-        String history = dto == null ? null : dto.getHistory();
-        String historyBlock = (history == null || history.isBlank())
-                ? "" : "\n\n【上文对话】\n" + history.trim();
-        String raw = llmClient.chat(AiFeature.CHAT, LlmClient.AI_CHAT_SYSTEM_PROMPT,
-                "【业务上下文】\n" + context + historyBlock + "\n\n【使用者问题】\n" + question);
-        boolean llmOk = raw != null && !raw.isBlank();
-        vo.setLlmAvailable(llmOk);
-        // 3. 模型不可用时退到规则答案（从已拼好的上下文里摘一段）
-        if (llmOk) {
-            vo.setAnswer(raw.trim());
-            vo.setSource("llm");
-        } else {
-            vo.setAnswer(ruleAnswer(question, context));
-            vo.setSource("rule");
-        }
-        return vo;
-    }
-
-    /** 规则检索：按问题关键词注入 stats / 当前病历 / 归一 / 知识；找不到就注入知识+提示 */
-    private String buildContext(String question, String recordId) {
-        // 按 5 个语义块独立取，再按固定顺序拼接（与原实现的命中顺序逐字一致）；
-        // 全部未命中才回落到「功能与流程」，别让模型空答（P3.4 拆分）
-        // 病历只加载一次、只解析一次，向下传给两个用到的块（P2-14）：
-        // recordId 为空时 load 立即返回 null，不产生额外查询
-        Record r = load(recordId);
-        Map<String, Object> data = r == null ? Map.of() : structured(r);
-        String all = statsBlock(question)
-                + standardBlock(question, r, data)
-                + currentRecordBlock(question, r, data)
-                + knowledgeBlock(question)
-                + myLogsBlock(question);
-        if (all.isEmpty()) {
-            return "【知识】" + KNOWLEDGE_FUNCTION + "\n" + KNOWLEDGE_FLOW + "\n";
-        }
-        return all;
-    }
-
-    /** 块 1：统计类问题 → 看板指标；未命中返回 "" */
-    private String statsBlock(String question) {
-        if (!containsAny(question, "合格率", "合格", "待复核", "无效", "记录数", "病历数", "总数", "统计", "构成")) {
-            return "";
-        }
-        var ov = statsService.overview();
-        return new StringBuilder()
-                .append("【看板统计】全库病历 ").append(ov.getTotalRecords()).append(" 条：合格 ")
-                .append(ov.getQualifiedCount()).append("（").append(ov.getQualifiedRate()).append("%）、待复核 ")
-                .append(ov.getPendingReviewCount()).append("、无效 ").append(ov.getInvalidCount()).append("。\n")
-                .toString();
-    }
-
-    /**
-     * 块 2：归一/标准类问题 → 标准依据 + 当前病历命中分布；未命中返回 ""。
-     *
-     * <p>{@code r}/{@code data} 由 {@link #buildContext} 加载后传入，本块不再自己查库解析（P2-14）。</p>
-     */
-    private String standardBlock(String question, Record r, Map<String, Object> data) {
-        if (!containsAny(question, "归一", "命中", "标准化", "标准依据", "术语")) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append("【归一/标准】").append(KNOWLEDGE_STANDARD).append('\n');
-        if (r != null) {
-            AiReplyVO.NormHits n = normHits(data);
-            sb.append("当前病历归一命中 ").append(n.getTotal()).append(" 处（精确 ")
-                    .append(n.getExact()).append(" / 包含 ").append(n.getContain())
-                    .append(" / 模糊 ").append(n.getFuzzy()).append("）。\n");
-        }
-        return sb.toString();
-    }
-
-    /**
-     * 块 3：指向具体病历的问题 → 当前病历上下文；未命中返回 ""。
-     *
-     * <p>{@code r}/{@code data} 由 {@link #buildContext} 加载后传入，本块不再自己查库解析（P2-14）。
-     * 「没打开病历」与「病历不存在/无权读」都表现为 {@code r == null}，与原实现同文案。</p>
-     */
-    private String currentRecordBlock(String question, Record r, Map<String, Object> data) {
-        if (!containsAny(question, "这份病历", "当前病历", "该病历", "这个病历", "本病例", "这条病历")) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        if (r == null) {
-            sb.append("【当前病历】未在详情中打开病历，无法回答“这份病历”类问题。\n");
-        } else {
-            sb.append("【当前病历】中医诊断：").append(nz(r.getTcmDiagnosis()))
-                    .append("；辨证：").append(nz(r.getPattern()))
-                    .append("；评分：").append(r.getScore() == null ? "未评分" : r.getScore())
-                    .append("（").append(nz(r.getGrade())).append("）。");
-            QcScorer.Missing core = coreMissing(data, r);
-            sb.append("核心字段缺失：").append(core.full().isEmpty() ? "无" : join(core.full())).append("；");
-            sb.append("未抽取到（原始病历有记录）：")
-                    .append(core.partial().isEmpty() ? "无" : join(core.partial())).append("。\n");
-        }
-        return sb.toString();
-    }
-
-    /** 块 4：用法/流程类问题 → 功能与流程说明；未命中返回 "" */
-    private String knowledgeBlock(String question) {
-        if (!containsAny(question, "功能", "怎么用", "如何使用", "流程", "标准依据", "接下来", "下一步")) {
-            return "";
-        }
-        return "【功能】" + KNOWLEDGE_FUNCTION + "\n" + "【流程】" + KNOWLEDGE_FLOW + "\n";
-    }
-
-    /** 块 5：问「我做了什么」→ 本人最近操作（脱敏：动作/对象/时间，不含 IP）；未命中返回 "" */
-    private String myLogsBlock(String question) {
-        if (!containsAny(question, "操作", "日志", "我做了", "做了什么", "审计", "提交了", "操作记录")) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder("【我的最近操作】");
-        List<OperationLog> recent = logService.listRecentByOperator(RequestUtils.currentUsername(), 50);
-        if (recent.isEmpty()) {
-            sb.append("没有查到操作记录。\n");
-        } else {
-            for (OperationLog l : recent) {
-                sb.append(nz(l.getAction()));
-                if (l.getTarget() != null && !l.getTarget().isBlank()) {
-                    sb.append('：').append(l.getTarget().trim());
-                }
-                if (l.getLogTime() != null) {
-                    sb.append("（").append(l.getLogTime().format(LOG_TS)).append("）");
-                }
-                sb.append('；');
-            }
-            sb.append('\n');
-        }
-        return sb.toString();
-    }
-
-    /** LLM 不可用时的降级答案：从已拼好的上下文里摘出最相关的一段，没有就回功能与流程说明 */
-    private String ruleAnswer(String question, String context) {
-        // 1. 优先回"当前病历"，其次"我做了什么"，再次"看板统计"
-        StringBuilder sb = new StringBuilder();
-        sb.append("（规则问答）");
-        if (context.contains("【当前病历】")) {
-            int i = context.indexOf("【当前病历】");
-            int end = context.indexOf('\n', i);
-            sb.append(context, i + "【当前病历】".length(), end < 0 ? context.length() : end);
-        } else if (context.contains("【我的最近操作】")) {
-            int i = context.indexOf("【我的最近操作】");
-            int end = context.indexOf('\n', i);
-            sb.append(context, i + "【我的最近操作】".length(), end < 0 ? context.length() : end);
-        } else if (context.contains("【看板统计】")) {
-            int i = context.indexOf("【看板统计】");
-            int end = context.indexOf('\n', i);
-            sb.append(context, i + "【看板统计】".length(), end < 0 ? context.length() : end);
-        } else {
-            sb.append(KNOWLEDGE_FUNCTION).append(' ').append(KNOWLEDGE_FLOW);
-        }
-        return sb.toString().trim();
-    }
-
     // ------------------------------------------------------------------ 复核预检
 
     /**
@@ -628,14 +421,6 @@ public class AiServiceImpl implements IAiService {
             }
         }
         return out;
-    }
-
-    private static boolean containsAny(String text, String... keys) {
-        // 任一关键词被包含即算命中
-        for (String k : keys) {
-            if (text.contains(k)) return true;
-        }
-        return false;
     }
 
     private static String join(List<String> list) {

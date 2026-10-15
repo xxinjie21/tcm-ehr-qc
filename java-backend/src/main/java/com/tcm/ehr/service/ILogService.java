@@ -74,7 +74,10 @@ public interface ILogService {
                      String startTime, String endTime);
 
     /**
-     * 某操作人最近的 n 条日志，供 AI 助手拼装"我做了什么"上下文。
+     * 某操作人最近的 n 条日志。
+     *
+     * <p><b>当前无消费方</b>：原为「AI 助手」拼装「我做了什么」上下文所用，该功能已移除。
+     * 保留是因为日志页的「按操作人查」正需要这个形态的查询，不必再写一遍。</p>
      *
      * @param operator 操作人用户名
      * @param limit    最多返回条数

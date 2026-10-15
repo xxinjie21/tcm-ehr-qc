@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * LLM 统一入口（Spring AI 2.0 承载）。
  *
- * <p><b>职责</b>：供 ①AI 助手 ②病历解读 ③复核预检意见 统一复用；
+ * <p><b>职责</b>：供 ①病历解读 ②复核预检意见 ③术语补词 统一复用；
  * 双通道 {@code provider=ollama}（本机，无需 api-key）/ {@code provider=openai}（OpenAI 及兼容三方网关，
  * DeepSeek / 通义 / 智谱等改 {@code llm.base-url} 即可接入）。
  * <b>判定地基仍是规则引擎</b>——评分 / 分级 / 归一不依赖本类，本类只负责把规则结论叙述成人话。</p>
@@ -219,19 +219,6 @@ public class LlmClient {
             - 缺失的业务字段就如实说缺失，不要编造内容；
             - 只输出一个 JSON 对象，不要任何解释文字，不要 markdown 代码块；
             - 格式：{"summary":{"chiefComplaint":"","diagnosis":"","syndrome":"","prescription":""},"narrative":""}
-            """;
-
-    /**
-     * AI 助手系统提示词：面向使用者的项目业务问答，不答技术实现。
-     */
-    public static final String AI_CHAT_SYSTEM_PROMPT = """
-            你是「中医电子病历质控与标准化系统」的使用助手，面向临床与质控使用者。
-            只回答与本系统相关的问题：数据统计、功能用法、业务流程、质控判定原因。
-            硬性要求：
-            - 不回答技术实现细节（框架、代码、数据库结构、接口实现等）；遇到这类问题，
-              回复：这属于系统实现细节，建议查看设计文档或咨询开发同学。
-            - 不臆造数据；上下文没给的数据就说查不到，不要编造。
-            - 回答简洁（一般不超过 200 字），中文作答。
             """;
 
     /**

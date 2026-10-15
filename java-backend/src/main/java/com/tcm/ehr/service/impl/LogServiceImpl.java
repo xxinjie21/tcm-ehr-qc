@@ -133,7 +133,9 @@ public class LogServiceImpl implements ILogService {
     }
 
     /**
-     * 取某操作人最近的若干条日志，供 AI 助手理解上下文。
+     * 取某操作人最近的若干条日志。
+     *
+     * <p>当前无消费方（原供「AI 助手」理解上下文，该功能已移除）；保留供日志页「按操作人查」扩展。</p>
      *
      * @param operator 操作人
      * @param limit 最多返回条数
