@@ -58,6 +58,17 @@
             v-bind="recomputeBar"
             :stroke-width="10"
           />
+          <!-- T2：运行中也显示失败计数 —— 后端每 25 条落库一次进度，轮询即可见；
+               此时不回明细（长任务每 2 秒重渲染整张长表不值当），只给一行计数，
+               与 NLP 批量面板的运行中口径一致。终态仍走下面的失败清单。 -->
+          <div
+            v-if="isActiveTask(recomputeProgress) && recomputeProgress.failed > 0"
+            class="recompute-failures"
+          >
+            <div class="rf-hd">
+              已失败 {{ recomputeProgress.failed }} 条 · 任务结束后显示清单并支持重试
+            </div>
+          </div>
           <!-- 失败清单 + 仅重试失败：终态且确有失败时显示（用户要看到失败的是哪条、为什么、并可只重试失败） -->
           <div
             v-if="!isActiveTask(recomputeProgress) && recomputeProgress && recomputeProgress.failures && recomputeProgress.failures.length"
@@ -86,6 +97,35 @@
               </el-button>
             </div>
           </div>
+        </div>
+        <!-- T1：最近重算任务清单。此前刷新/切页返回只能接上「正在跑」的那条，
+             已结束的任务详情无处可看；这里补上与 NLP 批量面板同口径的清单，
+             点「查看」拉详情（含失败明细）。截断标记由后端下发，不足上限时不出现。 -->
+        <div v-if="taskList.length" class="recompute-tasks">
+          <div class="rt-hd">
+            最近重算任务（最多 {{ taskListLimit }} 条）<span v-if="taskListTruncated" class="rt-trunc">已省略更早的任务</span>
+            <el-checkbox v-model="onlyFailedTasks" size="small" style="margin-left: var(--sp-3)">只看有失败的</el-checkbox>
+          </div>
+          <el-table
+            :data="onlyFailedTasks ? taskList.filter((t) => t.failed > 0) : taskList"
+            border
+            size="small"
+          >
+            <el-table-column label="提交时间" width="170">
+              <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="150">
+              <template #default="{ row }">{{ taskStatusText(row) }}</template>
+            </el-table-column>
+            <el-table-column prop="total" label="条数" width="90" />
+            <el-table-column prop="success" label="成功" width="90" />
+            <el-table-column prop="failed" label="失败" width="90" />
+            <el-table-column label="操作" width="90">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="viewTask(row.id)">查看</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
         <div v-loading="dedLoading" element-loading-text="正在统计扣分分布…">
           <template v-if="dedStats">
@@ -186,7 +226,7 @@
       </template>
       <details class="std-panel">
         <summary class="std-sum">
-          <span v-if="rules">合格 ≥ {{ rules.thresholds.qualified }} 分 · 无效 &lt; {{ rules.thresholds.invalid }} 分或真缺失 ≥ {{ rules.thresholds.seriousFullMissing }} · 病历应包含 {{ rules.completeness.elements.length }} 项</span>
+          <span v-if="rules">合格 ≥ {{ rules.thresholds.reviewUpper }} 分 · 无效 &lt; {{ rules.thresholds.invalid }} 分 · 病历应包含 {{ rules.completeness.elements.length }} 项</span>
           <span v-else>标准加载中…</span>
           <span class="tip">展开查看完整评分口径</span>
         </summary>
@@ -223,7 +263,7 @@
         </div>
         <div class="st">
           <span class="st-k">分级</span>
-          <span class="st-v">合格 ≥{{ rules.thresholds.qualified }} ／ 无效 &lt;{{ rules.thresholds.invalid }} 或真缺失 ≥{{ rules.thresholds.seriousFullMissing }}</span>
+          <span class="st-v">合格 ≥{{ rules.thresholds.reviewUpper }} ／ 无效 &lt;{{ rules.thresholds.invalid }}</span>
         </div>
       </div>
       <!-- 完整规则说明收进折叠区：默认只看摘要，需要细节时再展开 -->
@@ -303,10 +343,10 @@ const loadRules = async () => {
   }
 }
 
-// 标准里的合格线。规则未就绪时给 null（显示「—」），不再退回 90 ——
-// 那个 90 是后端出厂默认值的拷贝，管理员改过合格线后，等待期里界面会按 90
+// 标准里的合格线。规则未就绪时给 null（显示「—」），不再退回出厂默认 ——
+// 那个默认是后端出厂值的拷贝，管理员改过合格线后，等待期里界面会按旧值
 // 算出「距合格线还差 N 分」，与服务端结论矛盾。
-const qualified = computed(() => rules.value?.thresholds?.qualified ?? null)
+const qualified = computed(() => rules.value?.thresholds?.reviewUpper ?? null)
 
 // 拉取当前范围的扣分聚合（按类型、按项、分级分布）
 const loadDedStats = async () => {
@@ -519,6 +559,7 @@ const pollTask = async (id) => {
       )
       loadPrecheck(1)
       loadDedStats()
+      loadTaskList()
       return
     }
     pollTimer = setTimeout(() => pollTask(id), 2000)
@@ -547,6 +588,7 @@ const handleRecompute = async () => {
     const res = await recomputeQc({ filters: { ...filters }, requestKey: crypto.randomUUID() })
     const t = res.data || {}
     recomputeProgress.value = t
+    loadTaskList()
     // 4. 空范围提交出来的是 total=0 的任务：直接当完成，不必轮询
     if (isActiveTask(t)) {
       pollTask(t.id)
@@ -596,6 +638,7 @@ const retryFailed = async (taskId) => {
     const res = await retryQcBatchFailed(taskId)
     const t = res.data || {}
     recomputeProgress.value = t
+    loadTaskList()
     if (isActiveTask(t)) {
       pollTask(t.id)
     }
@@ -607,6 +650,60 @@ const retryFailed = async (taskId) => {
   }
 }
 
+// ===== 最近重算任务清单（T1）=====
+// 此前页面只表达「当前/最近一次」任务：刷新或切页返回能接上在跑的那条，
+// 但已结束的任务详情无处可看。后端列表接口回包是 { tasks, truncated, limit }（不是裸数组），
+// 截断标记要显式说出来 —— 页面不能自己写死「最多 50 条」，不足 50 条时那句话本身就是错的。
+const taskList = ref([])
+const taskListTruncated = ref(false)
+const taskListLimit = ref(50)
+// 「只看有失败的」：长任务要能一眼找到出过错的批次，不必逐条看状态
+const onlyFailedTasks = ref(false)
+
+// 拉取最近任务；失败静默（拦截器已提示），不阻塞页面其余部分。返回任务数组供复用。
+const loadTaskList = async () => {
+  try {
+    const res = await listQcBatch()
+    const tasks = res.data?.tasks || []
+    taskList.value = tasks
+    taskListTruncated.value = res.data?.truncated === true
+    taskListLimit.value = res.data?.limit || 50
+    return tasks
+  } catch {
+    // 拦截器已提示
+    return []
+  }
+}
+
+// 状态文案：与上方进度提示同一口径，避免列表里出现 QUEUED/RUNNING 这类裸码
+const taskStatusText = (t) => {
+  switch (t.status) {
+    case 'QUEUED': return '排队中'
+    case 'RUNNING': return `进行中 ${t.done}/${t.total}`
+    case 'COMPLETED': return '已完成'
+    case 'CANCELLED': return '已取消'
+    case 'INTERRUPTED': return '已中断（可重跑）'
+    case 'FAILED': return '失败'
+    default: return t.status
+  }
+}
+
+// 回看某条历史任务的进度与失败明细：列表接口不带 failures（省流量），明细走详情接口。
+// 若点到的其实还在跑，则接上轮询；否则停轮询（已结束的任务不该再动）。
+const viewTask = async (id) => {
+  try {
+    const res = await getQcBatch(id)
+    recomputeProgress.value = res.data || null
+    if (isActiveTask(recomputeProgress.value)) {
+      pollTask(id)
+    } else {
+      stopPoll()
+    }
+  } catch {
+    // 拦截器已提示
+  }
+}
+
 // 回到本页时接上正在跑的重算任务。
 //
 // 重算是长任务（几千条要跑几分钟），用户切到别的页面再回来时本组件已重新挂载，
@@ -615,21 +712,13 @@ const retryFailed = async (taskId) => {
 // 列表接口本就只返回本组织的任务，直接找状态为排队/进行中的那条接着轮询即可
 // （后端保证同一组织同时只有一条重算任务在跑，故取首条即可）。
 const resumeRunningTask = async () => {
-  try {
-    // 1. 取本组织最近任务
-    const res = await listQcBatch()
-    // 2. 找正在跑的那条（最多一条）
-    const running = (res.data || []).find((t) => isActiveTask(t))
-    // 3. 没有在跑的任务就什么都不做，保持页面原样
-    if (!running) {
-      return
-    }
-    // 4. 回填进度并接上轮询，进度条与按钮文案随即恢复显示
-    recomputeProgress.value = running
-    pollTask(running.id)
-  } catch {
-    // 拿不到列表不影响页面其余部分（拦截器已提示）
+  const tasks = await loadTaskList()
+  const running = tasks.find((t) => isActiveTask(t))
+  if (!running) {
+    return
   }
+  recomputeProgress.value = running
+  pollTask(running.id)
 }
 
 // 组件卸载时停掉轮询，避免离开页面后还在发请求
@@ -708,6 +797,21 @@ onMounted(() => {
 }
 .recompute-failures .rf-actions {
   margin-top: var(--sp-2);
+}
+/* 最近重算任务清单（T1）：与失败清单同款分隔，列表随任务条数撑高，不自开滚动层 */
+.recompute-tasks {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px dashed var(--line-soft);
+}
+.recompute-tasks .rt-hd {
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+  margin-bottom: var(--sp-2);
+}
+.recompute-tasks .rt-trunc {
+  margin-left: var(--sp-2);
+  color: var(--ochre-text);
 }
 /* 扣分构成与 AI 预检左右并排（写法照抄 Dashboard 的 .grid-2）：
    四张卡纵向堆到 1235px、第 4 块落在屏外（审查报告 L2）。

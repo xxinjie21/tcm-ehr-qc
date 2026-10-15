@@ -12,6 +12,7 @@ import com.tcm.ehr.domain.vo.NlpHealthVO;
 import com.tcm.ehr.service.INlpBatchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,12 +33,21 @@ class NlpControllerTest {
         return new NlpExtractDTO(text);
     }
 
+    /** 单条抽取的异步池（NlpAsyncTasks 现从 Spring 取池）：本测试不跑异步路径，够用即可 */
+    private static ThreadPoolTaskExecutor executor() {
+        ThreadPoolTaskExecutor e = new ThreadPoolTaskExecutor();
+        e.setCorePoolSize(1);
+        e.setMaxPoolSize(1);
+        e.initialize();
+        return e;
+    }
+
     /** 构造 controller；termNormalizer 传 null 表示该用例不关心归一行为 */
     private NlpController controller(PythonNlpClient client, EsTermNormalizer termNormalizer) {
         EsTermNormalizer normalizer = termNormalizer == null ? mock(EsTermNormalizer.class) : termNormalizer;
         // 批量解析依赖（批K 起构造器新增）：本测试不碰批量接口，用替身占位
         return new NlpController(client, new EntityNormalizer(normalizer, new tools.jackson.databind.ObjectMapper()),
-                mock(INlpBatchService.class), mock(OperationLogger.class), new NlpAsyncTasks());
+                mock(INlpBatchService.class), mock(OperationLogger.class), new NlpAsyncTasks(executor()));
     }
 
     @Test

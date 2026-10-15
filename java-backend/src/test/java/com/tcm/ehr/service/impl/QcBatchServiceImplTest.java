@@ -8,6 +8,7 @@ import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.QcTask;
 import com.tcm.ehr.domain.vo.QcTaskVO;
+import com.tcm.ehr.domain.vo.QcTasksVO;
 import com.tcm.ehr.mapper.QcTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -388,5 +390,47 @@ class QcBatchServiceImplTest {
 
         assertTrue(json.contains("中医内科"), json);
         assertTrue(json.contains("2026-01-01"), json);
+    }
+
+    // ------------------------------------------------- 列表截断信号（与 NLP 列表同构）
+
+    /**
+     * 列表原先写死 {@code LIMIT 50} 且回包是裸数组，页面只能自己写一句「最多显示最近 50 条」
+     * 当标题 —— 不足 50 条时这句话本身就是错的，真被截断时也看不出「还有更早的没返回」。
+     * 这里锁两条：恰好到上限**不算**截断（靠多取一条精确判定，不是拿 {@code size == 50} 猜），
+     * 超出一条才置 truncated。
+     */
+    @Test
+    void listMarksTruncatedOnlyWhenBeyondLimit() {
+        bindRequestContext();
+        try {
+            // 1. 恰好 50 条：不截断，原样返回 50 条
+            QcTaskMapper exact = mock(QcTaskMapper.class);
+            when(exact.selectList(any())).thenReturn(tasks(50));
+            QcTasksVO voExact = newService(exact, mock(RecordMapper.class), mock(OperationLogger.class)).list();
+            assertEquals(50, voExact.getTasks().size());
+            assertFalse(voExact.isTruncated(), "恰好到上限不算截断");
+            assertEquals(50, voExact.getLimit());
+
+            // 2. 51 条（多取的那一条）：截断为真，但只回上限条数
+            QcTaskMapper over = mock(QcTaskMapper.class);
+            when(over.selectList(any())).thenReturn(tasks(51));
+            QcTasksVO voOver = newService(over, mock(RecordMapper.class), mock(OperationLogger.class)).list();
+            assertEquals(50, voOver.getTasks().size(), "只能回上限条数");
+            assertTrue(voOver.isTruncated(), "多出一条即说明还有更早的任务没返回");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    private static List<QcTask> tasks(int n) {
+        List<QcTask> out = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            QcTask t = new QcTask();
+            t.setId("t-" + i);
+            t.setStatus(QcTask.COMPLETED);
+            out.add(t);
+        }
+        return out;
     }
 }

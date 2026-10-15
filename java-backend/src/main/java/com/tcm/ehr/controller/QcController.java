@@ -17,6 +17,7 @@ import com.tcm.ehr.domain.vo.LogicCheckVO;
 import com.tcm.ehr.domain.vo.QcCheckVO;
 import com.tcm.ehr.domain.vo.QcRulesVO;
 import com.tcm.ehr.domain.vo.QcTaskVO;
+import com.tcm.ehr.domain.vo.QcTasksVO;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 import com.tcm.ehr.service.IQcBatchService;
 import com.tcm.ehr.service.IQcService;
@@ -126,12 +127,13 @@ public class QcController {
     /**
      * 列出最近的批量重算任务（最多 50 条）。
      *
-     * <p>【权限：登录即可】不含失败明细（看明细请走详情接口）。</p>
+     * <p>【权限：登录即可】不含失败明细（看明细请走详情接口）。
+     * 回包带 {@code truncated} 截断标记，供页面区分「这就是全部」与「更早的已省略」。</p>
      *
-     * @return 按提交时间倒序的任务列表
+     * @return 按提交时间倒序的任务列表 + 截断标记
      */
     @GetMapping("/score/batch")
-    public Result<List<QcTaskVO>> listScoreBatch() {
+    public Result<QcTasksVO> listScoreBatch() {
         return Result.ok(qcBatchService.list());
     }
 

@@ -1,0 +1,95 @@
+package com.tcm.ehr.common.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * 异步执行的线程池：统一交给 Spring 框架（{@link ThreadPoolTaskExecutor}），
+ * 不再各处手写 {@code Executors.newFixedThreadPool} / {@code new ThreadPoolExecutor}。
+ *
+ * <ul>
+ *   <li>{@code aiAsyncExecutor} / {@code nlpAsyncExecutor}：AI、NLP 单条长响应的异步任务池。
+ *       4 线程 + 有界队列 100、满载即拒（AbortPolicy）—— 让「池满」变成前端可见的 503
+ *       而不是静默排队，且 150s 后前端已放弃时任务不会还堆在无界队列里。</li>
+ *   <li>{@code qcBatchExecutor} / {@code nlpBatchExecutor}：批量任务的「认领任务」常驻 worker 池。</li>
+ *   <li>{@code nlpRecordExecutor}：NLP 单个任务内并行处理病历的池（与认领池分开，否则占着线程等
+ *       页内结果会死锁）。</li>
+ * </ul>
+ *
+ * <p>所有池都用守护线程：进程退出不被非守护线程吊住。批量池的大小与属性取值一致，
+ * 认领 worker 数 = {@code qc.batch.concurrency} / {@code nlp.batch.concurrency}。</p>
+ */
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+
+    /** 命名 + 守护线程的线程工厂 */
+    private static ThreadFactory namedDaemon(String prefix) {
+        AtomicInteger seq = new AtomicInteger();
+        return r -> {
+            Thread t = new Thread(r, prefix + seq.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
+    }
+
+    /**
+     * AI 单条异步任务池：固定 4 线程（下游是 I/O 等待型，4 个足够且不会把下游压垮）、
+     * 有界队列 100，满载即拒。
+     */
+    @Bean
+    public ThreadPoolTaskExecutor aiAsyncExecutor() {
+        return boundedAsyncPool("ai-task-");
+    }
+
+    /** NLP 单条异步任务池：与 AI 分开，避免两边互相挤占。 */
+    @Bean
+    public ThreadPoolTaskExecutor nlpAsyncExecutor() {
+        return boundedAsyncPool("nlp-task-");
+    }
+
+    private static ThreadPoolTaskExecutor boundedAsyncPool(String prefix) {
+        ThreadPoolTaskExecutor e = new ThreadPoolTaskExecutor();
+        e.setCorePoolSize(4);
+        e.setMaxPoolSize(4);
+        e.setQueueCapacity(100);
+        e.setThreadFactory(namedDaemon(prefix));
+        e.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        return e;
+    }
+
+    /** QC 批量重算的常驻 worker 池，大小 = {@code qc.batch.concurrency} */
+    @Bean
+    public ThreadPoolTaskExecutor qcBatchExecutor(@Value("${qc.batch.concurrency:2}") int concurrency) {
+        return fixedPool(concurrency, "qc-batch-worker-");
+    }
+
+    /** NLP 批量解析的常驻 worker 池（认领任务），大小 = {@code nlp.batch.concurrency} */
+    @Bean
+    public ThreadPoolTaskExecutor nlpBatchExecutor(@Value("${nlp.batch.concurrency:8}") int concurrency) {
+        return fixedPool(concurrency, "nlp-batch-worker-");
+    }
+
+    /** NLP 任务内并行处理病历的池，大小同上，两个池共享同一份并发预算 */
+    @Bean
+    public ThreadPoolTaskExecutor nlpRecordExecutor(@Value("${nlp.batch.concurrency:8}") int concurrency) {
+        return fixedPool(concurrency, "nlp-record-worker-");
+    }
+
+    /** 固定大小池：core=max，队列无界（与 {@code newFixedThreadPool} 语义一致） */
+    private static ThreadPoolTaskExecutor fixedPool(int concurrency, String prefix) {
+        int threads = Math.max(1, concurrency);
+        ThreadPoolTaskExecutor e = new ThreadPoolTaskExecutor();
+        e.setCorePoolSize(threads);
+        e.setMaxPoolSize(threads);
+        e.setThreadFactory(namedDaemon(prefix));
+        return e;
+    }
+}

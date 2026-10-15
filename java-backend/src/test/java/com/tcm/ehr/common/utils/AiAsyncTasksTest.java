@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
@@ -56,7 +57,7 @@ class AiAsyncTasksTest {
 
     @Test
     void 任务线程读取到提交时捕获的组织用户与角色() throws Exception {
-        AiAsyncTasks tasks = new AiAsyncTasks();
+        AiAsyncTasks tasks = new AiAsyncTasks(executor());
         String taskId = tasks.submit(() -> {
             // 任务线程里逐项读值：H4 修复前这里是 uniform「unknown / 空」
             String echo = RequestUtils.currentOrgId() + "|"
@@ -93,7 +94,7 @@ class AiAsyncTasksTest {
         attrs.setAttribute(RequestUtils.ATTR_ORG_ROLE, ORG_ROLE, RequestAttributes.SCOPE_REQUEST);
         RequestContextHolder.setRequestAttributes(attrs);
 
-        AiAsyncTasks tasks = new AiAsyncTasks();
+        AiAsyncTasks tasks = new AiAsyncTasks(executor());
         String taskId = tasks.submit(() -> {
             AiReplyVO vo = new AiReplyVO();
             vo.setAnswer(String.valueOf(RequestUtils.viewAllOrgs()));
@@ -110,7 +111,7 @@ class AiAsyncTasksTest {
     @Test
     void 提交线程无请求上下文也安全回落() throws Exception {
         RequestContextHolder.resetRequestAttributes();
-        AiAsyncTasks tasks = new AiAsyncTasks();
+        AiAsyncTasks tasks = new AiAsyncTasks(executor());
         String taskId = tasks.submit(() -> {
             AiReplyVO vo = new AiReplyVO();
             vo.setSource("done");
@@ -120,6 +121,16 @@ class AiAsyncTasksTest {
         AsyncTaskRegistry.Snapshot<AiReplyVO> snap = await(tasks, taskId, Duration.ofSeconds(10));
         assertNotNull(snap, "无请求上下文时提交也应正常完成任务");
         assertEquals(AsyncTaskRegistry.State.DONE, snap.state(), "任务应成功完成：" + snap.error());
+    }
+
+    /** 真实可跑的 Spring 线程池（替代原先基类里手写的池）：2 线程足够本测试的用例 */
+    private static ThreadPoolTaskExecutor executor() {
+        ThreadPoolTaskExecutor e = new ThreadPoolTaskExecutor();
+        e.setCorePoolSize(2);
+        e.setMaxPoolSize(2);
+        e.setQueueCapacity(16);
+        e.initialize();
+        return e;
     }
 
     /** 轮询到终态（RUNNING / DONE / FAILED 之外即出）或超时 */
@@ -146,7 +157,7 @@ class AiAsyncTasksTest {
         tools.jackson.databind.json.JsonMapper mapper =
                 tools.jackson.databind.json.JsonMapper.builder().build();
 
-        AiAsyncTasks a = new AiAsyncTasks();
+        AiAsyncTasks a = new AiAsyncTasks(executor());
         a.setRedis(mockRedis(store));
         a.setObjectMapper(mapper);
 
@@ -160,7 +171,7 @@ class AiAsyncTasksTest {
         assertEquals(AsyncTaskRegistry.State.DONE, fromA.state(), "本实例应拿到成功结果：" + fromA.error());
 
         // B 实例的进程内表是空的。真实前端也是轮询，这里同样等到终态
-        AiAsyncTasks b = new AiAsyncTasks();
+        AiAsyncTasks b = new AiAsyncTasks(executor());
         b.setRedis(mockRedis(store));
         b.setObjectMapper(mapper);
 

@@ -3,6 +3,7 @@ package com.tcm.ehr.service.impl;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
+import com.tcm.ehr.common.config.AsyncConfig;
 import com.tcm.ehr.common.utils.DistLock;
 import com.tcm.ehr.common.utils.EntityNormalizer;
 import com.tcm.ehr.common.utils.PythonNlpClient;
@@ -351,7 +352,7 @@ class NlpBatchIntegrationTest {
      */
     @Configuration
     @MapperScan(basePackages = "com.tcm.ehr.mapper", sqlSessionFactoryRef = "sqlSessionFactory")
-    @Import(NlpBatchServiceImpl.class)
+    @Import({NlpBatchServiceImpl.class, AsyncConfig.class})
     static class TestConfig {
 
         /** H2 内存库；建表脚本只在容器启动时执行一次 */

@@ -37,6 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -52,7 +53,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -153,6 +153,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     private ExecutorService recordPool;
 
+    /** 认领任务的常驻 worker 池，由 Spring 装配（AsyncConfig.nlpBatchExecutor） */
+    @Autowired
+    private ThreadPoolTaskExecutor nlpBatchExecutor;
+
+    /** 任务内并行处理病历的池，由 Spring 装配（AsyncConfig.nlpRecordExecutor） */
+    @Autowired
+    private ThreadPoolTaskExecutor nlpRecordExecutor;
+
     // ------------------------------------------------------------------ 生命周期
 
     @PostConstruct
@@ -180,21 +188,13 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         } catch (Exception e) {
             log.error("[批解析] 重启兜底失败：未完成任务未能标记为『已中断』，（DB 可能不可用）。不影响服务启动，恢复后可在列表里手动重跑", e);
         }
-        // 2. 起固定大小的守护线程池：并发固定，Python 服务不会被多个任务同时压垮
+        // 2. 取 Spring 线程池：并发固定，Python 服务不会被多个任务同时压垮
         int threads = Math.max(1, concurrency);
         running = true;
-        workers = Executors.newFixedThreadPool(threads, r -> {
-            Thread t = new Thread(r, "nlp-batch-worker");
-            t.setDaemon(true);
-            return t;
-        });
+        workers = nlpBatchExecutor.getThreadPoolExecutor();
         // 2.1 任务内并行池（见 recordPool 字段注释）：让「一个任务」也能吃满 NLP 的吞吐上限，
         //     而不是被单线程串行钉死在 1/单条耗时。两个池共享同一份并发预算。
-        recordPool = Executors.newFixedThreadPool(threads, r -> {
-            Thread t = new Thread(r, "nlp-record-worker");
-            t.setDaemon(true);
-            return t;
-        });
+        recordPool = nlpRecordExecutor.getThreadPoolExecutor();
         // 3. 每个线程跑同一个「认领任务」循环
         for (int i = 0; i < threads; i++) {
             workers.submit(this::workerLoop);

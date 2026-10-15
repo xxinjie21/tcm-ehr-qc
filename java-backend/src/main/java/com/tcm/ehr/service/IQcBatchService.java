@@ -2,8 +2,7 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.domain.dto.QcBatchDTO;
 import com.tcm.ehr.domain.vo.QcTaskVO;
-
-import java.util.List;
+import com.tcm.ehr.domain.vo.QcTasksVO;
 
 /**
  * 批量质控重算任务：提交、查询、取消、列表（§七 L5）。
@@ -54,7 +53,7 @@ public interface IQcBatchService {
     /**
      * 列出最近任务（最多 50 条，按创建时间倒序），只读。
      *
-     * @return 任务进度视图列表（不含失败明细）
+     * @return 任务列表 + 截断标记（多取一条精确判定，不靠 size == 上限猜）；不含失败明细
      */
-    List<QcTaskVO> list();
+    QcTasksVO list();
 }

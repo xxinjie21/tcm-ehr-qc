@@ -20,6 +20,7 @@ import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
 import com.tcm.ehr.domain.vo.QcBatchResultVO;
 import com.tcm.ehr.domain.vo.QcTaskVO;
+import com.tcm.ehr.domain.vo.QcTasksVO;
 import com.tcm.ehr.mapper.QcTaskMapper;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IQcBatchService;
@@ -28,7 +29,9 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -43,7 +46,6 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -120,6 +122,10 @@ public class QcBatchServiceImpl implements IQcBatchService {
     private volatile boolean running;
     private ExecutorService workers;
 
+    /** 认领任务的常驻 worker 池，由 Spring 装配（AsyncConfig.qcBatchExecutor） */
+    @Autowired
+    private ThreadPoolTaskExecutor qcBatchExecutor;
+
     // ------------------------------------------------------------------ 生命周期
 
     @PostConstruct
@@ -142,14 +148,10 @@ public class QcBatchServiceImpl implements IQcBatchService {
         } catch (Exception e) {
             log.error("[批重算] 重启兜底失败：未完成任务未能标记为『已中断』，（DB 可能不可用）。不影响服务启动，恢复后可在列表里手动重跑", e);
         }
-        // 2. 起固定大小的守护线程池（重算写密集，并发固定为 1）
+        // 2. 取 Spring 线程池：大小 = qc.batch.concurrency（重算写密集，并发固定为 1）
         int threads = Math.max(1, concurrency);
         running = true;
-        workers = Executors.newFixedThreadPool(threads, r -> {
-            Thread t = new Thread(r, "qc-batch-worker");
-            t.setDaemon(true);
-            return t;
-        });
+        workers = qcBatchExecutor.getThreadPoolExecutor();
         // 3. 每个线程跑同一个「取任务」循环
         for (int i = 0; i < threads; i++) {
             workers.submit(this::workerLoop);
@@ -454,16 +456,19 @@ public class QcBatchServiceImpl implements IQcBatchService {
     }
 
     @Override
-    public List<QcTaskVO> list() {
+    public QcTasksVO list() {
         // 只列本组织的任务：任务行带失败明细（含 recordId），跨组织可见等于泄露他组病历标识
+        // 多取一条精确判截断：恰好 LIST_LIMIT 条不算截断，LIST_LIMIT+1 条才是
         List<QcTask> tasks = taskMapper.selectList(new QueryWrapper<QcTask>()
                 .eq("org_id", RequestUtils.currentOrgId())
-                .orderByDesc("create_time").last("LIMIT " + LIST_LIMIT));
-        List<QcTaskVO> out = new ArrayList<>();
-        for (QcTask t : tasks) {
-            out.add(toVO(t, false));
+                .orderByDesc("create_time").last("LIMIT " + (LIST_LIMIT + 1)));
+        QcTasksVO vo = new QcTasksVO();
+        for (int i = 0; i < Math.min(tasks.size(), LIST_LIMIT); i++) {
+            vo.getTasks().add(toVO(tasks.get(i), false));
         }
-        return out;
+        vo.setTruncated(tasks.size() > LIST_LIMIT);
+        vo.setLimit(LIST_LIMIT);
+        return vo;
     }
 
     // ------------------------------------------------------------------ 执行

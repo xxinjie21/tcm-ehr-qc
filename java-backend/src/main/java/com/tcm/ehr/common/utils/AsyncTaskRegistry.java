@@ -1,11 +1,11 @@
 package com.tcm.ehr.common.utils;
 
 import com.tcm.ehr.common.exception.BusinessException;
-import com.tcm.ehr.common.metrics.Metrics;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import tools.jackson.databind.ObjectMapper;
@@ -13,11 +13,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -45,8 +42,8 @@ import java.util.function.UnaryOperator;
  *     故状态落共享层（Redis，{@code <前缀>{taskId}}，TTL 600s），进程内表退化为**一级缓存**。</li>
  * </ol>
  *
- * <p>线程池与登记表都**有界**：池固定 4 线程（下游是 I/O 等待型，4 个足够且不会把下游压垮），
- * 等待队列有界、满载即拒绝（回 503 而不是静默排队），登记表按条数与存活时间双重淘汰。
+ * <p>线程池与登记表都**有界**：池是 Spring 的 {@link ThreadPoolTaskExecutor}（有界队列、满载即拒，
+ * 由 {@link #submit} 回 503 而不是静默排队），登记表按条数与存活时间双重淘汰。
  * 共享层缺失（未装配 Redis）时自动退化为纯进程内行为，功能不降级为「不可用」。</p>
  *
  * <p><b>子类只提供两件事</b>：共享层 key 前缀与结果载荷类型（用于跨实例反序列化）。</p>
@@ -90,23 +87,18 @@ public abstract class AsyncTaskRegistry<T> {
     private static final long RESULT_TTL_SECONDS = 600L;
     /** 登记表上限：超出时按入库时刻淘汰最旧的，避免无界增长 */
     private static final int MAX_TASKS = 2000;
-    /** 任务线程数：下游是 I/O 等待型，4 个足够且不会把下游压垮 */
-    private static final int POOL_SIZE = 4;
-    /**
-     * 等待队列上限（AI-2）：4 线程 × 25。
-     *
-     * <p>原实现用 {@code Executors.newFixedThreadPool}，内部是<b>无界</b> {@code LinkedBlockingQueue}，
-     * 提交永不拒绝 —— 前端 150s 放弃后任务还在队列里排着，且 {@code MAX_TASKS} 只约束登记表、
-     * 管不到队列。改为有界队列 + 拒绝策略：满载时立刻回 503「繁忙」，让用户重试而不是静默排队。</p>
-     */
-    private static final int QUEUE_CAPACITY = 100;
 
     /** 共享层 key 前缀，如 {@code task:ai:} / {@code task:nlp:} */
     private final String redisKeyPrefix;
-    /** 指标名前缀（P1-14），如 {@code task.ai} */
-    private final String metricPrefix;
     /** 结果载荷类型，供跨实例反序列化 */
     private final Class<T> payloadType;
+    /**
+     * 任务线程池：由 Spring 装配（见 {@code AsyncConfig}），有界队列 + AbortPolicy。
+     *
+     * <p>满载时由 {@link #submit} 转成 503 —— 若用无界队列则提交永不拒绝，前端 150s 放弃后
+     * 任务还堆在队列里空转。</p>
+     */
+    private final ThreadPoolTaskExecutor executor;
 
     private final Map<String, Task<T>> tasks = new ConcurrentHashMap<>();
 
@@ -114,21 +106,11 @@ public abstract class AsyncTaskRegistry<T> {
     private StringRedisTemplate redis;
     private ObjectMapper objectMapper;
 
-    /** 有界任务池：拒绝策略 = AbortPolicy，由 {@link #submit} 转成 503 */
-    private final ThreadPoolExecutor pool = new ThreadPoolExecutor(
-            POOL_SIZE, POOL_SIZE, 0L, TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(QUEUE_CAPACITY),
-            r -> {
-                Thread t = new Thread(r, "async-task");
-                t.setDaemon(true);
-                return t;
-            },
-            new ThreadPoolExecutor.AbortPolicy());
-
-    protected AsyncTaskRegistry(String redisKeyPrefix, String metricPrefix, Class<T> payloadType) {
+    protected AsyncTaskRegistry(String redisKeyPrefix, Class<T> payloadType,
+                                ThreadPoolTaskExecutor executor) {
         this.redisKeyPrefix = redisKeyPrefix;
-        this.metricPrefix = metricPrefix;
         this.payloadType = payloadType;
+        this.executor = executor;
     }
 
     /**
@@ -189,17 +171,13 @@ public abstract class AsyncTaskRegistry<T> {
         sharedPut(id, running);
 
         try {
-            pool.execute(() -> {
+            executor.execute(() -> {
                 try {
                     RequestContextHolder.setRequestAttributes(ctx);
-                    // 任务耗时分布（P1-14）：只统计真正跑任务的这段时间
-                    long startedAt = System.currentTimeMillis();
                     T reply = work.get();
-                    Metrics.observeMs(metricPrefix + ".ms", System.currentTimeMillis() - startedAt);
                     update(id, t -> t.with(State.DONE, reply, null));
                 } catch (Exception e) {
                     // 失败也要留痕：前端要给出「可重试 + 明确原因」，不能只显示转圈
-                    Metrics.inc(metricPrefix + ".failed");
                     String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                     log.warn("[异步任务] {} 失败：{}", id, msg);
                     update(id, t -> t.with(State.FAILED, null, msg));
@@ -211,9 +189,7 @@ public abstract class AsyncTaskRegistry<T> {
             // 队列已满（AI-2）：撤回刚登记的 RUNNING 项，否则前端轮询会永远看到「还在跑」
             tasks.remove(id);
             sharedDelete(id);
-            Metrics.inc(metricPrefix + ".rejected");
-            log.warn("[异步任务] 任务池已满（{} 线程 + {} 队列），拒绝任务 {}",
-                    POOL_SIZE, QUEUE_CAPACITY, id);
+            log.warn("[异步任务] 任务池已满，拒绝任务 {}", id);
             throw new BusinessException(1012, "AI 繁忙，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE);
         }
         return id;
