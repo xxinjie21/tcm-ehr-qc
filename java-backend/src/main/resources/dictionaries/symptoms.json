@@ -512,5 +512,441 @@
   {
     "standardTerm": "吞咽时上下移动",
     "aliases": []
+  },
+  {
+    "standardTerm": "鼻塞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咽痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咽痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰酸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "恶寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "能食",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心慌",
+    "aliases": []
+  },
+  {
+    "standardTerm": "恶风",
+    "aliases": []
+  },
+  {
+    "standardTerm": "知饥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "反酸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "汗出",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口粘",
+    "aliases": []
+  },
+  {
+    "standardTerm": "流涕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "怕冷",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夜尿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口臭",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肠鸣",
+    "aliases": []
+  },
+  {
+    "standardTerm": "纳可",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胃胀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "恶心",
+    "aliases": []
+  },
+  {
+    "standardTerm": "怯寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "矢气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "梦呓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "头昏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "唇干",
+    "aliases": []
+  },
+  {
+    "standardTerm": "恶热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "无汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻干",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疲倦",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "怕热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "流涎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白带",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疲劳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "手凉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "畏寒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "干咳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "纳差",
+    "aliases": []
+  },
+  {
+    "standardTerm": "欲呕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "目痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "磨牙",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灼热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "易醒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻涕",
+    "aliases": []
+  },
+  {
+    "standardTerm": "出汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "手麻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眼干",
+    "aliases": []
+  },
+  {
+    "standardTerm": "出血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿频",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咽阻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口淡",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眠浅",
+    "aliases": []
+  },
+  {
+    "standardTerm": "经期",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿黄",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰多",
+    "aliases": []
+  },
+  {
+    "standardTerm": "打鼾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "欲食",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咯痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "身痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "呃逆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "便溏",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脱皮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眼痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "皮疹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脱发",
+    "aliases": []
+  },
+  {
+    "standardTerm": "欲饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脱屑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "腰胀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿多",
+    "aliases": []
+  },
+  {
+    "standardTerm": "带下",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "身痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "有汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "刺痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口涩",
+    "aliases": []
+  },
+  {
+    "standardTerm": "短气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "背痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "隐痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "足冷",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼾声",
+    "aliases": []
+  },
+  {
+    "standardTerm": "焦虑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寐可",
+    "aliases": []
+  },
+  {
+    "standardTerm": "头胀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口甜",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口酸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "身热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "黄汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尿急",
+    "aliases": []
+  },
+  {
+    "standardTerm": "头汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "昏沉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "畏光",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻鸣",
+    "aliases": []
+  },
+  {
+    "standardTerm": "少气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "烧心",
+    "aliases": []
+  },
+  {
+    "standardTerm": "低热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "手冷",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻痠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鼻堵",
+    "aliases": []
+  },
+  {
+    "standardTerm": "早醒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "膝痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寐差",
+    "aliases": []
+  },
+  {
+    "standardTerm": "多汗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喘息",
+    "aliases": []
+  },
+  {
+    "standardTerm": "困倦",
+    "aliases": []
+  },
+  {
+    "standardTerm": "欲吐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "燥热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阴痒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "抽筋",
+    "aliases": []
+  },
+  {
+    "standardTerm": "眠差",
+    "aliases": []
   }
 ]
