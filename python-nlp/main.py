@@ -29,8 +29,12 @@ MODEL_DIR = os.environ.get("NLP_MODEL_DIR", "model")
 
 # 单次请求的文本上限（字符）。超长直接 422，而不是悄悄截断
 MAX_TEXT_CHARS = 20000
-# NER 的 token 上限；超出部分模型看不到（规则兜底仍用全文，见 _rules）
+# 模型单窗口的 token 上限（含 [CLS]/[SEP]）。长文本由 _ner 按标点切成多个窗口
+# 逐段前向再合并 —— 不再像旧实现那样把超出部分整段丢掉（规则兜底始终用全文，见 _rules）
 NER_MAX_TOKENS = 510
+# 无标点长句不得不按 token 硬切时的窗口重叠量：让被边界切断的实体在相邻窗口各出现一次，
+# 合并（_merge_runs）时按字符区间重叠复原成完整实体
+NER_WINDOW_OVERLAP = 24
 
 # 推理并发上限（AI-12）：extract 是同步 def，FastAPI 会把它投进 anyio 线程池（默认上限 40）；
 # torch 推理是 CPU 密集型，40 个线程同时跑只会争抢 GIL 与内存（RSS 峰值翻倍）。
@@ -189,7 +193,7 @@ class ExtractResponse(BaseModel):
     formulaList: List[Entity] = []
     herbs: List[Herb] = []
     modelAvailable: bool = False
-    # 是否因长度被截断（模型只看前 NER_MAX_TOKENS 个 token；规则兜底始终用全文）
+    # 是否被截断：长文本现由 _ner 分窗口覆盖整段，恒为 False（保留该字段只为兼容既有 Java / 前端接口）
     truncated: bool = False
 
 
@@ -268,53 +272,149 @@ def health():
 
 
 def _ner(text: str) -> Tuple[Dict[str, List[dict]], bool]:
-    """模型 NER：BIO 解码 + offsets→sourceText + 置信度。
+    """模型 NER：把长文本按标点切成多个 ≤NER_MAX_TOKENS 的窗口逐段前向，再合并。
 
-    :return (各字段实体, 是否被截断)。截断时模型只看得到前 NER_MAX_TOKENS 个 token，
-            尾部实体会静默丢失 —— 所以把标记回传，让调用方知道这次结果不完整。
+    旧实现直接 `truncation=True, max_length=NER_MAX_TOKENS`，超过 510 token 的尾部
+    会被静默丢掉 —— 而长病历的中医诊断 / 辨证 / 处方恰好都排在文本尾部，抽出来自然是
+    空的。现在整段文本都会被覆盖，故恒返回 truncated=False（该标志保留只为兼容既有的
+    Java / 前端接口）。
+
+    :return (各字段实体, 是否被截断)。恒为 False —— 文本已整段覆盖。
     """
     import torch
+
+    out: Dict[str, List[dict]] = {f: [] for f in FIELDS}
+    if not text:
+        return out, False
 
     # 1. 进程内 torch 线程数只设一次（AI-12）：避免「请求并发 × 进程内线程」双重 oversubscribe
     _apply_torch_threads(torch)
 
-    # 2. 编码 + 前向都在信号量内：并发超过 INFER_CONCURRENCY 时排队，而不是一起挤 CPU。
-    #    编码并保留字符偏移，超长按 NER_MAX_TOKENS 截断
+    # 2. 全部窗口的前向放在同一个信号量内：一次请求算一个并发单位
+    runs: List[Tuple[str, int, int, List[float]]] = []
     with _infer_sem:
-        enc = _tokenizer(text, return_offsets_mapping=True, return_tensors="pt",
-                         truncation=True, max_length=NER_MAX_TOKENS)
-        truncated = int(enc["input_ids"].shape[-1]) >= NER_MAX_TOKENS
-        offsets = enc.pop("offset_mapping")[0].tolist()
-        # inference_mode 比 no_grad 更彻底（P2-15）：除关闭自动求导外，还跳过版本计数与
-        # 视图追踪，前向的内存与少量算子开销都更低。本处只做前向 + softmax + argmax，
-        # 不产生需要参与自动求导的张量，两者数值完全一致，可放心替换。
-        with torch.inference_mode():
-            logits = _model(**enc).logits[0]
-        probs = torch.softmax(logits, dim=-1)
-        ids = logits.argmax(-1).tolist()
+        for base, chunk in _ner_windows(text):
+            _ner_forward(chunk, base, torch, runs)
 
-    # 3. 逐 token 做 BIO 解码：B 起新实体、I 续接同字段、其余收尾当前实体
-    out: Dict[str, List[dict]] = {f: [] for f in FIELDS}
-    cur_field, cur_start, cur_end, cur_confs = None, None, None, []
-    for ti, ((start, end), lid) in enumerate(zip(offsets, ids)):
-        if start == end:  # special token
+    # 3. 合并跨窗口重复 / 重叠的实体后，按全局字符区间_flush 成最终结果
+    for field, start, end, confs in _merge_runs(runs):
+        _flush(out, field, text, start, end, confs)
+    return out, False
+
+
+def _ntokens(s: str) -> int:
+    """不含特殊符的 token 数，用来规划窗口大小（中文约 1 字 1 token）。"""
+    return int(_tokenizer(s, add_special_tokens=False, return_tensors="pt")["input_ids"].shape[-1])
+
+
+def _ner_windows(text: str):
+    """规划窗口：产出 (全局起始字符, 窗口文本)，窗口拼接后完整覆盖 text。
+
+    先按标点在句读处切块，再贪心打包到 ≤ budget 个 token。这样窗口边界落在一句话的
+    结尾，几乎不会把实体切碎；只有「整块本身超过 budget」的无标点长句才按 token 硬切
+    （带 NER_WINDOW_OVERLAP 重叠，交给 _merge_runs 复原）。
+    """
+    budget = NER_MAX_TOKENS - 2  # 预留 [CLS] / [SEP]
+    if _ntokens(text) <= budget:
+        yield 0, text
+        return
+    buf_start, buf, buf_tok = 0, [], 0
+    for p_start, piece in _pieces(text):
+        tok = _ntokens(piece)
+        if tok > budget:  # 无标点长句：先冲掉缓冲，再单独滑动切分
+            if buf:
+                yield buf_start, "".join(buf)
+                buf, buf_tok = [], 0
+            yield from _split_long_piece(p_start, piece, budget)
             continue
-        label = _id2label.get(lid, "O")
-        tag, _, typ = label.partition("-")
+        if buf and buf_tok + tok > budget:  # 当前窗口装不下 → 收尾开新窗口
+            yield buf_start, "".join(buf)
+            buf, buf_tok = [], 0
+        if not buf:
+            buf_start = p_start
+        buf.append(piece)
+        # 各块 token 数之和是拼接口 token 数的上界（拼接只会合并、不会新增 token），
+        # 用它预算是安全的：真实窗口一定 ≤ budget
+        buf_tok += tok
+    if buf:
+        yield buf_start, "".join(buf)
+
+
+def _pieces(text: str):
+    """把文本切成「以标点结尾」的小块，保留全部字符（拼接回去等于原文）。"""
+    start = 0
+    for i, ch in enumerate(text):
+        if ch in "。！？；，、：\n":
+            yield start, text[start:i + 1]
+            start = i + 1
+    if start < len(text):
+        yield start, text[start:]
+
+
+def _split_long_piece(start: int, piece: str, budget: int):
+    """单个无标点长句超过预算时按 token 滑动切分，窗口间留 NER_WINDOW_OVERLAP 重叠。"""
+    offs = _tokenizer(piece, return_offsets_mapping=True,
+                      return_tensors="pt")["offset_mapping"][0].tolist()
+    n = len(offs)
+    if n <= budget:
+        yield start, piece
+        return
+    step = max(1, budget - NER_WINDOW_OVERLAP)
+    i = 0
+    while i < n:
+        j = min(i + budget, n)
+        s, e = offs[i][0], offs[j - 1][1]
+        yield start + s, piece[s:e]
+        if j >= n:
+            break
+        i += step
+
+
+def _ner_forward(chunk: str, base: int, torch, runs: List[Tuple[str, int, int, List[float]]]) -> None:
+    """对单个窗口做一次前向 + BIO 解码，把实体以「全局字符区间」追加进 runs。"""
+    enc = _tokenizer(chunk, return_offsets_mapping=True, return_tensors="pt")
+    offsets = enc.pop("offset_mapping")[0].tolist()
+    # inference_mode 比 no_grad 更彻底（P2-15）：除关闭自动求导外，还跳过版本计数与
+    # 视图追踪，前向的内存与少量算子开销都更低。本处只做前向 + softmax + argmax，
+    # 不产生需要参与自动求导的张量，两者数值完全一致，可放心替换。
+    with torch.inference_mode():
+        logits = _model(**enc).logits[0]
+    probs = torch.softmax(logits, dim=-1).tolist()
+    labels = logits.argmax(-1).tolist()
+
+    # 逐 token 做 BIO 解码：B 起新实体、I 续接同字段、其余收尾当前实体
+    cur = None  # (field, start, end, confs)，start/end 为全局字符区间
+    for ti, ((s, e), lid) in enumerate(zip(offsets, labels)):
+        if s == e:  # special token
+            continue
+        tag, _, typ = _id2label.get(lid, "O").partition("-")
         field = LABEL_FIELD.get(typ)
-        prob = float(probs[ti][lid])
+        prob = probs[ti][lid]
         if tag == "B" and field:
-            _flush(out, cur_field, text, cur_start, cur_end, cur_confs)
-            cur_field, cur_start, cur_end, cur_confs = field, start, end, [prob]
-        elif tag == "I" and field == cur_field and cur_field:
-            cur_end = end
-            cur_confs.append(prob)
+            if cur:
+                runs.append(cur)
+            cur = (field, base + s, base + e, [prob])
+        elif tag == "I" and cur and field == cur[0]:
+            cur = (cur[0], cur[1], base + e, cur[3] + [prob])
         else:
-            _flush(out, cur_field, text, cur_start, cur_end, cur_confs)
-            cur_field, cur_start, cur_end, cur_confs = None, None, None, []
-    # 4. 收尾最后一个未闭合的实体
-    _flush(out, cur_field, text, cur_start, cur_end, cur_confs)
-    return out, truncated
+            if cur:
+                runs.append(cur)
+            cur = None
+    if cur:
+        runs.append(cur)
+
+
+def _merge_runs(runs: List[Tuple[str, int, int, List[float]]]) -> List[Tuple[str, int, int, List[float]]]:
+    """按字段合并重复 / 重叠的实体（窗口重叠或整段重复时同一实体可能被抽到多次）。"""
+    merged: List[Tuple[str, int, int, List[float]]] = []
+    for field in FIELDS:
+        for r in sorted((x for x in runs if x[0] == field), key=lambda x: (x[1], x[2])):
+            if merged and merged[-1][0] == field and r[1] < merged[-1][2]:
+                m = merged[-1]
+                merged[-1] = (field, m[1], max(m[2], r[2]), m[3] + r[3])
+            else:
+                merged.append(r)
+    return merged
 
 
 def _apply_torch_threads(torch) -> None:
