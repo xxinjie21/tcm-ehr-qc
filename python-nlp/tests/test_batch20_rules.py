@@ -20,7 +20,8 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 本文件在 python-nlp/tests/ 下，上溯三层才是仓库根
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, 'python-nlp'))
 
 from main import Entity, ExtractResponse, _reroute_pulse_tongue, _rules  # noqa: E402

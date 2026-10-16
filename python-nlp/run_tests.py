@@ -6,12 +6,12 @@
 
 只跑**不依赖模型**的测试（不需要 model/ 那 422MB）：
 
-    test_batch20_rules.py   纯规则回归：舌象形态 / 苔藓黑名单 / 脉位分段 /
-                            词典精确命中 / 脉舌不在 symptoms
-    test_ner_chunking.py    分词与分窗：_pieces 拼接无损、_ner_windows 短文本单窗
-                            （monkeypatch main._ntokens，不加载模型）
+    tests/test_batch20_rules.py   纯规则回归：舌象形态 / 苔藓黑名单 / 脉位分段 /
+                                  词典精确命中 / 脉舌不在 symptoms
+    tests/test_ner_chunking.py    分词与分窗：_pieces 拼接无损、_ner_windows 短文本单窗
+                                  （monkeypatch nlp_model._ntokens，不加载模型）
 
-**test_extract.py 故意排除**：它是手动调试脚本，不是可自动化的测试 ——
+**tests/test_extract.py 故意排除**：它是手动调试脚本，不是可自动化的测试 ——
 0 个 assert、硬编码本机绝对路径 C:\\Users\\...\\Temp\\composed.txt、
 且调 _load_model() 会吃掉 422MB 模型。留在闸门里只会让 CI 在别人机器上必挂。
 
@@ -25,8 +25,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # 从轻到重排序：纯规则在前，失败时先暴露最便宜的问题
 TESTS = [
-    'test_batch20_rules.py',
-    'test_ner_chunking.py',
+    os.path.join('tests', 'test_batch20_rules.py'),
+    os.path.join('tests', 'test_ner_chunking.py'),
 ]
 
 
