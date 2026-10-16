@@ -48,8 +48,6 @@ import java.util.UUID;
 public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         implements IOrgService {
 
-    private static final String DEFAULT_ORG_ID = "grp-default-2026";
-
     /** 防滥用 1：每人同时最多持有的 owner 组织数（不自动归档，超了就必须先归档旧的） */
     private static final int MAX_ACTIVE_ORGS_PER_USER = 3;
 

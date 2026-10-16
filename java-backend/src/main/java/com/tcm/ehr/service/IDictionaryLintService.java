@@ -24,22 +24,6 @@ public interface IDictionaryLintService {
     DictionaryLintVO lint(String type, List<TermEntry> entries);
 
     /**
-     * 体检一份词表文件内容（Excel/CSV/JSON 都先解析成词条再走同一个体检）。
-     *
-     *
-     * 与 {@link #lint} 分开是因为「解析」要处理编码、扩展名、大小，
-     *
-     * 属于 IO 层；而 {@link #lint} 是纯逻辑，可以脱离文件单独测。
-     *
-     * @param type    术语类型
-     * @param entries 已解析的词条
-     * @return 体检结论
-     */
-    default DictionaryLintVO lintParsed(String type, List<TermEntry> entries) {
-        return lint(type, entries);
-    }
-
-    /**
      * 体检一份词表，<b>失败时返回一份空结论而不抛</b>。
      *
      * <p>体检只是「提醒」：如果它自己抛异常就把整个解析带崩，用户连文件内容都看不到 ——
