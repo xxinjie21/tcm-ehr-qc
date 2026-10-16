@@ -87,6 +87,21 @@ public final class EntityTypes {
     private static final Map<String, EntityType> BY_KEY;
     private static final Map<String, EntityType> DICT_BY_STRUCTURED;
 
+    /**
+     * {@link #all()} / {@link #dictKeys()} 的缓存视图（审查报告 §4.7）。
+     *
+     * <p>两者都只是上面那张 9 类常量表的过滤视图，内容在类加载后不再变化；原先每次调用
+     * 都新建一份集合（{@code all()} 在单次标准化报表里被调 4 次）。缓存为不可变视图，
+     * 调用方一律只读。</p>
+     *
+     * <p>{@code DICT_KEYS} 用 {@code unmodifiableSet(LinkedHashSet)} 而<b>不是</b>
+     * {@code Set.copyOf}：后者的迭代顺序未定义（按每次 JVM 启动的 SALT 打乱），会破坏
+     * 「顺序稳定」这条契约 —— {@code QcRuleSet.defaults()} 的 {@code elementTypes} 顺序
+     * 与 {@code EntityTypesDictionaryRegistrationTest} 都依赖它。</p>
+     */
+    private static final List<EntityType> ALL_VIEW;
+    private static final Set<String> DICT_KEYS;
+
     static {
         Map<String, EntityType> byKey = new LinkedHashMap<>();
         Map<String, EntityType> dictByStructured = new LinkedHashMap<>();
@@ -100,6 +115,15 @@ public final class EntityTypes {
         }
         BY_KEY = java.util.Collections.unmodifiableMap(byKey);
         DICT_BY_STRUCTURED = java.util.Collections.unmodifiableMap(dictByStructured);
+
+        ALL_VIEW = List.copyOf(byKey.values());
+        Set<String> dictKeys = new LinkedHashSet<>();
+        for (EntityType t : byKey.values()) {
+            if (t.dict()) {
+                dictKeys.add(t.key());
+            }
+        }
+        DICT_KEYS = java.util.Collections.unmodifiableSet(dictKeys);
     }
 
     private EntityTypes() {
@@ -107,22 +131,18 @@ public final class EntityTypes {
 
     /** 全部类型（按 order） */
     public static List<EntityType> all() {
-        return new ArrayList<>(BY_KEY.values());
+        return ALL_VIEW;
     }
 
-    /** 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/治法，顺序稳定） */
+    /**
+     * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/治法，顺序稳定）。
+     *
+     * <p>⚠️ 别把这里读成「计分也用 8 类」：{@code QcScorer.keyOf()} 只认本类中
+     * {@code countsUnnormalized=true} 的 5 类（疾病/证候/症状/中药/方剂），舌象/脉象/治法
+     * 落 null → 按 0 条未命中处理。口径差异是有意的（见本类头部说明与《多批次实施计划》批次 20）。</p>
+     */
     public static Set<String> dictKeys() {
-        // 从 9 类里筛出**有词典的 8 类**并取 key；LinkedHashSet 保住 order。
-        // ⚠️ 别把这里读成「计分也用 8 类」：QcScorer.keyOf() 只认本类中 countsUnnormalized=true
-        // 的 5 类（疾病/证候/症状/中药/方剂），舌象/脉象/治法落 null → 按 0 条未命中处理。
-        // 口径差异是有意的（见本类头部说明与《多批次实施计划》批次 20）。
-        Set<String> out = new LinkedHashSet<>();
-        for (EntityType t : BY_KEY.values()) {
-            if (t.dict()) {
-                out.add(t.key());
-            }
-        }
-        return out;
+        return DICT_KEYS;
     }
 
     /** 按类型 key 取类型定义；key 为 null 或未登记时返回 null，调用方需自行兜底 */

@@ -54,13 +54,27 @@ public class JwtUtil {
 
     private final StringRedisTemplate redis;
 
+    /**
+     * 派生好的签名 Key 缓存。
+     *
+     * <p>{@code secret} 由 {@code @Value} 注入后不再变化，而验签是每请求热路径 ——
+     * 每次重建都要重算一次字节数组并做长度校验，纯浪费。{@code volatile} 而非
+     * {@code @PostConstruct}：注入顺序与首次使用之间不必建立额外约定，懒初始化即可。</p>
+     */
+    private volatile Key cachedKey;
+
     public JwtUtil(StringRedisTemplate redis) {
         this.redis = redis;
     }
 
-    /** 由配置密钥派生 HS256 签名 Key */
+    /** 由配置密钥派生 HS256 签名 Key（首次派生后缓存；派生失败不缓存，下次仍抛同样异常） */
     private Key getKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        Key k = cachedKey;
+        if (k == null) {
+            k = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+            cachedKey = k;
+        }
+        return k;
     }
 
     /**
@@ -109,7 +123,7 @@ public class JwtUtil {
      * 解析令牌并一次性完成「签名 / 有效期 / 令牌版本」三项校验。
      *
      * <p>返回 {@code null} 表示不可用（过期 / 签名不符 / 格式非法 / 已被退出登录或改密码作废）；
-     * 可用则直接返回载荷。拦截器原先「先 {@link #isValid} 再 {@link #parseToken}」会对同一 token
+     * 可用则直接返回载荷。拦截器原先「先验签再 {@link #parseToken}」会对同一 token
      * 做两遍 HMAC 验签 + Base64 + JSON 解析（全站最热路径），本方法把它们合并为一遍。</p>
      *
      * @param token JWT 字符串
@@ -127,16 +141,6 @@ public class JwtUtil {
             // 过期 / 签名不符 / 格式非法一律视为不可用；由拦截器统一回 401
             return null;
         }
-    }
-
-    /**
-     * 判断令牌是否可用（签名 + 有效期 + 令牌版本）。
-     *
-     * @param token JWT 字符串
-     * @return 可用为 true
-     */
-    public boolean isValid(String token) {
-        return parseAndVerify(token) != null;
     }
 
     // ------------------------------------------------------------ 令牌版本

@@ -175,7 +175,7 @@ public class EntityNormalizer {
      * 组织级归一（就地改 {@code structured_data} 的 Map 形态）。
      *
      * <p><b>用途</b>：人工复核提交修正后写回前用。复核员<b>新输入</b>的词只带
-     * {@code content/name}，没有 {@code normLevel}；而 {@link QcScorer#countUnnormalized}
+     * {@code content/name}，没有 {@code normLevel}；而 {@code QcScorer.countUnnormalized}
      * 把「无 normLevel」算作未标准化 → <b>人工修正反而扣分</b>（weightEach=1、封顶 5）。
      * 这里在写回前跑一遍与模型抽取完全相同的归一，口径统一。</p>
      *
@@ -228,7 +228,8 @@ public class EntityNormalizer {
      *
      * <p>为什么用词典命中而不是词形匹配：像「酸软无力」这种真正的症状也含「无力」，
      * 按词形挪会误伤它（实测确有 50 条「酸软无力」）。判据与中药那段一致 ——
-     * 归一命中词典即视为「本类型术语」，{@link EsTermNormalizer.NormalizeResult#source()} 非空。</p>
+     * 归一命中词典即视为「本类型术语」，{@link EsTermNormalizer.NormalizeResult#level()}
+     * 落在命中区间（{@link EsTermNormalizer#isHit(int)}）。</p>
      *
      * <p>顺序：先试脉象、未命中再试舌象（两次 ES 查询只在确有症状实体时才发生，
      * 且第二次靠短路避免无谓查询）。命中的实体带着原 content/sourceText 挪过去，
@@ -515,7 +516,7 @@ public class EntityNormalizer {
      *
      * <p><b>处理顺序</b>：① 剔除截断项 → ② append 完整词 → ③ 再走一次
      * {@link #normalize}（由它统一填 level / source / code 并按标准词去重）。
-     * 刻意<b>不</b>在本方法里自己判命中层级：那是 {@link EsTermNormalizer#judge} 的职责，
+     * 刻意<b>不</b>在本方法里自己判命中层级：那是 {@code EsTermNormalizer.judge} 的职责，
      * 复制一份就会两处漂移。二次归一是幂等的（标准词本身是精确命中项）。</p>
      *
      * <p><b>截断项判据</b>：归一失败（无 normLevel）<b>且</b> content/name 是某个

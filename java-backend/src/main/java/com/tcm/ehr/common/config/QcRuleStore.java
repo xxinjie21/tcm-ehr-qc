@@ -262,7 +262,7 @@ public class QcRuleStore {
         if (r.getCompleteness() == null || r.getCompleteness().getElements() == null
                 || r.getCompleteness().getElements().isEmpty()) {
             w.add("完整性要素为空，已回填内置 6 要素");
-            r.setCompleteness(QcRuleSet.defaults().getCompleteness());
+            r.setCompleteness(QcRuleSet.defaultCompleteness());
         }
         // 2. 过滤旧格式/不完整的一致性规则（缺触发或期望值 → 丢弃并告警）
         if (r.getConsistency() == null) {
@@ -287,7 +287,7 @@ public class QcRuleStore {
         }
         // 3. 标准化配置缺失 → 回默认
         if (r.getStandardization() == null) {
-            r.setStandardization(QcRuleSet.defaults().getStandardization());
+            r.setStandardization(QcRuleSet.defaultStandardization());
         }
         // 4. 分级阈值非法（合格线 ≤ 无效线等）→ 回默认并告警
         QcRuleSet.Thresholds t = r.getThresholds();

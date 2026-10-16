@@ -151,12 +151,8 @@ public class QcRuleSet {
     /** 出厂默认（按当前数据集调优的通用示例，可被 qc-rules.json 覆盖） */
     public static QcRuleSet defaults() {
         QcRuleSet r = new QcRuleSet();
-
-        // 1. 完整性 6 要素（症状/疾病/证候/舌象/脉象/中药），取自实体类型目录
-        for (String key : List.of("symptom", "disease", "pattern", "tongue", "pulse", "herb")) {
-            EntityTypes.EntityType t = EntityTypes.byKey(key);
-            r.completeness.elements.add(el(t.label(), t.structuredKey(), t.fallback()));
-        }
+        r.completeness = defaultCompleteness();
+        r.standardization = defaultStandardization();
 
         // 格式
         // 年龄正则与 hint 见 AGE_PATTERN / AGE_HINT（与前端下拉目录共用，避免两边漂移）
@@ -195,19 +191,49 @@ public class QcRuleSet {
         r.consistency.add(rule("肾阴亏虚-方剂", "pattern", List.of("肾阴亏虚", "虚阳上亢"),
                 "formula", List.of("知柏地黄丸")));
 
-        // 2. 术语标准化：elementTypes 取 EntityTypes.dictKeys()（批次 20 起有词典的 8 类：
-        // 疾病/证候/症状/中药/方剂/舌象/脉象/治法），每处 1 分、封顶 5 分。
-        // ⚠️ 这 8 类不等于「未归一扣分计 8 类」：QcScorer.keyOf() 只给 EntityTypes 中
-        // countsUnnormalized=true 的 5 类（疾病/证候/症状/中药/方剂）映射 structuredKey，
-        // 舌象/脉象/治法落 null → 不计未归一扣分（政策，见 EntityTypes 构造 javadoc）。
-        // 两处说的是不同东西，别按「8 类就该有 8 处扣分」去改。
-        r.standardization.setEnabled(true);
-        r.standardization.setElementTypes(new ArrayList<>(EntityTypes.dictKeys()));
-        r.standardization.setWeightEach(1);
-        r.standardization.setCap(5);
-
         r.duplicateWeight = 5;
         return r;
+    }
+
+    /**
+     * 内置默认完整性要素：6 要素（症状/疾病/证候/舌象/脉象/中药），取自 {@link EntityTypes}。
+     *
+     * <p>包级可见：{@code QcRuleStore.normalize()} 在「要素为空」时直接取它回填。原先是
+     * {@code QcRuleSet.defaults().getCompleteness()} —— 为了拿一个子对象，把 14 条一致性规则、
+     * 2 条格式规则与各自的 List 全构造一遍再丢掉（审查报告 §4.6）。</p>
+     *
+     * <p><b>每次返回新对象，不共享常量</b>：{@code Element} 是可变 {@code @Data}，
+     * 共享出去一旦被谁改了就是全局污染 —— 与本类 {@code EntityTypes.BY_KEY}
+     * 「构建完包成不可变后才赋给 static」同一条约定。</p>
+     */
+    static Completeness defaultCompleteness() {
+        Completeness c = new Completeness();
+        for (String key : List.of("symptom", "disease", "pattern", "tongue", "pulse", "herb")) {
+            EntityTypes.EntityType t = EntityTypes.byKey(key);
+            c.elements.add(el(t.label(), t.structuredKey(), t.fallback()));
+        }
+        return c;
+    }
+
+    /**
+     * 内置默认术语标准化配置（同上：供 {@link #defaults()} 与 {@code QcRuleStore.normalize()} 共用，
+     * 每次返回新对象）。
+     *
+     * <p>{@code elementTypes} 取 {@link EntityTypes#dictKeys()}（批次 20 起有词典的 8 类：
+     * 疾病/证候/症状/中药/方剂/舌象/脉象/治法），每处 1 分、封顶 5 分。</p>
+     *
+     * <p>⚠️ 这 8 类不等于「未归一扣分计 8 类」：{@code QcScorer.keyOf()} 只给 {@code EntityTypes}
+     * 中 {@code countsUnnormalized=true} 的 5 类（疾病/证候/症状/中药/方剂）映射 {@code structuredKey}，
+     * 舌象/脉象/治法落 null → 不计未归一扣分（政策，见 {@code EntityTypes} 构造 javadoc）。
+     * 两处说的是不同东西，别按「8 类就该有 8 处扣分」去改。</p>
+     */
+    static Standardization defaultStandardization() {
+        Standardization s = new Standardization();
+        s.setEnabled(true);
+        s.setElementTypes(new ArrayList<>(EntityTypes.dictKeys()));
+        s.setWeightEach(1);
+        s.setCap(5);
+        return s;
     }
 
     /**

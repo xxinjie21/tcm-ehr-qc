@@ -82,8 +82,8 @@ class LlmClientTest {
         LlmClient client = clientOf(props(false, "ollama"));
 
         assertFalse(client.isAvailable(), "llm.enabled=false 时不应装配模型");
-        assertNull(client.chat("随便问一句"), "关闭时应降级返回 null");
-        assertNull(client.chat("系统提示", "用户输入"), "关闭时应降级返回 null");
+        assertNull(client.chat(null, null, "随便问一句"), "关闭时应降级返回 null");
+        assertNull(client.chat(null, "系统提示", "用户输入"), "关闭时应降级返回 null");
     }
 
     /** provider 写错：装配失败被收敛为降级，不得抛异常 */
@@ -93,7 +93,7 @@ class LlmClientTest {
 
         assertDoesNotThrow(client::isAvailable, "provider 非法不应抛异常");
         assertFalse(client.isAvailable(), "provider 非法应判为不可用");
-        assertNull(client.chat("你好"), "provider 非法应降级返回 null");
+        assertNull(client.chat(null, null, "你好"), "provider 非法应降级返回 null");
     }
 
     /** 选 openai 但没填 api-key：降级，绝不抛（这正是自动装配会把启动搞崩的场景） */
@@ -105,7 +105,7 @@ class LlmClientTest {
 
         assertDoesNotThrow(client::isAvailable, "缺 api-key 不应抛异常");
         assertFalse(client.isAvailable(), "缺 api-key 应判为不可用");
-        assertNull(client.chat("你好"), "缺 api-key 应降级返回 null");
+        assertNull(client.chat(null, null, "你好"), "缺 api-key 应降级返回 null");
     }
 
     /** 本机 Ollama 通道无需凭据，应当能装配成功 */
@@ -114,7 +114,6 @@ class LlmClientTest {
         LlmClient client = clientOf(props(true, "ollama"));
 
         assertTrue(client.isAvailable(), "ollama 通道不需要 api-key，应装配成功");
-        assertTrue("ollama".equals(client.provider()));
     }
 
     /** Ollama 服务未启动（指向必然连不上的端口）：调用期失败也必须是降级，不得抛 */
@@ -126,7 +125,7 @@ class LlmClientTest {
         LlmClient client = clientOf(p);
 
         assertTrue(client.isAvailable(), "装配不依赖网络，应仍可用");
-        assertDoesNotThrow(() -> assertNull(client.chat("你好"), "连不上 Ollama 应降级返回 null"));
+        assertDoesNotThrow(() -> assertNull(client.chat(null, null, "你好"), "连不上 Ollama 应降级返回 null"));
     }
 
     /**

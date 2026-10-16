@@ -120,13 +120,13 @@ public class OperationLogger {
                           String objectType, String objectId) {
         // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，不截断会让同一操作在不同出口相差 1 秒
         LocalDateTime now = LocalDateTime.now().withNano(0);
+        // 对象标识成对使用：只有类型没 ID（或反之）一律视为没有对象，不写半截数据
+        boolean hasObject = objectType != null && !objectType.isBlank()
+                && objectId != null && !objectId.isBlank();
         insertDb(now, operator, role, action, target, detail,
                 orgId == null || orgId.isBlank() ? null : orgId.trim(),
-                // 对象标识成对使用：只有类型没 ID（或反之）一律视为没有对象，不写半截数据
-                objectType == null || objectType.isBlank() || objectId == null || objectId.isBlank()
-                        ? null : objectType.trim(),
-                objectType == null || objectType.isBlank() || objectId == null || objectId.isBlank()
-                        ? null : objectId.trim());
+                hasObject ? objectType.trim() : null,
+                hasObject ? objectId.trim() : null);
     }
 
     /** 入库（审计页唯一数据源）；失败仅告警，不阻塞业务 */

@@ -1,6 +1,7 @@
 package com.tcm.ehr.common.utils;
 
 import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.xssf.eventusermodel.ReadOnlySharedStringsTable;
 import org.apache.poi.xssf.eventusermodel.XSSFReader;
@@ -99,8 +100,14 @@ public final class ExcelRawStreamReader {
                 throw new IOException("Excel 读取失败：" + e.getMessage(), e);
             }
         } finally {
-            // 临时文件必须删：上传侧已有 50MB 体积闸门，但仍不该在磁盘上留残留
-            Files.deleteIfExists(tmp);
+            // 临时文件必须删：上传侧已有 50MB 体积闸门，但仍不该在磁盘上留残留。
+            // 删除失败只吞掉 —— 它若抛出去会覆盖 try 中真实的读取异常，把「Excel 读取失败」
+            // 报成「临时文件删除失败」，用户拿到的报错完全对不上原因。
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException ignored) {
+                // 临时目录不可写 / 文件被占用：留残留好过丢掉真实异常（本类无 logger）
+            }
         }
     }
 
@@ -268,9 +275,10 @@ public final class ExcelRawStreamReader {
             } catch (NumberFormatException e) {
                 return new RawCell(col, false, false, 0, raw, null);
             }
-            boolean dateFormatted = styleIdx >= 0 && styles != null && DateUtil.isADateFormat(
-                    styles.getStyleAt(styleIdx).getDataFormat(),
-                    styles.getStyleAt(styleIdx).getDataFormatString());
+            // 样式索引回表只取一次（原写法在同一表达式里连调两次 getStyleAt）
+            CellStyle st = styleIdx >= 0 && styles != null ? styles.getStyleAt(styleIdx) : null;
+            boolean dateFormatted = st != null && DateUtil.isADateFormat(
+                    st.getDataFormat(), st.getDataFormatString());
             LocalDateTime dt = dateFormatted ? DateUtil.getLocalDateTime(d) : null;
             return new RawCell(col, true, dateFormatted, d, numberToText(d), dt);
         }

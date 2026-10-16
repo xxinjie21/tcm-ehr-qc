@@ -15,8 +15,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -62,7 +62,7 @@ class JwtRevokeTest {
         ValueOperations<String, String> v = ops(redis);
         when(v.get(anyString())).thenReturn(null);
         JwtUtil u = newUtil(redis);
-        assertTrue(u.isValid(u.generateToken("u1", "alice", "用户")));
+        assertNotNull(u.parseAndVerify(u.generateToken("u1", "alice", "用户")));
     }
 
     @Test
@@ -74,11 +74,11 @@ class JwtRevokeTest {
         when(v.get(anyString())).thenReturn(null);
         JwtUtil u = newUtil(redis);
         String token = u.generateToken("u1", "alice", "用户");
-        assertTrue(u.isValid(token));
+        assertNotNull(u.parseAndVerify(token));
 
         // 退出登录：Redis 里的当前版本变成 "1"
         when(v.get("tcm:ehr:auth:ver:u1")).thenReturn("1");
-        assertFalse(u.isValid(token), "版本不一致的令牌必须失效");
+        assertNull(u.parseAndVerify(token), "版本不一致的令牌必须失效");
     }
 
     @Test
@@ -90,7 +90,7 @@ class JwtRevokeTest {
         JwtUtil u = newUtil(redis);
         // 新令牌带 ver=3（currentVersion 读到 3）
         String token = u.generateToken("u1", "alice", "用户");
-        assertTrue(u.isValid(token));
+        assertNotNull(u.parseAndVerify(token));
     }
 
     @Test
@@ -106,8 +106,8 @@ class JwtRevokeTest {
         when(v.get("tcm:ehr:auth:ver:uA")).thenReturn("1");
         when(v.get("tcm:ehr:auth:ver:uB")).thenReturn(null);
 
-        assertFalse(u.isValid(tokenA), "A 已登出");
-        assertTrue(u.isValid(tokenB), "B 不该被牵连");
+        assertNull(u.parseAndVerify(tokenA), "A 已登出");
+        assertNotNull(u.parseAndVerify(tokenB), "B 不该被牵连");
     }
 
     @Test
@@ -119,7 +119,7 @@ class JwtRevokeTest {
         JwtUtil u = newUtil(redis);
         String token = u.generateToken("u1", "alice", "用户");
         // 签名与有效期仍校验，只是跳过版本比对
-        assertTrue(u.isValid(token), "Redis 故障时应降级放行，保证可用性");
+        assertNotNull(u.parseAndVerify(token), "Redis 故障时应降级放行，保证可用性");
     }
 
     @Test
@@ -129,9 +129,9 @@ class JwtRevokeTest {
         ValueOperations<String, String> v = ops(redis);
         when(v.get(anyString())).thenReturn(null);
         JwtUtil u = newUtil(redis);
-        assertFalse(u.isValid("not-a-jwt"), "非法令牌必须无效");
+        assertNull(u.parseAndVerify("not-a-jwt"), "非法令牌必须无效");
         String token = u.generateToken("u1", "alice", "用户");
-        assertFalse(u.isValid(token.substring(0, token.length() - 2) + "xx"), "被篡改的令牌必须无效");
+        assertNull(u.parseAndVerify(token.substring(0, token.length() - 2) + "xx"), "被篡改的令牌必须无效");
     }
 
     @Test
@@ -151,7 +151,7 @@ class JwtRevokeTest {
                 .signWith(ReflectionTestUtils.invokeMethod(u, "getKey"),
                         io.jsonwebtoken.SignatureAlgorithm.HS256)
                 .compact();
-        assertTrue(u.isValid(legacy), "尚未发生作废时，老令牌应继续可用");
+        assertNotNull(u.parseAndVerify(legacy), "尚未发生作废时，老令牌应继续可用");
     }
 
     // ------------------------------------------- P2-20：占位版本号 + TTL 抖动
@@ -198,7 +198,7 @@ class JwtRevokeTest {
 
         String token = u.generateToken("u1", "alice", "用户");
 
-        assertTrue(u.isValid(token), "版本一致，令牌应可用");
+        assertNotNull(u.parseAndVerify(token), "版本一致，令牌应可用");
         verify(v, never()).setIfAbsent(anyString(), anyString(), any(Duration.class));
         verify(v, never()).set(anyString(), anyString(), any(Duration.class));
     }
@@ -292,7 +292,7 @@ class JwtRevokeTest {
                         io.jsonwebtoken.SignatureAlgorithm.HS256)
                 .compact();
 
-        assertTrue(u.isValid(legacy), "占位值 \"0\" 应与「无 ver claim」等价，不能把老令牌踢下线");
+        assertNotNull(u.parseAndVerify(legacy), "占位值 \"0\" 应与「无 ver claim」等价，不能把老令牌踢下线");
     }
 
     /**

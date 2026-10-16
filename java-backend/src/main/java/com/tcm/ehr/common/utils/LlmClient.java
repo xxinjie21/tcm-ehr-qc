@@ -113,31 +113,14 @@ public class LlmClient {
         return resolve() != null;
     }
 
-    /** <b>当前用户</b>生效的通道名，供日志与诊断展示 */
-    public String provider() {
-        return configStore.getFor(RequestUtils.currentUserId()).provider();
-    }
-
-    /**
-     * 单轮对话。
-     *
-     * @param systemPrompt 系统提示词，可为 {@code null}
-     * @param userPrompt 用户输入
-     * @return 模型输出；不可用或调用失败返回 {@code null}，调用方据此走降级路径
-     */
-    public String chat(String systemPrompt, String userPrompt) {
-        return chat(null, systemPrompt, userPrompt);
-    }
-
     /**
      * 单轮对话，并按<b>这个 AI 功能自己的开关</b>门控。
      *
-     * <p>与 {@link #chat(String, String)} 的唯一差别：额外判定该功能有没有被单独关掉。
-     * 关掉时同样返回 {@code null} —— 调用方本就有「LLM 不可用就走规则」的分支，
-     * 两种降级同路，调用方不必再判一次。</p>
-     *
      * <p>{@code feature} 传 {@code null} 表示不关心功能维度（如探测、未归类的调用），
-     * 行为等同 {@link #chat(String, String)}。</p>
+     * 只判「LLM 整体是否可用」。</p>
+     *
+     * <p>该功能被单独关掉时同样返回 {@code null} —— 调用方本就有「LLM 不可用就走规则」的
+     * 分支，两种降级同路，调用方不必再判一次。</p>
      *
      * @param feature 哪个 AI 功能，可为 {@code null}
      * @param systemPrompt 系统提示词，可为 {@code null}
@@ -169,17 +152,12 @@ public class LlmClient {
         }
     }
 
-    /** 无系统提示词的单轮对话 */
-    public String chat(String userPrompt) {
-        return chat(null, userPrompt);
-    }
-
     /**
      * 连通性探测：用<b>给定参数</b>（而非当前生效配置）
      * 装配模型并发一轮最小请求，让用户可以先试再存。
      *
-     * <p>与 {@link #chat} 相反，本方法<b>不吞异常</b>——探测的意义就是把失败原因交给调用方。
-     * 调用方必须对异常信息做脱敏（抹掉 api-key）后再回传。</p>
+     * <p>与 {@link #chat(AiFeature, String, String)} 相反，本方法<b>不吞异常</b>——
+     * 探测的意义就是把失败原因交给调用方。调用方必须对异常信息做脱敏（抹掉 api-key）后再回传。</p>
      *
      * @return 模型的回复内容
      * @throws IllegalStateException 参数非法或连接/鉴权失败
