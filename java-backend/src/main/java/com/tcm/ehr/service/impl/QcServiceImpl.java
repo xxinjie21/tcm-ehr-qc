@@ -1,7 +1,6 @@
 package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -18,7 +17,6 @@ import com.tcm.ehr.domain.dto.QcCheckDTO;
 import com.tcm.ehr.domain.dto.QcScoreDTO;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
-import com.tcm.ehr.domain.po.ReviewTask;
 import com.tcm.ehr.domain.vo.DeductionStatsVO;
 import com.tcm.ehr.domain.vo.LogicCheckVO;
 import com.tcm.ehr.domain.vo.QcBatchResultVO;
@@ -30,13 +28,11 @@ import com.tcm.ehr.mapper.ReviewTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

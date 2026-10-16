@@ -18,8 +18,9 @@ import java.util.List;
  * 因此「自增成功但过期没设上」这个中间态不存在。同理，脚本里的读-改-写也不会
  * 与其它客户端的命令交错。</p>
  *
- * <p>限流（R12）等后续需要「判断 + 计数」原子完成的场景也复用本类，
- * 不再各自拼 {@code INCR}/{@code EXPIRE}。</p>
+ * <p>本类当前只有两个使用者：登录失败计数（{@link #incrWithTtlOnFirst}）与
+ * JWT 令牌版本号（{@link #incrWithTtl}）。接口限流已改用 Redisson {@code RRateLimiter}
+ * （《自研组件替换计划》#1），不再经由本类。</p>
  */
 public final class RedisLua {
 

@@ -1,6 +1,5 @@
 package com.tcm.ehr.common.utils;
 
-import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

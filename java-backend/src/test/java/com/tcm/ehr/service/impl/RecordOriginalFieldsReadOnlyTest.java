@@ -1,6 +1,5 @@
 package com.tcm.ehr.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.mapper.RecordMapper;

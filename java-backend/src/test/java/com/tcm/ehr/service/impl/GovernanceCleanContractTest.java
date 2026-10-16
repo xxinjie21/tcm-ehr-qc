@@ -8,7 +8,6 @@ import com.tcm.ehr.domain.vo.CleanResultVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.mapper.ReviewTaskMapper;
 import com.tcm.ehr.service.IDictionaryTermStore;
-import com.tcm.ehr.service.IDictionaryFileService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;

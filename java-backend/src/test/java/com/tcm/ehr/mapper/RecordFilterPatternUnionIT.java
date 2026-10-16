@@ -26,7 +26,6 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

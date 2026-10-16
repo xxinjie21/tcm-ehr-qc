@@ -1,6 +1,5 @@
 package com.tcm.ehr.controller;
 
-import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.domain.dto.CleanDTO;
 import com.tcm.ehr.domain.dto.ExportDTO;

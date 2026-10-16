@@ -5,7 +5,6 @@ import com.tcm.ehr.common.exception.ForbiddenException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcm.ehr.common.config.QcRuleSet;
 import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.utils.DistLock;

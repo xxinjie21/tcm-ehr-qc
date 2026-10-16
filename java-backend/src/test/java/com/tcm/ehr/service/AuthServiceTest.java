@@ -16,7 +16,6 @@ import com.tcm.ehr.service.impl.AuthServiceImpl;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.data.redis.core.StringRedisTemplate;

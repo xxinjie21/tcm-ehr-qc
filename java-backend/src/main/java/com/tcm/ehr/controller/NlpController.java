@@ -1,7 +1,6 @@
 package com.tcm.ehr.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
-import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.AsyncTaskRegistry;
 import com.tcm.ehr.common.utils.EntityNormalizer;
@@ -29,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**

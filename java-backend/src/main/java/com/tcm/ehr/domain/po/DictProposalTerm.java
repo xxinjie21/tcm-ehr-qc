@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.time.LocalDateTime;
 
 /**
  * 提案术语快照（{@code dict_proposal_term}）。

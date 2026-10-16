@@ -1,6 +1,5 @@
 package com.tcm.ehr.controller;
 
-import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.AiAsyncTasks;
 import com.tcm.ehr.common.utils.AsyncTaskRegistry;

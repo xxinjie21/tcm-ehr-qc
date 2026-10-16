@@ -6,8 +6,6 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.exception.ForbiddenException;
-import com.tcm.ehr.common.utils.ExcelRawStreamReader;
-import java.io.IOException;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.ReviewTaskUtil;
@@ -28,30 +26,19 @@ import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.DateUtil;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * 病历数据服务实现：Excel 批量导入 + 单条新增。

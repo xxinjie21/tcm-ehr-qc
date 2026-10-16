@@ -1,9 +1,7 @@
 package com.tcm.ehr.common.utils;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.SearchDTO;
-import com.tcm.ehr.domain.po.Record;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

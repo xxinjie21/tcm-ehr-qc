@@ -9,8 +9,6 @@ import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.DictProposalDiffVO;
 import com.tcm.ehr.service.IOrgPermissionService;
-import com.tcm.ehr.mapper.DictArchiveTermMapper;
-import com.tcm.ehr.mapper.DictArchiveVersionMapper;
 import com.tcm.ehr.mapper.DictProposalMapper;
 import com.tcm.ehr.mapper.DictProposalTermMapper;
 import com.tcm.ehr.service.impl.DictProposalServiceImpl;
@@ -23,7 +21,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;

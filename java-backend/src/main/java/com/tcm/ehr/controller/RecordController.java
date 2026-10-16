@@ -1,7 +1,6 @@
 package com.tcm.ehr.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
-import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.domain.Result;
 import jakarta.validation.Valid;
 import com.tcm.ehr.common.utils.OperationLogger;

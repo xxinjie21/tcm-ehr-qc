@@ -1,7 +1,6 @@
 package com.tcm.ehr.service.impl;
 
 import com.tcm.ehr.common.utils.RequestUtils;
-import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.ImportTaskVO;
 import com.tcm.ehr.mapper.RecordMapper;
 import com.tcm.ehr.service.IDictionaryTermStore;
@@ -11,7 +10,6 @@ import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -25,8 +23,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;

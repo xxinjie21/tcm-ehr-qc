@@ -3,7 +3,6 @@ package com.tcm.ehr.service.impl;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.config.AiFeature;
 import com.tcm.ehr.common.utils.TextUtil;
 import com.tcm.ehr.common.utils.LlmClient;

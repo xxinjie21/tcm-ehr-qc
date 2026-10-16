@@ -1,6 +1,5 @@
 package com.tcm.ehr.service.impl;
 
-import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.StandardizationReportVO;
 import com.tcm.ehr.mapper.RecordMapper;
