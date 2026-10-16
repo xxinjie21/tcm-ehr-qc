@@ -217,8 +217,8 @@ public class LlmConfigStore {
         return snapshot.config();
     }
 
-    /** 配置版本号；每次保存个人配置自增（见 {@link #saveFor}） */
-    public long version() {
+    /** 配置版本号；每次保存个人配置自增（见 {@link #saveFor}）。仅类内消费（{@link #versionOf}） */
+    private long version() {
         return snapshot.version();
     }
 

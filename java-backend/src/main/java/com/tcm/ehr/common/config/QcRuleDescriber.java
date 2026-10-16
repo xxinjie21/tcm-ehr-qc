@@ -32,13 +32,16 @@ public final class QcRuleDescriber {
 
         // 2. 完整性：列出全部要素名 + 两档扣分
         // 完整性
+        List<QcRuleSet.Element> elements = r.getCompleteness().getElements();
         List<String> names = new ArrayList<>();
-        int full = 0, partial = 0;
-        for (QcRuleSet.Element e : r.getCompleteness().getElements()) {
+        for (QcRuleSet.Element e : elements) {
             names.add(e.getName());
-            full = e.getWeightFull();
-            partial = e.getWeightPartial();
         }
+        // 扣分档位取自首个要素：出厂默认各要素同权重（见 QcRuleSet.defaults）。
+        // 原实现把 full/partial 写在循环里逐次覆盖，只留最后一个要素的值 —— 同权重下输出无差异，
+        // 一旦按要素差异化权重就会给出错误文案（审查报告 §4.2）。
+        int full = elements.isEmpty() ? 0 : elements.get(0).getWeightFull();
+        int partial = elements.isEmpty() ? 0 : elements.get(0).getWeightPartial();
         out.add("病历应包含【" + String.join("、", names) + "】；完全缺失每项扣 " + full
                 + " 分，仅有原始记录（未结构化）每项扣 " + partial + " 分。");
 

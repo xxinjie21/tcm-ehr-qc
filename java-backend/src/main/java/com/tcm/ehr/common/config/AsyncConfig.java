@@ -3,7 +3,6 @@ package com.tcm.ehr.common.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ThreadFactory;
@@ -27,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 认领 worker 数 = {@code qc.batch.concurrency} / {@code nlp.batch.concurrency}。</p>
  */
 @Configuration
-@EnableAsync
 public class AsyncConfig {
 
     /** 命名 + 守护线程的线程工厂 */

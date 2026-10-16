@@ -13,29 +13,22 @@ package com.tcm.ehr.common.config;
 public enum AiFeature {
 
     /** 病历解读 */
-    INTERPRET("interpret", "AI 解读"),
+    INTERPRET("interpret"),
 
     /** 复核预检意见 */
-    REVIEW("review", "复核意见"),
+    REVIEW("review"),
 
     /** 术语补词建议 */
-    TERM_SUGGEST("termSuggest", "术语建议");
+    TERM_SUGGEST("termSuggest");
 
     private final String key;
-    private final String label;
 
-    AiFeature(String key, String label) {
+    AiFeature(String key) {
         this.key = key;
-        this.label = label;
     }
 
     /** 稳定键名：DTO / 前端入参都用它标识功能 */
     public String key() {
         return key;
-    }
-
-    /** 中文名：供前端开关标签与日志使用 */
-    public String label() {
-        return label;
     }
 }

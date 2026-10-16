@@ -108,11 +108,6 @@ public class LlmClient {
 
     // ------------------------------------------------------------------ 对外
 
-    /** <b>当前用户</b>的配置是否开启 LLM（未配置则看系统基线） */
-    public boolean isEnabled() {
-        return configStore.getFor(RequestUtils.currentUserId()).enabled();
-    }
-
     /** 当前是否可用：配置已开启且装配成功 */
     public boolean isAvailable() {
         return resolve() != null;

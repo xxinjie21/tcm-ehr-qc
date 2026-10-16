@@ -57,7 +57,6 @@ public class QcRuleStore {
         this.current = normalize(QcRuleSet.defaults());
     }
 
-    /** 当前生效规则 */
     /**
      * 取<b>某个组织</b>生效的规则：该组织有行就用它的，没有则回退内置默认。
      *
@@ -184,11 +183,11 @@ public class QcRuleStore {
         return c != null ? c : QcRuleSet.defaults();
     }
 
-    public QcRuleSet get() {
+    /** 当前生效规则（仅类内 {@link #baseline()} 消费） */
+    private QcRuleSet get() {
         return current;
     }
 
-    /** 最近一次加载/保存的告警（供前端提示） */
     /** 规则版本自增：让 LlmClient 之类的「按版本判断是否重建」逻辑感知变化 */
     private void bump() {
         version.incrementAndGet();

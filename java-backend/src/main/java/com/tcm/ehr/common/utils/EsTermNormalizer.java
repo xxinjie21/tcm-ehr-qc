@@ -224,13 +224,6 @@ public class EsTermNormalizer {
             if (input.contains(std) || containsAnyAlias(e, input)) {
                 out.add(std);
             }
-            if (e.getAliases() != null) {
-                for (String a : e.getAliases()) {
-                    if (a != null && !a.isBlank() && !a.equals(input) && input.contains(a)) {
-                        out.add(std);
-                    }
-                }
-            }
         }
         return out;
     }

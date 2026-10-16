@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class StatsCache {
 
-    static final String KEY_PREFIX = RedisKeys.PREFIX + "cache:stats:";
+    private static final String KEY_PREFIX = RedisKeys.PREFIX + "cache:stats:";
     /** 版本号 key 的固定段：{@code ...:cache:stats:ver:{scope}}，与数据 key 的 {@code {scope}:v{n}} 段不撞名 */
     private static final String VERSION_SEGMENT = "ver:";
     /** 单飞锁 key 前缀 */

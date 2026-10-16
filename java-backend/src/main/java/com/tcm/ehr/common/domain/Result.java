@@ -47,15 +47,6 @@ public class Result<T> {
     }
 
     /**
-     * 成功响应（无数据体）。
-     *
-     * @return code=200、data=null 的响应
-     */
-    public static <T> Result<T> ok() {
-        return ok(null);
-    }
-
-    /**
      * 失败响应。
      *
      * @param code 业务状态码
@@ -66,17 +57,6 @@ public class Result<T> {
         Result<T> r = new Result<>();
         r.setCode(code);
         r.setMsg(msg);
-        r.setData(null);
         return r;
-    }
-
-    /**
-     * 失败响应（默认 500）。
-     *
-     * @param msg 失败原因
-     * @return code=500 的响应
-     */
-    public static <T> Result<T> error(String msg) {
-        return error(500, msg);
     }
 }
