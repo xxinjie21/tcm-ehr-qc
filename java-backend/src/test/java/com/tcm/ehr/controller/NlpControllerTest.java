@@ -10,6 +10,10 @@ import com.tcm.ehr.domain.dto.NlpExtractDTO;
 import com.tcm.ehr.domain.vo.NlpExtractVO;
 import com.tcm.ehr.domain.vo.NlpHealthVO;
 import com.tcm.ehr.service.INlpBatchService;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -18,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.eq;
@@ -55,6 +60,28 @@ class NlpControllerTest {
         NlpController controller = controller(mock(PythonNlpClient.class), null);
         assertEquals(400, controller.extract(dto("   ")).getStatusCode().value());
         assertEquals(400, controller.extract(new NlpExtractDTO(null)).getStatusCode().value());
+    }
+
+    /**
+     * 超长文本必须在 Java 入口被拦下，不能转发到 Python 拿 422 再降级。
+     *
+     * <p>这里不能走 {@code controller.extract(...)}：本测试是纯单元测试，没有 Spring MVC 的
+     * {@code @Valid} 流程，Bean Validation 不会触发（上面的 {@code blankTextReturns400}
+     * 测的其实是 Controller 里那行手写判空）。所以直接对 DTO 跑 Validator。</p>
+     */
+    @Test
+    void textLongerThanLimitFailsValidation() {
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+
+        // 边界：正好 20000 通过（与 python-nlp/main.py 的 MAX_TEXT_CHARS 同值）
+        assertTrue(validator.validate(new NlpExtractDTO("热".repeat(20000))).isEmpty());
+
+        // 20001 必须报错，且提示语直接说明是长度问题 —— 前端 apiErrorMessage 会把它显示给用户，
+        // 这正是修这个契约的目的：别再让用户看到「服务不可用」而误以为后端挂了
+        Set<ConstraintViolation<NlpExtractDTO>> violations =
+                validator.validate(new NlpExtractDTO("热".repeat(20001)));
+        assertFalse(violations.isEmpty());
+        assertEquals("文本最长 20000 字符", violations.iterator().next().getMessage());
     }
 
     @Test
