@@ -81,7 +81,9 @@ public class DataInitializationListener implements ApplicationRunner {
         }
 
         // 3. MySQL数据源
-        log.info("[MySQL] 数据源已配置（tcm_ehr@localhost:3306）");
+        //    刻意不写 host/库名：这里拿不到 DataSource 的真实 URL，写死一个与实际配置无关的
+        //    地址（原为 "tcm_ehr@localhost:3306"）在排查连接问题时只会误导。
+        log.info("[MySQL] 数据源已配置");
 
         // 4. 术语库加载（提前内置）：JSON文件 -> ES索引重建
         loadDictionaries();

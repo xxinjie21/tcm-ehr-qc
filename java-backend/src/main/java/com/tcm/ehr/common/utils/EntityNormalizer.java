@@ -429,27 +429,32 @@ public class EntityNormalizer {
         vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat, orgId));
 
         // 3. 中药单独处理：归一目标是 name 而不是 content
-        for (NlpExtractVO.Herb herb : vo.getHerbs()) {
-            if (herb == null) continue;
-            // 中药以 name 为归一目标，sourceText 保留原文（模型侧 name 与 sourceText 同源）
-            String raw = rawOf(herb.getName(), herb.getSourceText());
-            if (raw.isEmpty()) continue;
-            if (TextUtil.isBlank(herb.getSourceText())) {
-                herb.setSourceText(raw);
+        //    ⚠️ 判空不可省：structured_data 可能没有 herbs 键（或显式为 null），而其余 8 类走
+        //    normEntities 已有同样的判空 —— 这里原先是漏的（《common组件审查报告》§七.6）。
+        //    同一份 VO 在上方 prefetchRecall 里也是判空后遍历的。
+        if (vo.getHerbs() != null) {
+            for (NlpExtractVO.Herb herb : vo.getHerbs()) {
+                if (herb == null) continue;
+                // 中药以 name 为归一目标，sourceText 保留原文（模型侧 name 与 sourceText 同源）
+                String raw = rawOf(herb.getName(), herb.getSourceText());
+                if (raw.isEmpty()) continue;
+                if (TextUtil.isBlank(herb.getSourceText())) {
+                    herb.setSourceText(raw);
+                }
+                EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", orgId, raw);
+                // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
+                if (!EsTermNormalizer.isHit(r.level())) {
+                    continue;
+                }
+                herb.setName(r.standardTerm());
+                herb.setNormLevel(r.level());
+                stat[0]++;
+                stat[r.level()]++;
             }
-            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", orgId, raw);
-            // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
-            if (!EsTermNormalizer.isHit(r.level())) {
-                continue;
-            }
-            herb.setName(r.standardTerm());
-            herb.setNormLevel(r.level());
-            stat[0]++;
-            stat[r.level()]++;
+            // 5. 中药也按标准词去重
+            vo.setHerbs(dedupByTerm(vo.getHerbs(), NlpExtractVO.Herb::getName,
+                    NlpExtractVO.Herb::getSourceText, NlpExtractVO.Herb::getNormLevel));
         }
-        // 5. 中药也按标准词去重
-        vo.setHerbs(dedupByTerm(vo.getHerbs(), NlpExtractVO.Herb::getName,
-                NlpExtractVO.Herb::getSourceText, NlpExtractVO.Herb::getNormLevel));
 
         return NormStat.of(stat);
     }

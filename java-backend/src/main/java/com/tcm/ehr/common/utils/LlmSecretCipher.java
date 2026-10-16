@@ -41,10 +41,10 @@ public class LlmSecretCipher {
     public LlmSecretCipher(@Value("${llm.crypto-password:}") String password,
                            @Value("${llm.crypto-salt:}") String salt) {
         TextEncryptor built = null;
-        if (isBlank(password)) {
+        if (TextUtil.isBlank(password)) {
             log.warn("[LLM] 未配置加密口令（环境变量 TCM_LLM_ENC_KEY 或配置 llm.crypto-password）："
                     + "用户 LLM 密钥将无法落库加密保存，服务照常启动");
-        } else if (isBlank(salt)) {
+        } else if (TextUtil.isBlank(salt)) {
             log.warn("[LLM] 未配置加密盐（环境变量 TCM_LLM_ENC_SALT 或配置 llm.crypto-salt）："
                     + "用户 LLM 密钥将无法落库加密保存，服务照常启动");
         } else {
@@ -58,10 +58,6 @@ public class LlmSecretCipher {
         }
         this.encryptor = built;
         this.available = built != null;
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.isBlank();
     }
 
     /** 加密密钥是否就绪；false 时保存会直接拒绝（而不是明文落库） */

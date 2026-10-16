@@ -8,8 +8,12 @@ import java.util.List;
 /**
  * 质控规则集。
  *
- * <p>默认值由 {@link #defaults()} 给出（按当前数据集调优的通用示例）；运行时可被
- * {@code data/qc-rules.json} 覆盖，字段级深合并（缺的用默认补、多的忽略）。</p>
+ * <p>默认值由 {@link #defaults()} 给出（按当前数据集调优的通用示例）。<b>运行时权威是 DB</b>：
+ * 每组织一行（{@code qc_rules.rules_json}），无行的组织回退默认；读取、字段级深合并
+ * （缺的用默认补、多的忽略）与告警都由 {@code QcRuleStore} 负责。</p>
+ *
+ * <p>⚠️ 原注释写的「运行时可被 {@code data/qc-rules.json} 覆盖」<b>已作废</b>：那个文件
+ * 从来不存在，其兜底读路径已在批次 25.a 删除（{@code QcRuleStore} 类头有同样说明）。</p>
  *
  * <p>一致性 / 格式规则声明它依赖的病历要素，判定时若该要素在数据中缺失，则视为"不适用"、
  * 跳过而不误判；完整性要素相反——缺失即按两档扣分（真缺失扣满档，原始病历有记录但未结构化扣半档），
@@ -148,7 +152,7 @@ public class QcRuleSet {
         private int invalid = 60;
     }
 
-    /** 出厂默认（按当前数据集调优的通用示例，可被 qc-rules.json 覆盖） */
+    /** 出厂默认（按当前数据集调优的通用示例；运行时权威是 DB，见类头说明） */
     public static QcRuleSet defaults() {
         QcRuleSet r = new QcRuleSet();
         r.completeness = defaultCompleteness();

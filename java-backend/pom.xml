@@ -138,7 +138,8 @@
             <version>5.2.5</version>
         </dependency>
 
-        <!-- Caffeine：进程内缓存（VersionedCache 的底层 LRU、RegexCache 的编译结果备忘） -->
+        <!-- Caffeine：进程内缓存（RegexCache 的正则编译结果备忘、QcRuleStore 的组织规则行短 TTL）。
+             注：VersionedCache 是自写的 LinkedHashMap(accessOrder=true)，不用 Caffeine。 -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>

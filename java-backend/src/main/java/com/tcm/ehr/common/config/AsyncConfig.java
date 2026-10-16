@@ -23,6 +23,11 @@ import java.util.concurrent.ThreadPoolExecutor;
  * <p>所有池都用守护线程：进程退出不被非守护线程吊住。批量池的大小与属性取值一致，
  * 认领 worker 数 = {@code qc.batch.concurrency} / {@code nlp.batch.concurrency}。</p>
  *
+ * <p><b>关停策略：刻意不等在跑任务</b>（不设 {@code setWaitForTasksToCompleteOnShutdown} /
+ * {@code setAwaitTerminationSeconds}，两者默认 false）。在跑的可能是 150s 级的长响应，
+ * 等它跑完会让关停迟迟不返回；宁可丢弃（前端会收到连接中断，可重试）也不阻塞关停。
+ * 这是取舍、不是遗漏 —— 见《common组件审查报告》§4.9。</p>
+ *
  * <p><b>线程命名与守护位交给 Spring 原生</b>（《common组件审查报告》§1.2）：不再自写
  * {@code ThreadFactory} + {@code AtomicInteger}。{@link ThreadPoolTaskExecutor} 未显式设
  * ThreadFactory 时<b>以自身为工厂</b>，而它继承 {@code CustomizableThreadFactory} →

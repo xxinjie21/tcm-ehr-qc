@@ -450,7 +450,8 @@ public final class RecordFilter {
     }
 
     private static boolean notBlank(String value) {
-        return value != null && !value.isBlank();
+        // 判空口径统一走 TextUtil.isBlank（原为逐字重写一份 value != null && !value.isBlank()）
+        return !TextUtil.isBlank(value);
     }
 
     /**
