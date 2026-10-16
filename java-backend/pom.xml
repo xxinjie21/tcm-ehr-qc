@@ -138,6 +138,13 @@
             <version>5.2.5</version>
         </dependency>
 
+        <!-- Caffeine：进程内缓存（VersionedCache 的底层 LRU、RegexCache 的编译结果备忘） -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>3.1.8</version>
+        </dependency>
+
         <!-- PDFBox 依赖已移除（2026-10-07）：原为「PDF 术语库抽文本 → 交给 LLM 转换，
             批A·1.4」预留，但从未有代码使用（全仓 0 处 import），
             且标准化报告的「打印 / 另存 PDF」功能已按需求整体下掉 —— 保留它只是白挂着。 -->

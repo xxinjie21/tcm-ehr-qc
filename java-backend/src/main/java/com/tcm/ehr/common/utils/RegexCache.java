@@ -1,7 +1,8 @@
 package com.tcm.ehr.common.utils;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.util.regex.Pattern;
 
 /**
@@ -17,20 +18,25 @@ import java.util.regex.Pattern;
  * 与本项目「配置类一律以 DB 为权威 + 版本号失效」那条约束不冲突：那条约束管的是
  * <b>配置内容</b>的权威来源，而这里只备忘「把这段文本编译成对象」的结果，内容仍来自 DB。</p>
  *
- * <p><b>为什么有上界</b>：表达式由管理员按组织配置，理论上可无限新增。
- * 到界后不再写入（退化为每次都编译），而不是淘汰已有项 —— 淘汰会让常用表达式反复重编译，
- * 反而制造抖动。上界取 {@value #MAX_ENTRIES}，远超「一个部署里出现过的不同格式规则数」。</p>
+ * <p><b>底层改用 Caffeine</b>（《自研组件替换计划》#4）：原实现是「自写 {@code ConcurrentHashMap}
+ * + 到界后只读不写」，属重复实现通用能力。换成 {@code Caffeine.maximumSize(512)} 后有两处变化：
+ * ① 到界后按 Caffeine 的淘汰策略逐出冷门表达式，而不是「冻住最早写入的 512 条」——
+ * 常用表达式反而更稳（不会被早期冷门项永久占位），只在「一个部署里出现过 &gt; 512 条不同格式规则」
+ * 时才可能出现重复编译，代价可忽略；② 线程安全与容量判断都交给 Caffeine，删掉手写逻辑。</p>
  *
- * <p><b>非法表达式</b>：{@link Pattern#compile(String)} 会抛，本类<b>不吞</b>它 ——
- * 调用方（{@code formatOk}）本来就要把「规则自身写错」与「病历不合规」分开处理
- * （前者放行不扣分），异常必须留给它看见。</p>
+ * <p><b>非法表达式</b>：{@link Pattern#compile} 会抛，本类<b>不吞</b>它 ——
+ * Caffeine 的 {@code get(key, mappingFunction)} 在映射函数抛异常时不写入缓存、原样抛出，
+ * 与原来的「先编译、成功了才入表」语义一致。调用方（{@code formatOk}）本来就要把
+ * 「规则自身写错」与「病历不合规」分开处理（前者放行不扣分），异常必须留给它看见。</p>
  */
 public final class RegexCache {
 
-    /** 备忘条数上界：到界后只读不写，退化为每次现编译 */
+    /** 备忘条数上界 */
     private static final int MAX_ENTRIES = 512;
 
-    private static final Map<String, Pattern> CACHE = new ConcurrentHashMap<>();
+    private static final Cache<String, Pattern> CACHE = Caffeine.newBuilder()
+            .maximumSize(MAX_ENTRIES)
+            .build();
 
     private RegexCache() {
     }
@@ -38,21 +44,12 @@ public final class RegexCache {
     /**
      * 取（必要时编译）一个正则。
      *
-     * @param expr 表达式；调用方需保证非 null 非空白（本类不做空判断，传 null 会按 {@code Pattern.compile} 的语义抛 NPE）
+     * @param expr 表达式；调用方需保证非 null 非空白（Caffeine 的 {@code get} 对 null 键抛 NPE，
+     *             与原先 {@code ConcurrentHashMap.get(null)} 同样抛 NPE）
      * @return 编译结果（可能是备忘里复用的实例）
      * @throws java.util.regex.PatternSyntaxException 表达式非法
      */
     public static Pattern of(String expr) {
-        // 1. 命中即复用
-        Pattern hit = CACHE.get(expr);
-        if (hit != null) {
-            return hit;
-        }
-        // 2. 未命中：先编译（可能抛），成功了再决定要不要入表
-        Pattern compiled = Pattern.compile(expr);
-        if (CACHE.size() < MAX_ENTRIES) {
-            CACHE.put(expr, compiled);
-        }
-        return compiled;
+        return CACHE.get(expr, Pattern::compile);
     }
 }
