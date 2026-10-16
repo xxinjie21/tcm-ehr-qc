@@ -54,13 +54,7 @@ public final class StructuredDataMeta {
             // 2. 解析后塞 _meta（版本 + 打点时刻 + 词条数），再序列化回去
             Map<String, Object> data = mapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
-            Map<String, Object> meta = new LinkedHashMap<>();
-            meta.put("dictVersion", dictVersion);
-            meta.put("dictCapturedAt", LocalDateTime.now().withNano(0).format(TS));
-            if (dictTermCount != null) {
-                meta.put("dictTermCount", dictTermCount);
-            }
-            data.put(META_KEY, meta);
+            data.put(META_KEY, metaOf(dictVersion, dictTermCount));
             return mapper.writeValueAsString(data);
         } catch (Exception e) {
             // 3. 打点失败原样返回：宁可没有版本信息，也不能弄丢结构化数据本身
@@ -89,13 +83,7 @@ public final class StructuredDataMeta {
         try {
             // 2. 有版本号才塞 _meta；没有就只把已解析的结构原样序列化回去
             if (dictVersion != null && !dictVersion.isBlank()) {
-                Map<String, Object> meta = new LinkedHashMap<>();
-                meta.put("dictVersion", dictVersion);
-                meta.put("dictCapturedAt", LocalDateTime.now().withNano(0).format(TS));
-                if (dictTermCount != null) {
-                    meta.put("dictTermCount", dictTermCount);
-                }
-                data.put(META_KEY, meta);
+                data.put(META_KEY, metaOf(dictVersion, dictTermCount));
             }
             return mapper.writeValueAsString(data);
         } catch (Exception e) {
@@ -126,16 +114,32 @@ public final class StructuredDataMeta {
         try {
             Map<String, Object> data = mapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
-            Map<String, Object> meta = new LinkedHashMap<>();
-            meta.put(KEY_MANUAL, true);
-            meta.put(KEY_EDITED_BY, editedBy);
-            meta.put(KEY_EDITED_AT, LocalDateTime.now().withNano(0).format(TS));
-            data.put(META_KEY, meta);
+            data.put(META_KEY, metaOfManual(editedBy));
             return mapper.writeValueAsString(data);
         } catch (Exception e) {
             // 打点失败不能丢数据：宁可没有人工修改标记
             return json;
         }
+    }
+
+    /** 词典版本元信息（版本串 + 打点时刻 + 可选词条数）；装配逻辑只此一处 */
+    private static Map<String, Object> metaOf(String dictVersion, Integer dictTermCount) {
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("dictVersion", dictVersion);
+        meta.put("dictCapturedAt", LocalDateTime.now().withNano(0).format(TS));
+        if (dictTermCount != null) {
+            meta.put("dictTermCount", dictTermCount);
+        }
+        return meta;
+    }
+
+    /** 人工修改元信息（三要素）；stampManual 用，替换而非合并整个 _meta */
+    private static Map<String, Object> metaOfManual(String editedBy) {
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put(KEY_MANUAL, true);
+        meta.put(KEY_EDITED_BY, editedBy);
+        meta.put(KEY_EDITED_AT, LocalDateTime.now().withNano(0).format(TS));
+        return meta;
     }
 
     /**

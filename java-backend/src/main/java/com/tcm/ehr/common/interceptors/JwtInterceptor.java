@@ -1,6 +1,5 @@
 package com.tcm.ehr.common.interceptors;
 
-import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.service.OrgResolution;
@@ -103,9 +102,6 @@ public class JwtInterceptor implements HandlerInterceptor {
     }
 
     private boolean reject(HttpServletResponse response) throws Exception {
-        response.setStatus(401);
-        response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(Result.error(401, "未登录或token失效")));
-        return false;
+        return JsonResponses.write(objectMapper, response, 401, "未登录或token失效");
     }
 }

@@ -324,8 +324,7 @@ public class EntityNormalizer {
     private boolean hitsDictionary(String type, String orgId, String raw) {
         try {
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
-            return r != null && r.level() >= EsTermNormalizer.LEVEL_EXACT
-                    && r.level() <= EsTermNormalizer.LEVEL_FUZZY;
+            return r != null && EsTermNormalizer.isHit(r.level());
         } catch (Exception ex) {
             // 词典/ES 不可用时**不挪**：宁可少归位，也不能凭猜把症状改成脉象
             log.warn("[归一] 归位判定失败（type={}）: {}", type, ex.getMessage());
@@ -439,7 +438,7 @@ public class EntityNormalizer {
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", orgId, raw);
             // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
-            if (r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
+            if (!EsTermNormalizer.isHit(r.level())) {
                 continue;
             }
             herb.setName(r.standardTerm());
@@ -474,7 +473,7 @@ public class EntityNormalizer {
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
             // 4. 未命中词典就保持原样，不写 normLevel
-            if (r.level() < EsTermNormalizer.LEVEL_EXACT || r.level() > EsTermNormalizer.LEVEL_FUZZY) {
+            if (!EsTermNormalizer.isHit(r.level())) {
                 continue;
             }
             // 4.5 否定语境下的「包含命中」一律不归一。

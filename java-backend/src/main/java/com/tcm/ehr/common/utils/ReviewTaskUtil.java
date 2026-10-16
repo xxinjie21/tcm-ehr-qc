@@ -1,10 +1,6 @@
 package com.tcm.ehr.common.utils;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
 
 /**
  * 复核任务工具。
@@ -46,13 +42,6 @@ public final class ReviewTaskUtil {
         String raw = (structuredData == null ? "" : structuredData) + "\u0000"
                 + (score == null ? "" : score) + "\u0000"
                 + (grade == null ? "" : grade);
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(md.digest(raw.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            // SHA-256 是 JDK 必备算法，正常走不到这里；真到了也不能返回常量指纹 ——
-            // 那等于对所有病历返回同一个值，并发保护直接失效。
-            throw new IllegalStateException("SHA-256 不可用，无法计算复核指纹", e);
-        }
+        return DigestUtil.hex("SHA-256", raw);
     }
 }

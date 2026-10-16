@@ -68,24 +68,6 @@ public final class RequestUtils {
         return attr(ATTR_ROLE);
     }
 
-    /** 取当前系统角色；非请求线程/异常时装"unknown"，调用方按"不是管理员"处理（H4 捕获值的兜底） */
-    public static String safeCurrentRole() {
-        try {
-            return attr(ATTR_ROLE);
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    /** 取当前组织角色（owner/member）；非请求线程/异常时给空串（H4 捕获值的兜底） */
-    public static String safeCurrentOrgRole() {
-        try {
-            return attr(ATTR_ORG_ROLE);
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
     /**
      * 当前操作人所属课题组。
      *

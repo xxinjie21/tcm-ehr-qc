@@ -151,8 +151,10 @@ public abstract class AsyncTaskRegistry<T> {
         String userId = safeUserId();
         // 角色有两个维度：系统角色（管理员/用户）与组织角色（owner/member），
         // 任务线程读哪一个都不能退化成 null/unknown —— 一并捕获并在任务线程重建。
-        String role = RequestUtils.safeCurrentRole();
-        String orgRole = RequestUtils.safeCurrentOrgRole();
+        // 无请求上下文时 RequestUtils.attr() 内部已整体兜住并返回 "unknown"，故直接用非 safe 版
+        // （原 safeCurrentRole/safeCurrentOrgRole 的 catch 永不触发、返回值恒等，已删；审查报告 §2.5）
+        String role = RequestUtils.currentRole();
+        String orgRole = RequestUtils.currentOrgRole();
         // 「不限组织」也必须捕获：它只在请求线程由 JwtInterceptor 置一次（见
         // RequestUtils.ATTR_VIEW_ALL_ORGS），任务线程是另一根线程，读不到就等于 false。
         // 漏了它，管理员发起的异步 AI 解读 / 复核会被按他所属的那一个组织过滤，

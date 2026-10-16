@@ -54,6 +54,16 @@ public class EsTermNormalizer {
     /** 三级：Dice 相似度达阈值 */
     public static final int LEVEL_FUZZY = 3;
 
+    /**
+     * level 是否落在「命中」区间（精确 ~ 模糊）。
+     *
+     * <p>{@code EntityNormalizer} 有 3 处重复写 {@code level >= LEVEL_EXACT && level <= LEVEL_FUZZY}
+     * （其中 2 处取反判定「未命中」），收敛到此处一处，避免层级区间改动时漏改（审查报告 §2.11）。</p>
+     */
+    public static boolean isHit(int level) {
+        return level >= LEVEL_EXACT && level <= LEVEL_FUZZY;
+    }
+
     private final IEsTermIndexService esTermIndexService;
 
     /**

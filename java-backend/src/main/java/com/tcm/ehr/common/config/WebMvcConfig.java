@@ -15,6 +15,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
 
+    /** 免鉴权白名单：登录与注册不需要 token。三个拦截器共用同一份，避免漏改一处 */
+    private static final String[] WHITELIST = {"/api/auth/login", "/api/auth/register"};
+
     private final JwtInterceptor jwtInterceptor;
     private final RoleInterceptor roleInterceptor;
     private final OrgRoleInterceptor groupRoleInterceptor;
@@ -30,13 +33,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // 顺序即执行顺序：先鉴权（401），再校验角色（403）
         registry.addInterceptor(jwtInterceptor)
                 .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/auth/login", "/api/auth/register");
+                .excludePathPatterns(WHITELIST);
         registry.addInterceptor(roleInterceptor)
                 .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/auth/login", "/api/auth/register");
+                .excludePathPatterns(WHITELIST);
         // 组内角色（组长）校验：在系统级角色之后执行
         registry.addInterceptor(groupRoleInterceptor)
                 .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/auth/login", "/api/auth/register");
+                .excludePathPatterns(WHITELIST);
     }
 }

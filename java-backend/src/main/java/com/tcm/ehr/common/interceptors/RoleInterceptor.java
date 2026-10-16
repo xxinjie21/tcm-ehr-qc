@@ -2,7 +2,6 @@ package com.tcm.ehr.common.interceptors;
 
 import tools.jackson.databind.ObjectMapper;
 import com.tcm.ehr.common.annotation.RequireRole;
-import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.RequestUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -71,9 +70,6 @@ public class RoleInterceptor implements HandlerInterceptor {
     /** 403：与 JwtInterceptor 的 401 保持同一响应形态（HTTP 状态码 + Result 包装） */
     private boolean reject(HttpServletResponse response, String[] roles) throws Exception {
         String need = Arrays.stream(roles).collect(Collectors.joining(" / "));
-        response.setStatus(403);
-        response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(Result.error(403, "权限不足，需要角色：" + need)));
-        return false;
+        return JsonResponses.write(objectMapper, response, 403, "权限不足，需要角色：" + need);
     }
 }

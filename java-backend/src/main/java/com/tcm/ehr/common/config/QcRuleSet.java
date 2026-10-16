@@ -34,6 +34,21 @@ public class QcRuleSet {
      */
     public static final String GENDER_PATTERN = "^(男|女)$";
 
+    /**
+     * 年龄格式正则 —— <b>唯一权威</b>。默认规则（{@link #defaults()}）与前端下拉目录
+     * （{@code QcRuleDescriber.catalogFormats()}）共用同一份，避免两边漂移：界面显示的校验
+     * 与实际应用的规则不一致时，用户会以为「改了规则不生效」。
+     *
+     * <p>用 {@code (...)+} 允许<b>复合单位</b>：「32岁6月」「35岁2月」是真实病历的常见写法。
+     * 原先的 {@code ^\d+(\.\d+)?(岁|个月|月|天)?$} 只允许单个单位后缀，实测把真实数据里
+     * 92.1% 的年龄判成格式错误（32550/35354，失败形态 100% 为复合单位）。单位后缀在每组内
+     * 仍必须可选，否则纯数字「45」会反过来不匹配。</p>
+     */
+    public static final String AGE_PATTERN = "^(\\d+(\\.\\d+)?(岁|个月|月|天)?)+$";
+
+    /** 年龄正则的「人话」说明（regex 类型只输出 hint、不输出正则本身） */
+    public static final String AGE_HINT = "须为数字，可带 岁/个月/月/天 单位（可组合，如 32岁6月）";
+
     private Completeness completeness = new Completeness();
     private List<FormatRule> format = new ArrayList<>();
     private List<ConsistencyRule> consistency = new ArrayList<>();
@@ -144,15 +159,9 @@ public class QcRuleSet {
         }
 
         // 格式
-        // 年龄正则用 (...)+ 允许「复合单位」：「32岁6月」「35岁2月」是真实病历的常见写法。
-        // 原先的 ^\d+(\.\d+)?(岁|个月|月|天)?$ 只允许单个单位后缀，实测把真实数据里
-        // 92.1% 的年龄判成格式错误（32550/35354，失败形态 100% 为复合单位）。
-        // 单位后缀在每组内仍必须可选，否则纯数字「45」会反过来不匹配。
-        QcRuleSet.FormatRule age = format("age", "regex", "^(\\d+(\\.\\d+)?(岁|个月|月|天)?)+$",
-                List.of(), "年龄", "年龄格式不正确");
-        age.setHint("须为数字，可带 岁/个月/月/天 单位（可组合，如 32岁6月）");
-        r.format.add(age);
-        r.format.add(format("gender", "enum", null, GENDER_VALUES, "性别", "性别非 男/女"));
+        // 年龄正则与 hint 见 AGE_PATTERN / AGE_HINT（与前端下拉目录共用，避免两边漂移）
+        r.format.add(format("age", "regex", AGE_PATTERN, List.of(), "年龄", "年龄格式不正确", AGE_HINT));
+        r.format.add(format("gender", "enum", null, GENDER_VALUES, "性别", "性别非 男/女", null));
 
         // 一致性（证候 → 中药 / 方剂；值取自词典，当前数据无方剂则方剂规则不触发）
         // 证候 → 中药
@@ -201,8 +210,13 @@ public class QcRuleSet {
         return r;
     }
 
-    private static Element el(String name, String source, List<String> fallback) {
-        // 1. 逐字段装配 2. 兜底字段列新建 ArrayList：不能共享入参列表
+    /**
+     * 构造完整性要素；{@code fallback} 拷贝成新列表避免共享入参。
+     *
+     * <p>包级可见：{@code QcRuleDescriber.catalogElements()} 也用它构造前端下拉目录，
+     * 保证「目录里的可选项」与「默认规则」逐字同构（审查报告 §2.2）。</p>
+     */
+    static Element el(String name, String source, List<String> fallback) {
         Element e = new Element();
         e.setName(name);
         e.setSource(source);
@@ -210,8 +224,14 @@ public class QcRuleSet {
         return e;
     }
 
-    private static FormatRule format(String field, String type, String expr, List<String> values, String label, String reason) {
-        // 1. 逐字段装配；values 拷一份
+    /**
+     * 构造格式规则；{@code values} 拷贝一份避免共享入参列表。
+     *
+     * <p>包级可见：{@code QcRuleDescriber.catalogFormats()} 也用它构造前端下拉目录，
+     * 保证「目录里的模板」与「默认规则」逐字同构（审查报告 §2.2）。</p>
+     */
+    static FormatRule format(String field, String type, String expr, List<String> values, String label,
+                             String reason, String hint) {
         FormatRule f = new FormatRule();
         f.setField(field);
         f.setType(type);
@@ -219,6 +239,7 @@ public class QcRuleSet {
         f.setValues(new ArrayList<>(values));
         f.setLabel(label);
         f.setReason(reason);
+        f.setHint(hint);
         return f;
     }
 

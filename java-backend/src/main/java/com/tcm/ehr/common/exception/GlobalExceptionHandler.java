@@ -37,6 +37,16 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     /**
+     * 统一错误响应：HTTP 状态 + {@code Result{code,msg}}。
+     *
+     * <p>本类的 handler 几乎都是这个形状，原先各写一遍 {@code ResponseEntity.status(..).body(Result.error(..))}；
+     * 收敛到此处一处，新增 handler 不会再漏掉统一形态（审查报告 §2.8）。</p>
+     */
+    private static ResponseEntity<Result<Void>> error(HttpStatus status, int code, String msg) {
+        return ResponseEntity.status(status).body(Result.error(code, msg));
+    }
+
+    /**
      * 用户名或密码错误。
      *
      * @param e 携带可展示的提示文案
@@ -44,7 +54,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Result<Void>> handleBadCredentials(BadCredentialsException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.error(401, e.getMessage()));
+        return error(HttpStatus.UNAUTHORIZED, 401, e.getMessage());
     }
 
     /**
@@ -55,7 +65,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Result<Void>> handleUnauthorized(UnauthorizedException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.error(401, e.getMessage()));
+        return error(HttpStatus.UNAUTHORIZED, 401, e.getMessage());
     }
 
     /**
@@ -66,7 +76,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Result<Void>> handleIllegalArgument(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(Result.error(400, e.getMessage()));
+        return error(HttpStatus.BAD_REQUEST, 400, e.getMessage());
     }
 
     /**
@@ -80,7 +90,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusiness(BusinessException e) {
-        return ResponseEntity.status(e.getStatus()).body(Result.error(e.getCode(), e.getMessage()));
+        return error(e.getStatus(), e.getCode(), e.getMessage());
     }
 
     /**
@@ -91,7 +101,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Result<Void>> handleForbidden(ForbiddenException e) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.error(403, e.getMessage()));
+        return error(HttpStatus.FORBIDDEN, 403, e.getMessage());
     }
 
     /**
@@ -104,7 +114,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(LlmProbeException.class)
     public ResponseEntity<Result<Void>> handleLlmProbe(LlmProbeException e) {
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Result.error(1009, e.getMessage()));
+        return error(HttpStatus.BAD_GATEWAY, 1009, e.getMessage());
     }
 
     /**
@@ -119,7 +129,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TermIndexUnavailableException.class)
     public ResponseEntity<Result<Void>> handleTermIndexUnavailable(TermIndexUnavailableException e) {
         log.error("[全局异常] 术语索引不可用: {}", e.getMessage(), e);
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Result.error(1010, e.getMessage()));
+        return error(HttpStatus.SERVICE_UNAVAILABLE, 1010, e.getMessage());
     }
 
     /**
@@ -133,7 +143,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServiceNotReadyException.class)
     public ResponseEntity<Result<Void>> handleServiceNotReady(ServiceNotReadyException e) {
         log.error("[全局异常] 服务未就绪: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Result.error(1011, e.getMessage()));
+        return error(HttpStatus.SERVICE_UNAVAILABLE, 1011, e.getMessage());
     }
 
     /**
@@ -147,7 +157,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RateLimitedException.class)
     public ResponseEntity<Result<Void>> handleRateLimited(RateLimitedException e) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Result.error(429, e.getMessage()));
+        return error(HttpStatus.TOO_MANY_REQUESTS, 429, e.getMessage());
     }
 
     /**
@@ -158,7 +168,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Result<Void>> handleNotFound(ResourceNotFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(e.getCode(), e.getMessage()));
+        return error(HttpStatus.NOT_FOUND, e.getCode(), e.getMessage());
     }
 
     /**
@@ -175,18 +185,18 @@ public class GlobalExceptionHandler {
         List<FieldError> errors = e.getBindingResult().getFieldErrors();
         // 1. 拿不到字段错误就只给通用文案
         if (errors.isEmpty()) {
-            return ResponseEntity.badRequest().body(Result.error(400, "请求参数非法"));
+            return error(HttpStatus.BAD_REQUEST, 400, "请求参数非法");
         }
         // 2. 只有一个错误时直接说那一条，不要"字段：xxx"的前缀噪音
         if (errors.size() == 1) {
-            return ResponseEntity.badRequest().body(Result.error(400, messageOf(errors.get(0))));
+            return error(HttpStatus.BAD_REQUEST, 400, messageOf(errors.get(0)));
         }
         // 3. 多个错误逐条拼（去重：同一字段可能触发多条约束）
         String msg = errors.stream()
                 .map(fe -> fe.getField() + "：" + messageOf(fe))
                 .distinct()
                 .collect(Collectors.joining("；"));
-        return ResponseEntity.badRequest().body(Result.error(400, msg));
+        return error(HttpStatus.BAD_REQUEST, 400, msg);
     }
 
     private static String messageOf(FieldError fe) {
@@ -204,7 +214,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Result<Void>> handleNotReadable(HttpMessageNotReadableException e) {
         log.warn("[全局异常] 请求体不可读: {}", e.getMessage());
-        return ResponseEntity.badRequest().body(Result.error(400, "请求体缺失或格式错误"));
+        return error(HttpStatus.BAD_REQUEST, 400, "请求体缺失或格式错误");
     }
 
     /**
@@ -215,8 +225,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<Result<Void>> handleMissingParam(MissingServletRequestParameterException e) {
-        return ResponseEntity.badRequest()
-                .body(Result.error(400, "缺少必填参数：" + e.getParameterName()));
+        return error(HttpStatus.BAD_REQUEST, 400, "缺少必填参数：" + e.getParameterName());
     }
 
     /**
@@ -227,8 +236,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Result<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
-        return ResponseEntity.badRequest()
-                .body(Result.error(400, "参数类型不正确：" + e.getName()));
+        return error(HttpStatus.BAD_REQUEST, 400, "参数类型不正确：" + e.getName());
     }
 
     /**
@@ -239,7 +247,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Result<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
-        return ResponseEntity.badRequest().body(Result.error(400, "文件超过大小上限（单文件/请求 50MB）"));
+        return error(HttpStatus.BAD_REQUEST, 400, "文件超过大小上限（单文件/请求 50MB）");
     }
 
     /**
@@ -250,7 +258,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MultipartException.class)
     public ResponseEntity<Result<Void>> handleMultipart(MultipartException e) {
-        return ResponseEntity.badRequest().body(Result.error(400, "请以 multipart/form-data 上传文件"));
+        return error(HttpStatus.BAD_REQUEST, 400, "请以 multipart/form-data 上传文件");
     }
 
     /**
@@ -263,8 +271,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<Result<Void>> handleMissingPart(MissingServletRequestPartException e) {
-        return ResponseEntity.badRequest()
-                .body(Result.error(400, "缺少文件参数：" + e.getRequestPartName()));
+        return error(HttpStatus.BAD_REQUEST, 400, "缺少文件参数：" + e.getRequestPartName());
     }
 
     /**
@@ -277,7 +284,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(404, "接口不存在"));
+        return error(HttpStatus.NOT_FOUND, 404, "接口不存在");
     }
 
     /**
@@ -290,8 +297,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<Result<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .body(Result.error(405, "请求方法不支持：" + e.getMethod()));
+        return error(HttpStatus.METHOD_NOT_ALLOWED, 405, "请求方法不支持：" + e.getMethod());
     }
 
     /**
@@ -302,8 +308,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<Result<Void>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
-        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                .body(Result.error(415, "请求内容类型不支持，请使用 application/json"));
+        return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 415, "请求内容类型不支持，请使用 application/json");
     }
 
     /**
@@ -334,7 +339,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Result<Void>> handleConstraintViolation(ConstraintViolationException e) {
-        return ResponseEntity.badRequest().body(Result.error(400, e.getMessage()));
+        return error(HttpStatus.BAD_REQUEST, 400, e.getMessage());
     }
 
     /**
@@ -351,8 +356,7 @@ public class GlobalExceptionHandler {
         String msg = e.getFieldErrors().stream()
                 .map(fe -> fe.getField() + " " + fe.getDefaultMessage())
                 .collect(Collectors.joining("；"));
-        return ResponseEntity.badRequest()
-                .body(Result.error(400, msg.isEmpty() ? "参数格式错误" : msg));
+        return error(HttpStatus.BAD_REQUEST, 400, msg.isEmpty() ? "参数格式错误" : msg);
     }
 
     /**
@@ -367,8 +371,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Result<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
         log.warn("[全局异常] 数据完整性约束冲突: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Result.error(409, "数据冲突：该记录已存在或仍被其他数据引用"));
+        return error(HttpStatus.CONFLICT, 409, "数据冲突：该记录已存在或仍被其他数据引用");
     }
 
     /**
@@ -383,7 +386,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConcurrentOperationException.class)
     public ResponseEntity<Result<Void>> handleConcurrentOperation(ConcurrentOperationException e) {
         log.warn("[全局异常] 并发互斥未获锁: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Result.error(409, e.getMessage()));
+        return error(HttpStatus.CONFLICT, 409, e.getMessage());
     }
 
     /**
@@ -400,7 +403,6 @@ public class GlobalExceptionHandler {
         String traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         log.error("[全局异常][trace={}] {}", traceId, e.getMessage(), e);
         // 2. 异常原文只进日志，不回给前端
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Result.error(500, "系统异常，请联系管理员（追踪码 " + traceId + "）"));
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, 500, "系统异常，请联系管理员（追踪码 " + traceId + "）");
     }
 }

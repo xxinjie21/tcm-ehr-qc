@@ -82,18 +82,10 @@ public final class RecordFilter {
             if (notBlank(dto.getStatus())) {
                 wrapper.eq("status", dto.getStatus().trim());
             }
-            if (dto.getDateRange() != null && dto.getDateRange().size() == 2
-                    && notBlank(dto.getDateRange().get(0)) && notBlank(dto.getDateRange().get(1))) {
-                wrapper.ge("visit_time", dto.getDateRange().get(0).trim() + " 00:00:00");
-                wrapper.le("visit_time", dto.getDateRange().get(1).trim() + " 23:59:59");
-            }
+            applyRange(wrapper, "visit_time", dto.getDateRange());
             // 导入时间区间（records.create_time）：与就诊时间是两个独立维度，可同时生效取交集。
             // 判据与上一条完全一致 —— 两端齐全才成立，含首尾两天（补 00:00:00 / 23:59:59）。
-            if (dto.getImportRange() != null && dto.getImportRange().size() == 2
-                    && notBlank(dto.getImportRange().get(0)) && notBlank(dto.getImportRange().get(1))) {
-                wrapper.ge("create_time", dto.getImportRange().get(0).trim() + " 00:00:00");
-                wrapper.le("create_time", dto.getImportRange().get(1).trim() + " 23:59:59");
-            }
+            applyRange(wrapper, "create_time", dto.getImportRange());
             // 5. 仅未解析：structured_data 为 SQL NULL（用 IS NULL —— 该列是 JSON 类型，不能与 '' 比较）
             andOnlyUnparsed(wrapper, dto.getOnlyUnparsed());
         }
@@ -420,17 +412,9 @@ public final class RecordFilter {
                 wrapper.eq("grade", filterDto.getGrade().trim());
             }
             // 3. 时间区间要两端齐全；补全时分秒，保证含首尾两天
-            if (filterDto.getDateRange() != null && filterDto.getDateRange().size() == 2
-                    && notBlank(filterDto.getDateRange().get(0)) && notBlank(filterDto.getDateRange().get(1))) {
-                wrapper.ge("visit_time", filterDto.getDateRange().get(0).trim() + " 00:00:00");
-                wrapper.le("visit_time", filterDto.getDateRange().get(1).trim() + " 23:59:59");
-            }
+            applyRange(wrapper, "visit_time", filterDto.getDateRange());
             // 3.1 导入时间区间（records.create_time）：与就诊时间独立、可同时生效，判据同上
-            if (filterDto.getImportRange() != null && filterDto.getImportRange().size() == 2
-                    && notBlank(filterDto.getImportRange().get(0)) && notBlank(filterDto.getImportRange().get(1))) {
-                wrapper.ge("create_time", filterDto.getImportRange().get(0).trim() + " 00:00:00");
-                wrapper.le("create_time", filterDto.getImportRange().get(1).trim() + " 23:59:59");
-            }
+            applyRange(wrapper, "create_time", filterDto.getImportRange());
             // 4. 仅按指定病历 ID 收窄（用于「仅重试失败」）：在数据域之上再取交集，不越权
             if (filterDto.getIds() != null && !filterDto.getIds().isEmpty()) {
                 wrapper.in("id", filterDto.getIds());
@@ -447,6 +431,22 @@ public final class RecordFilter {
             wrapper.orderByDesc("visit_time").orderByAsc("id");
         }
         return wrapper;
+    }
+
+    /**
+     * 时间区间条件：两端齐全才生效（缺一端当没给），补全时分秒保证含首尾两天。
+     *
+     * <p>{@code visit_time}（接诊时间）与 {@code create_time}（导入时间）两个维度的判据逐字相同、
+     * 只是列名不同，两条 build 路径原本各写两遍，收敛到此处（审查报告 §2.4）。</p>
+     *
+     * @param column 目标列名（{@code visit_time} / {@code create_time}）
+     * @param range  [开始日期, 结束日期]（yyyy-MM-dd），可为 null
+     */
+    private static void applyRange(QueryWrapper<Record> wrapper, String column, List<String> range) {
+        if (range != null && range.size() == 2 && notBlank(range.get(0)) && notBlank(range.get(1))) {
+            wrapper.ge(column, range.get(0).trim() + " 00:00:00");
+            wrapper.le(column, range.get(1).trim() + " 23:59:59");
+        }
     }
 
     private static boolean notBlank(String value) {

@@ -130,10 +130,10 @@ public final class QcRuleDescriber {
     /** 可选要素目录：取自实体类型目录（9 类，中文名 ↔ 类型 key / structuredKey / 回退列），用户只选中文 */
     public static List<QcRuleSet.Element> catalogElements() {
         // 逐类转成可选项；带上 typeKey，配置弹窗提交时才知道对应哪个类型
-        // 1. 遍历 9 类实体，每类产出一个可勾选项
+        // 1. 遍历 9 类实体，每类产出一个可勾选项（装配走 QcRuleSet.el，与默认规则同构）
         List<QcRuleSet.Element> list = new ArrayList<>();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
-            QcRuleSet.Element e = el(t.label(), t.structuredKey(), t.fallback());
+            QcRuleSet.Element e = QcRuleSet.el(t.label(), t.structuredKey(), t.fallback());
             e.setTypeKey(t.key());
             list.add(e);
         }
@@ -142,13 +142,13 @@ public final class QcRuleDescriber {
 
     /** 格式模板目录 */
     public static List<QcRuleSet.FormatRule> catalogFormats() {
-        // 两条固定模板：年龄（正则，带 hint）与性别（枚举）
-        // 1. 年龄：正则 + 给人看的 hint 2. 性别：枚举白名单
-        // 性别白名单取 QcRuleSet.GENDER_VALUES（唯一权威），不在此处另抄一份
+        // 两条固定模板：年龄（正则，带 hint）与性别（枚举）。
+        // 正则/hint 取 QcRuleSet.AGE_PATTERN / AGE_HINT、性别白名单取 QcRuleSet.GENDER_VALUES
+        // （均为唯一权威），不在此处另抄一份 —— 抄了就会与默认规则漂移（审查报告 §2.2）。
         List<QcRuleSet.FormatRule> list = new ArrayList<>();
-        list.add(fmt("age", "regex", "^(\\d+(\\.\\d+)?(岁|个月|月|天)?)+$", List.of(), "年龄", "年龄格式不正确",
-                "须为数字，可带 岁/个月/月/天 单位（可组合，如 32岁6月）"));
-        list.add(fmt("gender", "enum", null, QcRuleSet.GENDER_VALUES, "性别", "性别非 男/女"));
+        list.add(QcRuleSet.format("age", "regex", QcRuleSet.AGE_PATTERN, List.of(), "年龄", "年龄格式不正确",
+                QcRuleSet.AGE_HINT));
+        list.add(QcRuleSet.format("gender", "enum", null, QcRuleSet.GENDER_VALUES, "性别", "性别非 男/女", null));
         return list;
     }
 
@@ -156,35 +156,5 @@ public final class QcRuleDescriber {
         // 类型未登记就原样返回 key，不抛（文案层不该因脏数据中断）
         EntityTypes.EntityType t = EntityTypes.byKey(type);
         return t == null ? type : t.label();
-    }
-
-    private static QcRuleSet.Element el(String name, String source, List<String> fallback) {
-        // 1. 逐字段装配；fallback 拷贝成新列表避免共享入参
-        QcRuleSet.Element e = new QcRuleSet.Element();
-        e.setName(name);
-        e.setSource(source);
-        e.setFallback(new ArrayList<>(fallback));
-        return e;
-    }
-
-    private static QcRuleSet.FormatRule fmt(String field, String type, String expr, List<String> values,
-                                            String label, String reason) {
-        // 无 hint 的重载：hint 留空，describe 会回退用 reason
-        return fmt(field, type, expr, values, label, reason, null);
-    }
-
-    private static QcRuleSet.FormatRule fmt(String field, String type, String expr, List<String> values,
-                                            String label, String reason, String hint) {
-        // 逐字段装配模板；values 拷贝一份避免共享入参列表
-        // 1. 基本字段 2. values 拷一份
-        QcRuleSet.FormatRule f = new QcRuleSet.FormatRule();
-        f.setField(field);
-        f.setType(type);
-        f.setExpr(expr);
-        f.setValues(new ArrayList<>(values));
-        f.setLabel(label);
-        f.setReason(reason);
-        f.setHint(hint);
-        return f;
     }
 }

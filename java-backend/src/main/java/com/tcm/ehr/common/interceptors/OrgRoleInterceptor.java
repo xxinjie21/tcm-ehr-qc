@@ -1,7 +1,6 @@
 package com.tcm.ehr.common.interceptors;
 
 import com.tcm.ehr.common.annotation.RequireOrgRole;
-import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.common.utils.RequestUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -80,9 +79,6 @@ public class OrgRoleInterceptor implements HandlerInterceptor {
     }
 
     private boolean reject(HttpServletResponse response, String msg) throws Exception {
-        response.setStatus(403);
-        response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(Result.error(403, msg)));
-        return false;
+        return JsonResponses.write(objectMapper, response, 403, msg);
     }
 }
