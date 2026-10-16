@@ -69,7 +69,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * fragment 桶与 dictionaryGap 桶，被误当成「词表缺口的二字症状词」——
      * 而那两桶其实是舌脉要素，补症状词是补错了方向。</p>
      *
-     * <p>与 Python 侧 {@code python-nlp/main.py#_is_pulse_tongue} 及
+     * <p>与 Python 侧 {@code python-nlp/nlp_rules.py#_is_pulse_tongue} 及
      * {@code tools/reroute-pulse-tongue-stored.py} 三处同口径：同一件事不能各写一套。
      * 那里额外排除了「关节」「尺肤」「苔藓」「尖锐」四个首字撞上的症状域真词，
      * 以及含非汉字的抽取噪声 —— 本处同样排除，见 {@link #MISROUTED_EXCLUDE}。</p>

@@ -73,7 +73,7 @@ class NlpControllerTest {
     void textLongerThanLimitFailsValidation() {
         Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
-        // 边界：正好 20000 通过（与 python-nlp/main.py 的 MAX_TEXT_CHARS 同值）
+        // 边界：正好 20000 通过（与 python-nlp/schemas.py 的 MAX_TEXT_CHARS 同值）
         assertTrue(validator.validate(new NlpExtractDTO("热".repeat(20000))).isEmpty());
 
         // 20001 必须报错，且提示语直接说明是长度问题 —— 前端 apiErrorMessage 会把它显示给用户，
