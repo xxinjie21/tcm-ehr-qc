@@ -1,19 +1,23 @@
 """批次 20 的抽取与归一回归测试（不依赖模型，纯规则）。
 
 跑法（在仓库根目录）：
-    python python-nlp/test_batch20_rules.py
-或：
-    python-nlp/.venv/Scripts/python.exe python-nlp/test_batch20_rules.py
+    python python-nlp/tests/test_batch20_rules.py
+或走统一闸门：
+    python-nlp/.venv/Scripts/python.exe python-nlp/run_tests.py
 
 为什么要这个文件：本项目只有 Java 侧的单测，python-nlp 的规则从未被测试覆盖。
 而批次 20 改的恰好是这几条正则 —— 它们「不抛异常、只是悄悄少抽一类子要素」，
-没有测试就只能靠肉眼 diff。这里把三件事钉住：
+没有测试就只能靠肉眼 diff。这里把这几件事钉住：
 
-① 舌象形态子要素不再丢（`边有齿痕` / `有裂纹` / `有瘀点`）
-② 脉位与脉象分开成段（`脉细数，左尺无力` → 两条）
+① 舌象形态子要素不再丢（`边有齿痕` / `有裂纹` / `有瘀点` / 任务 4 的 `有芒刺` 等）
+② 脉位与脉象分开成段（`脉细数，左尺无力` → 两条）；脉位后缀**不许**限定为脉质字
 ③ 词典对真实片段**精确命中**，不出现有损的二层包含匹配
    （`苔黄燥少津` → `黄苔` 会把「燥、少津」两个子要素丢掉）
-④ 脉象 / 舌象要素不留在 `symptoms` 里（`_reroute_pulse_tongue`）
+④ 病因词表 / 治法引导词的扩展（任务 4）
+⑤ 脉象 / 舌象要素不留在 `symptoms` 里（`_reroute_pulse_tongue`）
+
+注意 ① 与 ④ 里带「任务 4」的用例：那几条改动在演示数据 500 行上命中 0 次，
+**本文件是它们唯一的验证手段**，不是锦上添花的补充测试。
 """
 import json
 import os
@@ -100,6 +104,18 @@ for text in ('苔藓样皮疹', '苔藓样皮损', '苔藓样大减', '苔藓', 
           [e.content for e in _rules(text)['tongueList']],
           [])
 
+# ①c 任务 4 新增的舌象形态锚。演示数据 500 行里这 4 个锚命中 0 次，
+#     所以这几条不是「回归测试」而是**行为固化** —— 否则这几行改动等于没人验过。
+#     `边有瘀斑` 那条是钉住 `边有` 没被收窄成 `边有齿痕`（收窄后它会整段丢掉）。
+for text, want in (('有芒刺', ['有芒刺']),
+                   ('边有瘀斑', ['边有瘀斑']),
+                   ('剥苔', ['剥苔']),
+                   ('无苔', ['无苔']),
+                   ('少苔', ['少苔'])):
+    check(f'舌象形态锚 {text}',
+          [e.content for e in _rules(text)['tongueList']],
+          want)
+
 print()
 print('② 脉位与脉象分开成段')
 check('脉细数，左尺无力',
@@ -108,6 +124,13 @@ check('脉细数，左尺无力',
 check('脉弦劲有力，左关尤甚',
       [e.content for e in _rules('脉弦劲有力，左关尤甚')['pulseList']],
       ['脉弦劲有力', '左关尤甚'])
+# ②b 上面两条同时是「脉位后缀不许要求是脉质字」的回归守卫。
+#     `docs/NLP服务性能与准确率提升计划.md` 的任务 4 提议把 RULE_PULSE_POSITION 收窄成
+#     「左/右 + 寸关尺 + 16 个脉质字之一」，而「无力」「尤甚」都不在那 16 个字里 ——
+#     照那个写法，上面两条会直接变成空，实测脉象 144 → 120 条次（-16.7%）。
+check('右寸沉弱无力（脉质字起头的长后缀）',
+      [e.content for e in _rules('右寸沉弱无力')['pulseList']],
+      ['右寸沉弱无力'])
 
 print()
 print('③ 描述性措辞不得被误当子要素')
@@ -121,6 +144,42 @@ print('④ 脉象抽取不能吞掉舌象（`脉细，舌红` 的「舌红」）
 check('脉细，舌红',
       [e.content for e in _rules('脉细，舌红')['pulseList']],
       ['脉细'])
+
+print()
+print('④b 病因词表扩展（任务 4：17 词 → 23 词）')
+check('肝郁（唯一在演示数据上有命中的新增词）',
+      [e.content for e in _rules('肝郁气滞')['causeList']],
+      ['肝郁'])
+check('肝郁脾虚 → 两个病因各自独立登记，不互相吞并',
+      [e.content for e in _rules('肝郁脾虚')['causeList']],
+      ['肝郁', '脾虚'])
+# 下面两条钉住「新词不许靠子串误命中」：心脾两虚 / 肾阴亏虚 都不含 脾虚 / 肾虚 子串。
+# 加词时若不小心加了「脾两虚」这类，会在这里炸。
+check('心脾两虚不含「脾虚」子串（不应命中）',
+      [e.content for e in _rules('心脾两虚')['causeList']],
+      [])
+check('肾阴亏虚不含「肾虚」子串（不应命中）',
+      [e.content for e in _rules('肾阴亏虚')['causeList']],
+      [])
+check('原有病因词不回归（寒湿 + 痰）',
+      [e.content for e in _rules('寒湿痹阻，痰气互结')['causeList']],
+      ['寒湿', '痰'])
+
+print()
+print('④c 治法引导词扩展（任务 4：补 法宜 / 当予）')
+# 演示数据整批连「治」字都没有，treatmentList 恒为空 —— 同样只有这里能验。
+check('法宜健脾益气（新增引导词）',
+      [e.content for e in _rules('法宜健脾益气')['treatmentList']],
+      ['法宜健脾益气'])
+check('当予温阳利水（新增引导词）',
+      [e.content for e in _rules('当予温阳利水')['treatmentList']],
+      ['当予温阳利水'])
+check('治以清热利湿（原有引导词不回归）',
+      [e.content for e in _rules('治以清热利湿')['treatmentList']],
+      ['治以清热利湿'])
+check('治法不能吃掉标点后的内容',
+      [e.content for e in _rules('治以清热利湿，忌辛辣')['treatmentList']],
+      ['治以清热利湿'])
 
 print()
 print('⑤ 词典精确命中，不出现有损的二层匹配')
