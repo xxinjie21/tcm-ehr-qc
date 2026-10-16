@@ -1,8 +1,9 @@
 package com.tcm.ehr.common.utils;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.apache.ibatis.session.ExecutorType;
-import org.apache.ibatis.session.SqlSession;
+import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
+import org.apache.ibatis.logging.Log;
+import org.apache.ibatis.logging.LogFactory;
 import org.apache.ibatis.session.SqlSessionFactory;
 
 import java.util.List;
@@ -15,20 +16,24 @@ import java.util.List;
  * {@value #BATCH_SIZE} 条 flush 一次，配合 JDBC 的 {@code rewriteBatchedStatements=true}
  * 合并成多值 INSERT，往返数从「条数」降到「条数 / 500」。</p>
  *
- * <p><b>事务语义（关键，不要改）</b>：{@code SqlSessionFactory.openSession(BATCH, false)}
- * 建出的会话，其事务由 {@code SpringManagedTransactionFactory} 装配，连接取自
- * {@code DataSourceUtils.getConnection} —— 即<b>当前事务的连接</b>。因此：</p>
+ * <p><b>批写机制已交给 MyBatis-Plus 官方 {@link SqlHelper#executeBatch}</b>
+ * （《自研组件替换计划》#11）：原实现自己 {@code openSession(BATCH, false)}、
+ * 手写「每 N 条 flush 一次 + 补尾批 + commit」，属重复实现框架已提供的能力。
+ * 本类只保留两件框架没有的东西 —— ① 统一的 {@value #BATCH_SIZE} 口径与调用签名；
+ * ② <b>{@code sqlSessionFactory} 为 null 时退化为逐条写</b>（单测直接 {@code new} 服务类、
+ * 未走 Spring 装配时的既有契约，{@code BatchInsertTransactionTest} 钉着）。</p>
+ *
+ * <p><b>事务语义（关键，不要改）</b>：{@code SqlHelper.executeBatch} 取到的会话由
+ * {@code SpringManagedTransactionFactory} 装配，连接取自 {@code DataSourceUtils.getConnection}
+ * —— 即<b>当前事务的连接</b>。因此：</p>
  * <ul>
  *   <li>写入落在调用方的事务里，随外层事务一起提交 / 回滚；</li>
  *   <li>{@code SpringManagedTransaction.commit()} / {@code rollback()} 在连接是
- *       事务连接时直接返回（不真正提交），所以这里的 {@code commit()} 在事务内是空操作，
- *       在事务外才是真提交 —— 两种上下文都对；</li>
+ *       事务连接时直接返回（不真正提交 / 回滚），所以框架内部的 {@code commit()} /
+ *       {@code rollback()} 在事务内都是空操作，在事务外才是真动作 —— 两种上下文都对；</li>
  *   <li>异常一律向上抛，<b>不做逐条重试</b>：唯一键冲突等错误必须让外层事务回滚，
  *       与改造前「第 k 条插入即抛」的原子性一致，不能被吞掉。</li>
  * </ul>
- *
- * <p><b>可选装配</b>：{@code sqlSessionFactory} 为 {@code null}（单测直接 {@code new}
- * 服务类、未走 Spring 装配）时退化为逐条写，语义与改造前完全一致。</p>
  */
 public final class BatchInsert {
 
@@ -39,6 +44,8 @@ public final class BatchInsert {
      * 500 条一次 flush 在「往返数」与「单批内存 / 语句长度」之间是既有实践验证过的折中。</p>
      */
     public static final int BATCH_SIZE = 500;
+
+    private static final Log LOG = LogFactory.getLog(BatchInsert.class);
 
     private BatchInsert() {
     }
@@ -69,21 +76,8 @@ public final class BatchInsert {
             }
             return;
         }
-        // 3. 批写：会话与 Mapper 同源取自本会话；每 BATCH_SIZE 条 flush 一次，最后补一次尾批。
-        //    事务内 commit() 是空操作，事务外才是真提交 —— 见类注释。
-        try (SqlSession session = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
-            M batchMapper = session.getMapper(mapperType);
-            int i = 1;
-            for (T row : rows) {
-                batchMapper.insert(row);
-                if (i % BATCH_SIZE == 0) {
-                    session.flushStatements();
-                }
-                i++;
-            }
-            // 尾批：条数不是 BATCH_SIZE 整数倍时，最后不足一批的必须显式刷出
-            session.flushStatements();
-            session.commit();
-        }
+        // 3. 批写：会话与 Mapper 同源取自本会话，每 BATCH_SIZE 条 flush 一次 —— 见类注释。
+        SqlHelper.executeBatch(sqlSessionFactory, LOG, rows, BATCH_SIZE,
+                (session, row) -> session.getMapper(mapperType).insert(row));
     }
 }
