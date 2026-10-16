@@ -1,5 +1,7 @@
 package com.tcm.ehr.common.config;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import com.tcm.ehr.domain.po.QcRule;
@@ -9,6 +11,8 @@ import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 质控规则存储：每组织一行（{@code qc_rules} 表），无行的组织回退内置默认；
@@ -39,10 +43,19 @@ public class QcRuleStore {
             new com.tcm.ehr.common.utils.VersionedCache<>(64);
     /** 组织规则行的短 TTL（T14）：5s 内不重复 selectById；写路径主动清 */
     private static final long ROW_CACHE_TTL_MS = 5_000L;
-    /** 行缓存条目；row 允许为 null（该组织没有行也是稳定事实，同样值得短缓存） */
-    private record RowCacheEntry(QcRule row, long expiresAtMs) {
-    }
-    private final java.util.Map<String, RowCacheEntry> rowCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /**
+     * 组织规则行缓存（T14）：写后 5s 过期，写路径 {@link #invalidate} 主动失效。
+     *
+     * <p><b>值用 {@link Optional} 包一层</b>：Caffeine 不接受 null 值（映射函数返回 null 时不写缓存），
+     * 而「该组织没有行」是稳定事实、同样值得短缓存 —— 直接存 {@code QcRule} 会让无行组织退化成
+     * 每次 {@code selectById}（批量质控 4 万条 = 4 万次查询，正是 T14 要消掉的开销）。</p>
+     *
+     * <p><b>刻意不设 maximumSize</b>：键空间 = 组织数（很小）。加上界会引入当前没有的逐出，
+     * 让本可命中的查询多打一次库，与「零行为改动」冲突。原实现也无上界。</p>
+     */
+    private final Cache<String, Optional<QcRule>> rowCache = Caffeine.newBuilder()
+            .expireAfterWrite(ROW_CACHE_TTL_MS, TimeUnit.MILLISECONDS)
+            .build();
     /** 最近一次 normalize 的告警（不可变快照，整体替换；见 26.10） */
     private volatile List<String> warnings = List.of();
 
@@ -91,14 +104,10 @@ public class QcRuleStore {
      * 靠短 TTL 兜住跨实例变更，写路径<b>主动删 key</b> 保证本实例立即生效。</p>
      */
     private QcRule rowFor(String orgId) {
-        long now = System.currentTimeMillis();
-        RowCacheEntry cached = rowCache.get(orgId);
-        if (cached != null && cached.expiresAtMs() > now) {
-            return cached.row();
-        }
-        QcRule row = ruleMapper.selectById(orgId);
-        rowCache.put(orgId, new RowCacheEntry(row, now + ROW_CACHE_TTL_MS));
-        return row;
+        // 命中（且未过期）直接返回；未命中或已过期才回源并写入。Caffeine 不会把过期条目返回，
+        // 与原先「读时比对 expiresAtMs」同一效果。
+        return rowCache.get(orgId, k -> Optional.ofNullable(ruleMapper.selectById(k)))
+                .orElse(null);
     }
 
     /** 解析某组织的规则 JSON；坏数据回退默认并留告警（存量坏数据不该让质检停摆） */
@@ -197,7 +206,7 @@ public class QcRuleStore {
     private void invalidate(String orgId) {
         perOrg.invalidate(orgId);
         // 行缓存也要清：否则本实例在 5s 内仍读到旧行（写后立即读是保存接口的常规路径）
-        rowCache.remove(orgId);
+        rowCache.invalidate(orgId);
     }
 
     public List<String> warnings() {

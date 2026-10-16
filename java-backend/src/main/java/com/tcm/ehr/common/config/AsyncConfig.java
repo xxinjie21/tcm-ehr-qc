@@ -5,9 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 异步执行的线程池：统一交给 Spring 框架（{@link ThreadPoolTaskExecutor}），
@@ -24,19 +22,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>所有池都用守护线程：进程退出不被非守护线程吊住。批量池的大小与属性取值一致，
  * 认领 worker 数 = {@code qc.batch.concurrency} / {@code nlp.batch.concurrency}。</p>
+ *
+ * <p><b>线程命名与守护位交给 Spring 原生</b>（《common组件审查报告》§1.2）：不再自写
+ * {@code ThreadFactory} + {@code AtomicInteger}。{@link ThreadPoolTaskExecutor} 未显式设
+ * ThreadFactory 时<b>以自身为工厂</b>，而它继承 {@code CustomizableThreadFactory} →
+ * {@code CustomizableThreadCreator}，故 {@code setThreadNamePrefix} / {@code setDaemon}
+ * 直接生效，线程名仍是 {@code <prefix><序号>}（序号从 1 起），与原先逐字一致。</p>
  */
 @Configuration
 public class AsyncConfig {
-
-    /** 命名 + 守护线程的线程工厂 */
-    private static ThreadFactory namedDaemon(String prefix) {
-        AtomicInteger seq = new AtomicInteger();
-        return r -> {
-            Thread t = new Thread(r, prefix + seq.incrementAndGet());
-            t.setDaemon(true);
-            return t;
-        };
-    }
 
     /**
      * AI 单条异步任务池：固定 4 线程（下游是 I/O 等待型，4 个足够且不会把下游压垮）、
@@ -58,7 +52,8 @@ public class AsyncConfig {
         e.setCorePoolSize(4);
         e.setMaxPoolSize(4);
         e.setQueueCapacity(100);
-        e.setThreadFactory(namedDaemon(prefix));
+        e.setThreadNamePrefix(prefix);
+        e.setDaemon(true);
         e.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         return e;
     }
@@ -87,7 +82,8 @@ public class AsyncConfig {
         ThreadPoolTaskExecutor e = new ThreadPoolTaskExecutor();
         e.setCorePoolSize(threads);
         e.setMaxPoolSize(threads);
-        e.setThreadFactory(namedDaemon(prefix));
+        e.setThreadNamePrefix(prefix);
+        e.setDaemon(true);
         return e;
     }
 }

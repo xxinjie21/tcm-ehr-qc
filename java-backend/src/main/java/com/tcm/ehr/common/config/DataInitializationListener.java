@@ -14,6 +14,8 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -56,12 +58,12 @@ public class DataInitializationListener implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         log.info("========== 系统启动初始化开始 ==========");
 
-        // 1. 验证Redis连接
+        // 1. 验证Redis连接：用 PING 而不是「写一个 key」—— 探活不该留下副作用。
+        //    原实现每次启动都往 Redis 写一个 10s TTL 的 tcm:…:startup:ping，
+        //    只为判断「连得上吗」，属无谓写入（审查报告 §1.5）。
         try {
-            redisTemplate.opsForValue().set(
-                    com.tcm.ehr.common.utils.RedisKeys.PREFIX + "startup:ping", "ok",
-                    java.time.Duration.ofSeconds(10));
-            log.info("[Redis] 连接成功: ping/pong ok");
+            String pong = redisTemplate.execute((RedisCallback<String>) RedisConnection::ping);
+            log.info("[Redis] 连接成功: ping={}", pong);
         } catch (Exception e) {
             log.warn("[Redis] 连接失败: {}", e.getMessage());
         }
