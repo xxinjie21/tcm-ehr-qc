@@ -306,15 +306,19 @@ import { recomputeQc, listQcBatch, getQcBatch, cancelQcBatch, retryQcBatchFailed
 import { searchRecords, getRawRecord } from '@/api/records'
 import { GRADE_OK } from '@/utils/grade'
 import { useUserStore } from '@/stores/user'
-import { fmtDateTime } from '@/utils/format'
+import { fmtDateTime, fmtDate } from '@/utils/format'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 // 规则写入口按 admin / owner / 授权成员 三档判定（与后端 qc/rules 写接口一致）
 const userStore = useUserStore()
 const canWriteRules = computed(() => userStore.canWriteQcRulesEntry)
 
-// 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护
-const filters = reactive({ department: '', dateRange: null, grade: '', sortBy: '', sortOrder: '', importRange: null })
+// 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护。
+// 默认口径：今天导入（与标准质量报告页同口径）—— 质控结论是「最近这批数据质量如何」，
+// 不带默认范围时一进页面看到的是全库历史，数字大得没有行动意义；
+// 用户想看全量把导入时间清空即可（两端缺一按「未给」处理）
+const today = fmtDate()
+const filters = reactive({ department: '', dateRange: null, grade: '', sortBy: '', sortOrder: '', importRange: [today, today] })
 
 // ===== 评分标准 / 扣分构成=====
 // 评分标准：rules 为当前生效规则，descriptions 为自然语言说明，catalog* 为可选项目录
@@ -464,11 +468,11 @@ const applyFilters = () => {
   loadPrecheck(1)
   loadDedStats()
 }
-// 重置筛选并立即重新查询
+// 重置筛选并立即重新查询：回到默认口径（今天导入），不是清空成全量 —— 与初始进入页面一致
 const resetFilters = () => {
   filters.department = ''
   filters.dateRange = null
-  filters.importRange = null
+  filters.importRange = [today, today]
   filters.grade = ''
   applyFilters()
 }

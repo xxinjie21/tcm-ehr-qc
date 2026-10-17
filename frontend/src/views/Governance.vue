@@ -308,6 +308,7 @@ import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import { clean as cleanApi, governanceStats } from '@/api/governance'
 import { exportDataset, previewDataset } from '@/api/export'
 import { saveBlob } from '@/utils/download'
+import { fmtDate } from '@/utils/format'
 import { LEVEL_TINY } from '@/utils/structured'
 
 // 28.18：每步补 detail（点开看的详述）与 where（结果落在结果区哪一项），
@@ -426,7 +427,10 @@ const handleClean = async () => {
 
 // 清洗范围：只作用于「质控合格」病历（后端同样强制合格），故不带分级维度。
 // 科室 / 就诊区间 / 导入区间 三个维度对清洗和导出都有效。
-const filters = reactive({ department: '', dateRange: null, importRange: null })
+// 默认口径：今天导入 —— 清洗 / 导出关心的是「刚导进来的这批」，
+// 不带默认范围一进页面就是全库；想看全量把导入时间清空即可（两端缺一按「未给」处理）
+const today = fmtDate()
+const filters = reactive({ department: '', dateRange: null, importRange: [today, today] })
 const format = ref('csv')
 const exporting = ref(false)
 // 导出文件名去重序号：Date.now() 是毫秒级，同一毫秒内连点两次导出仍会同名

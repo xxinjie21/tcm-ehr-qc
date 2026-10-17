@@ -33,6 +33,12 @@
         <template #action="{ row }">
           <el-button link type="primary" @click.stop="loadRecord(row)">载入</el-button>
         </template>
+        <template #empty>
+          <!-- 与病历数据页同口径：范围筛选的列表，空态要说「无符合条件」而不是
+               Element 默认的「暂无数据」—— 后者读起来像系统没数据 -->
+          <EmptyState :failed="listFailed" :loading="listLoading"
+            text="无符合条件的病历" @retry="() => search(1)" />
+        </template>
       </RecordTable>
 
       <el-pagination
@@ -370,7 +376,7 @@ import RangeFilter from '@/components/RangeFilter.vue'
 import { runNlpExtractAsync, submitNlpBatch, getNlpBatchProgress, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
 import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
-import { fmtDateTime } from '@/utils/format'
+import { fmtDateTime, fmtDate } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/errorMessage'
 import { MULTI_AUTOSIZE } from '@/utils/recordFields'
 import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
@@ -386,7 +392,10 @@ const activeTab = ref('single')
 // P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
 const loadedAt = ref(new Date().toLocaleString())
 // ===== 病历列表=====
-const query = reactive({ department: '', dateRange: null, grade: '', importRange: null })
+// 默认口径：今天导入（与标准质量报告页同口径）—— 解析页关心的是「刚导进来的这批抽得怎么样」，
+// 不带默认范围一进页面就是全库历史；想看全量把导入时间清空即可（两端缺一按「未给」处理）
+const today = fmtDate()
+const query = reactive({ department: '', dateRange: null, grade: '', importRange: [today, today] })
 const page = ref(1)
 const pageSize = ref(10)
 // 列表加载失败：与「确实没有匹配」区分开（三态统一）
@@ -417,11 +426,11 @@ const handleSizeChange = () => {
   search()
 }
 
-// 清空全部筛选条件并回到第 1 页重新查询
+// 重置筛选条件并回到第 1 页重新查询：回到默认口径（今天导入），与初始进入页面一致
 const resetFilters = () => {
   query.department = ''
   query.dateRange = null
-  query.importRange = null
+  query.importRange = [today, today]
   query.grade = ''
   search(1)
 }

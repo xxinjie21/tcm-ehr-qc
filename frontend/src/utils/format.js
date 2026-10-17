@@ -28,6 +28,24 @@ export function fmtDateTime(v, mode = 'second', empty = '—') {
 }
 
 /**
+ * 取「今天」的 yyyy-MM-dd。
+ *
+ * <p>与 {@link fmtDateTime} 的分工：后者处理<b>后端下发</b>的 ISO 时间串；本函数处理
+ * 「现在」—— 标准质量报告、质控、结构化解析、清洗与导出等页的「默认今天导入」口径
+ * 都靠它拼 importRange 的初值。不并进 fmtDateTime：那函数只认带 T 的串，喂 Date
+ * 会拿到 "Sat Oct 17 ..." 这种浏览器格式，静默截出脏数据。</p>
+ *
+ * @param {Date} [d=new Date()] 日期，默认今天
+ * @returns {string} yyyy-MM-dd
+ */
+export function fmtDate(d = new Date()) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/**
  * 取病历原始字段的展示值（P3.2：Review 与 RecordDetailDialog 各一份，收敛于此）。
  *
  * <p>接诊时间后端下发 ISO 串（含 T），这里统一换成「日期 时间」可读形式；
