@@ -93,6 +93,15 @@ public class StandardizationReportVO {
         /** 实际生效的起止（yyyy-MM-dd）；为空表示不限 */
         private String start;
         private String end;
+        /**
+         * 实际生效的导入时间起止（yyyy-MM-dd）；为空表示不限。
+         *
+         * <p>与 {@link #start}/{@link #end}（接诊时间）是两个独立维度，可同时生效、取交集。
+         * 导入时间过滤下推到 SQL（{@code records.create_time}），其排除量<b>不计入</b>
+         * {@link #excluded} —— excluded 只反映接诊时间过滤排除的条数。</p>
+         */
+        private String importStart;
+        private String importEnd;
         /** 区间内病历数 */
         private int records;
         /** 区间外（被本次过滤掉）的病历数，0 表示没过滤 */

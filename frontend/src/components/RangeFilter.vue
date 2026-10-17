@@ -84,9 +84,9 @@ const props = defineProps({
     type: Boolean,
     default: true
   },
-  // 是否显示「导入时间」。标准化报告页传 false —— 它的时间语义走独立的 start/end
-  // 参数（Java 侧按 visit_time 过滤并算 excluded），后端并不认 importRange，
-  // 显示出来会变成「填了但没生效」的静默失效，故在该页隐藏。
+  // 是否显示「导入时间」。默认 true（病历数据 / Qc / 结构化解析 / 标准化质量报告等页都用）。
+  // 标准化质量报告页同样传 true —— 它的默认口径就是「今天导入」：importRange 下推
+  // records.create_time，与 start/end（接诊时间）是两个独立维度、可同时生效。
   showImport: {
     type: Boolean,
     default: true

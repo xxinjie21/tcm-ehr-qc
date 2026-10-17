@@ -1,5 +1,7 @@
 package com.tcm.ehr.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.StandardizationReportVO;
 import com.tcm.ehr.mapper.RecordMapper;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -16,11 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -214,6 +219,65 @@ class StandardizationReportServiceImplTest {
     }
 
     // ------------------------------------------------------------ 时间维度
+
+    /**
+     * 抓取传给 mapper 的 QueryWrapper，验证「导入时间是否真的下推到 SQL」。
+     *
+     * <p>mock 的 selectList 不做真实过滤，所以 Java 侧筛没筛只能靠 wrapper 判断 ——
+     * 这正是要断言的：importRange 必须落在 create_time 条件上（与病历列表 / Qc 页同口径），
+     * 而不是被 withoutVisitRange 之类的手段悄悄丢掉（2026-10-17 之前正是如此：
+     * 接口接了参数、DTO 有字段，但报告这条路径从没透传）。</p>
+     */
+    private String capturedSql() {
+        ArgumentCaptor<QueryWrapper<Record>> captor = ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(recordMapper).selectList(captor.capture());
+        return captor.getValue().getCustomSqlSegment();
+    }
+
+    @Test
+    @DisplayName("导入区间生效：条件下推到 SQL（create_time），并回显到 range")
+    void importRangePushedToSqlAndEchoed() {
+        givenTimedRecords(recordAt("a", "2024-03-15 09:00:00"));
+
+        FiltersDTO f = new FiltersDTO();
+        f.setImportRange(List.of("2026-10-17", "2026-10-17"));
+        StandardizationReportVO vo = svc.report(f);
+
+        assertEquals("2026-10-17", vo.getRange().getImportStart(),
+                "导入区间要回显 —— 页面与 CSV 都靠它显示口径");
+        assertEquals("2026-10-17", vo.getRange().getImportEnd());
+        assertTrue(capturedSql().contains("create_time"),
+                "importRange 必须落到 create_time 条件上（下推 SQL），不是 Java 侧再筛一遍");
+    }
+
+    @Test
+    @DisplayName("导入区间只给一端：按「未给」处理，不下推 SQL、不回显")
+    void oneSidedImportRangeIgnored() {
+        givenTimedRecords(recordAt("a", "2024-03-15 09:00:00"));
+
+        FiltersDTO f = new FiltersDTO();
+        f.setImportRange(List.of("2026-10-17", ""));
+        StandardizationReportVO vo = svc.report(f);
+
+        assertNull(vo.getRange().getImportStart(), "只给一端不算区间，不应回显");
+        assertFalse(capturedSql().contains("create_time"),
+                "未生效的区间不该拼进 SQL —— 否则用户看到记录变少却找不到原因");
+    }
+
+    @Test
+    @DisplayName("接诊时间与导入时间可同时生效：两个维度都回显，互不覆盖")
+    void bothTimeDimensionsApplyTogether() {
+        givenTimedRecords(recordAt("a", "2024-03-15 09:00:00"));
+
+        FiltersDTO f = new FiltersDTO();
+        f.setDateRange(List.of("2024-01-01", "2024-12-31"));
+        f.setImportRange(List.of("2026-10-01", "2026-10-31"));
+        StandardizationReportVO vo = svc.report(f);
+
+        assertEquals("2024-01-01", vo.getRange().getStart(), "接诊时间维度不丢");
+        assertEquals("2026-10-01", vo.getRange().getImportStart(), "导入时间维度不丢");
+        assertTrue(capturedSql().contains("create_time"), "导入时间照常下推 SQL");
+    }
 
     @Test
     @DisplayName("上下界都给：按接诊时间过滤，且排除数正确")

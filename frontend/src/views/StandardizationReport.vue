@@ -25,12 +25,13 @@
         </div>
       </div>
 
-      <!-- 范围查询：科室 / 就诊时间 / 证候，与病历数据、质控等页同一套 RangeFilter。
-           报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器；
-           也不按导入时间收窄 —— 本页时间语义走独立的 start/end（Java 侧按 visit_time
-           过滤并算 excluded），后端不认 importRange，显示了就是静默失效。 -->
+      <!-- 范围查询：科室 / 导入时间 / 就诊时间 / 证候，与病历数据、质控等页同一套 RangeFilter。
+           报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器。
+           默认口径＝今天导入（不分科室）：importRange 下推 SQL 的 records.create_time；
+           「就诊时间」是另一个独立维度（start/end，Java 侧按 visit_time 过滤并算 excluded），
+           两维可同时生效、取交集。 -->
       <div class="rh-tools">
-        <RangeFilter v-model="filters" :show-grade="false" :show-import="false" />
+        <RangeFilter v-model="filters" :show-grade="false" :show-import="true" />
         <el-button size="default" :disabled="loading" @click="quickRange(1)">近一年</el-button>
         <el-button size="default" :disabled="loading" @click="quickRange(3)">近三年</el-button>
         <el-button type="primary" size="default" :loading="loading" @click="loadReport">
@@ -167,7 +168,6 @@ import StandardizationDetails from '@/components/StandardizationDetails.vue'
 import StandardizationCharts from '@/components/StandardizationCharts.vue'
 import { getStandardizationReport, exportStandardizationReport } from '@/api/stats'
 import { saveBlob } from '@/utils/download'
-import { useDepartments } from '@/composables/useDepartments'
 
 const report = ref(null)
 const loading = ref(false)
@@ -176,15 +176,18 @@ const loading = ref(false)
 const loadError = ref(false)
 const exporting = ref(false)
 
-const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '' })
-const { departments, reload: reloadDepartments } = useDepartments()
-
 const fmtDate = (d) => {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
+
+// 默认口径：今天导入的数据（不分科室）。
+// 导入时间（importRange）与就诊时间（dateRange）是两个独立维度，可同时生效、取交集；
+// 用户想放宽到全量，把导入时间清空即可（后端按「未给」处理）。
+const today = fmtDate(new Date())
+const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '', importRange: [today, today] })
 
 /** 时间快捷按钮：只改写 dateRange，随后立即查询 */
 function quickRange(years) {
@@ -199,17 +202,22 @@ const resetFilters = () => {
   filters.dateRange = null
   filters.pattern = ''
   filters.grade = ''
+  // 回到默认口径（今天导入），不是清空成全量 —— 与初始进入页面一致
+  filters.importRange = [today, today]
   loadReport()
 }
 
-/** 报告 / 导出参数：dateRange 必须两端齐全才生效；department/pattern 为空发空串 */
+/** 报告 / 导出参数：两个时间维度都两端齐全才生效；department/pattern 为空发空串 */
 const params = () => {
   const d = filters.dateRange
+  const ir = filters.importRange
   return {
     department: filters.department || '',
     start: d && d.length === 2 ? d[0] : '',
     end: d && d.length === 2 ? d[1] : '',
-    pattern: filters.pattern || ''
+    pattern: filters.pattern || '',
+    importStart: ir && ir.length === 2 ? ir[0] : '',
+    importEnd: ir && ir.length === 2 ? ir[1] : ''
   }
 }
 
@@ -220,6 +228,15 @@ const rangeTip = computed(() => {
   if (filters.department) scope.push(`科室＝${filters.department}`)
   if (filters.pattern) scope.push(`证候＝${filters.pattern}`)
   const scopeTxt = scope.length ? scope.join(' · ') + '；' : ''
+  // 导入区间（页面默认口径）优先展示；接诊区间是另一个维度，同时生效时并列
+  if (r.importStart || r.importEnd) {
+    const visit = (r.start || r.end)
+      ? ` · 就诊 ${r.start || '不限'} ~ ${r.end || '不限'}`
+      : ''
+    const excl = r.excluded > 0 ? `（已排除 ${r.excluded} 条区间外数据）` : ''
+    return `${scopeTxt}导入 ${r.importStart || '不限'} ~ ${r.importEnd || '不限'}，`
+      + `区间内 ${r.records} 条${excl}${visit}`
+  }
   if (r.start || r.end) {
     return `${scopeTxt}当前统计 ${r.start || '不限'} ~ ${r.end || '不限'}，区间内 ${r.records} 条`
       + (r.excluded > 0 ? `（已排除 ${r.excluded} 条区间外数据）` : '')
@@ -236,8 +253,14 @@ const pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : 
 const qc = computed(() => report.value?.qc || null)
 const qcLoaded = computed(() => qc.value !== null)
 const qcComplete = computed(() => qc.value?.complete === true)
-/** 只在「确实拿到了结果且不完整」时才提示 */
-const showQcGate = computed(() => qcLoaded.value && !qcComplete.value)
+/**
+ * 只在「确实拿到了结果、有数据、且不完整」时才提示。
+ *
+ * <p>空数据必须走空态（「本期无数据可评估」），不能被读成「质控没跑完」——
+ * 默认口径收窄到「今天导入」后，今天没导数据是常见情形，那种情况下
+ * {@code qc.total} 为 0、{@code complete} 为 false，若不短路会误报质控未完成。</p>
+ */
+const showQcGate = computed(() => qcLoaded.value && !isEmptyReport.value && !qcComplete.value)
 const qcTotal = computed(() => qc.value?.total ?? report.value?.dataset?.recordCount ?? 0)
 const qcScored = computed(() => qc.value?.scored ?? 0)
 const qcLast = computed(() => qc.value?.lastScoredAt || '')
@@ -363,7 +386,9 @@ const headline = computed(() => {
       icon: '!',
       tone: 'warn',
       title: '质控评分还没跑完，现在的数字不可信',
-      desc: `本组织 ${qcTotal.value} 条病历中，有 ${qcScored.value} 条已完成质控评分。`
+      // 「当前范围」而非「本组织」：qcTotal 是范围内条数，默认口径是今天导入，
+      // 说「本组织 N 条」会把范围数说成全组织数（范围外的未评分病历也被算进分母）
+      desc: `当前范围 ${qcTotal.value} 条病历中，有 ${qcScored.value} 条已完成质控评分。`
         + '报告里的「评分区分度」「扣分封顶」都来自质控结果，质控完成后报告才有意义。'
     }
   }
@@ -628,17 +653,10 @@ function copyByExecCommand(text) {
   }
 }
 
-onMounted(async () => {
-  // 预选第一个科室以减轻初始全量查询压力；用户仍可清空回全部
-  try {
-    await reloadDepartments()
-    if (!filters.department && departments.value && departments.value.length > 0) {
-      filters.department = departments.value[0]
-    }
-  } catch {
-    // 科室加载失败不阻断页面加载，仍按当前过滤条件（可能为空=全部）查询
-  }
-  await loadReport()
+// 默认口径即「今天导入」（不分科室），不再预选第一个科室 ——
+// 科室下拉由 RangeFilter 自己加载（组件内 useDepartments），页面无需再拉一次。
+onMounted(() => {
+  loadReport()
 })
 </script>
 

@@ -4230,7 +4230,7 @@ paths:
       tags:
         - 统计查询
       summary: 标准化质量报告
-      description: 【权限：登录即可】返回标准化质量报告，只读、不触发任何重算。可按接诊时间区间过滤（start/end 同时给或同时不给）。报告刻意分两层：甲类「标准符合度」只取决于词表建得对不对（词典规模/编码覆盖/别名质量/跨类重名），与用哪份数据无关；乙类「数据集覆盖度」（归一率/未归一构成/质控封顶率）只用于验证词表是否建全，**不代表真实病历上的准确率**，不可对外引用为科研结论。可按接诊时间区间过滤（start/end 同时给或同时不给）
+      description: 【权限：登录即可】返回标准化质量报告，只读、不触发任何重算。可按接诊时间区间过滤（start/end 同时给或同时不给）。报告刻意分两层：甲类「标准符合度」只取决于词表建得对不对（词典规模/编码覆盖/别名质量/跨类重名），与用哪份数据无关；乙类「数据集覆盖度」（归一率/未归一构成/质控封顶率）只用于验证词表是否建全，**不代表真实病历上的准确率**，不可对外引用为科研结论。可按接诊时间区间过滤（start/end 同时给或同时不给），也可按导入时间区间过滤（importStart/importEnd 同时给或同时不给；与接诊时间是两个独立维度、取交集），页面默认按「今天导入」收窄
       parameters:
         - name: start
           in: query
@@ -4244,6 +4244,20 @@ paths:
           description: 接诊时间上界（yyyy-MM-dd），空表示不限
           schema:
             type: string
+        - name: importStart
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: 导入时间下界（yyyy-MM-dd），与 importEnd 同时给才生效；与接诊时间（start/end）是两个独立维度，取交集
+        - name: importEnd
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: 导入时间上界（yyyy-MM-dd）
       responses:
         '200':
           description: 标准化质量报告
@@ -4277,6 +4291,20 @@ paths:
           description: 接诊时间上界（yyyy-MM-dd），空表示不限
           schema:
             type: string
+        - name: importStart
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: 导入时间下界（yyyy-MM-dd），与 importEnd 同时给才生效；与接诊时间（start/end）是两个独立维度，取交集
+        - name: importEnd
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: 导入时间上界（yyyy-MM-dd）
       responses:
         '200':
           description: 报告文件流

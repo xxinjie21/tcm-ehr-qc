@@ -178,6 +178,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 (rg.getStart() == null ? "不限" : rg.getStart()) + " ~ "
                         + (rg.getEnd() == null ? "不限" : rg.getEnd()),
                 "区间内 " + rg.getRecords() + " 条，排除 " + rg.getExcluded() + " 条"));
+        // 导入区间（2026-10-17 起报告默认按导入时间收窄）：CSV 必须体现这个维度，
+        // 否则导出文件看不出这批数字是「今天导入的」还是全库的
+        if (rg.getImportStart() != null && rg.getImportEnd() != null) {
+            rows.add(List.of("区间", "导入区间", rg.getImportStart() + " ~ " + rg.getImportEnd(),
+                    "按导入时间（records.create_time）收窄"));
+        }
         for (StandardizationReportVO.MonthlyBucket m : r.getByMonth()) {
             rows.add(List.of("按月份", m.getMonth() + " 病历数", String.valueOf(m.getRecords()), ""));
             rows.add(List.of("按月份", m.getMonth() + " 症状归一率",
@@ -213,20 +219,32 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /**
-     * 按范围出报告（科室 / 就诊时间 / 证候）。
+     * 按范围出报告（科室 / 就诊时间 / 证候 / 导入时间）。
      *
      * <p>甲类（词典质量 / 跨类重名）看的是词表本身，与病历无关，**不随范围收窄**；
-     * 只有乙类（病历相关统计）按范围过滤。时间过滤仍放在 Java 侧
-     * （{@link #filterByVisitTime}），而不是下沉到 SQL —— 因为 {@code range.excluded}
-     * （「已排除 N 条区间外数据」）要的是「范围内但因时间被排除的条数」，
-     * 只有保留「先取范围全集、再按时间筛」两步才能算出来。</p>
+     * 只有乙类（病历相关统计）按范围过滤。</p>
+     *
+     * <p>两个时间维度的过滤位置不同、各有理由：</p>
+     * <ul>
+     *   <li><b>接诊时间</b>（dateRange）留在 Java 侧（{@link #filterByVisitTime}），
+     *       因为 {@code range.excluded}（「已排除 N 条区间外数据」）要的是
+     *       「范围内但因时间被排除的条数」，只有「先取范围全集、再按时间筛」两步才能算出来；</li>
+     *   <li><b>导入时间</b>（importRange）下推到 SQL（{@code records.create_time}），
+     *       与病历列表 / Qc 页同一口径；它的排除量不进 excluded（那本是接诊时间的语义），
+     *       回显走 {@code range.importStart/importEnd}。</li>
+     * </ul>
      */
     @Override
     public StandardizationReportVO report(FiltersDTO filters) {
         FiltersDTO f = filters == null ? new FiltersDTO() : filters;
         // 时间上下界必须同时给才生效，与 report(String, String) 及 StatsController 同一口径
-        String start = rangeBound(f, true);
-        String end = rangeBound(f, false);
+        String start = rangeBound(f.getDateRange(), true);
+        String end = rangeBound(f.getDateRange(), false);
+        // 导入时间（records.create_time）与接诊时间是两个独立维度，判据同样两端齐全；
+        // 区别在过滤位置：接诊时间留在 Java 侧（要算 excluded），导入时间下推到 SQL
+        // （RecordFilter 的 create_time 条件，与病历列表 / Qc 页同一口径）。
+        String importStart = rangeBound(f.getImportRange(), true);
+        String importEnd = rangeBound(f.getImportRange(), false);
 
         StandardizationReportVO vo = new StandardizationReportVO();
         vo.setDictQuality(dictQuality());
@@ -236,9 +254,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         // 原实现里同一条 structured_data 被 7 处统计器各自解析一遍（4 万条 ≈ 28 万次 Jackson 解析），
         // 且 selectList 无列投影（21 TEXT + 2 JSON 全量进堆，4 万条约 45MB）。
         // 科室 / 证候下沉到 SQL（RecordFilter），时间留在 Java 侧（见方法注释）。
-        List<Row> all = rowsInDomain(withoutDateRange(f));
+        List<Row> all = rowsInDomain(withoutVisitRange(f));
         List<Row> rows = filterByVisitTime(all, start, end);
-        vo.setRange(rangeOf(all, rows, start, end));
+        vo.setRange(rangeOf(all, rows, start, end, importStart, importEnd));
         vo.setByMonth(byMonth(rows));
         vo.setCoverage(coverage(rows));
         // A2：词表只读一次，两个统计器共用同一份（原先各自 new HashSet<>(symptomTerms()) 一遍）
@@ -335,36 +353,43 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return f;
     }
 
-    /** 取 dateRange 的一端；两端不齐（含只给一端）一律按「未给」返回 null */
-    private String rangeBound(FiltersDTO f, boolean start) {
-        List<String> dr = f.getDateRange();
-        if (dr == null || dr.size() != 2
-                || !notBlankDate(dr.get(0)) || !notBlankDate(dr.get(1))) {
+    /** 取区间的一端；两端不齐（含只给一端）一律按「未给」返回 null。接诊时间与导入时间共用 */
+    private String rangeBound(List<String> range, boolean start) {
+        if (range == null || range.size() != 2
+                || !notBlankDate(range.get(0)) || !notBlankDate(range.get(1))) {
             return null;
         }
-        return start ? dr.get(0) : dr.get(1);
+        return start ? range.get(0) : range.get(1);
     }
 
-    /** 复制一份去掉 dateRange 的范围：时间由 Java 侧过滤，避免与 SQL 重复并保留 excluded 口径 */
-    private FiltersDTO withoutDateRange(FiltersDTO f) {
+    /**
+     * 复制一份去掉**接诊时间**区间的范围：该维度由 Java 侧过滤（要算 excluded），
+     * 不能与 SQL 重复；导入时间（{@code importRange}）刻意保留 —— 它下推到
+     * {@code RecordFilter} 的 {@code create_time} 条件，与病历列表 / Qc 页同口径。
+     */
+    private FiltersDTO withoutVisitRange(FiltersDTO f) {
         FiltersDTO copy = new FiltersDTO();
         copy.setDepartment(f.getDepartment());
         copy.setPattern(f.getPattern());
         copy.setGrade(f.getGrade());
         copy.setIds(f.getIds());
         copy.setOnlyUnparsed(f.getOnlyUnparsed());
+        copy.setImportRange(f.getImportRange());
         return copy;
     }
 
     private StandardizationReportVO.TimeRange rangeOf(List<Row> all, List<Row> picked,
-                                                     String start, String end) {
+                                                     String start, String end,
+                                                     String importStart, String importEnd) {
         StandardizationReportVO.TimeRange r = new StandardizationReportVO.TimeRange();
         // 只有两端都给、过滤真正生效时才回显区间。
         // 只给一端时过滤没生效，若还回显「2024-01-01 ~ 不限」，界面会显示成一个
         // 实际并未应用的区间，而记录数其实是全部 —— 那是自相矛盾的展示。
-        boolean applied = notBlankDate(start) && notBlankDate(end);
-        r.setStart(applied ? start : null);
-        r.setEnd(applied ? end : null);
+        // rangeBound 已保证「不齐即 null」，这里直接透传。
+        r.setStart(start);
+        r.setEnd(end);
+        r.setImportStart(importStart);
+        r.setImportEnd(importEnd);
         r.setRecords(picked.size());
         r.setExcluded(all.size() - picked.size());
         return r;

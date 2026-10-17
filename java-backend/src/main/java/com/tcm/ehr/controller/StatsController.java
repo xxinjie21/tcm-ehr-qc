@@ -47,10 +47,17 @@ public class StatsController {
      * （只用于验证词表建全与否，<b>不代表真实病历准确率</b>）。响应里的
      * disclaimer 会原样带到页面，禁止前端隐藏。</p>
      *
-     * @param department 科室，空表示不限
-     * @param start 接诊时间起（yyyy-MM-dd），空表示不限
-     * @param end   接诊时间止（yyyy-MM-dd），空表示不限；只给一端按「未给」处理
-     * @param pattern 证候关键字，模糊匹配，空表示不限
+     * <p>两个时间维度相互独立、可同时生效（取交集）：{@code start}/{@code end} 是
+     * <b>接诊时间</b>（visit_time，Java 侧过滤，{@code range.excluded} 口径由此而来）；
+     * {@code importStart}/{@code importEnd} 是<b>导入时间</b>（records.create_time，
+     * 下推 SQL）。页面默认按「今天导入」收窄，正是这一维度。</p>
+     *
+     * @param department  科室，空表示不限
+     * @param start       接诊时间起（yyyy-MM-dd），空表示不限
+     * @param end         接诊时间止（yyyy-MM-dd），空表示不限；只给一端按「未给」处理
+     * @param pattern     证候关键字，模糊匹配，空表示不限
+     * @param importStart 导入时间起（yyyy-MM-dd），与 importEnd 同时给才生效
+     * @param importEnd   导入时间止（yyyy-MM-dd），空表示不限
      * @return 甲类标准符合度 + 乙类数据集覆盖度 + 按月分组
      */
     @GetMapping("/standardization-report")
@@ -58,20 +65,26 @@ public class StatsController {
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
-            @RequestParam(required = false) String pattern) {
-        return Result.ok(reportService.report(filters(department, start, end, pattern, null)));
+            @RequestParam(required = false) String pattern,
+            @RequestParam(required = false) String importStart,
+            @RequestParam(required = false) String importEnd) {
+        return Result.ok(reportService.report(
+                filters(department, start, end, pattern, null, importStart, importEnd)));
     }
 
     /**
      * 导出标准化质量报告 CSV（批次 28 · 28.23）。
      *
      * <p>【权限：登录即可 + 数据域】与页面同源同域。改由后端生成并与另外两条导出
-     * （数据集 / 日志）一样返回文件流，前端不再自行拼 CSV。</p>
+     * （数据集 / 日志）一样返回文件流，前端不再自行拼 CSV。参数语义与报告接口一致，
+     * 含导入时间维度（页面默认值会一并带入导出文件）。</p>
      *
-     * @param department 科室，空表示不限
-     * @param start 接诊时间起（yyyy-MM-dd），空表示不限
-     * @param end   接诊时间止（yyyy-MM-dd），空表示不限
-     * @param pattern 证候关键字，空表示不限
+     * @param department  科室，空表示不限
+     * @param start       接诊时间起（yyyy-MM-dd），空表示不限
+     * @param end         接诊时间止（yyyy-MM-dd），空表示不限
+     * @param pattern     证候关键字，空表示不限
+     * @param importStart 导入时间起（yyyy-MM-dd），与 importEnd 同时给才生效
+     * @param importEnd   导入时间止（yyyy-MM-dd），空表示不限
      * @return CSV 文件流（UTF-8 BOM，Excel 可直接打开）
      */
     @GetMapping("/standardization-report/export")
@@ -79,8 +92,11 @@ public class StatsController {
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
-            @RequestParam(required = false) String pattern) {
-        byte[] content = reportService.reportCsv(filters(department, start, end, pattern, null));
+            @RequestParam(required = false) String pattern,
+            @RequestParam(required = false) String importStart,
+            @RequestParam(required = false) String importEnd) {
+        byte[] content = reportService.reportCsv(
+                filters(department, start, end, pattern, null, importStart, importEnd));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=standardization-report.csv")
                 .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
@@ -102,7 +118,7 @@ public class StatsController {
     public Result<OverviewVO> overview(@RequestParam(required = false) String department,
                                        @RequestParam(required = false) String start,
                                        @RequestParam(required = false) String end) {
-        return Result.ok(statsService.overview(filters(department, start, end, null, null)));
+        return Result.ok(statsService.overview(filters(department, start, end, null, null, null, null)));
     }
 
     /**
@@ -135,7 +151,7 @@ public class StatsController {
                                   @RequestParam(required = false) String end,
                                   @RequestParam(required = false) String pattern,
                                   @RequestParam(required = false) String grade) {
-        return Result.ok(statsService.all(filters(department, start, end, pattern, grade)));
+        return Result.ok(statsService.all(filters(department, start, end, pattern, grade, null, null)));
     }
 
     /**
@@ -156,7 +172,7 @@ public class StatsController {
                                  @RequestParam(required = false) String end,
                                  @RequestParam(required = false) String pattern,
                                  @RequestParam(required = false) String grade) {
-        return Result.ok(statsService.extra(filters(department, start, end, pattern, grade)));
+        return Result.ok(statsService.extra(filters(department, start, end, pattern, grade, null, null)));
     }
 
     /**
@@ -173,8 +189,14 @@ public class StatsController {
         return Result.ok(statsService.stats(dto));
     }
 
-    /** GET 查询参数 → 统一的范围过滤对象（时间需上下界同时存在） */
-    private FiltersDTO filters(String department, String start, String end, String pattern, String grade) {
+    /**
+     * GET 查询参数 → 统一的范围过滤对象（两个时间维度都需上下界同时存在）。
+     *
+     * <p>与 {@code QcController.filters} 同构：接诊时间与导入时间是独立维度、可同时生效。
+     * overview / all / extra 不暴露导入时间，传 null 即「不限」（现状不变）。</p>
+     */
+    private FiltersDTO filters(String department, String start, String end, String pattern, String grade,
+                               String importStart, String importEnd) {
         // 1. 三个标量条件直接搬
         FiltersDTO f = new FiltersDTO();
         f.setDepartment(department);
@@ -186,6 +208,14 @@ public class StatsController {
             range.add(start);
             range.add(end);
             f.setDateRange(range);
+        }
+        // 3. 导入时间（records.create_time）同理：与接诊时间是两个独立维度，可同时生效
+        if (importStart != null && !importStart.isBlank()
+                && importEnd != null && !importEnd.isBlank()) {
+            List<String> importRange = new ArrayList<>(2);
+            importRange.add(importStart);
+            importRange.add(importEnd);
+            f.setImportRange(importRange);
         }
         return f;
     }
