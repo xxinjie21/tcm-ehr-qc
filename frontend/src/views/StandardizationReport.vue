@@ -88,6 +88,7 @@
       :unmatched="report?.unmatched || {}"
       :loading="loading"
       :error="loadError"
+      :range-label="chartRangeLabel"
       @retry="loadReport"
     />
 
@@ -239,6 +240,23 @@ const rangeTip = computed(() => {
       + (r.excluded > 0 ? `（已排除 ${r.excluded} 条区间外数据）` : '')
   }
   return `${scopeTxt}当前统计全部 ${r.records} 条`
+})
+
+/**
+ * 「本期图景」面板的范围口径标签：与页头 {@code rangeTip} 同源，取
+ * {@code report.range} 的后端回显（不是前端 filters 的直接映射 ——
+ * 回显值才是后端实际生效的区间）。
+ *
+ * <p>只取导入区间这一维：页面默认口径就是「今天导入」，这是用户眼里
+ * 「本期」的含义。两端都有且相同 → 单日；清空导入时间 → 全部导入。</p>
+ */
+const chartRangeLabel = computed(() => {
+  const r = report.value?.range
+  const s = r?.importStart || ''
+  const e = r?.importEnd || ''
+  if (s && e) return s === e ? `导入 ${s}` : `导入 ${s} ~ ${e}`
+  if (s || e) return `导入 ${s || '不限'} ~ ${e || '不限'}`
+  return '全部导入'
 })
 
 const pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : '—')

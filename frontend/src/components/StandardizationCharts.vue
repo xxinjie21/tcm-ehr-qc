@@ -10,7 +10,13 @@
        - P0-2：两图共用同一份 CHART_BASE（grid / 字号 / 浮层），x=0 起点与右边界对齐。
        - P0-3：y 轴标签按最长标签可用宽度截断（width + overflow: truncate），完整词看 tooltip。
        - P0-4：loading / error / empty 三态互斥，加载与失败不再借用空态文案。 -->
-  <PanelCard title="本期图景">
+  <PanelCard>
+    <!-- 范围口径跟随父页（默认=今天导入）：「本期」到底指哪一期必须写明，
+         否则用户换过范围后，会把上一个范围的数据当成当前范围的读。 -->
+    <template #header>
+      本期图景
+      <span v-if="rangeLabel" class="tip">{{ rangeLabel }}</span>
+    </template>
     <div class="sc-grid">
       <div class="sc-cell">
         <div class="sc-hd">
@@ -73,7 +79,9 @@ const props = defineProps({
   /** P0-4：父页数据加载中（此时不得渲染空态文案） */
   loading: { type: Boolean, default: false },
   /** P0-4：父页接口失败（与 loading、空数据互斥） */
-  error: { type: Boolean, default: false }
+  error: { type: Boolean, default: false },
+  /** 范围口径标签（父页传入，如「导入 2026-10-17」）：空串时不渲染 */
+  rangeLabel: { type: String, default: '' }
 })
 
 const emit = defineEmits(['retry'])
