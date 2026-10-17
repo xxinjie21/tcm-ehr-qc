@@ -67,7 +67,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import echarts from '@/utils/echarts'
 
@@ -284,6 +284,8 @@ onMounted(() => {
   nextTick(renderAll)
   window.addEventListener('resize', handleResize)
 })
+// KeepAlive 复原时重画两张图（容器被移出又插回 DOM）；数据未变，用现有 props 重绘即可。
+onActivated(() => nextTick(renderAll))
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   if (covChart) covChart.dispose()

@@ -123,7 +123,7 @@
 // 首页看板：待办快捷条 + 指标卡 + 两张图（趋势折线、评分分布柱状）。
 // 数据来自 /stats/overview（指标卡）与 /stats/extra（图表），筛选条件只影响后者。
 import { useDepartments } from '@/composables/useDepartments'
-import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import echarts from '@/utils/echarts'
@@ -386,6 +386,14 @@ onMounted(() => {
   loadDepartments()
   loadAll()
   window.addEventListener('resize', handleResize)
+})
+
+// KeepAlive 复原（切走再切回）时重画两张图：图表容器被移出又插回 DOM，
+// 复用同一份已加载数据重绘即可（renderTrend/renderDist 内部仅在容器变化时才 dispose 重建）。
+onActivated(async () => {
+  await nextTick()
+  renderTrend()
+  renderDist()
 })
 
 // 窗口尺寸变化时让图表跟随容器重算（P4.7：rAF 合并，拖动不逐帧重排）

@@ -135,7 +135,7 @@
         </nav>
       </aside>
 
-      <main id="main-content" ref="mainRef">
+      <main id="main-content" ref="mainRef" @scroll="onMainScroll">
         <!-- 面包屑：承载分组与当前位置。
              随路由一起淡入 —— 与主内容同一套 .page-enter 动画、同一触发时机，
              否则主内容在淡入、面包屑却「啪」地换成新文字，两个节奏对不上。 -->
@@ -148,14 +148,17 @@
         <!-- 每页一个 h1（视觉隐藏），与面板标题 h2 构成层级-->
         <h1 class="visually-hidden">{{ route.meta?.title || '首页看板' }}</h1>
         <!-- 内层路由切换：应用内子页面切换的主战场（顶层 App.vue 只管登录/注册 ↔ 外壳）。
-             用「:key 强制重建 + .page-enter 入场动画」，**不用 <Transition mode="out-in">**
-             —— 后者在 Vue 3.5 下对「不同组件类型的分支」会卡死（详见 theme.css ①b）。
-             :key 取 r.path 而非 fullPath：路径变了就重挂载并播放淡入；「同页只改 query」
-             （如 /review?recordId=1 → 2）不重挂载，保住页面内已填的表单与已选的筛选。
-             滚动归零见下方 watch(route.path)：主区是 main 自身在滚（.layout 定高 +
-             main overflow-y:auto），document 并不滚，router 的 scrollBehavior 管不到这里。 -->
+             用 <KeepAlive> 缓存每个页面组件实例 —— 切走再切回时，筛选/范围、分页、已加载列表、
+             滚动位置、勾选、半填表单、打开中的弹窗全部保持离开时原样，且不重新请求。
+             `:key="r.path"` 保留但含义已变：从「强制重挂载」变成**缓存键**（每页一份实例）。
+             `:key="cacheVersion"` 用于「跨页且带 query 的跳转」时整份清空（见 script 里的守卫）。
+             刻意**不用** <Transition mode="out-in">（Vue 3.5 下对不同组件类型的分支会卡死，
+             详见 theme.css ①b）；也刻意不加 include（本 router-view 的子路由即全部业务页）。
+             滚动复原见下方 watch(route.path)。 -->
         <router-view v-slot="{ Component, route: r }">
-          <component :is="Component" :key="r.path" class="page-enter" />
+          <KeepAlive :key="cacheVersion">
+            <component :is="Component" :key="r.path" class="page-enter" />
+          </KeepAlive>
         </router-view>
       </main>
     </div>
@@ -169,7 +172,7 @@
 import { logout as logoutApi } from '@/api/auth'
 import { getOverview } from '@/api/stats'
 import { governanceStats } from '@/api/governance'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import LlmConfigDialog from '@/components/LlmConfigDialog.vue'
@@ -178,20 +181,37 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-// 主区滚动容器（<main> 自身）。路由切换时要把它的 scrollTop 归零 ——
-// 主区是 main 内部滚动（.layout 定高 + main overflow-y:auto），document 不滚，
-// 所以 router 的 scrollBehavior 对它无效，必须直接操作这个元素。
-// 不归零的后果：从长页面（如病历数据滚到第 300 行）切到短页面，浏览器只把
-// scrollTop 夹到新上限、不会自动回顶，新页面直接停在底部。
-// flush:'post' —— 等新页挂载完再归零，避免对旧页写入后被新页的高度覆盖。
+// 主区滚动容器（<main> 自身）。主区是 main 内部滚动（.layout 定高 + main overflow-y:auto），
+// document 不滚，所以 router 的 scrollBehavior 对它无效，必须直接操作这个元素。
+// 按 path 记住每个页面的滚动位置，切回缓存页时写回（旧行为是「切页无条件归零」，
+// 那会把缓存页的滚动也一起清掉，与「完全复原」相悖）。滚动过程中持续记录（@scroll），
+// 离开时 map 里已是该页最后一次滚动位置。
 const mainRef = ref(null)
+const scrollPos = new Map()
+const onMainScroll = () => {
+  if (mainRef.value) scrollPos.set(route.path, mainRef.value.scrollTop)
+}
+// flush:'post' —— 等新页挂上、DOM 到位再写回：缓存页已是完整高度，写回有效；新页取 0。
 watch(
   () => route.path,
-  () => {
-    if (mainRef.value) mainRef.value.scrollTop = 0
+  (to) => {
+    if (mainRef.value) mainRef.value.scrollTop = scrollPos.get(to) ?? 0
   },
   { flush: 'post' }
 )
+
+// 跨页且带 query 的跳转 = 显式指令（如通知跳 /records?grade=无效、带 recordId 的跨页查看）：
+// 清空整份缓存，让目标页按 query 重新挂载 —— 否则 KeepAlive 会复用旧实例、无视 query。
+// ⚠️ 必须限定 to.path !== from.path：useUrlFilters 用 router.replace 把筛选写进当前页 URL，
+//    这也会走守卫；若按「带 query 就清」处理，每改一次筛选就把当前页卸掉重挂 —— 灾难。
+const cacheVersion = ref(0)
+const removeQueryGuard = router.beforeEach((to, from) => {
+  if (to.path !== from.path && Object.keys(to.query || {}).length) {
+    cacheVersion.value++
+    scrollPos.clear()
+  }
+})
+onBeforeUnmount(removeQueryGuard)
 
 // 28.20：登录时的权限快照会过期（owner 改权限 / 移除成员后），进主框架时重取一次
 onMounted(() => {
