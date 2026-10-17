@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OPENAPI = ROOT / "docs" / "中医电子病历质控与标准化系统-openapi.yaml"
+OPENAPI = ROOT / "docs" / "中医电子病历智能结构化与数据质量控制系统-openapi.yaml"
 BACKEND = ROOT / "java-backend" / "src" / "main" / "java"
 FRONTEND_ROUTER = ROOT / "frontend" / "src" / "router" / "index.js"
 

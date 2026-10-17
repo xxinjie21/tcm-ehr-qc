@@ -90,7 +90,7 @@ router.beforeEach((to) => {
   return true
 })
 
-const APP_NAME = '中医电子病历质控与标准化系统'
+const APP_NAME = '中医电子病历智能结构化与数据质量控制系统'
 
 router.afterEach((to) => {
   const title = to.meta && to.meta.title

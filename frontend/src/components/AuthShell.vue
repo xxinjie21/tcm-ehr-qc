@@ -3,15 +3,15 @@
     <div class="auth-shell">
       <aside class="auth-brand">
         <div class="ornament"></div>
-        <h2>中医电子病历<br>质控与标准化系统</h2>
-        <div class="en">TCM EHR Quality Control<br>&amp; Standardization</div>
+        <h2>中医电子病历<br>智能结构化与数据质量控制</h2>
+        <div class="en">TCM EHR Intelligent Structuring<br>&amp; Data Quality Control</div>
         <div class="ver">v1.0 · 2026-09</div>
       </aside>
       <section class="auth-form">
         <slot />
       </section>
     </div>
-    <div class="copyright">© 2026 中医电子病历质控与标准化系统 · 课程设计</div>
+    <div class="copyright">© 2026 中医电子病历智能结构化与数据质量控制系统 · 课程设计</div>
   </div>
 </template>
 
