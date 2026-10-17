@@ -38,6 +38,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DataInitializationListener implements ApplicationRunner {
 
+    /**
+     * 等 ES 就绪的总预算。实测一次整体重启：ES 容器 13:05:51 起、13:07:15 才 ready，
+     * 后端 13:06:47 起 —— 也就是说 60s 能覆盖这台机器上的冷启动，再多就是 ES 真挂了。
+     */
+    private static final long ES_READY_BUDGET_MS = 60_000L;
+
     private final StringRedisTemplate redisTemplate;
     private final IDictionaryFileService fileService;
     private final IEsTermIndexService esTermIndexService;
@@ -68,17 +74,15 @@ public class DataInitializationListener implements ApplicationRunner {
             log.warn("[Redis] 连接失败: {}", e.getMessage());
         }
 
-        // 2. 验证ES连接
-        //    必须 catch Exception，不能只 catch IOException：ES 连不上时 ping 抛的是
-        //    ElasticsearchException（unchecked，内部包着 ExecutionException / ConnectException），
-        //    只抓 IOException 会让它一路冒到 SpringApplication，把整个启动炸掉（实测过）。
-        //    ES 不可用应当是「归一不可用」（接口返回 503 说明原因），而不是「系统起不来」。
-        try {
-            boolean ping = esClient.ping(RequestOptions.DEFAULT);
-            log.info("[ES] 连接成功: ping={}", ping);
-        } catch (Exception e) {
-            log.warn("[ES] 连接失败: {} —— 术语索引不可用，归一相关接口将返回 503", e.getMessage());
-        }
+        // 2. 等 ES 就绪（有限重试），而不是只探一次
+        //    2026-10-17 实测：Docker 整套栈同时重启时，ES 容器 13:05:51 起、13:07:15 才
+        //    `started`，而后端 13:06:47 起、13:06:58 就开始灌词典 —— 比 ES 就绪早 17 秒。
+        //    Docker 端口代理会先接下 9200 的 TCP 连接、等容器内进程没在监听时再关掉，
+        //    所以拿到的是 ConnectionClosedException（Connection is closed）而不是
+        //    ConnectException（端口探测 9200 是假阳性，端口开着不等于能查）。
+        //    一次探活失败就放弃的话，这一轮 8 类词典全部对账失败（下面 loadDictionaries
+        //    的 catch 只记日志），归一靠旧索引苟着，直到下次重启才会补 —— 见 awaitEsReady。
+        awaitEsReady();
 
         // 3. MySQL数据源
         //    刻意不写 host/库名：这里拿不到 DataSource 的真实 URL，写死一个与实际配置无关的
@@ -89,6 +93,53 @@ public class DataInitializationListener implements ApplicationRunner {
         loadDictionaries();
 
         log.info("========== 系统启动初始化完成 ==========");
+    }
+
+    /**
+     * 等 Elasticsearch 就绪：总预算 {@value #ES_READY_BUDGET_MS} 毫秒，退避 2s 起翻倍、上限 15s。
+     *
+     * <p><b>为什么启动要等</b>：ES 不可用时 {@link #loadDictionaries} 里 8 类词典会逐类抛异常、
+     * 只记日志不重试，本轮对账直接作废；{@code dictionary_versions.indexed_version} 没追上的类
+     * 要等下次重启才会重建。等几秒比让用户「重启一次再说」便宜得多。</p>
+     *
+     * <p><b>为什么必须 catch Exception</b>：ES 连不上时 ping 抛的是
+     * {@code ElasticsearchException}（unchecked，内部包着 ExecutionException /
+     * ConnectionClosedException），只抓 IOException 会让它一路冒到 SpringApplication，
+     * 把整个启动炸掉（实测过）。ES 不可用应当是「归一不可用」（接口返回 503 说明原因），
+     * 而不是「系统起不来」。</p>
+     *
+     * <p>超时后<b>不</b>中断启动：继续往下走，词典对账会逐类报 error，归一仍走已有索引，
+     * 系统可用性不受影响。</p>
+     */
+    private void awaitEsReady() {
+        long delayMs = 2000;
+        long deadline = System.currentTimeMillis() + ES_READY_BUDGET_MS;
+        for (int attempt = 1; ; attempt++) {
+            try {
+                if (esClient.ping(RequestOptions.DEFAULT)) {
+                    log.info("[ES] 连接成功: ping=true（第 {} 次尝试）", attempt);
+                    return;
+                }
+                log.warn("[ES] 探活返回 false（第 {} 次尝试）", attempt);
+            } catch (Exception e) {
+                // 冷启动期最常见的就是这条：Connection is closed
+                log.warn("[ES] 连接失败（第 {} 次尝试）: {}", attempt, e.getMessage());
+            }
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= delayMs) {
+                log.warn("[ES] 等待就绪超时（{} 秒 / {} 次尝试）—— 本轮词典对账大概率失败，"
+                        + "归一仍走已有索引；ES 恢复后重启即可补齐", ES_READY_BUDGET_MS / 1000, attempt);
+                return;
+            }
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                log.warn("[ES] 等待就绪被中断，放弃等待");
+                return;
+            }
+            delayMs = Math.min(delayMs * 2, 15_000);
+        }
     }
 
     /**
