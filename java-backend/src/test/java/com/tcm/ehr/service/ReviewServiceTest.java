@@ -219,7 +219,7 @@ class ReviewServiceTest {
         // 列表改为批量探测病历是否仍存在（selectObjs 只取 id 列），不再逐行 selectById
         when(recordMapper.selectObjs(ArgumentMatchers.any())).thenReturn(List.<Object>of("rec-4"));
 
-        ReviewTasksVO vo = service.listTasks(1, 10, "待复核", null);
+        ReviewTasksVO vo = service.listTasks(1, 10, "待复核", null, null);
 
         assertEquals(1, vo.getTotal());
         ReviewTaskVO first = vo.getTasks().get(0);

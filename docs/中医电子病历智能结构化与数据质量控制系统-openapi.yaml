@@ -2778,7 +2778,7 @@ paths:
       tags:
         - 复核
       summary: 待复核任务列表
-      description: 【权限：登录即可】分页查询待复核病历任务，展示复核时限
+      description: 【权限：登录即可】分页查询待复核病历任务，展示复核时限。范围参数（科室 / 接诊时间 / 导入时间）按关联病历收窄（review_tasks 表本身没有这些列）；两个时间维度都两端齐全才生效，与病历数据、质控等页同一套 RangeFilter 口径。不给范围 = 全部（跨导入日期的积压队列默认可见）
       parameters:
         - name: page
           in: query
@@ -2797,6 +2797,44 @@ paths:
             enum:
               - 待复核
               - 已完成
+        - name: overdueOnly
+          in: query
+          required: false
+          description: true 时只返回已超期且仍待复核的任务
+          schema:
+            type: boolean
+        - name: department
+          in: query
+          required: false
+          description: 科室，空表示不限
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          description: 接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          description: 接诊时间上界（yyyy-MM-dd），与 start 同时给才生效
+          schema:
+            type: string
+        - name: importStart
+          in: query
+          required: false
+          description: 导入时间下界（yyyy-MM-dd），与 importEnd 同时给才生效；与接诊时间是两个独立维度，取交集
+          schema:
+            type: string
+            format: date
+        - name: importEnd
+          in: query
+          required: false
+          description: 导入时间上界（yyyy-MM-dd），与 importStart 同时给才生效
+          schema:
+            type: string
+            format: date
       responses:
         '200':
           description: 任务列表
@@ -2819,7 +2857,40 @@ paths:
       tags:
         - 复核
       summary: 复核概览统计
-      description: 【权限：登录即可】与 GET /api/review/tasks 同一数据域口径，只 COUNT 不 SELECT，一次返回待复核 / 已完成 / 待复核超期三个数（替代原先三次 pageSize=1 列表查询）
+      description: 【权限：登录即可】与 GET /api/review/tasks 同一数据域口径与同一套范围参数，只 COUNT 不 SELECT，一次返回待复核 / 已完成 / 待复核超期三个数（替代原先三次 pageSize=1 列表查询）。三个数随范围联动：统计卡是「点进去看到的那个队列」的入口，数字与点击后的列表一致
+      parameters:
+        - name: department
+          in: query
+          required: false
+          description: 科室，空表示不限
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          description: 接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          description: 接诊时间上界（yyyy-MM-dd），与 start 同时给才生效
+          schema:
+            type: string
+        - name: importStart
+          in: query
+          required: false
+          description: 导入时间下界（yyyy-MM-dd），与 importEnd 同时给才生效；与接诊时间是两个独立维度，取交集
+          schema:
+            type: string
+            format: date
+        - name: importEnd
+          in: query
+          required: false
+          description: 导入时间上界（yyyy-MM-dd），与 importStart 同时给才生效
+          schema:
+            type: string
+            format: date
       responses:
         '200':
           description: pending / done / overdue 三个计数

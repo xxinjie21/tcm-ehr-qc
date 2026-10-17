@@ -1,5 +1,15 @@
 <template>
   <div class="review-page">
+    <!-- 范围查询：科室 / 就诊时间 / 导入时间，与病历数据、质控等页同一套 RangeFilter。
+         默认「不限」：复核任务是跨导入日期的积压队列，预收窄会把历史积压藏起来。
+         范围对统计卡与任务列表同时生效 —— 卡片是「点进去看到的队列」的入口，
+         数字必须与点击后的列表一致（「指标即入口」口径）。 -->
+    <div class="rv-tools">
+      <RangeFilter v-model="urlFilters" :show-grade="false" />
+      <el-button type="primary" size="small" :loading="loading || statsLoading" @click="applyFilters">查 询</el-button>
+      <el-button size="small" :disabled="loading || statsLoading" @click="resetFilters">重置</el-button>
+      <span class="tip">范围对统计卡与任务列表同时生效</span>
+    </div>
     <!-- 28.18：复核页统计卡 —— 原来这一屏只有「状态下拉」，进来看不出待办总量与超期压力。
          卡片可点：点了直接切到对应筛选（沿用看板「指标即入口」的口径）。 -->
     <div class="rv-stats">
@@ -12,10 +22,8 @@
         note="状态「已完成」" clickable @click="filterBy('done')" />
     </div>
     <!-- ① 待复核任务列表 -->
-    <!-- 两个页签：「待复核任务」是复核主入口（原有内容一字未改）；
-         「全部病历」让复核员也能像在病历数据页那样浏览全部病历，并展开同一套对照面板。 -->
-    <el-tabs v-model="activeTab" class="rv-tabs">
-    <el-tab-pane label="待复核任务" name="tasks">
+    <!-- 原「全部病历」页签已删：复核页只留任务队列；要浏览全部病历请用「病历数据」页。
+         范围查询在页首（RangeFilter），对统计卡与本列表同时生效。 -->
     <PanelCard title="待复核任务列表">
       <div class="rv-bar">
         <!-- 这里的视觉标签是普通 span（不是 <label for>），控件本身没有无障碍名称，
@@ -91,52 +99,6 @@
         @size-change="handleSizeChange"
       />
     </PanelCard>
-    </el-tab-pane>
-
-    <el-tab-pane label="全部病历" name="records">
-      <PanelCard title="全部病历（可浏览并展开对照）">
-        <div class="rv-bar">
-          <el-button size="small" @click="loadAllRecords()">刷新</el-button>
-          <span class="tip">
-            点任意一行即可在下方展开与复核完全相同的原文对照 / 人工修正面板。
-            该病历若没有待复核任务，则只可查看与修正、不能提交裁决（后端要求任务存在）。
-          </span>
-        </div>
-        <!-- max-height 与病历数据页同口径（420）：每页 10 行直接显示完，
-             不再出现「要多滚一格才见底」的内部滚动条 -->
-        <RecordTable
-          ref="allTableRef"
-          :rows="allRows"
-          :loading="allLoading"
-          @sort-change="onAllSortChange"
-          loading-text="正在读取病历…"
-          highlight-current
-          :max-height="420"
-          :action-width="90"
-          @row-click="openReviewFromRecords"
-        >
-          <template #action="{ row }">
-            <el-button link type="primary" @click.stop="openReviewFromRecords(row)">查看</el-button>
-          </template>
-          <template #empty>
-            <EmptyState :failed="allFailed" :loading="allLoading" text="没有符合条件的病历"
-                        @retry="() => loadAllRecords()" />
-          </template>
-        </RecordTable>
-        <el-pagination
-          v-model:current-page="allPage"
-          v-model:page-size="allPageSize"
-          :page-sizes="PAGE_SIZES_STANDARD"
-          :total="allTotal"
-          layout="total, sizes, prev, pager, next, jumper"
-          :disabled="allLoading"
-          style="margin-top: var(--sp-3); justify-content: flex-end"
-          @current-change="loadAllRecords"
-          @size-change="handleAllSizeChange"
-        />
-      </PanelCard>
-    </el-tab-pane>
-    </el-tabs>
 
     <!-- ②~⑥ 详情区：当前任务卡 / 原文对照 / 左右对比 / 提交反馈 / 底部操作，见 ReviewDetailPanel.vue -->
     <ReviewDetailPanel
@@ -152,7 +114,7 @@
 // 人工复核页：上方是待复核 / 已完成任务列表，点「进入复核」在下方展开该任务的病历原文对照、
 // NLP 原始结构化数据（只读）与人工修正表单，左右并排比对。
 // 关键取舍：修正提交前只做「已补齐核心字段把对应扣分加回」的本地预估，最终评分与分级以服务端重算为准。
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import { listReviewTasks, getReviewStats } from '@/api/review'
 import { usePagedList } from '@/composables/usePagedList'
@@ -160,11 +122,10 @@ import { useUrlFilters } from '@/composables/useUrlFilters'
 import { fmtDateTime } from '@/utils/format'
 import { debounce } from '@/utils/debounce'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
-import RecordTable from '@/components/RecordTable.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import FreshnessTag from '@/components/FreshnessTag.vue'
-import { searchRecords } from '@/api/records'
 import ReviewDetailPanel from '@/components/ReviewDetailPanel.vue'
+import RangeFilter from '@/components/RangeFilter.vue'
 import StatCard from '@/components/StatCard.vue'
 
 // 时间格式化：去掉 T、截到分钟；空值返回「—」，避免列表里出现 Invalid Date
@@ -179,70 +140,42 @@ const overdueOnly = ref(false)
 const skippedMissing = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
+// ===== 筛选状态（URL 可分享）=====
+// 对标 E5「可分享视图」：这一步必须放在筛选状态声明之后、onMounted 之前。
+// 本页的筛选 = 两个独立 ref（status / overdueOnly）+ 范围三键（department / dateRange /
+// importRange），用 reactive 包一层得到组合式期望的「状态对象」—— Vue 的 reactive 会
+// 自动解包 ref 属性，写入会回到原 ref，因此这两个 ref 的既有用法一行都不用改。
+// 范围三键由页首 RangeFilter 就地维护（组件 v-model 就地改本对象，与病历数据 / 质控页
+// 同口径），随本对象一起入 URL：刷新 / 分享「某科室的待复核队列」，打开就是同一个视图。
+const urlFilters = reactive({ status, overdueOnly, department: '', dateRange: null, importRange: null })
+
+// 组装范围参数：dateRange / importRange 是 [起, 止] 两元素数组，缺任一端都视为未选 ——
+// 与后端 filters()「两端齐全才生效」同一口径，半截区间不发出去
+const rangeParams = () => {
+  const d = urlFilters.dateRange
+  const ir = urlFilters.importRange
+  return {
+    department: urlFilters.department || '',
+    start: d && d.length === 2 ? d[0] : '',
+    end: d && d.length === 2 ? d[1] : '',
+    importStart: ir && ir.length === 2 ? ir[0] : '',
+    importEnd: ir && ir.length === 2 ? ir[1] : ''
+  }
+}
+
+useUrlFilters(urlFilters, page, pageSize)
+// P2-9 data freshness: page read time (honest, no backend field, no guessing load internals)
+const loadedAt = ref(new Date().toLocaleString())
+
 // 列表骨架统一走 usePagedList：本页按原口径「失败只由拦截器提示 —— 不清空已有行、
 // 也不置失败标记」，故 clearOnFailure / trackFailure 都关掉
 const { list: rows, total, loading, load: loadTasks } = usePagedList({
-  fetcher: (signal) => listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value, overdueOnly: overdueOnly.value }, { signal }),
+  fetcher: (signal) => listReviewTasks({ page: page.value, pageSize: pageSize.value, status: status.value, overdueOnly: overdueOnly.value, ...rangeParams() }, { signal }),
   extract: (res) => ({ list: res.data?.tasks, total: res.data?.total }),
   onLoaded: (res) => { skippedMissing.value = res.data?.skippedMissing || 0 },
   clearOnFailure: false,
   trackFailure: false
 })
-
-// ===== 页签 =====
-const activeTab = ref('tasks')
-
-// 对标 E5「可分享视图」：这一步必须放在页签声明之后、onMounted 之前。
-// 本页的筛选是两个独立 ref（status / overdueOnly），用 reactive 包一层得到组合式期望的
-// 「状态对象」—— Vue 的 reactive 会自动解包 ref 属性，写入会回到原 ref，
-// 因此这两个 ref 的既有用法一行都不用改。分享场景很典型：
-// 「把『只看超期』这个队列发给同事」，打开就是同一个视图。
-const urlFilters = reactive({ status, overdueOnly })
-useUrlFilters(urlFilters, page, pageSize)
-// P2-9 data freshness: page read time (honest, no backend field, no guessing load internals)
-const loadedAt = ref(new Date().toLocaleString())
-
-// ===== 「全部病历」列表 =====
-const allPage = ref(1)
-const allPageSize = ref(10)
-const allTableRef = ref(null)
-// B3 列头排序（评分 / 接诊时间）：本页 allPage 本来就不入 URL，sort 同口径不入 URL
-const allSort = reactive({ sortBy: '', sortOrder: '' })
-// 「全部病历」列表：本页原本没有取号（后到的旧响应会覆盖新结果）—— 按验收「行为不变」
-// 的要求保留这一现状，故 race: false；失败要清空并标记，走默认
-const {
-  list: allRows, total: allTotal, loading: allLoading, failed: allFailed, load: loadAllList
-} = usePagedList({
-  fetcher: (signal) => searchRecords({
-    page: allPage.value, pageSize: allPageSize.value,
-    sortBy: allSort.sortBy, sortOrder: allSort.sortOrder
-  }, { signal }),
-  extract: (res) => ({ list: res.data?.records, total: res.data?.total }),
-  race: false
-})
-
-/**
- * 拉「全部病历」列表。
- *
- * <p>数据域仍由后端按登录者身份过滤（管理员看全部 / 其余看本组织），
- * 这里不自己拼组织条件 —— 前端拼的条件改一次就得全页同步，漏一处就是越权。</p>
- */
-const loadAllRecords = async (p) => {
-  if (p) allPage.value = p
-  await loadAllList()
-}
-
-// B3 列头排序变更：写排序回第 1 页重查（排序变了旧页码没有意义）
-const onAllSortChange = ({ sortBy, sortOrder }) => {
-  allSort.sortBy = sortBy
-  allSort.sortOrder = sortOrder
-  loadAllRecords(1)
-}
-
-const handleAllSizeChange = (sz) => {
-  allPageSize.value = sz
-  loadAllRecords(1)
-}
 // 查询复核任务列表：传数字即跳到该页（翻页与重试共用同一入口）
 const load = async (p) => {
   if (typeof p === 'number') page.value = p
@@ -265,19 +198,36 @@ const rowClass = ({ row }) => (row.overdue ? 'row-overdue' : '')
 // ===== 28.18 复核概览统计 =====
 // 三个数由专用 /count 端点一次返回（只 COUNT 不 SELECT）；原先三次 pageSize=1 的
 // 列表查询每次都会附带一次全表排序（性能审查 P1-5）。
+// 收与任务列表同一套范围参数 —— 卡片是「点进去看到的那个队列」的入口，数字与列表一致
 const reviewStats = reactive({ pending: 0, done: 0, overdue: 0 })
+// 统计加载态：查 询 按钮要同时等列表与计数两个请求回来，先到的那个解锁后还能再点
+const statsLoading = ref(false)
 const loadReviewStats = async () => {
+  statsLoading.value = true
   try {
-    const res = await getReviewStats()
+    const res = await getReviewStats(rangeParams())
     reviewStats.pending = res.data?.pending ?? 0
     reviewStats.done = res.data?.done ?? 0
     reviewStats.overdue = res.data?.overdue ?? 0
   } catch { /* 拦截器已提示；统计失败不影响任务列表本身 */ }
+  finally { statsLoading.value = false }
 }
 
-// 点统计卡 = 切到任务页签 + 套用对应筛选（与下拉框同一套状态，URL 分享仍然有效）
+// 范围查询：统计卡与任务列表一起刷新（整页口径，与质控页 applyFilters 同形状）
+const applyFilters = () => {
+  load(1)
+  loadReviewStats()
+}
+// 重置范围并立即重查：本页默认口径就是「不限」（跨导入日期的积压队列），重置 = 清空全部范围条件
+const resetFilters = () => {
+  urlFilters.department = ''
+  urlFilters.dateRange = null
+  urlFilters.importRange = null
+  applyFilters()
+}
+
+// 点统计卡 = 套用对应筛选（与下拉框同一套状态，URL 分享仍然有效）
 const filterBy = (kind) => {
-  activeTab.value = 'tasks'
   if (kind === 'done') { status.value = '已完成'; overdueOnly.value = false }
   else if (kind === 'overdue') { status.value = '待复核'; overdueOnly.value = true }
   else { status.value = '待复核'; overdueOnly.value = false }
@@ -290,30 +240,11 @@ const activeTaskId = ref(null)
 const openReview = (row) => detailRef.value?.open(row)
 const onDetailOpened = (row) => { activeTaskId.value = row?.taskId || null }
 
-/**
- * 从「全部病历」进入复核。
- *
- * <p>病历列表行的主键叫 {@code id}，复核任务行叫 {@code recordId}；
- * 这里补齐成 openReview 期望的形状。<b>刻意不带 taskId</b> ——
- * 后端 submitReview 要求该病历存在待复核任务，从「全部病历」进入的病历可能没有，
- * 提交按钮据此禁用（见模板），而不是让用户填完表才被后端拒绝。</p>
- */
-const openReviewFromRecords = (row) => {
-  openReview({ recordId: row.id, score: row.score, taskId: null, fromRecords: true })
-}
-
 // 提交裁决后：任务列表与概览统计都要重取（状态可能由待复核变已完成）
 const onSubmitted = () => {
   load()
   loadReviewStats()
 }
-
-// 切到「全部病历」时才加载：进页面就查会白付一次请求（大多数人先看任务）
-watch(activeTab, (tab) => {
-  if (tab === 'records' && allRows.value.length === 0) {
-    loadAllRecords()
-  }
-})
 
 onMounted(() => {
   load(1)
@@ -322,8 +253,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.rv-tabs :deep(.el-tabs__header) {
-  margin-bottom: var(--sp-3);
+/* 页首范围查询条：与 RangeFilter 同一行，控件底对齐（与质控页 .filter-bar 同口径） */
+.rv-tools {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 /* 28.18：三张概览卡等宽排一行（窄屏换行） */
 .rv-stats {
