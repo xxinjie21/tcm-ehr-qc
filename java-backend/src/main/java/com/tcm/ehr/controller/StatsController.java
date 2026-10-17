@@ -67,7 +67,7 @@ public class StatsController {
             @RequestParam(required = false) String importStart,
             @RequestParam(required = false) String importEnd) {
         return Result.ok(reportService.report(
-                filters(department, start, end, null, null, importStart, importEnd)));
+                filters(department, start, end, null, importStart, importEnd)));
     }
 
     /**
@@ -92,7 +92,7 @@ public class StatsController {
             @RequestParam(required = false) String importStart,
             @RequestParam(required = false) String importEnd) {
         byte[] content = reportService.reportCsv(
-                filters(department, start, end, null, null, importStart, importEnd));
+                filters(department, start, end, null, importStart, importEnd));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=standardization-report.csv")
                 .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
@@ -114,7 +114,7 @@ public class StatsController {
     public Result<OverviewVO> overview(@RequestParam(required = false) String department,
                                        @RequestParam(required = false) String start,
                                        @RequestParam(required = false) String end) {
-        return Result.ok(statsService.overview(filters(department, start, end, null, null, null, null)));
+        return Result.ok(statsService.overview(filters(department, start, end, null, null, null)));
     }
 
     /**
@@ -137,7 +137,6 @@ public class StatsController {
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
      * @param end        接诊时间上界（yyyy-MM-dd）
-     * @param pattern    证候关键字，模糊匹配
      * @param grade      分级（合格/待复核/无效）
      * @return 指标卡与四类统计的聚合结果
      */
@@ -145,9 +144,8 @@ public class StatsController {
     public Result<StatsAllVO> all(@RequestParam(required = false) String department,
                                   @RequestParam(required = false) String start,
                                   @RequestParam(required = false) String end,
-                                  @RequestParam(required = false) String pattern,
                                   @RequestParam(required = false) String grade) {
-        return Result.ok(statsService.all(filters(department, start, end, pattern, grade, null, null)));
+        return Result.ok(statsService.all(filters(department, start, end, grade, null, null)));
     }
 
     /**
@@ -158,7 +156,6 @@ public class StatsController {
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
      * @param end        接诊时间上界（yyyy-MM-dd）
-     * @param pattern    证候关键字，模糊匹配
      * @param grade      分级
      * @return 趋势/科室/分布/词典规模的聚合结果
      */
@@ -166,9 +163,8 @@ public class StatsController {
     public Result<StatsVO> extra(@RequestParam(required = false) String department,
                                  @RequestParam(required = false) String start,
                                  @RequestParam(required = false) String end,
-                                 @RequestParam(required = false) String pattern,
                                  @RequestParam(required = false) String grade) {
-        return Result.ok(statsService.extra(filters(department, start, end, pattern, grade, null, null)));
+        return Result.ok(statsService.extra(filters(department, start, end, grade, null, null)));
     }
 
     /**
@@ -191,12 +187,11 @@ public class StatsController {
      * <p>与 {@code QcController.filters} 同构：接诊时间与导入时间是独立维度、可同时生效。
      * overview / all / extra 不暴露导入时间，传 null 即「不限」（现状不变）。</p>
      */
-    private FiltersDTO filters(String department, String start, String end, String pattern, String grade,
+    private FiltersDTO filters(String department, String start, String end, String grade,
                                String importStart, String importEnd) {
-        // 1. 三个标量条件直接搬
+        // 1. 两个标量条件直接搬
         FiltersDTO f = new FiltersDTO();
         f.setDepartment(department);
-        f.setPattern(pattern);
         f.setGrade(grade);
         // 2. 时间要上下界同时存在才生效：只给一端会被当成"从某时到最新"，那不是用户的意思
         if (start != null && !start.isBlank() && end != null && !end.isBlank()) {

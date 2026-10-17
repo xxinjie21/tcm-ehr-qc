@@ -1,5 +1,5 @@
 <template>
-  <!-- 病历检索筛选条：科室 / 就诊时间 / 导入时间 / 证候 / 分级。
+  <!-- 病历检索筛选条：科室 / 就诊时间 / 导入时间 / 分级。
        与 StatsFilter 的分工：本组件用 v-model 双向绑定（受控 + 自更新），
        供病历数据、复核等列表页复用；StatsFilter 只读展示 + 向上抛动作事件。 -->
   <div class="range-filter">
@@ -48,10 +48,6 @@
         <el-button size="small" @click="todayImport">今天</el-button>
       </div>
     </div>
-    <div v-if="showPattern" class="rf-item">
-      <label for="rf-pattern">证候</label>
-      <TermInput id="rf-pattern" v-model="inner.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
-    </div>
     <div v-if="showGrade" class="rf-item">
       <label for="rf-grade">分级</label>
       <el-select id="rf-grade" v-model="inner.grade" placeholder="全部" clearable style="width: 110px">
@@ -65,25 +61,17 @@
 
 <script setup>
 // 筛选条（受控组件）：自身不持有筛选状态，通过 v-model 与父组件同步；
-// 科室候选来自后端 DISTINCT，证候输入走词典联想（TermInput）。
+// 科室候选来自后端 DISTINCT。
 import { useDepartments } from '@/composables/useDepartments'
 import { computed, onMounted, ref } from 'vue'
-import TermInput from '@/components/TermInput.vue'
 
 const props = defineProps({
-  // 筛选值对象，字段：department / dateRange / pattern / grade / importRange。
+  // 筛选值对象，字段：department / dateRange / grade / importRange。
   // 默认值给出完整空结构，父组件少传字段时子控件也不会取到 undefined。
   // importRange 筛的是「导入时间」（后端 records.create_time），dateRange 筛的是「就诊时间」。
   modelValue: {
     type: Object,
-    default: () => ({ department: '', dateRange: null, pattern: '', grade: '', importRange: null })
-  },
-  // 是否显示「证候」输入。默认 true（病历数据 / 复核等列表页都用）。
-  // 标准化质量报告页传 false —— 该页是组织级口径、无证候维度展示，
-  // 且证候是 LIKE 子串模糊匹配，子集统计的参考性弱（2026-10-17 定案删除）。
-  showPattern: {
-    type: Boolean,
-    default: true
+    default: () => ({ department: '', dateRange: null, grade: '', importRange: null })
   },
   // 是否显示「分级」选择器。清洗页传 false —— 清洗只作用于「质控合格」，
   // 分级对清洗没有意义，留着只会让用户以为能把整库都洗一遍。

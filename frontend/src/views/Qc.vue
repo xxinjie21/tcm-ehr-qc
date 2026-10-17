@@ -314,7 +314,7 @@ const userStore = useUserStore()
 const canWriteRules = computed(() => userStore.canWriteQcRulesEntry)
 
 // 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护
-const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '', importRange: null })
+const filters = reactive({ department: '', dateRange: null, grade: '', sortBy: '', sortOrder: '', importRange: null })
 
 // ===== 评分标准 / 扣分构成=====
 // 评分标准：rules 为当前生效规则，descriptions 为自然语言说明，catalog* 为可选项目录
@@ -386,7 +386,6 @@ const params = () => {
     end: d && d.length === 2 ? d[1] : '',
     importStart: ir && ir.length === 2 ? ir[0] : '',
     importEnd: ir && ir.length === 2 ? ir[1] : '',
-    pattern: filters.pattern || '',
     grade: filters.grade || ''
   }
 }
@@ -470,7 +469,6 @@ const resetFilters = () => {
   filters.department = ''
   filters.dateRange = null
   filters.importRange = null
-  filters.pattern = ''
   filters.grade = ''
   applyFilters()
 }

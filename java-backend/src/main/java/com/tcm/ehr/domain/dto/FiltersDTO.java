@@ -20,7 +20,6 @@ public class FiltersDTO {
      * <p>与 {@link #dateRange}（接诊时间）相互独立，可同时生效、取交集；缺省或两端不齐时不生效。</p>
      */
     private List<String> importRange;
-    private String pattern;
     /** 分级：合格/待复核/无效 */
     private String grade;
     /**

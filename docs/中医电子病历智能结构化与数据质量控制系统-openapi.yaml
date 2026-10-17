@@ -757,9 +757,6 @@ components:
             type: string
             format: date
           description: '[开始日期, 结束日期]，按病历导入时间（records.create_time）过滤；与 dateRange 独立，可同时生效'
-        pattern:
-          type: string
-          description: 辨证结论关键词
         grade:
           type: string
           description: 分级（合格/待复核/无效）
@@ -3378,11 +3375,6 @@ paths:
           schema:
             type: string
             format: date
-        - name: pattern
-          in: query
-          required: false
-          schema:
-            type: string
         - name: grade
           in: query
           required: false
@@ -4058,7 +4050,6 @@ paths:
               dateRange:
                 - '2024-01-01'
                 - '2024-12-31'
-              pattern: ''
               status: ''
               page: 1
               pageSize: 20
@@ -4147,11 +4138,6 @@ paths:
           schema:
             type: string
             format: date
-        - name: pattern
-          in: query
-          required: false
-          schema:
-            type: string
         - name: grade
           in: query
           required: false
@@ -4198,11 +4184,6 @@ paths:
           schema:
             type: string
             format: date
-        - name: pattern
-          in: query
-          required: false
-          schema:
-            type: string
         - name: grade
           in: query
           required: false

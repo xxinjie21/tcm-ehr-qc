@@ -130,32 +130,6 @@ class GovernanceServiceImplExportTest {
     }
 
     @Test
-    @DisplayName("证候筛选下沉到 SQL 并集（A8）：导出不再内存二次筛，行数==预览 total")
-    void patternGoesToSqlUnionAndExportMatchesPreview() throws Exception {
-        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
-        List<Record> rows = List.of(rec("a", t, null), rec("b", t.plusSeconds(1), null), rec("c", t.plusSeconds(2), null));
-        when(mapper.selectList(any())).thenReturn(rows);
-
-        ExportDTO dto = csv();
-        dto.setFilters(Map.of("pattern", "肝郁"));
-
-        IGovernanceService.ExportedFile file = svc.export(dto);
-        // SQL 已把 pattern 并集筛完，批内不再二次过滤 → 直接导出 SQL 返回的所有行
-        assertEquals(3, csvDataLines(file));
-
-        // 关键：传给 selectList 的 wrapper 必须带上「pattern OR structured_data」并集条件
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<QueryWrapper<Record>> captor = ArgumentCaptor.forClass(QueryWrapper.class);
-        verify(mapper, org.mockito.Mockito.atLeast(1)).selectList(captor.capture());
-        String sql = captor.getValue().getCustomSqlSegment();
-        assertTrue(sql.contains("pattern") && sql.contains("structured_data"),
-                "证候筛选必须走 pattern OR structured_data（A8 并集）: " + sql);
-
-        Map<String, Object> preview = svc.previewDataset(dto);
-        assertEquals(3L, preview.get("total"), "预览 total == 导出行数（与列表同一筛选条件）");
-    }
-
-    @Test
     @DisplayName("无证候筛选：行数 == 预览 total（count 与 selectList 同 wrapper）")
     void exportRowCountMatchesPreviewTotalWithoutPattern() throws Exception {
         LocalDateTime t = LocalDateTime.of(2026, 1, 1, 0, 0, 0);

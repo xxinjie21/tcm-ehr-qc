@@ -237,7 +237,7 @@ public class StatsCache {
         if (f == null) {
             return true;
         }
-        if (!textOk(f.getDepartment()) || !textOk(f.getPattern())) {
+        if (!textOk(f.getDepartment())) {
             return false;
         }
         if (f.getGrade() != null && !f.getGrade().isBlank() && !GRADES.contains(f.getGrade())) {

@@ -26,14 +26,12 @@
       </div>
 
       <!-- 范围查询：科室 / 导入时间 / 就诊时间，与病历数据、质控等页同一套 RangeFilter。
-           证候筛选不随 RangeFilter 暴露 —— 本报告是组织级口径，无证候维度展示，
-           且证候是 LIKE 子串模糊匹配，子集统计的参考性弱（2026-10-17 定案删除）。 -->
            报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器。
            默认口径＝今天导入（不分科室）：importRange 下推 SQL 的 records.create_time；
            「就诊时间」是另一个独立维度（start/end，Java 侧按 visit_time 过滤并算 excluded），
            两维可同时生效、取交集。 -->
       <div class="rh-tools">
-        <RangeFilter v-model="filters" :show-grade="false" :show-import="true" :show-pattern="false" />
+        <RangeFilter v-model="filters" :show-grade="false" :show-import="true" />
         <el-button size="default" :disabled="loading" @click="quickRange(1)">近一年</el-button>
         <el-button size="default" :disabled="loading" @click="quickRange(3)">近三年</el-button>
         <el-button type="primary" size="default" :loading="loading" @click="loadReport">

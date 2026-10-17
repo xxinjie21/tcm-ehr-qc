@@ -16,7 +16,7 @@ export function resetQcRules() {
   return request.post('/qc/rules/reset')
 }
 
-// 范围扣分维度聚合：参数 department/start/end/pattern/grade
+// 范围扣分维度聚合：参数 department/start/end/grade
 export function getDeductionStats(params) {
   return request.get('/qc/deduction-stats', { params })
 }

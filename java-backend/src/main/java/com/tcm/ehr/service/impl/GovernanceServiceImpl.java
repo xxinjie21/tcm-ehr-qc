@@ -271,7 +271,6 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         if (filters != null) {
             scope.setDepartment(filters.getDepartment());
             scope.setDateRange(filters.getDateRange());
-            scope.setPattern(filters.getPattern());
             scope.setIds(filters.getIds());
             scope.setOnlyUnparsed(filters.getOnlyUnparsed());
         }
@@ -706,13 +705,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /**
      * 导出/预览共用的范围条件：能下推 SQL 的都下推，再追加"只含合格"这条硬约束。
-     *
-     * <p>证候筛选不再这里剥离、也不在内存二次筛（A8）：直接保留 {@code pattern}，
-     * 由 {@link RecordFilter#build} 的「原始列 OR structured_data JSON」并集统一收窄 ——
-     * 导出与列表/范围删除/统计下钻/范围扣分/批量质控共用同一个 builder，口径不再分叉。</p>
      */
     private QueryWrapper<Record> qualifiedWrapper(ExportDTO dto) {
-        // 1. 条件组装复用 RecordFilter（证候并集见 RecordFilter.patternUnion）
+        // 1. 条件组装复用 RecordFilter
         FiltersDTO f = RecordFilter.fromMap(dto.getFilters());
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), f);
         // 2. 追加导出自己的硬约束：只导「合格且已清洗」的病历。
@@ -749,7 +744,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         boolean firstPage = true;
         while (true) {
             // 每页重建 wrapper：QueryWrapper.and() 原地追加，复用会把 WHERE 逐页累积；
-            // qualifiedWrapper 含证候并集（RecordFilter.patternUnion）+ grade=合格 & governed=1
+            // qualifiedWrapper 含 grade=合格 & governed=1
             QueryWrapper<Record> wrapper = qualifiedWrapper(dto);
             if (!firstPage) {
                 RecordKeyset.anchorAfter(wrapper, cursorVt, cursorId);

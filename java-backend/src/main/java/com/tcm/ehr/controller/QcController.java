@@ -215,7 +215,6 @@ public class QcController {
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
      * @param end        接诊时间上界（yyyy-MM-dd）
-     * @param pattern    证候关键字，模糊匹配
      * @param grade      分级
      * @param importStart 导入时间下界（yyyy-MM-dd），与 importEnd 同时给才生效；与接诊时间独立
      * @param importEnd   导入时间上界（yyyy-MM-dd）
@@ -226,21 +225,19 @@ public class QcController {
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
-            @RequestParam(required = false) String pattern,
             @RequestParam(required = false) String grade,
             @RequestParam(required = false) String importStart,
             @RequestParam(required = false) String importEnd) {
         return Result.ok(qcService.deductionStats(
-                filters(department, start, end, pattern, grade, importStart, importEnd)));
+                filters(department, start, end, grade, importStart, importEnd)));
     }
 
     /** GET 查询参数 → 统一的范围过滤对象（两个时间维度都需上下界同时存在） */
-    private FiltersDTO filters(String department, String start, String end, String pattern, String grade,
+    private FiltersDTO filters(String department, String start, String end, String grade,
                                String importStart, String importEnd) {
-        // 1. 三个标量条件直接搬
+        // 1. 两个标量条件直接搬
         FiltersDTO f = new FiltersDTO();
         f.setDepartment(department);
-        f.setPattern(pattern);
         f.setGrade(grade);
         // 2. 时间要上下界同时存在才生效：只给一端会被当成"从某时到最新"，那不是用户的意思
         if (start != null && !start.isBlank() && end != null && !end.isBlank()) {

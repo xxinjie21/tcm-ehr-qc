@@ -26,7 +26,6 @@ public class SearchDTO {
      * 缺省或两端不齐时不生效（与 dateRange 同一判据）。</p>
      */
     private List<String> importRange;
-    private String pattern;
     /** 分级：合格/待复核/无效 */
     private String grade;
     private String status;

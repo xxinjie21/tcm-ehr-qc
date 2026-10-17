@@ -208,10 +208,6 @@
             style="width: 240px"
           />
         </div>
-        <div>
-          <label for="ex-pattern">证候</label>
-          <TermInput id="ex-pattern" v-model="filters.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
-        </div>
         <el-button @click="handlePreview" :loading="preview.loading">预览数据集</el-button>
         <el-button type="primary" :loading="exporting" @click="handleExport">导出下载</el-button>
       </div>
@@ -307,7 +303,6 @@ import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
-import TermInput from '@/components/TermInput.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
 import { clean as cleanApi, governanceStats } from '@/api/governance'
@@ -352,7 +347,6 @@ const scopeText = computed(() => {
   if (filters.department) parts.push(filters.department)
   if (filters.dateRange && filters.dateRange.length === 2) parts.push(`${filters.dateRange[0]}~${filters.dateRange[1]}`)
   if (filters.importRange && filters.importRange.length === 2) parts.push(`导入 ${filters.importRange[0]}~${filters.importRange[1]}`)
-  if (filters.pattern) parts.push(filters.pattern)
   return parts.length ? parts.join(' · ') : '全部'
 })
 
@@ -431,8 +425,8 @@ const handleClean = async () => {
 }
 
 // 清洗范围：只作用于「质控合格」病历（后端同样强制合格），故不带分级维度。
-// 科室 / 就诊区间 / 导入区间 / 证候 四个维度对清洗和导出都有效。
-const filters = reactive({ department: '', dateRange: null, pattern: '', importRange: null })
+// 科室 / 就诊区间 / 导入区间 三个维度对清洗和导出都有效。
+const filters = reactive({ department: '', dateRange: null, importRange: null })
 const format = ref('csv')
 const exporting = ref(false)
 // 导出文件名去重序号：Date.now() 是毫秒级，同一毫秒内连点两次导出仍会同名
@@ -457,15 +451,14 @@ const pushExportHistory = (payload) => {
   catch { /* 存不下（隐私模式/配额满）就只在本次会话内保留 */ }
 }
 
-// 组装预览 / 导出共用的请求体：只带后端约定的 department / dateRange / importRange / pattern
-// 四个维度，刻意不含 grade —— 分级只作用于数据清洗，导出恒为质控合格病历
+// 组装预览 / 导出共用的请求体：只带后端约定的 department / dateRange / importRange
+// 三个维度，刻意不含 grade —— 分级只作用于数据清洗，导出恒为质控合格病历
 const buildPayload = () => ({
   format: format.value,
   filters: {
     department: filters.department || '',
     dateRange: filters.dateRange || [],
-    importRange: filters.importRange || [],
-    pattern: filters.pattern || ''
+    importRange: filters.importRange || []
   }
 })
 

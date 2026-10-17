@@ -303,14 +303,14 @@ const GROUP_FIELDS = new Map(
 const groupFields = (group) => GROUP_FIELDS.get(group) || []
 
 // ===== F·7.4 查询 =====
-const query = reactive({ department: '', dateRange: null, pattern: '', grade: '', sortBy: '', sortOrder: '', importRange: null })
+const query = reactive({ department: '', dateRange: null, grade: '', sortBy: '', sortOrder: '', importRange: null })
 // 范围删除要求至少一个筛选条件（与后端一致，防误删全库）
 const hasFilter = computed(() => {
   const r = query.dateRange
   const range = Array.isArray(r) && r.length === 2 && r[0] && r[1]
   const ir = query.importRange
   const importRange = Array.isArray(ir) && ir.length === 2 && ir[0] && ir[1]
-  return !!(query.department || query.pattern || query.grade || range || importRange)
+  return !!(query.department || query.grade || range || importRange)
 })
 const page = ref(1)
 const pageSize = ref(10)
@@ -360,7 +360,6 @@ const resetFilters = () => {
   query.department = ''
   query.dateRange = null
   query.importRange = null
-  query.pattern = ''
   query.grade = ''
   // 2. 回到第 1 页，避免停在不存在的页码
   page.value = 1

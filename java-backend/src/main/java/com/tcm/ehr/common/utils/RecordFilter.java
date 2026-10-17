@@ -73,9 +73,6 @@ public final class RecordFilter {
             if (notBlank(dto.getDoctorId())) {
                 wrapper.eq("doctor_id", dto.getDoctorId().trim());
             }
-            if (notBlank(dto.getPattern())) {
-                patternUnion(wrapper, dto.getPattern().trim());
-            }
             if (notBlank(dto.getGrade())) {
                 wrapper.eq("grade", dto.getGrade().trim());
             }
@@ -227,7 +224,6 @@ public final class RecordFilter {
         }
         // 2. 三个标量条件逐个翻译
         filterDto.setDepartment(text(filters.get("department")));
-        filterDto.setPattern(text(filters.get("pattern")));
         filterDto.setGrade(text(filters.get("grade")));
         // 3. 时间区间要两端都有才成立，缺一端当没给
         if (filters.get("dateRange") instanceof List<?> dateRange && dateRange.size() == 2
@@ -255,7 +251,6 @@ public final class RecordFilter {
     public static String describe(Object filters) {
         String department = null;
         String grade = null;
-        String pattern = null;
         String start = null;
         String end = null;
         String importStart = null;
@@ -264,7 +259,6 @@ public final class RecordFilter {
         if (filters instanceof FiltersDTO filterDto) {
             department = filterDto.getDepartment();
             grade = filterDto.getGrade();
-            pattern = filterDto.getPattern();
             if (filterDto.getDateRange() != null && filterDto.getDateRange().size() == 2) {
                 start = filterDto.getDateRange().get(0);
                 end = filterDto.getDateRange().get(1);
@@ -276,7 +270,6 @@ public final class RecordFilter {
         } else if (filters instanceof Map<?, ?> rawFilters) {
             department = text(rawFilters.get("department"));
             grade = text(rawFilters.get("grade"));
-            pattern = text(rawFilters.get("pattern"));
             if (rawFilters.get("dateRange") instanceof List<?> dateRange && dateRange.size() == 2) {
                 start = text(dateRange.get(0));
                 end = text(dateRange.get(1));
@@ -294,9 +287,6 @@ public final class RecordFilter {
         }
         if (notBlank(grade)) {
             parts.add("分级＝" + grade.trim());
-        }
-        if (notBlank(pattern)) {
-            parts.add("证候＝" + pattern.trim());
         }
         // 3. 只给一端时写「不限」，别让审计看不出这是半区间
         if (notBlank(start) || notBlank(end)) {
@@ -405,9 +395,6 @@ public final class RecordFilter {
             if (notBlank(filterDto.getDepartment())) {
                 wrapper.eq("department", filterDto.getDepartment().trim());
             }
-            if (notBlank(filterDto.getPattern())) {
-                patternUnion(wrapper, filterDto.getPattern().trim());
-            }
             if (notBlank(filterDto.getGrade())) {
                 wrapper.eq("grade", filterDto.getGrade().trim());
             }
@@ -452,25 +439,5 @@ public final class RecordFilter {
     private static boolean notBlank(String value) {
         // 判空口径统一走 TextUtil.isBlank（原为逐字重写一份 value != null && !value.isBlank()）
         return !TextUtil.isBlank(value);
-    }
-
-    /**
-     * 证候筛选统一口径（A8）：取「原始 {@code pattern} 列 <b>OR</b> {@code structured_data}
-     * JSON」的<b>并集</b>模糊匹配。
-     *
-     * <p>为什么必须并集：医生在证候输入框可能填归一前（原写法）或归一后（标准词）任意一种，
-     * 只有 {@code pattern LIKE} 会漏掉「仅写在 structured_data.patternList 里的标准词」（归一后
-     * 的证候写法常与医生原文不同）。过去列表/范围删除/统计下钻只认原始列、导出才认 JSON ——
-     * 同一筛选条件两边结果集不一致（实测筛「气滞痰阻证」列表 0 条、导出 50 条）。</p>
-     *
-     * <p>医疗数据「漏」比「多」严重：宁可多命中几条，也不能让医生在列表里搜不到标准的归一结果。
-     * {@code structured_data} 是 JSON 列，但 MySQL 的 {@code LIKE} 在其上完全可用
-     * （中文正常命中，无需 unicode 转义序列），实测 4 万行仅比单列 LIKE 多约 60% 耗时（低频操作）。</p>
-     *
-     * @param wrapper 已带数据域与其它筛选的 wrapper
-     * @param value   用户输入的证候词（like 子串）
-     */
-    private static void patternUnion(QueryWrapper<Record> wrapper, String value) {
-        wrapper.and(w -> w.like("pattern", value).or().like("structured_data", value));
     }
 }

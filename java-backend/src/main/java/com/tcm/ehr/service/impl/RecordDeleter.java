@@ -173,6 +173,6 @@ public class RecordDeleter {
         boolean range = f.getDateRange() != null && f.getDateRange().size() == 2
                 && !TextUtil.isBlank(f.getDateRange().get(0)) && !TextUtil.isBlank(f.getDateRange().get(1));
         // 3. 任一维度非空即算有筛选
-        return !TextUtil.isBlank(f.getDepartment()) || !TextUtil.isBlank(f.getPattern()) || !TextUtil.isBlank(f.getGrade()) || range;
+        return !TextUtil.isBlank(f.getDepartment()) || !TextUtil.isBlank(f.getGrade()) || range;
     }
 }
