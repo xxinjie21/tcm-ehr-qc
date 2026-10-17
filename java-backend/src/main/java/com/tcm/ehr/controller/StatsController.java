@@ -55,7 +55,6 @@ public class StatsController {
      * @param department  科室，空表示不限
      * @param start       接诊时间起（yyyy-MM-dd），空表示不限
      * @param end         接诊时间止（yyyy-MM-dd），空表示不限；只给一端按「未给」处理
-     * @param pattern     证候关键字，模糊匹配，空表示不限
      * @param importStart 导入时间起（yyyy-MM-dd），与 importEnd 同时给才生效
      * @param importEnd   导入时间止（yyyy-MM-dd），空表示不限
      * @return 甲类标准符合度 + 乙类数据集覆盖度 + 按月分组
@@ -65,11 +64,10 @@ public class StatsController {
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
-            @RequestParam(required = false) String pattern,
             @RequestParam(required = false) String importStart,
             @RequestParam(required = false) String importEnd) {
         return Result.ok(reportService.report(
-                filters(department, start, end, pattern, null, importStart, importEnd)));
+                filters(department, start, end, null, null, importStart, importEnd)));
     }
 
     /**
@@ -82,7 +80,6 @@ public class StatsController {
      * @param department  科室，空表示不限
      * @param start       接诊时间起（yyyy-MM-dd），空表示不限
      * @param end         接诊时间止（yyyy-MM-dd），空表示不限
-     * @param pattern     证候关键字，空表示不限
      * @param importStart 导入时间起（yyyy-MM-dd），与 importEnd 同时给才生效
      * @param importEnd   导入时间止（yyyy-MM-dd），空表示不限
      * @return CSV 文件流（UTF-8 BOM，Excel 可直接打开）
@@ -92,11 +89,10 @@ public class StatsController {
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
-            @RequestParam(required = false) String pattern,
             @RequestParam(required = false) String importStart,
             @RequestParam(required = false) String importEnd) {
         byte[] content = reportService.reportCsv(
-                filters(department, start, end, pattern, null, importStart, importEnd));
+                filters(department, start, end, null, null, importStart, importEnd));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=standardization-report.csv")
                 .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))

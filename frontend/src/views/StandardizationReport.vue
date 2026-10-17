@@ -25,13 +25,15 @@
         </div>
       </div>
 
-      <!-- 范围查询：科室 / 导入时间 / 就诊时间 / 证候，与病历数据、质控等页同一套 RangeFilter。
+      <!-- 范围查询：科室 / 导入时间 / 就诊时间，与病历数据、质控等页同一套 RangeFilter。
+           证候筛选不随 RangeFilter 暴露 —— 本报告是组织级口径，无证候维度展示，
+           且证候是 LIKE 子串模糊匹配，子集统计的参考性弱（2026-10-17 定案删除）。 -->
            报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器。
            默认口径＝今天导入（不分科室）：importRange 下推 SQL 的 records.create_time；
            「就诊时间」是另一个独立维度（start/end，Java 侧按 visit_time 过滤并算 excluded），
            两维可同时生效、取交集。 -->
       <div class="rh-tools">
-        <RangeFilter v-model="filters" :show-grade="false" :show-import="true" />
+        <RangeFilter v-model="filters" :show-grade="false" :show-import="true" :show-pattern="false" />
         <el-button size="default" :disabled="loading" @click="quickRange(1)">近一年</el-button>
         <el-button size="default" :disabled="loading" @click="quickRange(3)">近三年</el-button>
         <el-button type="primary" size="default" :loading="loading" @click="loadReport">
@@ -187,7 +189,7 @@ const fmtDate = (d) => {
 // 导入时间（importRange）与就诊时间（dateRange）是两个独立维度，可同时生效、取交集；
 // 用户想放宽到全量，把导入时间清空即可（后端按「未给」处理）。
 const today = fmtDate(new Date())
-const filters = reactive({ department: '', dateRange: null, pattern: '', grade: '', importRange: [today, today] })
+const filters = reactive({ department: '', dateRange: null, grade: '', importRange: [today, today] })
 
 /** 时间快捷按钮：只改写 dateRange，随后立即查询 */
 function quickRange(years) {
@@ -200,14 +202,13 @@ function quickRange(years) {
 const resetFilters = () => {
   filters.department = ''
   filters.dateRange = null
-  filters.pattern = ''
   filters.grade = ''
   // 回到默认口径（今天导入），不是清空成全量 —— 与初始进入页面一致
   filters.importRange = [today, today]
   loadReport()
 }
 
-/** 报告 / 导出参数：两个时间维度都两端齐全才生效；department/pattern 为空发空串 */
+/** 报告 / 导出参数：两个时间维度都两端齐全才生效；department 为空发空串 */
 const params = () => {
   const d = filters.dateRange
   const ir = filters.importRange
@@ -215,7 +216,6 @@ const params = () => {
     department: filters.department || '',
     start: d && d.length === 2 ? d[0] : '',
     end: d && d.length === 2 ? d[1] : '',
-    pattern: filters.pattern || '',
     importStart: ir && ir.length === 2 ? ir[0] : '',
     importEnd: ir && ir.length === 2 ? ir[1] : ''
   }
@@ -226,7 +226,6 @@ const rangeTip = computed(() => {
   if (!r) return ''
   const scope = []
   if (filters.department) scope.push(`科室＝${filters.department}`)
-  if (filters.pattern) scope.push(`证候＝${filters.pattern}`)
   const scopeTxt = scope.length ? scope.join(' · ') + '；' : ''
   // 导入区间（页面默认口径）优先展示；接诊区间是另一个维度，同时生效时并列
   if (r.importStart || r.importEnd) {

@@ -219,7 +219,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /**
-     * 按范围出报告（科室 / 就诊时间 / 证候 / 导入时间）。
+     * 按范围出报告（科室 / 就诊时间 / 导入时间）。
      *
      * <p>甲类（词典质量 / 跨类重名）看的是词表本身，与病历无关，**不随范围收窄**；
      * 只有乙类（病历相关统计）按范围过滤。</p>
@@ -233,6 +233,10 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      *       与病历列表 / Qc 页同一口径；它的排除量不进 excluded（那本是接诊时间的语义），
      *       回显走 {@code range.importStart/importEnd}。</li>
      * </ul>
+     *
+     * <p>不随范围收窄的还有<b>证候</b>：该页是组织级口径、无证候维度展示，且证候是
+     * LIKE 子串模糊匹配，子集统计的参考性弱 —— 2026-10-17 定案不再暴露（接口与前端
+     * 同步移除，FiltersDTO 的 pattern 字段仍服务于病历列表 / 统计看板）。</p>
      */
     @Override
     public StandardizationReportVO report(FiltersDTO filters) {
@@ -253,7 +257,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         // A1/T2 + C1：这里**一次遍历、一次解析**，抽扁平中间结构（Row）向下传给各统计器。
         // 原实现里同一条 structured_data 被 7 处统计器各自解析一遍（4 万条 ≈ 28 万次 Jackson 解析），
         // 且 selectList 无列投影（21 TEXT + 2 JSON 全量进堆，4 万条约 45MB）。
-        // 科室 / 证候下沉到 SQL（RecordFilter），时间留在 Java 侧（见方法注释）。
+        // 科室下沉到 SQL（RecordFilter），时间留在 Java 侧（见方法注释）。
         List<Row> all = rowsInDomain(withoutVisitRange(f));
         List<Row> rows = filterByVisitTime(all, start, end);
         vo.setRange(rangeOf(all, rows, start, end, importStart, importEnd));
@@ -366,11 +370,11 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 复制一份去掉**接诊时间**区间的范围：该维度由 Java 侧过滤（要算 excluded），
      * 不能与 SQL 重复；导入时间（{@code importRange}）刻意保留 —— 它下推到
      * {@code RecordFilter} 的 {@code create_time} 条件，与病历列表 / Qc 页同口径。
+     * 证候（{@code pattern}）刻意<b>不</b>复制 —— 见 {@link #report(FiltersDTO)} 的说明。
      */
     private FiltersDTO withoutVisitRange(FiltersDTO f) {
         FiltersDTO copy = new FiltersDTO();
         copy.setDepartment(f.getDepartment());
-        copy.setPattern(f.getPattern());
         copy.setGrade(f.getGrade());
         copy.setIds(f.getIds());
         copy.setOnlyUnparsed(f.getOnlyUnparsed());

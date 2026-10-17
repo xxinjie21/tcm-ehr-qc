@@ -48,7 +48,7 @@
         <el-button size="small" @click="todayImport">今天</el-button>
       </div>
     </div>
-    <div class="rf-item">
+    <div v-if="showPattern" class="rf-item">
       <label for="rf-pattern">证候</label>
       <TermInput id="rf-pattern" v-model="inner.pattern" type="pattern" placeholder="如：肝肾亏虚" style="width: 150px" />
     </div>
@@ -77,6 +77,13 @@ const props = defineProps({
   modelValue: {
     type: Object,
     default: () => ({ department: '', dateRange: null, pattern: '', grade: '', importRange: null })
+  },
+  // 是否显示「证候」输入。默认 true（病历数据 / 复核等列表页都用）。
+  // 标准化质量报告页传 false —— 该页是组织级口径、无证候维度展示，
+  // 且证候是 LIKE 子串模糊匹配，子集统计的参考性弱（2026-10-17 定案删除）。
+  showPattern: {
+    type: Boolean,
+    default: true
   },
   // 是否显示「分级」选择器。清洗页传 false —— 清洗只作用于「质控合格」，
   // 分级对清洗没有意义，留着只会让用户以为能把整库都洗一遍。
