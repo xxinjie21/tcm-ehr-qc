@@ -7,6 +7,7 @@ import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.StatsDTO;
 import com.tcm.ehr.domain.po.Record;
+import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.OverviewVO;
 import com.tcm.ehr.domain.vo.StatsAllVO;
 import com.tcm.ehr.domain.vo.StatsVO;
@@ -40,6 +41,12 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     /** 词频 TopN */
     private static final int TOP_N = 10;
+
+    /** 看板「词典规模」展示的 5 类术语（与前端卡片一致） */
+    private static final List<String> DICT_TYPES = List.of("disease", "symptom", "pattern", "herb", "formula");
+
+    /** 看板扩展缓存基准 TTL：60 ± 10s（与词频同口径，变更低频、读量大） */
+    private static final java.time.Duration EXTRA_TTL = java.time.Duration.ofSeconds(60);
 
     /**
      * 允许下推到 SQL 的实体数组路径白名单。
@@ -194,6 +201,14 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public StatsVO extra(FiltersDTO filters) {
+        // 看板扩展：全表 GROUP BY ×3 + 词典读取，每次进首页都现算。加 60s 短 TTL 缓存；
+        // 失效用 StatsCache 的全局版本段 —— 任一写入即作废（见 StatsCache.getOrLoad）。
+        return statsCache.getOrLoad("extra", filters, EXTRA_TTL,
+                () -> extraFromDb(filters), StatsVO.class);
+    }
+
+    /** 看板扩展现算主体（不含缓存）。缓存包装见 {@link #extra(FiltersDTO)}。 */
+    private StatsVO extraFromDb(FiltersDTO filters) {
         // P2-10：三块统计全部下推到 SQL 侧聚合。原实现是 recordsFor() 把命中病历（4 万行 ×
         // 5 列投影）整份拉进堆，再对同一份 List 独立遍历三遍（月 / 科室 / 分数）。
         // 现在中间计数留在 DB，回传行数从「病历数」降到「月份数 / 科室数 / 分档数」。
@@ -267,35 +282,20 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             vo.getScoreDistribution().add(b);
         });
 
-        // 4. 词典规模（5 类术语数量）：读 dictionary_terms，见 termCount
-        vo.getDictionary().put("disease", termCount("disease"));
-        vo.getDictionary().put("symptom", termCount("symptom"));
-        vo.getDictionary().put("pattern", termCount("pattern"));
-        vo.getDictionary().put("herb", termCount("herb"));
-        vo.getDictionary().put("formula", termCount("formula"));
-        return vo;
-    }
-
-    /**
-     * 某类术语条数：读 {@code dictionary_terms}（当前组织生效口径）。
-     *
-     * <p><b>必须与归一读同一处</b>（批次8b）：词典真源已从 JSON 文件改为按组织的表，
-     * 这里若还数文件，看板会显示「文件里的基础层条数」，与该组织实际生效的词典
-     * （含组织自有词条）对不上 —— 数字看起来正常，含义是错的。</p>
-     *
-     * <p>刻意<b>不</b>改成查 ES 的 _count：那样看板会因 ES 不可用而连「词典规模」这种
-     * 静态信息都拿不到，而改造前看板并不依赖 ES。</p>
-     *
-     * <p>读库失败时返回 <b>-1</b> 而不是 0 —— 0 会被读成「词典是空的」，属于另一种误导。</p>
-     */
-    private int termCount(String type) {
+        // 4. 词典规模（5 类术语条数）：**一次读回生效词表**，替代逐类 readEffective
+        //    （性能审查 P1-1：原实现 5 类 × (基础层 + 本组织) 最多 10 条 SQL）。
+        //    读库失败时全类给 -1 而不是 0 —— 0 会被读成「词典是空的」，属另一种误导。
+        Map<String, List<TermEntry>> dicts = null;
         try {
-            return termStore.readEffective(RequestUtils.currentOrgId(), type).size();
+            dicts = termStore.readEffectiveAll(RequestUtils.currentOrgId());
         } catch (Exception e) {
-            // 读不到给 -1 而不是 0：0 会被当成「词典是空的」，-1 才能让页面显示「不可用」
-            log.warn("[统计] {} 词典读取失败，词条数按 -1 上报: {}", type, e.getMessage());
-            return -1;
+            log.warn("[统计] 词典读取失败，词典规模按 -1 上报: {}", e.getMessage());
         }
+        for (String type : DICT_TYPES) {
+            vo.getDictionary().put(type,
+                    dicts == null ? -1 : dicts.getOrDefault(type, List.of()).size());
+        }
+        return vo;
     }
 
     /**

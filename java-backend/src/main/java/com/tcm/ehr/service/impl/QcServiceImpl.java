@@ -68,6 +68,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private final ReviewTaskMapper reviewTaskMapper;
     private final ObjectMapper objectMapper;
     private final QcRuleStore ruleStore;
+    /** 扣分统计缓存（性能审查：进质控页即全库扫描，导入后未重算时退化到 4.9s） */
+    private final com.tcm.ehr.common.cache.StatsCache statsCache;
+
+    /** 扣分统计缓存基准 TTL：60 ± 10s（数据仅质控重算 / 导入后变化） */
+    private static final java.time.Duration DEDUCTION_TTL = java.time.Duration.ofSeconds(60);
 
     // ------------------------------------------------------------------ 检查
 
@@ -355,6 +360,14 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      */
     @Override
     public DeductionStatsVO deductionStats(FiltersDTO filters) {
+        // 性能审查：本接口每次进质控页都全库扫描；导入后未重算时回退子集=全库、退化到 4.9s。
+        // 加 60s 短 TTL 缓存（javadoc 早已点名此手段）；失效用 StatsCache 全局版本段，任一写入即作废。
+        return statsCache.getOrLoad("deduction", filters, DEDUCTION_TTL,
+                () -> deductionStatsFromDb(filters), DeductionStatsVO.class);
+    }
+
+    /** 扣分统计现算主体（不含缓存）。缓存包装见 {@link #deductionStats(FiltersDTO)}。 */
+    private DeductionStatsVO deductionStatsFromDb(FiltersDTO filters) {
         // 1. 初始化聚合容器：按类型、按条目、等级分布
         DeductionStatsVO vo = new DeductionStatsVO();
         Map<String, int[]> byType = new LinkedHashMap<>();

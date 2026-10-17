@@ -555,7 +555,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     public long countMatched(SearchDTO dto) {
         // 数据域 + 用户筛选，统一走 RecordFilter（与 searchRecords 完全相同，禁止手写 where）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), dto);
-        // COUNT 不关心 ORDER BY / SELECT 列，表结构有 (org_id) 覆盖后仅 5ms
+        // COUNT 不需要排序键：MySQL 对 `SELECT COUNT(*) ... ORDER BY` 直接忽略排序（聚合只出一行，
+        // 不产生 filesort），故这里照用 build 不会多扫；不带 status 的等值条件也无额外代价。
         return baseMapper.selectCount(wrapper);
     }
 

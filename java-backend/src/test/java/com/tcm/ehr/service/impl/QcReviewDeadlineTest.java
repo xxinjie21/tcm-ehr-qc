@@ -39,7 +39,7 @@ class QcReviewDeadlineTest {
         RecordMapper recordMapper = mock(RecordMapper.class);
         ReviewTaskMapper reviewTaskMapper = mock(ReviewTaskMapper.class);
         QcServiceImpl svc = new QcServiceImpl(reviewTaskMapper, new ObjectMapper(),
-                mock(QcRuleStore.class));
+                mock(QcRuleStore.class), mock(com.tcm.ehr.common.cache.StatsCache.class));
         // QcServiceImpl 继承 ServiceImpl<Record>，写库走 baseMapper
         ReflectionTestUtils.setField(svc, "baseMapper", recordMapper);
 

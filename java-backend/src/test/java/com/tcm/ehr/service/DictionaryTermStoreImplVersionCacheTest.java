@@ -2,6 +2,7 @@ package com.tcm.ehr.service;
 
 import com.tcm.ehr.domain.po.DictionaryTerm;
 import com.tcm.ehr.domain.po.DictionaryVersion;
+import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.mapper.DictionaryTermMapper;
 import com.tcm.ehr.mapper.DictionaryVersionMapper;
 import com.tcm.ehr.service.impl.DictionaryTermStoreImpl;
@@ -12,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,6 +49,64 @@ class DictionaryTermStoreImplVersionCacheTest {
         v.setType("symptom");
         v.setVersion("v1");
         return v;
+    }
+
+    private static DictionaryTerm term(String org, String type, String std) {
+        return term(org, type, std, null);
+    }
+
+    private static DictionaryTerm term(String org, String type, String std, String aliasJson) {
+        DictionaryTerm t = new DictionaryTerm();
+        t.setOrgId(org);
+        t.setType(type);
+        t.setStandardTerm(std);
+        t.setAliases(aliasJson);
+        return t;
+    }
+
+    @Test
+    @DisplayName("readEffectiveAll：一趟取回全部类型，本组织同标准词覆盖基础层（消除报告/看板 N+1）")
+    void readEffectiveAllReadsOnceAndMergesLikePerType() {
+        DictionaryTermMapper termMapper = mock(DictionaryTermMapper.class);
+        DictionaryVersionMapper versionMapper = mock(DictionaryVersionMapper.class);
+        when(versionMapper.selectOne(any())).thenReturn(null);
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(versionMapper.selectMaps(any())).thenReturn(List.of());
+
+        // 真实 SQL 由 org_id IN ('', 'org-A') 过滤；mock 直接把两层全部行一次返回
+        when(termMapper.selectList(any())).thenReturn(List.of(
+                term("", "symptom", "咳嗽", "[\"BASE\"]"),
+                term("", "disease", "感冒"),
+                term("org-A", "symptom", "咳嗽", "[\"OWN\"]"),   // 同标准词 → 应覆盖基础层
+                term("org-A", "symptom", "喘证")));
+
+        IDictionaryTermStore store = svc(termMapper, versionMapper);
+        Map<String, List<TermEntry>> all = store.readEffectiveAll("org-A");
+
+        assertEquals(1, Mockito.mockingDetails(termMapper).getInvocations().size(),
+                "readEffectiveAll 必须一趟取回（原逐类读 ≈ 16 次词条查询 → 这里只允许 1 次）");
+        assertEquals(2, all.get("symptom").size(), "同标准词覆盖后不重复：咳嗽 + 喘证 = 2");
+        assertEquals(1, all.get("disease").size(), "基础层其它类型照常带入");
+        TermEntry cough = all.get("symptom").stream()
+                .filter(e -> "咳嗽".equals(e.getStandardTerm())).findFirst().orElseThrow();
+        assertEquals("OWN", cough.getAliases().get(0),
+                "同标准词应保留本组织那条（口径与 readEffective 逐位一致）");
+    }
+
+    @Test
+    @DisplayName("readEffectiveAll：基础层组织只发一条 org_id='' 的查询")
+    void readEffectiveAllBaseOnly() {
+        DictionaryTermMapper termMapper = mock(DictionaryTermMapper.class);
+        DictionaryVersionMapper versionMapper = mock(DictionaryVersionMapper.class);
+        when(versionMapper.selectOne(any())).thenReturn(null);
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(versionMapper.selectMaps(any())).thenReturn(List.of());
+        when(termMapper.selectList(any())).thenReturn(List.of(term("", "symptom", "咳嗽")));
+
+        Map<String, List<TermEntry>> all =
+                svc(termMapper, versionMapper).readEffectiveAll("");
+        assertEquals(1, Mockito.mockingDetails(termMapper).getInvocations().size());
+        assertEquals(1, all.get("symptom").size());
     }
 
     @Test

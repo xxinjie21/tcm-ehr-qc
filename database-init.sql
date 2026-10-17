@@ -80,9 +80,11 @@ CREATE TABLE IF NOT EXISTS records (
   UNIQUE KEY uk_records_org_text_hash (org_id, text_hash),
   -- 索引治理（2026-10-09）：按访问路径精简。原 13 个二级索引中，
   -- idx_records_org / idx_records_org_visit_time 被下列复合索引的最左前缀完全覆盖；
-  -- idx_registration_no / idx_status / idx_grade 的单列场景亦被 org 前缀复合索引覆盖
-  -- （管理员「看全部」的 grade/status 过滤退化为全表扫，40k 量级可接受）。
-  -- 保留下列 7 个二级索引即可覆盖全部实际查询，显著降低批量回写的写放大。
+  -- idx_registration_no / idx_grade 的单列场景被 org 前缀复合索引覆盖，但 idx_status **不在**其中 ——
+  -- 下列索引无一含 status，带 status 的筛选曾退化为全表扫（管理员「看全部」的 status 过滤同理）。
+  -- 保留下列索引即可覆盖全部实际查询，显著降低批量回写的写放大。
+  -- 2026-10-17 修正：补 idx_records_org_status_vt / idx_records_status_vt 两条，消除 status 全表扫。
+  -- （原注释把 idx_status 误算作被覆盖，是审阅疏漏；EXPLAIN 实测为 Table scan。）
   -- 2026-10-15 修正：上句的「40k 量级可接受」只适用于 grade/status 过滤，**不适用于默认序**。
   -- 默认序 visit_time DESC, id ASC 是混合方向；单列 (visit_time) 正扫两列升序、反扫两列降序，
   -- 都凑不出「一降一升」⇒ 管理员（不带 org_id，用不上下面的 org 前缀）只能全表读整行再排序
@@ -98,10 +100,22 @@ CREATE TABLE IF NOT EXISTS records (
   -- 这是第 8 个二级索引：新维度没有可复用的最左前缀，不是重复建设。
   -- 已有库由 Flyway V5__add_records_create_time_index.sql 升级。
   INDEX idx_records_org_ct_id (org_id, create_time DESC, id ASC),
+  -- 状态筛选：status 此前无任何索引（上述注释曾误称被覆盖），带 status 的搜索/清洗/导出全表扫。
+  -- org 前缀（数据域）+ status 等值 + 稳定序；排序键仍是 visit_time，故只服务 WHERE。
+  -- 无 org 版服务管理员「看全部」（此时用不上 org 前缀）。已有库由 Flyway V7 升级。
+  INDEX idx_records_org_status_vt (org_id, status, visit_time DESC, id ASC),
+  INDEX idx_records_status_vt (status, visit_time DESC, id ASC),
   -- 科室筛选 + 默认排序（三星索引：等值 org_id/department → 排序 visit_time/id）
   INDEX idx_records_org_dept_vt (org_id, department, visit_time DESC, id ASC),
   -- overview / governance 聚合：org_id + grade + governed
   INDEX idx_records_org_grade_gov (org_id, grade, governed),
+  -- 看板聚合覆盖索引（2026-10-17，性能审查 P0-2/P1-5 根因）：
+  -- /stats/extra 的趋势 GROUP BY DATE_FORMAT(visit_time) 与科室 GROUP BY department，
+  -- 之前均为 Table scan on records —— 不是行数问题，而是 records 行宽 avg≈12KB（两个 TEXT），
+  -- 整表 ≈290MB，聚合只需 3 列却读整行。本条同时覆盖 (visit_time, grade) 与 (department, grade)，
+  -- 聚合改走 Covering index scan（admin 2306→50ms / 科目 2287→16ms）。
+  -- 单条同时服务 org 与 admin（后者退化为整条索引覆盖扫描，仅 ~2MB）。已有库由 Flyway V8 升级。
+  INDEX idx_records_org_agg (org_id, visit_time, department, grade),
   -- 用户可排序白名单 score / registration_no，末级 id 保持稳定
   INDEX idx_records_org_score_desc_id (org_id, score DESC, id ASC),
   INDEX idx_records_org_regno_id (org_id, registration_no, id)

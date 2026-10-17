@@ -47,6 +47,19 @@ public interface IDictionaryTermStore {
      */
     List<TermEntry> readEffective(String orgId, String type);
 
+    /**
+     * 一次读回某组织「基础层 ∪ 本组织」生效的<b>全部类型</b>词条，按 {@code type} 分组。
+     *
+     * <p>口径与逐类调用 {@link #readEffective} 逐位一致（同一标准词以本组织为准）。存在的意义是
+     * 消除 N+1：报告/看板要 8 类 × (基础层 + 本组织) = 最多 16 次读，每次都带一次版本查询 +
+     * 一次词条查询（≈32 条 SQL）。这里用一条 {@code org_id IN ('', ?)} 取回两层、在内存里合并，
+     * 整趟只发 1 条 SQL。</p>
+     *
+     * @param orgId 组织号；空串/null 视为基础层
+     * @return type → 生效词条（无词条的类型不出现在返回里）
+     */
+    Map<String, List<TermEntry>> readEffectiveAll(String orgId);
+
     /** 读某组织某类型的自有词条（不回落到基础层） */
     List<TermEntry> read(String orgId, String type);
 

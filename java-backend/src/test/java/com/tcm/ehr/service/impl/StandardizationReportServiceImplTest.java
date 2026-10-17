@@ -1,6 +1,7 @@
 package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.common.cache.StatsCache;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.StandardizationReportVO;
@@ -17,6 +18,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,9 +50,14 @@ class StandardizationReportServiceImplTest {
         // 词表读路径 mock 成空，让本测试专注乙类的四类拆分；
         // 甲类词典质量依赖真实词表，不在本测试范围
         IDictionaryTermStore termStore = mock(IDictionaryTermStore.class);
-        when(termStore.readEffective(any(), any())).thenReturn(List.of());
+        when(termStore.readEffectiveAll(any())).thenReturn(Map.of());
+        // 直通 StatsCache：getOrLoadSwr 直接调 loader（绕过 Redis），让本测试聚焦报告计算逻辑
+        // （报告走 SWR 变体：陈旧时后台重算，这里同步直通，验证的仍是同一份现算体）
+        StatsCache statsCache = mock(StatsCache.class);
+        when(statsCache.getOrLoadSwr(any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(4)).get());
         svc = new StandardizationReportServiceImpl(recordMapper, termStore,
-                new tools.jackson.databind.ObjectMapper());
+                new tools.jackson.databind.ObjectMapper(), statsCache);
 
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setAttribute("currentUserId", "u-1");

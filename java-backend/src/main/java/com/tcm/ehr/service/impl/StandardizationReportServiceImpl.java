@@ -124,6 +124,11 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     private final IDictionaryTermStore termStore;
     /** 与 StatsServiceImpl 同一个注入实例，不另建 —— 每次 new ObjectMapper 会有可观的初始化开销 */
     private final tools.jackson.databind.ObjectMapper objectMapper;
+    /** 报告缓存（性能审查：报告是全站最重的读接口，进页即全量拉数据域 + 每条解析 2 次 JSON） */
+    private final com.tcm.ehr.common.cache.StatsCache statsCache;
+
+    /** 报告缓存基准 TTL：比看板长（变更更稀、计算更重），仍带 ±10s 抖动 */
+    private static final java.time.Duration REPORT_TTL = java.time.Duration.ofSeconds(180);
 
     @Override
     public StandardizationReportVO report() {
@@ -241,6 +246,43 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     @Override
     public StandardizationReportVO report(FiltersDTO filters) {
         FiltersDTO f = filters == null ? new FiltersDTO() : filters;
+        // ---- 缓存包装（报告页是全站最重的读接口：全量拉数据域 + 每条解析 2 次 JSON）----
+        // ① 入参（department / dateRange / importRange / grade）全在白名单内 —— getOrLoadSwr 会再核一遍，
+        //    白名单外（奇怪字符 / 超长）自动绕过缓存现算，保证 key 空间有界；
+        // ② 时间范围 / 科室不变但换词典后数字会变 → 词典版本作 salt 拼进 key，换词表即换 key；
+        // ③ 失效用 StatsCache 的全局版本段：任一写入（导入 / 清洗 / 复核 / 批次）立即作废，
+        //    不依赖「被改数据所属 org」，管理员写入落别组也不会漏失效；
+        // ④ SWR：时间到期后先秒回旧值、后台重算 —— 那 ~5s 冷算（其中 ~3s 是读 110MB JSON 的
+        //    磁盘 I/O，SQL 侧已无优化空间）不再挡在用户前面；而写入走版本号 ⇒ key 变 ⇒
+        //    两把 key 都落空 ⇒ 仍阻塞现算新值（正确性优先，绝不端出写前的旧数字）。
+        //
+        // ⚠️ 后台重算的线程没有请求上下文：必须在**请求线程**先把 orgId / 数据域 / 看全部标记
+        //    捕获成快照，否则后台线程里 RequestUtils 读到 "unknown"、RecordFilter 全 fail-closed，
+        //    会算出错误（甚至空）的报告并回填缓存。见 ReportContext。
+        ReportContext ctx = new ReportContext(
+                RequestUtils.currentOrgId(), RecordFilter.domainOrgId(), RequestUtils.viewAllOrgs());
+        String dictVersion = termStore.effectiveDictVersion(ctx.orgId());
+        return statsCache.getOrLoadSwr("report", f, dictVersion, REPORT_TTL,
+                () -> computeReport(f, ctx), StandardizationReportVO.class);
+    }
+
+    /**
+     * 报告现算所需的请求上下文快照（在<b>请求线程</b>捕获）。
+     *
+     * <p>SWR 的陈旧分支会在后台线程重算，那里读不到 {@code RequestContextHolder}
+     * （{@code RequestUtils} 一律返回 {@code "unknown"}、{@code RecordFilter} fail-closed）。
+     * 把三个取值定死在请求线程，现算体就与线程无关。做法与本项目批任务的
+     * {@code qc_task.role} / {@code org_id} 快照一致。</p>
+     *
+     * @param orgId       当前组织（读词表用）
+     * @param domainOrgId 数据域落在 {@code org_id} 列上的取值（无组 → 不可能值哨兵）
+     * @param viewAllOrgs 管理员「看全部」标记（true 时不加组织条件）
+     */
+    private record ReportContext(String orgId, String domainOrgId, boolean viewAllOrgs) {
+    }
+
+    /** 报告现算主体（不含缓存）。缓存包装见 {@link #report(FiltersDTO)}。 */
+    private StandardizationReportVO computeReport(FiltersDTO f, ReportContext ctx) {
         // 时间上下界必须同时给才生效，与 report(String, String) 及 StatsController 同一口径
         String start = rangeBound(f.getDateRange(), true);
         String end = rangeBound(f.getDateRange(), false);
@@ -251,20 +293,23 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         String importEnd = rangeBound(f.getImportRange(), false);
 
         StandardizationReportVO vo = new StandardizationReportVO();
-        vo.setDictQuality(dictQuality());
-        vo.setCrossTypeDuplicates(crossTypeDuplicates());
+        // 生效词表一次读回（性能审查 P1-1：原 dictQuality / crossTypeDuplicates / coverage /
+        // symptomTerms 各自逐类 readEffective，8 类 × 2 层 ≈ 32 条 SQL；现整趟 1 条）。
+        Map<String, List<TermEntry>> dicts = termStore.readEffectiveAll(ctx.orgId());
+        vo.setDictQuality(dictQuality(dicts));
+        vo.setCrossTypeDuplicates(crossTypeDuplicates(dicts));
         // 乙类：病历相关，必须先按数据域收窄，否则登录即可的接口会读到跨组织数据。
         // A1/T2 + C1：这里**一次遍历、一次解析**，抽扁平中间结构（Row）向下传给各统计器。
         // 原实现里同一条 structured_data 被 7 处统计器各自解析一遍（4 万条 ≈ 28 万次 Jackson 解析），
         // 且 selectList 无列投影（21 TEXT + 2 JSON 全量进堆，4 万条约 45MB）。
         // 科室下沉到 SQL（RecordFilter），时间留在 Java 侧（见方法注释）。
-        List<Row> all = rowsInDomain(withoutVisitRange(f));
+        List<Row> all = rowsInDomain(ctx, withoutVisitRange(f));
         List<Row> rows = filterByVisitTime(all, start, end);
         vo.setRange(rangeOf(all, rows, start, end, importStart, importEnd));
         vo.setByMonth(byMonth(rows));
-        vo.setCoverage(coverage(rows));
+        vo.setCoverage(coverage(rows, dicts));
         // A2：词表只读一次，两个统计器共用同一份（原先各自 new HashSet<>(symptomTerms()) 一遍）
-        Set<String> symptomDict = new HashSet<>(symptomTerms());
+        Set<String> symptomDict = new HashSet<>(symptomTerms(dicts));
         vo.setUnmatched(unmatched(rows, symptomDict));
         vo.setNormalizable(normalizableRate(rows, symptomDict));
         vo.setScore(scoreDistribution(rows));
@@ -275,8 +320,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         // 批次14 · 对标 A5：数字的血缘 —— 本报告出自哪一版词典。
         // 与 generatedAt 配对：「按什么算的」+「什么时候算的」才是可追溯的；
         // 只给时间的话，换过词表后数字变了也说不清是哪一版造成的。
-        vo.setSourceVersion(termStore.effectiveDictVersion(
-                com.tcm.ehr.common.utils.RequestUtils.currentOrgId()));
+        vo.setSourceVersion(termStore.effectiveDictVersion(ctx.orgId()));
         return vo;
     }
 
@@ -499,14 +543,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     // ------------------------------------------------------------ 甲类 · 词典质量
 
     /** 各类型词表的规模、别名质量 */
-    private List<StandardizationReportVO.DictQuality> dictQuality() {
-        String orgId = RequestUtils.currentOrgId();
+    private List<StandardizationReportVO.DictQuality> dictQuality(Map<String, List<TermEntry>> dicts) {
         List<StandardizationReportVO.DictQuality> out = new ArrayList<>();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             if (!t.dict()) {
                 continue;
             }
-            List<TermEntry> entries = termStore.readEffective(orgId, t.key());
+            List<TermEntry> entries = dicts.getOrDefault(t.key(), List.of());
             StandardizationReportVO.DictQuality q = new StandardizationReportVO.DictQuality();
             q.setType(t.key());
             q.setLabel(t.label());
@@ -530,14 +573,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /** 跨类重名：同一术语出现在多本词典里，类型判定会有歧义 */
-    private List<String> crossTypeDuplicates() {
-        String orgId = RequestUtils.currentOrgId();
+    private List<String> crossTypeDuplicates(Map<String, List<TermEntry>> dicts) {
         Map<String, Set<String>> termToTypes = new LinkedHashMap<>();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             if (!t.dict()) {
                 continue;
             }
-            for (TermEntry e : termStore.readEffective(orgId, t.key())) {
+            for (TermEntry e : dicts.getOrDefault(t.key(), List.of())) {
                 termToTypes.computeIfAbsent(e.getStandardTerm(), k -> new LinkedHashSet<>()).add(t.key());
             }
         }
@@ -564,8 +606,14 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 且刻意内联书写（不传数组变量）：守卫按源码里的引号 token 逐个比对真实列清单，
      * 传变量会让它一个都扫不到，守卫就形同虚设。</p>
      */
-    private List<Row> rowsInDomain(FiltersDTO filters) {
-        QueryWrapper<Record> wrapper = RecordFilter.build(RecordFilter.domainOrgId(), filters);
+    private List<Row> rowsInDomain(ReportContext ctx, FiltersDTO filters) {
+        // 性能审查 P0-1：这里**不要** ORDER BY —— 报告随后按 byMonth(TreeMap)/coverage 等
+        // 与行序无关的方式重排，带排序只会让「导入时间范围」这类条件退化成全表读整行 + filesort
+        // （buildForAggregate 与 build 共用同一段 WHERE 组装，只是不追加排序键）。
+        // 数据域与「看全部」走 ctx 快照（而非现读 RequestContextHolder）—— 见 ReportContext：
+        // 本方法可能在 SWR 的后台重算线程里执行，那里读不到请求上下文。
+        QueryWrapper<Record> wrapper = RecordFilter.buildForAggregate(
+                ctx.domainOrgId(), filters, ctx.viewAllOrgs());
         wrapper.select("id", "visit_time", "score", "update_time", "chief_complaint", "self_report", "structured_data", "qc_results");
         return toRows(recordMapper.selectList(wrapper));
     }
@@ -585,7 +633,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /** 各类实体：抽取数 / 已归一数 */
-    private List<StandardizationReportVO.TypeCoverage> coverage(List<Row> rows) {
+    private List<StandardizationReportVO.TypeCoverage> coverage(List<Row> rows,
+                                                                Map<String, List<TermEntry>> dicts) {
         Map<String, StandardizationReportVO.TypeCoverage> byField = new LinkedHashMap<>();
         // 只列有词典的类型：无词典的类型（如 cause）归一率恒为 0，画到图上就是一根没有意义的
         // 空条（表现为「有病因却没有对应术语库」）。与 dictQuality() / crossTypeDuplicates()
@@ -607,14 +656,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         }
         // 标出「解析早于词表建立」的类型：词表非空且抽到了实体，却一条都没归上。
         // 这一种补词表无效，只能重跑解析 —— 与真正的词表缺口必须分开说。
-        String orgId = RequestUtils.currentOrgId();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             StandardizationReportVO.TypeCoverage c = byField.get(t.structuredKey());
             if (c == null) {
                 continue;
             }
             if (t.dict()) {
-                c.setTermCount(termStore.readEffective(orgId, t.key()).size());
+                c.setTermCount(dicts.getOrDefault(t.key(), List.of()).size());
             }
             c.setSuspectedStaleExtraction(c.getTermCount() > 0 && c.getTotal() > 0 && c.getNormalized() == 0);
         }
@@ -834,9 +882,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     // ------------------------------------------------------------ 工具
 
-    private Set<String> symptomTerms() {
+    private Set<String> symptomTerms(Map<String, List<TermEntry>> dicts) {
         Set<String> terms = new HashSet<>();
-        for (TermEntry e : termStore.readEffective(RequestUtils.currentOrgId(), "symptom")) {
+        for (TermEntry e : dicts.getOrDefault("symptom", List.of())) {
             terms.add(e.getStandardTerm());
             if (e.getAliases() != null) {
                 terms.addAll(e.getAliases());

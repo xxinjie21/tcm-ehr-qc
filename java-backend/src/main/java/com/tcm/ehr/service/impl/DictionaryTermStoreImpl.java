@@ -127,6 +127,55 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     }
 
     /**
+     * 一次读回某组织「基础层 ∪ 本组织」生效的全部词条，按 type 分组（消除报告/看板的 N+1）。
+     *
+     * <p>与逐类调用 {@link #readEffective} 同口径（本组织同标准词覆盖基础层）：用一条
+     * {@code org_id IN ('', ?)} 取回两层，再在内存里按 type 合并。整趟只发 1 条 SQL，
+     * 替代「8 类 × 2 层」最多 32 条（每条 read 都带一次版本查询 + 一次词条查询）。</p>
+     *
+     * <p>刻意<b>不走</b> termsCache：它按 (org,type) 分片缓存，缓存命中要逐个类型查版本号，
+     * 反而无法一趟取回。这里一次库查询的代价远低于逐类版本查询，且结果一次用完即弃。</p>
+     */
+    @Override
+    public Map<String, List<TermEntry>> readEffectiveAll(String orgId) {
+        String org = norm(orgId);
+        java.util.Set<String> orgs = org.isEmpty()
+                ? java.util.Set.of(BASE_ORG)
+                : java.util.Set.of(BASE_ORG, org);
+        Map<String, List<TermEntry>> base = new HashMap<>();
+        Map<String, List<TermEntry>> own = new HashMap<>();
+        for (DictionaryTerm r : termMapper.selectList(new QueryWrapper<DictionaryTerm>()
+                .in("org_id", orgs))) {
+            Map<String, List<TermEntry>> bucket = norm(r.getOrgId()).isEmpty() ? base : own;
+            bucket.computeIfAbsent(r.getType(), k -> new ArrayList<>()).add(toEntry(r));
+        }
+        Map<String, List<TermEntry>> out = new HashMap<>();
+        java.util.Set<String> types = new java.util.LinkedHashSet<>();
+        types.addAll(base.keySet());
+        types.addAll(own.keySet());
+        for (String type : types) {
+            List<TermEntry> b = base.getOrDefault(type, List.of());
+            List<TermEntry> o = own.getOrDefault(type, List.of());
+            if (b.isEmpty()) {
+                out.put(type, new ArrayList<>(o));
+            } else if (o.isEmpty()) {
+                out.put(type, new ArrayList<>(b));
+            } else {
+                // 与 readEffective 同一合并口径：基础层先入，本组织同标准词覆盖
+                java.util.Map<String, TermEntry> merged = new java.util.LinkedHashMap<>();
+                for (TermEntry e : b) {
+                    merged.put(termKey(e), e);
+                }
+                for (TermEntry e : o) {
+                    merged.put(termKey(e), e);
+                }
+                out.put(type, new ArrayList<>(merged.values()));
+            }
+        }
+        return out;
+    }
+
+    /**
      * 取召回索引（P1-15 / S1）：生效词条表 + 它的字符倒排表，一次装载、同源返回。
      *
      * <p><b>为什么缓存的是「合并后的生效词条」</b>：{@link #readEffective} 每次都要把两层

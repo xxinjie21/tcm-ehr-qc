@@ -356,7 +356,21 @@ public final class RecordFilter {
      * @return 只含数据域 + 用户筛选、**无排序**的查询条件
      */
     public static QueryWrapper<Record> buildForAggregate(String orgId, FiltersDTO filterDto) {
-        return build(orgId, filterDto, RequestUtils.viewAllOrgs(), false);
+        return buildForAggregate(orgId, filterDto, RequestUtils.viewAllOrgs());
+    }
+
+    /**
+     * 聚合专用（显式给定「是否看全部」）—— 供<b>后台线程</b>调用。
+     *
+     * <p>与 2 参重载的唯一差别是「看全部」由调用方显式传入，而不是现读
+     * {@link RequestUtils#viewAllOrgs()}。原因同 {@link #buildWithinOrg}：后台线程里
+     * {@code viewAllOrgs()} 恒为 false（读不到 {@code RequestContextHolder}），
+     * 若在后台按它构建条件，管理员视角的数据域会悄悄退化成「只看本组」，算出错误结果。
+     * 故调用方必须在<b>提交线程</b>把该标记捕获下来，再交给后台重算。</p>
+     */
+    public static QueryWrapper<Record> buildForAggregate(String orgId, FiltersDTO filterDto,
+                                                         boolean viewAllOrgs) {
+        return build(orgId, filterDto, viewAllOrgs, false);
     }
 
     /**

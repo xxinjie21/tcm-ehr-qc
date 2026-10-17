@@ -42,7 +42,7 @@ class QcProcessOneTransactionTest {
 
     private QcServiceImpl service(RecordMapper recordMapper, ReviewTaskMapper reviewTaskMapper) {
         QcServiceImpl svc = new QcServiceImpl(reviewTaskMapper, new ObjectMapper(),
-                mock(QcRuleStore.class));
+                mock(QcRuleStore.class), mock(com.tcm.ehr.common.cache.StatsCache.class));
         // QcServiceImpl 继承 ServiceImpl<Record>，写库走 baseMapper（批次 10 才统一成显式注入）
         ReflectionTestUtils.setField(svc, "baseMapper", recordMapper);
         return svc;

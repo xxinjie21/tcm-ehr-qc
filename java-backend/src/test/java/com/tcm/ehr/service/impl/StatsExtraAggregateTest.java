@@ -49,7 +49,7 @@ class StatsExtraAggregateTest {
     private static final String ORG = "org-A";
 
     private static StatsServiceImpl svc(RecordMapper mapper) {
-        StatsServiceImpl s = new StatsServiceImpl(mock(IDictionaryTermStore.class), mock(StatsCache.class));
+        StatsServiceImpl s = new StatsServiceImpl(mock(IDictionaryTermStore.class), passThroughCache());
         for (Class<?> c = s.getClass(); c != null; c = c.getSuperclass()) {
             try {
                 Field f = c.getDeclaredField("baseMapper");
@@ -63,6 +63,14 @@ class StatsExtraAggregateTest {
             }
         }
         return s;
+    }
+
+    /** 直通 StatsCache：getOrLoad 直接调 loader（绕过 Redis），让本测试聚焦 SQL 聚合逻辑 */
+    private static StatsCache passThroughCache() {
+        StatsCache cache = mock(StatsCache.class);
+        when(cache.getOrLoad(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(3)).get());
+        return cache;
     }
 
     private static void context() {
@@ -241,9 +249,9 @@ class StatsExtraAggregateTest {
     @DisplayName("词典规模：读不到时按 -1 上报（既有口径不受本次改造影响）")
     void dictionaryCountsStillReported() {
         IDictionaryTermStore store = mock(IDictionaryTermStore.class);
-        when(store.readEffective(any(), any())).thenThrow(new IllegalStateException("ES 挂了"));
+        when(store.readEffectiveAll(any())).thenThrow(new IllegalStateException("ES 挂了"));
         RecordMapper mapper = mapper(List.of(), List.of(), List.of());
-        StatsServiceImpl s = new StatsServiceImpl(store, mock(StatsCache.class));
+        StatsServiceImpl s = new StatsServiceImpl(store, passThroughCache());
         for (Class<?> c = s.getClass(); c != null; c = c.getSuperclass()) {
             try {
                 Field f = c.getDeclaredField("baseMapper");
