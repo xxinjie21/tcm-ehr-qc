@@ -98,6 +98,17 @@ public class EsTermNormalizer {
     private double scoreThreshold;
 
     /**
+     * 包含级允许的「输入比标准词更长」的码点差额（R3，默认 1）。
+     *
+     * <p>取 1 而非 2：差 2 会放进 {@code 知饥易饿→知饥不食}、{@code 带下量多→带下}
+     * 这类语义不等价的包含（实测清洗链路的负优化来源）。差 1 只放行「加一字修饰」
+     * （{@code 炒苍术→苍术}、{@code 岷当归→当归}），基本是炮制 / 品名前缀。
+     * 差 2 的正确映射（若有）一律走别名登记，不放宽阈值 —— 语义等价由词典决定，不由代码猜。</p>
+     */
+    @Value("${elasticsearch.contain-delta:1}")
+    private int containDelta;
+
+    /**
      * 归一结果。
      *
      * @param standardTerm 命中的标准词（未命中时=原文）
@@ -239,47 +250,78 @@ public class EsTermNormalizer {
     }
 
     /**
-     * 既有三级判定（改造前后逐字保持，勿改顺序与比较符）。
+     * 三级判定（精确 / 包含 / 模糊），2026-10-18 起加护栏 R1–R4 + R6 + R7。
      *
-     * @return 命中结果；三级都不中返回 {@code null}
+     * <p>规则集（依据见 {@code docs/术语归一与导出准确率提升计划.md} 节点 C，反例均来自全流程实测）：</p>
+     * <ul>
+     *   <li><b>R1</b> 输入码点 &lt; 2 只允许精确命中（{@code 有→有汗}、{@code 血→血分证}）。</li>
+     *   <li><b>R2</b> 禁止 {@code standardTerm.contains(input)}（标准词方向的子串不认，
+     *       {@code 脚气→干脚气}）；短简称走别名登记。</li>
+     *   <li><b>R3</b> 允许 {@code input.contains(standardTerm/alias)}，但差额 ≤ {@link #containDelta}（默认 1）。</li>
+     *   <li><b>R4</b> 禁止 {@code alias.contains(input)}（别名方向的子串不认，
+     *       {@code 治疗→食疗}、{@code 反复发作→流清涕}）。</li>
+     *   <li><b>R6</b> 一级判定分两轮：先跨全部候选找 {@code std==input}（取最短），再找
+     *       {@code alias==input}（取最短）—— 否则更早召回的别名会抢走本该由更短标准词精确命中的输入
+     *       （{@code 心悸→心悸手抖}、{@code 知饥→知饥不食}）。</li>
+     *   <li><b>R7</b> 模糊级也否决「子串关系」候选（{@code 干脚气 ⊃ 脚气}、{@code 广藿香 ⊃ 藿香}
+     *       的 Dice 恰好 0.8，只加 R2/R4 挡不住）；子串等价一律由别名表决定（C3）。</li>
+     * </ul>
+     * <p>R5（否定语境不归一）由调用方用 {@link TermGuard} 拦截，不在本方法内。</p>
+     *
+     * @return 命中结果；都不中返回 {@code null}
      */
     private NormalizeResult judge(List<TermEntry> entries, String input) {
-        // 一级·精确：标准词/别名完全相等
-        // 1. 精确优先：命中即返回，不给后面的宽松规则机会
+        // 1. 一级 A：标准词精确（跨全部候选，多条取最短标准词）
+        //    ⚠️ 分两轮而不是「逐条目先 std 再 alias」：后者会让更早召回的**别名**抢走
+        //    本该由更短标准词精确命中的输入（实测 心悸 → 心悸手抖、知饥 → 知饥不食）。
+        TermEntry best = null;
         for (TermEntry e : entries) {
-            if (e.getStandardTerm().equals(input)) {
-                return new NormalizeResult(e.getStandardTerm(), LEVEL_EXACT);
-            }
-            if (e.getAliases() != null && e.getAliases().contains(input)) {
-                return new NormalizeResult(e.getStandardTerm(), 1);
+            if (e.getStandardTerm() != null && e.getStandardTerm().equals(input) && shorter(e, best)) {
+                best = e;
             }
         }
-
-        // 二级·包含（双向）：输入包含标准词/别名 或 标准词/别名包含输入，多命中取最短标准词
-        // 2. 双向包含：多命中时取最短标准词（"胃痛" 优先于 "胃脘痛"）
+        if (best != null) {
+            return new NormalizeResult(best.getStandardTerm(), LEVEL_EXACT);
+        }
+        // 2. 一级 B：别名精确（同样分轮、同取最短标准词）
+        for (TermEntry e : entries) {
+            if (e.getStandardTerm() != null && e.getAliases() != null
+                    && e.getAliases().contains(input) && shorter(e, best)) {
+                best = e;
+            }
+        }
+        if (best != null) {
+            return new NormalizeResult(best.getStandardTerm(), LEVEL_EXACT);
+        }
+        // 3. R1：单字只允许精确命中（上面两轮已覆盖），不再参与包含/模糊
+        int inputLen = input.codePointCount(0, input.length());
+        if (inputLen < 2) {
+            return null;
+        }
+        // 4. 二级·包含（R2 + R3 + R4）：只认「输入包含标准词/别名」这个方向，且差额受限于 containDelta
         TermEntry bestContains = null;
         for (TermEntry e : entries) {
-            boolean hit = e.getStandardTerm().contains(input)
-                    || input.contains(e.getStandardTerm())
-                    || containsAnyAlias(e, input);
-            if (hit && (bestContains == null
-                    || e.getStandardTerm().length() < bestContains.getStandardTerm().length())) {
+            if (!containsAsPartOfInput(e, input, inputLen)) {
+                continue;
+            }
+            if (shorter(e, bestContains)) {
                 bestContains = e;
             }
         }
         if (bestContains != null) {
             return new NormalizeResult(bestContains.getStandardTerm(), LEVEL_CONTAIN);
         }
-
-        // 三级·模糊：字符Dice相似度 ≥ 阈值，取最高分
-        // 3. 模糊：标准词与各别名都算一遍，取最高分。
-        //    输入的去重字符集在这里算**一次**、全部候选复用（P1-16 收口）：原先每个 pair 都
-        //    重算一遍 |A|，而 a 恒是同一个 input —— 候选一多就是「同一份输入被重复去重上百次」。
-        //    只在走到模糊级时才算（一二级命中会提前 return），不为没走到的分支白付成本。
+        // 5. 三级·模糊：字符 Dice ≥ 阈值，取最高分。
+        //    ⚠️ R7 收紧：与输入构成「子串关系」的候选不参与打分 —— 否则 R2/R4 拦下的
+        //    `脚气→干脚气`（Dice 恰好 0.8）、`藿香→广藿香`（0.8）会从模糊级复活。
+        //    输入的去重字符集在这里算**一次**、全部候选复用（P1-16 收口）。
         char[] inputDistinct = distinctChars(input);
         TermEntry bestFuzzy = null;
         double bestScore = 0;
         for (TermEntry e : entries) {
+            if (hasSubstringRelation(e, input)) {
+                continue;
+            }
             double s = dicePrepared(inputDistinct, e.getStandardTerm());
             if (e.getAliases() != null) {
                 for (String a : e.getAliases()) {
@@ -291,12 +333,58 @@ public class EsTermNormalizer {
                 bestFuzzy = e;
             }
         }
-        // 4. 最高分仍不到阈值就算未命中，给 null
         if (bestFuzzy != null && bestScore >= scoreThreshold) {
             return new NormalizeResult(bestFuzzy.getStandardTerm(), LEVEL_FUZZY);
         }
 
         return null;
+    }
+
+    /** 标准词/别名是否作为**完整片段**出现在输入里，且差额不超过 containDelta（R2~R4）。 */
+    private boolean containsAsPartOfInput(TermEntry e, String input, int inputLen) {
+        String std = e.getStandardTerm();
+        if (std != null && !std.isBlank() && input.contains(std)
+                && inputLen - std.codePointCount(0, std.length()) <= containDelta) {
+            return true;
+        }
+        if (e.getAliases() == null) {
+            return false;
+        }
+        for (String a : e.getAliases()) {
+            if (a == null || a.isBlank()) {
+                continue;
+            }
+            // 别名只在这个方向上认：输入里出现了完整的别名片段（R4 禁掉的是反方向）
+            if (input.contains(a) && inputLen - a.codePointCount(0, a.length()) <= containDelta) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 候选更短者优先（与改造前「多命中取最短标准词」同口径）。 */
+    private static boolean shorter(TermEntry candidate, TermEntry best) {
+        return best == null
+                || candidate.getStandardTerm().length() < best.getStandardTerm().length();
+    }
+
+    /** 候选的 std / 任一别名是否与输入互为子串（R7：这类关系不许走模糊级，交给别名表）。 */
+    private static boolean hasSubstringRelation(TermEntry e, String input) {
+        if (substringEitherWay(e.getStandardTerm(), input)) {
+            return true;
+        }
+        if (e.getAliases() != null) {
+            for (String a : e.getAliases()) {
+                if (substringEitherWay(a, input)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean substringEitherWay(String a, String input) {
+        return a != null && !a.isBlank() && (a.contains(input) || input.contains(a));
     }
 
     private boolean containsAnyAlias(TermEntry e, String input) {

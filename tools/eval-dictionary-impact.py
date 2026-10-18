@@ -52,6 +52,8 @@ FIELD_TO_FILE = {
 # herbs 的归一目标取 name，其余取 content
 NAME_FIELD = {'herbs': 'name'}
 SCORE_THRESHOLD = 0.8
+# 包含级允许的「输入比标准词长」上限（码点），与 EsTermNormalizer.contain-delta 对齐（R3，默认 1）
+CONTAIN_DELTA = 1
 
 
 def die(msg):
@@ -69,29 +71,44 @@ def dice(a, b):
     return 2.0 * len(sa & sb) / (len(sa) + len(sb))
 
 
+def _substring_either_way(e, term):
+    """候选的 std / 任一别名是否与输入互为子串（R7）。"""
+    parts = [e['standardTerm']] + list(e.get('aliases') or [])
+    return any(p and (p in term or term in p) for p in parts)
+
+
 def judge(entries, term):
-    """三级判定：①精确 ②双向包含（多命中取最短标准词）③Dice ≥ 阈值。返回 (标准词, 层级) 或 (None, 0)"""
-    # 一级·精确
-    for e in entries:
-        if e['standardTerm'] == term or term in (e.get('aliases') or []):
-            return e['standardTerm'], 1
-    # 二级·双向包含，多命中取最短标准词
+    """三级判定（与 EsTermNormalizer.judge 同口径，含 R1~R4 + R6 + R7 护栏）。
+
+    ⚠️ 必须与 Java 侧 {@code EsTermNormalizer.judge} 保持同口径：这是词典影响评估的离线镜像，
+    口径一分叉，后续所有词典评估都会基于旧规则。返回 (标准词, 层级) 或 (None, 0)。
+    """
+    n = len(term)
+    # 一级 A：标准词精确（多条取最短）—— 必须先于别名轮，见 R6
+    cands = [e for e in entries if e['standardTerm'] == term]
+    if cands:
+        return min(cands, key=lambda e: len(e['standardTerm']))['standardTerm'], 1
+    # 一级 B：别名精确（多条取最短）
+    cands = [e for e in entries if term in (e.get('aliases') or [])]
+    if cands:
+        return min(cands, key=lambda e: len(e['standardTerm']))['standardTerm'], 1
+    # R1：单字只允许精确命中（上面两轮已覆盖）
+    if n < 2:
+        return None, 0
+    # 二级：只认「输入包含标准词/别名」这个方向，且差额 ≤ CONTAIN_DELTA（R2/R3/R4）
     best = None
     for e in entries:
-        st = e['standardTerm']
-        hit = st in term or term in st
-        if not hit:
-            for a in (e.get('aliases') or []):
-                if a in term or term in a:
-                    hit = True
-                    break
-        if hit and (best is None or len(st) < len(best['standardTerm'])):
-            best = e
+        parts = [e['standardTerm']] + list(e.get('aliases') or [])
+        if any(p and p in term and n - len(p) <= CONTAIN_DELTA for p in parts):
+            if best is None or len(e['standardTerm']) < len(best['standardTerm']):
+                best = e
     if best is not None:
         return best['standardTerm'], 2
-    # 三级·模糊取最高分
+    # 三级：Dice；R7 —— 与输入互为子串的候选不参与打分
     top, top_s = None, 0.0
     for e in entries:
+        if _substring_either_way(e, term):
+            continue
         s = dice(term, e['standardTerm'])
         for a in (e.get('aliases') or []):
             s = max(s, dice(term, a))

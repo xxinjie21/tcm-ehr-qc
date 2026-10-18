@@ -710,40 +710,11 @@ public class EntityNormalizer {
      * （饥不欲食 / 口渴不欲饮）会被一起拦下。但它们在精确命中层不受影响
      * （词典里就是正式条目），只有被当包含命中捞到时才会被拦 —— 那种情况下
      * 归一结果本来就可疑。</p>
+     *
+     * <p>2026-10-18 起判据迁到 {@link TermGuard#isNegatedContext(String)}：清洗链路也要用同一条，
+     * 口径只写一处。本方法保留原签名、内部委托，既有调用点与测试不动。</p>
      */
     static boolean isNegated(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return false;
-        }
-        // 1. 单字否定词：覆盖 无/不/未/莫/非/缺/欠/寡/忌/禁
-        for (int i = 0; i < raw.length(); i++) {
-            switch (raw.charAt(i)) {
-                case '无':
-                case '不':
-                case '未':
-                case '莫':
-                case '非':
-                case '缺':
-                case '寡':
-                case '忌':
-                case '禁':
-                case '欠':
-                    return true;
-                default:
-                    break;
-            }
-        }
-        // 2. 「已 + 痊愈类」：带下已干净 / 皮疹已无新发 / 汗出已止
-        //    「已无」已被上面的「无」覆盖，这里补的是「已愈 / 已好 / 已干净 / 已退」等没有否定字的
-        int idx;
-        if ((idx = raw.indexOf('已')) >= 0 && idx + 1 < raw.length()) {
-            String rest = raw.substring(idx + 1);
-            for (String cured : new String[]{"愈", "好", "干净", "退", "消", "止", "解", "除", "去"}) {
-                if (rest.startsWith(cured)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return TermGuard.isNegatedContext(raw);
     }
 }

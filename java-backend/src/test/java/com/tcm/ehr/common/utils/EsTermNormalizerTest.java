@@ -41,6 +41,7 @@ class EsTermNormalizerTest {
         es = Mockito.mock(IEsTermIndexService.class);
         normalizer = new EsTermNormalizer(es);
         ReflectionTestUtils.setField(normalizer, "scoreThreshold", 0.8);
+        ReflectionTestUtils.setField(normalizer, "containDelta", 1);
     }
 
     private static TermEntry entry(String standardTerm, List<String> aliases, String source) {
@@ -131,15 +132,31 @@ class EsTermNormalizerTest {
 
     // ---------------------------------------------------------------- 三级判定阈值
 
-    /** 二级包含：输入包含标准词 */
+    /** 二级包含：输入只比标准词多一个字（差 1）仍算包含命中 */
     @Test
     void containsLevel_shouldHit() throws IOException {
         esRecalls(List.of(entry(STD, List.of(ALIAS), "症状")));
 
-        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "咽痛伴发热");
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "咽痛感");
 
         assertEquals(STD, r.standardTerm());
-        assertEquals(2, r.level(), "输入包含标准词属包含命中");
+        assertEquals(2, r.level(), "输入包含标准词、且差额在 contain-delta 内属包含命中");
+    }
+
+    /**
+     * R3 收紧：输入比标准词长超过 contain-delta（差 3）不再算包含。
+     *
+     * <p>改造前「咽痛伴发热」会被包含级捞成「咽痛」（把「伴发热」丢掉）；高精度目标下这类
+     * 语义不等价的包含必须拒掉 —— 差额受 {@code elasticsearch.contain-delta}（默认 1）限制。</p>
+     */
+    @Test
+    void containsLevel_shouldRejectBeyondDelta() throws IOException {
+        esRecalls(List.of(entry(STD, List.of(ALIAS), "症状")));
+
+        EsTermNormalizer.NormalizeResult r = normalizer.normalize(TYPE, "咽痛伴发热");
+
+        assertEquals("咽痛伴发热", r.standardTerm(), "差 3 字超过 contain-delta，应判未命中");
+        assertEquals(0, r.level());
     }
 
     /** 三级 Dice：咽喉痛 vs 咽痛 = 2*2/(3+2) = 0.8，恰好达阈值应命中 */
