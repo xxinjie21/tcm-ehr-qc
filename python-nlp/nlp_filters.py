@@ -4,11 +4,16 @@
 后面的归一、扣分、导出替换全都少背一份噪声。Java 侧的 `dropSingleCharFragments`
 只认识「词典里有没有」，对「细胞角蛋白19」这种不在任何词典里的鬼词无能为力。
 
-三条判据各自独立可测：
+五条判据各自独立可测：
     F1 单字残词    len(span) < 2 的无词典字段
     F2 假药名      中药名的形态合理性（全汉字 / 长度 / 机构语素 / 省份开头）
     F3 否定句阳性  span 自带否定词，或同段前文里存在否定辖域
+    F4 否定泄漏    **任意实体类**（含疾病）被否定辖域覆盖时剔除 —— 2026-10-18 实测「无脚气」
+                   仍被抽成疾病名，只因 F3 此前只作用于症状列
+    F5 症状噪声    含阿拉伯数字（「反复发作5」「经前3天乳房胀」）、以「为主」收尾（「头面为主」）、
+                   纯常态陈述（「小便可」「纳可」）、描述性碎片（「反复发作」）
 """
+import re
 from typing import Dict, List, Optional
 
 from schemas import ExtractResponse
@@ -54,7 +59,7 @@ NEG_HARD = ("无", "未", "莫", "非", "否认", "未见", "无明显", "排除
 # 「不X」里 X 属于这些语素时，是**规范说法**（症状名本身带「不」），不能当否定句
 NEG_KEEP_TAIL = ("寐", "适", "安", "宁", "固", "化", "和", "利", "扬", "仁", "遂", "孕",
                  "消", "佳", "畅", "眠", "食", "欲", "得", "解", "知", "足", "均", "能",
-                 "受", "育", "明", "振", "规", "思", "运", "痛")
+                 "受", "育", "明", "振", "规", "思", "运", "痛", "调")
 # 回看的上限（防超长文本 O(n²)）。真正决定「看到哪」的是**分句界**，不是这个长度。
 NEG_WINDOW = 30
 # 回看时遇到这些**分句界**就停：否定词不跨分句作用。
@@ -126,6 +131,25 @@ def is_negated_span(span: str, text: str = "", start: Optional[int] = None,
 
 
 # ---- 统一入口 -----------------------------------------------------------------
+# F4 否定泄漏的作用范围：**所有**实体类（不只是症状）。舌/脉/治法同样会被「无/不」否定，
+# 疾病尤其常见（「排除肿瘤」「无高血压」）。全出现都在否定语境才丢（见 is_negated_span）。
+_ENTITY_FIELDS = ("diseases", "symptoms", "patternList", "formulaList",
+                  "causeList", "treatmentList", "tongueList", "pulseList")
+# F5 症状形态噪声判据
+_DIGIT_RE = re.compile(r"\d")
+# 纯「常态陈述」：小便可 / 纳可 / 眠可 / 二便可 —— 是「正常」而非症状，进词表只会瞎命中
+_NORMAL_STATE_RE = re.compile(r"^[\u4e00-\u9fff]{1,3}(可|正常)$")
+# 描述性连接碎片：模型常把主诉里的「反复发作」整段当症状
+_NOISE_EXACT = {"反复发作", "反复出现", "无明显异常", "无特殊"}
+
+
+def _is_noisy_symptom(s: str) -> bool:
+    """非症状的抽取碎片：含阿拉伯数字（「反复发作5」「经前3天乳房胀痛」）、
+    以「为主」收尾（「头面为主」）、纯常态陈述（「小便可」「纳可」）、或描述性碎片（「反复发作」）。"""
+    return (bool(_DIGIT_RE.search(s)) or s.endswith("为主")
+            or s in _NOISE_EXACT or bool(_NORMAL_STATE_RE.match(s)))
+
+
 def drop_noise(resp: ExtractResponse, full_text: str = "") -> Dict[str, int]:
     """就地过滤抽取结果，返回各字段丢弃条数（供日志/报表对账）。
 
@@ -133,18 +157,25 @@ def drop_noise(resp: ExtractResponse, full_text: str = "") -> Dict[str, int]:
     只给 span 的调用点仍走「span 自带否定」这一半。
     """
     counts: Dict[str, int] = {}
+    # F1 单字残词
     for field in _SINGLE_CHAR_FIELDS:
         items: List = getattr(resp, field) or []
         kept = [e for e in items if len((e.content or "").strip()) >= 2]
         counts[field] = len(items) - len(kept)
         setattr(resp, field, kept)
-    # 症状：再过滤否定（传全文，函数内部定位每一处出现）
-    symptoms = list(resp.symptoms or [])
-    kept = [e for e in symptoms
-            if not is_negated_span(e.content or e.sourceText or "", full_text)]
-    counts["symptoms"] = counts.get("symptoms", 0) + (len(symptoms) - len(kept))
-    resp.symptoms = kept
-    # 中药：形态过滤（丢了的连着 dosage 一起丢）
+    # F3+F4 否定：所有实体类一起过（含疾病）；传全文，函数内部定位每一处出现
+    for field in _ENTITY_FIELDS:
+        items: List = getattr(resp, field) or []
+        kept = [e for e in items
+                if not is_negated_span(e.content or e.sourceText or "", full_text)]
+        counts[field] = counts.get(field, 0) + (len(items) - len(kept))
+        setattr(resp, field, kept)
+    # F5 症状形态噪声
+    symptoms = resp.symptoms or []
+    kept_s = [e for e in symptoms if not _is_noisy_symptom(e.content or e.sourceText or "")]
+    counts["symptoms"] = counts.get("symptoms", 0) + (len(symptoms) - len(kept_s))
+    resp.symptoms = kept_s
+    # F2 中药形态过滤（丢了的连着 dosage 一起丢）
     herbs = resp.herbs or []
     kept_h = [h for h in herbs if is_plausible_herb(h.name or h.sourceText or "")]
     counts["herbs"] = len(herbs) - len(kept_h)

@@ -76,6 +76,38 @@ check('规范症状（食欲不振 / 大便不畅 / 睡眠欠佳）全部保留'
       ['食欲不振', '大便不畅', '睡眠欠佳'])
 
 print()
+print('F4 否定泄漏：任意实体类（含疾病）被否定辖域覆盖时剔除')
+# 2026-10-18 实测「无脚气」被抽成疾病名 —— 根因是 F3 此前只作用于症状列。
+# 「排除肿瘤」走 NEG_HARD 硬模式；「月经不调」含「不调」是规范症状，不许被自否定误伤。
+_text = '无脚气，无黄汗。排除肿瘤。月经不调，大便不畅。'
+_resp = ExtractResponse()
+_resp.diseases = [Entity(content=x, sourceText=x) for x in ['脚气', '肿瘤', '月经不调']]
+_resp.symptoms = [Entity(content='大便不畅', sourceText='大便不畅')]
+drop_noise(_resp, full_text=_text)
+check('被否定的疾病「脚气」「肿瘤」剔除，肯定项「月经不调」保留',
+      [e.content for e in _resp.diseases], ['月经不调'])
+check('规范症状「大便不畅」（含「不X」）不被误伤',
+      [e.content for e in _resp.symptoms], ['大便不畅'])
+
+print()
+print('F5 症状形态噪声：含阿拉伯数字 / 以「为主」收尾')
+_resp = ExtractResponse()
+_resp.symptoms = [Entity(content=x, sourceText=x) for x in
+                  ['反复发作5', '头面为主', '经期小腹痛']]
+drop_noise(_resp)
+check('数字噪声「反复发作5」与「头面为主」被剔除',
+      [e.content for e in _resp.symptoms], ['经期小腹痛'])
+
+print()
+print('F5b 常态陈述与描述碎片：小便可 / 纳可 / 反复发作 不算症状')
+_resp = ExtractResponse()
+_resp.symptoms = [Entity(content=x, sourceText=x) for x in
+                  ['小便可', '纳可', '二便正常', '反复发作', '头晕']]
+drop_noise(_resp)
+check('常态陈述与「反复发作」被剔除，真症状「头晕」保留',
+      [e.content for e in _resp.symptoms], ['头晕'])
+
+print()
 if failures:
     print(f'=== 失败 {len(failures)} 项：{failures}')
     sys.exit(1)

@@ -69,7 +69,7 @@ def extract(req: ExtractRequest):
             getattr(resp, f).extend(ner.get(f, []))
     # 2. 规则兜底叠加（模型缺失时这里是唯一来源）
     rules = _rules(text)
-    for f in ("tongueList", "pulseList", "causeList", "treatmentList"):
+    for f in ("tongueList", "pulseList", "causeList", "treatmentList", "herbs"):
         getattr(resp, f).extend(rules[f])
     # 3. 症状去脉/舌：把误落进 symptoms 的脉象 / 舌象要素归位
     _reroute_pulse_tongue(resp)

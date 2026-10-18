@@ -6,7 +6,8 @@
 import re
 from typing import Dict, List
 
-from schemas import Entity, ExtractResponse
+from nlp_filters import is_plausible_herb
+from schemas import Entity, ExtractResponse, Herb
 
 # 舌象 / 脉象：批次 20 起已有 tongues.json / pulses.json 词典（此前只有格式规则）。
 # 下面的正则仍在词典归一之前把子要素切成独立段（舌质/舌苔/齿痕/裂纹），
@@ -83,6 +84,12 @@ RULE_CAUSE_WORDS = ["风寒", "风热", "暑湿", "风湿", "湿热", "寒湿", 
 # 注：不要加「湿热蕴结」这类含更短词的条目 —— 命中判定是 `w in text`，
 # 文本里有「湿热蕴结」时「湿热」已经命中，再加一条会让同一个病因出现两次
 DOSAGE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(g|ml|mg|片|枚|条|张|付)")
+# 处方吃药名兜底（批次 21，2026-10-18）：模型 NER 会漏掉处方里部分药名
+# （实测一条真实病历漏了 岷当归 / 白芍 / 泽泻 三味）。形态「分隔符 + 药名 + 剂量」是处方里
+# 最稳的写法，用它兜底。**只认 g / 克**：片/付/条 等是剂型/付数，不是单味药剂量，
+# 一并收进来会把「中草药处1(15付)」误当药名。要求整段名是 `is_plausible_herb` 才收。
+HERB_DOSE_RE = re.compile(
+    r"(?:^|[，,、;；。\s（(])([\u4e00-\u9fff]{2,6})\s*(\d+(?:\.\d+)?\s*(?:g|克))")
 
 
 def _rules(text: str) -> Dict[str, List[Entity]]:
@@ -121,7 +128,16 @@ def _rules(text: str) -> Dict[str, List[Entity]]:
     # 2. 病因走词表包含匹配；dict.fromkeys 的去重作用对此处是冗余的（RULE_CAUSE_WORDS 本身无重复项），只保证顺序与控制去重即可
     cause = [ent(w) for w in dict.fromkeys(RULE_CAUSE_WORDS) if w in text]
     treatment = [ent(m.group(0)) for m in RULE_TREATMENT.finditer(text)]
-    return {"tongueList": tongue, "pulseList": pulse, "causeList": cause, "treatmentList": treatment}
+    # 3. 处方吃药名兜底：模型漏抽的药名在这里按「药名+剂量」补回（重复项在 Java 侧按术语去重）
+    herbs, seen = [], set()
+    for m in HERB_DOSE_RE.finditer(text):
+        name = m.group(1)
+        if name in seen or not is_plausible_herb(name):
+            continue
+        seen.add(name)
+        herbs.append(Herb(name=name, dosage=m.group(2), sourceText=name, source="rule"))
+    return {"tongueList": tongue, "pulseList": pulse, "causeList": cause,
+            "treatmentList": treatment, "herbs": herbs}
 
 
 # ---- 舌脉要素判据（与 Java 侧 StandardizationReportServiceImpl.MISROUTED_PREFIX
