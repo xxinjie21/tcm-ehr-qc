@@ -51,4 +51,25 @@ class GovernanceExportReplaceSafetyTest {
                 standardize("脉较细弦，湿热下注",
                         Map.of("脉较细弦", "脉弦细", "湿热下注", "湿热下注证")));
     }
+
+    @Test
+    void negationDoesNotBleedAcrossClauses() {
+        // 2026-10-18 实测 bug：上句「血行不畅」的「不」把本句「湿热下注」误判成否定 → 漏替换
+        assertEquals("湿热下注证，血行不畅；湿热下注证，血行不畅；湿热下注证，血行不畅",
+                standardize("湿热下注，血行不畅；湿热下注，血行不畅；湿热下注，血行不畅",
+                        Map.of("湿热下注", "湿热下注证")),
+                "同一字段里同一术语必须逐处一致替换");
+        // 「欠流利」的「欠」不是否定语素
+        assertEquals("脉弦，欠流利。；脉弦",
+                standardize("脉较弦，欠流利。；脉较弦", Map.of("脉较弦", "脉弦")),
+                "「欠X」不是否定语境");
+    }
+
+    @Test
+    void normativeBuIsNotNegationButRealNegationIs() {
+        // 规范说法「大便不畅」的「不」（尾字属保留集）不否定同分句后面的术语
+        assertEquals("大便不畅而脉弦细证", standardize("大便不畅而脉弦细", Map.of("脉弦细", "脉弦细证")));
+        // 真否定：不恶寒 里的「恶寒」不替换
+        assertEquals("无汗，不恶寒", standardize("无汗，不恶寒", Map.of("恶寒", "恶寒证")));
+    }
 }

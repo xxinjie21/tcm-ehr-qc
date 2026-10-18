@@ -1026,9 +1026,23 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 替换对的最小长度（码点）：单字替换只会污染文本，不给它机会（E1） */
     private static final int MIN_REPLACE_LEN = 2;
-    /** 否定词窗口（同 TermGuard 的判据集合，这里只需前向 6 字） */
-    private static final char[] NEG_CHARS = {'无', '不', '未', '莫', '非', '缺', '寡', '忌', '禁', '欠'};
-    private static final int NEG_WINDOW = 6;
+    /** 否定词（硬否定语素 / 多字短语） */
+    private static final String[] NEG_WORDS = {"无", "未", "莫", "非", "否", "未见", "无明显", "排除", "否认"};
+    /**
+     * 否定判定的分句界：否定**不跨分句**作用。
+     *
+     * <p>2026-10-18 实测的 bug：〈湿热下注，血行不畅；湿热下注…〉里第二个「湿热下注」前
+     * 6 字含「不」（来自上句「血行不畅」），旧实现把它判成否定语境 → 跳过替换，
+     * 于是同一字段里同一个术语**部分替换、部分不替换**，导出件自相矛盾。同因还有
+     * 「脉较弦，欠流利。；脉较弦」被「欠」误伤。修法：回看遇到分句界即截断。</p>
+     */
+    private static final String NEG_STOP = "。；;！？，,：:\n";
+    /**
+     * 「不X」里 X 属这些语素时是**规范说法**（症状名本身带「不」），不能当否定
+     * —— 与 `python-nlp/nlp_filters.py` 的 `NEG_KEEP_TAIL` 同口径。
+     */
+    private static final String NEG_KEEP_TAIL = "寐适安宁固化利扬仁遂孕消佳畅眠食欲得解知足均能受育明振规思运痛";
+    private static final int NEG_WINDOW = 8;
 
     /**
      * 按替换对做「受控」文本替换（E1~E3）。
@@ -1081,16 +1095,32 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return out.toString();
     }
 
-    /** 位置 pos 之前 NEG_WINDOW 字内是否有否定词（E3） */
+    /** 位置 pos 之前、**同一分句内**是否有否定词（E3；否定不跨分句，见 {@link #NEG_STOP}） */
     private static boolean negatedBefore(String s, int pos) {
-        int from = Math.max(0, pos - NEG_WINDOW);
-        for (int i = from; i < pos; i++) {
-            char c = s.charAt(i);
-            for (char neg : NEG_CHARS) {
-                if (c == neg) {
-                    return true;
-                }
+        String ctx = s.substring(Math.max(0, pos - NEG_WINDOW), pos);
+        // 截到最近一个分句界之后：否定词不跨分句作用（否则上句的「不/欠」会误伤本句术语）
+        int cut = -1;
+        for (int i = ctx.length() - 1; i >= 0; i--) {
+            if (NEG_STOP.indexOf(ctx.charAt(i)) >= 0) {
+                cut = i;
+                break;
             }
+        }
+        if (cut >= 0) {
+            ctx = ctx.substring(cut + 1);
+        }
+        for (String w : NEG_WORDS) {
+            if (ctx.contains(w)) {
+                return true;
+            }
+        }
+        // 「不X」：X 属保留尾字则是规范说法（不寐 / 食欲不振 / 大便不畅），不算否定
+        int bu = ctx.indexOf('不');
+        while (bu >= 0) {
+            if (bu + 1 >= ctx.length() || NEG_KEEP_TAIL.indexOf(ctx.charAt(bu + 1)) < 0) {
+                return true;
+            }
+            bu = ctx.indexOf('不', bu + 1);
         }
         return false;
     }
