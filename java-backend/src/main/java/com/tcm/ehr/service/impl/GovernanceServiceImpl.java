@@ -14,6 +14,7 @@ import com.tcm.ehr.common.utils.RecordKeyset;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
 import com.tcm.ehr.common.utils.StructuredDataMeta;
+import com.tcm.ehr.common.utils.TermGuard;
 import com.tcm.ehr.domain.dto.ExportDTO;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.po.Record;
@@ -460,10 +461,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private int[] normalizeStructuredData(Record r, Map<String, Object> data, DictMeta dictMeta) {
         int[] stat = {0, 0, 0, 0};
         try {
-            // 1. 8 类 entity 逐类归一 + 同标准词去重（P3.4 拆出）
-            normalizeEntityList(data, stat);
-            // 2. 中药走另一套：name 归一 + 剂量单位小写（P3.4 拆出）
-            normalizeHerbs(data, stat);
+            // 1+2. 8 类 entity 与中药归一（P3.4 拆出；与测试入口 normalizeForTest 同源）
+            stat = normalizeForTest(data);
             // 3. 打上词典版本再写库：归一结果与当时词典版本必须成对
             //    T16：入参已是解析好的 Map，走 Map 重载，去掉「序列化 → 解析 → 再序列化」的回环。
             //    ⚠️ 版本源是 IDictionaryTermStore：原先用
@@ -484,6 +483,20 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return stat;
     }
 
+    /**
+     * 实体归一（8 类）+ 中药归一的同源入口，返回 {@code [改写着色数, 精确, 包含, 模糊]}。
+     *
+     * <p>包级可见是给同包测试用的**可见入口**（{@code GovernanceCleanIdempotentTest}），
+     * 生产路径由 {@link #normalizeStructuredData} 调用它 —— 不新增生产逻辑，只是把
+     * 两个私有方法开放给同包测试，避免测试直接反射私有方法。</p>
+     */
+    int[] normalizeForTest(Map<String, Object> data) {
+        int[] stat = {0, 0, 0, 0};
+        normalizeEntityList(data, stat);
+        normalizeHerbs(data, stat);
+        return stat;
+    }
+
     /** 8 类 entity（content）逐类归一并做同标准词去重；stat 就地累加 */
     @SuppressWarnings("unchecked")
     private void normalizeEntityList(Map<String, Object> data, int[] stat) {
@@ -496,18 +509,37 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 for (Object item : list) {
                     if (!(item instanceof Map)) continue;
                     Map<String, Object> entity = (Map<String, Object>) item;
-                    Object content = entity.get("content");
-                    if (content == null || String.valueOf(content).isBlank()) continue;
-                    var result = termNormalizer.normalize(type, RequestUtils.currentOrgId(), String.valueOf(content));
-                    // 只在「命中词典且词形确实变了」时才改写并记统计，
-                    // 否则会把未命中的实体也标成已归一
-                    if (result.level() >= EsTermNormalizer.LEVEL_EXACT
-                            && !result.standardTerm().equals(String.valueOf(content))) {
+                    // D1：归一的输入必须是**原文**（sourceText），不是上一次归一的结果（content）。
+                    // 实测：以 content 为输入会把「心悸」再归成「心悸手抖」、「知饥」再归成「知饥不食」——
+                    // 非幂等，且第二次的结果比第一次更差。没有 sourceText（导入数据）才退回 content。
+                    String raw = str(entity.get("sourceText"));
+                    if (raw == null || raw.isBlank()) {
+                        raw = str(entity.get("content"));
+                    }
+                    if (raw == null || raw.isBlank()) continue;
+                    // 解析链路已有 sourceText 回填逻辑，这里保持一致的展示口径
+                    if (str(entity.get("sourceText")) == null) {
+                        entity.put("sourceText", raw);
+                    }
+                    var result = termNormalizer.normalize(type, RequestUtils.currentOrgId(), raw);
+                    if (!EsTermNormalizer.isHit(result.level())) {
+                        continue;
+                    }
+                    // D2：否定语境下的包含命中一律不归一（与解析链路共用 TermGuard 判据）
+                    if (result.level() == EsTermNormalizer.LEVEL_CONTAIN
+                            && TermGuard.isNegatedContext(raw)) {
+                        continue;
+                    }
+                    // D3：命中就写 normLevel（质控据此认定「已标准化」）；
+                    //     报表的 normalized 计数只统计**词形确实变了**的那部分（语义不变）
+                    boolean changed = !result.standardTerm().equals(String.valueOf(entity.get("content")));
+                    if (changed) {
                         entity.put("content", result.standardTerm());
-                        entity.put("normLevel", result.level());
+                    }
+                    entity.put("normLevel", result.level());
+                    if (changed) {
                         stat[0]++;
-                        if (result.level() >= EsTermNormalizer.LEVEL_EXACT
-                && result.level() <= EsTermNormalizer.LEVEL_FUZZY) stat[result.level()]++;
+                        stat[result.level()]++;
                     }
                 }
             }
@@ -525,16 +557,29 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         for (Object item : list) {
             if (!(item instanceof Map)) continue;
             Map<String, Object> herb = (Map<String, Object>) item;
-            Object name = herb.get("name");
-            if (name == null || String.valueOf(name).isBlank()) continue;
-            var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), String.valueOf(name));
-            if (result.level() >= EsTermNormalizer.LEVEL_EXACT
-                    && !result.standardTerm().equals(String.valueOf(name))) {
-                herb.put("name", result.standardTerm());
+            // D1：同实体，按原文（sourceText）归一，无 sourceText 才退回 name（幂等）
+            String raw = str(herb.get("sourceText"));
+            if (raw == null || raw.isBlank()) {
+                raw = str(herb.get("name"));
+            }
+            if (raw == null || raw.isBlank()) continue;
+            if (str(herb.get("sourceText")) == null) {
+                herb.put("sourceText", raw);
+            }
+            var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), raw);
+            if (EsTermNormalizer.isHit(result.level())
+                    && !(result.level() == EsTermNormalizer.LEVEL_CONTAIN
+                         && TermGuard.isNegatedContext(raw))) {
+                // D3：命中就写 normLevel；只有词形确实变了才计入 normalized 统计
+                boolean changed = !result.standardTerm().equals(String.valueOf(herb.get("name")));
+                if (changed) {
+                    herb.put("name", result.standardTerm());
+                }
                 herb.put("normLevel", result.level());
-                stat[0]++;
-                if (result.level() >= EsTermNormalizer.LEVEL_EXACT
-                && result.level() <= EsTermNormalizer.LEVEL_FUZZY) stat[result.level()]++;
+                if (changed) {
+                    stat[0]++;
+                    stat[result.level()]++;
+                }
             }
             if (herb.get("dosage") != null) {
                 String d = String.valueOf(herb.get("dosage")).trim().toLowerCase();
@@ -560,6 +605,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 item -> mapStr(item, termField),
                 item -> mapStr(item, "sourceText"),
                 GovernanceServiceImpl::mapLevel);
+    }
+
+    /** 取结构化数据实体字段的字符串值；null 保持 null（不变成 "null"） */
+    private static String str(Object v) {
+        return v == null ? null : String.valueOf(v);
     }
 
     /** 取 structuredData 实体里的字符串字段；非 Map 或字段缺失返回 null */
