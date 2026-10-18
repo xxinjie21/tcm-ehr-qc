@@ -62,7 +62,11 @@ SEG_SPLIT = re.compile(r"[，。、；;\s]+")
 #      · 演示数据 500 行里这两个词命中 0 次（整批数据连「治」字都没有，treatmentList 恒为空），
 #        即**无任何数据能验证它们**。
 #    判据同病因表：加之前先 grep `dictionaries/`，词典里没有对应条目就不要加。
-RULE_TREATMENT = re.compile(r"治[以法]?[^，。；;\s]{1,10}")
+# ⚠️ 只认带引导词的治法（治以 / 治法 / 治则 / 治宜）。原先的 `治[以法]?[^，。；;\s]{1,10}`
+#    会把「甲硝锉消炎治疗」「光动力治疗5次」「治疗过程中自觉烧灼感」整段收成治法
+#    —— 2026-10-18 实测一条真实病历就产出 3 条这样的噪声。
+#    本数据集里治法本就恒空，收窄不会丢真实治法；要放宽必须先有一批带「治以…」的真实数据。
+RULE_TREATMENT = re.compile(r"治[以法则宜][^，。；;\s]{1,10}")
 # ⚠️ 本表**不要再扩**「证候 / 病名」性质的词（2026-10-17 撤回过一次，别再加回来）。
 #    教训：任务 4 曾把 肝郁 / 脾虚 / 肾虚 / 火热 / 水饮 / 食积 6 个词加进本表，
 #    后来撤回。原因是这 6 个词在词典里的身份根本不是「病因」：
@@ -97,11 +101,20 @@ def _rules(text: str) -> Dict[str, List[Entity]]:
         if RULE_TONGUE.match(seg) or RULE_TONGUE_MORPH.match(seg):
             # 输出时去掉「或」连接词：它是原文的连词，不是子要素的一部分
             tongue.append(ent(seg[1:] if seg.startswith("或") else seg))
+        # 无「舌/苔」前缀的舌诊专名（边/尖/根/齿痕 打头，全汉字，≤8 字）
+        elif _seg_cjk(seg) and len(seg) <= 8 and seg.startswith(_TONGUE_HEADS_EX) \
+                and not seg.startswith(_PT_BLACKLIST):
+            tongue.append(ent(seg))
     # 2. 脉象：脉象本体与脉位分开成段（批次 20）。
     #    脉位（左/右 + 寸关尺）是独立于脉象的标准维度，合在一段就分不出
     #    「脉细数」与「左尺无力」两个语义。按标点分段后天然独立，无需额外剥离。
     pulse = [ent(seg) for seg in SEG_SPLIT.split(text)
              if seg and RULE_PULSE.match(seg)]
+    # 无「左/右」前缀的脉位（寸/关/尺 打头，全汉字，2~6 字），如「寸略旺」「尺较沉」
+    pulse.extend(ent(seg) for seg in SEG_SPLIT.split(text)
+                 if _seg_cjk(seg) and 2 <= len(seg) <= 6
+                 and seg.startswith(_PULSE_HEADS) and not seg.startswith(_PT_BLACKLIST)
+                 and seg not in [p.content for p in pulse])
     pulse.extend(ent(m.group(0)) for m in RULE_PULSE_POSITION.finditer(text)
                  if m.group(0) not in [p.content for p in pulse])
     # 脉位排在脉象之后：阅读顺序是「先读脉象，再看哪一部位异常」
@@ -122,7 +135,17 @@ def _rules(text: str) -> Dict[str, List[Entity]]:
 # （尺偏沉 124、根部厚腻 129、寸后及关前反中取明显 6），只判两字会漏掉 3057 条。
 _PULSE_HEADS = ("尺", "寸", "关")
 _TONGUE_HEADS = ("尖", "根", "苔")
+# ④ 舌象专名（批次 21 补）：不以「舌/苔」起头但确属舌诊的写法
+#    `边尖略红`（舌边尖）、`边齿痕`（舌边）、`根苔厚腻`（舌根）。
+#    ⚠️ 不另立常量（C2）：脉位直接复用 `_PULSE_HEADS`；舌象在既有 `_TONGUE_HEADS`
+#    基础上只补「边 / 齿痕」（原常量只含 尖/根/苔）。同一件事两套常量就是漂移的起点。
+_TONGUE_HEADS_EX = _TONGUE_HEADS + ("边", "齿痕")
 _PT_HEADS = _PULSE_HEADS + _TONGUE_HEADS
+
+
+def _seg_cjk(seg: str) -> bool:
+    """整段是否全为汉字（用于无前缀舌脉专名的判定，挡掉 `尺>`、`寸及` 一类抽取噪声）。"""
+    return bool(seg) and all("\u4e00" <= ch <= "\u9fff" for ch in seg)
 # 既无前缀、首字也不属于上述专名的脉象组合词，逐个列（都是「脉象」的固定合称）
 _PT_WHITELIST = ("动惕", "动剔", "弦滑", "浮滑", "浮数")
 # 首字撞上专名但**语义不是舌脉**的前缀，一律排除（踩过的坑，均为症状域真词）：
