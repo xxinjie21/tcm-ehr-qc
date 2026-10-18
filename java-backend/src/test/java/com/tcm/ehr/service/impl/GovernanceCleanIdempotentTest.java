@@ -84,6 +84,27 @@ class GovernanceCleanIdempotentTest {
         assertEquals(1, after.get("normLevel"), "命中词典就必须写 normLevel，否则质控永远算它未归一");
     }
 
+    @Test
+    void missBackfillsRawContentAndClearsStaleNormLevel() {
+        // 库里残留的旧映射：content=流清涕（旧标准词）、sourceText=反复发作，且带着旧 normLevel=2。
+        // 现行规则未命中 → content 必须回填原文、normLevel 清空；
+        // 否则导出的「标准化对照」会拿这个失效映射去改正文（实测 32 处坏替换的来源之一）。
+        EsTermNormalizer norm = mock(EsTermNormalizer.class);
+        when(norm.normalize(anyString(), anyString(), anyString()))
+                .thenReturn(new EsTermNormalizer.NormalizeResult("反复发作", 0));
+        Map<String, Object> stale = sym("流清涕", "反复发作");
+        stale.put("normLevel", 2);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("symptoms", new ArrayList<>(List.of(stale)));
+
+        svc(norm).normalizeForTest(data);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> after = (Map<String, Object>) ((List<?>) data.get("symptoms")).get(0);
+        assertEquals("反复发作", after.get("content"), "未命中必须回填原文");
+        assertNull(after.get("normLevel"), "失效的旧 normLevel 必须清掉");
+    }
+
     @SuppressWarnings("unchecked")
     private GovernanceServiceImpl svc(EsTermNormalizer norm) {
         GovernanceServiceImpl svc = new GovernanceServiceImpl(norm, new ObjectMapper(),

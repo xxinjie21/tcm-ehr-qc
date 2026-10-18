@@ -522,12 +522,17 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         entity.put("sourceText", raw);
                     }
                     var result = termNormalizer.normalize(type, RequestUtils.currentOrgId(), raw);
-                    if (!EsTermNormalizer.isHit(result.level())) {
-                        continue;
-                    }
                     // D2：否定语境下的包含命中一律不归一（与解析链路共用 TermGuard 判据）
-                    if (result.level() == EsTermNormalizer.LEVEL_CONTAIN
-                            && TermGuard.isNegatedContext(raw)) {
+                    boolean hit = EsTermNormalizer.isHit(result.level())
+                            && !(result.level() == EsTermNormalizer.LEVEL_CONTAIN
+                                 && TermGuard.isNegatedContext(raw));
+                    if (!hit) {
+                        // D4（Task 6 补丁）：未命中 / 被护栏拦下 → content 回填**原文**，并清掉可能残留的
+                        // normLevel。content 只是归一的产物（D1）：库里旧的「标准词」若按现行规则已不再成立，
+                        // 必须被原文覆盖，否则导出的「标准化对照」会拿一个失效映射去改正文 ——
+                        // 实测残留映射造成 32 处坏替换（治疗→食疗、反复发作→流清涕…）。
+                        entity.put("content", raw);
+                        entity.remove("normLevel");
                         continue;
                     }
                     // D3：命中就写 normLevel（质控据此认定「已标准化」）；
@@ -567,9 +572,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 herb.put("sourceText", raw);
             }
             var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), raw);
-            if (EsTermNormalizer.isHit(result.level())
+            boolean hit = EsTermNormalizer.isHit(result.level())
                     && !(result.level() == EsTermNormalizer.LEVEL_CONTAIN
-                         && TermGuard.isNegatedContext(raw))) {
+                         && TermGuard.isNegatedContext(raw));
+            if (!hit) {
+                // D4：未命中 / 被拦下 → name 回填原文并清残留 normLevel（同 normalizeEntityList）
+                herb.put("name", raw);
+                herb.remove("normLevel");
+            } else {
                 // D3：命中就写 normLevel；只有词形确实变了才计入 normalized 统计
                 boolean changed = !result.standardTerm().equals(String.valueOf(herb.get("name")));
                 if (changed) {
