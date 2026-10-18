@@ -10,6 +10,7 @@
                                   词典精确命中 / 脉舌不在 symptoms
     tests/test_ner_chunking.py    分词与分窗：_pieces 拼接无损、_ner_windows 短文本单窗
                                   （monkeypatch nlp_model._ntokens，不加载模型）
+    tests/test_noise_filter.py    产物过滤：单字残词 / 假药名形态 / 否定句阳性
 
 **tests/test_extract.py 故意排除**：它是手动调试脚本，不是可自动化的测试 ——
 0 个 assert、硬编码本机绝对路径 C:\\Users\\...\\Temp\\composed.txt、
@@ -27,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TESTS = [
     os.path.join('tests', 'test_batch20_rules.py'),
     os.path.join('tests', 'test_ner_chunking.py'),
+    os.path.join('tests', 'test_noise_filter.py'),
 ]
 
 
