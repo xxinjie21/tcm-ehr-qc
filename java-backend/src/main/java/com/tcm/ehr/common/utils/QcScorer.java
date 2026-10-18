@@ -4,6 +4,7 @@ import com.tcm.ehr.domain.po.Record;
 import com.tcm.ehr.domain.vo.ScoreResultVO;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -78,8 +79,13 @@ public final class QcScorer {
         com.tcm.ehr.common.config.QcRuleSet.Standardization st = rs.getStandardization();
         if (st.isEnabled() && data != null && !st.getElementTypes().isEmpty()) {
             int miss = 0;
+            Map<String, Integer> byType = new LinkedHashMap<>();
             for (String type : st.getElementTypes()) {
-                miss += countUnnormalized(data, type);
+                int n = countUnnormalized(data, type);
+                if (n > 0) {
+                    byType.put(com.tcm.ehr.common.config.EntityTypes.byKey(type).label(), n);
+                    miss += n;
+                }
             }
             if (miss > 0) {
                 // 分段扣分（2026-10-05 修）：原先 `Math.min(cap, miss * weightEach)` 在未归一数 ≥ cap 后
@@ -92,8 +98,16 @@ public final class QcScorer {
         int points = miss <= st.getCap()
                 ? miss * st.getWeightEach()
                 : st.getWeightEach() * (st.getCap() + (miss - st.getCap()) / st.getCap());
+                // F2：把「miss 的构成」写进 reason（按类型明细），便于对账
+                StringBuilder detail = new StringBuilder();
+                for (Map.Entry<String, Integer> e : byType.entrySet()) {
+                    if (detail.length() > 0) {
+                        detail.append(" / ");
+                    }
+                    detail.append(e.getKey()).append(' ').append(e.getValue());
+                }
                 ded.add(new ScoreResultVO.Deduction("术语未标准化", "未命中词典",
-                        points, "有 " + miss + " 个实体未命中标准词典"));
+                        points, "有 " + miss + " 个实体未命中标准词典（" + detail + "）"));
             }
         }
 
@@ -230,19 +244,20 @@ public final class QcScorer {
         return t != null && t.countsUnnormalized() ? t.structuredKey() : null;
     }
 
-    /** 该类型下未命中词典（无 normLevel）的实体数 */
+    /** 该类型下未命中词典的实体数：`normLevel` 缺失**或**不在命中区间（0 = 查过但没命中）都算 */
     private static int countUnnormalized(Map<String, Object> data, String type) {
         String structuredKey = keyOf(type);
         // 1. 该类型没有对应列表（未抽取）就不计未命中
         if (structuredKey == null || !(data.get(structuredKey) instanceof List<?> list)) {
             return 0;
         }
-        // 2. 逐个实体看有没有 normLevel：没有就是没命中词典
+        // 2. 逐个实体看 normLevel：缺失或非命中区间（0/越界）= 未命中词典
         int missCount = 0;
         for (Object item : list) {
             if (item instanceof Map<?, ?> entity) {
                 Object normLevel = entity.get("normLevel");
-                if (normLevel == null) {
+                int lv = (normLevel instanceof Number n) ? n.intValue() : 0;
+                if (!EsTermNormalizer.isHit(lv)) {
                     missCount++;
                 }
             }
