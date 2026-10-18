@@ -177,6 +177,15 @@ private int termCount;
         private java.util.Map<String, Integer> top = new java.util.LinkedHashMap<>();
         public java.util.Map<String, Integer> getTop() { return top; }
         public void setTop(java.util.Map<String, Integer> top) { this.top = top; }
+        /**
+         * 靠 L2（包含）/ L3（模糊）**推断**命中的实体明细（G3）：键=实体原文，值=出现次数，按次数降序。
+         *
+         * <p>这批不是「词表缺口」（它们已被归一），但归一结论是猜出来的 —— 与 {@link #top} 同型
+         * 单列，供前端提示「需登记别名或人工确认」，避免把推断命中混进词表缺口清单。</p>
+         */
+        private java.util.Map<String, Integer> inferred = new java.util.LinkedHashMap<>();
+        public java.util.Map<String, Integer> getInferred() { return inferred; }
+        public void setInferred(java.util.Map<String, Integer> inferred) { this.inferred = inferred; }
         /** 未归一总数 */
         private int total;
         /**

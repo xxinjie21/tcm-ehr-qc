@@ -698,9 +698,28 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         StandardizationReportVO.UnmatchedBreakdown b = new StandardizationReportVO.UnmatchedBreakdown();
         // 批次2：同一次遍历内累积「词表缺口」项的次数（键=实体原文），不额外扫库
         java.util.Map<String, Integer> gapCount = new java.util.LinkedHashMap<>();
+        // G3：L2/L3 推断命中的实体（同一次遍历累积，键=原文，值=次数）
+        java.util.Map<String, Integer> inferred = new java.util.LinkedHashMap<>();
         for (Row row : rows) {
             for (Object item : row.symptoms) {
-                if (!(item instanceof Map<?, ?> m) || m.get("normLevel") != null) {
+                if (!(item instanceof Map<?, ?> m)) {
+                    continue;
+                }
+                Object levelObj = m.get("normLevel");
+                if (levelObj != null) {
+                    // G3：命中的实体不进「词表缺口」，但 L2（包含）/ L3（模糊）是推断出来的，
+                    //     单列到 inferred 供人工确认 / 登记别名；L1 精确命中无需确认。
+                    int level = (levelObj instanceof Number n) ? n.intValue() : 0;
+                    if (level == com.tcm.ehr.common.utils.EsTermNormalizer.LEVEL_CONTAIN
+                            || level == com.tcm.ehr.common.utils.EsTermNormalizer.LEVEL_FUZZY) {
+                        String c = str(m.get("content"));
+                        if (c.isEmpty()) {
+                            c = str(m.get("sourceText"));
+                        }
+                        if (!c.isEmpty()) {
+                            inferred.merge(c, 1, Integer::sum);
+                        }
+                    }
                     continue;
                 }
                 String content = str(m.get("content"));
@@ -739,6 +758,11 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
                 .limit(15)
                 .forEach(e -> b.getTop().put(e.getKey(), e.getValue()));
+        // G3：推断命中同型降序装入（上限同 TopN），供「登记别名 / 人工确认」清单
+        inferred.entrySet().stream()
+                .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
+                .limit(15)
+                .forEach(e -> b.getInferred().put(e.getKey(), e.getValue()));
         return b;
     }
 

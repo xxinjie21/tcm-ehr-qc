@@ -252,6 +252,7 @@
                   <span v-if="normStat.hit">（{{ LEVEL_TINY[1] }} {{ normStat.exact }} / {{ LEVEL_TINY[2] }} {{ normStat.contain }} / {{ LEVEL_TINY[3] }} {{ normStat.fuzzy }}）</span>，
                   未命中 <b :class="{ bad: normStat.miss > 0 }">{{ normStat.miss }}</b>
                   <span v-if="normStat.noDict">；另有 {{ normStat.noDict }} 个实体所在字段无独立词典、不参与归一</span>
+                  <span v-if="normStat.hit">；其中「包含 / 模糊」是推断命中，<b>需人工确认</b></span>
                 </div>
                 <div class="ns-line">
                   归一由 <b>ES 术语索引</b> 提供（ES 是唯一权威，没有内存兜底）；<b>索引不可用时抽取会直接失败并说明原因</b>，不会静默把词判成「未收录」。

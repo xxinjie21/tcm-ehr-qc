@@ -65,6 +65,33 @@ class StandardizationUnmatchedTopTest {
         assertEquals(136, b.getDictionaryGap(), "缺口分项应为 16+15+...+1 = 136");
     }
 
+    @Test
+    void unmatchedTopSeparatesInferredHits() throws Exception {
+        // 复用本文件既有的反射夹具：injectObjectMapper / rowsOf / invokeUnmatched
+        StandardizationReportServiceImpl svc = Mockito.mock(StandardizationReportServiceImpl.class);
+        ObjectMapper mapper = injectObjectMapper(svc);
+
+        // symptoms：① 未命中(normLevel=null) ② L1 精确命中 ③ L2 包含命中
+        Record r = new Record();
+        r.setStructuredData("{\"symptoms\":["
+                + "{\"content\":\"词表外长词甲乙丙丁戊\",\"normLevel\":null},"
+                + "{\"content\":\"带下\",\"normLevel\":1},"
+                + "{\"content\":\"带下量多\",\"normLevel\":2}]}");
+
+        StandardizationReportVO.UnmatchedBreakdown b =
+                invokeUnmatched(svc, rowsOf(mapper, List.of(r)), Collections.emptySet());
+
+        // 未命中只统计 normLevel==null 的那条（L1/L2 都是命中，不算未命中）
+        assertEquals(1, b.getTotal(), "只有 normLevel=null 计入未命中");
+        assertTrue(b.getTop().containsKey("词表外长词甲乙丙丁戊"), "真正的词表缺口才进 TopN");
+        assertFalse(b.getTop().containsKey("带下量多"), "L2 推断命中不得混进词表缺口清单");
+        // G3：新增 inferred（与 top 同型的 Map），承接「靠 L2/L3 猜中」的实体，供别名补录
+        assertNotNull(b.getInferred(), "G3：inferred 不应为 null");
+        assertEquals(1, b.getInferred().getOrDefault("带下量多", 0),
+                "L2 命中应单列到 inferred，且带出现次数：" + b.getInferred());
+        assertFalse(b.getInferred().containsKey("带下"), "L1 精确命中不进 inferred（无需人工确认）");
+    }
+
     // ---------- 辅助 ----------
 
     private static Record recordWithRepeats(String content, int times) {
