@@ -672,7 +672,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         // 标准数据集：把这条病历里「被归一过」的术语在文本中就地换成标准词。
                         // 只改导出件，库里的原文一个字节都不动（本链路纯只读）。
                         sb.append(objectMapper.writeValueAsString(
-                                standardizeMap(r, replacementsOf(r))));
+                                standardizeMap(r, effectivePairs(r, STANDARDIZABLE_FIELDS))));
                     } catch (JacksonException e) {
                         throw new UncheckedIOException(new IOException(e));
                     }
@@ -741,7 +741,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private Object maskedSample(List<Record> sample) {
         List<Map<String, Object>> standardized = new ArrayList<>(sample.size());
         for (Record r : sample) {
-            standardized.add(standardizeMap(r, replacementsOf(r)));
+            standardized.add(standardizeMap(r, effectivePairs(r, STANDARDIZABLE_FIELDS)));
         }
         String json = objectMapper.writeValueAsString(standardized);
         return objectMapper.readValue(mask(json), new TypeReference<List<Map<String, Object>>>() {
@@ -878,7 +878,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         forEachQualified(dto, batch -> {
             for (Record r : batch) {
                 hasRow[0] = true;
-                appendCsvRow(out, r, cols, replacementsOf(r));
+                appendCsvRow(out, r, cols, effectivePairs(r, STANDARDIZABLE_FIELDS));
             }
         });
         return hasRow[0] ? out.toByteArray() : null;
@@ -1005,7 +1005,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * 库里的病历原文一个字节都不动 —— 与清洗同理，这是「导出标准数据集」而非「改写病历」。</p>
      *
      * <p>顺序不能反：先术语替换、后标点规整。若先规整，半角逗号会被转成全角，
-     * {@link #standardizeText} 的 {@code contains(原文)} 就落空、漏掉替换。</p>
+     * {@link #standardizeText} 就匹配不到原文片段、漏掉替换。</p>
      *
      * <p>用 {@code convertValue} 而不是直接改 Record：导出的记录对象可能还在 MyBatis
      * 一级缓存里，就地改会污染后续读取。</p>
@@ -1024,15 +1024,94 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         return row;
     }
 
-    /** 按替换对做文本内替换（字面量，非正则）；没有命中就原样返回 */
+    /** 替换对的最小长度（码点）：单字替换只会污染文本，不给它机会（E1） */
+    private static final int MIN_REPLACE_LEN = 2;
+    /** 否定词窗口（同 TermGuard 的判据集合，这里只需前向 6 字） */
+    private static final char[] NEG_CHARS = {'无', '不', '未', '莫', '非', '缺', '寡', '忌', '禁', '欠'};
+    private static final int NEG_WINDOW = 6;
+
+    /**
+     * 按替换对做「受控」文本替换（E1~E3）。
+     *
+     * <p><b>为什么不能再用 {@code String.replace}</b>：它对每次调用做全文替换，且不区分位置 ——
+     * 2026-10-18 实测一条病历里 {@code 血 → 血分证} 命中 17 处（把「血行不畅」「血块」「经血色暗红」
+     * 全改成「血分证行不畅」「血分证块」）、{@code 有 → 有汗} 命中 11 处（「伴有腰酸痛」→「伴有汗腰酸痛」）。
+     * 导出的标准数据集是要直接拿去分析/训练的，这种污染比"少替换一次"严重得多。</p>
+     *
+     * <p>扫描规则：① 丢弃码点 &lt; {@link #MIN_REPLACE_LEN} 的对；② 对每个位置按 key 长度降序试匹配，
+     * 命中即消费该区间（最长匹配 + 不重叠）；③ 命中位置前 {@link #NEG_WINDOW} 字含否定词则跳过。</p>
+     */
     private static String standardizeText(String s, List<Map.Entry<String, String>> pairs) {
         if (s == null || s.isEmpty() || pairs.isEmpty()) {
             return s;
         }
-        String out = s;
+        List<Map.Entry<String, String>> usable = new ArrayList<>();
         for (Map.Entry<String, String> p : pairs) {
-            if (out.contains(p.getKey())) {
-                out = out.replace(p.getKey(), p.getValue());
+            if (p.getKey().codePointCount(0, p.getKey().length()) >= MIN_REPLACE_LEN) {
+                usable.add(p);
+            }
+        }
+        if (usable.isEmpty()) {
+            return s;
+        }
+        // 按 key 长度降序：最长匹配优先（与原注释里的「柴胡桂枝汤」案例同因，但这次是位置级保证）
+        usable.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+        StringBuilder out = new StringBuilder(s.length());
+        int i = 0;
+        while (i < s.length()) {
+            Map.Entry<String, String> hit = null;
+            for (Map.Entry<String, String> p : usable) {
+                if (s.startsWith(p.getKey(), i)) {
+                    hit = p;
+                    break;
+                }
+            }
+            if (hit == null) {
+                out.append(s.charAt(i++));
+                continue;
+            }
+            // 否定语境里的这一个落点不替换（否证句改了就成语义反转）
+            if (negatedBefore(s, i)) {
+                out.append(hit.getKey());
+            } else {
+                out.append(hit.getValue());
+            }
+            i += hit.getKey().length();
+        }
+        return out.toString();
+    }
+
+    /** 位置 pos 之前 NEG_WINDOW 字内是否有否定词（E3） */
+    private static boolean negatedBefore(String s, int pos) {
+        int from = Math.max(0, pos - NEG_WINDOW);
+        for (int i = from; i < pos; i++) {
+            char c = s.charAt(i);
+            for (char neg : NEG_CHARS) {
+                if (c == neg) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** 只保留在这条病历的文本字段里**确实命中过**的替换对（E4：对照列必须与正文一致） */
+    private List<Map.Entry<String, String>> effectivePairs(Record r, List<String> fields) {
+        List<Map.Entry<String, String>> all = replacementsOf(r);
+        if (all.isEmpty()) {
+            return all;
+        }
+        List<Map.Entry<String, String>> out = new ArrayList<>();
+        for (Map.Entry<String, String> p : all) {
+            if (p.getKey().codePointCount(0, p.getKey().length()) < MIN_REPLACE_LEN) {
+                continue;
+            }
+            for (String f : fields) {
+                String v = RecordUtil.column(r, f);
+                if (v != null && v.contains(p.getKey())) {
+                    out.add(p);
+                    break;
+                }
             }
         }
         return out;
