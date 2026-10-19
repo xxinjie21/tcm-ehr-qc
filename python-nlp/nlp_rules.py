@@ -11,7 +11,8 @@ from schemas import Entity, ExtractResponse, Herb
 
 # 舌象 / 脉象：批次 20 起已有 tongues.json / pulses.json 词典（此前只有格式规则）。
 # 下面的正则仍在词典归一之前把子要素切成独立段（舌质/舌苔/齿痕/裂纹），
-# 抽不到或词表未收录的段保留原文，不计入未归一扣分（见 EntityTypes 的 countsUnnormalized）。
+# 抽不到或词表未收录的段保留原文，出厂默认不计入未归一扣分
+# （默认哪几类计分见 QcRuleSet.defaultStandardization；可在「规则配置」里勾选调整）。
 # 换数据集若写「左关尤甚」（无「脉」字）或苔色单独成列，仍会漏。见 §九 9.5 风险 1/2。
 #
 # ①  舌：字符类由「舌」扩到「舌苔」。原正则只认「舌」起头，`舌质淡红，苔薄白` 会把
@@ -168,20 +169,40 @@ _PT_WHITELIST = ("动惕", "动剔", "弦滑", "浮滑", "浮数")
 #   关节 —— 关节痛/关节怕冷/关节屈伸不利 等，实测 90+ 个不同写法都在症状里；
 #   尺肤 —— 尺部皮肤（诊断体征），尺肤热/尺肤凉/尺肤粘，与脉象是两回事；
 #   苔藓 —— 皮肤病（苔藓/苔藓样皮损），不是舌苔；
-#   尖锐 —— 声音/湿疣等义（尖锐声），脉象里没有「尖锐」。
-_PT_BLACKLIST = ("关节", "尺肤", "苔藓", "尖锐")
+#   尖锐 —— 声音/湿疣等义（尖锐声），脉象里没有「尖锐」；
+#   脉下 —— 脉位下方的部位描述（左脉下有一囊肿），是症状不是脉象。
+_PT_BLACKLIST = ("关节", "尺肤", "苔藓", "尖锐", "脉下")
+# 方位 / 数量前缀：脉位常写成「两关偏浮」「右寸后关前」「双寸关」「左关偏浮」——
+# 首字不是三部，只判首字会漏（2026-10-19 实测存量这批 4318 条）。
+# 只剥**一个**字符：既覆盖上述写法，又不会把「两手手指略自温」「左侧肩颈痠痛」
+# 这类症状误收（剥掉首字后仍不以舌脉专名开头）。
+_PT_QUALIFIERS = ("左", "右", "双", "两")
+
+
+def _pt_core(content: str) -> str:
+    """剥掉一个可选的方位/数量前缀（左/右/双/两），供首字判据使用。"""
+    return content[1:] if content[:1] in _PT_QUALIFIERS else content
 
 
 def _is_pulse_tongue(content: str) -> bool:
-    """该实体是不是脉象/舌象要素（不管带不带「脉」「舌」前缀）。"""
-    if not content or content.startswith(_PT_BLACKLIST):
+    """该实体是不是脉象/舌象要素（不管带不带「脉」「舌」前缀，允许一个方位前缀）。"""
+    if not content:
         return False
-    if content.startswith(("脉", "舌")):
+    core = _pt_core(content)
+    # 黑名单在「原字」与「剥前缀后」两处都判：'左关节痛' 剥掉「左」后要能看到「关节」
+    if content.startswith(_PT_BLACKLIST) or core.startswith(_PT_BLACKLIST):
+        return False
+    if core.startswith(("脉", "舌")):
         return True
-    if content.startswith(_PT_HEADS):
+    if core.startswith(_PT_HEADS):
         # 抽取噪声（如 "尺>"、"寸及"、"关尺>寸"）：含非汉字的一律不当舌脉
         return all("\u4e00" <= ch <= "\u9fff" for ch in content)
     return content in _PT_WHITELIST
+
+
+def _pt_is_tongue(content: str) -> bool:
+    """该舌脉要素属舌象（舌/尖/根/苔 打头，允许一个方位/数量前缀）。"""
+    return _pt_core(content).startswith(("舌", "尖", "根", "苔"))
 
 
 def _reroute_pulse_tongue(resp: ExtractResponse) -> None:
@@ -194,8 +215,8 @@ def _reroute_pulse_tongue(resp: ExtractResponse) -> None:
 
     * 症状归一率的分子分母被这批词拉低（它们本不属于症状）；
     * 后端质量报告会把它统计成「脉象、舌象被当成症状」的错放（实测 3978 条）；
-    * `EntityTypes` 声明舌象/脉象 `countsUnnormalized=false`（不该计未归一扣分），
-      可它们落在 `symptoms` 里（该列是 true）⇒ 反而被算进了「术语未标准化」扣分。
+    * 出厂默认舌象/脉象不计未归一扣分（见 `QcRuleSet.defaultStandardization`），
+      可它们落在 `symptoms` 里（该列默认计分）⇒ 反而被算进了「术语未标准化」扣分。
 
     **移动而不是丢弃**：规则没抽到的那部分脉/舌要素（实测占错放项的 59%）原本
     只存在于 `symptoms`，直接删会连抽取结果一起丢掉。
@@ -210,7 +231,7 @@ def _reroute_pulse_tongue(resp: ExtractResponse) -> None:
         c = (e.content or e.sourceText or "").strip()
         if not _is_pulse_tongue(c):
             kept.append(e)
-        elif c.startswith(("舌", "尖", "根", "苔")):
+        elif _pt_is_tongue(c):
             _append_unique_by_content(resp.tongueList, e, c)
         else:
             _append_unique_by_content(resp.pulseList, e, c)

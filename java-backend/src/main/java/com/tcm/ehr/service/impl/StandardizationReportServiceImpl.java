@@ -82,19 +82,29 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 首字撞上脉诊三部 / 舌诊专名，但<b>确实是症状</b>的前缀，一律不当错放。
      *
-     * <p>四个都是实测踩出来的坑（首字撞上，语义却属症状域）：</p>
+     * <p>五个都是实测踩出来的坑（首字撞上，语义却属症状域）：</p>
      * <ul>
      *   <li><b>关节</b> —— 关节痛 / 关节怕冷 / 关节屈伸不利 …… 实测症状里有 90+
      *       个不同写法（关节痛 一条 164 次），是量最大的一类；</li>
      *   <li><b>尺肤</b> —— 尺部皮肤，诊断体征（尺肤热 / 尺肤凉 / 尺肤粘），
      *       与脉象是两回事；</li>
      *   <li><b>苔藓</b> —— 皮肤病（苔藓 / 苔藓样皮损），不是舌苔；</li>
-     *   <li><b>尖锐</b> —— 声音 / 湿疣等义（尖锐声），脉象里没有「尖锐」。</li>
+     *   <li><b>尖锐</b> —— 声音 / 湿疣等义（尖锐声），脉象里没有「尖锐」；</li>
+     *   <li><b>脉下</b> —— 脉位下方的部位描述（左脉下有一囊肿），是症状不是脉象。</li>
      * </ul>
      * <p>误判会把真症状判成「不可归一」：症状归一率虚高、错放数虚高，
      * 两边都是假信号。口径与 Python 侧 {@code _PT_BLACKLIST} 完全一致。</p>
      */
-    private static final String[] MISROUTED_EXCLUDE = {"关节", "尺肤", "苔藓", "尖锐"};
+    private static final String[] MISROUTED_EXCLUDE = {"关节", "尺肤", "苔藓", "尖锐", "脉下"};
+    /**
+     * 方位 / 数量前缀：脉位常写成「两关偏浮」「右寸后关前」「双寸关」「左关偏浮」，
+     * 首字不是三部，只判首字会漏（2026-10-19 实测存量这批 4318 条）。
+     *
+     * <p>只剥<b>一个</b>字符：既覆盖上述写法，又不会把「两手手指略自温」
+     * 「左侧肩颈痠痛」这类症状误判成错放（剥掉首字后仍不以舌脉专名开头）。
+     * 口径与 Python 侧 {@code _PT_QUALIFIERS} / 工具脚本同源。</p>
+     */
+    private static final String[] MISROUTED_QUALIFIER = {"左", "右", "双", "两"};
 
     /**
      * 该未归一症状实体是否是「脉象/舌象要素错放进了症状」。
@@ -104,8 +114,10 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * {@link #MISROUTED_EXCLUDE} 挡首字撞车的症状域真词。</p>
      */
     private boolean isMisrouted(String content) {
-        if (startsWithAny(content, MISROUTED_EXCLUDE)
-                || !startsWithAny(content, MISROUTED_PREFIX)) {
+        String core = stripPtQualifier(content);
+        // 黑名单在原字与剥前缀后都判：'左关节痛' 剥掉「左」后要能看到「关节」
+        if (startsWithAny(content, MISROUTED_EXCLUDE) || startsWithAny(core, MISROUTED_EXCLUDE)
+                || !startsWithAny(core, MISROUTED_PREFIX)) {
             return false;
         }
         // 含非汉字的抽取噪声（实测「关尺>寸」这类夹了比较符号的）不当舌脉，
@@ -946,6 +958,20 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             }
         }
         return false;
+    }
+
+    /**
+     * 剥掉一个可选的方位/数量前缀（左/右/双/两）后返回，供 {@link #isMisrouted} 的首字判据使用。
+     * 空串或长度不足时原样返回 —— 单字「两」本身剥不出舌脉专名，交给后续判据拒绝。
+     */
+    private String stripPtQualifier(String content) {
+        if (content == null) {
+            return "";
+        }
+        if (content.length() > 1 && startsWithAny(content, MISROUTED_QUALIFIER)) {
+            return content.substring(1);
+        }
+        return content;
     }
 
     private boolean startsWithAny(String text, String[] prefixes) {

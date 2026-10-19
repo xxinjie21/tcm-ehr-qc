@@ -47,28 +47,40 @@ PT_HEADS = PULSE_HEADS + TONGUE_HEADS
 PT_WHITELIST = ("动惕", "动剔", "弦滑", "浮滑", "浮数")
 # 首字撞上专名但语义不是舌脉的前缀（都是症状域真词，实测都真实存在）：
 #   关节 —— 关节痛/关节怕冷 等 90+ 个写法；尺肤 —— 尺部皮肤，诊断体征非脉象；
-#   苔藓 —— 皮肤病；尖锐 —— 声音/湿疣等义。
-PT_BLACKLIST = ("关节", "尺肤", "苔藓", "尖锐")
+#   苔藓 —— 皮肤病；尖锐 —— 声音/湿疣等义；脉下 —— 脉位下方的部位描述（左脉下有一囊肿）。
+PT_BLACKLIST = ("关节", "尺肤", "苔藓", "尖锐", "脉下")
+# 方位 / 数量前缀：脉位常写「两关偏浮」「右寸后关前」「双寸关」「左关偏浮」，
+# 首字不是三部，只判首字会漏。只剥一个字符，避免误收「两手…」「左侧…」类症状。
+PT_QUALIFIERS = ("左", "右", "双", "两")
+
+
+def _pt_core(content: str) -> str:
+    """剥掉一个可选的方位/数量前缀（左/右/双/两）。"""
+    return content[1:] if content[:1] in PT_QUALIFIERS else content
 
 
 def is_pulse_tongue(content: str) -> bool:
-    """该实体是不是脉象/舌象要素（不管带不带「脉」「舌」前缀）。
+    """该实体是不是脉象/舌象要素（不管带不带「脉」「舌」前缀，允许一个方位前缀）。
 
     省略前缀的舌脉要素**不限两字**：实测存量 3~7 字的描述性短语占多数
     （根部厚腻 129、尺后偏沉 62、寸后及关前反中取明显 6），只判两字会漏。
     """
-    if not content or content.startswith(PT_BLACKLIST):
+    if not content:
         return False
-    if content.startswith(("脉", "舌")):
+    core = _pt_core(content)
+    # 黑名单在原字与剥前缀后都判：'左关节痛' 剥掉「左」后要能看到「关节」
+    if content.startswith(PT_BLACKLIST) or core.startswith(PT_BLACKLIST):
+        return False
+    if core.startswith(("脉", "舌")):
         return True
-    if content.startswith(PT_HEADS):
+    if core.startswith(PT_HEADS):
         # 抽取噪声（如 "尺>"、"寸及"、"关尺>寸"）：含非汉字的一律不当舌脉
         return all("\u4e00" <= ch <= "\u9fff" for ch in content)
     return content in PT_WHITELIST
 
 
 def is_tongue(content: str) -> bool:
-    return content.startswith(("舌", "尖", "根", "苔"))
+    return _pt_core(content).startswith(("舌", "尖", "根", "苔"))
 
 conn = pymysql.connect(host="localhost", port=3306, user="root", password="123456",
                        database="tcm_ehr", charset="utf8mb4")
