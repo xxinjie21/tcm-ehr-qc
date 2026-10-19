@@ -164,7 +164,8 @@
   {
     "standardTerm": "白滑苔",
     "aliases": [
-      "苔白滑"
+      "苔白滑",
+      "苔白底略滑"
     ]
   },
   {
@@ -663,5 +664,16 @@
     "aliases": [
       "子舌"
     ]
+  },
+  {
+    "standardTerm": "舌边尖红",
+    "aliases": [
+      "边尖略红",
+      "舌边尖略红"
+    ]
+  },
+  {
+    "standardTerm": "舌质偏暗",
+    "aliases": []
   }
 ]

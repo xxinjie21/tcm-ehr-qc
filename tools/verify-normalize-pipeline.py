@@ -93,10 +93,11 @@ def check_rules_backfill(vo):
     """
     tongue = [str(t.get("content") or "") for t in (vo.get("tongueList") or [])]
     pulse = [str(p.get("content") or "") for p in (vo.get("pulseList") or [])]
-    log(any("边尖略红" in t for t in tongue) and any("齿痕" in t for t in tongue),
-        "tongueList 含 边尖略红、*齿痕", "tongue=" + ",".join(tongue))
-    log(any("寸略旺" in p for p in pulse) and any("尺较沉" in p for p in pulse),
-        "pulseList 含 寸略旺、尺较沉", "pulse=" + ",".join(pulse))
+    # 补录词典后这些原词会被归一成标准词，故「原词 / 标准词」命中其一即算通过。
+    log(any(("边尖略红" in t or "舌边尖红" in t) for t in tongue) and any("齿痕" in t for t in tongue),
+        "tongueList 含 边尖略红/舌边尖红、*齿痕", "tongue=" + ",".join(tongue))
+    log(any(("寸略旺" in p or "寸旺" in p) for p in pulse) and any(("尺较沉" in p or "尺脉沉" in p) for p in pulse),
+        "pulseList 含 寸略旺/寸旺、尺较沉/尺脉沉", "pulse=" + ",".join(pulse))
 
     treat = [str(t.get("content") or "") for t in (vo.get("treatmentList") or [])]
     bad = [t for t in treat if "治疗5次" in t or t.startswith("治疗过程中")]
