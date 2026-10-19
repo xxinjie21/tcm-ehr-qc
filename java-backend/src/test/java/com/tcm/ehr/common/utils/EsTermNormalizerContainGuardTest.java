@@ -102,4 +102,53 @@ class EsTermNormalizerContainGuardTest {
         recalls(entry("知饥不食", List.of("饥不欲食", "知饥")), entry("知饥", List.of("易饥饿")));
         assertEquals("知饥", normalizer.normalize("symptom", "知饥").standardTerm());
     }
+
+    @Test
+    void fuzzyLevelRejectsPolarityDiff() throws IOException {
+        // 实测 2026-10-19：咽不痛→咽痛、大便成形→便溏、食欲欠佳→能食，全部语义相反
+        recalls(entry("咽痛", List.of("咽喉疼痛")));
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("symptom", "咽不痛").level(),
+                "「咽不痛」与「咽痛」仅差一个否定字，模糊级不得命中");
+
+        recalls(entry("便溏", List.of("大便溏", "大便不成形")));
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("symptom", "大便成形").level(),
+                "「大便成形」是「大便不成形」的反义，模糊级不得命中");
+
+        recalls(entry("能食", List.of("食欲佳", "纳可")));
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("symptom", "食欲欠佳").level(),
+                "「食欲欠佳」与「食欲佳」仅差一个减弱字，模糊级不得命中");
+    }
+
+    @Test
+    void fuzzyPolarityVetoDoesNotBlockExactOrOtherAliases() throws IOException {
+        recalls(entry("便溏", List.of("大便溏", "大便不成形")));
+        assertEquals(EsTermNormalizer.LEVEL_EXACT, normalizer.normalize("symptom", "大便不成形").level(),
+                "别名原样命中不受极性否决影响");
+        recalls(entry("口干", List.of("口干欲饮")));
+        assertEquals(EsTermNormalizer.LEVEL_EXACT, normalizer.normalize("symptom", "口干").level(),
+                "标准词原样命中不受影响");
+    }
+
+    @Test
+    void singleCharAliasNeverContains() throws IOException {
+        // R8（2026-10-19）：单字别名只用于召回/精确命中。差额阈值是 ≤1，
+        // 1 字别名放进包含判定必然吃掉任何含该字的 2 字串。
+        recalls(entry("脉软", List.of("软")));
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("pulse", "质软").level(),
+                "「质软」是舌质描述，不是脉软");
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("pulse", "软条").level(),
+                "「软条」是便质描述，不是脉软");
+        assertEquals(EsTermNormalizer.LEVEL_EXACT, normalizer.normalize("pulse", "软").level(),
+                "单字输入仍然精确命中（R1 的那一半能力保留）");
+
+        recalls(entry("呕吐", List.of("吐", "呕")));
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("symptom", "吐痰").level(),
+                "「吐痰」不是呕吐");
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("symptom", "呕血").level(),
+                "「呕血」不是呕吐");
+
+        recalls(entry("斑疹", List.of("斑", "疹")));
+        assertEquals(EsTermNormalizer.LEVEL_NONE, normalizer.normalize("symptom", "湿疹").level(),
+                "「湿疹」是病名，不是斑疹");
+    }
 }

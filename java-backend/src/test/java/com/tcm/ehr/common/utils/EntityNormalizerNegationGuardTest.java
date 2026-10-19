@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
  * <p><b>实测规模</b>（2026-10-15，35352 条真实病历）：补 109 个规范症状词后，
  * 若不拦截会有 4867 条否证/已愈句被误归一；拦截后干净命中 18874 条不受影响。</p>
  *
- * <p>三条断言对应三种情形：拦（否证句）· 不拦（干净包含）· 不拦（精确命中）。</p>
+ * <p>三条断言对应三种情形：丢（否证句）· 不丢（干净包含）· 不丢（精确命中）。</p>
  */
 class EntityNormalizerNegationGuardTest {
 
@@ -69,16 +69,16 @@ class EntityNormalizerNegationGuardTest {
     }
 
     @Test
-    void negatedSentencesAreNotNormalized() {
+    void negatedSentencesAreDroppedEntirely() {
         EntityNormalizer en = normalizer(containHitNormalizer());
         // 3 条否证句：症状词都在，但整句是对该症状的否证 / 已愈
         NlpExtractVO vo = voWithSymptoms("无明显流涎", "带下已干净", "便前已无肠鸣");
 
         en.normalize(vo, ORG);
 
-        // 违反会怎样：三条都会被归成症状，语义反转；且因写了 normLevel，
-        // QcScorer 会认为「术语已标准化」⇒ 质控倒加分。
-        assertEquals(Arrays.asList(null, null, null), levels(vo.getSymptoms()));
+        // 违反会怎样：① 归成症状 ⇒ 语义反转 + 质控倒加分；② 保留为「未归一实体」⇒
+        // 把一个不存在的症状记进结构化数据，还拉低归一率（2026-10-19 起改为整条丢弃）。
+        assertTrue(vo.getSymptoms().isEmpty(), "否证句不入库");
         assertTrue(en.drainNegatedSkip() > 0, "否证句必须计入 negatedSkip，否则报表无法对账");
     }
 
