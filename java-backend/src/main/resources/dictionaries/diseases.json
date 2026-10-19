@@ -53,7 +53,8 @@
     "standardTerm": "鼻鼽",
     "aliases": [
       "过敏性鼻炎",
-      "变应性鼻炎"
+      "变应性鼻炎",
+      "鼽嚏"
     ]
   },
   {
@@ -397,7 +398,9 @@
   },
   {
     "standardTerm": "肺痨",
-    "aliases": []
+    "aliases": [
+      "肺结核"
+    ]
   },
   {
     "standardTerm": "脑痨",
@@ -1285,7 +1288,8 @@
   {
     "standardTerm": "冻疮",
     "aliases": [
-      "冻瘃"
+      "冻瘃",
+      "冷疮"
     ]
   },
   {
@@ -1294,7 +1298,10 @@
   },
   {
     "standardTerm": "水火烫伤",
-    "aliases": []
+    "aliases": [
+      "烧伤",
+      "烫伤"
+    ]
   },
   {
     "standardTerm": "电击伤",
@@ -1824,7 +1831,9 @@
   },
   {
     "standardTerm": "肠痈",
-    "aliases": []
+    "aliases": [
+      "阑尾炎"
+    ]
   },
   {
     "standardTerm": "小肠瘅",
@@ -2506,7 +2515,9 @@
     "standardTerm": "乳痈",
     "aliases": [
       "乳吹",
-      "急性乳腺炎"
+      "急性乳腺炎",
+      "吹乳",
+      "妒乳"
     ]
   },
   {
@@ -2859,7 +2870,8 @@
     "aliases": [
       "蛇丹",
       "缠腰火丹",
-      "带状疱疹"
+      "带状疱疹",
+      "火带疮"
     ]
   },
   {
@@ -3096,7 +3108,9 @@
     "aliases": [
       "斑秃油风",
       "脱发",
-      "斑秃"
+      "斑秃",
+      "鬼剃头",
+      "鬼舐头"
     ]
   },
   {
@@ -3308,7 +3322,8 @@
     "standardTerm": "丹毒",
     "aliases": [
       "火丹",
-      "丹熛"
+      "丹熛",
+      "天火"
     ]
   },
   {
@@ -3843,7 +3858,8 @@
   {
     "standardTerm": "瘰疬",
     "aliases": [
-      "颈部淋巴结结核"
+      "颈部淋巴结结核",
+      "鼠疮"
     ]
   },
   {
@@ -3899,7 +3915,8 @@
     "standardTerm": "脱疽",
     "aliases": [
       "血栓闭塞性脉管炎",
-      "动脉硬化闭塞症"
+      "动脉硬化闭塞症",
+      "脱骨疽"
     ]
   },
   {
@@ -3958,7 +3975,9 @@
   {
     "standardTerm": "痔疮",
     "aliases": [
-      "痔病"
+      "痔病",
+      "痔疾",
+      "痔核"
     ]
   },
   {
@@ -4272,11 +4291,15 @@
   },
   {
     "standardTerm": "月经先期",
-    "aliases": []
+    "aliases": [
+      "经行先期"
+    ]
   },
   {
     "standardTerm": "月经后期",
-    "aliases": []
+    "aliases": [
+      "经行后期"
+    ]
   },
   {
     "standardTerm": "月经先后无定期",
@@ -6006,7 +6029,8 @@
   {
     "standardTerm": "鼻渊",
     "aliases": [
-      "鼻窦炎"
+      "鼻窦炎",
+      "脑漏"
     ]
   },
   {
@@ -6121,7 +6145,8 @@
   {
     "standardTerm": "梅核气",
     "aliases": [
-      "咽异感症"
+      "咽异感症",
+      "梅核"
     ]
   },
   {
@@ -6150,7 +6175,9 @@
   },
   {
     "standardTerm": "牙痛",
-    "aliases": []
+    "aliases": [
+      "齿痛"
+    ]
   },
   {
     "standardTerm": "龋齿",
@@ -6424,7 +6451,8 @@
   {
     "standardTerm": "支气管炎",
     "aliases": [
-      "气管支气管炎"
+      "气管支气管炎",
+      "慢性支气管炎"
     ]
   },
   {
@@ -6438,5 +6466,161 @@
     "aliases": [
       "肝硬变"
     ]
+  },
+  {
+    "standardTerm": "失眠",
+    "aliases": []
+  },
+  {
+    "standardTerm": "喉痹",
+    "aliases": [
+      "咽喉肿痛"
+    ]
+  },
+  {
+    "standardTerm": "鼻炎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痹症",
+    "aliases": [
+      "痹病"
+    ]
+  },
+  {
+    "standardTerm": "浅表性胃炎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "紫癜",
+    "aliases": []
+  },
+  {
+    "standardTerm": "子宫肌瘤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "皮疹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痫症",
+    "aliases": [
+      "癫痫"
+    ]
+  },
+  {
+    "standardTerm": "反胃",
+    "aliases": [
+      "胃反"
+    ]
+  },
+  {
+    "standardTerm": "水泻",
+    "aliases": [
+      "水样便"
+    ]
+  },
+  {
+    "standardTerm": "尿血",
+    "aliases": [
+      "血尿"
+    ]
+  },
+  {
+    "standardTerm": "甲状腺结节",
+    "aliases": []
+  },
+  {
+    "standardTerm": "丘疹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "耳闭",
+    "aliases": []
+  },
+  {
+    "standardTerm": "糜烂性胃炎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "便血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "红疹",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肺结节",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛋白尿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痞证",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆囊息肉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脑炎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "咳喘",
+    "aliases": [
+      "咳嗽气喘"
+    ]
+  },
+  {
+    "standardTerm": "口腔溃疡",
+    "aliases": []
+  },
+  {
+    "standardTerm": "哮喘",
+    "aliases": [
+      "过敏性哮喘",
+      "支气管哮喘"
+    ]
+  },
+  {
+    "standardTerm": "糖尿病",
+    "aliases": [
+      "2型糖尿病"
+    ]
+  },
+  {
+    "standardTerm": "脂肪肝",
+    "aliases": [
+      "中度脂肪肝",
+      "轻度脂肪肝"
+    ]
+  },
+  {
+    "standardTerm": "吞酸",
+    "aliases": [
+      "吐酸"
+    ]
+  },
+  {
+    "standardTerm": "嘈杂",
+    "aliases": [
+      "心嘈"
+    ]
+  },
+  {
+    "standardTerm": "奔豚气",
+    "aliases": [
+      "奔豚"
+    ]
+  },
+  {
+    "standardTerm": "唇风",
+    "aliases": []
   }
 ]

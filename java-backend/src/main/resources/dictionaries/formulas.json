@@ -1388,7 +1388,8 @@
   {
     "standardTerm": "六味地黄丸",
     "aliases": [
-      "六味丸"
+      "六味丸",
+      "六味地黄汤"
     ]
   },
   {
@@ -2524,7 +2525,9 @@
   },
   {
     "standardTerm": "苏合香丸",
-    "aliases": []
+    "aliases": [
+      "苏合丸"
+    ]
   },
   {
     "standardTerm": "苏黄止咳胶囊",
@@ -2560,7 +2563,9 @@
   },
   {
     "standardTerm": "杞菊地黄丸",
-    "aliases": []
+    "aliases": [
+      "杞菊地黄汤"
+    ]
   },
   {
     "standardTerm": "杞菊地黄丸-浓缩丸",
@@ -6541,7 +6546,9 @@
   },
   {
     "standardTerm": "止嗽散",
-    "aliases": []
+    "aliases": [
+      "止嗽丸"
+    ]
   },
   {
     "standardTerm": "正柴胡饮",
@@ -8132,7 +8139,9 @@
   },
   {
     "standardTerm": "玉屏风散",
-    "aliases": []
+    "aliases": [
+      "玉屏风丸"
+    ]
   },
   {
     "standardTerm": "完带汤",
@@ -9114,7 +9123,9 @@
   },
   {
     "standardTerm": "至宝丹",
-    "aliases": []
+    "aliases": [
+      "局方至宝丹"
+    ]
   },
   {
     "standardTerm": "小儿回春丹",
@@ -9470,7 +9481,8 @@
   {
     "standardTerm": "定喘汤",
     "aliases": [
-      "千金定喘汤"
+      "千金定喘汤",
+      "定喘丸"
     ]
   },
   {
@@ -9559,7 +9571,9 @@
   },
   {
     "standardTerm": "生化汤",
-    "aliases": []
+    "aliases": [
+      "生化丸"
+    ]
   },
   {
     "standardTerm": "失笑散",
@@ -10829,7 +10843,9 @@
   },
   {
     "standardTerm": "温胆汤",
-    "aliases": []
+    "aliases": [
+      "温胆丸"
+    ]
   },
   {
     "standardTerm": "黄连温胆汤",
@@ -11096,7 +11112,9 @@
   },
   {
     "standardTerm": "半夏白术天麻汤",
-    "aliases": []
+    "aliases": [
+      "半夏白术天麻丸"
+    ]
   },
   {
     "standardTerm": "定痫丸",
@@ -11326,5 +11344,9 @@
       "人参蛤蚧散",
       "人参蛤蚧汤"
     ]
+  },
+  {
+    "standardTerm": "五味消毒饮",
+    "aliases": []
   }
 ]

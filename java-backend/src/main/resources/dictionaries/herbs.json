@@ -518,7 +518,9 @@
   },
   {
     "standardTerm": "黄药子",
-    "aliases": []
+    "aliases": [
+      "黄独"
+    ]
   },
   {
     "standardTerm": "丹参",
@@ -683,7 +685,10 @@
   },
   {
     "standardTerm": "干姜",
-    "aliases": []
+    "aliases": [
+      "白姜",
+      "干生姜"
+    ]
   },
   {
     "standardTerm": "炮姜",
@@ -1099,7 +1104,10 @@
   },
   {
     "standardTerm": "瓦楞子",
-    "aliases": []
+    "aliases": [
+      "瓦垄子",
+      "蚶壳"
+    ]
   },
   {
     "standardTerm": "牛黄",
@@ -1256,7 +1264,9 @@
   },
   {
     "standardTerm": "石韦",
-    "aliases": []
+    "aliases": [
+      "石苇"
+    ]
   },
   {
     "standardTerm": "石吊兰",
@@ -1355,7 +1365,10 @@
   },
   {
     "standardTerm": "白及",
-    "aliases": []
+    "aliases": [
+      "白芨",
+      "甘根"
+    ]
   },
   {
     "standardTerm": "白头翁",
@@ -1475,7 +1488,9 @@
   },
   {
     "standardTerm": "冬瓜皮",
-    "aliases": []
+    "aliases": [
+      "白瓜皮"
+    ]
   },
   {
     "standardTerm": "冬虫夏草",
@@ -1498,11 +1513,17 @@
   },
   {
     "standardTerm": "半边莲",
-    "aliases": []
+    "aliases": [
+      "急解索",
+      "半边花"
+    ]
   },
   {
     "standardTerm": "半枝莲",
-    "aliases": []
+    "aliases": [
+      "狭叶韩信草",
+      "并头草"
+    ]
   },
   {
     "standardTerm": "半夏",
@@ -1757,7 +1778,9 @@
   },
   {
     "standardTerm": "灯心草",
-    "aliases": []
+    "aliases": [
+      "灯芯草"
+    ]
   },
   {
     "standardTerm": "灯盏细辛",
@@ -1866,7 +1889,10 @@
   },
   {
     "standardTerm": "苍术",
-    "aliases": []
+    "aliases": [
+      "茅苍术",
+      "北苍术"
+    ]
   },
   {
     "standardTerm": "芡实",
@@ -1947,7 +1973,10 @@
   },
   {
     "standardTerm": "吴茱萸",
-    "aliases": []
+    "aliases": [
+      "吴萸",
+      "淡吴萸"
+    ]
   },
   {
     "standardTerm": "牡荆叶",
@@ -2321,7 +2350,10 @@
   },
   {
     "standardTerm": "金钱草",
-    "aliases": []
+    "aliases": [
+      "大金钱草",
+      "过路黄"
+    ]
   },
   {
     "standardTerm": "金铁锁",
@@ -2492,11 +2524,16 @@
   },
   {
     "standardTerm": "草果",
-    "aliases": []
+    "aliases": [
+      "草果仁"
+    ]
   },
   {
     "standardTerm": "茵陈",
-    "aliases": []
+    "aliases": [
+      "绵茵陈",
+      "茵陈蒿"
+    ]
   },
   {
     "standardTerm": "茯苓皮",
@@ -2593,7 +2630,10 @@
   },
   {
     "standardTerm": "厚朴",
-    "aliases": []
+    "aliases": [
+      "川朴",
+      "姜厚朴"
+    ]
   },
   {
     "standardTerm": "厚朴花",
@@ -2633,7 +2673,9 @@
   },
   {
     "standardTerm": "韭菜子",
-    "aliases": []
+    "aliases": [
+      "韭子"
+    ]
   },
   {
     "standardTerm": "哈蟆油",
@@ -2727,7 +2769,9 @@
   },
   {
     "standardTerm": "首乌藤",
-    "aliases": []
+    "aliases": [
+      "夜交藤"
+    ]
   },
   {
     "standardTerm": "洪连",
@@ -2743,7 +2787,9 @@
   },
   {
     "standardTerm": "穿心莲",
-    "aliases": []
+    "aliases": [
+      "一见喜"
+    ]
   },
   {
     "standardTerm": "络石藤",
@@ -2941,7 +2987,9 @@
   },
   {
     "standardTerm": "海金沙",
-    "aliases": []
+    "aliases": [
+      "海金砂"
+    ]
   },
   {
     "standardTerm": "海螵蛸",
@@ -2969,7 +3017,9 @@
   },
   {
     "standardTerm": "通草",
-    "aliases": []
+    "aliases": [
+      "通脱木"
+    ]
   },
   {
     "standardTerm": "预知子",
@@ -3131,7 +3181,10 @@
   },
   {
     "standardTerm": "猪苓",
-    "aliases": []
+    "aliases": [
+      "豕零",
+      "野猪粪"
+    ]
   },
   {
     "standardTerm": "猪胆粉",
@@ -3282,7 +3335,10 @@
   },
   {
     "standardTerm": "萹蓄",
-    "aliases": []
+    "aliases": [
+      "扁蓄",
+      "萹竹"
+    ]
   },
   {
     "standardTerm": "楮实子",
@@ -3434,7 +3490,9 @@
   },
   {
     "standardTerm": "滑石",
-    "aliases": []
+    "aliases": [
+      "飞滑石"
+    ]
   },
   {
     "standardTerm": "滑石粉",
@@ -3711,7 +3769,10 @@
   },
   {
     "standardTerm": "藁本",
-    "aliases": []
+    "aliases": [
+      "藁茇",
+      "鬼卿"
+    ]
   },
   {
     "standardTerm": "檀香",
@@ -3741,7 +3802,9 @@
   },
   {
     "standardTerm": "瞿麦",
-    "aliases": []
+    "aliases": [
+      "巨麦"
+    ]
   },
   {
     "standardTerm": "翻白草",
@@ -4088,7 +4151,10 @@
   },
   {
     "standardTerm": "淡豆豉",
-    "aliases": []
+    "aliases": [
+      "香豉",
+      "豆豉"
+    ]
   },
   {
     "standardTerm": "千斤拔",
@@ -4114,7 +4180,9 @@
   },
   {
     "standardTerm": "玉米须",
-    "aliases": []
+    "aliases": [
+      "玉蜀黍须"
+    ]
   },
   {
     "standardTerm": "五指毛桃",
@@ -4230,6 +4298,39 @@
       "葱白头",
       "葱茎白",
       "鲜葱白"
+    ]
+  },
+  {
+    "standardTerm": "贯众",
+    "aliases": [
+      "贯节",
+      "贯渠",
+      "虎卷",
+      "黑狗脊",
+      "贯仲"
+    ]
+  },
+  {
+    "standardTerm": "竹沥",
+    "aliases": [
+      "竹汁",
+      "淡竹沥",
+      "竹油"
+    ]
+  },
+  {
+    "standardTerm": "代赭石",
+    "aliases": [
+      "须丸",
+      "赤土",
+      "代赭"
+    ]
+  },
+  {
+    "standardTerm": "紫珠",
+    "aliases": [
+      "紫珠草",
+      "杜虹花"
     ]
   }
 ]

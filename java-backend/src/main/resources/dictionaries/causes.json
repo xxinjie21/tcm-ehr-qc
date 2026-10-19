@@ -1,1 +1,498 @@
-[]
+[
+  {
+    "standardTerm": "风邪",
+    "aliases": [
+      "外风",
+      "风邪外袭"
+    ]
+  },
+  {
+    "standardTerm": "寒邪",
+    "aliases": [
+      "外寒",
+      "寒邪外袭"
+    ]
+  },
+  {
+    "standardTerm": "暑邪",
+    "aliases": [
+      "暑热",
+      "暑热外袭"
+    ]
+  },
+  {
+    "standardTerm": "湿邪",
+    "aliases": [
+      "外湿",
+      "湿邪外袭"
+    ]
+  },
+  {
+    "standardTerm": "燥邪",
+    "aliases": [
+      "燥气"
+    ]
+  },
+  {
+    "standardTerm": "火邪",
+    "aliases": [
+      "火气"
+    ]
+  },
+  {
+    "standardTerm": "热邪",
+    "aliases": [
+      "实热",
+      "热邪外袭"
+    ]
+  },
+  {
+    "standardTerm": "风寒",
+    "aliases": [
+      "风寒袭表",
+      "风寒外束",
+      "风寒犯肺"
+    ]
+  },
+  {
+    "standardTerm": "风热",
+    "aliases": [
+      "风热袭表",
+      "风热外袭",
+      "风热犯肺"
+    ]
+  },
+  {
+    "standardTerm": "风湿",
+    "aliases": [
+      "风湿外袭"
+    ]
+  },
+  {
+    "standardTerm": "风燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风寒湿",
+    "aliases": [
+      "风寒湿邪"
+    ]
+  },
+  {
+    "standardTerm": "寒湿",
+    "aliases": [
+      "寒湿内侵"
+    ]
+  },
+  {
+    "standardTerm": "湿热",
+    "aliases": [
+      "湿热内蕴",
+      "湿热外袭"
+    ]
+  },
+  {
+    "standardTerm": "暑湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰湿",
+    "aliases": [
+      "湿痰"
+    ]
+  },
+  {
+    "standardTerm": "水湿",
+    "aliases": [
+      "水湿内停"
+    ]
+  },
+  {
+    "standardTerm": "湿浊",
+    "aliases": [
+      "湿浊内停"
+    ]
+  },
+  {
+    "standardTerm": "湿毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凉燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "秋燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "燥热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "实火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "虚火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "郁火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "郁热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘀热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "火毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "疫毒",
+    "aliases": [
+      "疫气"
+    ]
+  },
+  {
+    "standardTerm": "疫疠",
+    "aliases": [
+      "瘟疫",
+      "时疫"
+    ]
+  },
+  {
+    "standardTerm": "时疫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "温疫",
+    "aliases": []
+  },
+  {
+    "standardTerm": "情志失调",
+    "aliases": [
+      "情志不畅",
+      "情志不舒"
+    ]
+  },
+  {
+    "standardTerm": "恼怒",
+    "aliases": [
+      "大怒",
+      "暴怒"
+    ]
+  },
+  {
+    "standardTerm": "郁怒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "忧思",
+    "aliases": [
+      "忧愁思虑"
+    ]
+  },
+  {
+    "standardTerm": "悲忧",
+    "aliases": [
+      "悲伤",
+      "悲哀"
+    ]
+  },
+  {
+    "standardTerm": "惊恐",
+    "aliases": [
+      "惊吓"
+    ]
+  },
+  {
+    "standardTerm": "思虑过度",
+    "aliases": [
+      "思虑太过"
+    ]
+  },
+  {
+    "standardTerm": "郁怒伤肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "忧思伤脾",
+    "aliases": []
+  },
+  {
+    "standardTerm": "怒伤肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "饮食不节",
+    "aliases": [
+      "饮食无度"
+    ]
+  },
+  {
+    "standardTerm": "饮食不洁",
+    "aliases": [
+      "进食不洁"
+    ]
+  },
+  {
+    "standardTerm": "饮食生冷",
+    "aliases": [
+      "过食生冷"
+    ]
+  },
+  {
+    "standardTerm": "过食肥甘",
+    "aliases": [
+      "肥甘厚味"
+    ]
+  },
+  {
+    "standardTerm": "过食辛辣",
+    "aliases": [
+      "恣食辛辣"
+    ]
+  },
+  {
+    "standardTerm": "过食甜腻",
+    "aliases": []
+  },
+  {
+    "standardTerm": "暴饮暴食",
+    "aliases": [
+      "饥饱无常"
+    ]
+  },
+  {
+    "standardTerm": "饥饱失常",
+    "aliases": []
+  },
+  {
+    "standardTerm": "偏嗜",
+    "aliases": [
+      "偏食"
+    ]
+  },
+  {
+    "standardTerm": "嗜酒",
+    "aliases": [
+      "酗酒",
+      "饮酒过度"
+    ]
+  },
+  {
+    "standardTerm": "醉酒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "劳倦",
+    "aliases": [
+      "劳倦过度",
+      "劳倦内伤"
+    ]
+  },
+  {
+    "standardTerm": "劳力过度",
+    "aliases": []
+  },
+  {
+    "standardTerm": "劳神过度",
+    "aliases": [
+      "思虑劳神"
+    ]
+  },
+  {
+    "standardTerm": "房劳过度",
+    "aliases": [
+      "房事过度",
+      "房劳"
+    ]
+  },
+  {
+    "standardTerm": "过度劳累",
+    "aliases": []
+  },
+  {
+    "standardTerm": "安逸少动",
+    "aliases": [
+      "久卧少动"
+    ]
+  },
+  {
+    "standardTerm": "久坐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "久卧",
+    "aliases": []
+  },
+  {
+    "standardTerm": "久立",
+    "aliases": []
+  },
+  {
+    "standardTerm": "久视",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰浊",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰热",
+    "aliases": [
+      "热痰"
+    ]
+  },
+  {
+    "standardTerm": "寒痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "湿痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰饮",
+    "aliases": [
+      "痰饮内停"
+    ]
+  },
+  {
+    "standardTerm": "饮邪",
+    "aliases": []
+  },
+  {
+    "standardTerm": "水饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "支饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "悬饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰瘀",
+    "aliases": [
+      "痰瘀互结"
+    ]
+  },
+  {
+    "standardTerm": "瘀血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血瘀",
+    "aliases": [
+      "瘀血内阻"
+    ]
+  },
+  {
+    "standardTerm": "气滞血瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寒凝血瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "热结血瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘀血阻络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "外伤",
+    "aliases": [
+      "外因损伤"
+    ]
+  },
+  {
+    "standardTerm": "跌扑损伤",
+    "aliases": [
+      "跌打损伤"
+    ]
+  },
+  {
+    "standardTerm": "金刃伤",
+    "aliases": [
+      "金创",
+      "金刃所伤"
+    ]
+  },
+  {
+    "standardTerm": "烧烫伤",
+    "aliases": [
+      "烫伤"
+    ]
+  },
+  {
+    "standardTerm": "虫兽伤",
+    "aliases": [
+      "虫兽咬伤"
+    ]
+  },
+  {
+    "standardTerm": "疠气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "过逸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "药物中毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "食物中毒",
+    "aliases": []
+  },
+  {
+    "standardTerm": "先天不足",
+    "aliases": []
+  },
+  {
+    "standardTerm": "久病体虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "病后失调",
+    "aliases": []
+  },
+  {
+    "standardTerm": "结石",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寄生虫",
+    "aliases": []
+  }
+]

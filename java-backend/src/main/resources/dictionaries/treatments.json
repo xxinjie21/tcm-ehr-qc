@@ -372,7 +372,9 @@
   },
   {
     "standardTerm": "发汗解表",
-    "aliases": []
+    "aliases": [
+      "解表发汗"
+    ]
   },
   {
     "standardTerm": "辛凉解表",
@@ -713,7 +715,8 @@
   {
     "standardTerm": "疏肝健脾",
     "aliases": [
-      "疏肝补脾"
+      "疏肝补脾",
+      "健脾疏肝"
     ]
   },
   {
@@ -750,7 +753,8 @@
   {
     "standardTerm": "健脾和胃",
     "aliases": [
-      "补中安胃"
+      "补中安胃",
+      "和胃健脾"
     ]
   },
   {
@@ -1259,7 +1263,8 @@
   {
     "standardTerm": "疏肝理气",
     "aliases": [
-      "疏肝解郁"
+      "疏肝解郁",
+      "舒肝理气"
     ]
   },
   {
@@ -1326,7 +1331,9 @@
   },
   {
     "standardTerm": "和胃降逆",
-    "aliases": []
+    "aliases": [
+      "降逆和胃"
+    ]
   },
   {
     "standardTerm": "降逆止呕",
@@ -1826,7 +1833,9 @@
   },
   {
     "standardTerm": "清热利湿",
-    "aliases": []
+    "aliases": [
+      "利湿清热"
+    ]
   },
   {
     "standardTerm": "清泄湿热",
@@ -2496,7 +2505,8 @@
   {
     "standardTerm": "滋阴",
     "aliases": [
-      "滋补阴液"
+      "滋补阴液",
+      "养阴"
     ]
   },
   {
@@ -2609,7 +2619,8 @@
   {
     "standardTerm": "滋补肾阴",
     "aliases": [
-      "滋养肾阴"
+      "滋养肾阴",
+      "滋肾阴"
     ]
   },
   {
@@ -2624,7 +2635,9 @@
   },
   {
     "standardTerm": "滋阴清热",
-    "aliases": []
+    "aliases": [
+      "养阴清热"
+    ]
   },
   {
     "standardTerm": "滋阴止汗",
@@ -3580,7 +3593,8 @@
   {
     "standardTerm": "燥湿化痰",
     "aliases": [
-      "祛湿化痰"
+      "祛湿化痰",
+      "化痰燥湿"
     ]
   },
   {
@@ -3931,7 +3945,8 @@
   {
     "standardTerm": "养心安神",
     "aliases": [
-      "补心安神"
+      "补心安神",
+      "安神养心"
     ]
   },
   {
@@ -6019,7 +6034,8 @@
   {
     "standardTerm": "清肺",
     "aliases": [
-      "清泄肺热"
+      "清泄肺热",
+      "清泻肺热"
     ]
   },
   {
@@ -6052,15 +6068,21 @@
   },
   {
     "standardTerm": "健脾益气",
-    "aliases": []
+    "aliases": [
+      "益气健脾"
+    ]
   },
   {
     "standardTerm": "清肝泻火",
-    "aliases": []
+    "aliases": [
+      "清泻肝火"
+    ]
   },
   {
     "standardTerm": "宁心安神",
-    "aliases": []
+    "aliases": [
+      "安神宁心"
+    ]
   },
   {
     "standardTerm": "收涩止带",
@@ -6077,5 +6099,17 @@
     "aliases": [
       "开窍启闭"
     ]
+  },
+  {
+    "standardTerm": "利湿退黄",
+    "aliases": []
+  },
+  {
+    "standardTerm": "固崩止带",
+    "aliases": []
+  },
+  {
+    "standardTerm": "通阳宣痹",
+    "aliases": []
   }
 ]

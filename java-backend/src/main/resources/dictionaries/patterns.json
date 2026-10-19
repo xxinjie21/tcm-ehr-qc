@@ -4938,7 +4938,9 @@
   },
   {
     "standardTerm": "营卫不和证",
-    "aliases": []
+    "aliases": [
+      "营卫失调"
+    ]
   },
   {
     "standardTerm": "气滞证",
@@ -10580,5 +10582,137 @@
     "aliases": [
       "气血两亏"
     ]
+  },
+  {
+    "standardTerm": "湿热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厥阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "太阴",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脾虚湿滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厥阴瘀热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "郁热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "少阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "表里相兼",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脾虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阳明",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脾虚痰湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "瘀热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阴虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阳明湿热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阳虚湿滞",
+    "aliases": []
+  },
+  {
+    "standardTerm": "太阴风湿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "郁证",
+    "aliases": [
+      "郁病"
+    ]
+  },
+  {
+    "standardTerm": "气郁",
+    "aliases": [
+      "气郁证"
+    ]
+  },
+  {
+    "standardTerm": "痰湿郁热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "太阴兼少阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "厥阴兼少阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "湿痰",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰湿蕴热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "痰证",
+    "aliases": []
+  },
+  {
+    "standardTerm": "饮证",
+    "aliases": []
   }
 ]
