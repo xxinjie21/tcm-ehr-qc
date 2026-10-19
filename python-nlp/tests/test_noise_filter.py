@@ -108,6 +108,17 @@ check('常态陈述与「反复发作」被剔除，真症状「头晕」保留'
       [e.content for e in _resp.symptoms], ['头晕'])
 
 print()
+print('F5c 叙事/结局碎片：以「消失 / 好转 / 达全身」收尾不算症状')
+# 2026-10-19 实测：「经来痛消失」若归一化会错配到「经行腹痛」（语义反转）；
+# 「运动后可汗出达全身」是转归描述，均须整体丢弃。
+_resp = ExtractResponse()
+_resp.symptoms = [Entity(content=x, sourceText=x) for x in
+                  ['经来痛消失', '病情好转', '运动后可汗出达全身', '汗出偏少']]
+drop_noise(_resp)
+check('叙事碎片被剔除，真症状「汗出偏少」保留',
+      [e.content for e in _resp.symptoms], ['汗出偏少'])
+
+print()
 if failures:
     print(f'=== 失败 {len(failures)} 项：{failures}')
     sys.exit(1)

@@ -141,12 +141,16 @@ _DIGIT_RE = re.compile(r"\d")
 _NORMAL_STATE_RE = re.compile(r"^[\u4e00-\u9fff]{1,3}(可|正常)$")
 # 描述性连接碎片：模型常把主诉里的「反复发作」整段当症状
 _NOISE_EXACT = {"反复发作", "反复出现", "无明显异常", "无特殊"}
+# 叙事/结局型碎片：以「为主」收尾（「头面为主」）、以「消失/好转/达全身」收尾
+# （「经来痛消失」「病情好转」「运动后可汗出达全身」）——是转归描述而非症状本体，
+# 归一化会把「经来痛消失」错配到「经行腹痛」，语义反转，必须整体丢弃。
+_NOISE_SUFFIX = ("为主", "消失", "好转", "达全身")
 
 
 def _is_noisy_symptom(s: str) -> bool:
     """非症状的抽取碎片：含阿拉伯数字（「反复发作5」「经前3天乳房胀痛」）、
-    以「为主」收尾（「头面为主」）、纯常态陈述（「小便可」「纳可」）、或描述性碎片（「反复发作」）。"""
-    return (bool(_DIGIT_RE.search(s)) or s.endswith("为主")
+    叙事型收尾（见 _NOISE_SUFFIX）、纯常态陈述（「小便可」「纳可」）、或描述性碎片（「反复发作」）。"""
+    return (bool(_DIGIT_RE.search(s)) or s.endswith(_NOISE_SUFFIX)
             or s in _NOISE_EXACT or bool(_NORMAL_STATE_RE.match(s)))
 
 
