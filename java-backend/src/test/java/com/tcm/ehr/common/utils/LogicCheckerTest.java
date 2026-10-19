@@ -17,9 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>判定链：触发类型实体命中触发值（包含匹配）→ 若期望类型<b>有</b>记录，则须命中期望值之一，
  * 否则记冲突；<b>期望类型没有记录 → 不适用、不判</b>（这条最容易出错，是本次重写的重点用例）。</p>
  *
- * <p>用例大多自建规则，不依赖 {@link QcRuleSet#defaults()} 的内置值 ——
- * 内置规则是按当前演示数据集调的，拿证候名硬凑会在规则改动时集体失效。
- * 只有最后两个用例专门验证「默认规则本身」的行为。</p>
+ * <p>用例全部自建规则，不依赖 {@link QcRuleSet#defaults()} 的内置值 ——
+ * 出厂默认自 2026-10-19 起不含任何一致性规则（见最后一个用例）。</p>
  */
 class LogicCheckerTest {
 
@@ -114,23 +113,16 @@ class LogicCheckerTest {
 
     // ---------------------------------------------------------------- 默认规则本身
 
-    /** 默认规则覆盖不到的证候不判冲突（旧用例用的是「肝肾亏虚」，而它恰好在内置触发值里，已换掉） */
+    /**
+     * 出厂默认不含任何一致性规则（2026-10-19 起）。
+     *
+     * <p>原内置 9 条「证候 → 中药」在真实病历上误报率 25%~80%，已整体移除：
+     * 固定「证候 → 单味药」对照表把「医生用了别的药」误判成逻辑冲突。需要时由组织
+     * 在「规则配置」里自行添加（自建规则的判定行为由上面各用例覆盖）。</p>
+     */
     @Test
-    void defaultRules_uncoveredPattern_noConflict() {
-        List<String> conflicts = LogicChecker.check(
-                data(List.of("风寒感冒"), List.of("麻黄")), QcRuleSet.defaults().getConsistency());
-
-        assertTrue(conflicts.isEmpty(), () -> "实际：" + conflicts);
-    }
-
-    /** 默认规则命中且期望值不符 → 冲突，规则名取自内置清单 */
-    @Test
-    void defaultRules_coveredPattern_conflict() {
-        // 「脾肾阳虚」的期望中药是 附子/肉桂
-        List<String> conflicts = LogicChecker.check(
-                data(List.of("脾肾阳虚"), List.of("桂枝")), QcRuleSet.defaults().getConsistency());
-
-        assertEquals(1, conflicts.size(), () -> "实际：" + conflicts);
-        assertTrue(conflicts.get(0).startsWith("脾肾阳虚-中药"), () -> "实际：" + conflicts);
+    void defaults_haveNoConsistencyRules() {
+        assertTrue(QcRuleSet.defaults().getConsistency().isEmpty(),
+                () -> "出厂默认应为空，实际：" + QcRuleSet.defaults().getConsistency());
     }
 }

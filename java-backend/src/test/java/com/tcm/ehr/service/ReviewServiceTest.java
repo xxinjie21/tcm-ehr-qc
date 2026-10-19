@@ -1,5 +1,6 @@
 package com.tcm.ehr.service;
 
+import com.tcm.ehr.common.config.QcRuleSet;
 import com.tcm.ehr.common.config.QcRuleStore;
 import com.tcm.ehr.common.exception.ConcurrentOperationException;
 import com.tcm.ehr.common.exception.ResourceNotFoundException;
@@ -45,6 +46,7 @@ class ReviewServiceTest {
 
     private RecordMapper recordMapper;
     private ReviewTaskMapper reviewTaskMapper;
+    private QcRuleStore ruleStore;
     private ReviewServiceImpl service;
 
     /** 组绑定的请求上下文：阶段 2 起所有数据读取都需要它 */
@@ -68,7 +70,9 @@ class ReviewServiceTest {
         recordMapper = Mockito.mock(RecordMapper.class);
         reviewTaskMapper = Mockito.mock(ReviewTaskMapper.class);
         // QcRuleStore 的 init() 是 @PostConstruct，测试里不调用 → get() 返回 null
-        // → QcScorer 落回内置默认规则（正是要测的口径）
+        // → QcScorer 落回内置默认规则（正是要测的口径）。
+        // 但出厂默认自 2026-10-19 起已无一致性规则，故显式注入一条最小规则集，
+        // 让「逻辑冲突 → 待复核」的用例不依赖默认清单。
         // 复核提交修正前会跑一遍归一（否则人工新输入的词没有 normLevel，
         // 会被 QcScorer 当成未标准化而扣分）。mock 的 EsTermNormalizer 必须
         // 像真实实现一样返回非 null 的结果 —— 契约上它就不返回 null，
@@ -78,8 +82,9 @@ class ReviewServiceTest {
                         Mockito.anyString()))
                 .thenAnswer(inv -> new EsTermNormalizer.NormalizeResult(
                         inv.getArgument(2), 1));
-        QcRuleStore ruleStore = new QcRuleStore(new ObjectMapper(),
+        ruleStore = new QcRuleStore(new ObjectMapper(),
                 org.mockito.Mockito.mock(QcRuleMapper.class));
+        ReflectionTestUtils.setField(ruleStore, "current", rulesWithPatternHerbRule());
         // 复核写库段自批次 26.4 起是独立 Bean（事务落点），入口只做归一后委托
         IReviewWriteService writeService = new ReviewWriteServiceImpl(recordMapper, reviewTaskMapper,
                 new ObjectMapper(), ruleStore);
@@ -92,6 +97,19 @@ class ReviewServiceTest {
     @AfterEach
     void tearDown() {
         org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+    }
+
+    /** 注入给 ruleStore 的最小规则集：一条「脾肾阳虚 → 中药（附子/肉桂）」，用于造逻辑冲突 */
+    private static QcRuleSet rulesWithPatternHerbRule() {
+        QcRuleSet rules = QcRuleSet.defaults();
+        QcRuleSet.ConsistencyRule c = new QcRuleSet.ConsistencyRule();
+        c.setName("脾肾阳虚-中药");
+        c.setTriggerType("pattern");
+        c.setTriggerValues(List.of("脾肾阳虚"));
+        c.setExpectType("herb");
+        c.setExpectValues(List.of("附子", "肉桂"));
+        rules.getConsistency().add(c);
+        return rules;
     }
 
     /**
@@ -119,7 +137,7 @@ class ReviewServiceTest {
     }
 
     /**
-     * 中药名可控。默认一致性规则里「脾肾阳虚-中药」期望附子/肉桂 ——
+     * 中药名可控。注入的规则里「脾肾阳虚-中药」期望附子/肉桂 ——
      * 换成「桂枝」即可造出「证候-中药」逻辑冲突 → 待复核。
      */
     private Record record(String id, boolean withFormula, String herbName) {
@@ -151,7 +169,7 @@ class ReviewServiceTest {
 
     @Test
     void keepPendingWhenStillNotQualified() {
-        // 中药用了「桂枝」，与默认规则「脾肾阳虚-中药」（期望附子/肉桂）不符 → 逻辑冲突 → 待复核
+        // 中药用了「桂枝」，与注入规则「脾肾阳虚-中药」（期望附子/肉桂）不符 → 逻辑冲突 → 待复核
         Record r = record("rec-1", false, "桂枝");
         ReviewTask t = task("task-1", "rec-1");
         when(recordMapper.selectById("rec-1")).thenReturn(r);

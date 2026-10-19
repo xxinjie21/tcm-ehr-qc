@@ -40,7 +40,7 @@ class QcScorerTest {
                 "pulseList", List.of(entity("脉浮")),
                 "tongueList", List.of(entity("舌淡红")),
                 "patternList", List.of(entity("风寒感冒")),
-                // 治法没有独立词典，不参与术语标准化
+                // 治法不在出厂默认的术语标准化类型内（默认只勾 5 类：疾病/证候/症状/中药/方剂）
                 "treatmentList", List.of(entity("辛温解表")),
                 "formulaList", List.of(entity("麻黄汤")),
                 "herbs", List.of(herb("麻黄")),
@@ -178,24 +178,33 @@ class QcScorerTest {
     }
 
     /**
-     * 证候命中「脾肾阳虚」的默认规则有两条（→中药、→方剂），且都未命中期望值 → 2 条冲突。
-     * 有冲突即落待复核 —— 即便分数 80 已 ≥ 合格线，冲突仍把它拉回待复核。
+     * 有逻辑冲突即落待复核 —— 即便分数 90 已 ≥ 合格线，冲突仍把它拉回待复核。
+     *
+     * <p>出厂默认自 2026-10-19 起已无一致性规则，故本用例显式构造一条「证候 → 中药」规则
+     * （与旧默认「脾肾阳虚-中药」同构）来验证冲突优先级高于分数。默认清单已空这一点由
+     * {@code LogicCheckerTest.defaults_haveNoConsistencyRules} 钉住。</p>
      */
     @Test
-    void bothLogicConflictsPendingReview() {
+    void logicConflictPendingReview() {
         Map<String, Object> data = new HashMap<>(fullData());
         data.put("patternList", List.of(entity("脾肾阳虚")));
         data.put("herbs", List.of(herb("桂枝"))); // 期望 附子/肉桂
-        data.put("formulaList", List.of(entity("银翘散"))); // 期望 济生肾气丸
 
-        ScoreResultVO vo = QcScorer.score(data, raw(), false, QcRuleSet.defaults());
+        QcRuleSet rules = QcRuleSet.defaults();
+        QcRuleSet.ConsistencyRule c = new QcRuleSet.ConsistencyRule();
+        c.setName("脾肾阳虚-中药");
+        c.setTriggerType("pattern");
+        c.setTriggerValues(List.of("脾肾阳虚"));
+        c.setExpectType("herb");
+        c.setExpectValues(List.of("附子", "肉桂"));
+        rules.getConsistency().add(c);
 
-        assertEquals(2, vo.getLogicConflicts().size(), () -> "实际：" + vo.getLogicConflicts());
-        assertTrue(vo.getLogicConflicts().stream().anyMatch(c -> c.startsWith("脾肾阳虚-中药")),
+        ScoreResultVO vo = QcScorer.score(data, raw(), false, rules);
+
+        assertEquals(1, vo.getLogicConflicts().size(), () -> "实际：" + vo.getLogicConflicts());
+        assertTrue(vo.getLogicConflicts().stream().anyMatch(x -> x.startsWith("脾肾阳虚-中药")),
                 () -> "实际：" + vo.getLogicConflicts());
-        assertTrue(vo.getLogicConflicts().stream().anyMatch(c -> c.startsWith("脾肾阳虚-方剂")),
-                () -> "实际：" + vo.getLogicConflicts());
-        assertEquals(80, vo.getScore()); // 100 - 2×10
+        assertEquals(90, vo.getScore()); // 100 - 1×10
         assertEquals("待复核", vo.getGrade());
     }
 

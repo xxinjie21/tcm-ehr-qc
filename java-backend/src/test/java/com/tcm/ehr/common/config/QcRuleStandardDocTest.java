@@ -46,7 +46,8 @@ class QcRuleStandardDocTest {
             }
         }
 
-        // 3. 一致性：14 条规则名逐条核对（最易漏的一类）
+        // 3. 一致性：出厂默认无规则（consistency 为空），本循环恒空；
+        //    组织自配的一致性规则不在本文文档覆盖范围内
         for (QcRuleSet.ConsistencyRule c : rules.getConsistency()) {
             if (!doc.contains(c.getName())) {
                 missing.add("一致性规则「" + c.getName() + "」");
