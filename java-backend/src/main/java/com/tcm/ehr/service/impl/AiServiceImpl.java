@@ -85,7 +85,7 @@ public class AiServiceImpl implements IAiService {
         vo.setAnswer(template);
 
         // 2. 再让 LLM 改写叙述并给要点摘要；不可用或异常都保留上一步的模板叙述
-        String raw = llmClient.chat(AiFeature.INTERPRET, LlmClient.AI_INTERPRET_SYSTEM_PROMPT, interpretPrompt(vo, r, data));
+        String raw = llmClient.chat(AiFeature.INTERPRET, LlmClient.AI_INTERPRET_SYSTEM_PROMPT, interpretPrompt(vo, r));
         boolean llmOk = raw != null && !raw.isBlank();
         vo.setLlmAvailable(llmOk);
         vo.setSource(llmOk ? "llm" : "rule");
@@ -131,7 +131,7 @@ public class AiServiceImpl implements IAiService {
     }
 
     /** 解读 prompt：把规则结论 + 病历关键字段拼给模型，要求只回 JSON */
-    private String interpretPrompt(AiReplyVO vo, Record r, Map<String, Object> data) {
+    private String interpretPrompt(AiReplyVO vo, Record r) {
         // 1. 先给规则结论，模型只做叙述加工，避免它自己下结论
         StringBuilder sb = new StringBuilder("【规则预检结论】\n");
         sb.append("- 完整性：21 字段完整 ").append(vo.getCompleteness().getPresent())
@@ -147,7 +147,6 @@ public class AiServiceImpl implements IAiService {
         sb.append("\n【病历关键字段】\n")                .append("主诉：").append(nz(r.getChiefComplaint())).append('\n')
                 .append("中医诊断：").append(nz(r.getTcmDiagnosis())).append('\n')
                 .append("辨证结论：").append(nz(r.getPattern())).append('\n')
-                .append("治法（结构化）：").append(join(contents(data, "treatmentList"))).append('\n')
                 .append("草药：").append(nz(r.getPrescription())).append('\n');
         sb.append("\n请只输出要求的 JSON 对象。");
         return sb.toString();
@@ -352,8 +351,6 @@ public class AiServiceImpl implements IAiService {
         StringBuilder sb = new StringBuilder("【规则预检单】\n").append(precheck).append('\n');
         sb.append("【结构化数据】\n")
                 .append("证候：").append(join(contents(data, "patternList"))).append('\n')
-                .append("治法：").append(join(contents(data, "treatmentList"))).append('\n')
-                .append("方剂：").append(join(contents(data, "formulaList"))).append('\n')
                 .append("舌象：").append(join(contents(data, "tongueList"))).append('\n')
                 .append("脉象：").append(join(contents(data, "pulseList"))).append('\n');
         sb.append("\n请给出复核建议。");

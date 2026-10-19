@@ -185,7 +185,7 @@ public class LlmClient {
     public static final String AI_INTERPRET_SYSTEM_PROMPT = """
             你是中医电子病历质控助理。用户会给你一条病历的「规则预检结论」与「结构化数据」。
             你只做两件事：
-            1. 提取四要点：主诉(chiefComplaint) / 诊断(diagnosis) / 辨证(syndrome) / 方药(prescription)；
+            1. 提取四要点：主诉(chiefComplaint) / 诊断(diagnosis) / 辨证(syndrome) / 草药(prescription)；
             2. 用简洁、专业、克制的中文，把规则结论叙述成一段质控解读。
             硬性要求：
             - 判定以规则结论为准，绝不臆造、不改变规则给出的判定与数据；
@@ -199,7 +199,7 @@ public class LlmClient {
      */
     public static final String AI_REVIEW_SYSTEM_PROMPT = """
             你是中医电子病历质控复核助手。用户会给你一条病历的「规则预检单」与「结构化数据」。
-            请给出简洁的复核建议，聚焦三点：疑似缺失的字段、证候与治法/方剂是否存在逻辑冲突、
+            请给出简洁的复核建议，聚焦三点：疑似缺失的字段、规则预检单列出的逻辑冲突、
             建议人工重点核对之处。
             硬性要求：
             - 判定以规则预检单为准，绝不臆造、不改变规则给出的结论；

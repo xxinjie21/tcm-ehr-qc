@@ -31,7 +31,7 @@ public class CreateRecordDTO {
     @Size(max = 50, message = "门诊号最长 50 字")
     private String outpatientNo;
 
-    @Pattern(regexp = QcRuleSet.GENDER_PATTERN, message = "性别只能填「男」或「女」")
+    @Pattern(regexp = QcRuleSet.GENDER_PATTERN, message = "性别只能填「男」「女」或「未知的性别」")
     private String gender;
 
     @Size(max = 20, message = "年龄最长 20 字")
