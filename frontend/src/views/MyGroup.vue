@@ -7,18 +7,16 @@
            元素与遮罩同生同灭，遮罩移除与下一块内容挂载不同步，就会闪一下；
            而且没给 element-loading-text，会显示 Element Plus 默认的英文 Loading...。
            最小高度只在加载时给（.is-loading），避免不加载时一直占 160px。 -->
-      <div
-        v-loading="loading"
-        element-loading-text="正在读取我的组织…"
-        :class="['my-org-wrap', { 'is-loading': loading }]"
-      >
+      <div class="my-org-wrap">
+        <!-- 加载态：骨架占位（P0-3），不挂 v-loading 遮罩 —— 遮罩会把容器盖住；内容到达后替换 -->
+        <LoadingSkeleton v-if="loading" variant="form" :rows="4" label="正在读取我的组织…" />
 
       <!-- 未加入组织：批次 6 起可自助创建；无「待加入池」也不再有「审批中」 -->
       <div v-if="!loading && !data.org" class="my-org-empty">
         <!-- 复用共享空态组件（Dashboard / Records / Qc / NlpExtract 都用它）：
              原来这里是裸 el-empty，接口失败时与「真的没加入组织」显示成同一画面，
              用户会以为自己没有组织。EmptyState 区分 failed 并给「重试」出口。 -->
-        <EmptyState v-if="orgFailed" failed :loading="loading"
+        <EmptyState v-if="orgFailed" failed
                     text="组织信息加载失败，请重试" @retry="loadMyOrg" />
         <EmptyState v-else text="你还没有加入任何组织">
           <p class="empty-hint">你可以自己创建一个组织（创建后你就是所有者），</p>
@@ -28,7 +26,7 @@
       </div>
 
       <!-- 有组织：所有者 / 成员共用 -->
-      <div v-if="!loading && data.org">
+      <div v-if="!loading && data.org" class="org-detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="组织名称">{{ data.org.name }}</el-descriptions-item>
           <el-descriptions-item label="组织编码">{{ data.org.code }}</el-descriptions-item>
@@ -53,7 +51,8 @@
               <el-button size="small" type="danger" :loading="leaving" @click="doLeave">退出组织</el-button>
             </span>
           </div>
-          <el-table v-loading="membersLoading" element-loading-text="正在读取成员…" :data="members" border stripe style="margin-top: var(--sp-3)">
+          <div class="fill-table">
+          <el-table :data="members" border stripe height="100%" style="margin-top: var(--sp-3)">
             <el-table-column prop="username" label="用户名" min-width="120" />
             <el-table-column label="角色" width="90">
               <template #default="{ row }">
@@ -98,6 +97,7 @@
                           text="该组织暂无成员" @retry="loadMembers" />
             </template>
           </el-table>
+          </div>
         </template>
 
         <!-- 成员只给信息，不给任何操作入口 -->
@@ -114,8 +114,8 @@
       </div>
 
       <!-- 创建组织 -->
-      <el-dialog v-if="createDialog" v-model="createDialog" title="创建组织" width="min(480px, 94vw)" top="10vh">
-        <el-form label-width="88px">
+      <el-dialog v-if="createDialog" v-model="createDialog" title="创建组织" width="min(480px, 94vw)" top="6vh" :close-on-click-modal="false">
+        <el-form label-width="72px">
           <el-form-item label="组织名称">
             <el-input v-model="createForm.name" maxlength="100" placeholder="必填" />
           </el-form-item>
@@ -123,7 +123,7 @@
             <el-input v-model="createForm.code" placeholder="可留空；大写字母/数字/连字符，2~50" />
           </el-form-item>
           <el-form-item label="用途说明">
-            <el-input v-model="createForm.purpose" type="textarea" :rows="2" maxlength="500" />
+            <el-input v-model="createForm.purpose" v-autoheight type="textarea" :rows="2" maxlength="500" />
           </el-form-item>
         </el-form>
         <template #footer>
@@ -135,7 +135,7 @@
       </el-dialog>
 
       <!-- 按用户名拉人 -->
-      <el-dialog v-if="addDialog" v-model="addDialog" title="按用户名拉人" width="min(480px, 94vw)" top="10vh">
+      <el-dialog v-if="addDialog" v-model="addDialog" title="按用户名拉人" width="min(480px, 94vw)" top="6vh" :close-on-click-modal="false">
         <!-- ⚠️ 原来用的是 #append：Element Plus 的 append 插槽把内容渲染在输入框
              **外面**（两个相邻的盒子），不是框内的按钮；而且它带 :loading 的
              el-button 会在搜索时重排，导致输入框宽度/边框跳一下（看着像闪屏）。
@@ -175,12 +175,14 @@ import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import {
   getMyOrg, listMembers, addMember, removeMember, transferOwner, leaveGroup,
   createOrg, searchUsers, setPermissions
 } from '@/api/org'
 import { useUserStore } from '@/stores/user'
 import { fmtDateTime } from '@/utils/format'
+import { vAutoheight } from '@/utils/autoheight'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -389,12 +391,51 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 遮罩容器：本身不占位；加载时才给最小高度，否则遮罩没有可覆盖的区域 */
-.my-org-wrap.is-loading {
-  min-height: 160px;
+/* 加载态由 LoadingSkeleton 占位（P0-3），不再需要遮罩最小高度 */
+
+/* ===== 留白·对称专项（范本 Qc.vue .grid-2 等高链）=====
+   单卡被 .page-fill 拉满整屏高，卡内 .my-org-wrap 拿到确定高度后纵列分布：
+   加载骨架/空态吃满并垂直居中，有组织时成员表 .fill-table flex:1 吃剩余高度。 */
+:deep(.panel) {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
 }
+:deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.my-org-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 空态在等高卡内垂直居中（safe：内容超高时退回顶部，不被推出可视区） */
 .my-org-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: var(--sp-5) 0;
+}
+/* 加载骨架占满卡内剩余高度 */
+.my-org-wrap > .load-skel {
+  flex: 1 1 auto;
+}
+/* 有组织详情块：descriptions/操作行/建组织行固定高，成员表吃中间剩余 */
+.org-detail {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fill-table {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .empty-hint {
   margin: 0 0 var(--sp-1);

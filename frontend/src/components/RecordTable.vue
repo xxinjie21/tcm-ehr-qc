@@ -17,13 +17,12 @@
   -->
   <el-table
     :ref="tableRef"
-    v-loading="loading"
-    :element-loading-text="loadingText"
     :data="rows"
     border
     size="small"
     style="margin-top: var(--sp-3)"
-    :max-height="maxHeight"
+    :max-height="height ? undefined : maxHeight"
+    :height="height || undefined"
     :row-class-name="rowClassName"
     :highlight-current-row="highlightCurrent"
     @selection-change="$emit('selection-change', $event)"
@@ -100,9 +99,13 @@
         <slot name="action" v-bind="scope" />
       </template>
     </el-table-column>
-    <!-- 空态由页面填（各页文案与失败态不同），没给就退回 Element 默认 -->
-    <template v-if="$slots.empty" #empty>
-      <slot name="empty" />
+    <!-- 空态：页面给了就用页面的（各页文案与失败态不同）。没给时：
+         P0-3 起加载中渲染共享骨架屏 —— 表头照常可见、不挂遮罩（原 v-loading 会把
+         表头与上一批行一起盖住）；加载完仍无数据才落回 Element 默认「暂无数据」 -->
+    <template #empty>
+      <slot name="empty">
+        <LoadingSkeleton v-if="loading" variant="table" :rows="5" :label="loadingText" />
+      </slot>
     </template>
   </el-table>
 </template>
@@ -121,12 +124,17 @@
 import { ref } from 'vue'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import { gradeClass, gradeTagType } from '@/utils/grade'
 
 defineProps({
   /** 病历行数组（SearchVO.Item[]） */
   rows: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
+  /**
+   * 加载中的说明文案。P0-3 起不再喂给 v-loading 遮罩（遮罩已移除），而是作为
+   * 骨架屏上方那句说明渲染（没传 `empty` 插槽时）。
+   */
   loadingText: { type: String, default: '正在读取病历…' },
   /** 是否显示多选列 */
   selectable: { type: Boolean, default: false },
@@ -134,6 +142,16 @@ defineProps({
   highlightCurrent: { type: Boolean, default: false },
   rowClassName: { type: [String, Function], default: '' },
   maxHeight: { type: [String, Number], default: 420 },
+  /**
+   * 定高：与 maxHeight **二选一**，传了它就用定高、忽略 maxHeight。
+   * 用途：卡片与兄弟组件等高、需要表格**撑满**卡内剩余高度时（如质控页「AI 预检列表」
+   * 与左侧「扣分构成」并排，结构化解析页左栏「选择病历」与右栏工作区等高）。
+   * maxHeight 只封顶不撑高 —— 数据不满时表格会缩回内容高，其余高度就空在卡片底部；
+   * 定高则表体始终占满，「空态」也在表体内居中。
+   * 传 `"100%"` 即可：Element Plus 把字符串原样写进根元素 style，高度由 CSS 解析 ——
+   * 前提是父容器高度确定（页面侧用 .fill-table 这类「flex 吃掉剩余空间」的容器保证）。
+   */
+  height: { type: [String, Number], default: '' },
   /** 操作列宽度：按钮多的一页给大一些 */
   actionWidth: { type: [String, Number], default: 90 },
   /**

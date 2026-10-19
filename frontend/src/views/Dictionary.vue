@@ -3,7 +3,7 @@
        页签：小组基线（只读）/ 提案审核 / 归档版本。
        批量导入与「我的词典」均已剥离为独立页——普通成员走导入页生成提案，
        管理员在那里还能选择直接生效；「我的词典」入口在页头引导条行末。 -->
-  <div>
+  <div class="dict-page">
     <!-- 页头：一句话交代三个页签各自管什么，避免新用户对着名词猜。
          页签划分依据是「谁能改」：词典查询=只读浏览（可切三层）；
          提案审核=把改动交给组长；归档版本=历史与回滚。
@@ -39,7 +39,7 @@
     <el-tabs v-model="tab" class="dict-tabs">
 
     <el-tab-pane label="词典查询" name="baseline">
-    <PanelCard :title="`词典查询（${typeLabel(typeKey)}）`">
+    <PanelCard :title="`词典查询（${typeLabel(typeKey)}）`" class="q-card">
       <div class="search-row">
         <!-- 只给 placeholder 的搜索框没有无障碍名称，补 aria-label
              （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
@@ -59,7 +59,12 @@
            原公式按 32px 估算，而本表未加 size="small"（表头与行高实测均为 40px），
            于是 20 条/页只放得下 16 行、表格内部仍滚 160px（M23 复测 2026-10-06 未过）。
            每页条数可调（20~200），行数多时由页面自身滚动 -->
-<el-table v-loading="loadingTerms" element-loading-text="正在查询术语…" :data="terms" border stripe style="margin-top: var(--sp-3)" :max-height="termsTableHeight">
+        <!-- P0-3：去掉 v-loading 遮罩（它把表头与上一页术语一起盖住了）。
+             加载中由下方 #empty 的 EmptyState 渲染骨架屏，表头保持可见 -->
+      <!-- 等高链：术语表吃满卡内剩余高度（原 :max-height 随每页条数硬算，
+           选少了卡底仍空一块）。height="100%"，当前页整铺开、行多时表体内滚 -->
+      <div class="fill-table">
+        <el-table :data="terms" border stripe height="100%">
           <!-- 空态解释「为什么空、怎么才有内容」：走下方 #empty 插槽；:empty-text 是死代码已删 -->
           <el-table-column prop="standardTerm" label="标准术语" min-width="240" />
         <el-table-column label="别名">
@@ -79,11 +84,14 @@
           <!-- P5.8：空态必须解释「为什么空 / 怎么才有内容」；加载失败与真为空分开 -->
           <EmptyState
             :failed="termsFailed"
+            :loading="loadingTerms"
+            loading-text="正在查询术语…"
             :text="emptyText"
             @retry="loadTerms(true)"
           />
         </template>
       </el-table>
+      </div>
       <!-- 分页：词典已从演示的十几条涨到上千条（如疾病 1357、证候 2080），
            一次全量渲染会卡且无法定位，故按页浏览 -->
       <el-pagination
@@ -119,7 +127,7 @@
     </el-tab-pane>
 
     <el-tab-pane label="归档版本" name="archives">
-    <PanelCard title="归档版本">
+    <PanelCard title="归档版本" class="arch-card">
       <div class="rv-row">
         <el-button size="small" :loading="archivesLoading" @click="loadArchives">刷新归档</el-button>
         <span class="tip">
@@ -129,8 +137,9 @@
           </template>
         </span>
       </div>
-      <el-table :data="archives" border size="small" max-height="220" style="margin-top: var(--sp-3)"
-        empty-text="暂无归档版本。基线第一次变更后会自动生成">
+      <div class="fill-table">
+        <el-table :data="archives" border size="small" height="100%"
+          empty-text="暂无归档版本。基线第一次变更后会自动生成">
         <el-table-column prop="versionNo" label="版本" width="80" />
         <el-table-column label="词条数" width="90">
           <template #default="{ row }">{{ row.termCount ?? '—' }}</template>
@@ -158,6 +167,7 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
     </PanelCard>
     </el-tab-pane>
     </el-tabs>
@@ -325,11 +335,8 @@ const termsFailed = ref(false)
 // 分页：page 从 1 起，size 为每页条数，total 为命中总数（驱动 el-pagination 算总页数）
 const page = ref(1)
 const size = ref(20)
-
-// M23：术语表高度跟随分页大小（表头 40 + 行高 40 × 当前页 + 余量 8）。
-// 行高取本表实际渲染值（该表未加 size="small"）；按 32 估算会让 20 条/页藏 4 行、内滚 160px。
-// 两个加数与 size 同源，任何一个写小都会让 max-height 矮于内容，滚动条就又回来了。
-const termsTableHeight = computed(() => 40 + (size.value || 10) * 40 + 8)
+// 术语表高度改由 .fill-table + height="100%" 在卡内吃满（等高链），
+// 不再按每页条数硬算 max-height（M23 那套随分页涨高的写法已被取代）。
 const total = ref(0)
 
 // 查询当前类型下的术语（关键字命中标准词或别名）
@@ -546,6 +553,63 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ===== 等高链（照 Qc.vue .grid-2 写法）=====
+   页头引导条/类型行/tab 头固定高度，剩下的垂直高度交给当前激活页签的卡片：
+   dict-page → dict-tabs → el-tabs__content → 激活 tab-pane → PanelCard(纵列弹性)
+   → panel-bd(纵列弹性) → .fill-table(flex:1) → el-table height="100%"。
+   链上任一环高度不定，百分比就退化为 auto、表格缩回内容高、卡底又空一块。 */
+.dict-page {
+  height: calc(100vh - 186px);
+  display: flex;
+  flex-direction: column;
+}
+.dict-tabs {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dict-tabs :deep(.el-tabs__content) {
+  /* EP 默认是 overflow:hidden 的 block：子 tab-pane 按内容 1027 高时会被剪裁成看不见的下半截
+     （裁内容，禁止）。改成 flex 列容器，让已有 flex:1;min-height:0 的激活 tab-pane 吃到确定高度 */
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* 未激活页签被 v-show 置 display:none（覆盖此处），激活页签才有这套 flex 生效 */
+.dict-tabs :deep(.el-tab-pane) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.q-card,
+.arch-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.q-card :deep(.panel-bd),
+.arch-card :deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.fill-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: var(--sp-3);
+}
+/* 词典范围弹窗：正文超高时弹窗内滚动（8 行通常不触发，留兜底），关闭叉号在右上角始终可见 */
+.layer-dialog :deep(.el-dialog__body) {
+  max-height: 72vh;
+  overflow: auto;
+}
+
 /* 类型 tab：激活态与下划线改用主题墨色，替换 Element Plus 默认蓝 */
 .dict-tabs {
   margin-bottom: var(--sp-1);

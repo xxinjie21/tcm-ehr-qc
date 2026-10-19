@@ -98,12 +98,14 @@
         <!-- 批次4：长任务要能一眼找到「哪些批次出过错」，不必逐条看状态 -->
         <el-checkbox v-model="onlyFailedTasks" size="small" style="margin-left: var(--sp-3)">只看有失败的</el-checkbox>
       </div>
-      <!-- V8b：同失败清单 —— 去掉写死的 max-height="260"，卡内不再自开滚动层，
-           表格随任务条数撑高，与 main 页内滚动合一；标题行的条数上限与截断说明保留。 -->
+      <!-- 2026-10-18 用户最新指令：恢复固定高度 + 表体内滚，不再随任务条数无限撑长
+           （覆盖早前 V8b「去掉 max-height、不自开滚动层」的旧决策）。
+           max-height 360：约 9 行小尺寸表格高，超过即表体内部滚动；标题行条数上限与截断说明保留。 -->
       <el-table
         :data="onlyFailedTasks ? batchTasks.filter((t) => t.failed > 0) : batchTasks"
         border
         size="small"
+        max-height="360"
       >
         <el-table-column label="提交时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
@@ -537,6 +539,26 @@ onBeforeUnmount(stopPoll)
 </script>
 
 <style scoped>
+/* ===== 留白·对称专项 =====
+   本面板嵌在 NlpExtract 页工作区（非 .page-fill 页），分区自上而下自然流式堆叠。
+   把面板接成纵列弹性链：若外层工作区把本卡拉高，.panel-bd 拿到确定高度。
+   最近任务表按 2026-10-18 用户最新指令恢复固定高度（max-height="360"）+ 表体内滚，
+   不再随任务条数无限撑长（覆盖 V8b 旧决策）；失败清单仍为折叠展开、不自开滚动层。
+   2026-10-18 用户方案「固定一边 + 滚动条」：.panel-bd 在右卡固定高度（约 1066px）内
+   justify-content:space-between 让首尾块贴卡顶/卡底、中间区块均分；内容超高时 overflow:auto 内滚。
+   本组件无 textarea、无 v-loading 遮罩（按钮用行内 :loading 小圈）。 */
+:deep(.panel) {
+  display: flex;
+  flex-direction: column;
+}
+:deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: auto;
+}
 .tip { line-height: 1.7; }
 .actions { margin-top: var(--sp-3); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .batch-filter {

@@ -6,7 +6,8 @@
     :model-value="modelValue"
     title="规则配置（改完点保存即生效）"
     width="min(1000px, 96vw)"
-    top="4vh"
+    top="6vh"
+    :close-on-click-modal="false"
     @update:model-value="(v) => emit('update:modelValue', v)"
   >
     <!-- 句子式编辑器：每段就是一句可读的话，直接在句子里改数字 / 选项，不暴露 JSON -->

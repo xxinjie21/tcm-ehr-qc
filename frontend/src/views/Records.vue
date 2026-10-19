@@ -40,7 +40,7 @@
             loading-text="正在检索病历…"
             selectable
             :row-class-name="rowClass"
-            :max-height="420"
+            :height="620"
             :action-width="150"
             @selection-change="onSelectionChange"
             @sort-change="onSortChange"
@@ -159,10 +159,8 @@
       <el-tab-pane label="单条新增病历" name="create" lazy>
         <PanelCard title="单条新增病历">
           <!-- 控件尺寸由 el-form 的 size="large" 决定（40px / 14px）。
-               ⚠️ 文本域的高度**不由 CSS 决定**：Element Plus 的 autosize 会写行内
-               style="height:…px"，行内样式压过任何 class 规则 —— 之前 CSS 里写的
-               min-height 完全没起作用。现病史/主诉/中医诊断这类多行字段靠
-               autosize 的 minRows:3 给到 3 行。 -->
+               多行字段高度由 v-autoheight 指令按内容自适应（不再用 Element autosize ——
+               实测它在病历载入 / 手动输入时都不撑高，内容超出就出内部滚动条）。 -->
           <el-form
             ref="createFormRef"
             class="compact-form"
@@ -190,6 +188,7 @@
                   >
                     <el-option label="男" value="男" />
                     <el-option label="女" value="女" />
+                    <el-option label="未知的性别" value="未知的性别" />
                   </el-select>
                   <el-date-picker
                     v-else-if="f.key === 'visitTime'"
@@ -202,9 +201,9 @@
                   <el-input
                     v-else
                     v-model="form[f.key]"
+                    v-autoheight
                     :type="f.multi ? 'textarea' : 'text'"
-                    :rows="f.multi ? 3 : undefined"
-                    :autosize="f.multi ? MULTI_AUTOSIZE : false"
+                    :rows="f.multi ? 2 : undefined"
                     :maxlength="f.max"
                     :show-word-limit="!!f.max"
                     clearable
@@ -224,13 +223,17 @@
 
   <!-- 失败行编辑并重传：字段名与导入列一致，可逐字段修正后单独重传 -->
   <el-dialog v-model="retryVisible" title="重传失败行" width="min(1000px, 94vw)" top="6vh">
-    <div class="tip">下面是失败的行（可修改后重传）。空字段会被忽略，重复类失败无法重传。</div>
-    <div v-for="(row, i) in retryRows" :key="i" class="retry-row">
-      <div class="rr-hd">第 {{ i + 1 }} 行</div>
-      <div class="rr-fields">
-        <div v-for="f in failFields" :key="f.key" class="rr-field">
-          <label>{{ f.label }}</label>
-          <el-input v-model="row[f.key]" size="small" clearable />
+    <!-- body 内部限高滚动：失败行很多时，超长内容在弹窗内滚动，footer（取消/重传）始终留在视口内。
+         与 RecordDetailDialog 的 .detail-2col 同一套写法（内层容器 max-height+overflow，而非改 el-dialog 自身） -->
+    <div class="retry-body">
+      <div class="tip">下面是失败的行（可修改后重传）。空字段会被忽略，重复类失败无法重传。</div>
+      <div v-for="(row, i) in retryRows" :key="i" class="retry-row">
+        <div class="rr-hd">第 {{ i + 1 }} 行</div>
+        <div class="rr-fields">
+          <div v-for="f in failFields" :key="f.key" class="rr-field">
+            <label>{{ f.label }}</label>
+            <el-input v-model="row[f.key]" size="small" clearable />
+          </div>
         </div>
       </div>
     </div>
@@ -258,7 +261,8 @@ import {
   importRecords, createRecord, searchRecords, countRecords, getRawRecord, deleteRecords, deleteRecordsByFilter, importRows
 } from '@/api/records'
 import { fmtDateTime, fieldOf } from '@/utils/format'
-import { fieldsWithWide, MULTI_AUTOSIZE } from '@/utils/recordFields'
+import { fieldsWithWide } from '@/utils/recordFields'
+import { vAutoheight } from '@/utils/autoheight'
 import VisitTimeCell from '@/components/cells/VisitTimeCell.vue'
 import AgeGenderCell from '@/components/cells/AgeGenderCell.vue'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
@@ -313,7 +317,7 @@ const hasFilter = computed(() => {
   return !!(query.department || query.grade || range || importRange)
 })
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(20)
 // 列表骨架统一走 usePagedList：本页失败**保留已有行**、但仍要标记失败
 // （空态据此区分「加载失败」与「确实无数据」），故 clearOnFailure: false
 const {
@@ -741,7 +745,7 @@ const FORM_RULES = {
     { required: true, message: '门诊号不能为空', trigger: 'blur' },
     { max: 50, message: '门诊号不超过 50 字', trigger: 'blur' }
   ],
-  gender: [{ pattern: /^(男|女)$/, message: '性别只能选「男」或「女」', trigger: 'change' }],
+  gender: [{ pattern: /^(男|女|未知的性别)$/, message: '性别只能选「男」「女」或「未知的性别」', trigger: 'change' }],
   age: [
     {
       validator: (rule, value, cb) => {
@@ -873,6 +877,9 @@ onMounted(async () => {
 }
 /* 重传弹窗：每行一段可编辑字段 */
 .retry-row { margin-bottom: var(--sp-3); }
+/* body 内部滚动容器：失败行极多时在弹窗内滚，footer 不被顶出视口。
+   top 6vh + 标题/footer 约占 190px，给 body 留约 70vh */
+.retry-body { max-height: 70vh; overflow-y: auto; }
 .retry-row .rr-hd { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
 .retry-row .rr-fields {
   display: grid;
@@ -885,7 +892,7 @@ onMounted(async () => {
   margin-top: 14px;
   padding: var(--sp-2) var(--sp-3);
   background: var(--danger-surface);
-  border: 1px solid #e3c3bb;
+  border: 1px solid var(--danger-border-soft);
   border-radius: 4px;
   font-size: var(--fs-xs);
   color: var(--danger);
@@ -912,8 +919,11 @@ onMounted(async () => {
   color: var(--text-sub-strong);
 }
 .result-hd { font-size: var(--fs-base); font-weight: bold; color: var(--ink); margin-bottom: var(--sp-3); }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-3); }
-.stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: var(--sp-3) var(--sp-4); text-align: center; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-3); }
+/* 等高：grid 默认 stretch 把三张卡拉到同一行高；卡内大数字+小字簇改为纵列弹性容器并垂直居中 ——
+   当某张卡的 label 换行变高（其余两张被拉平）时，簇居中而非顶在卡头、卡底留一大块空白。
+   不收缩矮栏：矮栏照样被拉到等高，只是把它内部的簇居中，不是把它压回去。 */
+.stat-item { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: var(--sp-3) var(--sp-4); text-align: center; display: flex; flex-direction: column; justify-content: center; }
 .stat-item .num { font-size: var(--fs-xl); font-weight: bold; color: var(--ink); }
 .stat-item .lbl { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-top: var(--sp-1); }
 .stat-item.green .num { color: var(--ink-mid); }

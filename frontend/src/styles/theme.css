@@ -40,6 +40,42 @@
   --danger-surface: #f7ece9;   /* 警示浅底 */
   --ochre-surface: #f3ecdf;    /* 赭石浅底（= --ochre-light） */
 
+  /* ===== 语义补全（P1 任务 8 · D 方案：取值一律不变，只补名字）=====
+     背景：全站 .vue 里 63 处颜色字面量，其中 15 处原本就等于已有令牌（直接换名）；
+     其余按用途归类到下面三组。所有取值与原字面量逐位相同 —— 本轮**不改任何颜色**，
+     只让「改色」有单一入口。图表色由 utils/chartTheme.js 读取同名令牌，避免 CSS/JS 两套色值漂移。 */
+  --link: #2b6cb0;                 /* 链接色（DictionaryImport 原 var(--link, #2b6cb0) 的兜底值） */
+  --danger-border-soft: #e3c3bb;   /* 警示浅边框（NlpExtract / Records / ReviewDetailPanel / StructuredDataCard 共 5 处；与 --el-color-danger-light-3 #d8a99f 不同，故不合并） */
+  --ochre-ink: #6b5a44;            /* 赭系次要文字（AuthShell / LlmConfigDialog） */
+  --ochre-strong: #8a6a44;         /* 赭系强调文字（Qc / QcDeductionDialog），比 --ochre-text #846440 更深 */
+
+  /* 侧栏文字阶梯（MainLayout 专用，4 档明度；底是墨绿侧栏，不能套白底文字令牌） */
+  --nav-text-strong: #dbe4de;
+  --nav-text: #d8dfd9;
+  --nav-text-weak: #c9c3b4;
+  --nav-accent-weak: #c9b99a;
+
+  /* 图表色（与 utils/chartTheme.js 一一对应；JS 侧不写 var()，由该模块读取） */
+  --chart-axis-line: #d8d2c4;
+  --chart-split-line: #efebe1;
+  --chart-axis-label: #4a4438;
+  --chart-series-ink: #4d6b58;
+  --chart-series-warn: #b8772f;
+
+  /* 组件专用色（单文件使用，登记在此以免再次散落；取值不变） */
+  --cmp-aii-skeleton: #e8e4da;          /* AiInterpretCard 骨架底 */
+  --cmp-aii-chip-miss-border: #e6c9c3;  /* AiInterpretCard 缺项 chip 边框 */
+  --cmp-aii-chip-core-border: #e2d3b8;  /* AiInterpretCard 核心要素 chip 边框 */
+  --cmp-auth-bg: #fffdf9;               /* AuthShell 登录页底 */
+  --cmp-qc-warn-border: #ecd9b0;        /* Qc 提示条边框 */
+  --cmp-review-warn-border: #e0cdb0;    /* ReviewDetailPanel 超期提示边框 */
+  --cmp-review-divider: #eee4d3;        /* ReviewDetailPanel 分隔线 */
+  --cmp-review-highlight: #faf6ee;      /* ReviewDetailPanel 高亮底 */
+  --cmp-review-ok-border: #cddcd2;      /* ReviewDetailPanel 通过态边框 */
+  --cmp-sdc-popper-ink: #2b2b2b;        /* StructuredDataCard 浮层正文 */
+  --cmp-sdc-popper-key: #8a8578;        /* StructuredDataCard 浮层键名 */
+  --cmp-dash-tile-bg: #f0ede4;          /* Dashboard 数据块底 */
+
   /* 间距五档（P4.14）：gap / padding / margin 只用这五档 */
   --sp-1: 4px;
   --sp-2: 8px;
@@ -209,6 +245,30 @@ body {
 .tip {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
+}
+
+/* ===== 页面级范围查询条 .scope-bar（P0-1）=====
+   每页内容区**最顶部**的一条筛选/范围区：全宽、紧贴第一个面板之前，六页同一形态。
+   此前同样的东西有四种实现、四种间距与宽度：Qc 自己的 .scope-bar + .filter-bar、
+   Governance 的 .scope-bar、Review 的 .rv-tools、Dashboard 的 StatsFilter 自带卡片。
+   这里收敛为全局基类，页面统一用 <ScopeBar> 组件（components/ScopeBar.vue）承载；
+   行内排布 = 控件底对齐（与 RangeFilter 内部的 align-items:flex-end 同口径），窄屏自动换行。 */
+.scope-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: var(--sp-4) var(--sp-5);
+  margin-bottom: var(--sp-3);
+}
+/* 条内说明文字：**不**强制独占一行。
+   1680 档实测：强制换行（flex: 1 1 100%）时「重置」会单独占第二行、说明占第三行，
+   整条 172px；让它跟着换行的控件同处一行则为 124px（省 48px 纵向空间）。 */
+.scope-bar > .tip {
+  margin-left: var(--sp-1);
 }
 
 /* ===== 表格（原型表格风格） =====
@@ -490,6 +550,92 @@ body {
   margin: -6px;
 }
 
+/* ===== 加载指示（v-loading）=====
+   全站 13 处 v-loading 此前一律吃 Element Plus 默认外观：纯白 0.9 遮罩 + 40px 灰圈，
+   落在宣纸底上发灰；而挂在**很小的容器**上时（如治理页那簇 30px 高的统计数字），
+   圈和「正在…」文字会比容器还大、直接压住被加载的数字（用户反馈的「位置与其他内容重合」）。
+   这里统一成主题语言：遮罩改宣纸底半透明（保留「内容正在被挡住」的语义，但不刺眼），
+   圈改墨绿、缩小到 28px，文字墨绿 13px。
+   ⚠️ 小容器（高度 < ~56px）不要再挂 v-loading —— 遮罩只有那么大，圈仍会溢出。
+   这类位置改挂行内圈 .spin-inline（见下），圈占了位、不遮挡。 */
+:root:root .el-loading-mask {
+  background-color: rgba(245, 243, 237, 0.72);
+  /* 防「闪白」：多数请求 < 150ms 就回来了，遮罩刚出现就消失 —— 那一下闪烁比不加动效更烦。
+     延迟 150ms 再淡入：快请求期间遮罩根本来不及显示，慢请求仍能看见「正在加载」。
+     用 backwards 填充，延迟期间停在 opacity:0（动画优先级高于 Element 自己的
+     .el-loading-fade 过渡，结束后自动交还给过渡值 1，不会卡在透明） */
+  animation: mask-in 150ms var(--ease-out) 150ms backwards;
+}
+@keyframes mask-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+:root:root .el-loading-spinner .circular {
+  width: 28px;
+  height: 28px;
+}
+:root:root .el-loading-spinner .path {
+  stroke: var(--ink-mid);
+  stroke-width: 3.2;
+}
+:root:root .el-loading-spinner .el-loading-text {
+  color: var(--text-sub-strong);
+  font-size: var(--fs-xs);
+}
+
+/* 行内小转圈：给「高度不足、挂整块遮罩会压住内容」的位置用（统计数字簇等）。
+   只占 14px、跟着文字排，不遮不压；颜色沿用主色。 */
+.spin-inline {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink-mid);
+  border-radius: 50%;
+  animation: spin-inline 0.7s linear infinite;
+  vertical-align: -2px;
+}
+@keyframes spin-inline {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== 共享骨架屏 .load-skel（P0-3，组件 components/LoadingSkeleton.vue）=====
+   为什么要有它：此前数据区一律挂 `v-loading` 遮罩 —— 遮罩压在容器上，
+   把**已经渲染出来的文字**（统计数字、表头、上一批结果）也盖住了，正是要避免的「重合」。
+   骨架屏只占「还没有内容可看」的位置：有内容时不动它（刷新时用 .spin-inline 在角落转圈），
+   没内容时用骨架条把将来的形状先占出来，读起来是「内容正在来」而不是「白屏 / 遮住」。
+   视觉语言与既有两处骨架屏（AiInterpretCard .aii-skeleton、StandardizationReport .sk-*）
+   同口径：**纯色块 + opacity 呼吸**，1.2s ease-in-out infinite。
+   ⚠️ 项目硬规则：禁止渐变 —— 所以不要改成 background-image/线性渐变扫光。
+   颜色只走既有令牌（--line-soft），不再引第三种骨架底色
+   （此前两处分别是 #e8e4da / #f0ede4，本组件起统一到令牌）。 */
+.load-skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+}
+.load-skel__label {
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+  margin-bottom: var(--sp-1);
+}
+.load-skel__row {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--line-soft);
+  animation: sk 1.2s ease-in-out infinite;
+}
+/* 变体只改行高：表格行更高、图表块更厚，占位形状贴近真实内容 */
+.load-skel--table .load-skel__row { height: 18px; }
+.load-skel--chart .load-skel__row { height: 22px; }
+.load-skel--form .load-skel__row { height: 32px; border-radius: 6px; }
+@keyframes sk {
+  0%,
+  100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 /* ===== 视觉隐藏（给屏幕阅读器的文本，不占视觉空间） ===== */.visually-hidden {
   position: absolute;
   width: 1px;
@@ -711,6 +857,26 @@ aside :focus-visible,
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+   /* 例外：**「正在进行」的转圈**（查询按钮的 loading 图标 / 遮罩转圈 / 行内小圈 / 骨架呼吸）。
+      上面那条把全站动画压到 0.01ms 一次，转圈会停住 —— 但转圈不是装饰，是状态指示：
+      停住会被读成「卡死了、没反应」，反而制造焦虑。这类旋转幅度小、无空间位移，
+      前庭负担极低，WCAG 2.3.3（动画交互）也把「承载状态的动效」排除在外。
+      骨架屏同理：它整块就是「正在加载」这一个信息，停住等于没有加载态（P0-3）。
+      这里只把上面关掉的两项按元素本身的时长还原（图标/遮罩 2s、行内小圈 0.7s、骨架 1.2s），
+      不改外观、也不放慢。 */
+  .el-icon.is-loading,
+  .el-loading-spinner .circular,
+  .el-loading-spinner .path,
+  .spin-inline,
+  .load-skel__row {
+    animation-iteration-count: infinite !important;
+  }
+  .el-icon.is-loading,
+  .el-loading-spinner .circular { animation-duration: 2s !important; }
+  .el-loading-spinner .path { animation-duration: 1.5s !important; }
+  .spin-inline { animation-duration: 0.7s !important; }
+  .load-skel__row { animation-duration: 1.2s !important; }
 }
 
 /* P2-16（2026-10-05）：补「浅暖分隔线」token。

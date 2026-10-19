@@ -1,5 +1,20 @@
 <template>
   <div class="std-report">
+    <!-- 范围查询（P0-1）：原先嵌在报告头卡内（.rh-tools），与其余页「内容区最顶部一条」
+         的位置不一致。现提到报告头之前，用全站共享的 ScopeBar + RangeFilter：
+         六页同一位置、同一外形。近一年/近三年是范围的快捷选法，同属筛选、一起放在条内；
+         「导出 CSV」是业务动作（不改变筛选），留在报告头右侧。 -->
+    <ScopeBar>
+      <RangeFilter v-model="filters" :show-grade="false" :show-import="true" />
+      <el-button size="default" :disabled="loading" @click="quickRange(1)">近一年</el-button>
+      <el-button size="default" :disabled="loading" @click="quickRange(3)">近三年</el-button>
+      <el-button type="primary" size="default" :loading="loading" @click="loadReport">
+        {{ loadError ? '重试' : '查 询' }}
+      </el-button>
+      <el-button size="default" :disabled="loading" @click="resetFilters">重置</el-button>
+      <span class="tip">范围对本页全部指标与图表生效</span>
+    </ScopeBar>
+
     <!-- 报告头：一句话结论 + 统计口径 + 时间区间 / 刷新 / 导出，全部收进一张卡。
          此前「质控门禁条 / 加载失败条 / 数据来源条 / 时间工具条 / 结论条」是五条各自
          带左边框的长横幅，叠在正文顶部像五道横杠。现合并为单一头部：
@@ -25,19 +40,8 @@
         </div>
       </div>
 
-      <!-- 范围查询：科室 / 导入时间 / 就诊时间，与病历数据、质控等页同一套 RangeFilter。
-           报告不按分级收窄（分级是质控结论，不是报告的分析维度），故隐藏分级选择器。
-           默认口径＝今天导入（不分科室）：importRange 下推 SQL 的 records.create_time；
-           「就诊时间」是另一个独立维度（start/end，Java 侧按 visit_time 过滤并算 excluded），
-           两维可同时生效、取交集。 -->
+      <!-- P0-1：范围查询与查询/重置已上移到页首 ScopeBar；此处只留报告自身的动作 -->
       <div class="rh-tools">
-        <RangeFilter v-model="filters" :show-grade="false" :show-import="true" />
-        <el-button size="default" :disabled="loading" @click="quickRange(1)">近一年</el-button>
-        <el-button size="default" :disabled="loading" @click="quickRange(3)">近三年</el-button>
-        <el-button type="primary" size="default" :loading="loading" @click="loadReport">
-          {{ loadError ? '重试' : '查 询' }}
-        </el-button>
-        <el-button size="default" :disabled="loading" @click="resetFilters">重置</el-button>
         <el-button size="default" :loading="exporting" @click="handleExport">导出 CSV</el-button>
       </div>
 
@@ -165,6 +169,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
+import ScopeBar from '@/components/ScopeBar.vue'
 import StandardizationDetails from '@/components/StandardizationDetails.vue'
 import StandardizationCharts from '@/components/StandardizationCharts.vue'
 import { getStandardizationReport, exportStandardizationReport } from '@/api/stats'
@@ -799,6 +804,11 @@ onMounted(() => {
   /* P2-1：容器类 6px */
   border-radius: 6px;
   background: var(--surface);
+  /* 留白·对称：卡内 label / 大数字 / note 三段在固定高度内垂直分布，
+     不再顶在卡头、底部留一大块空。骨架 .kpi-skel 自身 display:block 覆盖，不受影响。 */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 .kpi.warn { border-left: 3px solid var(--ochre); }
 .kpi.ok { border-left: 3px solid var(--success); }

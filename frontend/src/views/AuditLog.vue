@@ -2,11 +2,11 @@
   <!-- 操作日志页：筛选 + 分页表格 + 导出 CSV（无日志删除入口）
        根节点 .page-fill：短内容时卡片撑到主区底部（V6），不再裸露下半屏纸底 -->
   <div class="page-fill">
-    <PanelCard title="操作日志">
+    <PanelCard title="操作日志" class="log-card">
       <div class="filter-row">
         <!-- 这两个控件只有 placeholder、没有视觉标签，补 aria-label
              （Chrome 的「No label associated with a form field」检查不认 placeholder） -->
-        <el-select v-model="query.action" aria-label="操作类型" placeholder="操作类型" clearable style="width: 150px">
+        <el-select v-model="query.action" aria-label="操作类型" placeholder="操作类型" clearable style="width: 140px">
           <el-option v-for="a in actionOptions" :key="a" :label="a" :value="a" />
         </el-select>
         <el-input
@@ -49,7 +49,12 @@
            去掉写死的 max-height="520"（审查报告 V6）：520 在默认 10 条/页时根本触不到、
            形同虚设，调到 50 条/页时又变成「页内滚动 + 卡内滚动」两层嵌套。
            行数由分页控制（10/20/50），超长时统一交给 main 这一个滚动层。 -->
-      <el-table v-loading="loading" element-loading-text="正在读取操作日志…" :data="logs" border stripe style="margin-top: var(--sp-3)" @row-click="onRowClick">
+      <!-- P0-3：去掉 v-loading 遮罩（它把表头与上一批日志一起盖住了）。
+           加载中由下方 #empty 的 EmptyState 渲染骨架屏，表头保持可见。 -->
+      <!-- 等高链：.fill-table 吃掉卡内剩余高度，表格 height="100%" 撑满，
+           短列表时空白落在表体内（不再堆在分页下面留一大块卡底） -->
+      <div class="fill-table">
+        <el-table :data="logs" border stripe height="100%" @row-click="onRowClick">
         <el-table-column label="操作时间" width="170">
           <template #default="{ row }">{{ fmtDateTime(row.logTime) }}</template>
         </el-table-column>
@@ -84,11 +89,14 @@
         <template #empty>
           <EmptyState
             :failed="logFailed"
+            :loading="loading"
+            loading-text="正在读取操作日志…"
             :text="logFailed ? '日志加载失败' : '暂无日志记录'"
             @retry="loadLogs"
           />
         </template>
       </el-table>
+      </div>
 
       <el-pagination
         v-model:current-page="query.page"
@@ -256,5 +264,35 @@ onMounted(() => {
   gap: var(--sp-3);
   align-items: center;
   flex-wrap: wrap;
+}
+/* 等高链（照 Qc.vue .grid-2 写法）：page-fill 已把卡拉到主区底部，
+   卡本身改纵列弹性容器，正文拿到确定高度后再把高度传给吃满的表格。
+   环上任一断了都会让高度退化为 auto、表格缩回内容高、卡底又空一块。 */
+/* 关键：全局 .page-fill 用的是 min-height，min-height 不是确定高度——内容一超过它，
+   容器就按内容长高，flex:1 子项不再「填充剩余」，el-table height="100%" 解析到 auto
+   父级退回内容高、整卡被撑出过视口。这里本页覆写为**确定 height**，让 flex:1 在
+   固定高度内封顶：短列表表格吃满空白，行多时表体内滚、分页与卡底都留在视口内。 */
+.page-fill {
+  height: calc(100vh - 186px);
+}
+.log-card {
+  display: flex;
+  flex-direction: column;
+  /* flex 子项默认 min-height:auto 禁止收缩：卡片 min-content 874 > 容器 802 会撑出容器断链。
+     置 0 让卡片被 .page-fill 的确定高度压住，再逐层下传 */
+  min-height: 0;
+}
+.log-card :deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+/* 表格吃掉卡内剩余高度；margin-top 承接筛选条/口径说明与表格的间距 */
+.fill-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: var(--sp-3);
 }
 </style>

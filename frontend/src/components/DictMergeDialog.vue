@@ -285,4 +285,11 @@ const confirmMerge = () => {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
 }
+/* 弹窗内容（概览 + 两张差异表）超长时在弹窗体内滚动：
+   body 封顶 calc(100vh - 210px)（≈ 顶部 6vh + 标题 + 页脚 + 内边距），
+   取消 / 确认合并按钮始终钉在弹窗底部、不被顶出视口。 */
+.merge-dialog :deep(.el-dialog__body) {
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
+}
 </style>

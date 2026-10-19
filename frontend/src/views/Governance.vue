@@ -6,11 +6,19 @@
          统计的加载 / 失败态（含重试按钮）原样保留，但只挂在数字组上：
          给整条加 loading 遮罩会让统计刷新期间范围筛选也点不了。 -->
     <section class="scope-bar">
-      <div v-loading="statsLoading" element-loading-text="正在统计标准化情况…" class="gs-group">
+      <div class="gs-group" :class="{ 'is-loading': statsLoading }">
         <span class="gs" title="三张卡只统计「质控合格」的病历；清洗也默认在合格范围内进行（可在下方「分级」里改），因此「清洗总病历」不会超过合格数">
           <b>{{ stats.qualified ?? 0 }}</b> 质控合格病历</span>
         <span class="gs"><b>{{ stats.pendingGovern ?? 0 }}</b> 待清洗</span>
         <span class="gs"><b>{{ stats.governedCount ?? 0 }}</b> 已清洗</span>
+        <!-- 加载态改行内小圈（原 v-loading 挂在这 30px 高的簇上，整块遮罩压住了数字）；
+             数字同时置灰，表示「这是旧值、正在刷新」。
+             出现/消失走全站共享的 panel-fade 纯淡入淡出，不在数字后面硬弹一个图标 -->
+        <Transition name="panel-fade">
+          <span v-if="statsLoading" class="gs-loading">
+            <i class="spin-inline" aria-hidden="true"></i>统计中…
+          </span>
+        </Transition>
         <!-- 失败态与「确实为 0」区分开，避免用户把旧值当最新结果-->
         <span v-if="statsFailed" class="gs-fail">
           统计加载失败{{ statsLoadedAt ? `（上次成功 ${statsLoadedAt}）` : '' }}
@@ -173,40 +181,11 @@
           </el-radio-group>
         </div>
         <div>
-          <label for="ex-department">科室</label>
-          <el-select id="ex-department" v-model="filters.department" placeholder="全部科室" clearable style="width: 130px">
-            <el-option v-for="d in departments" :key="d" :label="d" :value="d" />
-          </el-select>
-        </div>
-        <div>
-          <!-- 同 RangeFilter：范围选择器的 id 必须传数组（内部两个 input）；
-               aria-label 由 Picker 透传给 PickerRangeTrigger，会同时落到起止两个框上 -->
-          <label for="ex-date-start">就诊时间</label>
-          <el-date-picker
-            :id="['ex-date-start', 'ex-date-end']"
-            aria-label="就诊时间"
-            v-model="filters.dateRange"
-            type="daterange"
-            value-format="YYYY-MM-DD"
-            start-placeholder="开始"
-            end-placeholder="截止"
-            style="width: 240px"
-          />
-        </div>
-        <div>
-          <label for="ex-import-start">导入时间</label>
-          <!-- 与上方 RangeFilter 的「导入时间」同一字段（filters.importRange），
-               这里只是同一份状态的第二个入口：导出卡片有自己的控件排布，不能只靠上方那个。 -->
-          <el-date-picker
-            :id="['ex-import-start', 'ex-import-end']"
-            aria-label="导入时间"
-            v-model="filters.importRange"
-            type="daterange"
-            value-format="YYYY-MM-DD"
-            start-placeholder="开始"
-            end-placeholder="截止"
-            style="width: 240px"
-          />
+          <!-- P0-1：这里原先是自己写的一套范围控件（ex-department 130px + 两个 daterange），
+               绑的还是同一份 filters —— 同一功能一页两实现、两尺寸（130 vs 140/240）。
+               现直接复用页首同一个 RangeFilter：同一组件、同一外形、同一份状态，
+               两个入口改任意一个，另一边立刻同步。 -->
+          <RangeFilter v-model="filters" :show-grade="false" />
         </div>
         <el-button @click="handlePreview" :loading="preview.loading">预览数据集</el-button>
         <el-button type="primary" :loading="exporting" @click="handleExport">导出下载</el-button>
@@ -297,7 +276,6 @@
 // 数据治理页：在「当前范围」内执行数据清洗与术语归一，并把质控合格病历导出为标准数据集。
 // 设计取舍：清洗只做去重标记 / 字段清理 / 空值规整 / 脏数据隔离 / 术语归一，既不删除病历、
 // 也不填充医生未书写的内容；导出恒只取质控合格病历，分级筛选只作用于清洗、不影响导出范围。
-import { useDepartments } from '@/composables/useDepartments'
 import { reactive, ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
@@ -605,13 +583,11 @@ const reExport = async (entry) => {
   }
 }
 
-// 导出区科室选项取后端实际值，避免写死科室与库中数据对不上
-// 科室下拉：收敛到 useDepartments（Promise 单例缓存，与 Dashboard/RangeFilter 共用）
-const { departments, reload: loadDepartments } = useDepartments()
+// 导出区科室选项由复用的 RangeFilter 自己加载（组件内 useDepartments 单例缓存），
+// 本页不再单独拉一份 —— P0-1 把导出区的手写范围控件换成了同一个 RangeFilter。
 
 onMounted(() => {
   loadStats()
-  loadDepartments()
   loadExportHistory()
 })
 </script>
@@ -640,6 +616,19 @@ onMounted(() => {
 .gs-fail {
   font-size: var(--fs-xs);
   color: var(--danger);
+}
+/* 刷新中：数字置灰（提示是旧值）+ 尾部一个行内小圈。整簇高度只有 30px 左右，
+   用不了整块 v-loading 遮罩，所以走 .spin-inline */
+.gs-group.is-loading .gs b {
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+}
+.gs-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
 }
 
 /* 当前范围条：合并后承载左数字组 + 右范围控件两簇 */
@@ -710,7 +699,9 @@ onMounted(() => {
 }
 .flow-step {
   display: flex;
-  align-items: center;
+  /* 2026-10-18：align-items:center → stretch。原居中使各卡按自身内容高在行内垂直错落、说明一行/两行卡高不一；
+     stretch 配合 .flow-wrapper 的 align-items:stretch，5 张卡全部拉到最高卡等高、底边对齐 */
+  align-items: stretch;
   flex: 1 1 0;
   gap: 6px;
   min-width: 0;
@@ -730,6 +721,11 @@ onMounted(() => {
   font-family: inherit;
   color: inherit;
   width: 100%;
+  /* 等高对称：.flow-wrapper/.flow-step 已 stretch 让五张卡等高；卡内（序号圆/名称/说明）
+     纵列堆叠，数字圆与名称自上而下同起点，说明由 .step-desc 的 margin-top:auto 沉底贴卡底 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .step-card:hover {
   transform: translateY(-2px);
@@ -804,7 +800,10 @@ onMounted(() => {
 }
 /* 每步的一句话解释：卡内常显，不再收进折叠区 */
 .step-desc {
-  margin-top: 6px;
+  /* 2026-10-18：margin-top:auto 把说明沉底锚定卡底（一行/两行说明的卡，数字与名称位置完全一致）；
+     padding-top:6px 保留原视觉间距 */
+  margin-top: auto;
+  padding-top: 6px;
   font-size: var(--fs-xs);
   line-height: 1.6;
   color: var(--text-sub-strong);
@@ -869,7 +868,9 @@ onMounted(() => {
 }
 .clean-stats {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  /* minmax(0,1fr) 允许列收缩，长 label（如「含人工修改·已跳过」）换行时不撑破网格；
+     行内默认 align-items:stretch 把六张卡拉到同一高度 */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--sp-3);
 }
 .stat-item {
@@ -878,6 +879,11 @@ onMounted(() => {
   border-radius: 6px;
   padding: var(--sp-4) var(--sp-4);
   text-align: center;
+  /* 等高对称：某张卡 label 换行变高时，其余卡被拉平，大数字+小字簇垂直居中，
+     不再顶在卡头、卡底留白（不收缩矮栏） */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .stat-item .num {
   font-size: var(--fs-xl);
@@ -1008,6 +1014,6 @@ label,
   .step-arrow {
     display: none;
   }
-  .clean-stats { grid-template-columns: repeat(3, 1fr); }
+  .clean-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 </style>

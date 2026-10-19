@@ -29,7 +29,10 @@
     <!-- 左右两栏：原先 7 个表单项纵向堆叠，窗口一矮就要滚动才能
          填到最后一项、也看不到探测结果。改为左「通道与接入」/ 右「模型参数 + 探测结果」，
          一屏内可填完并即时看到连接是否可用 -->
-    <div v-loading="loading" element-loading-text="正在读取模型配置…" class="llm-body">
+    <div class="llm-body">
+      <!-- 加载态：骨架占位（P0-3），不挂 v-loading 遮罩（遮罩会盖住表单区） -->
+      <LoadingSkeleton v-if="loading" variant="form" :rows="6" label="正在读取模型配置…" />
+      <template v-else>
       <div class="llm-col">
         <div class="col-hd">通道与接入</div>
         <el-form label-position="top" class="llm-form">
@@ -127,6 +130,7 @@
           点左下「测试连接」可就地看到结果，不必先保存
         </div>
       </div>
+      </template>
     </div>
 
     <template #footer>
@@ -143,6 +147,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getLlmConfig, updateLlmConfig, testLlmConfig } from '@/api/llm'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import { apiErrorMessage } from '@/utils/errorMessage'
 
 // 常用模型（可选择或手输；避免用户不知道填什么）
@@ -286,7 +291,7 @@ async function handleSave() {
   background: var(--ochre-light);
   font-size: var(--fs-xs);
   line-height: 1.8;
-  color: #6b5a44;
+  color: var(--ochre-ink);
 }
 /* 读配置 / 保存失败时的告警条 */
 .llm-warn {
@@ -305,16 +310,22 @@ async function handleSave() {
   color: var(--ink);
 }
 
-/* 左右两栏：窄屏（<720px）自动收为单栏，不产生横向滚动 */
+/* 左右两栏：窄屏（<720px）自动收为单栏，不产生横向滚动。
+   等高专项：由 flex + align-items:flex-start（矮栏收缩、底部留白）改为 grid，
+   align-items 取默认 stretch —— 行高随较高的左栏走，右栏被拉到同高，矮栏底部留白消除。 */
 .llm-body {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--sp-5);
-  align-items: flex-start;
+  /* 内容超长时弹窗内部滚动，页脚按钮始终可见（与规则配置弹窗同策略） */
+  max-height: 72vh;
+  overflow-y: auto;
 }
-/* flex:1 + min-width:0：两栏等宽且可收缩，长模型名不会撑破一栏 */
+/* min-width:0：长模型名不会撑破一栏；纵列容器让右栏结果块可沉底分布 */
 .llm-col {
-  flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 /* 右栏左侧的分隔线（窄屏收单栏时在媒体查询里去掉） */
 .llm-col + .llm-col {
@@ -323,7 +334,7 @@ async function handleSave() {
 }
 @media (max-width: 900px) {
   .llm-body {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 0;
   }
   .llm-col + .llm-col {
@@ -398,6 +409,11 @@ async function handleSave() {
   line-height: 1.8;
   word-break: break-all;
 }
+/* 等高专项：右栏被 grid stretch 拉到与左栏同高后，探测结果块沉到栏底，
+   避免结果块与表单项挤在栏顶、栏底空一截（窄屏收单栏时无多余空间，auto 退化为 0） */
+.llm-col:last-child .llm-result {
+  margin-top: auto;
+}
 .llm-result.is-ok {
   border-left: 3px solid var(--ink-mid);
   background: var(--ink-light);
@@ -406,7 +422,7 @@ async function handleSave() {
 .llm-result.is-bad {
   border-left: 3px solid var(--danger);
   background: var(--danger-surface);
-  color: #8a3d33;
+  color: var(--el-color-danger-dark-2);
 }
 .llm-result.is-idle {
   border-style: dashed;

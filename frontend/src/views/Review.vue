@@ -4,12 +4,26 @@
          默认「不限」：复核任务是跨导入日期的积压队列，预收窄会把历史积压藏起来。
          范围对统计卡与任务列表同时生效 —— 卡片是「点进去看到的队列」的入口，
          数字必须与点击后的列表一致（「指标即入口」口径）。 -->
-    <div class="rv-tools">
+    <ScopeBar>
       <RangeFilter v-model="urlFilters" :show-grade="false" />
-      <el-button type="primary" size="small" :loading="loading || statsLoading" @click="applyFilters">查 询</el-button>
-      <el-button size="small" :disabled="loading || statsLoading" @click="resetFilters">重置</el-button>
+      <!-- P0-1：状态与「只看超期」原在卡内 .rv-bar，与页首范围筛选分两处维护 ——
+           一页两套筛选、动线割裂。现与范围同轴收进这一条：筛选只有一处，
+           卡片里只留「刷新 / 提示 / 数据新鲜度」这类列表自身的动作与说明。 -->
+      <div class="rv-item">
+        <span class="rv-lbl">状态</span>
+        <el-select v-model="status" aria-label="状态" style="width: 140px" @change="loadTaskDebounced">
+          <el-option label="待复核" value="待复核" />
+          <el-option label="已完成" value="已完成" />
+        </el-select>
+      </div>
+      <!-- 批次9：worklist「只需我处理」—— 只看已超期且仍待复核的任务。过滤在服务端做
+           （overdueOnly），不是在前端筛当前页：否则用户看到一片干净、其它页却还有超期任务，
+           等于状态撒谎。上与范围同轴放在页首筛选条内。 -->
+      <el-checkbox v-model="overdueOnly" class="rv-check" @change="loadTaskDebounced">只看超期未复核</el-checkbox>
+      <el-button type="primary" size="default" :loading="loading || statsLoading" @click="applyFilters">查 询</el-button>
+      <el-button size="default" :disabled="loading || statsLoading" @click="resetFilters">重置</el-button>
       <span class="tip">范围对统计卡与任务列表同时生效</span>
-    </div>
+    </ScopeBar>
     <!-- 28.18：复核页统计卡 —— 原来这一屏只有「状态下拉」，进来看不出待办总量与超期压力。
          卡片可点：点了直接切到对应筛选（沿用看板「指标即入口」的口径）。 -->
     <div class="rv-stats">
@@ -26,27 +40,18 @@
          范围查询在页首（RangeFilter），对统计卡与本列表同时生效。 -->
     <PanelCard title="待复核任务列表">
       <div class="rv-bar">
-        <!-- 这里的视觉标签是普通 span（不是 <label for>），控件本身没有无障碍名称，
-             Chrome 会报「No label associated with a form field」；补 aria-label 即可 -->
-        <span>状态</span>
-        <el-select v-model="status" size="small" aria-label="状态" style="width: 130px" @change="loadTaskDebounced">
-          <el-option label="待复核" value="待复核" />
-          <el-option label="已完成" value="已完成" />
-        </el-select>
+        <!-- P0-1：状态下拉与「只看超期」已上移到页首 ScopeBar（与范围同轴），
+             卡片里只保留列表自身的动作与说明 -->
         <el-button size="small" @click="load()">刷新</el-button>
         <span class="tip">超时仅视觉提醒、不自动流转；点击「进入复核」在下方展开对照</span>
-        <!-- 批次9：worklist 入口 —— 复核员真正关心的是「现在必须处理哪几条」 -->
-        <el-checkbox v-model="overdueOnly" size="small" @change="loadTaskDebounced">只看超期未复核</el-checkbox>
         <FreshnessTag :time="loadedAt" reason="数据为本次页面读取时刻；解析/质控更新后请刷新" />
       </div>
 
       <el-table
-        v-loading="loading"
-    element-loading-text="正在读取待复核任务…"
         :data="rows"
         border
         size="small"
-        max-height="420"
+        :height="630"
         :row-class-name="rowClass"
         highlight-current-row
       >
@@ -72,7 +77,7 @@
         </el-table-column>
         <template #empty>
           <!-- 28.13：空态补行动引导 —— 复核任务不是凭空出现的，说清它从哪来、下一步点哪 -->
-          <EmptyState text="暂无复核任务">
+          <EmptyState :loading="loading" text="暂无复核任务">
             <div class="empty-hint">
               复核任务由质控评分产生：先到「质控校验」页对范围内的病历执行重算，
               分级为「待复核」的任务会自动出现在这里。
@@ -126,6 +131,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import FreshnessTag from '@/components/FreshnessTag.vue'
 import ReviewDetailPanel from '@/components/ReviewDetailPanel.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
+import ScopeBar from '@/components/ScopeBar.vue'
 import StatCard from '@/components/StatCard.vue'
 
 // 时间格式化：去掉 T、截到分钟；空值返回「—」，避免列表里出现 Invalid Date
@@ -139,7 +145,7 @@ const overdueOnly = ref(false)
 // P5.2：因关联病历已删而跳过的任务数
 const skippedMissing = ref(0)
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(20)
 // ===== 筛选状态（URL 可分享）=====
 // 对标 E5「可分享视图」：这一步必须放在筛选状态声明之后、onMounted 之前。
 // 本页的筛选 = 两个独立 ref（status / overdueOnly）+ 范围三键（department / dateRange /
@@ -253,14 +259,17 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 页首范围查询条：与 RangeFilter 同一行，控件底对齐（与质控页 .filter-bar 同口径） */
-.rv-tools {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-  margin-bottom: 10px;
+/* P0-1：页首筛选条改用共享 ScopeBar（.scope-bar 基类在 theme.css），
+   这里只补本页「状态」这项次级筛选的标签样式 —— 与 RangeFilter 的
+   `.rf-item label` 同口径（标签压在控件上方、字号 --fs-xs），保证同条内两项对齐。 */
+.rv-item .rv-lbl {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-sub-strong);
+  margin-bottom: 3px;
 }
+/* 勾选框没有「上方标签」，底对齐会与 32px 控件错位，单独下压一点对齐文字行 */
+.rv-check { margin-bottom: var(--sp-1); }
 /* 28.18：三张概览卡等宽排一行（窄屏换行） */
 .rv-stats {
   display: grid;

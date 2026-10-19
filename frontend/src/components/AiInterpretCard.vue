@@ -171,7 +171,7 @@ watch(() => props.recordId, () => {
   height: 12px;
   border-radius: 2px;
   margin-bottom: var(--sp-2);
-  background: #e8e4da;
+  background: var(--cmp-aii-skeleton);
   animation: sk 1.2s ease-in-out infinite;
 }
 .aii-skeleton .sk-grid {
@@ -183,7 +183,7 @@ watch(() => props.recordId, () => {
 .aii-skeleton .sk-box {
   height: 40px;
   border-radius: 4px;
-  background: #e8e4da;
+  background: var(--cmp-aii-skeleton);
   animation: sk 1.2s ease-in-out infinite;
 }
 @keyframes sk {
@@ -273,8 +273,8 @@ watch(() => props.recordId, () => {
   background: var(--paper);
   color: var(--ink);
 }
-.chip.miss { color: var(--danger); border-color: #e6c9c3; }
-.chip.core { color: var(--ochre-text); border-color: #e2d3b8; }
+.chip.miss { color: var(--danger); border-color: var(--cmp-aii-chip-miss-border); }
+.chip.core { color: var(--ochre-text); border-color: var(--cmp-aii-chip-core-border); }
 .chip.exact { color: var(--ink-mid); }
 .chip.contain { color: var(--ochre-text); }
 .chip.fuzzy { color: var(--danger); }

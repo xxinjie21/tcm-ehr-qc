@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="mine-page">
     <!-- 从「术语词典」页签摘出的「我的词典」独立页：统一入口在词典页页头引导条行末
          （与「词典范围」并列），不在每个术语类型下各放一个入口。
          类型决定本地词典的 localStorage 键（9 类各存各的）；进入时类型跟随来源页
@@ -14,7 +14,7 @@
       <el-button size="small" plain @click="$router.push('/dictionary')">返回术语词典</el-button>
     </div>
 
-    <PanelCard title="个人词典（本地）">
+    <PanelCard title="个人词典（本地）" class="mine-card">
       <div class="tip" style="margin-bottom: var(--sp-2)">
         这是你自己的词典副本：可手动增删，也可<b>批量导入文件</b>或从组内词典拉取。
         它只存在这台电脑。
@@ -40,7 +40,7 @@
         </el-button>
         <el-button
           size="small"
-          @click="$router.push({ path: '/dictionary/import', query: { type: typeKey } })"
+          @click="$router.push({ path: '/dictionary/import', query: { type: typeKey, from: 'mine' } })"
         >
           批量导入文件
         </el-button>
@@ -57,8 +57,11 @@
         <span v-if="baselineTouched" class="rv-dirty">本地有未提交的改动</span>
         <span v-else>与基线一致</span>
       </div>
-      <el-table :data="localPaged" border size="small" max-height="260" style="margin-top: var(--sp-3)"
-        :empty-text="localTerms.length ? '' : '先点「拉取组内词典」或「批量导入文件」把词条加到本地'">
+      <!-- 等高链：本地词条表吃掉卡内剩余高度（原写死 max-height=260 时，
+           短词条列表下卡底空一大块）。height="100%"，行多时表体内滚 -->
+      <div class="fill-table">
+        <el-table :data="localPaged" border size="small" height="100%"
+          :empty-text="localTerms.length ? '' : '先点「拉取组内词典」或「批量导入文件」把词条加到本地'">
         <el-table-column prop="standardTerm" label="标准词" min-width="160" />
         <el-table-column label="别名" min-width="200">
           <template #default="{ row }">{{ (row.aliases || []).join('、') }}</template>
@@ -71,6 +74,7 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
       <div v-if="localTerms.length > LOCAL_PAGE_SIZE" class="rv-pager">
         <el-button size="small" :disabled="localPage <= 1" @click="localPage--">上一页</el-button>
         <span class="tip">{{ localPage }} / {{ localPageCount }}</span>
@@ -496,6 +500,33 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 页面撑到主区底部（与 theme.css .page-fill 同口径：100vh−顶栏/面包屑/内边距）。
+   根节点除卡片外还有页头行与弹窗，故不能直接套 .page-fill（它的 > :first-child
+   会把页头拉满）——这里显式让卡片 flex:1、页头行固定。 */
+.mine-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 186px);
+}
+.mine-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.mine-card :deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+/* 本地词条表吃满卡内剩余高度 */
+.fill-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: var(--sp-3);
+}
+
 /* 术语类型行：与词典页页头同款（radio-group + 返回键） */
 .dict-head {
   display: flex;

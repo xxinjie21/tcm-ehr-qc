@@ -1,20 +1,9 @@
 <template>
   <div class="sd-card">
-    <!-- 可追溯：这份结构化数据是依据哪一版术语词典产生的（抽取/归一落库时打点）。
-         主行只给人能判断的信息（依据多少条词条 + 什么时候采集），
-         哈希串是技术标识，放 tooltip 里；直接把 81 字符的
-         "disease:c2dd2a1e;pattern:…;" 甩在页面上没有任何解读价值。 -->
+    <!-- 可追溯：这份结构化数据是依据哪一版术语词典产生的（抽取/归一落库时打点）。 -->
     <div v-if="dictVersion || dictCapturedAt" class="sd-meta">
       依据词典<template v-if="dictTermCount"> <b>{{ dictTermCount }} 条词条</b></template>
       <span v-if="dictCapturedAt" class="sd-meta-t">· 采集于 {{ dictCapturedAt }}</span>
-      <el-tooltip v-if="dictVersion" placement="top">
-        <template #content>
-          词典内容指纹：{{ dictVersion }}<br>
-          同一份词典内容才会得到同一个指纹；词典改动后指纹随之变化，
-          据此可判断某份结构化数据是由「哪一版词库」归一出来的。
-        </template>
-        <span class="sd-meta-fp">查看版本指纹</span>
-      </el-tooltip>
     </div>
 
     <!-- 人工修改提示：这块数据被人工改过，清洗归一会跳过，
@@ -94,11 +83,13 @@
             **哪怕 9 类全空**，所以「有对象但 9 类都空」明确代表抽取跑过了。
          原先两种都写「无标准化数据」，用户会以为「抽取没问题、只是没东西」，
          而实际可能是一次都没抽过 —— 两者的下一步动作完全不同。 -->
-    <EmptyState v-else :text="emptyTitle" :image-size="70">
-      <div class="empty-hint">{{ emptyHint }}</div>
-      <!-- 空结果的原因补白：历史数据没写降级原因时，用实时探测把「也可能是一次降级抽取」说出来 -->
-      <div v-if="liveHintText" class="empty-hint sd-live">{{ liveHintText }}</div>
-    </EmptyState>
+    <div v-else class="sd-empty">
+      <EmptyState :text="emptyTitle" :image-size="70">
+        <div class="empty-hint">{{ emptyHint }}</div>
+        <!-- 空结果的原因补白：历史数据没写降级原因时，用实时探测把「也可能是一次降级抽取」说出来 -->
+        <div v-if="liveHintText" class="empty-hint sd-live">{{ liveHintText }}</div>
+      </EmptyState>
+    </div>
   </div>
 </template>
 
@@ -286,7 +277,17 @@ const levelDesc = (level, raw, name) => {
 </script>
 
 <style scoped>
-.sd-card { font-size: var(--fs-base); }
+.sd-card { font-size: var(--fs-base); display: flex; flex-direction: column; }
+/* 空态在等高卡内垂直居中：卡片被父栏拉到等高高度时，空态不再顶在卡头下、
+   把整卡高度空出一大截；min-height 给无父栏高度时的兜底高度 */
+.sd-empty {
+  flex: 1 1 auto;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
 .sd-meta {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
@@ -318,23 +319,17 @@ const levelDesc = (level, raw, name) => {
 .sd-degrade {
   margin-top: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid #e3c3bb;
+  border: 1px solid var(--danger-border-soft);
   border-left: 3px solid var(--danger);
   border-radius: 4px;
   background: var(--danger-surface);
-  color: #8a3d33;
+  color: var(--el-color-danger-dark-2);
   font-size: var(--fs-xs);
   line-height: 1.7;
 }
 .sd-degrade strong {
   margin-right: var(--sp-2);
   color: var(--danger);
-}
-.sd-meta-fp {
-  margin-left: var(--sp-1);
-  color: var(--text-sub-strong);
-  cursor: help;
-  border-bottom: 1px dotted var(--line);
 }
 .sd-sec { margin-bottom: var(--sp-3); }
 .sd-sec-title {
@@ -389,15 +384,15 @@ const levelDesc = (level, raw, name) => {
 /* 原因补白：与空态正文分开一段，颜色偏警示 —— 它说的是「这份空不一定可信」 */
 .sd-live {
   margin-top: var(--sp-2);
-  color: #8a3d33;
+  color: var(--el-color-danger-dark-2);
 }
 </style>
 
 <!-- 非 scoped：el-tooltip 的内容被 teleport 到 body，scoped 选择器命中不到，必须用全局块 -->
 <style>
 .el-popper .tp { max-width: 340px; font-size: var(--fs-xs); line-height: 1.7; }
-.el-popper .tp-hd { font-weight: bold; margin-bottom: var(--sp-1); color: #2b2b2b; }
+.el-popper .tp-hd { font-weight: bold; margin-bottom: var(--sp-1); color: var(--cmp-sdc-popper-ink); }
 .el-popper .tp-row { display: flex; gap: var(--sp-2); }
-.el-popper .tp-k { flex: 0 0 62px; color: #8a8578; }
-.el-popper .tp-v { flex: 1 1 auto; color: #2b2b2b; }
+.el-popper .tp-k { flex: 0 0 62px; color: var(--cmp-sdc-popper-key); }
+.el-popper .tp-v { flex: 1 1 auto; color: var(--cmp-sdc-popper-ink); }
 </style>

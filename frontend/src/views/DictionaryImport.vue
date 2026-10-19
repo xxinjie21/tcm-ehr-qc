@@ -5,7 +5,7 @@
          L6（审查报告）：原先复用 rh-link（那是给提示条用的 13px 文字链），
          挂在页头主入口上显得突兀；改用与页内其余操作一致的 el-button。 -->
     <div class="import-top">
-      <el-button size="small" @click="goDictionary">← 返回术语词典</el-button>
+      <el-button size="small" @click="goDictionary">← {{ backLabel }}</el-button>
     </div>
     <!--
       批量导入词典。
@@ -31,7 +31,7 @@
         <router-link class="rh-link" to="/standardization-report">查看质量报告</router-link>
         <!-- 与「查看质量报告」并排：导入完这一页的任务就结束了，用户要么去看结果，
              要么回词典确认新词条 —— 两条出口都给，别让人靠侧边栏自己找路 -->
-        <router-link class="rh-link" to="/dictionary">返回术语词典</router-link>
+        <router-link class="rh-link" :to="backPath">{{ backLabel }}</router-link>
         <!-- 「稍后再说」：与左侧两条出口的区别是「什么都不做」，所以给它一个真按钮，
              点了把这条提示收起来 —— 重跑入口在「标准化质量报告」页，随时能回去。 -->
         <el-button link class="rh-skip" @click="dismissRerun">
@@ -113,6 +113,7 @@
             <el-input
               v-model="pastedText"
               type="textarea"
+              v-autoheight
               :rows="4"
               placeholder="神疲乏力&#10;食少纳呆&#10;恶风&#9;平时也怕风"
             />
@@ -335,7 +336,7 @@
                原先这一页导入完就「断」在这里：没有任何按钮回到术语词典，
                用户只能自己去侧边栏找路（面包屑也不是链接）。 -->
           <div class="import-done-ops">
-            <el-button type="primary" @click="goDictionary">返回术语词典</el-button>
+            <el-button type="primary" @click="goDictionary">{{ backLabel }}</el-button>
             <span class="tip">在「我的词典」里可以核对刚导入的词条</span>
           </div>
         </div>
@@ -352,7 +353,8 @@
             <tr><td>柴胡</td><td>北柴胡、醋柴胡</td></tr>
           </tbody>
         </table>
-        <div class="sample-t" style="margin-top: var(--sp-3)">JSON（等价写法）</div>
+        <div class="json-sec">
+        <div class="sample-t">JSON（等价写法）</div>
         <!-- 一行一个字段：这张卡只有 320~420px 宽，整条对象写成一行会被右边缘截断
              （实测 "aliases": ["北柴胡", "醋… 后面看不全）—— 示例卡是给人照抄的，
              看不全就等于没给。 -->
@@ -366,6 +368,7 @@
     "aliases": ["北柴胡", "醋柴胡"]
   }
 ]</pre>
+        </div>
       </div>
     </PanelCard>
 
@@ -397,6 +400,7 @@ import { apiErrorMessage } from '@/utils/errorMessage'
 import { useUserStore } from '@/stores/user'
 import { splitAliases } from '@/utils/terms'
 import { mergeTermLists } from '@/utils/dictMerge'
+import { vAutoheight } from '@/utils/autoheight'
 
 const TYPES = [
   { value: 'disease', label: '疾病' },
@@ -419,7 +423,14 @@ const isAdmin = computed(() => userStore.role === '管理员')
 const router = useRouter()
 // 来源页（「术语词典」）会把当前选中的类型放进 query.type，下面用它决定默认值
 const route = useRoute()
-const goDictionary = () => router.push('/dictionary')
+/** 返回去向跟随来源：从「我的词典」进入则回 /dictionary/mine 并保持类型，否则回术语词典 */
+const backPath = computed(() =>
+  route.query.from === 'mine'
+    ? { path: '/dictionary/mine', query: { type: route.query.type } }
+    : '/dictionary'
+)
+const backLabel = computed(() => route.query.from === 'mine' ? '返回我的词典' : '返回术语词典')
+const goDictionary = () => router.push(backPath.value)
 
 const uploadRef = ref(null)
 const dictFileList = ref([])
@@ -1077,7 +1088,7 @@ const handleSubmit = async () => {
 }
 .rh-link {
   font-size: var(--fs-xs);
-  color: var(--link, #2b6cb0);
+  color: var(--link);
 }
 /* 「稍后再说」：这一行唯一的「什么都不做」出口。靠右放、配色压到最弱 ——
    它原先是个不可点的 span，夹在两个蓝色链接后面，看起来像「第三个失效的链接」。
@@ -1187,7 +1198,22 @@ const handleSubmit = async () => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
   gap: 0 var(--sp-3);
-  align-items: start;
+  /* 等高对称：行内两栏默认 stretch，矮栏（格式示例）被拉到与左栏同高。
+     此前写 align-items:start 让矮栏缩回内容高，卡底与左栏之间留一条不对称空白。 */
+}
+/* 等高链（照 Qc.vue .grid-2 范本）：卡片纵列弹性容器、正文吃满剩余高度并自滚，
+   间距交给 grid gap（PanelCard 默认 12px 下边距在此置 0，避免双重留白） */
+.dict-import :deep(.panel) {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dict-import :deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
 }
 .dict-import > .rerun-hint {
   grid-column: 1 / -1;
@@ -1281,6 +1307,25 @@ const handleSubmit = async () => {
   font-size: var(--fs-base);
 }
 /* 格式示例：给可照抄的表 */
+/* 右栏被拉平等高后，.sample 是卡内唯一子块，flex:1 吃满；
+   多余空间由末尾 JSON 代码块（.code margin-top:auto）沉底吸收，
+   而不是在卡底堆一块空白。单列窄屏时高度由内容决定，auto 边距归零、无副作用 */
+.sample {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* JSON 段（标题 + 代码块）作为整体沉底：空白只落在 Excel 段与 JSON 段之间，
+   标题不再孤悬在中腹、与下方代码块脱节 */
+.json-sec {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+}
+.json-sec .sample-t {
+  margin-top: var(--sp-3);
+}
 .sample-t {
   font-size: var(--fs-base);
   font-weight: 600;

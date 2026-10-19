@@ -10,125 +10,113 @@
       @saved="applyRules"
     />
 
-    <!-- 本范围扣分构成：范围内各病历扣分明细聚合。
-         顶部工具条 = 原独立的「范围查询」PanelCard（审查报告 L2）：那张卡只有 137px 高、
-         里面仅一行筛选，八成面积是空的。去掉卡壳降级为工具条后，筛选与它实际驱动的
-         两块数据在视觉上更近，也省掉一整张卡的卡头与内边距。
-         整页口径的语义不变：一次「查询」同时刷新扣分构成与 AI 预检列表
-         （此前 RangeFilter 只喂图谱，而「AI 预检列表」另挂独立分级下拉，同一页两个口径）。 -->
+    <!-- 页面动作区（P0-1）：业务**动作**与筛选彻底分离。
+         「质控评分计算 / 取消重算」原先挤在筛选条里，用户第一眼分不清
+         「这是查询还是操作」；现固定在内容区右上，反馈（进度条 / 失败清单）紧随其后，
+         筛选条只留筛选。动作口径仍是「按页首范围查询的范围」重算。 -->
+    <div class="page-actions">
+      <span class="tip">「质控评分计算」按页首「范围查询」的范围重算评分与分级</span>
+      <!-- 重算是异步任务（§七 L5）：提交后按钮立刻解锁，进度单独显示，别让按钮一直转圈 -->
+      <el-button
+        type="warning"
+        size="default"
+        :loading="recomputing"
+        :disabled="isActiveTask(recomputeProgress)"
+        @click="handleRecompute"
+      >
+        {{ recomputeButtonText }}
+      </el-button>
+      <!-- 28.3：cancelQcBatch 后端早已就绪，前端却一直没入口 ——
+            一旦提交就只剩等，想停只能刷新页面（任务仍在后台跑）。
+            只在运行中出现，避免常态多一个永远点不到的按钮 -->
+      <el-button
+        v-if="isActiveTask(recomputeProgress)"
+        size="default"
+        :loading="cancelling"
+        @click="handleCancelRecompute"
+      >
+        取消重算
+      </el-button>
+    </div>
+
+    <!-- 动作反馈：进度与失败清单属于「上面这个动作」，不属于筛选条 ——
+         原先它们夹在筛选条里（进度条甚至把筛选条撑成两行），现跟随动作区。 -->
+    <!-- I7：批量重算此前只有按钮文案（「重算中 1234/40000…」），看不出推进快慢。
+         数据早已在 recomputeProgress 里，补一条进度条：只在任务运行时渲染，
+         终态由 v-if 自动移除，不留占位 -->
+    <el-progress
+      v-if="isActiveTask(recomputeProgress)"
+      class="recompute-progress"
+      v-bind="recomputeBar"
+      :stroke-width="10"
+    />
+    <!-- T2：运行中也显示失败计数 —— 后端每 25 条落库一次进度，轮询即可见；
+         此时不回明细（长任务每 2 秒重渲染整张长表不值当），只给一行计数，
+         与 NLP 批量面板的运行中口径一致。终态仍走下面的失败清单。 -->
+    <div
+      v-if="isActiveTask(recomputeProgress) && recomputeProgress.failed > 0"
+      class="recompute-failures"
+    >
+      <div class="rf-hd">
+        已失败 {{ recomputeProgress.failed }} 条 · 任务结束后显示清单并支持重试
+      </div>
+    </div>
+    <!-- 失败清单 + 仅重试失败：终态且确有失败时显示（用户要看到失败的是哪条、为什么、并可只重试失败） -->
+    <div
+      v-if="!isActiveTask(recomputeProgress) && recomputeProgress && recomputeProgress.failures && recomputeProgress.failures.length"
+      class="recompute-failures"
+    >
+      <div class="rf-hd">
+        失败清单（{{ recomputeProgress.failures.length }} 条{{ recomputeProgress.failureTruncated ? '，仅显示前 500 条' : '' }}）
+      </div>
+      <el-table :data="recomputeProgress.failures" border size="small" max-height="240">
+        <el-table-column prop="recordId" label="病历ID" width="290" show-overflow-tooltip />
+        <el-table-column prop="reason" label="失败原因" show-overflow-tooltip />
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openDetail(row.recordId)">查看详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="rf-actions">
+        <el-button
+          type="warning"
+          size="small"
+          :loading="retrying"
+          @click="retryFailed(recomputeProgress.id)"
+        >
+          仅重试失败（{{ recomputeProgress.failed }} 条）
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 范围查询（整页口径 · 共享）：一次「查询」同时刷新下方「本范围扣分构成」与
+         「AI 预检列表 / 扣分明细」两块数据。
+         此前它被并进「本范围扣分构成」卡内当工具条（审查报告 L2 为省掉一张 137px 高的空卡
+         所改）。但那两张卡吃的都是这一个范围 —— 挂在其中一张卡里，会被读成
+         「只作用于那张卡」。这里保留「不占一张空卡」的结论，只把它放回两张卡的共同上方：
+         去卡壳的细工具栏，形态与语义对齐「清洗与导出」页的 .scope-bar。
+         P0-1：壳子改用共享 ScopeBar 组件（外形与位置全站一份定义）。 -->
+    <ScopeBar>
+      <RangeFilter v-model="filters" />
+      <!-- F7：与同排 RangeFilter 的 32px 输入框等高，按钮 default 档；
+           底对齐后不会再出现 24px 与 32px 混排 -->
+      <el-button type="primary" size="default" :loading="queryLoading" @click="applyFilters">查 询</el-button>
+      <el-button size="default" :disabled="queryLoading" @click="resetFilters">重置</el-button>
+      <span class="tip">范围对下方「扣分构成」与「AI 预检列表」同时生效</span>
+    </ScopeBar>
+
+    <!-- 本范围扣分构成：范围内各病历扣分明细聚合（只放聚合结果，范围查询已提到页首共享），
+         与右侧「AI 预检列表」并排；两卡底边由 grid 行拉平（等高），
+         卡内要「吃满剩余高度」的表格由 CSS 弹性 + 百分比高度决定，不再用 JS 量像素 -->
     <div class="grid-2">
       <PanelCard title="本范围扣分构成">
-        <!-- 工具条：下边框与正文分隔，避免筛选与统计内容糊在一起 -->
-        <div class="panel-toolbar">
-          <div class="filter-bar">
-            <RangeFilter v-model="filters" />
-            <!-- F7：与同排 RangeFilter 的 32px 输入框等高，按钮改 default 档；
-                 同排的重算 / 取消重算一并改，否则底对齐后会出现 24px 与 32px 混排 -->
-            <el-button type="primary" size="default" :loading="queryLoading" @click="applyFilters">查 询</el-button>
-            <el-button size="default" :disabled="queryLoading" @click="resetFilters">重置</el-button>
-            <!-- 重算是异步任务（§七 L5）：提交后按钮立刻解锁，进度单独显示，别让按钮一直转圈 -->
-            <el-button
-              type="warning"
-              size="default"
-              :loading="recomputing"
-              :disabled="isActiveTask(recomputeProgress)"
-              @click="handleRecompute"
-            >
-              {{ recomputeButtonText }}
-            </el-button>
-            <!-- 28.3：cancelQcBatch 后端早已就绪，前端却一直没入口 ——
-                 一旦提交就只剩等，想停只能刷新页面（任务仍在后台跑）。
-                 只在运行中出现，避免常态多一个永远点不到的按钮 -->
-            <el-button
-              v-if="isActiveTask(recomputeProgress)"
-              size="default"
-              :loading="cancelling"
-              @click="handleCancelRecompute"
-            >
-              取消重算
-            </el-button>
-            <span class="tip">范围对本页各块同时生效；「质控评分计算」按当前范围重算评分与分级</span>
-          </div>
-          <!-- I7：批量重算此前只有按钮文案（「重算中 1234/40000…」），看不出推进快慢。
-               数据早已在 recomputeProgress 里，补一条进度条：只在任务运行时渲染，
-               终态由 v-if 自动移除，不留占位 -->
-          <el-progress
-            v-if="isActiveTask(recomputeProgress)"
-            class="recompute-progress"
-            v-bind="recomputeBar"
-            :stroke-width="10"
-          />
-          <!-- T2：运行中也显示失败计数 —— 后端每 25 条落库一次进度，轮询即可见；
-               此时不回明细（长任务每 2 秒重渲染整张长表不值当），只给一行计数，
-               与 NLP 批量面板的运行中口径一致。终态仍走下面的失败清单。 -->
-          <div
-            v-if="isActiveTask(recomputeProgress) && recomputeProgress.failed > 0"
-            class="recompute-failures"
-          >
-            <div class="rf-hd">
-              已失败 {{ recomputeProgress.failed }} 条 · 任务结束后显示清单并支持重试
-            </div>
-          </div>
-          <!-- 失败清单 + 仅重试失败：终态且确有失败时显示（用户要看到失败的是哪条、为什么、并可只重试失败） -->
-          <div
-            v-if="!isActiveTask(recomputeProgress) && recomputeProgress && recomputeProgress.failures && recomputeProgress.failures.length"
-            class="recompute-failures"
-          >
-            <div class="rf-hd">
-              失败清单（{{ recomputeProgress.failures.length }} 条{{ recomputeProgress.failureTruncated ? '，仅显示前 500 条' : '' }}）
-            </div>
-            <el-table :data="recomputeProgress.failures" border size="small" max-height="240">
-              <el-table-column prop="recordId" label="病历ID" width="290" show-overflow-tooltip />
-              <el-table-column prop="reason" label="失败原因" show-overflow-tooltip />
-              <el-table-column label="操作" width="100">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="openDetail(row.recordId)">查看详情</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-            <div class="rf-actions">
-              <el-button
-                type="warning"
-                size="small"
-                :loading="retrying"
-                @click="retryFailed(recomputeProgress.id)"
-              >
-                仅重试失败（{{ recomputeProgress.failed }} 条）
-              </el-button>
-            </div>
-          </div>
-        </div>
-        <!-- T1：最近重算任务清单。此前刷新/切页返回只能接上「正在跑」的那条，
-             已结束的任务详情无处可看；这里补上与 NLP 批量面板同口径的清单，
-             点「查看」拉详情（含失败明细）。截断标记由后端下发，不足上限时不出现。 -->
-        <div v-if="taskList.length" class="recompute-tasks">
-          <div class="rt-hd">
-            最近重算任务（最多 {{ taskListLimit }} 条）<span v-if="taskListTruncated" class="rt-trunc">已省略更早的任务</span>
-            <el-checkbox v-model="onlyFailedTasks" size="small" style="margin-left: var(--sp-3)">只看有失败的</el-checkbox>
-          </div>
-          <el-table
-            :data="onlyFailedTasks ? taskList.filter((t) => t.failed > 0) : taskList"
-            border
-            size="small"
-          >
-            <el-table-column label="提交时间" width="170">
-              <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
-            </el-table-column>
-            <el-table-column label="状态" width="150">
-              <template #default="{ row }">{{ taskStatusText(row) }}</template>
-            </el-table-column>
-            <el-table-column prop="total" label="条数" width="90" />
-            <el-table-column prop="success" label="成功" width="90" />
-            <el-table-column prop="failed" label="失败" width="90" />
-            <el-table-column label="操作" width="90">
-              <template #default="{ row }">
-                <el-button link type="primary" @click="viewTask(row.id)">查看</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-        <div v-loading="dedLoading" element-loading-text="正在统计扣分分布…">
-          <template v-if="dedStats">
+        <div>
+          <!-- P0-3：原 v-loading 整块遮罩会把卡内已有文字（数字、表头）一起盖住 ——
+               改为「还没有聚合结果时用骨架占位、已有结果时保持可见」，不再挂遮罩。
+               刷新时的动效由页首「查 询」按钮的 loading 圈承担（它才是触发者）。 -->
+          <LoadingSkeleton v-if="dedLoading && !dedStats" variant="chart" :rows="5" label="正在统计扣分分布…" />
+          <template v-else-if="dedStats">
             <!-- 按扣分类型聚合：横条长度按最大扣分点数归一（见 barWidth） -->
             <div v-if="dedStats.byType.length" class="dist">
               <div v-for="t in dedStats.byType" :key="t.type" class="dist-row">
@@ -142,12 +130,16 @@
             <!-- 扣分项明细：受影响病历数 + 合计扣分，用于定位主要扣分来源 -->
             <template v-if="dedStats.byItem.length">
               <div class="sub-hd">Top 扣分项</div>
-              <el-table :data="dedStats.byItem" border size="small" max-height="240">
-                <el-table-column prop="type" label="类型" width="130" />
-                <el-table-column prop="item" label="项" width="110" />
-                <el-table-column prop="count" label="受影响病历数" width="110" />
-                <el-table-column prop="points" label="合计扣分" width="100" />
-              </el-table>
+              <!-- P0-2：撑满卡内剩余高度改由 CSS 决定（.fill-table 吃满弹性空间、
+                    表格自身 height:100%），不再用 JS 量卡片像素反算 —— 见本文件样式段 -->
+              <div class="fill-table fill-table--left">
+                <el-table :data="dedStats.byItem" border size="small" max-height="560">
+                  <el-table-column prop="type" label="类型" width="130" />
+                  <el-table-column prop="item" label="项" width="110" />
+                  <el-table-column prop="count" label="受影响病历数" width="110" />
+                  <el-table-column prop="points" label="合计扣分" width="100" />
+                </el-table>
+              </div>
               <!-- P5.2：明细被截断时告知，避免「为什么只看到 20 条」的隔屏疑问 -->
               <div v-if="dedStats.itemsTruncated" class="trunc-hint">扣分项较多，仅展示扣分最高的 20 项</div>
             </template>
@@ -159,44 +151,47 @@
             </div>
             <div v-if="dedStats.truncated" class="trunc-hint">超出扫描上限，仅统计前 {{ dedStats.scanned }} 份</div>
           </template>
-          <EmptyState v-else-if="!dedLoading" text="当前范围暂无可统计的评分结果" :image-size="70" />
+          <EmptyState v-else text="当前范围暂无可统计的评分结果" :image-size="70" />
         </div>
       </PanelCard>
 
-      <!-- AI 预检列表：与「病历数据」共用同一套 searchRecords 查询，扣分范围沿用上方筛选。
-           与左侧「本范围扣分构成」并排（grid-2）：原来 4 张卡纵向堆到 1235px，
-           第 4 块整块在屏外，先用并排把上半页收成一行 -->
+      <!-- AI 预检列表：与「病历数据」共用同一套 searchRecords 查询，扣分范围沿用页首筛选。
+            与左侧「本范围扣分构成」并排（grid-2）：原来 4 张卡纵向堆到 1235px，
+            第 4 块整块在屏外，先用并排把上半页收成一行 -->
       <PanelCard title="AI 预检列表 / 扣分明细">
         <!-- M20：原「点击行查看…」提示条独占一行（约 40px）。并进卡头后，
              首条扣分明细在 1366×768 下从 y=776 提前到屏内（标题行本来就有 48px 高） -->
         <template #header>
           <span>AI 预检列表 / 扣分明细</span>
-          <span class="tip" style="font-weight: normal">点击行查看规则扣分明细；扣分范围沿用上方「范围查询」</span>
+          <span class="tip" style="font-weight: normal">点击行查看规则扣分明细；扣分范围沿用页首「范围查询」</span>
         </template>
 
         <!-- 并排后本表只有半幅宽（约 660px），固定列合计 716px 必然横向滚动 ——
              theme.css 已放开 EP 横向滚动条，滚动是可达的；操作列仍 fixed 在右侧。
-             max-height 360 → 420：半幅宽下行数不变但表更窄，略增高度让右栏
-             与左侧统计栏的底边基本齐平，不至于一高一矮 -->
-        <RecordTable
-            ref="precheckTableRef"
-            :rows="precheckRows"
-            :loading="precheckLoading"
-            loading-text="正在预检待复核项…"
-            :max-height="420"
-            :action-width="100"
-            :row-class-name="precheckRowClass"
-            @sort-change="onPrecheckSortChange"
-          >
-            <template #action="{ row }">
-              <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
-            </template>
-            <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一份 searchRecords 查询 -->
-            <template #empty>
-              <EmptyState :failed="precheckFailed" :loading="precheckLoading"
-                text="筛选范围内没有病历" @retry="() => loadPrecheck(1)" />
-            </template>
-          </RecordTable>
+             P0-2：高度改由 CSS 决定（外层 .fill-table 吃满卡内剩余高度、表格 height:100%），
+             左栏扣分构成高时右栏跟着长、左栏矮时右栏也不再缩在卡顶，两栏底边始终齐平；
+             min-height 420 与改造前写死的档位一致，不会比那时更矮 -->
+        <div class="fill-table fill-table--right">
+          <RecordTable
+              ref="precheckTableRef"
+              :rows="precheckRows"
+              :loading="precheckLoading"
+              loading-text="正在预检待复核项…"
+              :height="790"
+              :action-width="100"
+              :row-class-name="precheckRowClass"
+              @sort-change="onPrecheckSortChange"
+            >
+              <template #action="{ row }">
+                <el-button link type="primary" @click="openDetail(row.id)">扣分明细</el-button>
+              </template>
+              <!-- 文案与「病历数据」「结构化解析」两页统一：这张表就是同一份 searchRecords 查询 -->
+              <template #empty>
+                <EmptyState :failed="precheckFailed" :loading="precheckLoading"
+                  text="筛选范围内没有病历" @retry="() => loadPrecheck(1)" />
+              </template>
+            </RecordTable>
+        </div>
         <!-- 分页：切换每页条数时回到第 1 页（见 handleSizeChange） -->
         <el-pagination
           v-model:current-page="precheckPage"
@@ -211,6 +206,40 @@
         />
       </PanelCard>
     </div>
+
+    <!-- T1：最近重算任务清单。此前刷新/切页返回只能接上「正在跑」的那条，
+         已结束的任务详情无处可看；这里补上与 NLP 批量面板同口径的清单，
+         点「查看」拉详情（含失败明细）。截断标记由后端下发，不足上限时不出现。
+         它是**任务监控**、不是哪张结果卡的内容 —— 所以拿出来单独成卡（原挂在
+         「本范围扣分构成」卡尾，会把该卡撑到比右栏高出一截），且放在结果区之后。 -->
+    <PanelCard v-if="taskList.length" title="最近重算任务">
+      <div class="rt-hd">
+        最多 {{ taskListLimit }} 条<span v-if="taskListTruncated" class="rt-trunc">已省略更早的任务</span>
+        <el-checkbox v-model="onlyFailedTasks" size="small" style="margin-left: var(--sp-3)">只看有失败的</el-checkbox>
+      </div>
+      <!-- 2026-10-18 用户指令：最多50条也要内滚，固定 max-height 360（约9行），超出表体内滚、不再随条数无限撑长 -->
+      <el-table
+        :data="onlyFailedTasks ? taskList.filter((t) => t.failed > 0) : taskList"
+        border
+        size="small"
+        max-height="360"
+      >
+        <el-table-column label="提交时间" width="170">
+          <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="150">
+          <template #default="{ row }">{{ taskStatusText(row) }}</template>
+        </el-table-column>
+        <el-table-column prop="total" label="条数" width="90" />
+        <el-table-column prop="success" label="成功" width="90" />
+        <el-table-column prop="failed" label="失败" width="90" />
+        <el-table-column label="操作" width="90">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="viewTask(row.id)">查看</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </PanelCard>
 
     <!-- 质控评分标准（M20 复测 2026-10-06：低频阅读内容 → 移到结果区之后并默认收起）。
          此前它占首屏 332px（y282~614），把承载结论的「AI 预检列表 / 扣分明细」推到 y≈989、
@@ -304,15 +333,17 @@ import EmptyState from '@/components/EmptyState.vue'
 import { usePagedList } from '@/composables/usePagedList'
 import { useUrlFilters } from '@/composables/useUrlFilters'
 import RecordTable from '@/components/RecordTable.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import QcRulesDialog from '@/components/QcRulesDialog.vue'
 import QcDeductionDialog from '@/components/QcDeductionDialog.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
+import ScopeBar from '@/components/ScopeBar.vue'
 import { recomputeQc, listQcBatch, getQcBatch, cancelQcBatch, retryQcBatchFailed, qcScore, getQcRules, getDeductionStats } from '@/api/qc'
 import { searchRecords, getRawRecord } from '@/api/records'
 import { GRADE_OK } from '@/utils/grade'
 import { useUserStore } from '@/stores/user'
-import { fmtDateTime, fmtDate } from '@/utils/format'
+import { fmtDateTime } from '@/utils/format'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
 // 规则写入口按 admin / owner / 授权成员 三档判定（与后端 qc/rules 写接口一致）
@@ -320,11 +351,9 @@ const userStore = useUserStore()
 const canWriteRules = computed(() => userStore.canWriteQcRulesEntry)
 
 // 整页共用的筛选条件，由上方 RangeFilter 通过 v-model 维护。
-// 默认口径：今天导入（与标准质量报告页同口径）—— 质控结论是「最近这批数据质量如何」，
-// 不带默认范围时一进页面看到的是全库历史，数字大得没有行动意义；
-// 用户想看全量把导入时间清空即可（两端缺一按「未给」处理）
-const today = fmtDate()
-const filters = reactive({ department: '', dateRange: null, grade: '', sortBy: '', sortOrder: '', importRange: [today, today] })
+// 默认不带时间范围：进页面即看全库（两端都空 = 不按时间过滤）。
+// 想看「刚导进来的这批」用筛选条上的「今天」按钮临时圈定。
+const filters = reactive({ department: '', dateRange: null, grade: '', sortBy: '', sortOrder: '', importRange: null })
 
 // ===== 评分标准 / 扣分构成=====
 // 评分标准：rules 为当前生效规则，descriptions 为自然语言说明，catalog* 为可选项目录
@@ -335,6 +364,13 @@ const catalogElements = ref([])
 const catalogFormats = ref([])
 const dedStats = ref(null)
 const dedLoading = ref(false)
+
+// ===== 并排两栏的等高 =====
+// P0-2：不再在前端按卡片实测高度反算表格像素（那套 JS 量取依赖 DOM 时机，
+// 换档/数据变化就要重量，漏一次就塌）；改为纯布局：
+//   · 两卡等高 —— .grid-2 是 grid，行内两项默认 stretch，天然齐平；
+//   · 卡内表格吃满剩余高度 —— .fill-table（flex:1）+ 表格 height:100%，
+//     高度链全部由 CSS 定（见样式段），无需 JS 参与。
 
 // 读取当前生效规则与说明文案
 const loadRules = async () => {
@@ -436,7 +472,7 @@ const applyRules = (res) => {
 // 否则同一页会出现两个互不相干的分级口径
 // 预检列表状态
 const precheckPage = ref(1)
-const precheckSize = ref(10)
+const precheckSize = ref(20)
 
 // 28.12：预检列表把「非合格」行整行高亮 —— 质控场景就是来找缺陷病历的，
 // 逐行看分级标签不如整行底色来得快。分级名口径来自 utils/grade，不另立标准。
@@ -489,11 +525,11 @@ const applyFilters = () => {
   loadPrecheck(1)
   loadDedStats()
 }
-// 重置筛选并立即重新查询：回到默认口径（今天导入），不是清空成全量 —— 与初始进入页面一致
+// 重置筛选并立即重新查询：清空全部条件（含导入时间），回到「全库」口径 —— 与初始进入页面一致
 const resetFilters = () => {
   filters.department = ''
   filters.dateRange = null
-  filters.importRange = [today, today]
+  filters.importRange = null
   filters.grade = ''
   applyFilters()
 }
@@ -793,19 +829,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 页面级范围查询条：与 RangeFilter 同一行，控件底对齐 */
-.filter-bar {
+/* 页面动作区（P0-1）：业务动作不混进筛选条，固定在内容区右上。
+   与下方筛选条（.scope-bar，基类在 theme.css）同一水平内边距，视觉上仍属同一条动线。 */
+.page-actions {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: flex-end;
   gap: var(--sp-3);
   flex-wrap: wrap;
-}
-/* 面板顶部工具条：原「范围查询」独立面板并入后，用下边框 + 间距与正文分隔，
-   视觉上仍是「一行筛选」，但不再多占一张卡的卡头与内边距 */
-.panel-toolbar {
-  padding-bottom: var(--sp-3);
-  border-bottom: 1px solid var(--line);
-  margin-bottom: var(--sp-3);
+  margin-bottom: var(--sp-2);
 }
 /* 重算进度条：贴在按钮行下方，限宽避免横贯整块面板 */
 .recompute-progress {
@@ -826,18 +858,13 @@ onMounted(() => {
 .recompute-failures .rf-actions {
   margin-top: var(--sp-2);
 }
-/* 最近重算任务清单（T1）：与失败清单同款分隔，列表随任务条数撑高，不自开滚动层 */
-.recompute-tasks {
-  margin-top: var(--sp-4);
-  padding-top: var(--sp-3);
-  border-top: 1px dashed var(--line-soft);
-}
-.recompute-tasks .rt-hd {
+/* 最近重算任务清单（T1）：2026-10-18 用户指令「最近任务用滑动条、不要无限增加长度」—— 表体固定 max-height 360（约9行），超出内滚，不再随任务条数撑高到页面底部 */
+.rt-hd {
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
   margin-bottom: var(--sp-2);
 }
-.recompute-tasks .rt-trunc {
+.rt-trunc {
   margin-left: var(--sp-2);
   color: var(--ochre-text);
 }
@@ -857,6 +884,92 @@ onMounted(() => {
 }
 .grid-2 :deep(.panel) {
   margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* ===== P0-2：两卡等高 + 卡内表格吃满剩余高度，全部交给布局本身 =====
+   等高：.grid-2 是 grid，行内两项默认 align-items: stretch，行高取两者较大的
+        内容高，矮的那张被拉平 —— 不需要任何 JS 参与。
+   吃满：① 两张卡都改成纵列弹性容器（.panel 本身是块状、正文高度由内容决定，
+           只给正文加 flex 没有「可分配空间」—— flex-basis:0 会把正文压成 0 高、
+            内容溢出到卡外，卡片只剩卡头）；
+         ② 正文（.panel-bd）拿到确定高度后自己也是纵列容器，把确定高度传给
+            卡内需要「吃满」的那块（.fill-table：flex:1 吃剩余空间）；
+         ③ .fill-table 里的 el-table 用 height="100%"（EP 把这个字符串直接写进
+            根元素 style，纯 CSS 解析），数据不满时空白落在表体内、行多时表体内滚。
+   ⚠️ 这条链上任一环的高度必须是「确定的」：环断裂（例如中间夹一层没有 flex/高度的
+      普通 div）时百分比高度会静默退化成 auto，表现为表格缩回内容高、卡片底部空一块。 */
+.grid-2 :deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+/* 左卡正文（v-loading 包装层）：内容居中，保证「本范围内没有扣分项 / 暂无可统计的
+   评分结果」这类空态落在卡片中间，而不是顶在卡头下面把下面四百多像素全空着
+   （1366/1680 两档实测 450px+）；safe center 让内容超出时退回顶部、不被推出可视区。
+   有数据时 .fill-table 靠 flex:1 吃满剩余高度，居中自然无效、不影响常态。 */
+.grid-2 > :deep(.panel:first-child) .panel-bd > * {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  /* 单列布局（<1600px）时卡片高度由内容决定，正文在「统计中」这段还没有内容，
+     卡片会缩成卡头一条、v-loading 的遮罩与转圈被压成 0 高。给正文一个下限，
+     加载态与「范围内无扣分项」态都有正常的一屏内高度。 */
+  min-height: 132px;
+}
+/* 加载态骨架占满卡内剩余高度：行从顶上排（safe center 对「撑满的子项」无效），
+   读起来是「内容正在一条条来」，而不是悬在卡片正中的一截色带。 */
+.grid-2 > :deep(.panel:first-child) .panel-bd .load-skel {
+  flex: 1 1 auto;
+}
+/* 卡内「吃满剩余高度」的表格容器：flex 吃掉卡内剩余空间，表格自身 height="100%"。
+   min-height 与改造前写死的档位一致（左 200 / 右 420），保证单列（<1600px，卡片高度
+   由内容决定、百分比退化为 auto）时不会比那时更矮。 */
+.fill-table {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.fill-table--left {
+  min-height: 200px;
+}
+.fill-table--right {
+  min-height: 420px;
+}
+/* 2026-10-18 用户反馈「空数据时把 el-table__empty-block 长度调大、左右要对称」：
+   有数据时右表由 .fill-table flex:1 撑高（现状不回归）；空态时表内容少、el-table 只按
+   内容高 299px 缩起，表底与分页之间留 121px 空白。这里给右卡 el-table 一个 420px 下限，
+   空态 empty-block（height:100%）撑满居中、表与分页间空隙消失；内容高于 420 时下限不生效。 */
+.grid-2 > :deep(.panel:last-child) .el-table {
+  min-height: 420px;
+}
+/* 返工第2次（2026-10-18 实测）：el-table 根 420 是 min-height 撑出来的、并非确定高度，
+   百分比 height:100% 对无确定高度父级不生效（被当 auto），inner-wrapper 仍按内容高 299 缩起、
+   body-wrapper/empty-block 仍 267、根内 625→746 仍有 121px 空。
+   改为给 inner-wrapper 直接下 min-height:420：inner-wrapper 内部是 flex 列（header ~32 +
+   body-wrapper flex:1）→ body-wrapper 自动撑到 420-32=388 → empty-block(height:100%) 撑到
+   388 居中显示「筛选范围内没有病历」，根内 121px 空消失。
+   el-table 根的 min-height:420 保留（两者叠加根仍 420、表底与分页 12px 空隙、左右卡等高 563 不变）；
+   有数据态（20 行 ~740px）内容高于 420，min-height 不绑定、无回归。 */
+.grid-2 > :deep(.panel:last-child) .el-table__inner-wrapper {
+  min-height: 420px;
+}
+/* 返工第3次（2026-10-18 实测）：根/inner/body-wrapper 全由 min-height/flex 撑出、均为非确定高度，
+   empty-block 的 inline height:100% 逐级解析失败、停在内容高 267（文本上方对齐、下方露 121px 空）。
+   直接对 empty-block 下确定高度绕开百分比级联：定高 388（=body-wrapper 420 - 表头 ~32）撑满，
+   el-empty 在其中垂直居中；!important 必须，用于覆盖 EP 的 inline height:100%。
+   空态专属节点，有数据态不存在、零影响。 */
+.grid-2 > :deep(.panel:last-child) .el-table__empty-block {
+  height: 388px !important;
+}
+/* 空态左卡：显示「本范围内没有扣分项」(.ok) 时，紧随其后的「分级分布」标题(.sub-hd)原本
+   悬在卡中部（.grade-chips 为空 h=0）。用 margin-top:auto 把它连同空 chips 一起推到卡底，
+   形成顶部「无扣分项」+ 底部「分级分布」的沉底分布，与右栏空态对称；有数据时 .ok 不存在、
+   此规则不命中，不回归。 */
+.grid-2 > :deep(.panel:first-child) .panel-bd > div .ok + .sub-hd {
+  margin-top: auto;
 }
 /* 报告口径：≥1600 档才左右并排；1366 档半幅宽连一行筛选都放不下，收回单列 */
 @media (max-width: 1599px) {
@@ -867,7 +980,7 @@ onMounted(() => {
 /* 截断 / 告警提示条：浅黄底，与错误红区分 */
 .trunc-hint {
   background: var(--ochre-surface);
-  border: 1px solid #ecd9b0;
+  border: 1px solid var(--cmp-qc-warn-border);
   color: var(--ochre-text);
   border-radius: 6px;
   padding: var(--sp-2) var(--sp-3);
@@ -955,11 +1068,11 @@ onMounted(() => {
 }
 .std-grade.mid {
   background: var(--ochre-light);
-  color: #8a6a44;
+  color: var(--ochre-strong);
 }
 .std-grade.bad {
   background: var(--danger-surface);
-  color: #8a3d33;
+  color: var(--el-color-danger-dark-2);
 }
 .rule-card {
   display: flex;

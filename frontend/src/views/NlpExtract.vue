@@ -12,43 +12,57 @@
       </div>
 
       <!-- max-height 与病历数据 / 人工复核同口径（420，2026-10-07 调档）：
-           每页 10 行直接显示完，不再出现「要多滚一格才见底」的内部滚动条
-           （原 360 在 13px 字阶下只够 ~9 行，用户得在表格里上下滚才能看全）。
-           >10 条时仍保留滚动，属预期。
+           默认每页 20 行（2026-10-18 由 10 调为 20，与 Qc 页 AI 预检列表同口径），
+           行数足以填满与右栏工作区等高后的卡片剩余高度，消除左栏大片留白。
+           切 10 / 50 条时表体在固定高度内出内部滚动条，属预期。
            slim：左栏是窄分栏，8 列全渲染会把摘要挤没、并冒出不可发现的横向滚动条；
            slim 只留「病历ID(90) / 摘要 / 操作」三列（内容宽约 420px），其余信息在
            右侧详情区可见（载入后有完整原文与结构化结果）。不传 slim 的共用页不受影响。 -->
-      <RecordTable
-        ref="tableRef"
-        slim
-        :rows="rows"
-        :loading="listLoading"
-        loading-text="正在读取任务列表…"
-        highlight-current
-        :row-class-name="rowClass"
-        :max-height="420"
-        :action-width="90"
-        @row-click="loadRecord"
-      >
-        <template #action="{ row }">
-          <el-button link type="primary" @click.stop="loadRecord(row)">载入</el-button>
-        </template>
-        <template #empty>
-          <!-- 与病历数据页同口径：范围筛选的列表，空态要说「无符合条件」而不是
-               Element 默认的「暂无数据」—— 后者读起来像系统没数据 -->
-          <EmptyState :failed="listFailed" :loading="listLoading"
-            text="无符合条件的病历" @retry="() => search(1)" />
-        </template>
-      </RecordTable>
+      <!-- P0-2：高度不再由 JS 按卡片实测反算（原 V5 的 useFillTableHeight），改由布局决定 ——
+           外层 .fill-table 吃掉卡片剩余高度、表格自身 height="100%"（纯 CSS 解析）：
+           左栏与右侧工作区等高后，表格填满卡片剩余高度，分页不再悬在卡底、
+           表格下方也不再空一大块；420 仍是最小值（见 .fill-table--picker）。 -->
+      <div class="fill-table fill-table--picker">
+        <RecordTable
+          ref="tableRef"
+          slim
+          :rows="rows"
+          :loading="listLoading"
+          loading-text="正在读取任务列表…"
+          highlight-current
+          :row-class-name="rowClass"
+          height="100%"
+          :action-width="90"
+          @row-click="loadRecord"
+        >
+          <template #action="{ row }">
+            <el-button link type="primary" @click.stop="loadRecord(row)">载入</el-button>
+          </template>
+          <template #empty>
+            <!-- 与病历数据页同口径：范围筛选的列表，空态要说「无符合条件」而不是
+                 Element 默认的「暂无数据」—— 后者读起来像系统没数据 -->
+            <EmptyState :failed="listFailed" :loading="listLoading"
+              text="无符合条件的病历" @retry="() => search(1)" />
+          </template>
+        </RecordTable>
+      </div>
 
+      <!-- 2026-10-19 分页器布局定高：原 layout="total, sizes, prev, pager, next, jumper"
+          是 flex-wrap 流动布局 —— 总条数 34182 时 20 条/页的末页号是 4 位数「1710」，
+          按钮行更宽把 jumper 挤到第三行（分页器高 124px）；切 50 条/页末页号 3 位数
+          「684」放得下（84px）→ 分页器高度随页数位数变化，直接改变左栏/页面长度
+          （用户反馈「20 条时长为 20、切 50 后长度变 21」即此）。
+          改为固定两行结构：上一行 = 上一页/页码/下一页，下一行 = 每页条数/跳页，
+          两行宽度都远小于栏宽，与总页数位数无关；total 移除（「共 N 条」已在左卡
+          筛选行的提示里展示，不重复）。分页器恒高、切分页不再改变页面长度。 -->
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :page-sizes="PAGE_SIZES_STANDARD"
 :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
+        layout="prev, pager, next, sizes, jumper"
             :disabled="listLoading"
-            style="margin-top: var(--sp-3); justify-content: flex-end"
+            class="picker-pager"
             @current-change="search"
         @size-change="handleSizeChange"
       />
@@ -67,7 +81,7 @@
         </template>
         <template v-else-if="probeHint === 'SERVICE_UNREACHABLE'">
           <b>抽取服务当前连不上</b>，现在点「执行抽取」只会得到空结果；
-          请联系系统管理员恢复抽取服务，或先用下方「术语归一试算」直接查词典。
+          请联系系统管理员恢复抽取服务。
         </template>
         <template v-else>
           抽取服务在跑，但<b>模型没有加载成功</b>，现在抽取只有规则兜底
@@ -112,14 +126,13 @@
               <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）——
               自动抽取功能<b>当前还没有开启</b>，所以没有产出内容。
               这不是「术语归一」没执行：<b>归一一直在跑</b>，只是没有可归的要素。
-              开启由系统管理员在服务端完成，页面上无法自助打开；在此之前可以先用下方
-              「术语归一试算」直接查词典。
+              开启由系统管理员在服务端完成，页面上无法自助打开。
             </template>
             <template v-else-if="emptyReason === 'SERVICE_UNREACHABLE'">
               <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）——
               自动抽取功能<b>已经开启，但抽取服务当前连不上</b>（服务可能未启动或中途停止了），
               所以这次没有产出内容。这不是「术语归一」没执行：<b>归一一直在跑</b>，只是没有可归的要素。
-              请联系系统管理员恢复抽取服务后重试；也可以先用下方「术语归一试算」直接查词典。
+              请联系系统管理员恢复抽取服务后重试。
             </template>
             <template v-else-if="emptyReason === 'MODEL_MISSING'">
               <b>本次只识别出很少的要素</b> —— 抽取服务已经启动，但<b>模型没有加载成功</b>，
@@ -132,7 +145,7 @@
               <b>本次没有抽取到病历要素</b>（疾病、证候、症状、中药等）。
               自动抽取功能当前未开启，或抽取服务暂时不可用，所以没有产出内容。
               这不是「术语归一」没执行：<b>归一一直在跑</b>，只是没有可归的要素。
-              请联系系统管理员；也可以先用下方「术语归一试算」直接查词典。
+              请联系系统管理员。
             </template>
             <template v-else>
               抽取已正常执行，但这段原文里没有识别出可归一的要素（疾病、证候、症状、中药等）。
@@ -150,13 +163,13 @@
               <div class="pane-hd">原文（按字段模块化，可单独修改）</div>
               <!-- 分区常显 + 多列栅格：原先 4 组折叠、默认只开 2 组，
                    用户仍要逐组展开、整页依旧要滚动；与病历数据页同一口径。
-                   控件尺寸由 size="large" 决定（40px）；多行字段的高度由
-                   autosize 的 minRows 给 —— Element 的 autosize 会写行内
-                   style="height:…px"，CSS 里的 min-height 会被它压掉。 -->
+                   控件尺寸由 size="large" 决定（40px）；多行字段高度由 v-autoheight
+                   指令按内容自适应（不再用 Element autosize —— 实测它在病历载入、
+                   手动输入时都不撑高，内容超出就出内部滚动条）。 -->
               <el-form
                 ref="fieldFormRef"
                 class="compact-form field-form"
-                label-width="68px"
+                label-width="72px"
                 size="large"
                 @submit.prevent>
                 <div v-for="g in FIELD_GROUPS" :key="g.title" class="form-group">
@@ -171,9 +184,9 @@
                     >
                       <el-input
                         v-model="fields[f.key]"
+                        v-autoheight
                         :type="f.multi ? 'textarea' : 'text'"
-                        :rows="f.multi ? 3 : undefined"
-                        :autosize="f.multi ? MULTI_AUTOSIZE : false"
+                        :rows="f.multi ? 2 : undefined"
                         clearable
                       />
                     </el-form-item>
@@ -263,58 +276,6 @@
                 </div>
               </div>
 
-              <!-- 术语归一试算：词典直查，不依赖 Python NLP 服务，
-                   让用户在本页就能亲自跑一次归一、看到「原文 → 标准词」。
-                   V4：原先排在空态**下方** —— 尚未抽取时用户先看到空态与大片留白，
-                   往下滚才撞见这个可用工具；按「信息优先」移到空态上方，
-                   词典直查入口先于留白出现。 -->
-              <div class="norm-tool">
-                <div class="nt-hd">术语归一试算（直查词典，不依赖 NLP 服务）</div>
-                <div class="nt-row">
-                  <!-- 这一行只有 placeholder、没有视觉标签，补 aria-label 让屏幕阅读器
-                       与 Chrome 的「No label associated with a form field」检查能认出它们
-                       （placeholder 不算无障碍名称） -->
-                  <el-select v-model="normType" size="small" aria-label="词典类型" style="width: 116px">
-                    <el-option v-for="t in NORM_TYPES" :key="t.value" :label="t.label" :value="t.value" />
-                  </el-select>
-                  <el-input
-                    v-model="normTerm"
-                    size="small"
-                    aria-label="待归一的术语"
-                    placeholder="如：脾肾阳虚"
-                    clearable
-                    @keyup.enter="runNormalize"
-                  />
-                  <el-button
-                    size="small"
-                    :loading="normLoading"
-                    :disabled="!normTerm.trim()"
-                    @click="runNormalize"
-                  >
-                    归 一
-                  </el-button>
-                </div>
-                <!-- 「试算结果 ↔ 示例提示」也是一处状态切换，用同一套 panel-fade 保持节奏一致。
-                     两个分支都是 div（同类型），必须给 key 才能被识别为「换了内容」。 -->
-                <Transition name="panel-fade" mode="out-in">
-                  <div v-if="normResult" key="r" class="nt-result">
-                    <span class="nt-in">{{ normResult.term }}</span>
-                    <span class="nt-arrow">→</span>
-                    <span class="nt-out" :class="{ miss: !normResult.level }">{{ normResult.standardTerm }}</span>
-                    <!-- 试算也要说清「怎么比上的」：否则用户没法判断是精确命中还是猜的 -->
-                    <span class="nt-src">
-                      <template v-if="normResult.level">
-                        命中词典 · {{ LEVEL_FULL[normResult.level] || normResult.level }}
-                      </template>
-                      <template v-else>未命中词典，返回原词</template>
-                    </span>
-                  </div>
-                  <div v-else key="h" class="nt-hint">
-                    命中示例：证候「脾肾阳虚」、中药「炙甘草」；词典未收录的口语词（如「嗓子疼」）会原样返回并标为未命中。
-                  </div>
-                </Transition>
-              </div>
-
               <!-- 28.17：点击结果里的实体，左侧原文区定位到对应字段并高亮原文片段。
                    「空态 ↔ 结果态」是典型的页内状态切换：加 panel-fade 让结果「浮现」
                    而不是「啪」地出现。用 mode="out-in" 先让空态淡出再让结果淡入 ——
@@ -375,12 +336,11 @@ import StructuredDataCard from '@/components/StructuredDataCard.vue'
 import NlpBatchPanel from '@/components/NlpBatchPanel.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import { runNlpExtractAsync, submitNlpBatch, getNlpBatchProgress, cancelNlpBatch, listNlpBatch } from '@/api/nlp'
-import { normalize } from '@/api/governance'
 import { searchRecords, getRawRecord, updateRecord } from '@/api/records'
 import { fmtDateTime, fmtDate } from '@/utils/format'
 import { apiErrorMessage } from '@/utils/errorMessage'
-import { MULTI_AUTOSIZE } from '@/utils/recordFields'
-import { LEVEL_FULL, LEVEL_TINY, summarizeNorm } from '@/utils/structured'
+import { vAutoheight } from '@/utils/autoheight'
+import { LEVEL_TINY, summarizeNorm } from '@/utils/structured'
 import { confirmBox } from '@/utils/confirm'
 import { PAGE_SIZES_STANDARD } from '@/utils/constants'
 
@@ -390,15 +350,20 @@ const { status: nlpStatus, loading: nlpProbing, probeNlp } = useNlpStatus()
 
 const activeTab = ref('single')
 
+// P0-2：左栏「选择病历」表格不再由 JS 定高 —— 左栏与右侧工作区等高（见 .split-picker 样式），
+// 表格填满卡片剩余高度这件事由 CSS 完成（外层 .fill-table 吃剩余空间 + 表格 height="100%"）。
+
 // P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
 const loadedAt = ref(new Date().toLocaleString())
 // ===== 病历列表=====
-// 默认口径：今天导入（与标准质量报告页同口径）—— 解析页关心的是「刚导进来的这批抽得怎么样」，
-// 不带默认范围一进页面就是全库历史；想看全量把导入时间清空即可（两端缺一按「未给」处理）
-const today = fmtDate()
-const query = reactive({ department: '', dateRange: null, grade: '', importRange: [today, today] })
+// 默认不带时间范围：进页面即看全库（两端都空 = 不按时间过滤）。
+// 想看「刚导进来的这批」用筛选条上的「今天」按钮临时圈定。
+const query = reactive({ department: '', dateRange: null, grade: '', importRange: null })
 const page = ref(1)
-const pageSize = ref(10)
+// 默认每页 20 条：与 Qc 页 AI 预检列表同口径（10→20），让表体行数足以填满
+// 与右栏工作区等高后的卡片剩余高度，消除左栏大片留白（2026-10-18 用户拍板）。
+// 切 10 / 50 条时表体在固定高度内出内部滚动条，属预期（见 .fill-table--picker）。
+const pageSize = ref(20)
 // 列表加载失败：与「确实没有匹配」区分开（三态统一）
 
 // 查询病历列表（分页 / 筛选 / 重试共用）：传数字即跳到该页；失败置 listFailed 与「确实没有匹配」区分，toast 由拦截器出
@@ -427,11 +392,11 @@ const handleSizeChange = () => {
   search()
 }
 
-// 重置筛选条件并回到第 1 页重新查询：回到默认口径（今天导入），与初始进入页面一致
+// 重置筛选条件并回到第 1 页重新查询：清空全部条件（含导入时间），回到「全库」口径
 const resetFilters = () => {
   query.department = ''
   query.dateRange = null
-  query.importRange = [today, today]
+  query.importRange = null
   query.grade = ''
   search(1)
 }
@@ -707,44 +672,6 @@ const sourceNote = computed(() => {
  */
 const normStat = computed(() => summarizeNorm(result.value))
 
-// ===== 术语归一试算=====
-// 类型取自接口契约 NormalizeDTO.type 的枚举，不在此另立「字段 → 词典类型」映射
-const NORM_TYPES = [
-  { value: 'disease', label: '疾病' },
-  { value: 'pattern', label: '证候' },
-  { value: 'symptom', label: '症状' },
-  { value: 'herb', label: '中药' },
-  { value: 'formula', label: '方剂' }
-]
-const normType = ref('pattern')
-const normTerm = ref('')
-const normLoading = ref(false)
-const normResult = ref(null)
-
-// 直接查词典归一（POST /api/governance/normalize），不经过 Python NLP 服务
-const runNormalize = async () => {
-  // 1. 取词去空白，为空直接返回不发请求
-  const term = normTerm.value.trim()
-  if (!term) return
-  // 2. 进入试算态
-  normLoading.value = true
-  try {
-    // 3. 查词典归一，把命中词 / 级别落成展示结果
-    const res = await normalize({ type: normType.value, term })
-    const d = res.data || {}
-    normResult.value = {
-      term,
-      standardTerm: d.standardTerm || term,
-      level: d.level || 0
-    }
-  } catch {
-    // 拦截器已提示
-  } finally {
-    // 4. 无论成败都收掉试算态
-    normLoading.value = false
-  }
-}
-
 // 写回结构化数据：先二次确认（覆盖原有内容、不可撤销），确认后才提交，取消则直接返回不发请求
 const save = async () => {
   // 1. 取用于回显的病历标识（优先登记号）
@@ -793,19 +720,19 @@ onMounted(() => {
 }
 .loaded-bar b { color: var(--ink); }
 /* 左栏（原文）给 1.25 份宽（第九轮实测校准，原为 1.5）。
-   第九轮改回「同页展开」：曾把滚动收到这个框内部（max-height + overflow:auto），
-   为的是整页不出下拉条；但用户明确不要这一层的上下滚动条 —— 框内滚动等于把内容切成
-   两个滚动上下文，找实体要滚两次。现在框不限高，内容自然撑开、由页面统一滚动，
-   与项目「长内容同页展开」的既有口径一致。左栏主操作条仍是 sticky bottom，滚动时恒在视口内。
-
-   比例为何从 1.5 收到 1.25（Edge 实测两档视口）：
+   2026-10-19 起（用户反馈「单条解析的 NLP 结构化解析也是左右分布，要用「固定一边 +
+   滚动条」方案解决留白」）：内层 .split-compare 两栏改为**等高锚定 + 内容超高时
+   各自内部滚动**（见下方 V6 块）——原先「框不限高、内容自然撑开、由页面统一滚动」
+   的写法在右栏结果长于左栏时会让行高随内容变化（用户反馈「执行后长度变了」即此）。
+   现在列高恒等于等高框，找实体在单列内滚动即可，不再需要页面来回滚两栏；
+   操作条仍 sticky bottom，列内滚动时恒在可视底边。比例依据（第九轮实测，仍有效）：
    - 左栏高度对宽度不敏感 —— 799→666px 区间内左表单恒为 545px（1366 下 517px），收窄它没有代价；
    - 右栏的实体卡高度对宽度极敏感 —— 1366 下右栏 439px 宽时 sd-card 高达 1056px，488px 宽即降到
      701px 并触底（标签不再反复折行）；1600 下 533px 宽本来已触底，加宽无收益。
    - 1.25 是拐点：再往下（1.1 / 1.0）右栏只再降 20~40px，却把左栏压得过窄。
    实测效果（已注入 normVia，即后端重启后的真实状态）：
      1366 下两栏高度差 808 → 429px；1600 下 404 → 381px；两档 sd-card 均落在 701px 地板值。
-   注意：右栏比左栏高是内容量差异（9 类实体分区 + 归一汇总 + 归一试算，对 12 个字段的表单），
+   注意：右栏比左栏高是内容量差异（9 类实体分区 + 归一汇总，对 12 个字段的表单），
    不可能靠比例抹平；这里只把「因宽度不足而白折的行」消掉。 */
 .split {
   display: grid;
@@ -831,13 +758,45 @@ onMounted(() => {
 .split-compare {
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 }
-/* V4：结果列拉到与左栏等高 —— 继承自 .split 的 align-items:start 让右栏只有自身内容高
-   （空态时约 465px，左栏约 943px），478px 空白整块堆在下方。
-   stretch 之后空白回到列内，配合 .empty-center 上下对称分掉。 */
+/* 2026-10-19：内层两栏等高规则集中在下方 V6 块（含 min-height:0 / overflow-y:auto /
+   space-between，2026-10-19 更新）；旧 V4 单设 last-child 的写法已并入，不再单独保留。 */
+/* V6（留白·对称专项）：原文列（.split-compare 左栏）同样拉到与右栏等高。
+   此前左栏继承 .split 的 align-items:start，只按自身表单内容高排布（约 545px），
+   右栏结果卡 701px+，高度差整块裸露在左栏卡底下方。stretch 后左栏填满该列：
+   表头与 4 个表单分组自然打包在顶部（.form-group 间距保持 6px，绝不拉伸输入框行），
+   .pane-actions 用 margin-top:auto 贴住列底 —— 左右两栏底边齐平，多余弹性空间
+   只落在「整段文本」与操作条之间这一处，而不是摊在输入行之间。
+   2026-10-19（用户反馈「单条解析的 NLP 结构化解析也是左右分布，要用同一套
+   「固定一边 + 滚动条」方案解决留白」）：网格项默认 min-height:auto，内容超高时
+   拒绝收缩、把 .split-compare 撑破 —— 实测执行抽取后右卡 1247px 内容把内栏顶到
+   1565px、溢出 918px 等高框，卡底以下整段外溢（这正是「执行后长度变了」的观感来源）。
+   修正：两栏补 min-height:0 + overflow-y:auto —— 列高恒等于等高框，内容超高时各自
+   内部滚动（不裁内容）；短内容时用 space-between 在列内均匀分布、消除大块留白
+   （原先 margin-top:auto 会把全部弹性空间堆在「整段文本」与操作条之间一处）。
+   与右栏空态 .empty-center{margin:auto 0} 不冲突：auto 边距优先于 space-between，
+   空态仍上下居中。 */
+.split-compare > .pane:first-child {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  justify-content: space-between;
+}
 .split-compare > .pane:last-child {
   align-self: stretch;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  justify-content: space-between;
+}
+/* 2026-10-19：操作条不再用 margin-top:auto 吸底（auto 边距会优先吸收全部弹性空间，
+   使上方的 justify-content:space-between 恒为 no-op）；分布交给列级 space-between，
+   操作条作为末子项自然落在列底。内部滚动时 position:sticky bottom:0 仍把操作条
+   钉在滚动视口底边 —— 长表单滚动时「执行抽取 / 写回」按钮恒可见，交互不受影响。 */
+.split-compare > .pane:first-child .pane-actions {
+  flex: 0 0 auto;
 }
 /* V4：空态（尚未抽取）在列内垂直居中。
    margin:auto 上下均分剩余空间 —— flex 列布局中 auto 边距先于 justify-content
@@ -852,6 +811,122 @@ onMounted(() => {
    左栏（原文）也下移 45px —— 但内层两栏同在一张卡片里、表头本就同线，
    那 45px 是误伤（V4 拉伸对齐时会放大成肉眼可见的错位）。收窄到 .split-picker 才是原意。 */
 .split-picker > .pane:first-child { margin-top: 45px; }
+/* V5（2026-10-17）：外层左栏「选择病历」也拉到与右栏工作区**等高**并让卡内内容撑满。
+   此前外层沿用 .split 的 align-items:start，左栏只有自身内容高（1680 下 652px），
+   右栏 949px —— 297px 空白整块裸露在左卡下方的页面底上（用户反馈的「两栏不齐、
+   下面一大块空」）。stretch 后左卡填满该列，卡内纵向弹性：标题条固定、主体吃掉剩余高度、
+   表格吃掉主体剩余高度（表是卡内最大的那块），分页紧随其后。
+   多余空间落在表格**内部**（行不满时表现为表体留白，空态则居中），而不是裸露在卡片外面。
+   P0-2：表格高度改由这条 CSS 链决定（.fill-table + height="100%"），
+   不再用 useFillTableHeight 量卡片像素（那套依赖 DOM 时机，换档/数据变化都要重量）。
+   ⚠️ 内层 .split-compare 的右栏另有 V4 的处理（.empty-center 上下均分），两处不冲突。 */
+.split-picker { align-items: stretch; }
+.split-picker > .pane:first-child {
+  display: flex;
+  flex-direction: column;
+}
+.split-picker > .pane:first-child > :deep(.panel) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* 等高后卡片贴住列底，去掉 PanelCard 自带的 12px 下外边距，避免底部多出一截 */
+  margin-bottom: 0;
+}
+/* .panel-bd 在 PanelCard 内部（是 .panel 的子元素，不是 .pane 的），故用后代选择器，
+   不能写子选择器 —— 写错会静默失效：卡片高度被撑开了，但主体不会跟着长高、分页也不会沉底 */
+.split-picker > .pane:first-child :deep(.panel-bd) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* 卡内「吃满剩余高度」的表格容器：flex 吃掉主体剩余空间，表格自身 height="100%"。
+   min-height 420 与改造前写死的档位一致（列高由内容决定时不会比那时更矮）。 */
+.fill-table {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.fill-table--picker {
+  min-height: 420px;
+  /* 2026-10-18 用户最终方案「固定一边 + 滚动条」：左列表固定高度锚定，行多时表体内滚。
+     max-height 700：左卡自然高 = 45(标签行下移) + 366(非表格块) + 700(表高) = 1111px，
+     作为左右两栏的锚定行高；默认 20 行（约 752px 内容）超过 700 上限 → 表体内部滚动，
+     不再无限撑长页面；切 10/50 条/页同样在固定高度内内滚。
+     2026-10-19：锚定的**确定性**改由右栏承担（.pane:last-child 固定 height:1111px，
+     见下方）——网格行高恒定后，左卡/本容器/表格恒为 700，max-height 降级为防御性封顶；
+     分页 20↔50 只改变行数与表体内滚，不再改变任何长度。 */
+  height: 700px;
+  max-height: 700px;
+}
+/* V5：分页紧跟表格（表格已吃满卡片剩余高度，多余空间落在表体内部），padding 只保证 12px 间距。
+   这里**不能**写 margin-top:auto —— 自动外边距会被 getComputedStyle 解析成一个具体像素值，
+   早先那版 JS 定高会把它算进「表格下方的占位」，可用高度于是恒等于当前表格高度、
+   表格永远停在最小值上；改成 CSS 定高后这个坑不再成立，但分页紧贴表格仍是本页口径。 */
+.split-picker > .pane:first-child :deep(.panel-bd) > .picker-pager {
+  margin-top: 0;
+  padding-top: var(--sp-3);
+  justify-content: flex-end;
+}
+/* 2026-10-18 用户最终方案「固定一边 + 滚动条」：右 pane 补等高链，穿透 el-tabs 两层。
+   左栏已用 .fill-table--picker{max-height:700} 锚定行高 1111px；右栏从 pane 到 PanelCard
+   逐层 flex:1/min-height:0 拉到同一行高并填满，内容超高时在 .panel-bd 内部滚动，
+   不再无限撑长页面。右 pane 上限 1111px = 左栏锚定行高（45 标签行 + 366 非表格块 + 700 表高），
+   防止载入长病历后右卡自然高把整行再顶高，保证「固定一边」生效。
+   选择器层级：.pane:last-child（本组件模板节点，无需 :deep）→ .nlp-tabs（el-tabs 根，
+   class 由本模板传入，直接选）→ :deep(.el-tabs__content / .el-tab-pane)（Element 内部 DOM）
+   → :deep(.panel / .panel-bd)（PanelCard 内部 DOM）。隐藏的 tab-pane 是 display:none 不参与布局。
+   2026-10-19 修正：max-height → height（定锚）。max-height 只封顶、高度仍由内容驱动——
+   右侧内容短（未载入/空态/结果少）时行高缩水，左列表与分页跟着变短；这正是用户反馈
+   「切分页 / 执行抽取后选择病历与 NLP 解析长度会变」的根因。改为固定 height 后右栏恒定
+   1111px，网格行高恒定 → 左列表恒 700、内层 .split-compare 恒等高，切分页 / 执行 /
+   换病历 / 服务横幅出现均不改变页面长度；内容超高由 .panel-bd / 内栏 overflow:auto 内部滚动承接。 */
+.split-picker > .pane:last-child {
+  display: flex;
+  flex-direction: column;
+  height: 1111px;
+}
+.split-picker > .pane:last-child .nlp-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.split-picker > .pane:last-child .nlp-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.split-picker > .pane:last-child .nlp-tabs :deep(.el-tab-pane) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.split-picker > .pane:last-child .nlp-tabs :deep(.panel) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+.split-picker > .pane:last-child .nlp-tabs :deep(.panel-bd) {
+  flex: 1;
+  min-height: 0;
+  /* 必须声明 flex column：否则 .panel-bd 是 block，其子项 .split-compare 的 flex:1 1 auto
+     不生效、按内容高停放，卡内 split-compare 下方残留裸空白（实测 149px）。
+     与左栏 .panel-bd 同款；本规则带 .nlp-tabs 前缀，只命中右侧工作区卡，不影响批量 Tab
+     （批量卡 .panel-bd 由 NlpBatchPanel 自己的 space-between 规则接管）。 */
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+/* 右卡内「原文 / 抽取结果」两栏吸收多余高度：在 .panel-bd(flex column) 里吃满剩余空间 */
+.split-picker > .pane:last-child .split-compare {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .pane { min-width: 0; }
 .pane-hd { font-size: var(--fs-base); font-weight: bold; color: var(--ink); margin-bottom: var(--sp-2); }
 .src-note { font-size: var(--fs-xs); color: var(--ink-mid); margin-left: var(--sp-2); }
@@ -869,8 +944,8 @@ onMounted(() => {
 .norm-note b { color: var(--ink); }
 .norm-note.warn {
   background: var(--danger-surface);
-  border-color: #e3c3bb;
-  color: #8a3d33;
+  border-color: var(--danger-border-soft);
+  color: var(--el-color-danger-dark-2);
 }
 /* 归一汇总（第九轮）：把命中数、未命中数、走 ES 还是内存摊开 */
 .norm-stat {
@@ -910,14 +985,14 @@ onMounted(() => {
 /* 无产出提示：把「为什么没有结果」摆到填写区上方，不藏在空态里 */
 .nlp-off {
   background: var(--danger-surface);
-  border: 1px solid #e3c3bb;
+  border: 1px solid var(--danger-border-soft);
   border-left: 3px solid var(--danger);
   border-radius: 6px;
   padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-3);
   font-size: var(--fs-xs);
   line-height: 1.8;
-  color: #8a3d33;
+  color: var(--el-color-danger-dark-2);
 }
 .nlp-off b { color: var(--danger); }
 /* 服务状态横幅（25.7）：与「无产出」提示同款配色，区别在它是动手之前的预报；
@@ -926,32 +1001,6 @@ onMounted(() => {
 .nlp-probe .np-text { flex: 1 1 auto; }
 .nlp-probe .el-button { flex: 0 0 auto; }
 
-/* 术语归一试算：词典直查，不依赖 NLP 服务 */
-.norm-tool {
-  margin-top: var(--sp-3);
-  padding: var(--sp-3) var(--sp-3);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-.nt-hd { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: var(--sp-2); }
-.nt-row { display: flex; gap: var(--sp-2); align-items: center; }
-.nt-result {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  margin-top: var(--sp-2);
-  padding-top: var(--sp-2);
-  border-top: 1px dashed var(--line-soft);
-  font-size: var(--fs-xs);
-}
-.nt-in { color: var(--text-sub-strong); }
-.nt-arrow { color: #c9c3b4; }
-.nt-out { color: var(--ink); font-weight: bold; }
-.nt-out.miss { color: var(--danger); }
-.nt-src { font-size: var(--fs-xs); color: var(--text-sub-strong); margin-left: auto; }
-.nt-hint { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); line-height: 1.7; }
 /* 28.13：空态引导文案，居中但不喧宾夺主 */
 .empty-hint { max-width: 360px; margin: 0 auto; font-size: var(--fs-xs); color: var(--text-sub-strong); line-height: 1.8; }
 

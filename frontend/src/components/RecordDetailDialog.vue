@@ -102,8 +102,8 @@ const FIELDS = fieldsWithWide([
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--sp-4);
-  align-items: start;
-  /* 比原来少 50px：上方多了一层页签，页脚「关闭」仍须留在视口内 */
+  /* 用户要求「固定一栏 + 滑动条」：两栏等高锚定、不再整体滚动，
+     内容多时各自内部滚动（左原始字段固定、右结构化+AI 内容多走内滚） */
   max-height: calc(86vh - 190px);
   overflow: auto;
 }
@@ -111,6 +111,24 @@ const FIELDS = fieldsWithWide([
    长文本（如现病史）会撑破两栏宽度 */
 .detail-col {
   min-width: 0;
+  overflow: auto;
+}
+/* 左栏（原始 21 字段只读表）：flex 列容器，让 el-descriptions 吃满栏高。
+   矮栏时留白落在表格下方（顶对齐，与右栏内容同一行起读）；
+   右栏是 StructuredDataCard + AiInterpretCard 内容驱动卡堆，保持自然高度、不拉散成 space-between。 */
+.detail-col:first-child {
+  display: flex;
+  flex-direction: column;
+}
+.detail-col:first-child :deep(.el-descriptions) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 用户要求：左「原始字段」一栏撑满弹窗高度（调大长度），表格铺满 */
+.detail-col:first-child :deep(.el-descriptions__body),
+.detail-col:first-child :deep(.el-descriptions__table) {
+  height: 100%;
 }
 /* 栏标题：小字次级色，只作分区提示 */
 .col-hd {

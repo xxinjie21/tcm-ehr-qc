@@ -17,7 +17,8 @@
   </div>
   <!-- 列表只列「谁 / 多少 / 什么状态」，术语类型由页头筛选器统一控制，
        审核意见与差异都在右侧详情里 —— 左栏重复一遍只会把列挤到横向滚动。 -->
-  <el-table :data="proposals" border size="small" max-height="300" style="margin-top: var(--sp-2)"
+  <div class="rv-list-wrap">
+  <el-table :data="proposals" border size="small" height="100%"
     :empty-text="`当前类型暂无${statusLabel}提案`">
     <el-table-column label="提交人" min-width="96" show-overflow-tooltip>
       <template #default="{ row }">{{ row.submitUserId }}</template>
@@ -36,6 +37,7 @@
       </template>
     </el-table-column>
   </el-table>
+  </div>
   <div v-if="isOwner" class="tip" style="margin-top: var(--sp-2)">
     你是本组组长：成员提交的改动会列在这里，由你点「通过」才合并入小组基线。
   </div>
@@ -46,11 +48,12 @@
 
   <!-- 右侧：差异详情常驻（不再用弹窗 —— 三栏差异塞进 el-dialog 太挤） -->
   <div class="rv-detail">
+  <div v-if="!currentProposal" class="rv-empty">
     <EmptyState
-      v-if="!currentProposal"
       text="从左侧选择一条提案查看差异"
       :image-size="70"
     />
+  </div>
     <template v-else>
       <div class="rv-detail-hd">
         <div class="rv-detail-meta">
@@ -506,21 +509,42 @@ defineExpose({
 /* ===== 提案审核：主从布局 ===== */
 /* 左侧固定 420px 列表、右侧自适应详情。
    宽度从 340px 提到 420px：左列表的列宽合计约 316px（提交人 96 + 词条数 72
-   + 状态 84 + 操作 64），340px 时会被挤到横向滚动。 */
+   + 状态 84 + 操作 64），340px 时会被挤到横向滚动。
+   改 grid 双列、默认 stretch 等高：右栏详情高时左栏被拉到同高，
+   提案表经 .rv-list-wrap 吃满剩余高度（行多表体内滚、行少无多余滚动条）；
+   不再 align-items:flex-start 让左栏缩回内容高、表底空一截。 */
 .rv-master {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
   gap: var(--sp-4);
-  align-items: flex-start;
 }
 .rv-side {
-  flex: 0 0 420px;
-  min-width: 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rv-list-wrap {
+  flex: 1 1 auto;
+  min-height: 280px;
+  margin-top: var(--sp-2);
+  display: flex;
+  flex-direction: column;
 }
 .rv-detail {
   flex: 1 1 auto;
   min-width: 0;   /* 关键：否则 flex 子项不收缩，长内容会把右栏撑破 */
   border-left: 1px solid var(--line);
   padding-left: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+}
+/* 空态（未选提案）在被拉平的右栏内垂直居中，不再顶在栏头把下半栏空着 */
+.rv-empty {
+  flex: 1 1 auto;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .rv-detail-hd {
   display: flex;
@@ -562,10 +586,9 @@ defineExpose({
 /* 窄屏（<1200px）下主从退化为上下堆叠 */
 @media (max-width: 1200px) {
   .rv-master {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
   .rv-side {
-    flex: 1 1 auto;
     width: 100%;
   }
   .rv-detail {

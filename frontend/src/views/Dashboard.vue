@@ -1,7 +1,17 @@
 <template>
   <!-- 首页看板：只留 4 块 —— 待办快捷条 + 3 张指标卡 + 质控趋势 + 评分分布/科室合格率 -->
   <div>
-    <StatsFilter :model="filter" :departments="departments" @search="loadAll" @reset="resetFilters" />
+    <!-- P0-1：范围查询全站统一 —— 原先本页独用 StatsFilter（开单科室 150px + 两个单日期
+         150px、自带查询重置），与其余 7 页的 RangeFilter（科室/就诊时间/导入时间/分级）
+         字段、外形、宽度都不一样。现改为同一个 RangeFilter + 同一条 ScopeBar，
+         位置也从「页面第一条」保持不变（内容区最顶部、紧贴第一张卡）。
+         本页只按「科室 + 就诊时间」收窄（导入时间/分级对看板无意义，故隐藏）。 -->
+    <ScopeBar>
+      <RangeFilter v-model="filter" :show-grade="false" :show-import="false" />
+      <el-button type="primary" size="default" :loading="loading" @click="loadAll">查 询</el-button>
+      <el-button size="default" :disabled="loading" @click="resetFilters">重置</el-button>
+      <span class="tip">范围对下方指标卡与图表同时生效；待办条的「待复核」为全量</span>
+    </ScopeBar>
 
     <!-- 待办快捷条；无权限的卡片置灰并标注，避免点了才被 403 弹回
          用 button 而非 div：天然可聚焦、支持 Enter/Space
@@ -38,8 +48,12 @@
            而且与下方指标卡的同一个数字重复。待办条只留动作型入口，数字看指标卡。 -->
     </section>
 
-    <!-- 只遮数据区：筛选条保持可交互，避免整页白屏 -->
-    <div v-loading="loading" element-loading-text="数据加载中…">
+    <!-- P0-3：这里原来是整块 v-loading 遮罩（筛选条虽保持可交互，但遮罩把三张指标卡
+         与两张图的标题、上一批数字全盖住了）。现在按区域各自表达加载态：
+         指标卡未返回时显示「—」（StatCard 自身处理 null），
+         图/排名区由各自的 EmptyState 渲染骨架屏（见 components/LoadingSkeleton.vue），
+         加载中的动效来自骨架呼吸 + 顶部「查 询」按钮的 loading 圈。 -->
+    <div>
       <!-- 3 张指标卡；tone 决定数字配色（green 达标 / ochre 待办 / red 异常）。
            「待复核」不在这一排 —— 那个数字只出现在上方待办条（25.6：同一屏一次即可，
            两处都有会让看板与待办条各说一个数、对不上时无从判断谁对）。
@@ -122,16 +136,17 @@
 <script setup>
 // 首页看板：待办快捷条 + 指标卡 + 两张图（趋势折线、评分分布柱状）。
 // 数据来自 /stats/overview（指标卡）与 /stats/extra（图表），筛选条件只影响后者。
-import { useDepartments } from '@/composables/useDepartments'
 import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import echarts from '@/utils/echarts'
-import StatsFilter from '@/components/StatsFilter.vue'
+import ScopeBar from '@/components/ScopeBar.vue'
+import RangeFilter from '@/components/RangeFilter.vue'
 import FreshnessTag from '@/components/FreshnessTag.vue'
 import StatCard from '@/components/StatCard.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import { CHART } from '@/utils/chartTheme'
 
 import { getOverview, getExtraStats } from '@/api/stats'
 import { governanceStats } from '@/api/governance'
@@ -155,14 +170,10 @@ const drill = (grade) => {
   if (grade) q.grade = grade
   if (filter.department) q.department = filter.department
   // 病历页的日期区间 URL 键是 dateRange（"起,止"），与 stats 接口的 start/end 不同名
-  if (filter.start && filter.end) q.dateRange = `${filter.start},${filter.end}`
+  if (filter.dateRange?.length === 2) q.dateRange = `${filter.dateRange[0]},${filter.dateRange[1]}`
   router.push({ path: '/records', query: q })
 }
 const userStore = useUserStore()
-
-// 科室选项取自后端，与站内其他筛选器同一数据源
-// 科室下拉选项（缓存：useDepartments 单例）
-const { departments, reload: loadDepartments } = useDepartments()
 
 // 待办卡片按登录返回的菜单判断可达性；无权限时置灰并说明原因
 const canVisit = (menuTitle) => (userStore.menus || []).includes(menuTitle)
@@ -176,7 +187,9 @@ const go = (path, menuTitle) => {
 }
 
 // 筛选条件：科室 + 就诊日期区间；只作用于图表接口
-const filter = reactive({ department: '', start: '', end: '' })
+// P0-1：字段结构改为 RangeFilter 的统一口径（dateRange 是 [起, 止] 数组），
+// 原先是 start/end 两个单日期字段（StatsFilter 的私有口径）。
+const filter = reactive({ department: '', dateRange: null })
 const loading = ref(false)
 // P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
 const loadedAt = ref(new Date().toLocaleString())
@@ -251,7 +264,7 @@ const renderTrend = () => {
       formatter: (params) => {
         const list = Array.isArray(params) ? params : [params]
         const rows = list.map((p) =>
-          `${p.marker}${p.seriesName}：<b style="color:#2f4639;font-size:15px">${p.value}</b>`
+          `${p.marker}${p.seriesName}：<b style="color:${CHART.ink};font-size:15px">${p.value}</b>`
         ).join('<br/>')
         return `${list[0]?.axisValue ?? ''}<br/>${rows}`
       }
@@ -260,10 +273,10 @@ const renderTrend = () => {
     legend: { data: ['合格率', '待复核'], right: 10, top: 0, textStyle: { fontSize: 13 } },
     // L1：容器由 230px 压到 180px 后，grid 上边距同步从 34 压到 28，避免图例与绘区间留死白
     grid: { left: 44, right: 48, top: 28, bottom: 28 },
-    xAxis: { type: 'category', data: t.map((p) => p.month), axisLine: { lineStyle: { color: '#d8d2c4' } }, axisLabel: { fontSize: 13 } },
+    xAxis: { type: 'category', data: t.map((p) => p.month), axisLine: { lineStyle: { color: CHART.axisLine } }, axisLabel: { fontSize: 13 } },
     yAxis: [
       // F6：两条 Y 轴补显式 axisLabel 字号 13（保持既有 color / splitLine 配置不变）
-      { type: 'value', name: '合格率%', max: 100, axisLabel: { formatter: '{value}', fontSize: 13 }, splitLine: { lineStyle: { color: '#efebe1' } } },
+      { type: 'value', name: '合格率%', max: 100, axisLabel: { formatter: '{value}', fontSize: 13 }, splitLine: { lineStyle: { color: CHART.splitLine } } },
       { type: 'value', splitLine: { show: false }, axisLabel: { fontSize: 13 } }
     ],
     series: [
@@ -275,8 +288,8 @@ const renderTrend = () => {
         //    之前 itemStyle.color:'var(--ink-mid)' 被判为非法色 → 折线描边失效，看着「很淡」，
         //    hover 触发重绘后直接消失；两条线的非法色还会一起回退成同一个颜色，区分度自然为零。
         data: t.map((p) => p.qualifiedRate),
-        itemStyle: { color: '#3d5a4c', borderColor: '#fff', borderWidth: 1.5 },
-        lineStyle: { color: '#3d5a4c', width: 3 },
+        itemStyle: { color: CHART.inkMid, borderColor: CHART.surface, borderWidth: 1.5 },
+        lineStyle: { color: CHART.inkMid, width: 3 },
         areaStyle: { color: 'rgba(61,90,76,0.12)' },
         // hover 只加粗、不做焦点模糊：避免非当前系列被压暗到看不见
         emphasis: { focus: 'none', lineStyle: { width: 3.5 } }
@@ -285,10 +298,10 @@ const renderTrend = () => {
         name: '待复核', type: 'line', smooth: true, yAxisIndex: 1,
         showSymbol: true, symbolSize: 6,
         // 亮赭石（赭石族更亮一档）：与墨绿在色相 + 明度两个维度都拉开，
-        // 比默认 --ochre(#96714f) 更容易和绿色线区分开
+        // 比默认 --ochre 更容易和绿色线区分开
         data: t.map((p) => p.pendingReview),
-        itemStyle: { color: '#b8772f', borderColor: '#fff', borderWidth: 1.5 },
-        lineStyle: { color: '#b8772f', type: 'dashed', width: 3 },
+        itemStyle: { color: CHART.seriesWarn, borderColor: CHART.surface, borderWidth: 1.5 },
+        lineStyle: { color: CHART.seriesWarn, type: 'dashed', width: 3 },
         emphasis: { focus: 'none', lineStyle: { width: 3.5 } }
       }
     ]
@@ -317,21 +330,21 @@ const renderDist = () => {
       formatter: (params) => {
         const list = Array.isArray(params) ? params : [params]
         return list.map((p) =>
-          `${p.marker}${p.name}：<b style="color:#2f4639;font-size:15px">${p.value}</b>`
+          `${p.marker}${p.name}：<b style="color:${CHART.ink};font-size:15px">${p.value}</b>`
         ).join('<br/>')
       }
     },
     grid: { left: 40, right: 16, top: 16, bottom: 28 },
     // F6：两条轴 axisLabel 补 13（原轴标签走 ECharts 默认字号，未随令牌上移）
-    xAxis: { type: 'category', data: d.map((b) => b.bucket), axisLine: { lineStyle: { color: '#d8d2c4' } }, axisLabel: { fontSize: 13 } },
-    yAxis: { type: 'value', axisLabel: { fontSize: 13 }, splitLine: { lineStyle: { color: '#efebe1' } } },
+    xAxis: { type: 'category', data: d.map((b) => b.bucket), axisLine: { lineStyle: { color: CHART.axisLine } }, axisLabel: { fontSize: 13 } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 13 }, splitLine: { lineStyle: { color: CHART.splitLine } } },
     series: [{
       type: 'bar', barWidth: '46%',
       // 28.21：0 值档位单独弱化，避免与「有数据」的档位在视觉上同一观感
       data: d.map((b) => b.count === 0
         ? { value: 0, itemStyle: { color: 'rgba(77,107,88,0.18)' } }
         : b.count),
-      itemStyle: { color: '#4d6b58', borderRadius: [2, 2, 0, 0] }
+      itemStyle: { color: CHART.seriesInk, borderRadius: [2, 2, 0, 0] }
     }]
   })
 }
@@ -339,8 +352,9 @@ const renderDist = () => {
 // 指标卡与图表接口的查询参数（两者都随上方筛选收窄；待复核数在卡片接口里另行保持全量）
 const params = () => ({
   department: filter.department || '',
-  start: filter.start || '',
-  end: filter.end || '',
+  // RangeFilter 交出的是 [起, 止] 两元素数组，stats 接口收的是两个独立参数
+  start: filter.dateRange?.[0] || '',
+  end: filter.dateRange?.[1] || '',
   pattern: ''
 })
 
@@ -377,13 +391,11 @@ const loadAll = async () => {
 // 重置筛选条件并重新拉取
 const resetFilters = () => {
   filter.department = ''
-  filter.start = ''
-  filter.end = ''
+  filter.dateRange = null
   loadAll()
 }
 
 onMounted(() => {
-  loadDepartments()
   loadAll()
   window.addEventListener('resize', handleResize)
 })
@@ -504,12 +516,30 @@ onBeforeUnmount(() => {
 /* 下方两块面板并排（窄屏收单列） */
 .grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0,1fr)：与 Qc.vue 一致，允许列收缩不撑破网格 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--sp-3);
 }
-/* 面板自带下边距，网格内用间距代替，避免双重留白 */
+/* 等高链（照 Qc.vue .grid-2，848-917 行范本）：
+   grid 行默认 align-items:stretch 两卡等高（禁止 align-items:start 收缩矮栏）；
+   面板改纵列弹性容器、正文 .panel-bd flex:1 吃满卡内剩余高度，
+   矮卡不再底部空一块；内容超出时卡内 overflow:auto 滚动，等高保持。 */
 .grid-2 :deep(.panel) {
   margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+.grid-2 :deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+/* 空态/失败态在等高卡内填充并垂直居中（el-empty 自身是纵向 flex 居中） */
+.grid-2 :deep(.el-empty) {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .mb {
   margin-bottom: 10px;
@@ -524,11 +554,15 @@ onBeforeUnmount(() => {
   /* L1：230px 高几乎全空却独占整行；180px + 数据点标记后信息密度足够 */
   height: 180px;
 }
-/* 科室合格率列表：超 260px 时内部滚动 */
+/* 科室合格率列表：flex:1 吃满等高卡剩余高度 —— 科室数少时右卡被拉到与
+   左「评分分布」图卡同高，不留底部空块；max-height 260 仍是上限，
+   超出时列表内部滚动（与改造前一致）。 */
 .rate-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: 260px;
   overflow-y: auto;
 }
@@ -553,7 +587,7 @@ onBeforeUnmount(() => {
 .rate-track {
   flex: 1;
   height: 13px;
-  background: #f0ede4;
+  background: var(--cmp-dash-tile-bg);
   border-radius: 2px;
   overflow: hidden;
 }

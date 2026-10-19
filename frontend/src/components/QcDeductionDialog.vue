@@ -131,6 +131,10 @@ const missedCount = computed(() =>
 /* 扣分明细弹窗的内容列 */
 .ded-col {
   min-width: 0;
+  /* 瀑布逐项累加 + 明细表行多时整体超高：弹窗内部滚动，页脚「关闭」始终可见
+     （与规则配置弹窗 .rc 同策略；明细表自身仍按 max-height=340 内滚） */
+  max-height: 72vh;
+  overflow-y: auto;
 }
 .ded-col .sd-title:first-child {
   margin-top: 0;
@@ -190,11 +194,11 @@ const missedCount = computed(() =>
 }
 .wf-grade.is-mid {
   background: var(--ochre-light);
-  color: #8a6a44;
+  color: var(--ochre-strong);
 }
 .wf-grade.is-bad {
   background: var(--danger-surface);
-  color: #8a3d33;
+  color: var(--el-color-danger-dark-2);
 }
 /* 合格线说明 */
 .wf-note {

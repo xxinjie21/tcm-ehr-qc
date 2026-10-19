@@ -16,7 +16,7 @@
           <el-input v-model="form.orgName" placeholder="名称最长 100 字" size="large" />
         </el-form-item>
         <el-form-item v-if="form.orgOpen" label="用途说明（可选）">
-          <el-input v-model="form.orgPurpose" type="textarea" :rows="2" placeholder="可选" />
+          <el-input v-model="form.orgPurpose" v-autoheight type="textarea" :rows="2" placeholder="可选" />
         </el-form-item>
       </el-collapse-item>
     </el-collapse>
@@ -72,6 +72,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AuthShell from '@/components/AuthShell.vue'
 import { register } from '@/api/auth'
+import { vAutoheight } from '@/utils/autoheight'
 
 const router = useRouter()
 const formRef = ref(null)

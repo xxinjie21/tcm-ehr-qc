@@ -3,7 +3,10 @@
     <PanelCard title="组织管理">
       <!-- 组织列表（仅管理员）：批次 6 起组织由用户自助创建、无审核，
            管理员只做治理 —— 停用 / 恢复 / 归档 / 改派所有者 -->
-      <el-table v-loading="loading" element-loading-text="正在读取组织列表…" :data="orgs" border stripe>
+      <!-- P0-3：去掉 v-loading 遮罩（它把表头与上一批组织一起盖住了）。
+           加载中由 #empty 的 EmptyState 渲染骨架屏，表头保持可见 -->
+      <div class="fill-table">
+      <el-table :data="orgs" border stripe height="100%">
         <el-table-column prop="code" label="组织编码" width="130" />
         <el-table-column prop="name" label="组织名称" min-width="140" />
         <el-table-column label="所有者" width="120">
@@ -44,12 +47,13 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
     </PanelCard>
 
     <!-- 归档（前提成员数为 0） -->
-    <el-dialog v-if="archiveVisible" v-model="archiveVisible" title="归档组织" width="min(440px, 94vw)" top="10vh">
+    <el-dialog v-if="archiveVisible" v-model="archiveVisible" title="归档组织" width="min(440px, 94vw)" top="6vh" :close-on-click-modal="false">
       <p class="tip">归档后该组织不再出现在生效列表；仅当成员数为 0 时允许。</p>
-      <el-input v-model="archiveReason" type="textarea" :rows="3" placeholder="归档原因（必填）" />
+      <el-input v-model="archiveReason" v-autoheight type="textarea" :rows="3" placeholder="归档原因（必填）" />
       <template #footer>
         <el-button @click="archiveVisible = false">取消</el-button>
         <el-button type="primary" :disabled="!archiveReason.trim()" @click="doArchive">确认归档</el-button>
@@ -57,7 +61,7 @@
     </el-dialog>
 
     <!-- 改派所有者（owner 账号丢失时的兜底） -->
-    <el-dialog v-if="reassignVisible" v-model="reassignVisible" title="改派所有者" width="min(440px, 94vw)" top="10vh">
+    <el-dialog v-if="reassignVisible" v-model="reassignVisible" title="改派所有者" width="min(440px, 94vw)" top="6vh" :close-on-click-modal="false">
       <p class="tip">把「{{ reassignRow?.name }}」的所有者改为下面选中的成员；原所有者降为成员。</p>
       <!-- 继任者只能来自「当前组成员」：原先是裸的用户 ID 输入框，
            既看不到用户名、又允许填组织外的人（后端会报「该用户不在此组织」）。 -->
@@ -95,6 +99,7 @@ import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { listOrgs, stopGroup, activateGroup, archiveOrg, reassignOwner, listMembers } from '@/api/org'
 import { fmtDateTime } from '@/utils/format'
+import { vAutoheight } from '@/utils/autoheight'
 
 const loading = ref(false)
 const orgs = ref([])
@@ -198,4 +203,26 @@ onMounted(load)
 <style scoped>
 /* 字号/颜色取自全局 .tip；这里只加组间距 */
 .tip { margin: 0 0 var(--sp-2); }
+
+/* ===== 留白·对称专项（范本 Qc.vue .grid-2 等高链）=====
+   单卡被 .page-fill> :first-child 拉满整屏高，但卡内表格是内容高，
+   矮表下方空一大块。把 .panel 改成纵列弹性容器、.panel-bd 拿到确定高度后
+   传给唯一的 .fill-table，表格 height="100%" 吃满剩余高度：
+   行少空白落在表体内（无滚动条），行多表体内滚 —— 不裁内容、不收缩矮栏。 */
+:deep(.panel) {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+:deep(.panel-bd) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.fill-table {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 </style>

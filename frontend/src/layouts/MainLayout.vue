@@ -471,7 +471,7 @@ const handleLogout = async () => {
 }
 .brand em {
   font-style: normal;
-  color: #c9b99a;
+  color: var(--nav-accent-weak);
   margin-left: var(--sp-2);
   font-size: var(--fs-xs);
 }
@@ -481,7 +481,7 @@ const handleLogout = async () => {
   align-items: center;
   gap: 10px;
   font-size: var(--fs-base);
-  color: #d8dfd9;
+  color: var(--nav-text);
 }
 /* 导入 LLM 入口：与「退出」同为顶栏次级操作，样式保持一致。
    P1-2（第三轮）：文字链接实测 36×21 / 69×21（padding:2px），命中区只有 21px 高，
@@ -497,7 +497,7 @@ const handleLogout = async () => {
   margin: -4px 0 -4px 0;
 }
 .topbar .llm-entry {
-  color: #d8dfd9;
+  color: var(--nav-text);
   font-size: var(--fs-base);
 }
 
@@ -512,7 +512,7 @@ const handleLogout = async () => {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #d8dfd9;
+  color: var(--nav-text);
   font-size: var(--fs-base);
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease-out),
@@ -554,7 +554,7 @@ const handleLogout = async () => {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #d8dfd9;
+  color: var(--nav-text);
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
@@ -644,10 +644,10 @@ const handleLogout = async () => {
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 2px;
   font-size: var(--fs-xs);
-  color: #dbe4de;          /* 徽标比用户名弱一档，与 --surface(var(--surface)) 区分 */
+  color: var(--nav-text-strong);          /* 徽标比用户名弱一档，与 --surface(var(--surface)) 区分 */
 }
 .logout {
-  color: #d8dfd9;
+  color: var(--nav-text);
 }
 .logout:hover {
   color: var(--surface);
@@ -754,6 +754,6 @@ main > * {
   font-weight: bold;
 }
 .crumb-sep {
-  color: #c9c3b4;
+  color: var(--nav-text-weak);
 }
 </style>

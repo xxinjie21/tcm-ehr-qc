@@ -2,7 +2,8 @@
   <!-- 对标 D3「活动流 / 变更审计」：病历详情页的「活动」页签。
        数据来自 GET /api/logs/by-object（后端按 (org_id, object_type, object_id) 建了索引，
        且复用审计页同一套可见范围 —— 按 ID 查不绕开数据域）。 -->
-  <div v-loading="loading" class="activity">
+  <div class="activity" :class="{ 'is-empty': !loading && !rows.length }">
+    <LoadingSkeleton v-if="loading && !rows.length" variant="line" :rows="4" label="正在读取活动记录…" />
     <el-empty
       v-if="!loading && !rows.length"
       :image-size="64"
@@ -40,6 +41,7 @@
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getObjectLogs } from '@/api/log'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 
 const props = defineProps({
   recordId: { type: String, default: '' }
@@ -102,6 +104,12 @@ watch(() => props.recordId, () => load(true), { immediate: true })
   /* 与左栏一致：内容高时内部滚动，别把弹窗页脚顶出视口（页脚是唯一的关闭出口） */
   max-height: calc(86vh - 190px);
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* 空态在最小高度内垂直居中：避免「还没有改动留痕」顶在框顶、下面空一截 */
+.activity.is-empty {
+  justify-content: center;
 }
 
 .act-hd {
@@ -118,7 +126,7 @@ watch(() => props.recordId, () => load(true), { immediate: true })
 .act-detail {
   margin-top: 2px;
   font-size: var(--fs-base);
-  color: var(--text-main);
+  color: var(--text);
   white-space: pre-wrap;
   word-break: break-word;
 }

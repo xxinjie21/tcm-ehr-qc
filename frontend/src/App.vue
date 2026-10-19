@@ -1,7 +1,7 @@
 <template>
   <!-- P4.1：全量注册 Element Plus 已去除，中文语言包改由 el-config-provider 下发
        （el-config-provider 由 unplugin-vue-components 自动解析） -->
-  <el-config-provider :locale="zhCn">
+  <el-config-provider :locale="zhCn" :size="'default'">
     <!-- 顶层路由过渡：只负责「登录/注册 ↔ 应用外壳」这一层（外壳整个换掉）。
          应用内子页面之间的切换发生在 MainLayout 的嵌套 router-view 里，见那边。
 

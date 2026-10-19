@@ -1,7 +1,7 @@
 <template>
-  <!-- 病历检索筛选条：科室 / 就诊时间 / 导入时间 / 分级。
-       与 StatsFilter 的分工：本组件用 v-model 双向绑定（受控 + 自更新），
-       供病历数据、复核等列表页复用；StatsFilter 只读展示 + 向上抛动作事件。 -->
+  <!-- 病历检索筛选条：科室 / 就诊时间 / 导入时间 / 分级。**全站唯一的范围查询实现** ——
+       P0-1 之前另有一个 StatsFilter（仅首页看板在用，字段/宽度/自带查询重置都不一样），
+       已合并到这里并删除：相同功能只留一个组件模型，跨页位置与外形才可能一致。 -->
   <div class="range-filter">
     <div class="rf-item">
       <label for="rf-department">科室</label>
@@ -45,7 +45,7 @@
           end-placeholder="截止"
           style="width: 240px"
         />
-        <el-button size="small" @click="todayImport">今天</el-button>
+        <el-button @click="todayImport">今天</el-button>
       </div>
     </div>
     <div v-if="showGrade" class="rf-item">
@@ -112,10 +112,11 @@ onMounted(reload)
 </script>
 
 <style scoped>
-/* 与 StatsFilter 同构的单行卡片布局；两者共用 styles/theme.css 的视觉令牌 */
+/* 单行筛选条：与页首 .scope-bar 同构（控件底对齐、窄屏逐项换行），视觉令牌来自 theme.css */
 .range-filter { display: flex; gap: var(--sp-4); align-items: flex-end; flex-wrap: wrap; }
-/* 标签压在各自控件上方（与 StatsFilter 一致） */
+/* 标签压在各自控件上方 */
 .rf-item label { display: block; font-size: var(--fs-xs); color: var(--text-sub-strong); margin-bottom: 3px; }
-/* 导入时间：日期区间与「今天」按钮同一行，按钮与 32px 输入框底对齐 */
-.rf-import { display: flex; align-items: center; gap: var(--sp-2); }
+/* 导入时间：日期区间与「今天」按钮同一行，按钮与 32px 输入框同高（不再用 size="small"，
+   否则 24px 的按钮混在同页 32px 控件里，与「控件大小必须一致」的口径冲突），按控件底边对齐 */
+.rf-import { display: flex; align-items: flex-end; gap: var(--sp-2); }
 </style>

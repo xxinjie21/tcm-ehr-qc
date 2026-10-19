@@ -70,6 +70,7 @@
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PanelCard from '@/components/PanelCard.vue'
 import echarts from '@/utils/echarts'
+import { CHART } from '@/utils/chartTheme'
 
 const props = defineProps({
   /** 后端 TypeCoverage：{ field, label, total, normalized, termCount, suspectedStaleExtraction } */
@@ -94,7 +95,7 @@ const emit = defineEmits(['retry'])
 const CHART_BASE = {
   grid: { left: 104, right: 40, top: 10, bottom: 40, containLabel: false },
   axisFontSize: 13,
-  labelColor: '#6b6558',
+  labelColor: CHART.labelStrong,
   labelFontSize: 13,
   // 浮层投影统一成全站的墨绿投影（C3：ECharts 默认是冷灰投影，与页面浮层不是一个色系）
   tooltipCss: 'box-shadow: 0 2px 8px rgba(47,70,57,.12); border-radius: 2px;',
@@ -186,23 +187,23 @@ const renderCov = () => {
       name: '归一率（%）',
       nameLocation: 'middle',
       nameGap: 30,
-      axisLine: { lineStyle: { color: '#d8d2c4' } },
-      splitLine: { lineStyle: { color: '#efebe1' } },
+      axisLine: { lineStyle: { color: CHART.axisLine } },
+      splitLine: { lineStyle: { color: CHART.splitLine } },
       axisLabel: { fontSize: CHART_BASE.axisFontSize }
     },
     yAxis: {
       type: 'category',
       data: rows.map((r) => r.label),
-      axisLine: { lineStyle: { color: '#d8d2c4' } },
-      axisLabel: { color: '#4a4438', fontSize: CHART_BASE.axisFontSize, interval: 0 }
+      axisLine: { lineStyle: { color: CHART.axisLine } },
+      axisLabel: { color: CHART.axisLabel, fontSize: CHART_BASE.axisFontSize, interval: 0 }
     },
     series: [
       {
         // P0-1 方案A：条长 = 归一率（0~100%）。某类词表未建全时会出现接近 0% 的短条，
         // 图形结论与事实一致；绝对条数只在 tooltip 与下方明细表出现。
         name: '归一率', type: 'bar', barWidth: rowBarWidth(covChart, rows.length),
-        itemStyle: { color: '#4d6b58' },
-        // P1-1：与右图同一套数据标签规则（right / #6b6558 / 13px / 恒显示）
+        itemStyle: { color: CHART.seriesInk },
+        // P1-1：与右图同一套数据标签规则（right / --text-sub-strong / 13px / 恒显示）
         label: {
           show: true, position: 'right', color: CHART_BASE.labelColor,
           fontSize: CHART_BASE.labelFontSize, fontWeight: 600,
@@ -236,24 +237,24 @@ const renderTop = () => {
       name: '出现次数（次）',
       nameLocation: 'middle',
       nameGap: 30,
-      axisLine: { lineStyle: { color: '#d8d2c4' } },
-      splitLine: { lineStyle: { color: '#efebe1' } },
+      axisLine: { lineStyle: { color: CHART.axisLine } },
+      splitLine: { lineStyle: { color: CHART.splitLine } },
       axisLabel: { fontSize: CHART_BASE.axisFontSize }
     },
     yAxis: {
       type: 'category',
       data: rows.map((r) => r.word),
-      axisLine: { lineStyle: { color: '#d8d2c4' } },
+      axisLine: { lineStyle: { color: CHART.axisLine } },
       // P0-3：grid.left=104 只容得下约 7 个汉字，长词按 92px 截断出省略号，
       // 完整词看悬浮（tooltip 头行 = 类目全名）。interval:0 保证每行都画。
       axisLabel: {
-        color: '#4a4438', fontSize: CHART_BASE.axisFontSize, interval: 0,
+        color: CHART.axisLabel, fontSize: CHART_BASE.axisFontSize, interval: 0,
         width: 92, overflow: 'truncate'
       }
     },
     series: [{
       name: '出现次数', type: 'bar', barWidth: rowBarWidth(topChart, rows.length),
-      itemStyle: { color: '#96714f', borderRadius: [0, 3, 3, 0] },
+      itemStyle: { color: CHART.ochre, borderRadius: [0, 3, 3, 0] },
       // P1-1：与左图同一套数据标签规则
       label: {
         show: true, position: 'right', color: CHART_BASE.labelColor,
@@ -299,7 +300,13 @@ onBeforeUnmount(() => {
 .sc-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  /* 留白·对称：grid 默认 align-items:stretch，两格等高；禁止 align-items:start。
+     格内改 flex 列，让空态/失败态吃掉等高后的剩余高度并垂直居中。 */
   gap: var(--sp-4);
+}
+.sc-cell {
+  display: flex;
+  flex-direction: column;
 }
 .sc-hd { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
 .sc-sub { margin-left: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); font-weight: 400; }
@@ -327,7 +334,13 @@ onBeforeUnmount(() => {
   color: var(--text-sub-strong);
 }
 .sc-empty {
+  /* 留白·对称：本格与另一张 260px 图表等高后，空态文案在剩余高度内垂直居中，
+     不再顶在格首、底部空一大块。 */
+  flex: 1 1 auto;
   margin: var(--sp-4) 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);

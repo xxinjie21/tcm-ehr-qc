@@ -39,7 +39,7 @@
   width: 100%;
   max-width: 880px;
   display: flex;
-  background: #fffdf9;
+  background: var(--cmp-auth-bg);
   border: 1px solid var(--line);
   min-height: 470px;
 }
@@ -171,7 +171,7 @@
   background: var(--ochre-light);
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-xs);
-  color: #6b5a44;
+  color: var(--ochre-ink);
   margin: 0 0 var(--sp-4);
 }
 

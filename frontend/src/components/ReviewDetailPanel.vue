@@ -1,5 +1,7 @@
 <template>
-    <div v-loading="detailLoading" element-loading-text="正在读取复核详情…">
+    <div>
+      <!-- 加载态：骨架占位（P0-3），不挂 v-loading 遮罩；仅在尚无内容时出现，已有内容保持可见 -->
+      <LoadingSkeleton v-if="detailLoading && !current && !record" variant="form" :rows="8" label="正在读取复核详情…" />
       <!-- ② 当前任务卡：详情区头部，右上角固定「关闭详情」出口。
            只把关闭入口放进底部吸底条，用户实测仍反馈「只有保存修改 / 复核通过」——
            进入复核后视线落在头部，出口必须在这里就出现，位置与弹窗右上角关闭同侧 -->
@@ -106,7 +108,7 @@
             <div class="field-row">
               <div class="flabel">复核备注</div>
               <div class="fvalue">
-                <el-input v-model="remark" type="textarea" :rows="3" placeholder="留痕用，例如：已对照原文补充脉象" />
+                <el-input v-model="remark" type="textarea" :rows="3" placeholder="留痕用，例如：已对照原文补充脉象" v-autoheight />
               </div>
             </div>
 
@@ -169,6 +171,8 @@ import { qcScore, getQcRules } from '@/api/qc'
 import { fmtDateTime, fieldOf } from '@/utils/format'
 import { fieldsWithWide } from '@/utils/recordFields'
 import { gradeOf, gradeHint, gradeClass, THRESHOLD_PLACEHOLDER } from '@/utils/grade'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
+import { vAutoheight } from '@/utils/autoheight'
 
 const emit = defineEmits(['submitted', 'opened', 'closed'])
 
@@ -555,12 +559,12 @@ defineExpose({ open: openReview, close: closeReview })
 .tag-score {
   color: var(--ochre-text);
   background: var(--ochre-light);
-  border: 1px solid #e0cdb0;
+  border: 1px solid var(--cmp-review-warn-border);
 }
 .tag-issue {
   color: var(--danger);
   background: var(--danger-surface);
-  border: 1px solid #e3c3bb;
+  border: 1px solid var(--danger-border-soft);
 }
 .deadline {
   margin-left: auto;
@@ -656,6 +660,19 @@ defineExpose({ open: openReview, close: closeReview })
   border-radius: 6px;
   overflow: hidden;
 }
+
+/* 右栏人工修正：等高卡内垂直分布，字段/备注/评分均匀展开、preview 沉底 */
+.compare > .panel:last-child {
+  display: flex;
+  flex-direction: column;
+}
+.compare > .panel:last-child .panel-bd {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
 .panel-hd {
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
@@ -674,8 +691,8 @@ defineExpose({ open: openReview, close: closeReview })
   background: var(--ink-mid);
 }
 .panel-hd.hd-left {
-  border-bottom-color: #eee4d3;
-  background: #faf6ee;
+  border-bottom-color: var(--cmp-review-divider);
+  background: var(--cmp-review-highlight);
   color: var(--ochre-text);
 }
 .panel-hd.hd-right {
@@ -787,7 +804,7 @@ defineExpose({ open: openReview, close: closeReview })
 .preview {
   margin-top: var(--sp-3);
   background: var(--ink-light);
-  border: 1px solid #cddcd2;
+  border: 1px solid var(--cmp-review-ok-border);
   border-radius: 2px;
   padding: var(--sp-2) var(--sp-4);
   font-size: var(--fs-base);
