@@ -28,7 +28,7 @@ import nlp_model
 # test_extract 等）继续可用，不必跟着改。
 from nlp_filters import drop_noise  # noqa: F401
 from nlp_model import _load_model, _ner  # noqa: F401
-from nlp_rules import _reroute_pulse_tongue, _rules  # noqa: F401
+from nlp_rules import _reroute_inquiry, _reroute_pulse_tongue, _rules  # noqa: F401
 from schemas import Entity, ExtractRequest, ExtractResponse, FIELDS  # noqa: F401
 
 logger = logging.getLogger("nlp")
@@ -73,6 +73,8 @@ def extract(req: ExtractRequest):
         getattr(resp, f).extend(rules[f])
     # 3. 症状去脉/舌：把误落进 symptoms 的脉象 / 舌象要素归位
     _reroute_pulse_tongue(resp)
+    # 3b. 症状去问诊：把二便/睡眠/饮食/喜好/卧位/精神/面色整句挪进 inquiry
+    _reroute_inquiry(resp)
     # 4. 产物过滤：单字残词 / 假药名 / 否定句（放在归位之后，归位靠词形前缀判据不受影响）
     dropped = drop_noise(resp, text)
     if dropped:

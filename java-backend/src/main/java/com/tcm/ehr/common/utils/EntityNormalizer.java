@@ -236,6 +236,9 @@ public class EntityNormalizer {
         writeBack(data, "treatmentList", vo.getTreatmentList());
         writeBack(data, "formulaList", vo.getFormulaList());
         writeBack(data, "herbs", vo.getHerbs());
+        // inquiry（任务 8·方案 A）为「问诊子项」透传位：不参与上方任何归一/扣分，
+        // 仅把抽取侧挪出的二便/睡眠/饮食/喜好/卧位/精神/面色整句原样保留进 structured_data。
+        writeBack(data, "inquiry", vo.getInquiry());
         return stat;
     }
 
@@ -274,12 +277,18 @@ public class EntityNormalizer {
                     kept.add(e);
                     continue;
                 }
-                if (hitsDictionary("pulse", orgId, raw)) {
+                // 兜底二：整串命中不了词典，但**能被脉象/舌象的拆解规则完整拆开**的，
+                // 就是脉象/舌象内容被错放（「左略涩」→ 脉涩、「双上略浮下略沉」→ 脉浮+脉沉、
+                // 「红点满布」→ 舌红点）。拆解本身要求整串被词条覆盖，因此不会把真症状挪走；
+                // 挪过去后 normEntities 会照常拆出标准词，两边分子同时受益。
+                if (hitsDictionary("pulse", orgId, raw)
+                        || !termNormalizer.decompose("pulse", orgId, raw).isEmpty()) {
                     vo.getPulseList().add(e);
                     moved++;
                     continue;
                 }
-                if (hitsDictionary("tongue", orgId, raw)) {
+                if (hitsDictionary("tongue", orgId, raw)
+                        || !termNormalizer.decompose("tongue", orgId, raw).isEmpty()) {
                     vo.getTongueList().add(e);
                     moved++;
                     continue;
@@ -355,6 +364,54 @@ public class EntityNormalizer {
         }
     }
 
+    /**
+     * 精确命中回拉（任务 8·方案 A 精度收口，与 moveMisplacedPulseTongue 同层的兜底）：
+     * python 的 _reroute_inquiry 只按前缀锚分批，可能把恰是症状词典标准词/别名的真症状
+     * 一起挪进 inquiry（如 嗜睡/乏力/便秘/小便不禁/面色萎黄）。
+     * 这里把能被症状词典【精确】命中的拉回 symptoms，交由随后的 normEntities 正常归一。
+     *
+     * 判据只用精确（EsTermNormalizer.LEVEL_EXACT），绝不用 isHit（含/模糊）：
+     * 否则 大便成形 会对 大便溏 走模糊命中（Dice=0.8）拉回并归成 大便溏，重演 R7 错映射。
+     * 词典/ES 不可用时【不拉回】（宁可在 inquiry 里，也不凭猜把问诊当症状）。
+     * 每次 normalizer 只跑一遍，纯函数式重写列表，不做有状态累积（幂等纪律）。
+     */
+    private void pullExactSymptomBack(NlpExtractVO vo, String orgId) {
+        java.util.List<NlpExtractVO.Entity> inquiry = vo.getInquiry();
+        if (inquiry == null || inquiry.isEmpty() || vo.getSymptoms() == null) {
+            return;
+        }
+        java.util.List<NlpExtractVO.Entity> kept = new java.util.ArrayList<>(inquiry.size());
+        int pulled = 0;
+        for (NlpExtractVO.Entity e : inquiry) {
+            if (e == null) {
+                kept.add(e);
+                continue;
+            }
+            String raw = rawSpan(e);   // 读 sourceText 优先（不读上一轮写回的 content）
+            if (!raw.isBlank() && exactSymptomHit(orgId, raw)) {
+                vo.getSymptoms().add(e);   // 拉回，交给后面的 normEntities 归一
+                pulled++;
+            } else {
+                kept.add(e);
+            }
+        }
+        if (pulled > 0) {
+            vo.setInquiry(kept);
+            log.info("[归一] 从 inquiry 拉回症状词典精确命中的真症状 {} 条", pulled);
+        }
+    }
+
+    /** 该原文是否被症状词典【精确】命中（标准词或别名恰好等于原文；不参与含/模糊）。 */
+    private boolean exactSymptomHit(String orgId, String raw) {
+        try {
+            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("symptom", orgId, raw);
+            return r != null && r.level() == EsTermNormalizer.LEVEL_EXACT;
+        } catch (Exception ex) {
+            log.warn("[归一] inquiry 精确命中判定失败: {}", ex.getMessage());
+            return false;
+        }
+    }
+
     /** 把归一后的强类型列表转回 Map 列表再放进 data，保持 Map 的同构约定 */
     private void writeBack(Map<String, Object> data, String key, List<?> typed) {
         data.put(key, objectMapper.convertValue(typed,
@@ -409,7 +466,7 @@ public class EntityNormalizer {
         java.util.LinkedHashSet<String> raws =
                 byStructuredKey.computeIfAbsent(structuredKey, k -> new java.util.LinkedHashSet<>());
         for (NlpExtractVO.Entity e : list) {
-            String raw = rawOf(e.getContent(), e.getSourceText());
+            String raw = rawSpan(e);
             if (raw != null && !raw.isBlank()) {
                 raws.add(raw);
             }
@@ -445,6 +502,13 @@ public class EntityNormalizer {
         //     被截断的残字。判据同样是**词典驱动**：长度为 1 **且不在该类型词典里**才丢 ——
         //     词典里确有 5 个单字标准词，一刀切会误删合法术语（本批数据里这类为 0，但规则要立对）。
         dropSingleCharFragments(vo, orgId);
+        // 1.7 精确命中回拉（任务 8·方案 A 精度收口）：python 侧把问诊整句挪进 inquiry 时只看
+        //     前缀锚，可能把「恰是症状词典标准词/别名的真症状」一起挪走（如 嗜睡/乏力/便秘/小便不禁
+        //     /面色萎黄）—— 实测症状词典里 116 条与问诊锚碰撞。这里是词典驱动的兜底：inquiry 里
+        //     sourceText 能被症状词典【精确】命中（LEVEL_EXACT）的拉回 symptoms，参与后续正常归一。
+        //     判据只用精确、绝不用 isHit（含/模糊）——否则 大便成形 会按模糊命中归成 大便溏（R7 类
+        //     错映射）。放在 normEntities 之前：拉回的实体走一遍正常归一拿到标准词与 normLevel。
+        pullExactSymptomBack(vo, orgId);
 
         // 2. 8 类 Entity 走同一字段→类型映射；无词典 / 未纳入归一范围的类型只回填 sourceText
         vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat, orgId, scope));
@@ -489,7 +553,82 @@ public class EntityNormalizer {
                     NlpExtractVO.Herb::getSourceText, NlpExtractVO.Herb::getNormLevel));
         }
 
+        // 4. 噪声碎片过滤：归一之后仍无 normLevel 的实体里，属于「单维描述 / 裸部位 / 残词」
+        //    的一律不入库（见 #dropNoiseFragments）。
+        int noise = dropNoiseFragments(vo);
+        if (noise > 0) {
+            log.info("[归一] 丢弃噪声碎片实体 {} 条（描述词 / 裸部位 / 残词）", noise);
+        }
+
         return NormStat.of(stat);
+    }
+
+    /** 单维描述词的裸名词（去掉后不影响语义的碎片）。 */
+    private static final Set<String> NOISE_BARE = Set.of(
+            "大便", "小便", "二便", "食欲", "食量", "疼痛", "口气", "扁桃体", "血块",
+            "月经", "睡眠", "精神", "体力", "饮食", "饮水", "舌", "苔", "脉", "色", "量");
+
+    /** 舌象的裸部位碎片（「舌质」「舌尖」「根部」这类截断词）。 */
+    private static final Set<String> NOISE_TONGUE_BARE = Set.of(
+            "舌质", "舌下", "舌尖", "舌体", "舌面", "苔", "根部", "边界", "中根", "舌");
+
+    /** 单维描述：颜色 / 量 / 质地 / 时间 / 频次 / 程度。 */
+    private static final java.util.regex.Pattern NOISE_DESC = java.util.regex.Pattern.compile(
+            "^(色[\\u4e00-\\u9fa5]{1,3}"
+                    + "|量(少|多|可|中等|一般|正常|偏少|偏多)"
+                    + "|偏干|偏稀|偏硬|偏软|成形|成条|干结|尚可|正常|一般"
+                    + "|晨起|清晨|夜间|夜里|晚上|平时|平素|近日|近期|偶尔|偶有|时有|经常|持续|反复|睡前|饭后|食后|经前|经期|经后"
+                    + "|慢性|急性|亚急性|过敏性|原发性|继发性|轻度|中度|重度"
+                    + ")$");
+
+    /** 疾病 / 证候里只剩分级词（「慢性」「过敏性」）—— 截断残词，不是诊断。 */
+    private static final java.util.regex.Pattern NOISE_SEVERITY = java.util.regex.Pattern.compile(
+            "^(慢性|急性|过敏性|原发性|继发性|轻度|中度|重度|亚急性)$");
+
+    /**
+     * 丢弃噪声碎片实体（2026-10-19）。
+     *
+     * <p>实测（34154 份）：症状字段里 7354 条是「成形」「大便」「色黄」「晨起」这类
+     * 单维描述或裸部位残词，既不可能归一、也不是一条症状发现；疾病字段另有 47 条
+     * 「慢性」「过敏性」这种被截断的分级词。</p>
+     *
+     * <p><b>只丢未归一的</b>：已命中词典的实体一律保留 —— 判据是「归一失败 + 形状是碎片」，
+     * 而不是「词形像碎片」。这样即使某个碎片恰好是合法标准词，也不会被误删。</p>
+     *
+     * @return 丢弃条数
+     */
+    private int dropNoiseFragments(NlpExtractVO vo) {
+        int n = 0;
+        n += dropNoiseIn(vo.getSymptoms(), "symptom");
+        n += dropNoiseIn(vo.getDiseases(), "disease");
+        n += dropNoiseIn(vo.getTongueList(), "tongue");
+        return n;
+    }
+
+    private int dropNoiseIn(List<NlpExtractVO.Entity> list, String type) {
+        if (list == null || list.isEmpty()) {
+            return 0;
+        }
+        int before = list.size();
+        list.removeIf(e -> e != null && e.getNormLevel() == null
+                && isNoiseFragment(type, rawOf(e.getContent(), e.getSourceText())));
+        return before - list.size();
+    }
+
+    private static boolean isNoiseFragment(String type, String s) {
+        if (s == null || s.isEmpty()) {
+            return false;
+        }
+        switch (type) {
+            case "symptom":
+                return NOISE_BARE.contains(s) || NOISE_DESC.matcher(s).matches();
+            case "disease":
+                return NOISE_SEVERITY.matcher(s).matches();
+            case "tongue":
+                return NOISE_TONGUE_BARE.contains(s);
+            default:
+                return false;
+        }
     }
 
     private List<NlpExtractVO.Entity> normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat, String orgId,
@@ -501,22 +640,61 @@ public class EntityNormalizer {
         // 2. 该字段对应哪类词典（舌/脉/病因/治法返回 null 已不成立：9 类均有词典，
         //    现返回的是字典类型 key；未纳入归一范围的类型由下方 scope 判定跳过）
         String type = dictionaryType(fieldKey);
-        // 3. 逐个实体归一
+        // 3. 逐个实体归一。拆解会一拆多，故另建结果表（不在遍历中改原表）
+        List<NlpExtractVO.Entity> out = new ArrayList<>(entities.size());
         for (NlpExtractVO.Entity e : entities) {
             if (e == null) continue;
-            String raw = rawOf(e.getContent(), e.getSourceText());
+            String raw = rawSpan(e);
             if (raw.isEmpty()) continue;
             if (TextUtil.isBlank(e.getSourceText())) {
                 e.setSourceText(raw);
             }
-            // 3.5 无独立词典，或该类型未纳入本组织「归一范围」→ 只保留原文（不写 normLevel）
+            // 3.5 清掉上一轮归一写回的痕迹（2026-10-19）：{@code normLevel} 只可能由归一写入，
+            //     content 与 sourceText 不一致时说明 content 就是上一轮写回的标准词（含拆解产物）。
+            //     重跑必须**从原文重新判定** —— 否则旧映射原样保留，撤回一条误映射的规则改动
+            //     在存量数据上永远看不见（实测：R8 撤回「质软→脉软」后计数一度零变化）。
+            //     抽解器自己做的同义映射（content=湿疮 / sourceText=湿疹，normLevel 为空）不在此列。
+            if (e.getNormLevel() != null) {
+                if (!TextUtil.isBlank(e.getSourceText()) && !e.getSourceText().equals(e.getContent())) {
+                    e.setContent(e.getSourceText());
+                }
+                e.setNormLevel(null);
+            }
+            // 3.6 无独立词典，或该类型未纳入本组织「归一范围」→ 只保留原文（不写 normLevel）
             if (type == null || !scope.contains(type)) {
+                out.add(e);
                 continue;
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
-            // 4. 未命中词典就保持原样，不写 normLevel
-            if (!EsTermNormalizer.isHit(r.level())) {
-                continue;
+            // 4. 未命中词典就保持原样，不写 normLevel。
+            //    4.1 组合短语（脉位+脉质 / 舌质+苔质）整串无法命中时，尝试拆成若干标准词；
+            //    包含命中同样尝试拆解：「脉细涩」按差额 1 会只归到「脉细」而丢掉「涩」，
+            //    完整拆成「脉细+脉涩」才是原文的语义。拆解要求整串被词典项完整覆盖，
+            //    任一残字都整体放弃（见 EsTermNormalizer#decompose）。
+            boolean negated = r.level() == EsTermNormalizer.LEVEL_CONTAIN && isNegated(raw);
+            boolean canDecompose = !EsTermNormalizer.isHit(r.level())
+                    || (r.level() == EsTermNormalizer.LEVEL_CONTAIN && !negated);
+            if (canDecompose) {
+                List<EsTermNormalizer.NormalizeResult> parts = termNormalizer.decompose(type, orgId, raw);
+                if (!parts.isEmpty()) {
+                    for (EsTermNormalizer.NormalizeResult part : parts) {
+                        NlpExtractVO.Entity split = new NlpExtractVO.Entity();
+                        split.setContent(part.standardTerm());
+                        split.setSourceText(raw);
+                        split.setConfidence(e.getConfidence());
+                        split.setSource(e.getSource());
+                        split.setNormLevel(part.level());
+                        out.add(split);
+                        stat[0]++;
+                        stat[part.level()]++;
+                    }
+                    continue;
+                }
+                // 拆不动：未命中就保持原样；包含命中则继续走下面的常规判定
+                if (!EsTermNormalizer.isHit(r.level())) {
+                    out.add(e);
+                    continue;
+                }
             }
             // 4.5 否定语境下的「包含命中」一律不归一。
             //
@@ -533,16 +711,20 @@ public class EntityNormalizer {
             // 实测（35352 条真实病历）：拦住 4867 条否证/已愈句，干净命中 18874 条不受影响。
             if (r.level() == EsTermNormalizer.LEVEL_CONTAIN && isNegated(raw)) {
                 negatedSkip.incrementAndGet();
+                // 2026-10-19：否证句直接**不入库**（原先保留为「未归一实体」）。
+                // 保留等于把一个不存在的症状记进结构化数据，还让它以「未归一」计入分母 ——
+                // 既降低归一率又拉低质控分，等于对否证句倒扣分。语义上它不是一条发现。
                 continue;
             }
             e.setContent(r.standardTerm());
             e.setNormLevel(r.level());
             stat[0]++;
             stat[r.level()]++;
+            out.add(e);
         }
         // 5. 归一之后再合并同标准词。统计仍按「归一动作」计（去重前），
         // 即 NormStat 描述的是做了多少次归一，去重只影响下发给前端的列表。
-        return dedupByTerm(entities, NlpExtractVO.Entity::getContent,
+        return dedupByTerm(out, NlpExtractVO.Entity::getContent,
                 NlpExtractVO.Entity::getSourceText, NlpExtractVO.Entity::getNormLevel);
     }
 
@@ -722,6 +904,29 @@ public class EntityNormalizer {
     }
 
     /** 归一目标值：优先 content，缺失时退回 sourceText（两者在模型侧同源） */
+    /**
+     * 归一原文：优先 {@code sourceText}（抽取时的原文 span），无则退 {@code content}。
+     *
+     * <p><b>为什么优先 sourceText</b>（2026-10-19）：{@code content} 可能是<b>上一轮归一写回的标准词</b>
+     * ——「仅归一」就地重跑时，拿 content 再归一等于<b>自命中</b>：
+     * 首轮的模糊命中（{@code 大便成形→便溏}）会在第二轮被固化成精确命中，原文里的组合短语
+     * （{@code 右寸关缓滑}）也永远拆不出来（content 已成「右寸」）。以原文为准则两轮幂等，
+     * 且每次都用最新词典与拆解规则重新判定。
+     * </p>
+     */
+    private static String rawSpan(NlpExtractVO.Entity e) {
+        if (e == null) {
+            return "";
+        }
+        if (!TextUtil.isBlank(e.getSourceText())) {
+            return e.getSourceText().trim();
+        }
+        if (!TextUtil.isBlank(e.getContent())) {
+            return e.getContent().trim();
+        }
+        return "";
+    }
+
     private String rawOf(String primary, String fallback) {
         // 1. 主值可用就用主值
         if (!TextUtil.isBlank(primary)) return primary.trim();

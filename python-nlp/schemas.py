@@ -17,7 +17,7 @@ MAX_TEXT_CHARS = 20000
 
 # 9 类结构化字段的固定顺序（响应组装与前端展示都按它走）
 FIELDS = ["diseases", "symptoms", "tongueList", "pulseList", "patternList",
-          "causeList", "treatmentList", "formulaList", "herbs"]
+          "causeList", "treatmentList", "formulaList", "herbs", "inquiry"]
 
 
 class ExtractRequest(BaseModel):
@@ -49,6 +49,7 @@ class ExtractResponse(BaseModel):
     treatmentList: List[Entity] = []
     formulaList: List[Entity] = []
     herbs: List[Herb] = []
+    inquiry: List[Entity] = []
     modelAvailable: bool = False
     # 是否被截断：长文本现由 _ner 分窗口覆盖整段，恒为 False（保留该字段只为兼容既有 Java / 前端接口）
     truncated: bool = False

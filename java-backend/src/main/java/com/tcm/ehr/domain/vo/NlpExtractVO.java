@@ -30,6 +30,12 @@ public class NlpExtractVO {
     private List<Entity> treatmentList = new ArrayList<>();
     private List<Entity> formulaList = new ArrayList<>();
     private List<Herb> herbs = new ArrayList<>();
+    /**
+     * 问诊子项（任务 8·方案 A）：二便 / 睡眠 / 饮食 / 喜好 / 卧位 / 精神 / 面色 的整句。
+     * <p>抽取侧（python-nlp）把这类从 {@code symptoms} 挪进来；本字段<b>不参与归一 / 质控 / 统计</b>，
+     * 在 {@code EntityNormalizer.normalizeMap} 里原样透传，只为保留临床信息不被误判为症状未归一。</p>
+     */
+    private List<Entity> inquiry = new ArrayList<>();
     private boolean modelAvailable;
 
     /**

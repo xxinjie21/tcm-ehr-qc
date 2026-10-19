@@ -243,3 +243,44 @@ def _append_unique_by_content(target: List[Entity], entity: Entity, content: str
     if any((x.content or x.sourceText or "").strip() == content for x in target):
         return
     target.append(entity)
+
+# ---- 问诊子项归位（任务 8·方案 A）----
+# 二便/睡眠/饮食/喜好/卧位/精神/面色 是中医「十问」结构化子项，不是症状。NER 无这些标签，
+# 只把它们标成 症状 → 落进 symptoms：①拉低症状归一率分母；②整句无标准词→吃「术语未标准化」扣分。
+# 与 _reroute_pulse_tongue 同思路：命中问诊锚的整句挪进 inquiry（不归一、不计分），不再留在 symptoms。
+# 严格「锚开头」：不以锚起头一律留 symptoms。宁可漏移，不许错移（精度优先）。
+_INQUIRY_LEAD = (
+    "大便", "小便", "二便", "排便",
+    "睡眠", "夜寐", "入睡", "多梦", "嗜睡", "易醒", "醒后",
+    "纳差", "纳呆", "纳食", "进食", "食量", "食欲", "饮水", "饮食", "胃口", "口渴喜",
+    "喜食", "喜饮", "喜俯", "喜仰", "喜侧", "喜卧", "喜睡", "喜爱", "喜甜", "喜肉", "喜热", "喜冷",
+    "俯卧", "仰卧", "侧卧", "嗜卧",
+    "精神", "乏力", "疲乏", "倦怠", "困倦",
+    "面色", "面红润", "面萎黄", "面白", "面晦暗", "面黄", "面无华",
+)
+# 命中锚但真属症状的排除（宁不得分不误挪）
+_INQUIRY_EXCLUDE = ("便血", "便脓", "便后", "小便痛", "小便涩")
+
+def _is_inquiry(content):
+    if not content:
+        return False
+    if content.startswith(_INQUIRY_EXCLUDE):
+        return False
+    return content.startswith(_INQUIRY_LEAD)
+
+def _reroute_inquiry(resp):
+    """把 symptoms 里命中间诊锚的整句挪进 inquiry，症状只留真症状。
+
+    为什么在这里做而不是规则侧：symptoms 只来自 NER 模型（_rules 不产症状），
+    只有在这一步能对「模型给出的 symptoms」做边界修正。挪 move 不是删：
+    问诊子项仍保留在 structured_data（inquiry）里可查，只是不再计入症状归一/质控。
+    """
+    kept, inquiry = [], getattr(resp, "inquiry", None) or []
+    for e in resp.symptoms:
+        c = (e.content or e.sourceText or "").strip()
+        if _is_inquiry(c):
+            inquiry.append(e)
+        else:
+            kept.append(e)
+    resp.symptoms = kept
+    resp.inquiry = inquiry
