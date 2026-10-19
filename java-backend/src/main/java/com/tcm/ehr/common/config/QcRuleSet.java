@@ -29,14 +29,17 @@ public class QcRuleSet {
      * 前端下拉目录（{@code QcRuleDescriber.catalogFormats()}）、前端表单校验
      * （{@code Records.vue}）。改一处忘另两处就会出现「界面能选、提交被判不合规」这类偏差。
      * 现统一取这里；前端两份由 {@code GET /api/qc/rules} 的 catalog 下发，不各自硬编码。</p>
+     *
+     * <p>含 {@code 未知的性别}：真实病历里存在该值（性别不明），《病历书写基本规范》首页也允许，
+     * 若不在白名单会被质控格式规则误判为「性别非 男/女」扣分（实测 31 条）。</p>
      */
-    public static final List<String> GENDER_VALUES = List.of("男", "女");
+    public static final List<String> GENDER_VALUES = List.of("男", "女", "未知的性别");
 
     /**
      * 性别校验正则（供 DTO 的 {@code @Pattern} 用；长度上限对齐 {@code records.gender VARCHAR(10)}）。
      * 放行 null / 空串（由 {@code @NotBlank} 或业务层决定「是否必填」），此处只管「填了就得合法」。
      */
-    public static final String GENDER_PATTERN = "^(男|女)$";
+    public static final String GENDER_PATTERN = "^(男|女|未知的性别)$";
 
     /**
      * 年龄格式正则 —— <b>唯一权威</b>。默认规则（{@link #defaults()}）与前端下拉目录
@@ -53,10 +56,24 @@ public class QcRuleSet {
     /** 年龄正则的「人话」说明（regex 类型只输出 hint、不输出正则本身） */
     public static final String AGE_HINT = "须为数字，可带 岁/个月/月/天 单位（可组合，如 32岁6月）";
 
+    /**
+     * 出厂默认「术语归一范围」类型 —— <b>唯一权威</b>。
+     *
+     * <p>取 9 类里有词典且默认参与归一的 8 类（疾病/证候/症状/中药/方剂/舌象/脉象/治法），
+     * <b>不含病因</b>：病因词典由用户自建、默认不勾选，故默认不归一。想要病因归一（且其词典已建好）
+     * 的组织，在「规则配置」里勾上即可。</p>
+     *
+     * <p>{@link #defaultNormalization()} 与 {@code QcRuleStore} 回填、{@code EntityNormalizer} 的
+     * 兜底范围共用这一份，避免三处各写一张清单造成漂移。</p>
+     */
+    public static final List<String> DEFAULT_NORMALIZATION_TYPES = List.of(
+            "disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse", "treatment");
+
     private Completeness completeness = new Completeness();
     private List<FormatRule> format = new ArrayList<>();
     private List<ConsistencyRule> consistency = new ArrayList<>();
     private Standardization standardization = new Standardization();
+    private Normalization normalization = new Normalization();
     private int duplicateWeight = 5;
     private Thresholds thresholds = new Thresholds();
 
@@ -80,6 +97,11 @@ public class QcRuleSet {
         private int weightFull = 12;
         /** 原始列有、结构化为空 → 漏抽扣分 */
         private int weightPartial = 6;
+        /**
+         * 是否属「有独立词典」的类型 —— 仅 {@link QcRuleDescriber#catalogElements()} 下发目录时填充，
+         * 供规则配置弹窗筛出术语标准化可勾选项（无词典的病因不参与标准化计分，故排除）。
+         */
+        private boolean dict;
     }
 
     /** 格式规则 */
@@ -126,12 +148,29 @@ public class QcRuleSet {
     @Data
     public static class Standardization {
         private boolean enabled = true;
-        /** 术语类型：disease/pattern/symptom/herb/formula */
+        /** 术语类型：disease/pattern/symptom/herb/formula/tongue/pulse/cause/treatment */
         private List<String> elementTypes = new ArrayList<>();
         /** 每个未命中词典的实体扣分 */
         private int weightEach = 1;
         /** 该项扣分上限 */
         private int cap = 5;
+    }
+
+    /**
+     * 术语归一范围：哪几类实体参与词形归一（原文 → 标准词）。
+     *
+     * <p>与 {@link Standardization} <b>相互独立</b>：
+     * 本块决定「哪些类型做归一」，{@code standardization} 决定「哪些类型计入未归一扣分」；
+     * 实际计分范围取两者的<b>交集</b>（未参与归一的类型，其实体本就不该有 normLevel，
+     * 若又计入扣分会被恒判「未归一」而扣满）——见 {@code QcScorer}。</p>
+     *
+     * <p><b>空列表 = 全部不归一</b>，是用户「一个都不勾」的合法选择，不回填默认
+     * （与 {@link Standardization#elementTypes} 同口径）。</p>
+     */
+    @Data
+    public static class Normalization {
+        /** 参与归一的术语类型：8 类有词典者（可在「规则配置」里增删，含病因） */
+        private List<String> elementTypes = new ArrayList<>();
     }
 
     @Data
@@ -157,43 +196,19 @@ public class QcRuleSet {
         QcRuleSet r = new QcRuleSet();
         r.completeness = defaultCompleteness();
         r.standardization = defaultStandardization();
+        r.normalization = defaultNormalization();
 
         // 格式
         // 年龄正则与 hint 见 AGE_PATTERN / AGE_HINT（与前端下拉目录共用，避免两边漂移）
         r.format.add(format("age", "regex", AGE_PATTERN, List.of(), "年龄", "年龄格式不正确", AGE_HINT));
-        r.format.add(format("gender", "enum", null, GENDER_VALUES, "性别", "性别非 男/女", null));
+        r.format.add(format("gender", "enum", null, GENDER_VALUES, "性别", "性别非 男/女/未知的性别", null));
 
-        // 一致性（证候 → 中药 / 方剂；值取自词典，当前数据无方剂则方剂规则不触发）
-        // 证候 → 中药
-        r.consistency.add(rule("肝气郁结-中药", "pattern", List.of("肝气郁结", "横逆犯胃", "胃失和降"),
-                "herb", List.of("柴胡", "白芍")));
-        r.consistency.add(rule("胃热炽盛-中药", "pattern", List.of("胃热炽盛", "耗伤津液"),
-                "herb", List.of("石膏", "知母")));
-        r.consistency.add(rule("脾肾阳虚-中药", "pattern", List.of("脾肾阳虚", "水湿内停"),
-                "herb", List.of("附子", "肉桂")));
-        r.consistency.add(rule("寒湿痹阻-中药", "pattern", List.of("寒湿痹阻"),
-                "herb", List.of("独活", "桑寄生")));
-        r.consistency.add(rule("肾阴亏虚-中药", "pattern", List.of("肾阴亏虚", "虚阳上亢"),
-                "herb", List.of("熟地黄", "山茱萸")));
-        r.consistency.add(rule("肝肾亏虚-中药", "pattern", List.of("肝肾亏虚", "筋骨失养"),
-                "herb", List.of("熟地黄", "牛膝")));
-        r.consistency.add(rule("肝阳上亢-中药", "pattern", List.of("肝阳上亢", "肝火上炎"),
-                "herb", List.of("天麻", "钩藤")));
-        r.consistency.add(rule("心脾两虚-中药", "pattern", List.of("心脾两虚", "气血不足"),
-                "herb", List.of("人参", "白术")));
-        r.consistency.add(rule("肺气虚寒-中药", "pattern", List.of("肺气虚寒", "卫表不固"),
-                "herb", List.of("黄芪", "防风")));
-        // 证候 → 方剂（经典方证对应；数据无方剂则不触发）
-        r.consistency.add(rule("肝气郁结-方剂", "pattern", List.of("肝气郁结", "横逆犯胃", "胃失和降"),
-                "formula", List.of("柴胡疏肝散")));
-        r.consistency.add(rule("胃热炽盛-方剂", "pattern", List.of("胃热炽盛", "耗伤津液"),
-                "formula", List.of("白虎加人参汤")));
-        r.consistency.add(rule("脾肾阳虚-方剂", "pattern", List.of("脾肾阳虚", "水湿内停"),
-                "formula", List.of("济生肾气丸")));
-        r.consistency.add(rule("寒湿痹阻-方剂", "pattern", List.of("寒湿痹阻"),
-                "formula", List.of("独活寄生汤")));
-        r.consistency.add(rule("肾阴亏虚-方剂", "pattern", List.of("肾阴亏虚", "虚阳上亢"),
-                "formula", List.of("知柏地黄丸")));
+        // 一致性：出厂默认**不含任何规则**（consistency 为空）。
+        // 原内置 9 条「证候 → 中药」在真实病历上误报率 25%~80%（同一证候对应的是复方治法，
+        // 不是固定两味药），实测把约 1031 次"医生用了别的药"误判成逻辑冲突、强拉待复核；
+        // 权威（《中医病案质量控制中心建设与管理指南（试行）》）也把理法方药一致性列为
+        // 人工/语义评审，不支持固定对照表。故默认置空，需要的组织在「规则配置」里用
+        // 「触发类型 → 期望类型」自行添加（目录仍保留全部类型）。
 
         r.duplicateWeight = 5;
         return r;
@@ -203,7 +218,7 @@ public class QcRuleSet {
      * 内置默认完整性要素：6 要素（症状/疾病/证候/舌象/脉象/中药），取自 {@link EntityTypes}。
      *
      * <p>包级可见：{@code QcRuleStore.normalize()} 在「要素为空」时直接取它回填。原先是
-     * {@code QcRuleSet.defaults().getCompleteness()} —— 为了拿一个子对象，把 14 条一致性规则、
+     * {@code QcRuleSet.defaults().getCompleteness()} —— 为了拿一个子对象，把全部一致性规则、
      * 2 条格式规则与各自的 List 全构造一遍再丢掉（审查报告 §4.6）。</p>
      *
      * <p><b>每次返回新对象，不共享常量</b>：{@code Element} 是可变 {@code @Data}，
@@ -220,24 +235,40 @@ public class QcRuleSet {
     }
 
     /**
-     * 内置默认术语标准化配置（同上：供 {@link #defaults()} 与 {@code QcRuleStore.normalize()} 共用，
+     * 出厂默认术语标准化配置（同上：供 {@link #defaults()} 与 {@code QcRuleStore.normalize()} 共用，
      * 每次返回新对象）。
      *
-     * <p>{@code elementTypes} 取 {@link EntityTypes#dictKeys()}（批次 20 起有词典的 8 类：
-     * 疾病/证候/症状/中药/方剂/舌象/脉象/治法），每处 1 分、封顶 5 分。</p>
+     * <p>{@code elementTypes} 默认取 {@code 疾病/证候/症状/中药/方剂} <b>5 类</b>，每处 1 分、
+     * 封顶 5 分（分段累加）。<b>可勾选范围</b>是 {@link EntityTypes#dictKeys()} 的 9 类，
+     * 用户在「规则配置」里可把舌象/脉象/治法/病因也加入（勾上即计分，但需该类型同时在
+     * {@link Normalization#getElementTypes()} 的归一范围内）。</p>
      *
-     * <p>⚠️ 这 8 类不等于「未归一扣分计 8 类」：{@code QcScorer.keyOf()} 只给 {@code EntityTypes}
-     * 中 {@code countsUnnormalized=true} 的 5 类（疾病/证候/症状/中药/方剂）映射 {@code structuredKey}，
-     * 舌象/脉象/治法落 null → 不计未归一扣分（政策，见 {@code EntityTypes} 构造 javadoc）。
-     * 两处说的是不同东西，别按「8 类就该有 8 处扣分」去改。</p>
+     * <p><b>为什么默认不含舌象/脉象/治法</b>：它们的子要素先由 python-nlp 按标点分段
+     * （舌质/舌苔/齿痕/裂纹、脉位与脉象分开），分段本身有损；抽不到或词表未收录的段保留原文，
+     * 若默认计入扣分，等于拿分段器的行为去惩罚用户。故出厂默认不含 —— 这是<b>默认值</b>，
+     * 不再是写死的政策（原先由 {@code EntityTypes.countsUnnormalized} 硬门控，用户勾了也不生效，
+     * 已按「以规则配置为准」移除）。</p>
      */
     static Standardization defaultStandardization() {
         Standardization s = new Standardization();
         s.setEnabled(true);
-        s.setElementTypes(new ArrayList<>(EntityTypes.dictKeys()));
+        s.setElementTypes(new ArrayList<>(
+                List.of("disease", "pattern", "symptom", "herb", "formula")));
         s.setWeightEach(1);
         s.setCap(5);
         return s;
+    }
+
+    /**
+     * 出厂默认术语归一范围（同上：供 {@link #defaults()} 与 {@code QcRuleStore.normalize()} 共用，
+     * 每次返回新对象）。
+     *
+     * <p>{@code elementTypes} 取 {@link #DEFAULT_NORMALIZATION_TYPES}（8 类，不含病因）。</p>
+     */
+    static Normalization defaultNormalization() {
+        Normalization n = new Normalization();
+        n.setElementTypes(new ArrayList<>(DEFAULT_NORMALIZATION_TYPES));
+        return n;
     }
 
     /**
@@ -271,18 +302,5 @@ public class QcRuleSet {
         f.setReason(reason);
         f.setHint(hint);
         return f;
-    }
-
-    private static ConsistencyRule rule(String name, String triggerType, List<String> triggerValues,
-                                        String expectType, List<String> expectValues) {
-        // 触发/期望两组值都要拷贝成新列表
-        // 1. 逐字段装配 2. 两组值各拷一份
-        ConsistencyRule c = new ConsistencyRule();
-        c.setName(name);
-        c.setTriggerType(triggerType);
-        c.setTriggerValues(new ArrayList<>(triggerValues));
-        c.setExpectType(expectType);
-        c.setExpectValues(new ArrayList<>(expectValues));
-        return c;
     }
 }

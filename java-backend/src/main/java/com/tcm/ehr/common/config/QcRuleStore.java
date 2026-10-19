@@ -95,6 +95,27 @@ public class QcRuleStore {
     }
 
     /**
+     * 取<b>某个组织</b>参与「术语归一」的类型集合（{@code normalization.elementTypes}）。
+     *
+     * <p>归一执行链路（{@code EntityNormalizer} / {@code GovernanceServiceImpl}）据此判断
+     * 某类型要不要做词形归一；{@code QcScorer} 另用它把扣分范围收窄为「质控勾选 ∩ 归一勾选」。</p>
+     *
+     * <p>规则行经 {@link #getFor(String)} 解析时已被 {@link #normalize(QcRuleSet)} 回填默认，
+     * 故这里只在极端情形（外部直接构造出缺字段的规则集）兜底。</p>
+     *
+     * @param orgId 组织 ID；空值回退系统基线（默认 8 类）
+     * @return 类型 key 集合；<b>空集表示该组织选择「全部不归一」</b>
+     */
+    public java.util.Set<String> normalizationTypes(String orgId) {
+        QcRuleSet r = getFor(orgId);
+        QcRuleSet.Normalization n = r == null ? null : r.getNormalization();
+        if (n == null || n.getElementTypes() == null) {
+            return java.util.Set.copyOf(QcRuleSet.DEFAULT_NORMALIZATION_TYPES);
+        }
+        return java.util.Set.copyOf(n.getElementTypes());
+    }
+
+    /**
      * 取组织规则行，5 秒内复用同一行（T14）。
      *
      * <p>只缓存解析结果是不够的：版本串要由行本身（{@code update_time}）算出来，
@@ -285,9 +306,21 @@ public class QcRuleStore {
         if (r.getFormat() == null) {
             r.setFormat(new ArrayList<>());
         }
-        // 3. 标准化配置缺失 → 回默认
+        // 3. 标准化配置缺失 → 回默认；elementTypes 为 null → 回默认 5 类。
+        //    （空列表是用户「一个都不勾」的合法选择，保留为空、不参与评分，不回填）
         if (r.getStandardization() == null) {
             r.setStandardization(QcRuleSet.defaultStandardization());
+        } else if (r.getStandardization().getElementTypes() == null) {
+            r.getStandardization().setElementTypes(
+                    new ArrayList<>(QcRuleSet.defaultStandardization().getElementTypes()));
+        }
+        // 3b. 归一范围缺失 → 回默认 8 类（空列表是用户「一个都不勾」的合法选择，保留为空、不回填）。
+        //     与 standardization 同法：老行没有 normalization 字段（新加），回填默认即维持旧行为。
+        if (r.getNormalization() == null) {
+            r.setNormalization(QcRuleSet.defaultNormalization());
+        } else if (r.getNormalization().getElementTypes() == null) {
+            r.getNormalization().setElementTypes(
+                    new ArrayList<>(QcRuleSet.DEFAULT_NORMALIZATION_TYPES));
         }
         // 4. 分级阈值非法（合格线 ≤ 无效线等）→ 回默认并告警
         QcRuleSet.Thresholds t = r.getThresholds();

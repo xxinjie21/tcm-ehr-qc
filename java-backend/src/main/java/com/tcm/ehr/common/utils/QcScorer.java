@@ -78,9 +78,15 @@ public final class QcScorer {
         // 4. 术语标准化
         com.tcm.ehr.common.config.QcRuleSet.Standardization st = rs.getStandardization();
         if (st.isEnabled() && data != null && !st.getElementTypes().isEmpty()) {
+            // 计分范围 = 质控勾选 ∩ 归一勾选：未纳入归一范围的类型，其实体本就不写 normLevel，
+            // 若仍计入扣分会恒判「未归一」而扣满（丢区分度的假信号）。见 QcRuleSet.Normalization。
+            java.util.Set<String> normalized = normalizedTypesOf(rs);
             int miss = 0;
             Map<String, Integer> byType = new LinkedHashMap<>();
             for (String type : st.getElementTypes()) {
+                if (!normalized.contains(type)) {
+                    continue;
+                }
                 int n = countUnnormalized(data, type);
                 if (n > 0) {
                     byType.put(com.tcm.ehr.common.config.EntityTypes.byKey(type).label(), n);
@@ -234,14 +240,15 @@ public final class QcScorer {
         return RecordUtil.column(r, field);
     }
 
-    /** 术语类型 → 结构化 structuredKey；未纳入未归一扣分的类型返回 null */
+    /** 术语类型 → 结构化 structuredKey；未登记的类型返回 null（不计未命中） */
     private static String keyOf(String type) {
-        // 批次14 · 14.1：这张「5 类」的小表已搬进 EntityTypes（countsUnnormalized），
-        // 这里改为查目录 —— 以后新增类型（或改某类是否计分）只动 EntityTypes 一处。
-        // 语义与搬走前逐字相同：只有 countsUnnormalized=true 的类型才映射出 structuredKey。
+        // 计分范围完全由规则集的 standardization.elementTypes 决定（调用方已按它筛选）：
+        // 这里只做「类型 → structuredKey」的映射，未登记类型返回 null。
+        // 原实现另叠一道 EntityTypes.countsUnnormalized 过滤 —— 结果是前端即便勾上
+        // 舌象/脉象/治法也照样不计分（双开关、勾了不生效）。已按「以规则配置为准」移除。
         com.tcm.ehr.common.config.EntityTypes.EntityType t =
                 com.tcm.ehr.common.config.EntityTypes.byKey(type);
-        return t != null && t.countsUnnormalized() ? t.structuredKey() : null;
+        return t != null ? t.structuredKey() : null;
     }
 
     /** 该类型下未命中词典的实体数：`normLevel` 缺失**或**不在命中区间（0 = 查过但没命中）都算 */
@@ -263,6 +270,14 @@ public final class QcScorer {
             }
         }
         return missCount;
+    }
+
+    /** 规则集里「参与归一」的类型集合；缺字段时退回出厂默认（维持旧行为） */
+    private static java.util.Set<String> normalizedTypesOf(com.tcm.ehr.common.config.QcRuleSet rs) {
+        com.tcm.ehr.common.config.QcRuleSet.Normalization n = rs.getNormalization();
+        return (n == null || n.getElementTypes() == null)
+                ? java.util.Set.copyOf(com.tcm.ehr.common.config.QcRuleSet.DEFAULT_NORMALIZATION_TYPES)
+                : java.util.Set.copyOf(n.getElementTypes());
     }
 
     private static String reasonFor(com.tcm.ehr.common.config.QcRuleSet.Element el, boolean rawHas) {

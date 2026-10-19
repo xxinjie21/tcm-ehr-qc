@@ -64,21 +64,38 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private final com.tcm.ehr.mapper.ReviewTaskMapper reviewTaskMapper;
 
     /**
+     * 组织级「归一范围」来源（{@code normalization.elementTypes}）。
+     *
+     * <p><b>字段注入而非构造参数</b>：{@code GovernanceCleanContractTest} / {@code GovernanceCleanIdempotentTest}
+     * 直接用 4 参构造 {@code new GovernanceServiceImpl(norm, mapper, store, taskMapper)}，把本依赖加成
+     * final 字段会改变构造签名、破坏它们。{@code required=false}：单测无此 bean 时退回出厂默认范围。</p>
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
+
+    /** 本组织参与归一的类型集合；无 store（单测）时退回出厂默认（8 类，不含病因） */
+    private Set<String> normScope() {
+        return qcRuleStore == null
+                ? Set.copyOf(com.tcm.ehr.common.config.QcRuleSet.DEFAULT_NORMALIZATION_TYPES)
+                : qcRuleStore.normalizationTypes(RequestUtils.currentOrgId());
+    }
+
+    /**
      * 单条术语归一（清洗页的「归一测试」入口）。
      *
-     * <p>只接受有独立词典的 5 类（疾病 / 证候 / 症状 / 中药 / 方剂），其余类型直接拒绝，
-     * 避免调用方以为舌象、脉象也有词典可查。</p>
+     * <p>只接受有独立词典的类型（{@link com.tcm.ehr.common.config.EntityTypes#dictKeys()}，现 9 类），
+     * 其余类型直接拒绝，避免调用方以为没有词典的类型也能查。</p>
      *
      * @param type 实体类型 key
      * @param term 待归一原文
      * @return 命中层级、标准词
-     * @throws IllegalArgumentException type 不属于 5 类词典类型
+     * @throws IllegalArgumentException type 不属于有词典的类型
      */
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
-        // 1. 只收词典里的 5 类：舌象/脉象等无词典，归一了也没有权威结果可依
+        // 1. 只收有独立词典的类型：没词典的类型归一了也没有权威结果可依
         if (!com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(type)) {
-            throw new IllegalArgumentException("type必须为disease/pattern/symptom/herb/formula");
+            throw new IllegalArgumentException("type 必须为有独立词典的类型");
         }
         return termNormalizer.normalize(type, RequestUtils.currentOrgId(), term);
     }
@@ -390,8 +407,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * <p><b>不改的是什么</b>：预热只写召回缓存、不参与判定。命中与否仍由三级规则与 Dice 阈值决定，
      * 预取失败也不影响正确性（逐条归一照常走 ES）。</p>
      *
-     * <p><b>只预热有独立词典的 5 类</b>（疾病 / 证候 / 症状 / 中药 / 方剂）。舌象、脉象、病因、治法
-     * 没有词典，清洗链路对它们根本不调 ES（见 {@link #normalizeEntityList}），预热没有意义。</p>
+     * <p><b>只预热本组织归一范围内的类型</b>（{@code normalization.elementTypes}，出厂默认含
+     * 疾病 / 证候 / 症状 / 中药 / 方剂；舌象 / 脉象 / 治法可勾选，病因默认不勾）。范围外的类型
+     * 清洗链路对其不调 ES（见 {@link #normalizeEntityList}），预热没有意义。</p>
      *
      * <p>预热粒度是「一页」而非整批：召回缓存本身有容量上限（{@code RECALL_CACHE_MAX}），
      * 一次问进远超用量的术语只会把先问进来的挤出去。一页正好是「问进来就马上用掉」的窗口。</p>
@@ -404,6 +422,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // 0. 只留本页的解析结果：回调一定发生在上页被消费完之后，这里清掉不会影响上页；
         //    不清的话整批 4 万条的解析结果会一直挂在内存里 —— 那正是 12c 要消掉的堆占用。
         pageParsed.clear();
+        // 0.5 本组织归一范围：范围外的类型不会走归一，预热它们纯属白问 ES
+        Set<String> scope = normScope();
         // 1. 逐条解析本页 structured_data（留档复用），并按类型收集待归一原文
         Map<String, Set<String>> rawsByType = new HashMap<>();
         for (Record r : page) {
@@ -416,15 +436,17 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (data == null) {
                 continue;
             }
-            // 2. 有词典的 4 类 entity：原文取 content（与 normalizeEntityList 同口径）
+            // 2. 归一范围内的 4 类 entity：原文取 content（与 normalizeEntityList 同口径）
             for (String key : List.of("diseases", "symptoms", "patternList", "formulaList")) {
                 String type = mapEntityType(key);
-                if (type != null) {
+                if (type != null && scope.contains(type)) {
                     collectEntityRaws(rawsByType, type, data.get(key), "content");
                 }
             }
             // 3. 中药是另一套：原文取 name（与 normalizeHerbs 同口径）
-            collectEntityRaws(rawsByType, "herb", data.get("herbs"), "name");
+            if (scope.contains("herb")) {
+                collectEntityRaws(rawsByType, "herb", data.get("herbs"), "name");
+            }
         }
         // 4. 一类一趟 _msearch；结果写进与单条 search 相同的缓存键，随后逐条归一直接命中
         rawsByType.forEach((type, raws) -> termNormalizer.prefetch(type, orgId, new ArrayList<>(raws)));
@@ -500,12 +522,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /** 8 类 entity（content）逐类归一并做同标准词去重；stat 就地累加 */
     @SuppressWarnings("unchecked")
     private void normalizeEntityList(Map<String, Object> data, int[] stat) {
+        // 本组织归一范围：范围外的类型不做词形归一（仍走去重），与「无独立词典」同一处理
+        Set<String> scope = normScope();
         for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
                 "causeList", "treatmentList", "formulaList")) {
             if (!(data.get(key) instanceof List<?> list)) continue;
             String type = mapEntityType(key);
-            // 有词典的才做词形归一；舌/脉/病因/治法这 4 类无词典，但仍要走去重
-            if (type != null) {
+            // 有词典、且在本组织归一范围内的才做词形归一；其余只走去重
+            if (type != null && scope.contains(type)) {
                 for (Object item : list) {
                     if (!(item instanceof Map)) continue;
                     Map<String, Object> entity = (Map<String, Object>) item;
@@ -559,6 +583,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         if (!(data.get("herbs") instanceof List<?> list)) {
             return;
         }
+        boolean herbOn = normScope().contains("herb");
         for (Object item : list) {
             if (!(item instanceof Map)) continue;
             Map<String, Object> herb = (Map<String, Object>) item;
@@ -571,24 +596,27 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (str(herb.get("sourceText")) == null) {
                 herb.put("sourceText", raw);
             }
-            var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), raw);
-            boolean hit = EsTermNormalizer.isHit(result.level())
-                    && !(result.level() == EsTermNormalizer.LEVEL_CONTAIN
-                         && TermGuard.isNegatedContext(raw));
-            if (!hit) {
-                // D4：未命中 / 被拦下 → name 回填原文并清残留 normLevel（同 normalizeEntityList）
-                herb.put("name", raw);
-                herb.remove("normLevel");
-            } else {
-                // D3：命中就写 normLevel；只有词形确实变了才计入 normalized 统计
-                boolean changed = !result.standardTerm().equals(String.valueOf(herb.get("name")));
-                if (changed) {
-                    herb.put("name", result.standardTerm());
-                }
-                herb.put("normLevel", result.level());
-                if (changed) {
-                    stat[0]++;
-                    stat[result.level()]++;
+            // 中药不在归一范围 → 跳过归一，但仍做剂量单位规整与去重
+            if (herbOn) {
+                var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), raw);
+                boolean hit = EsTermNormalizer.isHit(result.level())
+                        && !(result.level() == EsTermNormalizer.LEVEL_CONTAIN
+                             && TermGuard.isNegatedContext(raw));
+                if (!hit) {
+                    // D4：未命中 / 被拦下 → name 回填原文并清残留 normLevel（同 normalizeEntityList）
+                    herb.put("name", raw);
+                    herb.remove("normLevel");
+                } else {
+                    // D3：命中就写 normLevel；只有词形确实变了才计入 normalized 统计
+                    boolean changed = !result.standardTerm().equals(String.valueOf(herb.get("name")));
+                    if (changed) {
+                        herb.put("name", result.standardTerm());
+                    }
+                    herb.put("normLevel", result.level());
+                    if (changed) {
+                        stat[0]++;
+                        stat[result.level()]++;
+                    }
                 }
             }
             if (herb.get("dosage") != null) {

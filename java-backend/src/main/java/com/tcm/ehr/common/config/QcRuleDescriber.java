@@ -81,17 +81,37 @@ public final class QcRuleDescriber {
         // 同一条规则在配置弹窗里是中文、在说明里是英文 key，用户会怀疑哪个才算数（审查报告 H3）
         // 5. 术语标准化：类型 key 换中文名
         QcRuleSet.Standardization st = r.getStandardization();
-        if (st.isEnabled()) {
+        boolean hasStdTypes = st.getElementTypes() != null && !st.getElementTypes().isEmpty();
+        if (st.isEnabled() && hasStdTypes) {
             List<String> typeLabels = new ArrayList<>();
             for (String type : st.getElementTypes()) {
                 typeLabels.add(labelOf(type));
             }
             out.add("术语（" + String.join("/", typeLabels)
                     + "）未命中标准词典的：" + st.getWeightEach() + " 分/个，最多先扣 " + st.getCap() + " 个的量；"
-                + "再每满 " + st.getCap() + " 个追加一档（避免大量未归一时扣分触顶、分数失去区分度）。");
+                + "再每满 " + st.getCap() + " 个追加一档（避免大量未归一时扣分触顶、分数失去区分度）。"
+                + "实际计分取本范围与「术语归一范围」的交集 —— 未开归一的类型不计分。");
+        } else if (st.isEnabled()) {
+            // 启用了却没选任何类型：说明白，否则用户以为规则没生效
+            out.add("术语标准化：已启用，但未勾选任何实体类型（不参与评分）。");
         } else {
             // 关闭也要说明，否则用户以为漏配了规则
             out.add("术语标准化：已关闭（不参与评分）。");
+        }
+
+        // 5b. 术语归一范围（与上面的「标准化扣分」是两个独立开关）：哪些类型做词形归一。
+        //     未列入的类型不做归一，其实体不写 normLevel，也就不参与上面的未归一计分。
+        QcRuleSet.Normalization nz = r.getNormalization();
+        boolean hasNormTypes = nz != null && nz.getElementTypes() != null && !nz.getElementTypes().isEmpty();
+        if (hasNormTypes) {
+            List<String> normLabels = new ArrayList<>();
+            for (String type : nz.getElementTypes()) {
+                normLabels.add(labelOf(type));
+            }
+            out.add("术语归一范围：" + String.join("/", normLabels)
+                    + " 会做「原文 → 标准词」归一；未列入的类型只保留原文（不参与未归一计分）。");
+        } else {
+            out.add("术语归一范围：未勾选任何类型（全部不归一）。");
         }
 
         // 6. 重复与分级：两条固定说明
@@ -106,28 +126,34 @@ public final class QcRuleDescriber {
     }
 
     /**
-     * 一致性规则的构成摘要，如「14 条（中药 9 / 方剂 5）」。
+     * 一致性规则的构成摘要，如某组织配了规则时输出「3 条（中药 3）」。
      *
-     * <p>由规则数据拼装、后端下发。质控标准面板原来写死「14 条（证候 → 中药 / 舌象 / 脉象）」，
-     * 而实际规则里没有任何舌象/脉象项，改规则也不改文案（审查报告 H2）。</p>
+     * <p>由规则数据拼装、后端下发。<b>出厂默认无一致性规则（consistency 为空）</b>，
+     * 此时输出「0 条」—— 面板如实显示，不再写死条数（原写死「14 条（证候 → 中药 / 舌象 / 脉象）」，
+     * 与实际规则不符，审查报告 H2）。</p>
      */
     public static String consistencySummary(QcRuleSet r) {
-        // 1. 没规则就说 0 条
+        // 1. 没规则就说 0 条（出厂默认正是此分支）
         if (r == null || r.getConsistency() == null || r.getConsistency().isEmpty()) {
             return "0 条";
         }
-        // 2. 按"期望类型"分组计数（如 中药 9 / 方剂 5）
+        // 2. 按"期望类型"分组计数（如 中药 3）
         Map<String, Integer> byExpect = new LinkedHashMap<>();
         for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
             byExpect.merge(labelOf(c.getExpectType()), 1, Integer::sum);
         }
-        // 3. 拼成「14 条（中药 9 / 方剂 5）」
+        // 3. 拼成「3 条（中药 3）」
         List<String> parts = new ArrayList<>();
         byExpect.forEach((label, n) -> parts.add(label + " " + n));
         return r.getConsistency().size() + " 条（" + String.join(" / ", parts) + "）";
     }
 
-    /** 可选要素目录：取自实体类型目录（9 类，中文名 ↔ 类型 key / structuredKey / 回退列），用户只选中文 */
+    /**
+     * 可选要素目录：取自实体类型目录（9 类，中文名 ↔ 类型 key / structuredKey / 回退列），用户只选中文。
+     *
+     * <p>{@code dict=true} 的项即术语标准化可勾选类型（有词典的 8 类，病因除外），
+     * 前端据此筛出「术语标准化按哪几类计分」的下拉项。</p>
+     */
     public static List<QcRuleSet.Element> catalogElements() {
         // 逐类转成可选项；带上 typeKey，配置弹窗提交时才知道对应哪个类型
         // 1. 遍历 9 类实体，每类产出一个可勾选项（装配走 QcRuleSet.el，与默认规则同构）
@@ -135,6 +161,7 @@ public final class QcRuleDescriber {
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             QcRuleSet.Element e = QcRuleSet.el(t.label(), t.structuredKey(), t.fallback());
             e.setTypeKey(t.key());
+            e.setDict(t.dict());
             list.add(e);
         }
         return list;
@@ -148,7 +175,7 @@ public final class QcRuleDescriber {
         List<QcRuleSet.FormatRule> list = new ArrayList<>();
         list.add(QcRuleSet.format("age", "regex", QcRuleSet.AGE_PATTERN, List.of(), "年龄", "年龄格式不正确",
                 QcRuleSet.AGE_HINT));
-        list.add(QcRuleSet.format("gender", "enum", null, QcRuleSet.GENDER_VALUES, "性别", "性别非 男/女", null));
+        list.add(QcRuleSet.format("gender", "enum", null, QcRuleSet.GENDER_VALUES, "性别", "性别非 男/女/未知的性别", null));
         return list;
     }
 

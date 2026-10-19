@@ -26,10 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 静默传播到播种、导出、版本比对、前端类型下拉多处，所以用测试钉住。
  *
  *
- * 要守住三件事：① 三类确实有了词典且文件名对得上磁盘；② 病因仍无词典
- *
- * （它依赖规则词表，不该被顺手加词典）；③ 目录自身仍然自洽（key/structuredKey
- * 不重复、顺序稳定）。
+ * 要守住三件事：① 舌象/脉象/治法/病因确实有词典且文件名对得上磁盘；② 目录自身仍然自洽
+ * （key/structuredKey 不重复、顺序稳定）；③ 9 类均有词典（{@code dictKeys()} 是派生视图）。
  */
 class EntityTypesDictionaryRegistrationTest {
 
@@ -54,14 +52,16 @@ class EntityTypesDictionaryRegistrationTest {
         assertEquals("tongues.json", EntityTypes.fileNameOf("tongue"));
         assertEquals("pulses.json", EntityTypes.fileNameOf("pulse"));
         assertEquals("treatments.json", EntityTypes.fileNameOf("treatment"));
+        assertEquals("causes.json", EntityTypes.fileNameOf("cause"));
     }
 
     @Test
-    @DisplayName("病因仍无词典（依赖规则词表，不在本批次范围）")
-    void causeStillHasNoDictionary() {
+    @DisplayName("病因已有词典（病因词典 causes.json 与其余 8 类同时到位）")
+    void causeHasDictionary() {
         EntityTypes.EntityType cause = EntityTypes.byKey("cause");
         assertNotNull(cause);
-        assertFalse(cause.dict(), "病因不在批次 20 范围内，不应有词典");
+        assertTrue(cause.dict(), "病因应标记为有词典");
+        assertEquals("causes.json", cause.fileName(), "病因词典文件名须为 causes.json");
     }
 
     @Test
@@ -85,10 +85,10 @@ class EntityTypesDictionaryRegistrationTest {
     }
 
     @Test
-    @DisplayName("实体类型仍是 9 类（批次 20 只建词典，不增删实体类型）")
+    @DisplayName("实体类型仍是 9 类，且 9 类均有词典（病因已补上）")
     void stillNineTypes() {
         assertEquals(9, EntityTypes.all().size());
-        assertEquals(8, EntityTypes.dictKeys().size(), "8 类有词典，病因除外");
+        assertEquals(9, EntityTypes.dictKeys().size(), "9 类均有词典（病因已补）");
     }
 
     @Test

@@ -43,6 +43,26 @@ public class EntityNormalizer {
     private final tools.jackson.databind.ObjectMapper objectMapper;
 
     /**
+     * 组织级「归一范围」来源（{@code normalization.elementTypes}）—— 哪些实体类型做词形归一。
+     *
+     * <p><b>刻意用字段注入而非构造参数</b>：{@code @RequiredArgsConstructor} 会把新增的 final
+     * 字段加进构造签名，而 {@code EntityNormalizerMapTest} 等直接
+     * {@code new EntityNormalizer(term, mapper)} 构造，加参数会破坏它们。
+     * 标 {@code required=false}：单测无此 bean 时退回出厂默认范围（与旧行为一致）。</p>
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.tcm.ehr.common.config.QcRuleStore ruleStore;
+
+    /** 无 {@link #ruleStore}（单测直接 new）时的兜底归一范围，见 {@code QcRuleSet.DEFAULT_NORMALIZATION_TYPES} */
+    private static final java.util.Set<String> FALLBACK_NORM_SCOPE =
+            java.util.Set.copyOf(com.tcm.ehr.common.config.QcRuleSet.DEFAULT_NORMALIZATION_TYPES);
+
+    /** 本组织参与归一的类型集合；无 store 时退回出厂默认（8 类） */
+    private java.util.Set<String> normScope(String orgId) {
+        return ruleStore == null ? FALLBACK_NORM_SCOPE : ruleStore.normalizationTypes(orgId);
+    }
+
+    /**
      * 否定语境里被「包含命中」拦下、未写 normLevel 的实体数（仅观测，不参与命中统计）。
      *
      * <p>存在的理由：这类拦截会让症状未归一次数**变多**（本会误归的现在保持未归一），
@@ -75,8 +95,10 @@ public class EntityNormalizer {
     /**
      * 附录A 字段名 → 词典类型（唯一映射，解析链路与清洗链路共用，避免两处口径漂移）。
      *
-     * <p> 起取自 {@link com.tcm.ehr.common.config.EntityTypes}：只有"有词典"的类型参与归一，
-     * 舌象/脉象/病因/治法无独立词典，返回 {@code null}。</p>
+     * <p>取自 {@link com.tcm.ehr.common.config.EntityTypes}：9 类实体现均有独立词典
+     * （病因自本批次起有 {@code causes.json}），故凡登记过的字段都返回其词典类型 key；
+     * 只有<b>未登记</b>的字段名返回 {@code null}。<b>是否真的归一</b>还取决于该类型是否在
+     * 本组织「归一范围」内（见 {@link #normScope}），二者不是一回事。</p>
      *
      * @return 词典类型；该字段无独立词典时返回 {@code null}
      */
@@ -349,7 +371,7 @@ public class EntityNormalizer {
      * <p>类型 key 由 structuredKey 反查 {@link com.tcm.ehr.common.config.EntityTypes} 得到 ——
      * 复用那一份登记，不在本类里再写一张「字段名→类型」的表。</p>
      */
-    private void prefetchRecall(NlpExtractVO vo, String orgId) {
+    private void prefetchRecall(NlpExtractVO vo, String orgId, java.util.Set<String> scope) {
         java.util.Map<String, java.util.LinkedHashSet<String>> byStructuredKey = new java.util.LinkedHashMap<>();
         collectRaws(byStructuredKey, "diseases", vo.getDiseases());
         collectRaws(byStructuredKey, "symptoms", vo.getSymptoms());
@@ -371,7 +393,8 @@ public class EntityNormalizer {
         byStructuredKey.forEach((structuredKey, raws) -> {
             com.tcm.ehr.common.config.EntityTypes.EntityType t =
                     com.tcm.ehr.common.config.EntityTypes.dictTypeByStructuredKey(structuredKey);
-            if (t != null) {
+            // 只预热本组织归一范围内的类型：范围外的类型不会走归一，预热是白问一次 ES
+            if (t != null && scope.contains(t.key())) {
                 termNormalizer.prefetch(t.key(), orgId, new java.util.ArrayList<>(raws));
             }
         });
@@ -400,12 +423,17 @@ public class EntityNormalizer {
         }
         int[] stat = {0, 0, 0, 0};
 
+        // 1.3 本组织参与归一的类型集合（规则集 normalization.elementTypes）。
+        //     不在范围内的类型一律只保留原文、不写 normLevel —— 与「无独立词典」同一处理：
+        //     归一执行链路据此开关，QcScorer 的扣分范围再与它取交集。
+        java.util.Set<String> scope = normScope(orgId);
+
         // 1.4 预取召回（批次12 · 12b）：放在最前，用一次 _msearch 把原文预热进与单条 search
         //     相同的缓存键，随后 1.6 丢弃与逐条归一 的查询全部命中缓存，只发一次 ES 往返。
         //     ⚠️ 本注释原写「放在归位与丢弃之后」，与代码不符（代码在最前）。按当前顺序，预取
         //     集合会含随后被丢弃的单字残词（少量浪费）；但若真挪到 1.6 之后，1.6 的查询会全部
         //     落回单条 ES（更慢），故保留当前顺序、订正注释（审查报告 §4.1）。
-        prefetchRecall(vo, orgId);
+        prefetchRecall(vo, orgId, scope);
 
         // 1.5 归位（2026-10-05 修 #2）：抽取侧有时把脉象/舌象内容打进 symptoms ——
         //     实测症状字段 4170 条里有 107 条的内容**恰是脉象词典里的标准词**
@@ -418,21 +446,22 @@ public class EntityNormalizer {
         //     词典里确有 5 个单字标准词，一刀切会误删合法术语（本批数据里这类为 0，但规则要立对）。
         dropSingleCharFragments(vo, orgId);
 
-        // 2. 8 类 Entity 走同一字段→类型映射；无词典的 4 类只回填 sourceText（供前端展示原文）
-        vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat, orgId));
-        vo.setSymptoms(normEntities(vo.getSymptoms(), "symptoms", stat, orgId));
-        vo.setTongueList(normEntities(vo.getTongueList(), "tongueList", stat, orgId));
-        vo.setPulseList(normEntities(vo.getPulseList(), "pulseList", stat, orgId));
-        vo.setPatternList(normEntities(vo.getPatternList(), "patternList", stat, orgId));
-        vo.setCauseList(normEntities(vo.getCauseList(), "causeList", stat, orgId));
-        vo.setTreatmentList(normEntities(vo.getTreatmentList(), "treatmentList", stat, orgId));
-        vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat, orgId));
+        // 2. 8 类 Entity 走同一字段→类型映射；无词典 / 未纳入归一范围的类型只回填 sourceText
+        vo.setDiseases(normEntities(vo.getDiseases(), "diseases", stat, orgId, scope));
+        vo.setSymptoms(normEntities(vo.getSymptoms(), "symptoms", stat, orgId, scope));
+        vo.setTongueList(normEntities(vo.getTongueList(), "tongueList", stat, orgId, scope));
+        vo.setPulseList(normEntities(vo.getPulseList(), "pulseList", stat, orgId, scope));
+        vo.setPatternList(normEntities(vo.getPatternList(), "patternList", stat, orgId, scope));
+        vo.setCauseList(normEntities(vo.getCauseList(), "causeList", stat, orgId, scope));
+        vo.setTreatmentList(normEntities(vo.getTreatmentList(), "treatmentList", stat, orgId, scope));
+        vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat, orgId, scope));
 
         // 3. 中药单独处理：归一目标是 name 而不是 content
         //    ⚠️ 判空不可省：structured_data 可能没有 herbs 键（或显式为 null），而其余 8 类走
         //    normEntities 已有同样的判空 —— 这里原先是漏的（《common组件审查报告》§七.6）。
         //    同一份 VO 在上方 prefetchRecall 里也是判空后遍历的。
         if (vo.getHerbs() != null) {
+            boolean herbOn = scope.contains("herb");
             for (NlpExtractVO.Herb herb : vo.getHerbs()) {
                 if (herb == null) continue;
                 // 中药以 name 为归一目标，sourceText 保留原文（模型侧 name 与 sourceText 同源）
@@ -440,6 +469,10 @@ public class EntityNormalizer {
                 if (raw.isEmpty()) continue;
                 if (TextUtil.isBlank(herb.getSourceText())) {
                     herb.setSourceText(raw);
+                }
+                // 中药不在归一范围 → 只保留原文，不写 normLevel（同无词典处理）
+                if (!herbOn) {
+                    continue;
                 }
                 EsTermNormalizer.NormalizeResult r = termNormalizer.normalize("herb", orgId, raw);
                 // 4. 没命中词典就保持原样（不写 normLevel，质控据此算"未标准化"）
@@ -459,12 +492,14 @@ public class EntityNormalizer {
         return NormStat.of(stat);
     }
 
-    private List<NlpExtractVO.Entity> normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat, String orgId) {
+    private List<NlpExtractVO.Entity> normEntities(List<NlpExtractVO.Entity> entities, String fieldKey, int[] stat, String orgId,
+                                                   java.util.Set<String> scope) {
         // 1. 该字段没抽到东西就保持 null，别把 null 换成空列表
         if (entities == null) {
             return null;
         }
-        // 2. 该字段对应哪类词典（舌/脉/病因/治法返回 null）
+        // 2. 该字段对应哪类词典（舌/脉/病因/治法返回 null 已不成立：9 类均有词典，
+        //    现返回的是字典类型 key；未纳入归一范围的类型由下方 scope 判定跳过）
         String type = dictionaryType(fieldKey);
         // 3. 逐个实体归一
         for (NlpExtractVO.Entity e : entities) {
@@ -474,8 +509,9 @@ public class EntityNormalizer {
             if (TextUtil.isBlank(e.getSourceText())) {
                 e.setSourceText(raw);
             }
-            if (type == null) {
-                continue; // 该字段无独立词典，仅保留原文
+            // 3.5 无独立词典，或该类型未纳入本组织「归一范围」→ 只保留原文（不写 normLevel）
+            if (type == null || !scope.contains(type)) {
+                continue;
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
             // 4. 未命中词典就保持原样，不写 normLevel

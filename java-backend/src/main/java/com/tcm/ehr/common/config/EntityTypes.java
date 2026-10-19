@@ -12,18 +12,23 @@ import java.util.Set;
  *
  *
  * 唯一权威是 {@link #all()}：固定 9 类（对齐 NLP 可抽取的实体）。
- * 批次 20 起有词典的是 8 类（疾病/证候/症状/中药/方剂/舌象/脉象/治法），
- * 病因仍无词典（依赖规则词表）。不落盘、不做用户自定义——词典范围限定在 NLP 能提取的实体。
+ * 9 类均有独立词典（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法）——病因词典
+ * （{@code causes.json}）与其余 8 类同时到位，故 {@code dictKeys()} 现为 9 类。
+ * 不落盘、不做用户自定义——词典范围限定在 NLP 能提取的实体。
  *
- * <p>{@code dictKeys()} 的 8 类与 python-nlp 的 {@code LABEL_FIELD} 5 类都只是
+ * <p>{@code dictKeys()} 的 9 类与 python-nlp 的 {@code LABEL_FIELD} 5 类都只是
  * {@code all()} 的过滤视图，不是并列清单：前者按 {@code dict} 标志筛（25.b 防漂移测试钉住），
  * 后者是模型能输出的 NER 标签集（病名/症状/证型/方剂/本草），维度不同、不要求等长。</p>
  *
  *
- * ⚠️ 新增词典类型不会改变质控扣分口径：计分只认
- *
- * QcScorer.keyOf() 里硬编码的 5 类，新类型落到 default -> null
- * 后按 0 条未命中处理（详见《多批次实施计划》批次 20）。
+ * ⚠️ 两类范围都<b>不再</b>由本目录硬编码，全部交给组织级规则集（用户在「规则配置」里改）：
+ * <ul>
+ *   <li><b>归一范围</b>：{@code QcRuleSet.normalization.elementTypes} 决定哪些类型做词形归一
+ *       （出厂默认 8 类，不含病因）；</li>
+ *   <li><b>扣分范围</b>：{@code QcRuleSet.standardization.elementTypes} 决定哪些类型计入
+ *       「未归一扣分」（出厂默认 5 类），实际按它与归一范围<b>取交集</b>计分。</li>
+ * </ul>
+ * 本目录只声明类型元数据。
  */
 public final class EntityTypes {
 
@@ -35,17 +40,9 @@ public final class EntityTypes {
      * @param fileName      词典文件名（无词典为 null）
      * @param fallback      无结构化结果时的原始列回退字段（Record 属性名）
      * @param order         展示顺序
-     * @param countsUnnormalized
-     *        该类未归一的实体**是否计入质控的未归一扣分**（批次 14 · 14.1 把它从
-     *        QcScorer 的 switch 搬到这里，成为目录里的一项声明）。
-     *        <p><b>为什么舌象/脉象/治法为 false</b>：它们的子要素由 python-nlp 按标点先分段
-     *        （舌质/舌苔/齿痕/裂纹、脉位与脉象分开），分段本身有损；抽不到或词表未收录的段
-     *        保留原文，若计入扣分，等于拿分段器的行为去惩罚用户。故这三类（以及无词典的病因）
-     *        不计入未归一扣分 —— 这是政策，不是遗漏。</p>
      */
     public record EntityType(String key, String label, String structuredKey, boolean dict,
-                             String fileName, List<String> fallback, int order,
-                             boolean countsUnnormalized) {
+                             String fileName, List<String> fallback, int order) {
     }
 
     // rawFields = 该类型的「专属原文来源列」。空列表不等于「抽不出来」：
@@ -55,31 +52,29 @@ public final class EntityTypes {
     // 本数据集 prescription 列是纯中药清单（无方剂名）、也没有「治以…」文本，
     // 方剂/治法恒空是数据如此，不是接线问题。
     private static final List<EntityType> ALL = List.of(
-            // 末尾一位：countsUnnormalized（未归一是否计入质控扣分）。
-            // 不再维护 per-类型「来源/编码」—— 出处集中在项目文档统一声明。
             new EntityType("disease", "疾病", "diseases", true, "diseases.json",
-                    List.of("tcmDiagnosis", "westernDiagnosis"), 1, true),
+                    List.of("tcmDiagnosis", "westernDiagnosis"), 1),
             new EntityType("pattern", "证候", "patternList", true, "patterns.json",
-                    List.of("pattern"), 2, true),
+                    List.of("pattern"), 2),
             new EntityType("symptom", "症状", "symptoms", true, "symptoms.json",
-                    List.of("chiefComplaint", "selfReport", "presentIllness"), 3, true),
+                    List.of("chiefComplaint", "selfReport", "presentIllness"), 3),
             new EntityType("herb", "中药", "herbs", true, "herbs.json",
-                    List.of("prescription"), 4, true),
+                    List.of("prescription"), 4),
             new EntityType("formula", "方剂", "formulaList", true, "formulas.json",
-                    List.of(), 5, true),
+                    List.of(), 5),
             // 舌象/脉象/治法自批次 20 起有词典（此前 dict=false）：
             // 子要素先由 python-nlp 按标点分段抽成独立段（舌质/舌苔/齿痕/裂纹、
-            // 脉位与脉象分开），再归一；抽不到或词表未收录的段保留原文，不算未归一扣分
-            // —— 这条政策自批次 14 起由本行的 countsUnnormalized=false 声明，
-            // 不再靠 QcScorer 里那张远处的小表维护。
+            // 脉位与脉象分开），再归一；抽不到或词表未收录的段保留原文。
+            // 是否把这三类计入「未归一扣分」由规则集的 standardization.elementTypes 决定
+            // （出厂默认不含它们，理由见 QcRuleSet.defaultStandardization 的 javadoc）。
             new EntityType("tongue", "舌象", "tongueList", true, "tongues.json",
-                    List.of("tongue"), 6, false),
+                    List.of("tongue"), 6),
             new EntityType("pulse", "脉象", "pulseList", true, "pulses.json",
-                    List.of("pulse"), 7, false),
-            new EntityType("cause", "病因", "causeList", false, null,
-                    List.of(), 8, false),
+                    List.of("pulse"), 7),
+            new EntityType("cause", "病因", "causeList", true, "causes.json",
+                    List.of(), 8),
             new EntityType("treatment", "治法", "treatmentList", true, "treatments.json",
-                    List.of(), 9, false)
+                    List.of(), 9)
     );
 
     // P5.4：构建期用临时可变表，构建完即包成 unmodifiable 后赋给 final 字段，
@@ -135,11 +130,11 @@ public final class EntityTypes {
     }
 
     /**
-     * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/治法，顺序稳定）。
+     * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法，顺序稳定，共 9 类）。
      *
-     * <p>⚠️ 别把这里读成「计分也用 8 类」：{@code QcScorer.keyOf()} 只认本类中
-     * {@code countsUnnormalized=true} 的 5 类（疾病/证候/症状/中药/方剂），舌象/脉象/治法
-     * 落 null → 按 0 条未命中处理。口径差异是有意的（见本类头部说明与《多批次实施计划》批次 20）。</p>
+     * <p>这 9 类即「规则配置」弹窗里术语归一 / 术语标准化可勾选的范围；<b>实际生效范围</b>
+     * 由规则集的 {@code normalization.elementTypes}（归一）与 {@code standardization.elementTypes}
+     * （未归一扣分）决定。本方法给「可选项」，规则集给「已选项」。</p>
      */
     public static Set<String> dictKeys() {
         return DICT_KEYS;
