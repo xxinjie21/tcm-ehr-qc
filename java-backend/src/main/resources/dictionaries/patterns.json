@@ -2,10 +2,8 @@
   {
     "standardTerm": "肝气郁结",
     "aliases": [
-      "肝郁气滞",
       "肝郁",
-      "肝气郁",
-      "肝气郁结证"
+      "肝气郁"
     ]
   },
   {
@@ -27,7 +25,6 @@
     "aliases": [
       "胃热",
       "胃火炽盛",
-      "胃热证",
       "胃火"
     ]
   },
@@ -50,15 +47,13 @@
     "standardTerm": "脾肾阳虚",
     "aliases": [
       "脾肾两虚",
-      "脾肾阳亏",
-      "脾肾阳虚证"
+      "脾肾阳亏"
     ]
   },
   {
     "standardTerm": "水湿内停",
     "aliases": [
       "水湿停聚",
-      "水湿内停证",
       "水湿停"
     ]
   },
@@ -143,8 +138,7 @@
     "aliases": [
       "肝阳偏亢",
       "阴虚阳亢",
-      "肝阳上扰",
-      "肝阳上亢证"
+      "肝阳上扰"
     ]
   },
   {
@@ -152,7 +146,6 @@
     "aliases": [
       "肝火炽盛",
       "肝火",
-      "肝火上炎证",
       "肝经火旺"
     ]
   },
@@ -166,9 +159,7 @@
   {
     "standardTerm": "肝郁气滞",
     "aliases": [
-      "肝气郁结",
       "肝郁",
-      "肝郁证",
       "肝气郁"
     ]
   },
@@ -191,8 +182,7 @@
     "standardTerm": "心脾两虚",
     "aliases": [
       "心脾不足",
-      "心脾气血两虚",
-      "心脾两虚证"
+      "心脾气血两虚"
     ]
   },
   {
@@ -210,8 +200,7 @@
     "standardTerm": "肺气虚寒",
     "aliases": [
       "肺虚寒",
-      "肺阳不足",
-      "肺气虚寒证"
+      "肺阳不足"
     ]
   },
   {
@@ -231,9 +220,7 @@
   },
   {
     "standardTerm": "阴证",
-    "aliases": [
-      "阴寒证"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "阳证",
@@ -10393,6 +10380,205 @@
     "standardTerm": "三度",
     "aliases": [
       "重度"
+    ]
+  },
+  {
+    "standardTerm": "脾肾不足",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气血亏虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "气阴不足",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心阳不振",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心脾亏虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肝郁脾虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "风寒犯肺",
+    "aliases": [
+      "风寒束肺"
+    ]
+  },
+  {
+    "standardTerm": "风热犯肺",
+    "aliases": [
+      "风热袭肺"
+    ]
+  },
+  {
+    "standardTerm": "风寒束表",
+    "aliases": [
+      "风寒表证"
+    ]
+  },
+  {
+    "standardTerm": "风热袭表",
+    "aliases": [
+      "风热表证"
+    ]
+  },
+  {
+    "standardTerm": "痰浊阻肺",
+    "aliases": [
+      "痰湿阻肺"
+    ]
+  },
+  {
+    "standardTerm": "肺气虚",
+    "aliases": [
+      "肺气不足"
+    ]
+  },
+  {
+    "standardTerm": "肺阴虚",
+    "aliases": [
+      "肺阴亏虚"
+    ]
+  },
+  {
+    "standardTerm": "脾气虚",
+    "aliases": [
+      "脾气不足"
+    ]
+  },
+  {
+    "standardTerm": "脾阳虚",
+    "aliases": [
+      "脾阳不振"
+    ]
+  },
+  {
+    "standardTerm": "胃阴虚",
+    "aliases": [
+      "胃阴不足"
+    ]
+  },
+  {
+    "standardTerm": "肝风内动",
+    "aliases": [
+      "内风"
+    ]
+  },
+  {
+    "standardTerm": "肝血虚",
+    "aliases": [
+      "肝血不足"
+    ]
+  },
+  {
+    "standardTerm": "肝阴虚",
+    "aliases": [
+      "肝阴不足"
+    ]
+  },
+  {
+    "standardTerm": "心血虚",
+    "aliases": [
+      "心血不足"
+    ]
+  },
+  {
+    "standardTerm": "心气虚",
+    "aliases": [
+      "心气不足"
+    ]
+  },
+  {
+    "standardTerm": "心血瘀阻",
+    "aliases": [
+      "心脉瘀阻"
+    ]
+  },
+  {
+    "standardTerm": "心火亢盛",
+    "aliases": [
+      "心火上炎",
+      "心火炽盛"
+    ]
+  },
+  {
+    "standardTerm": "心肾不交",
+    "aliases": [
+      "心肾失交"
+    ]
+  },
+  {
+    "standardTerm": "肾阳虚",
+    "aliases": [
+      "肾阳不足"
+    ]
+  },
+  {
+    "standardTerm": "肾气虚",
+    "aliases": [
+      "肾气不足"
+    ]
+  },
+  {
+    "standardTerm": "肾精不足",
+    "aliases": [
+      "肾精亏虚"
+    ]
+  },
+  {
+    "standardTerm": "气滞血瘀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肝胆湿热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "膀胱湿热",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肺脾气虚",
+    "aliases": [
+      "肺脾两虚"
+    ]
+  },
+  {
+    "standardTerm": "肝胃不和",
+    "aliases": [
+      "肝胃气滞"
+    ]
+  },
+  {
+    "standardTerm": "脾胃虚寒",
+    "aliases": [
+      "脾胃阳虚"
+    ]
+  },
+  {
+    "standardTerm": "寒湿困脾",
+    "aliases": [
+      "寒湿中阻"
+    ]
+  },
+  {
+    "standardTerm": "痰湿中阻",
+    "aliases": [
+      "痰湿内阻"
+    ]
+  },
+  {
+    "standardTerm": "气血两虚",
+    "aliases": [
+      "气血两亏"
     ]
   }
 ]

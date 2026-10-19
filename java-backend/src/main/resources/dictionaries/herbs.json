@@ -14,7 +14,6 @@
     "standardTerm": "甘草",
     "aliases": [
       "生甘草",
-      "炙甘草",
       "粉甘草",
       "国老",
       "甘草梢",
@@ -40,7 +39,6 @@
       "白茯苓",
       "茯神",
       "赤茯苓",
-      "茯苓皮",
       "云苓",
       "茯菟"
     ]
@@ -48,15 +46,13 @@
   {
     "standardTerm": "牛膝",
     "aliases": [
-      "怀牛膝",
-      "川牛膝"
+      "怀牛膝"
     ]
   },
   {
     "standardTerm": "黄芪",
     "aliases": [
       "生黄芪",
-      "炙黄芪",
       "绵黄芪",
       "西黄芪",
       "北黄芪",
@@ -161,13 +157,13 @@
     "standardTerm": "人参",
     "aliases": [
       "生晒参",
-      "红参",
       "野山参",
       "吉林参",
       "棒槌",
       "人参须",
       "边条参",
-      "糖参"
+      "糖参",
+      "白参"
     ]
   },
   {
@@ -187,7 +183,6 @@
       "北五味子",
       "辽五味",
       "醋五味子",
-      "南五味子",
       "五梅子"
     ]
   },
@@ -278,7 +273,8 @@
     "aliases": [
       "元胡",
       "玄胡索",
-      "醋元胡"
+      "醋元胡",
+      "延胡"
     ]
   },
   {
@@ -333,7 +329,6 @@
   {
     "standardTerm": "葛根",
     "aliases": [
-      "粉葛",
       "甘葛",
       "煨葛根",
       "野葛",
@@ -349,7 +344,8 @@
       "黑顺片",
       "白附片",
       "炮附片",
-      "川附片"
+      "川附片",
+      "制附"
     ]
   },
   {
@@ -466,7 +462,6 @@
       "山栀",
       "炒栀子",
       "黑栀子",
-      "焦栀子",
       "枝子",
       "山栀子"
     ]
@@ -485,14 +480,14 @@
   },
   {
     "standardTerm": "菊花",
-    "aliases": []
-  },
-  {
-    "standardTerm": "代赭石",
     "aliases": [
-      "赭石",
-      "钉头赭石",
-      "煅赭石"
+      "杭菊",
+      "亳菊",
+      "滁菊",
+      "贡菊",
+      "白菊",
+      "黄菊",
+      "甘菊"
     ]
   },
   {
@@ -513,7 +508,13 @@
   },
   {
     "standardTerm": "浙贝母",
-    "aliases": []
+    "aliases": [
+      "浙贝",
+      "象贝",
+      "大贝",
+      "珠贝",
+      "元宝贝"
+    ]
   },
   {
     "standardTerm": "黄药子",
@@ -540,8 +541,7 @@
     "standardTerm": "龙眼肉",
     "aliases": [
       "桂圆肉",
-      "桂圆",
-      "益智"
+      "桂圆"
     ]
   },
   {
@@ -566,7 +566,6 @@
       "广木香",
       "云木香",
       "煨木香",
-      "川木香",
       "炙木香"
     ]
   },
@@ -584,11 +583,19 @@
   },
   {
     "standardTerm": "辛夷",
-    "aliases": []
+    "aliases": [
+      "辛夷花",
+      "木笔花",
+      "望春花",
+      "玉兰"
+    ]
   },
   {
     "standardTerm": "苍耳子",
-    "aliases": []
+    "aliases": [
+      "苍耳",
+      "炒苍耳子"
+    ]
   },
   {
     "standardTerm": "薄荷",
@@ -740,7 +747,6 @@
     "standardTerm": "大青叶",
     "aliases": [
       "大青",
-      "蓼大青叶",
       "板蓝根叶"
     ]
   },
@@ -867,11 +873,7 @@
       "川贝",
       "松贝",
       "青贝",
-      "浙贝母",
-      "象贝",
-      "大贝",
-      "珠贝",
-      "平贝母"
+      "炉贝"
     ]
   },
   {
@@ -1000,12 +1002,14 @@
   },
   {
     "standardTerm": "天竺黄",
-    "aliases": []
+    "aliases": [
+      "天竹黄",
+      "竹黄"
+    ]
   },
   {
     "standardTerm": "天南星",
     "aliases": [
-      "胆南星",
       "制南星",
       "南星",
       "陈南星"
@@ -1031,7 +1035,11 @@
   },
   {
     "standardTerm": "木瓜",
-    "aliases": []
+    "aliases": [
+      "宣木瓜",
+      "川木瓜",
+      "皱皮木瓜"
+    ]
   },
   {
     "standardTerm": "木芙蓉叶",
@@ -1039,7 +1047,10 @@
   },
   {
     "standardTerm": "木贼",
-    "aliases": []
+    "aliases": [
+      "木贼草",
+      "节节草"
+    ]
   },
   {
     "standardTerm": "木通",
@@ -1061,9 +1072,7 @@
     "standardTerm": "五加皮",
     "aliases": [
       "南五加皮",
-      "北五加皮",
-      "香加皮",
-      "刺五加"
+      "北五加皮"
     ]
   },
   {
@@ -1075,7 +1084,10 @@
   },
   {
     "standardTerm": "太子参",
-    "aliases": []
+    "aliases": [
+      "孩儿参",
+      "童参"
+    ]
   },
   {
     "standardTerm": "车前草",
@@ -1114,7 +1126,11 @@
   },
   {
     "standardTerm": "升麻",
-    "aliases": []
+    "aliases": [
+      "绿升麻",
+      "炙升麻",
+      "周升麻"
+    ]
   },
   {
     "standardTerm": "片姜黄",
@@ -1182,8 +1198,7 @@
   {
     "standardTerm": "水牛角",
     "aliases": [
-      "牛角尖",
-      "水牛角浓缩粉"
+      "牛角尖"
     ]
   },
   {
@@ -1260,7 +1275,6 @@
     "standardTerm": "石斛",
     "aliases": [
       "金钗石斛",
-      "霍山石斛",
       "鲜石斛",
       "耳环石斛"
     ]
@@ -1298,7 +1312,9 @@
   },
   {
     "standardTerm": "平贝母",
-    "aliases": []
+    "aliases": [
+      "平贝"
+    ]
   },
   {
     "standardTerm": "北刘寄奴",
@@ -1313,7 +1329,9 @@
     "aliases": [
       "沙参",
       "银条参",
-      "北沙参段"
+      "北沙参段",
+      "莱阳沙参",
+      "海沙参"
     ]
   },
   {
@@ -1353,7 +1371,10 @@
   },
   {
     "standardTerm": "白附子",
-    "aliases": []
+    "aliases": [
+      "禹白附",
+      "制白附子"
+    ]
   },
   {
     "standardTerm": "白茅根",
@@ -1374,7 +1395,11 @@
   },
   {
     "standardTerm": "白果",
-    "aliases": []
+    "aliases": [
+      "银杏",
+      "白果仁",
+      "炒白果"
+    ]
   },
   {
     "standardTerm": "白屈菜",
@@ -1393,7 +1418,8 @@
     "aliases": [
       "扁豆",
       "炒扁豆",
-      "白扁豆花"
+      "白扁豆花",
+      "去皮扁豆"
     ]
   },
   {
@@ -1427,18 +1453,20 @@
       "瓜蒌实",
       "全瓜蒌",
       "糖瓜蒌",
-      "瓜蒌皮",
       "蒌皮",
       "瓜蒌仁",
       "蒌仁"
     ]
   },
   {
-    "standardTerm": "瓜萎子",
-    "aliases": []
+    "standardTerm": "瓜蒌子",
+    "aliases": [
+      "瓜蒌仁",
+      "蒌仁"
+    ]
   },
   {
-    "standardTerm": "炒瓜萎子",
+    "standardTerm": "炒瓜蒌子",
     "aliases": []
   },
   {
@@ -1479,9 +1507,6 @@
   {
     "standardTerm": "半夏",
     "aliases": [
-      "法半夏",
-      "姜半夏",
-      "清半夏",
       "半夏曲",
       "制半夏",
       "姜夏",
@@ -1509,7 +1534,7 @@
     "aliases": []
   },
   {
-    "standardTerm": "老鹤草",
+    "standardTerm": "老鹳草",
     "aliases": []
   },
   {
@@ -1538,10 +1563,6 @@
     ]
   },
   {
-    "standardTerm": "地黄",
-    "aliases": []
-  },
-  {
     "standardTerm": "地榆",
     "aliases": [
       "地榆炭",
@@ -1558,7 +1579,6 @@
     "aliases": [
       "芒消",
       "朴硝",
-      "玄明粉",
       "元明粉",
       "风化硝"
     ]
@@ -1591,7 +1611,11 @@
   },
   {
     "standardTerm": "西洋参",
-    "aliases": []
+    "aliases": [
+      "花旗参",
+      "洋参",
+      "西参"
+    ]
   },
   {
     "standardTerm": "百合",
@@ -1603,7 +1627,12 @@
   },
   {
     "standardTerm": "百部",
-    "aliases": []
+    "aliases": [
+      "百部根",
+      "炙百部",
+      "蜜百部",
+      "嗽药"
+    ]
   },
   {
     "standardTerm": "当药",
@@ -1647,7 +1676,12 @@
   },
   {
     "standardTerm": "竹茹",
-    "aliases": []
+    "aliases": [
+      "竹二青",
+      "淡竹茹",
+      "姜竹茹",
+      "竹皮"
+    ]
   },
   {
     "standardTerm": "华山参",
@@ -1781,7 +1815,10 @@
   },
   {
     "standardTerm": "红粉",
-    "aliases": []
+    "aliases": [
+      "红升丹",
+      "升药"
+    ]
   },
   {
     "standardTerm": "红景天",
@@ -1953,7 +1990,6 @@
   {
     "standardTerm": "谷芽",
     "aliases": [
-      "稻芽",
       "生谷芽",
       "炒谷芽"
     ]
@@ -1976,7 +2012,12 @@
   },
   {
     "standardTerm": "羌活",
-    "aliases": []
+    "aliases": [
+      "川羌活",
+      "西羌活",
+      "竹节羌",
+      "大头羌"
+    ]
   },
   {
     "standardTerm": "沙苑子",
@@ -2113,8 +2154,11 @@
     ]
   },
   {
-    "standardTerm": "青石",
-    "aliases": []
+    "standardTerm": "青礞石",
+    "aliases": [
+      "礞石",
+      "煅青礞石"
+    ]
   },
   {
     "standardTerm": "青黛",
@@ -2140,7 +2184,9 @@
   },
   {
     "standardTerm": "苦杏仁",
-    "aliases": []
+    "aliases": [
+      "杏仁"
+    ]
   },
   {
     "standardTerm": "苦参",
@@ -2200,7 +2246,11 @@
   },
   {
     "standardTerm": "昆布",
-    "aliases": []
+    "aliases": [
+      "纶布",
+      "海昆布",
+      "黑昆布"
+    ]
   },
   {
     "standardTerm": "明党参",
@@ -2212,7 +2262,12 @@
   },
   {
     "standardTerm": "罗布麻叶",
-    "aliases": []
+    "aliases": [
+      "红麻",
+      "罗布麻",
+      "茶叶花",
+      "野麻"
+    ]
   },
   {
     "standardTerm": "罗汉果",
@@ -2292,8 +2347,10 @@
     ]
   },
   {
-    "standardTerm": "金蒙石",
-    "aliases": []
+    "standardTerm": "金礞石",
+    "aliases": [
+      "煅金礞石"
+    ]
   },
   {
     "standardTerm": "乳香",
@@ -2380,7 +2437,10 @@
   },
   {
     "standardTerm": "荆芥",
-    "aliases": []
+    "aliases": [
+      "假苏",
+      "姜芥"
+    ]
   },
   {
     "standardTerm": "荆芥炭",
@@ -2408,7 +2468,7 @@
     "aliases": []
   },
   {
-    "standardTerm": "华澄茄",
+    "standardTerm": "荜澄茄",
     "aliases": []
   },
   {
@@ -2448,7 +2508,10 @@
   },
   {
     "standardTerm": "胡芦巴",
-    "aliases": []
+    "aliases": [
+      "葫芦巴",
+      "芦巴子"
+    ]
   },
   {
     "standardTerm": "胡黄连",
@@ -2476,7 +2539,9 @@
     "standardTerm": "南沙参",
     "aliases": [
       "泡沙参",
-      "桔参"
+      "桔参",
+      "泡参",
+      "白沙参"
     ]
   },
   {
@@ -2604,7 +2669,11 @@
   },
   {
     "standardTerm": "香薷",
-    "aliases": []
+    "aliases": [
+      "香茹",
+      "西香薷",
+      "江香薷"
+    ]
   },
   {
     "standardTerm": "重楼",
@@ -2627,7 +2696,12 @@
   },
   {
     "standardTerm": "胖大海",
-    "aliases": []
+    "aliases": [
+      "大海",
+      "安南子",
+      "通大海",
+      "大洞果"
+    ]
   },
   {
     "standardTerm": "独一味",
@@ -2648,7 +2722,6 @@
     "standardTerm": "前胡",
     "aliases": [
       "信前胡",
-      "紫花前胡",
       "白花前胡"
     ]
   },
@@ -2768,7 +2841,12 @@
   },
   {
     "standardTerm": "党参",
-    "aliases": []
+    "aliases": [
+      "潞党参",
+      "台党参",
+      "防党参",
+      "炒党参"
+    ]
   },
   {
     "standardTerm": "鸭跖草",
@@ -2804,7 +2882,9 @@
   },
   {
     "standardTerm": "凌霄花",
-    "aliases": []
+    "aliases": [
+      "紫葳"
+    ]
   },
   {
     "standardTerm": "高山辣根菜",
@@ -2831,10 +2911,13 @@
   },
   {
     "standardTerm": "益智",
-    "aliases": []
+    "aliases": [
+      "益智仁",
+      "益智子"
+    ]
   },
   {
-    "standardTerm": "娄罗子",
+    "standardTerm": "娑罗子",
     "aliases": []
   },
   {
@@ -2870,7 +2953,11 @@
   },
   {
     "standardTerm": "海藻",
-    "aliases": []
+    "aliases": [
+      "海带花",
+      "海萝",
+      "羊栖菜"
+    ]
   },
   {
     "standardTerm": "浮萍",
@@ -2890,11 +2977,19 @@
   },
   {
     "standardTerm": "桑叶",
-    "aliases": []
+    "aliases": [
+      "冬桑叶",
+      "霜桑叶",
+      "炙桑叶"
+    ]
   },
   {
     "standardTerm": "桑白皮",
-    "aliases": []
+    "aliases": [
+      "桑根白皮",
+      "桑皮",
+      "炙桑皮"
+    ]
   },
   {
     "standardTerm": "桑枝",
@@ -3136,10 +3231,6 @@
     ]
   },
   {
-    "standardTerm": "淡豆鼓",
-    "aliases": []
-  },
-  {
     "standardTerm": "密蒙花",
     "aliases": []
   },
@@ -3172,11 +3263,22 @@
   },
   {
     "standardTerm": "款冬花",
-    "aliases": []
+    "aliases": [
+      "冬花",
+      "款冬",
+      "炙款冬花",
+      "蜜款冬花"
+    ]
   },
   {
     "standardTerm": "葶苈子",
-    "aliases": []
+    "aliases": [
+      "丁历",
+      "葶苈",
+      "炒葶苈子",
+      "南葶苈",
+      "北葶苈"
+    ]
   },
   {
     "standardTerm": "萹蓄",
@@ -3220,7 +3322,6 @@
     "aliases": [
       "地丁",
       "紫地丁",
-      "苦地丁",
       "地丁草"
     ]
   },
@@ -3230,15 +3331,24 @@
   },
   {
     "standardTerm": "紫苏子",
-    "aliases": []
+    "aliases": [
+      "苏子",
+      "炒苏子",
+      "黑苏子"
+    ]
   },
   {
     "standardTerm": "紫苏叶",
-    "aliases": []
+    "aliases": [
+      "苏叶",
+      "炙苏叶"
+    ]
   },
   {
     "standardTerm": "紫苏梗",
-    "aliases": []
+    "aliases": [
+      "苏梗"
+    ]
   },
   {
     "standardTerm": "紫草",
@@ -3259,11 +3369,19 @@
   },
   {
     "standardTerm": "紫菀",
-    "aliases": []
+    "aliases": [
+      "紫菀茸",
+      "炙紫菀",
+      "蜜紫菀",
+      "青菀"
+    ]
   },
   {
     "standardTerm": "蛤壳",
-    "aliases": []
+    "aliases": [
+      "海蛤壳",
+      "文蛤"
+    ]
   },
   {
     "standardTerm": "蛤蚧",
@@ -3441,7 +3559,11 @@
   },
   {
     "standardTerm": "蔓荆子",
-    "aliases": []
+    "aliases": [
+      "蔓荆实",
+      "炒蔓荆子",
+      "万荆子"
+    ]
   },
   {
     "standardTerm": "蓼大青叶",
@@ -3463,7 +3585,6 @@
     "aliases": [
       "大腹子",
       "花槟榔",
-      "焦槟榔",
       "海南子"
     ]
   },
@@ -3558,12 +3679,19 @@
   {
     "standardTerm": "薤白",
     "aliases": [
-      "薤白头"
+      "薤白头",
+      "野蒜",
+      "小根蒜"
     ]
   },
   {
     "standardTerm": "薏苡仁",
-    "aliases": []
+    "aliases": [
+      "薏米",
+      "苡仁",
+      "炒薏苡仁",
+      "苡米"
+    ]
   },
   {
     "standardTerm": "颠茄草",
@@ -3605,7 +3733,11 @@
   },
   {
     "standardTerm": "覆盆子",
-    "aliases": []
+    "aliases": [
+      "复盆子",
+      "西复盆子",
+      "小托盘"
+    ]
   },
   {
     "standardTerm": "瞿麦",
@@ -3824,13 +3956,6 @@
     "aliases": []
   },
   {
-    "standardTerm": "益智仁",
-    "aliases": [
-      "益智",
-      "益智子"
-    ]
-  },
-  {
     "standardTerm": "白豆蔻",
     "aliases": [
       "白蔻",
@@ -3843,13 +3968,6 @@
     "aliases": [
       "胶饴",
       "麦芽糖"
-    ]
-  },
-  {
-    "standardTerm": "葫芦巴",
-    "aliases": [
-      "胡芦巴",
-      "芦巴子"
     ]
   },
   {
@@ -3902,25 +4020,11 @@
     ]
   },
   {
-    "standardTerm": "夜交藤",
-    "aliases": [
-      "首乌藤",
-      "棋藤"
-    ]
-  },
-  {
     "standardTerm": "刺蒺藜",
     "aliases": [
       "白蒺藜",
       "蒺藜子",
       "炒蒺藜"
-    ]
-  },
-  {
-    "standardTerm": "罗布麻",
-    "aliases": [
-      "罗布麻叶",
-      "红麻"
     ]
   },
   {
@@ -3952,6 +4056,180 @@
       "黄丹",
       "广丹",
       "东丹"
+    ]
+  },
+  {
+    "standardTerm": "生地黄",
+    "aliases": [
+      "生地",
+      "地黄",
+      "干地黄"
+    ]
+  },
+  {
+    "standardTerm": "蚕沙",
+    "aliases": [
+      "蚕砂"
+    ]
+  },
+  {
+    "standardTerm": "神曲",
+    "aliases": [
+      "焦神曲",
+      "六神曲"
+    ]
+  },
+  {
+    "standardTerm": "皂角",
+    "aliases": [
+      "皂荚",
+      "皂荚子"
+    ]
+  },
+  {
+    "standardTerm": "淡豆豉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "千斤拔",
+    "aliases": []
+  },
+  {
+    "standardTerm": "海桐皮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "败酱草",
+    "aliases": [
+      "败酱"
+    ]
+  },
+  {
+    "standardTerm": "龙葵",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苦丁茶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "玉米须",
+    "aliases": []
+  },
+  {
+    "standardTerm": "五指毛桃",
+    "aliases": []
+  },
+  {
+    "standardTerm": "葛花",
+    "aliases": []
+  },
+  {
+    "standardTerm": "枳椇子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鬼箭羽",
+    "aliases": []
+  },
+  {
+    "standardTerm": "刺猬皮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "南天竹子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "泽漆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胡颓子叶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "冬瓜子",
+    "aliases": [
+      "冬瓜仁"
+    ]
+  },
+  {
+    "standardTerm": "白花蛇舌草",
+    "aliases": [
+      "蛇舌草",
+      "二叶葎",
+      "白花蛇草",
+      "蛇舌癀"
+    ]
+  },
+  {
+    "standardTerm": "五灵脂",
+    "aliases": [
+      "灵脂",
+      "糖五灵",
+      "五灵脂炭",
+      "醋五灵脂",
+      "寒号虫粪"
+    ]
+  },
+  {
+    "standardTerm": "南瓜子",
+    "aliases": [
+      "南瓜仁",
+      "白瓜子",
+      "番瓜子",
+      "金瓜米"
+    ]
+  },
+  {
+    "standardTerm": "紫河车",
+    "aliases": [
+      "胎盘",
+      "人胞",
+      "衣胞",
+      "河车",
+      "混沌衣"
+    ]
+  },
+  {
+    "standardTerm": "刘寄奴",
+    "aliases": [
+      "南刘寄奴",
+      "金寄奴",
+      "六月霜",
+      "奇蒿",
+      "寄奴"
+    ]
+  },
+  {
+    "standardTerm": "苎麻根",
+    "aliases": [
+      "苎根",
+      "野苎根",
+      "苎麻"
+    ]
+  },
+  {
+    "standardTerm": "竹叶",
+    "aliases": [
+      "苦竹叶",
+      "鲜竹叶",
+      "竹叶卷心"
+    ]
+  },
+  {
+    "standardTerm": "绿豆",
+    "aliases": [
+      "青小豆"
+    ]
+  },
+  {
+    "standardTerm": "葱白",
+    "aliases": [
+      "葱白头",
+      "葱茎白",
+      "鲜葱白"
     ]
   }
 ]

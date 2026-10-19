@@ -2,124 +2,156 @@
   {
     "standardTerm": "脉浮",
     "aliases": [
-      "浮脉"
+      "浮脉",
+      "举之有余",
+      "浮而有力"
     ]
   },
   {
     "standardTerm": "脉沉",
     "aliases": [
-      "沉脉"
+      "沉脉",
+      "按之有余",
+      "沉而有力"
     ]
   },
   {
     "standardTerm": "脉迟",
     "aliases": [
-      "迟脉"
+      "迟脉",
+      "一息不足四至"
     ]
   },
   {
     "standardTerm": "脉数",
     "aliases": [
-      "数脉"
+      "数脉",
+      "一息五至以上",
+      "数而有力"
     ]
   },
   {
     "standardTerm": "脉虚",
     "aliases": [
       "无力脉",
-      "虚脉"
+      "虚脉",
+      "虚脉无力",
+      "三部无力"
     ]
   },
   {
     "standardTerm": "脉实",
     "aliases": [
       "有力脉",
-      "实脉"
+      "实脉",
+      "实脉有力",
+      "三部有力"
     ]
   },
   {
     "standardTerm": "脉滑",
     "aliases": [
-      "滑脉"
+      "滑脉",
+      "如盘走珠",
+      "流利"
     ]
   },
   {
     "standardTerm": "脉涩",
     "aliases": [
-      "涩脉"
+      "涩脉",
+      "如轻刀刮竹",
+      "涩滞"
     ]
   },
   {
     "standardTerm": "脉弦",
     "aliases": [
-      "弦脉"
+      "弦脉",
+      "如按琴弦",
+      "弦直"
     ]
   },
   {
     "standardTerm": "脉紧",
     "aliases": [
-      "紧脉"
+      "紧脉",
+      "紧绳状",
+      "如转索"
     ]
   },
   {
     "standardTerm": "脉细",
     "aliases": [
-      "细脉"
+      "细脉",
+      "细如线",
+      "应指明显"
     ]
   },
   {
     "standardTerm": "脉濡",
     "aliases": [
-      "濡脉"
+      "濡脉",
+      "浮而细软"
     ]
   },
   {
     "standardTerm": "脉弱",
     "aliases": [
-      "弱脉"
+      "弱脉",
+      "沉而细软"
     ]
   },
   {
     "standardTerm": "脉微",
     "aliases": [
-      "微脉"
+      "微脉",
+      "极细极软",
+      "似有似无"
     ]
   },
   {
     "standardTerm": "脉洪",
     "aliases": [
-      "洪脉"
+      "洪脉",
+      "洪大有力",
+      "来盛去衰"
     ]
   },
   {
     "standardTerm": "脉大",
     "aliases": [
-      "大脉"
+      "大脉",
+      "大脉形粗"
     ]
   },
   {
     "standardTerm": "脉小",
     "aliases": [
-      "小脉",
-      "细脉"
+      "小脉"
     ]
   },
   {
     "standardTerm": "脉促",
     "aliases": [
-      "促脉"
+      "促脉",
+      "数而时一止"
     ]
   },
   {
     "standardTerm": "脉结",
     "aliases": [
-      "结脉"
+      "结脉",
+      "缓而时一止",
+      "时一止复来"
     ]
   },
   {
     "standardTerm": "脉代",
     "aliases": [
-      "代脉"
+      "代脉",
+      "迟中一止",
+      "止有定数"
     ]
   },
   {
@@ -131,31 +163,39 @@
   {
     "standardTerm": "脉动",
     "aliases": [
-      "动脉"
+      "动脉",
+      "动脉滑数",
+      "厥厥动摇"
     ]
   },
   {
     "standardTerm": "脉牢",
     "aliases": [
-      "牢脉"
+      "牢脉",
+      "牢脉沉实",
+      "沉按始得"
     ]
   },
   {
     "standardTerm": "脉革",
     "aliases": [
-      "革脉"
+      "革脉",
+      "革脉如按鼓皮"
     ]
   },
   {
     "standardTerm": "脉散",
     "aliases": [
-      "散脉"
+      "散脉",
+      "散脉漫无根"
     ]
   },
   {
     "standardTerm": "脉伏",
     "aliases": [
-      "伏脉"
+      "伏脉",
+      "伏于骨",
+      "重按推筋着骨"
     ]
   },
   {
@@ -169,7 +209,6 @@
   {
     "standardTerm": "脉浮缓无力",
     "aliases": [
-      "脉浮缓",
       "浮缓弱"
     ]
   },
@@ -184,14 +223,12 @@
   {
     "standardTerm": "脉滑数有力",
     "aliases": [
-      "脉滑数",
       "滑数有力"
     ]
   },
   {
     "standardTerm": "脉弦数有力",
     "aliases": [
-      "脉弦数",
       "弦数有力"
     ]
   },
@@ -285,25 +322,31 @@
   {
     "standardTerm": "脉长",
     "aliases": [
-      "长脉"
+      "长脉",
+      "长脉超过本位"
     ]
   },
   {
     "standardTerm": "脉短",
     "aliases": [
-      "短脉"
+      "短脉",
+      "短脉不及本位"
     ]
   },
   {
     "standardTerm": "脉缓",
     "aliases": [
-      "缓脉"
+      "缓脉",
+      "缓怠",
+      "一息四至"
     ]
   },
   {
     "standardTerm": "脉芤",
     "aliases": [
-      "芤脉"
+      "芤脉",
+      "芤脉如葱",
+      "中空"
     ]
   },
   {
@@ -620,6 +663,143 @@
     "standardTerm": "尺脉沉",
     "aliases": [
       "尺较沉"
+    ]
+  },
+  {
+    "standardTerm": "关实",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寸浮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寸滑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "寸濡",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尺沉缓",
+    "aliases": []
+  },
+  {
+    "standardTerm": "关缓滑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "尺缓滑",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脉虚数",
+    "aliases": [
+      "虚数脉",
+      "脉虚而数"
+    ]
+  },
+  {
+    "standardTerm": "脉虚弱",
+    "aliases": [
+      "虚弱脉"
+    ]
+  },
+  {
+    "standardTerm": "脉弦滑数",
+    "aliases": [
+      "弦滑数脉",
+      "脉弦滑而数"
+    ]
+  },
+  {
+    "standardTerm": "脉沉细数",
+    "aliases": [
+      "沉细数脉",
+      "脉沉细而数"
+    ]
+  },
+  {
+    "standardTerm": "脉浮细",
+    "aliases": [
+      "浮细脉"
+    ]
+  },
+  {
+    "standardTerm": "脉沉弱",
+    "aliases": [
+      "沉弱脉"
+    ]
+  },
+  {
+    "standardTerm": "脉虚细",
+    "aliases": [
+      "虚细脉"
+    ]
+  },
+  {
+    "standardTerm": "关弦",
+    "aliases": [
+      "关脉弦",
+      "右关弦",
+      "左关弦"
+    ]
+  },
+  {
+    "standardTerm": "关滑",
+    "aliases": [
+      "关脉滑",
+      "右关滑",
+      "左关滑"
+    ]
+  },
+  {
+    "standardTerm": "寸数",
+    "aliases": [
+      "寸脉数",
+      "右寸数",
+      "左寸数"
+    ]
+  },
+  {
+    "standardTerm": "关数",
+    "aliases": [
+      "关脉数",
+      "右关数",
+      "左关数"
+    ]
+  },
+  {
+    "standardTerm": "尺滑",
+    "aliases": [
+      "尺脉滑",
+      "右尺滑",
+      "左尺滑"
+    ]
+  },
+  {
+    "standardTerm": "寸细",
+    "aliases": [
+      "寸脉细",
+      "右寸细",
+      "左寸细"
+    ]
+  },
+  {
+    "standardTerm": "关细",
+    "aliases": [
+      "关脉细",
+      "右关细",
+      "左关细"
+    ]
+  },
+  {
+    "standardTerm": "尺细",
+    "aliases": [
+      "尺脉细",
+      "右尺细",
+      "左尺细"
     ]
   }
 ]

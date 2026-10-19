@@ -1159,7 +1159,9 @@
   },
   {
     "standardTerm": "腰椎间盘突出症",
-    "aliases": []
+    "aliases": [
+      "腰椎间盘突出"
+    ]
   },
   {
     "standardTerm": "腰椎滑脱症",
@@ -1430,7 +1432,9 @@
   },
   {
     "standardTerm": "癫狂病",
-    "aliases": []
+    "aliases": [
+      "癫狂"
+    ]
   },
   {
     "standardTerm": "癫病",
@@ -1448,7 +1452,9 @@
   },
   {
     "standardTerm": "痴呆病",
-    "aliases": []
+    "aliases": [
+      "痴呆"
+    ]
   },
   {
     "standardTerm": "肝系病",
@@ -1484,7 +1490,9 @@
   },
   {
     "standardTerm": "黄疸病",
-    "aliases": []
+    "aliases": [
+      "黄疸"
+    ]
   },
   {
     "standardTerm": "阳黄病",
@@ -1529,7 +1537,8 @@
   {
     "standardTerm": "肝癖",
     "aliases": [
-      "肝痞"
+      "肝痞",
+      "脂肪肝"
     ]
   },
   {
@@ -1641,7 +1650,8 @@
   {
     "standardTerm": "便秘病",
     "aliases": [
-      "便闭"
+      "便闭",
+      "便秘"
     ]
   },
   {
@@ -1650,7 +1660,10 @@
   },
   {
     "standardTerm": "泄泻病",
-    "aliases": []
+    "aliases": [
+      "泄泻",
+      "腹泻"
+    ]
   },
   {
     "standardTerm": "暴泻",
@@ -1711,7 +1724,8 @@
   {
     "standardTerm": "胃痞病",
     "aliases": [
-      "胃痞"
+      "胃痞",
+      "痞满"
     ]
   },
   {
@@ -1726,7 +1740,9 @@
   },
   {
     "standardTerm": "胃疡",
-    "aliases": []
+    "aliases": [
+      "胃溃疡"
+    ]
   },
   {
     "standardTerm": "胃痈",
@@ -1963,7 +1979,9 @@
   },
   {
     "standardTerm": "石淋",
-    "aliases": []
+    "aliases": [
+      "肾结石"
+    ]
   },
   {
     "standardTerm": "精癃",
@@ -2082,7 +2100,9 @@
   },
   {
     "standardTerm": "血劳",
-    "aliases": []
+    "aliases": [
+      "贫血"
+    ]
   },
   {
     "standardTerm": "髓劳",
@@ -2090,7 +2110,9 @@
   },
   {
     "standardTerm": "内伤发热病",
-    "aliases": []
+    "aliases": [
+      "内伤发热"
+    ]
   },
   {
     "standardTerm": "晕动病",
@@ -2278,7 +2300,8 @@
   {
     "standardTerm": "汗类病",
     "aliases": [
-      "汗病"
+      "汗病",
+      "汗证"
     ]
   },
   {
@@ -2420,7 +2443,8 @@
     "standardTerm": "颤病",
     "aliases": [
       "脑风",
-      "颤症"
+      "颤症",
+      "颤证"
     ]
   },
   {
@@ -2539,8 +2563,7 @@
   {
     "standardTerm": "乳头风",
     "aliases": [
-      "乳头破碎",
-      "乳头湿疹"
+      "乳头破碎"
     ]
   },
   {
@@ -2563,7 +2586,9 @@
   },
   {
     "standardTerm": "胁肋痛",
-    "aliases": []
+    "aliases": [
+      "胁痛"
+    ]
   },
   {
     "standardTerm": "疝气类病",
@@ -3004,7 +3029,6 @@
   {
     "standardTerm": "四弯风",
     "aliases": [
-      "奶癣",
       "胎疮",
       "特应性皮炎",
       "特异性皮炎",
@@ -3096,8 +3120,7 @@
   {
     "standardTerm": "粉刺",
     "aliases": [
-      "肺风粉刺",
-      "痤疮"
+      "肺风粉刺"
     ]
   },
   {
@@ -3361,8 +3384,7 @@
   {
     "standardTerm": "疔疮",
     "aliases": [
-      "疔",
-      "疖"
+      "疔"
     ]
   },
   {
@@ -5854,9 +5876,7 @@
   },
   {
     "standardTerm": "耳疖",
-    "aliases": [
-      "耳疔"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "耳疮",
@@ -5899,7 +5919,8 @@
   {
     "standardTerm": "脓耳",
     "aliases": [
-      "化脓性中耳炎"
+      "化脓性中耳炎",
+      "中耳炎"
     ]
   },
   {
@@ -6255,9 +6276,7 @@
   },
   {
     "standardTerm": "乳岩",
-    "aliases": [
-      "乳腺癌"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "失荣",
@@ -6319,6 +6338,105 @@
     "standardTerm": "子宫腺肌症",
     "aliases": [
       "子宫肌腺症"
+    ]
+  },
+  {
+    "standardTerm": "结肠息肉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "慢性直肠炎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "十二指肠息肉",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆囊炎",
+    "aliases": []
+  },
+  {
+    "standardTerm": "胆结石",
+    "aliases": []
+  },
+  {
+    "standardTerm": "肾病",
+    "aliases": []
+  },
+  {
+    "standardTerm": "呃逆",
+    "aliases": []
+  },
+  {
+    "standardTerm": "呕吐",
+    "aliases": []
+  },
+  {
+    "standardTerm": "头痛",
+    "aliases": []
+  },
+  {
+    "standardTerm": "口臭",
+    "aliases": []
+  },
+  {
+    "standardTerm": "脚气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "心悸",
+    "aliases": [
+      "心慌"
+    ]
+  },
+  {
+    "standardTerm": "健忘",
+    "aliases": [
+      "善忘",
+      "喜忘"
+    ]
+  },
+  {
+    "standardTerm": "腹痛",
+    "aliases": [
+      "腹中痛"
+    ]
+  },
+  {
+    "standardTerm": "血证",
+    "aliases": [
+      "出血病证"
+    ]
+  },
+  {
+    "standardTerm": "紫斑",
+    "aliases": [
+      "肌衄"
+    ]
+  },
+  {
+    "standardTerm": "十二指肠溃疡",
+    "aliases": [
+      "十二指肠溃疡病"
+    ]
+  },
+  {
+    "standardTerm": "支气管炎",
+    "aliases": [
+      "气管支气管炎"
+    ]
+  },
+  {
+    "standardTerm": "肺炎",
+    "aliases": [
+      "肺部炎症"
+    ]
+  },
+  {
+    "standardTerm": "肝硬化",
+    "aliases": [
+      "肝硬变"
     ]
   }
 ]

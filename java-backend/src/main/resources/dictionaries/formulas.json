@@ -102,15 +102,11 @@
   },
   {
     "standardTerm": "二陈丸",
-    "aliases": [
-      "二陈汤"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "二妙丸",
-    "aliases": [
-      "二妙散"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "十一味参芪片",
@@ -143,7 +139,6 @@
   {
     "standardTerm": "十全大补丸",
     "aliases": [
-      "十全大补汤",
       "十全"
     ]
   },
@@ -184,14 +179,12 @@
     "aliases": []
   },
   {
-    "standardTerm": "七味姜黄探",
+    "standardTerm": "七味姜黄搽剂",
     "aliases": []
   },
   {
     "standardTerm": "七味都气丸",
-    "aliases": [
-      "都气丸"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "七味铁屑丸",
@@ -211,9 +204,7 @@
   },
   {
     "standardTerm": "七宝美髯颗粒",
-    "aliases": [
-      "七宝美髯丹"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "七珍丸",
@@ -229,9 +220,7 @@
   },
   {
     "standardTerm": "八正合剂",
-    "aliases": [
-      "八正散"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "八味沉香散",
@@ -247,9 +236,7 @@
   },
   {
     "standardTerm": "八珍丸",
-    "aliases": [
-      "八珍汤"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "八珍丸-浓缩丸",
@@ -275,9 +262,7 @@
   },
   {
     "standardTerm": "人参养荣丸",
-    "aliases": [
-      "人参养荣汤"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "人参首乌胶囊",
@@ -442,7 +427,7 @@
     "aliases": []
   },
   {
-    "standardTerm": "大黄廣虫丸",
+    "standardTerm": "大黄䗪虫丸",
     "aliases": []
   },
   {
@@ -604,7 +589,7 @@
     "aliases": []
   },
   {
-    "standardTerm": "小儿扶牌颗",
+    "standardTerm": "小儿扶脾颗粒",
     "aliases": []
   },
   {
@@ -3191,7 +3176,9 @@
   },
   {
     "standardTerm": "败毒散",
-    "aliases": []
+    "aliases": [
+      "人参败毒散"
+    ]
   },
   {
     "standardTerm": "垂盆草颗粒",
@@ -8135,9 +8122,7 @@
   },
   {
     "standardTerm": "补中益气汤",
-    "aliases": [
-      "医主汤"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "生脉散",
@@ -8512,7 +8497,9 @@
   },
   {
     "standardTerm": "炙甘草汤",
-    "aliases": []
+    "aliases": [
+      "复脉汤"
+    ]
   },
   {
     "standardTerm": "十全大补汤",
@@ -10263,7 +10250,9 @@
   },
   {
     "standardTerm": "藿香正气散",
-    "aliases": []
+    "aliases": [
+      "藿香正气丸"
+    ]
   },
   {
     "standardTerm": "六和汤",
@@ -11330,5 +11319,12 @@
   {
     "standardTerm": "润肌膏",
     "aliases": []
+  },
+  {
+    "standardTerm": "参蛤散",
+    "aliases": [
+      "人参蛤蚧散",
+      "人参蛤蚧汤"
+    ]
   }
 ]

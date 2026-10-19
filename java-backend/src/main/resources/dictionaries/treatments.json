@@ -22,11 +22,7 @@
   },
   {
     "standardTerm": "清热燥湿",
-    "aliases": [
-      "清热化湿",
-      "苦寒燥湿",
-      "清热利湿"
-    ]
+    "aliases": []
   },
   {
     "standardTerm": "泻下",
@@ -38,42 +34,32 @@
   {
     "standardTerm": "和解",
     "aliases": [
-      "和解少阳",
-      "调和肝脾",
       "调和肠胃"
     ]
   },
   {
     "standardTerm": "理气",
     "aliases": [
-      "行气",
-      "理气止痛",
-      "疏肝理气"
+      "行气"
     ]
   },
   {
     "standardTerm": "活血",
     "aliases": [
       "行血",
-      "活血化瘀",
-      "活血行血",
-      "活血通络"
+      "活血行血"
     ]
   },
   {
     "standardTerm": "止血",
     "aliases": [
-      "凉血止血",
-      "收敛止血",
-      "化瘀止血",
-      "温经止血"
+      "收敛止血"
     ]
   },
   {
     "standardTerm": "化痰",
     "aliases": [
       "化痰浊",
-      "化痰止咳",
       "祛痰"
     ]
   },
@@ -82,24 +68,19 @@
     "aliases": [
       "降气平喘",
       "止咳",
-      "平喘",
-      "宣肺平喘"
+      "平喘"
     ]
   },
   {
     "standardTerm": "安神",
     "aliases": [
-      "宁心安神",
-      "养心安神",
-      "镇静安神",
-      "安神定志"
+      "镇静安神"
     ]
   },
   {
     "standardTerm": "开窍",
     "aliases": [
       "醒神开窍",
-      "芳香开窍",
       "通关开窍"
     ]
   },
@@ -133,19 +114,13 @@
     "standardTerm": "温里",
     "aliases": [
       "温中",
-      "散寒",
-      "温中散寒",
-      "温阳散寒",
-      "回阳救逆"
+      "散寒"
     ]
   },
   {
     "standardTerm": "祛湿",
     "aliases": [
-      "健脾祛湿",
-      "化湿",
-      "利湿",
-      "燥湿"
+      "健脾祛湿"
     ]
   },
   {
@@ -159,7 +134,6 @@
     "standardTerm": "消食",
     "aliases": [
       "消导",
-      "消食导滞",
       "消积化食",
       "消食和胃"
     ]
@@ -175,8 +149,6 @@
     "standardTerm": "固涩",
     "aliases": [
       "收敛固涩",
-      "固表止汗",
-      "涩肠止泻",
       "固精止遗"
     ]
   },
@@ -929,8 +901,7 @@
     "standardTerm": "清热凉血",
     "aliases": [
       "清气凉血",
-      "凉血",
-      "清营凉血"
+      "凉血"
     ]
   },
   {
@@ -1155,7 +1126,6 @@
   {
     "standardTerm": "清肝泄火",
     "aliases": [
-      "清肝泻火",
       "清肝泄热"
     ]
   },
@@ -1494,8 +1464,7 @@
     "standardTerm": "活血化瘀",
     "aliases": [
       "活血祛瘀",
-      "活血散瘀",
-      "活血"
+      "活血散瘀"
     ]
   },
   {
@@ -2287,8 +2256,7 @@
   {
     "standardTerm": "补益脾气",
     "aliases": [
-      "补脾益气",
-      "健脾益气"
+      "补脾益气"
     ]
   },
   {
@@ -2685,7 +2653,6 @@
   {
     "standardTerm": "滋阴降火",
     "aliases": [
-      "滋阴",
       "降火",
       "清虚热"
     ]
@@ -3710,8 +3677,7 @@
   {
     "standardTerm": "化痰散结",
     "aliases": [
-      "散结",
-      "软坚散结"
+      "散结"
     ]
   },
   {
@@ -5866,7 +5832,6 @@
   {
     "standardTerm": "食疗",
     "aliases": [
-      "饮食疗法",
       "食疗方"
     ]
   },
@@ -5977,5 +5942,140 @@
   {
     "standardTerm": "鳝血疗法",
     "aliases": []
+  },
+  {
+    "standardTerm": "补益",
+    "aliases": [
+      "补养"
+    ]
+  },
+  {
+    "standardTerm": "理血",
+    "aliases": [
+      "调理血分"
+    ]
+  },
+  {
+    "standardTerm": "涌吐",
+    "aliases": [
+      "催吐"
+    ]
+  },
+  {
+    "standardTerm": "祛风",
+    "aliases": [
+      "祛风散邪"
+    ]
+  },
+  {
+    "standardTerm": "息风",
+    "aliases": [
+      "熄风"
+    ]
+  },
+  {
+    "standardTerm": "平肝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "潜阳",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润燥",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清脏腑热",
+    "aliases": [
+      "清泄脏腑热邪"
+    ]
+  },
+  {
+    "standardTerm": "降气",
+    "aliases": [
+      "下气"
+    ]
+  },
+  {
+    "standardTerm": "利尿通淋",
+    "aliases": [
+      "利尿",
+      "通淋"
+    ]
+  },
+  {
+    "standardTerm": "祛风除湿",
+    "aliases": [
+      "祛风胜湿"
+    ]
+  },
+  {
+    "standardTerm": "宣肺",
+    "aliases": [
+      "宣通肺气"
+    ]
+  },
+  {
+    "standardTerm": "清肺",
+    "aliases": [
+      "清泄肺热"
+    ]
+  },
+  {
+    "standardTerm": "泻肺",
+    "aliases": []
+  },
+  {
+    "standardTerm": "润下",
+    "aliases": [
+      "润肠通便"
+    ]
+  },
+  {
+    "standardTerm": "逐水",
+    "aliases": [
+      "逐水消肿"
+    ]
+  },
+  {
+    "standardTerm": "息风止痉",
+    "aliases": [
+      "熄风止痉"
+    ]
+  },
+  {
+    "standardTerm": "安胎",
+    "aliases": [
+      "保胎"
+    ]
+  },
+  {
+    "standardTerm": "健脾益气",
+    "aliases": []
+  },
+  {
+    "standardTerm": "清肝泻火",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宁心安神",
+    "aliases": []
+  },
+  {
+    "standardTerm": "收涩止带",
+    "aliases": [
+      "固涩止带"
+    ]
+  },
+  {
+    "standardTerm": "温经止血",
+    "aliases": []
+  },
+  {
+    "standardTerm": "开窍醒神",
+    "aliases": [
+      "开窍启闭"
+    ]
   }
 ]
