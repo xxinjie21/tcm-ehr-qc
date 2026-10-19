@@ -5,8 +5,12 @@
  * 各写一份必然漂移（改了这边忘了那边），所以统一放这里。</p>
  *
  * <p><b>dict 的口径与后端 {@code EntityTypes}（dict=true）对齐</b>：
- * 疾病 / 症状 / 证候 / 方剂 / 中药 / 舌象 / 脉象 / 治法 八类都有独立词典
- * （舌象 / 脉象 / 治法自批次 20 起有词典），只有病因没有独立词典、只保留原文。</p>
+ * 疾病 / 症状 / 证候 / 方剂 / 中药 / 舌象 / 脉象 / 病因 / 治法 九类均有独立词典
+ * （舌象 / 脉象 / 治法自批次 20 起、病因自本批次起有词典）。</p>
+ *
+ * <p><b>「有词典」≠「参与归一」</b>：是否归一由组织级规则集的 {@code normalization.elementTypes}
+ * 决定（见 {@link DEFAULT_NORMALIZED_SECTIONS}）；此处 dict 只表示「有没有词典」，判断某分区
+ * 是否参与归一请用 {@link isNormalizedSection}。</p>
  */
 
 // 9 类实体分区（顺序即页面展示顺序）
@@ -16,11 +20,30 @@ export const ENTITY_SECTIONS = [
   { key: 'tongueList', label: '舌象', dict: true },
   { key: 'pulseList', label: '脉象', dict: true },
   { key: 'patternList', label: '证候', dict: true },
-  { key: 'causeList', label: '病因', dict: false },
+  { key: 'causeList', label: '病因', dict: true },
   { key: 'treatmentList', label: '治法', dict: true },
   { key: 'formulaList', label: '方剂', dict: true },
   { key: 'herbs', label: '中药', dict: true }
 ]
+
+/**
+ * 默认参与「归一」的分区键（结构化字段名）。
+ *
+ * <p>与后端 {@code QcRuleSet.DEFAULT_NORMALIZATION_TYPES}（8 类，不含病因）对齐。
+ * 归一执行由后端按组织级规则集决定；前端按此默认值把「未参与归一」的类型排除在
+ * 归一率统计之外（否则其实体无 normLevel，会被误算成「未命中」）。</p>
+ *
+ * <p>用户若在「规则配置」里改了归一范围，前端未拿到该配置时此处仍按默认展示 ——
+ * 属预期的近似（汇总数字用于快速判断，权威口径以后端为准）。</p>
+ */
+export const DEFAULT_NORMALIZED_SECTIONS = new Set([
+  'diseases', 'symptoms', 'tongueList', 'pulseList',
+  'patternList', 'treatmentList', 'formulaList', 'herbs'
+])
+
+/** 该分区是否默认参与归一（无词典或未纳入默认范围者返回 false） */
+export const isNormalizedSection = (key) =>
+  DEFAULT_NORMALIZED_SECTIONS.has(key) && (ENTITY_SECTIONS.find((s) => s.key === key)?.dict ?? false)
 
 /**
  * 归一命中层级 → 实体标签上的文案。
@@ -66,23 +89,23 @@ export const pct = (v) => {
  * @param vo NlpExtractVO（或 structuredData 对象）
  * @returns 统计对象；入参为空时返回 null
  */
-export function summarizeNorm(vo) {
+export function summarizeNorm(vo, normalizedSections = DEFAULT_NORMALIZED_SECTIONS) {
   // 1. 入参为空直接返回 null
   if (!vo) return null
   // 2. 初始化各计数累加器
   const s = {
-    total: 0,      // 参与统计的实体总数（有词典的 8 类）
+    total: 0,      // 参与统计的实体总数（参与归一的类型）
     hit: 0,        // 命中词典
     exact: 0,      // 1 精确
     contain: 0,    // 2 包含
     fuzzy: 0,      // 3 模糊
     miss: 0,       // 未命中词典
-    noDict: 0      // 无独立词典、不参与归一的实体数（病因）
+    noDict: 0      // 未参与归一（无词典 / 未纳入归一范围）的实体数
   }
-  // 3. 遍历 9 类分区，按「有无词典」分流累计
+  // 3. 遍历 9 类分区，按「有无词典 + 是否参与归一」分流累计
   for (const sec of ENTITY_SECTIONS) {
     const arr = Array.isArray(vo[sec.key]) ? vo[sec.key] : []
-    if (!sec.dict) {
+    if (!sec.dict || !normalizedSections.has(sec.key)) {
       s.noDict += arr.length
       continue
     }
@@ -114,19 +137,19 @@ export function summarizeNorm(vo) {
  * 用户还要再翻原文才知道是哪几个 —— 这里把哪些词没收录直接列出来。</p>
  *
  * <p><b>口径与后端 {@code QcScorer.countUnnormalized} 对齐</b>：同一份
- * {@code ENTITY_SECTIONS}（dict=true 的 8 类，与后端 {@code EntityTypes.dictKeys()} 一致），
- * 同一判据（{@code normLevel} 为 null/undefined 即算未命中）。默认规则集正好就是这 8 类；
- * 若用户在规则配置里改了参与计分的类型，后端按子集计、此处按全集列 —— 列表会比扣分条数多
- * 出被排除类型的那几条，属预期差异（仍能反映「哪些词没收录」。</p>
+ * {@code ENTITY_SECTIONS}，同一判据（{@code normLevel} 为 null/undefined 即算未命中），
+ * 并只列<b>参与归一</b>的分区（{@code normalizedSections}，默认 8 类、不含病因）。
+ * 若用户在规则配置里改了范围，后端按组织配置计、此处按传入/默认范围列，可能略有出入。</p>
  *
  * @param vo structuredData 对象
+ * @param normalizedSections 参与归一的分区键集合；默认 {@link DEFAULT_NORMALIZED_SECTIONS}
  * @returns [{ term, count }]（同一词未命中多次时 count > 1，便于复现后端按实体计数的 N）
  */
-export function missedNormTerms(vo) {
+export function missedNormTerms(vo, normalizedSections = DEFAULT_NORMALIZED_SECTIONS) {
   if (!vo) return []
   const acc = new Map()
   for (const sec of ENTITY_SECTIONS) {
-    if (!sec.dict) continue
+    if (!sec.dict || !normalizedSections.has(sec.key)) continue
     const arr = Array.isArray(vo[sec.key]) ? vo[sec.key] : []
     for (const it of arr) {
       // 与 summarizeNorm 同一判据：normLevel 不存在（未命中词典）才算

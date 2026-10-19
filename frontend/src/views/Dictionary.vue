@@ -13,7 +13,7 @@
       <span class="dg-item"><b>词典查询</b>只读浏览：系统默认 / 组内 / 本地三层可切</span>
       <span class="dg-item"><b>提案审核</b>组长在此确认改动并合并</span>
       <span class="dg-item"><b>归档版本</b>历史快照，可回滚</span>
-      <!-- 词典范围与「我的词典」是全站唯一入口，就在这一行末尾：点开可对 8 类术语词典各选一层。
+      <!-- 词典范围与「我的词典」是全站唯一入口，就在这一行末尾：点开可对 9 类术语词典各选一层。
            按钮文字带当前层名，所以它同时是状态显示，页面上不再另摆一排 radio。 -->
       <el-button class="dg-action" size="small" plain
         @click="$router.push({ path: '/dictionary/mine', query: { type: typeKey } })">
@@ -163,7 +163,7 @@
     </el-tabs>
 
     <!-- 词典范围 —— 全站唯一入口（页头引导条那一行的那颗按钮）。
-         弹窗里对 8 类术语词典**逐个**选层，每类各记各的（scopeByType），互不影响。 -->
+         弹窗里对 9 类术语词典**逐个**选层，每类各记各的（scopeByType），互不影响。 -->
     <el-dialog
       v-model="layerDialog"
       class="layer-dialog"
@@ -181,7 +181,7 @@
         提交提案用的工作副本；提交提案并经组长审核后，才会进入组内词典。
       </div>
 
-      <!-- 二、8 类逐个调控。每一行的三档是独立的：把「症状」切到组内，不影响「中药」 -->
+      <!-- 二、9 类逐个调控。每一行的三档是独立的：把「症状」切到组内，不影响「中药」 -->
       <el-table :data="layerRows" border size="small" class="ld-table">
         <el-table-column label="术语词典" min-width="110">
           <template #default="{ row }">
@@ -252,7 +252,7 @@ const proposalRef = ref(null)
  * 这就是批次 12 工作项 8「TDZ 调序」要防的那类问题。</p>
  */
 // 术语类型的显示名；键名必须与后端 type 参数一致（EntityTypes 的 key）。
-// 批次 20 起新增舌象/脉象/治法三类 —— 后端已给这三类建词典，此处同步暴露入口。
+// 批次 20 起新增舌象/脉象/治法，本批次新增病因 —— 后端均已建词典，此处同步暴露入口。
 const TYPE_LABELS = {
   disease: '疾病',
   pattern: '证候',
@@ -261,6 +261,7 @@ const TYPE_LABELS = {
   formula: '方剂',
   tongue: '舌象',
   pulse: '脉象',
+  cause: '病因',
   treatment: '治法'
 }
 
@@ -439,7 +440,7 @@ const LOCAL_KEY = (org, type) => `dict.local.${org || 'base'}.${type}`
 const localTerms = ref([])
 
 const localKey = computed(() => LOCAL_KEY(userStore.orgId, typeKey.value))
-// ---- 词典范围弹窗：对 8 类术语词典逐个选层 ----
+// ---- 词典范围弹窗：对 9 类术语词典逐个选层 ----
 const layerDialog = ref(false)
 /** 各类词典「归一实际用」的条数（系统默认 ∪ 组内）；取不到时该行显 — */
 const effectiveCounts = reactive(

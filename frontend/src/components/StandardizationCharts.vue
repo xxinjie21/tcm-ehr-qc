@@ -198,7 +198,7 @@ const renderCov = () => {
     },
     series: [
       {
-        // P0-1 方案A：条长 = 归一率（0~100%）。0% 的「病因」此时是最短的一条，
+        // P0-1 方案A：条长 = 归一率（0~100%）。某类词表未建全时会出现接近 0% 的短条，
         // 图形结论与事实一致；绝对条数只在 tooltip 与下方明细表出现。
         name: '归一率', type: 'bar', barWidth: rowBarWidth(covChart, rows.length),
         itemStyle: { color: '#4d6b58' },

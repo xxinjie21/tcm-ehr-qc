@@ -30,7 +30,54 @@
       </div>
 
       <div class="rc-hd">
-        ② 格式检查
+        ② 术语归一（范围）
+        <el-tooltip placement="top" content="勾选哪几类实体做「原文 → 标准词」归一；未勾选的类型只保留原文，也不参与下方的未归一扣分。出厂默认 疾病/证候/症状/中药/方剂/舌象/脉象/治法（不含病因）。"><span class="rc-info" tabindex="0" aria-label="术语归一范围说明">ⓘ</span></el-tooltip>
+      </div>
+      <div v-if="form.rules.normalization" class="rc-line">
+        术语归一：对
+        <el-select
+          v-model="form.rules.normalization.elementTypes"
+          multiple
+          filterable
+          collapse-tags
+          size="small"
+          style="min-width: 300px"
+          placeholder="选择参与归一的实体类型"
+        >
+          <el-option v-for="t in catalogTypes" :key="t.typeKey" :label="t.name" :value="t.typeKey" />
+        </el-select>
+        做归一；未勾选的类型只保留原文（不参与评分）。
+      </div>
+
+      <div class="rc-hd">
+        ③ 术语标准化（扣分）
+        <el-tooltip placement="top" content="勾选哪几类实体参与「未命中词典」扣分；出厂默认 疾病/证候/症状/中药/方剂。实际计分范围取它与上方「术语归一范围」的交集 —— 未开归一的类型不计分。"><span class="rc-info" tabindex="0" aria-label="术语标准化范围说明">ⓘ</span></el-tooltip>
+      </div>
+      <div v-if="form.rules.standardization" class="rc-line">
+        <el-switch v-model="form.rules.standardization.enabled" />
+        术语标准化：检查
+        <el-select
+          v-model="form.rules.standardization.elementTypes"
+          multiple
+          filterable
+          collapse-tags
+          size="small"
+          style="min-width: 300px"
+          :disabled="!form.rules.standardization.enabled"
+          placeholder="选择参与计分的实体类型"
+        >
+          <el-option v-for="t in catalogTypes" :key="t.typeKey" :label="t.name" :value="t.typeKey" />
+        </el-select>
+        未命中词典的每个扣
+        <el-input-number v-model="form.rules.standardization.weightEach" size="small" :min="0" :controls="false" />
+        分；未归一条数超过
+        <el-input-number v-model="form.rules.standardization.cap" size="small" :min="0" :controls="false" />
+        后按档累加
+        <el-tooltip placement="top" content="每满该条数再加扣一档，不封顶 —— 避免大量未归一时分数失去区分度。保存即生效；已评过的病历需重跑质控才会更新。"><span class="rc-info" tabindex="0" aria-label="术语标准化扣分说明">ⓘ</span></el-tooltip>
+      </div>
+
+      <div class="rc-hd">
+        ④ 格式检查
         <el-tooltip placement="top" content="勾选即启用该项检查；不合规按填写的分值扣分，无需另写规则。"><span class="rc-info" tabindex="0" aria-label="格式检查说明">ⓘ</span></el-tooltip>
       </div>
       <div class="rc-flow">
@@ -58,7 +105,7 @@
       </div>
 
       <div class="rc-hd">
-        ③ 一致性规则
+        ⑤ 一致性规则
         <el-tooltip placement="top" content="若病历的「触发类型」命中你选定的取值，而「期望类型」字段的取值不在期望集合里，则按对冲扣分。期望值取自词典。"><span class="rc-info" tabindex="0" aria-label="一致性规则说明">ⓘ</span></el-tooltip>
       </div>
       <div v-for="(c, i) in form.consistency" :key="c.uid" class="rc-block">
@@ -108,16 +155,7 @@
       </div>
       <el-button size="small" @click="addConsistency">+ 添加一致性规则</el-button>
 
-      <div class="rc-hd">④ 其它</div>
-      <div class="rc-line">
-        <el-switch v-model="form.rules.standardization.enabled" />
-        术语标准化：未命中词典的每个扣
-        <el-input-number v-model="form.rules.standardization.weightEach" size="small" :min="0" :controls="false" />
-        分；未归一条数超过
-        <el-input-number v-model="form.rules.standardization.cap" size="small" :min="0" :controls="false" />
-        后按档累加
-        <el-tooltip placement="top" content="每满该条数再加扣一档，不封顶 —— 避免大量未归一时分数失去区分度。保存即生效；已评过的病历需重跑质控才会更新。"><span class="rc-info" tabindex="0" aria-label="术语标准化扣分说明">ⓘ</span></el-tooltip>
-      </div>
+      <div class="rc-hd">⑥ 其它</div>
       <div class="rc-line">
         重复病历扣
         <el-input-number v-model="form.rules.duplicateWeight" size="small" :min="0" :controls="false" />
@@ -191,6 +229,12 @@ const initForm = () => {
   form.elementNames = els.map((e) => e.name)
   form.fullWeight = els[0]?.weightFull ?? 12
   form.partialWeight = els[0]?.weightPartial ?? 6
+  // 术语标准化：必须有 elementTypes 数组，多选控件才能绑定（后端正常都会下发，null 时补空数组）
+  const std = r.standardization || props.rules?.standardization || null
+  if (std && !Array.isArray(std.elementTypes)) std.elementTypes = []
+  // 术语归一范围：同理，新字段后端已下发；缺字段时用已取到的生效规则兜底
+  const nz = r.normalization || props.rules?.normalization || null
+  if (nz && !Array.isArray(nz.elementTypes)) nz.elementTypes = []
   form.format = (r.format || []).map((f) => ({
     uid: nextUid(), field: f.field, type: f.type || 'regex', expr: f.expr || '', values: f.values || [],
     label: f.label, weight: f.weight ?? 5, reason: f.reason
@@ -210,7 +254,8 @@ const initForm = () => {
   //    版本不齐），表单会显示一套「后端没说过」的数字，用户一保存就把它们写进本组织规则 ——
   //    静默改口径。故缺失时退到本页已从后端取到的生效规则，仍无则留空让用户看见。
   form.rules = {
-    standardization: r.standardization || props.rules?.standardization || null,
+    normalization: nz,
+    standardization: std,
     duplicateWeight: r.duplicateWeight ?? props.rules?.duplicateWeight ?? null,
     thresholds: r.thresholds || props.rules?.thresholds || null
   }
@@ -229,6 +274,9 @@ const fmtMap = computed(() => {
 const fmtOf = (field) => fmtMap.value.get(field)
 // 非模板格式规则（历史遗留或手工添加）：不在 catalogFormats 目录里的项，单独列出供编辑
 const customFormats = computed(() => form.format.filter((f) => !props.catalogFormats.some((t) => t.field === f.field)))
+  // 术语标准化/归一可勾选类型：目录里的全部 9 类（病因已有词典、可勾选；
+  // 是否真正参与归一并计分由用户选择，未开归一的类型另有交集口径在计算时兜底）
+  const catalogTypes = computed(() => props.catalogElements)
 const toggleFormat = (t, on) => {
   if (on) {
     if (!fmtOf(t.field)) {
@@ -286,6 +334,7 @@ const buildRulesPayload = () => {
     completeness: { elements },
     format: form.format.map(({ uid, ...f }) => f),
     consistency,
+    normalization: clone(form.rules.normalization),
     standardization: clone(form.rules.standardization),
     duplicateWeight: form.rules.duplicateWeight,
     thresholds: clone(form.rules.thresholds)

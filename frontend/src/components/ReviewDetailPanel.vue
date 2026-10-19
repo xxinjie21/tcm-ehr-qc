@@ -200,18 +200,19 @@ const CORE_KEYS = new Set(Object.values(FIELD_BY_ITEM))
 
 /**
  * 对照区的字段（功能设计附录A 的 9 类实体）。
- * termType 指向词典类型；治法/病因在现有词典里没有对应类别，故用普通输入框。
+ * termType 指向词典类型；9 类实体现均有独立词典（病因自本批次起有 causes.json），
+ * 故治法/病因此处也用词典候选输入框（termType 留给未建词典的类型用空串回退普通输入框）。
  */
 const COMPARE_FIELDS = [
   { key: 'patternList', label: '证候', termType: 'pattern' },
-  { key: 'treatmentList', label: '治法', termType: '' },
+  { key: 'treatmentList', label: '治法', termType: 'treatment' },
   { key: 'formulaList', label: '方剂', termType: 'formula' },
   { key: 'tongueList', label: '舌象', termType: 'symptom' },
   { key: 'pulseList', label: '脉象', termType: 'symptom' },
   { key: 'herbs', label: '中药', termType: 'herb' },
   { key: 'diseases', label: '疾病', termType: 'disease' },
   { key: 'symptoms', label: '症状', termType: 'symptom' },
-  { key: 'causeList', label: '病因', termType: '' }
+  { key: 'causeList', label: '病因', termType: 'cause' }
 ]
 
 // 时间格式化：去掉 T、截到分钟；空值返回「—」，避免列表里出现 Invalid Date

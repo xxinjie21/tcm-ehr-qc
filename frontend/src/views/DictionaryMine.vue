@@ -2,7 +2,7 @@
   <div>
     <!-- 从「术语词典」页签摘出的「我的词典」独立页：统一入口在词典页页头引导条行末
          （与「词典范围」并列），不在每个术语类型下各放一个入口。
-         类型决定本地词典的 localStorage 键（8 类各存各的）；进入时类型跟随来源页
+         类型决定本地词典的 localStorage 键（9 类各存各的）；进入时类型跟随来源页
          （query.type），页内仍可自由改 —— 只影响默认值，不限制切换。 -->
     <div class="dict-head">
       <span class="dh-label">术语类型</span>
@@ -189,6 +189,7 @@ const TYPE_LABELS = {
   formula: '方剂',
   tongue: '舌象',
   pulse: '脉象',
+  cause: '病因',
   treatment: '治法'
 }
 const TYPE_OPTIONS = Object.keys(TYPE_LABELS).map((v) => ({ value: v, label: TYPE_LABELS[v] }))

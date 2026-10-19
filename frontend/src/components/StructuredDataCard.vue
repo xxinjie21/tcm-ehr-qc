@@ -37,11 +37,12 @@
     <template v-if="hasAny">
       <div v-for="sec in sections" :key="sec.key" class="sd-section">
         <div v-if="list(sec.key).length" class="sd-sec">
-          <!-- 分区标题带上「这个字段有没有词典」：舌象/脉象/病因/治法四类本来就没有独立词典，
-               与其在每条实体上重复标「无词典」，不如在这里说一次，实体上只留真正有信息量的标签 -->
+          <!-- 分区标题带上「这个字段走不走词典归一」：9 类均有词典，但默认仅 8 类参与归一
+               （病因默认不勾），是否归一由组织规则配置决定；此处按默认范围给一次提示，
+               实体上只留真正有信息量的标签 -->
           <div class="sd-sec-title">
             {{ sec.label }}
-            <span class="sd-sec-hint">{{ sec.dict ? '走词典归一' : '无独立词典，保留原文' }}</span>
+            <span class="sd-sec-hint">{{ isNormalizedSection(sec.key) ? '走词典归一' : '保留原文' }}</span>
           </div>
           <div class="sd-items">
             <el-tooltip
@@ -108,7 +109,7 @@
 import { computed, watch } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useNlpStatus } from '@/composables/useNlpStatus'
-import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, LEVEL_UNMATCHED, entityName, pct } from '@/utils/structured'
+import { ENTITY_SECTIONS, LEVEL_SHORT, LEVEL_FULL, LEVEL_UNMATCHED, entityName, pct, isNormalizedSection } from '@/utils/structured'
 
 const props = defineProps({
   data: { type: [String, Object], default: null },
@@ -249,9 +250,12 @@ const tpRows = (sec, it) => {
   const raw = it.sourceText
   const name = entityName(sec, it)
 
-  // 2. 按「无词典 / 命中 / 未命中」三档生成归一相关行
-  if (!sec.dict) {
-    rows.push({ k: '归一', v: '该字段没有独立词典，不做归一，保留原文' })
+  // 2. 按「未参与归一 / 命中 / 未命中」三档生成归一相关行
+  if (!isNormalizedSection(sec.key)) {
+    rows.push({
+      k: '归一',
+      v: sec.dict ? '该类型未纳入归一范围，保留原文' : '该字段没有独立词典，不做归一，保留原文'
+    })
   } else if (it.normLevel) {
     rows.push({ k: '归一', v: LEVEL_FULL[it.normLevel] || it.normLevel })
     rows.push({ k: '怎么比的', v: levelDesc(it.normLevel, raw, name) })

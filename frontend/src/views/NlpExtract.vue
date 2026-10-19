@@ -248,10 +248,10 @@
                    用户既不知道命中了多少、未命中多少，也无从判断归一到底跑没跑。 -->
               <div v-if="normStat && normStat.total" class="norm-stat">
                 <div class="ns-line">
-                  有词典的实体 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>
+                  参与归一的实体 <b>{{ normStat.total }}</b> 个：命中 <b>{{ normStat.hit }}</b>
                   <span v-if="normStat.hit">（{{ LEVEL_TINY[1] }} {{ normStat.exact }} / {{ LEVEL_TINY[2] }} {{ normStat.contain }} / {{ LEVEL_TINY[3] }} {{ normStat.fuzzy }}）</span>，
                   未命中 <b :class="{ bad: normStat.miss > 0 }">{{ normStat.miss }}</b>
-                  <span v-if="normStat.noDict">；另有 {{ normStat.noDict }} 个实体所在字段无独立词典、不参与归一</span>
+                  <span v-if="normStat.noDict">；另有 {{ normStat.noDict }} 个实体所在类型未参与归一（无词典或未勾选归一）</span>
                   <span v-if="normStat.hit">；其中「包含 / 模糊」是推断命中，<b>需人工确认</b></span>
                 </div>
                 <div class="ns-line">

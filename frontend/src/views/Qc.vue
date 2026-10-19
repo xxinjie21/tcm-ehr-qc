@@ -250,11 +250,17 @@
           <span class="st-v">{{ rules.consistencySummary || '—' }}</span>
         </div>
         <div class="st">
+          <span class="st-k">术语归一</span>
+          <span class="st-v">{{ normTypeNames.length ? normTypeNames.join('、') : '全部不归一' }}</span>
+        </div>
+        <div class="st">
           <span class="st-k">术语标准化</span>
           <span class="st-v">{{ rules.standardization.enabled
-            ? ('开 · 未命中词典的每个 -' + rules.standardization.weightEach
+            ? ('开 · 计分类型 ' + (scoredTypeNames.length ? scoredTypeNames.join('、') : '无')
+               + '；未命中词典的每个 -' + rules.standardization.weightEach
                + '；超过 ' + rules.standardization.cap + ' 个后，每再满 '
-               + rules.standardization.cap + ' 个追加一档（分段扣分，避免大量未归一时触顶、分数失去区分度）')
+               + rules.standardization.cap + ' 个追加一档（分段扣分，避免大量未归一时触顶、分数失去区分度）'
+               + (excludedTypeNames.length ? '；已勾选但未开归一、不计分：' + excludedTypeNames.join('、') : ''))
             : '已关闭' }}</span>
         </div>
         <div class="st">
@@ -351,6 +357,21 @@ const loadRules = async () => {
 // 那个默认是后端出厂值的拷贝，管理员改过合格线后，等待期里界面会按旧值
 // 算出「距合格线还差 N 分」，与服务端结论矛盾。
 const qualified = computed(() => rules.value?.thresholds?.reviewUpper ?? null)
+
+// 术语类型 key → 中文名：用目录，目录没有（后端新增类型 / 未加载）时回退 key 本身。
+const typeName = (k) => catalogElements.value.find((e) => e.typeKey === k)?.name || k
+// 术语归一的类型（哪些做「原文 → 标准词」归一）
+const normTypeNames = computed(() => (rules.value?.normalization?.elementTypes || []).map(typeName))
+// 术语标准化里勾选、但未开归一 → 其实体不写 normLevel、不计分（QcScorer 取交集）
+const excludedTypeNames = computed(() => {
+  const norm = new Set(rules.value?.normalization?.elementTypes || [])
+  return (rules.value?.standardization?.elementTypes || []).filter((t) => !norm.has(t)).map(typeName)
+})
+// 实际计分类型 = 标准化勾选 ∩ 归一范围 —— 面板显示这一份，才是服务端真正用的口径
+const scoredTypeNames = computed(() => {
+  const norm = new Set(rules.value?.normalization?.elementTypes || [])
+  return (rules.value?.standardization?.elementTypes || []).filter((t) => norm.has(t)).map(typeName)
+})
 
 // 拉取当前范围的扣分聚合（按类型、按项、分级分布）
 const loadDedStats = async () => {
