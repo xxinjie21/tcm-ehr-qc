@@ -69,6 +69,19 @@ public class AsyncConfig {
         return fixedPool(concurrency, "qc-batch-worker-");
     }
 
+    /**
+     * 数据清洗任务的常驻 worker 池，大小 = {@code clean.batch.concurrency}（默认 1）。
+     *
+     * <p><b>必须独立成池，不能复用 {@code qcBatchExecutor}</b>：批量 worker 是
+     * {@code while(running)} 的常驻循环，会<b>永久占满</b>它所在池的全部线程；
+     * 池大小本就是「常驻 worker 数」。若清洗 worker 也 submit 到质控池，
+     * 它只会排在队列里<b>永不执行</b>（表现为任务永远停在 QUEUED）。</p>
+     */
+    @Bean
+    public ThreadPoolTaskExecutor cleanBatchExecutor(@Value("${clean.batch.concurrency:1}") int concurrency) {
+        return fixedPool(concurrency, "clean-batch-worker-");
+    }
+
     /** NLP 批量解析的常驻 worker 池（认领任务），大小 = {@code nlp.batch.concurrency} */
     @Bean
     public ThreadPoolTaskExecutor nlpBatchExecutor(@Value("${nlp.batch.concurrency:8}") int concurrency) {

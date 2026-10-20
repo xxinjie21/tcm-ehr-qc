@@ -166,6 +166,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         for (Record r : records) {
             if (progress != null && (++processedCnt % 200 == 0) && !progress.test(processedCnt)) {
                 log.info("[清洗] 收到中止请求，已处理 {} 条，提前结束", processedCnt);
+                // 中止时 total 记为<b>实际处理数</b>而非查询总数：
+                // 否则调用方（异步任务）会把 done 写成全量数，看起来像「跑完了才被取消」。
+                vo.setTotal(processedCnt);
                 break;
             }
             String status = r.getStatus();
