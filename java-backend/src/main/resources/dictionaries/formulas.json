@@ -1392,7 +1392,8 @@
       "六味丸",
       "六味地黄汤",
       "六味地黄",
-      "六味"
+      "六味",
+      "地黄丸"
     ]
   },
   {
@@ -7645,7 +7646,9 @@
   },
   {
     "standardTerm": "龙胆泻肝汤",
-    "aliases": []
+    "aliases": [
+      "龙胆泻肝加减"
+    ]
   },
   {
     "standardTerm": "苇茎汤",
@@ -8807,7 +8810,8 @@
       "桂附八味丸",
       "八味地黄丸",
       "金匮",
-      "金匮肾气"
+      "金匮肾气",
+      "肾气"
     ]
   },
   {
@@ -10025,7 +10029,9 @@
   },
   {
     "standardTerm": "大活络丹",
-    "aliases": []
+    "aliases": [
+      "大活络丸"
+    ]
   },
   {
     "standardTerm": "三黄汤",
@@ -11385,6 +11391,82 @@
   },
   {
     "standardTerm": "缩脾饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "滑石杏仁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡四妙温胆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣痹温胆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苍苦茵陈赤豆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡杏仁汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "人参乌梅汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "增损双解散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "银翘马勃散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加减苇茎汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "真武三二汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荆防连翘赤小豆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "少阳阳明风湿饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣痹止嗽散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "苏杏芩甘汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "平冲降逆汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "宣痹秦艽汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桃红清血丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "茵陈栀子厚朴汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "柴胡二陈汤",
     "aliases": []
   }
 ]
