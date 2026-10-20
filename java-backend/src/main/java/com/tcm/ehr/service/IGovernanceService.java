@@ -46,7 +46,8 @@ public interface IGovernanceService extends IService<Record> {
      * @param progress 每 200 条回调一次（已处理条数），返回 false 表示请求中止；null=不上报不中止
      */
     CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
-                        boolean skipNormalize, java.util.function.IntPredicate progress);
+                        boolean skipNormalize, java.util.function.IntPredicate progress,
+                        java.util.function.IntConsumer totalSink);
 
     /**
      * 导出标准数据集。

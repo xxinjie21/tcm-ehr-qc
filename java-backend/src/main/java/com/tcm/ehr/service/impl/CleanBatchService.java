@@ -290,6 +290,8 @@ public class CleanBatchService implements ICleanBatchService {
         t.setStatus(CleanTask.RUNNING);
         t.setStartedAt(startedAt);
 
+        // clean() 会把「范围内总条数」写进来，供进度回调落库（否则前端算不出百分比）
+        java.util.concurrent.atomic.AtomicInteger totalHolder = new java.util.concurrent.atomic.AtomicInteger(0);
         boolean cancelled = false;
         boolean failed = false;
         CleanResultVO result = null;
@@ -309,11 +311,18 @@ public class CleanBatchService implements ICleanBatchService {
                 CleanTask upd = new CleanTask();
                 upd.setId(tid);
                 upd.setDone(done);
+                // ⚠️ total 由 clean() 通过 totalHolder 回填（见下方注释）：
+                // 提交时 total 未知（要扫库才算），若一直为 0，前端 percent = done/total
+                // 恒为 0，进度条永远不动 —— 用户看到的就是「进度条不变」。
+                if (totalHolder.get() > 0) {
+                    upd.setTotal(totalHolder.get());
+                }
                 upd.setCurrentLabel(String.valueOf(done));
                 taskMapper.updateById(upd);
                 return !isCancelRequested(tid);
             };
-            result = governanceService.clean(null, filters, skipNorm, progress);
+            result = governanceService.clean(null, filters, skipNorm, progress,
+                    totalHolder::set);
             cancelled = isCancelRequested(id);
         } catch (Exception e) {
             failed = true;

@@ -77,28 +77,30 @@
         </div>
       </transition>
 
+      <!-- 清洗操作区（2026-10-21 重排）：按钮与「归一开关」同属一个居中操作块，
+           垂直紧凑排列。开关是次级选项，字号/颜色都弱于主按钮，不抢视觉。 -->
       <div class="clean-actions">
-        <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
-          {{ clean.loading ? '清洗执行中…' : '执行数据清洗' }}
-        </el-button>
-        <el-button v-if="clean.loading" size="large" :loading="cancellingClean" @click="handleCancelClean">
-          停止清洗
-        </el-button>
-        <!-- 执行期间说明「在做什么、要等多久、结果在哪看」，而不是只转一个圈-->
-        <span v-if="clean.loading" class="tip">
-          正在按 5 步依次处理，请勿关闭页面；完成后下方会给出分步结果
-        </span>
-      </div>
-
-      <!-- 术语归一开关（2026-10-20）：独立一行，不挤进按钮所在的 flex 容器
-           （挤进去会把居中按钮顶偏）。归一是五步里最耗时的一步，关掉可显著提速。 -->
-      <div class="clean-opt-row">
-        <el-checkbox v-model="clean.doNormalize" :disabled="clean.loading">
-          执行术语归一
-        </el-checkbox>
-        <span class="clean-opt-hint">
-          {{ clean.doNormalize ? '把原文统一为标准词（较慢）' : '只做去重 / 清理 / 隔离（快）' }}
-        </span>
+        <div class="ca-buttons">
+          <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
+            {{ clean.loading ? '清洗执行中…' : '执行数据清洗' }}
+          </el-button>
+          <el-button v-if="clean.loading" size="large" :loading="cancellingClean" @click="handleCancelClean">
+            停止清洗
+          </el-button>
+        </div>
+        <!-- 归一开关：默认执行（保持原行为）。归一是五步里最耗时的一步，关掉可显著提速 -->
+        <div class="ca-opt">
+          <el-checkbox v-model="clean.doNormalize" :disabled="clean.loading" size="small">
+            执行术语归一
+          </el-checkbox>
+          <span class="ca-opt-hint">
+            {{ clean.doNormalize ? '把原文统一为标准词（较慢）' : '只做去重、清理、隔离（快）' }}
+          </span>
+        </div>
+        <!-- 执行期间说明「在做什么」；清洗已改异步，关页面不影响执行 -->
+        <div v-if="clean.loading" class="ca-state">
+          {{ clean.status === 'QUEUED' ? '排队中…' : '正在处理，可随时「停止清洗」；关页面不影响执行' }}
+        </div>
       </div>
 
       <!-- 28.14：后端是同步接口、拿不到真实百分比，用不确定进度条只表达「在推进」；
@@ -916,32 +918,33 @@ onMounted(() => {
 
 /* ===== 执行按钮区 ===== */
 .clean-actions {
-  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--sp-4);
-  margin-bottom: var(--sp-1);
-}
-
-/* 提示文字绝对定位，不参与 flex 布局，避免加载时按钮被挤偏 */
-.clean-actions .tip {
-  position: absolute;
-  left: calc(50% + 80px);
-  white-space: nowrap;
-  font-size: var(--fs-xs);
-  color: var(--text-sub-strong);
-}
-
-/* 术语归一开关行（2026-10-20）：独立成行、居中，不参与按钮所在 flex 容器 */
-.clean-opt-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   gap: var(--sp-2);
   margin-bottom: var(--sp-3);
 }
-.clean-opt-hint {
+
+.clean-actions .ca-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* 归一开关行：次级视觉 —— 小字、次要色，与主按钮拉开层级，不抢注意力 */
+.clean-actions .ca-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.clean-actions .ca-opt-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
+}
+
+/* 执行期状态文案：单独一行、居中、弱化 */
+.clean-actions .ca-state {
   font-size: var(--fs-xs);
   color: var(--text-sub);
 }

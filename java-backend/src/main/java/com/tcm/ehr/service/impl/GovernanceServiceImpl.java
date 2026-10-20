@@ -115,7 +115,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     @Override
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
                               boolean skipNormalize) {
-        return clean(recordIds, filters, skipNormalize, null);
+        return clean(recordIds, filters, skipNormalize, null, null);
     }
 
     /**
@@ -128,7 +128,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * @param progress 每页回调一次（处理条数，返回 false 表示请求中止）；null=不上报不中止
      */
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
-                              boolean skipNormalize, java.util.function.IntPredicate progress) {
+                              boolean skipNormalize, java.util.function.IntPredicate progress,
+                              java.util.function.IntConsumer totalSink) {
         // 批次12 · 12c（第二步）：由「整批载入」改为**惰性分页**。
         // 原实现把 3.5 万行一次读进内存，每行还带 1.3KB 的 structured_data（合计 43.8MB）——
         // 这是清洗的堆占用来源。下面保持 for-each 写法**一行不改**，只把数据源换成按页拉取。
@@ -152,6 +153,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // total 单独查一次：逐页再算总数是浪费。
         // 注意 selectCount 返回 Long，不能 (int) 直接强转，须 intValue()。
         vo.setTotal(baseMapper.selectCount(wrapperFactory.get()).intValue());
+        // 把范围内总条数回填给调用方：异步任务要写进 clean_task.total，
+        // 否则 total 恒为 0，前端 percent = done/total 算不出真实百分比（进度条不动）。
+        if (totalSink != null) {
+            totalSink.accept(vo.getTotal());
+        }
 
         Set<String> seenTextHash = new HashSet<>();
         // T13：词典元数据一批只取一次（惰性 —— 本批没有任何归一需求时一次库都不查）。
