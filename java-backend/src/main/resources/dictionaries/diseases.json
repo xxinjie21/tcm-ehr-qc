@@ -39,11 +39,15 @@
   },
   {
     "standardTerm": "眩晕",
-    "aliases": []
+    "aliases": [
+      "头晕"
+    ]
   },
   {
     "standardTerm": "瘿病",
-    "aliases": []
+    "aliases": [
+      "瘿瘤"
+    ]
   },
   {
     "standardTerm": "不寐",
@@ -1186,7 +1190,9 @@
   },
   {
     "standardTerm": "腰肌劳损",
-    "aliases": []
+    "aliases": [
+      "慢性腰肌劳损"
+    ]
   },
   {
     "standardTerm": "骶髂关节损伤",
@@ -1328,13 +1334,15 @@
     "aliases": [
       "胸痹",
       "冠心病",
-      "心绞痛"
+      "心绞痛",
+      "冠状动脉粥样硬化性心脏病"
     ]
   },
   {
     "standardTerm": "真心痛",
     "aliases": [
-      "急性心肌梗死"
+      "急性心肌梗死",
+      "心梗"
     ]
   },
   {
@@ -1449,7 +1457,9 @@
   },
   {
     "standardTerm": "狂病",
-    "aliases": []
+    "aliases": [
+      "狂症"
+    ]
   },
   {
     "standardTerm": "花癫",
@@ -1652,7 +1662,9 @@
   },
   {
     "standardTerm": "腹胀病",
-    "aliases": []
+    "aliases": [
+      "腹胀"
+    ]
   },
   {
     "standardTerm": "便秘病",
@@ -1711,7 +1723,8 @@
   {
     "standardTerm": "伤食病",
     "aliases": [
-      "伤食"
+      "伤食",
+      "积食"
     ]
   },
   {
@@ -1900,7 +1913,8 @@
   {
     "standardTerm": "喘病",
     "aliases": [
-      "喘证"
+      "喘证",
+      "气喘"
     ]
   },
   {
@@ -1925,11 +1939,16 @@
   },
   {
     "standardTerm": "肺胀",
-    "aliases": []
+    "aliases": [
+      "肺气肿",
+      "慢性阻塞性肺病"
+    ]
   },
   {
     "standardTerm": "肺络张",
-    "aliases": []
+    "aliases": [
+      "支气管扩张"
+    ]
   },
   {
     "standardTerm": "尘肺",
@@ -1989,23 +2008,29 @@
   {
     "standardTerm": "石淋",
     "aliases": [
-      "肾结石"
+      "肾结石",
+      "膀胱结石",
+      "输尿管结石"
     ]
   },
   {
     "standardTerm": "精癃",
-    "aliases": []
+    "aliases": [
+      "前列腺增生"
+    ]
   },
   {
     "standardTerm": "遗尿病",
     "aliases": [
-      "遗尿"
+      "遗尿",
+      "尿床"
     ]
   },
   {
     "standardTerm": "小便不禁",
     "aliases": [
-      "小便失禁"
+      "小便失禁",
+      "漏尿"
     ]
   },
   {
@@ -2104,13 +2129,15 @@
   {
     "standardTerm": "虚损病",
     "aliases": [
-      "劳怯病"
+      "劳怯病",
+      "虚损"
     ]
   },
   {
     "standardTerm": "血劳",
     "aliases": [
-      "贫血"
+      "贫血",
+      "缺铁性贫血"
     ]
   },
   {
@@ -2127,7 +2154,8 @@
     "standardTerm": "晕动病",
     "aliases": [
       "注车",
-      "注船"
+      "注船",
+      "晕车"
     ]
   },
   {
@@ -2251,7 +2279,8 @@
   {
     "standardTerm": "紫癜病",
     "aliases": [
-      "葡萄疫"
+      "葡萄疫",
+      "过敏性紫癜"
     ]
   },
   {
@@ -2377,7 +2406,10 @@
   },
   {
     "standardTerm": "缺血性中风",
-    "aliases": []
+    "aliases": [
+      "脑梗死",
+      "脑梗"
+    ]
   },
   {
     "standardTerm": "出血性中风",
@@ -2421,7 +2453,8 @@
   {
     "standardTerm": "偏头风",
     "aliases": [
-      "偏头痛"
+      "偏头痛",
+      "半边头痛"
     ]
   },
   {
@@ -2453,7 +2486,8 @@
     "aliases": [
       "脑风",
       "颤症",
-      "颤证"
+      "颤证",
+      "帕金森病"
     ]
   },
   {
@@ -2663,7 +2697,8 @@
   {
     "standardTerm": "尪痹",
     "aliases": [
-      "类风湿关节炎"
+      "类风湿关节炎",
+      "类风湿"
     ]
   },
   {
@@ -2672,7 +2707,9 @@
   },
   {
     "standardTerm": "皮痹",
-    "aliases": []
+    "aliases": [
+      "硬皮病"
+    ]
   },
   {
     "standardTerm": "肌痹",
@@ -2714,7 +2751,9 @@
   },
   {
     "standardTerm": "历节风",
-    "aliases": []
+    "aliases": [
+      "历节"
+    ]
   },
   {
     "standardTerm": "鹤膝风",
@@ -2732,7 +2771,9 @@
   },
   {
     "standardTerm": "大偻",
-    "aliases": []
+    "aliases": [
+      "强直性脊柱炎"
+    ]
   },
   {
     "standardTerm": "膝痹",
@@ -2769,7 +2810,8 @@
     "standardTerm": "痿证类病",
     "aliases": [
       "痿病",
-      "痿证"
+      "痿证",
+      "痿症"
     ]
   },
   {
@@ -2985,7 +3027,9 @@
   },
   {
     "standardTerm": "阴癣",
-    "aliases": []
+    "aliases": [
+      "股癣"
+    ]
   },
   {
     "standardTerm": "紫白癜风",
@@ -3023,7 +3067,8 @@
     "aliases": [
       "月蚀疮",
       "耳周湿疹",
-      "外耳湿疹"
+      "外耳湿疹",
+      "耳廓湿疹"
     ]
   },
   {
@@ -3071,7 +3116,9 @@
   },
   {
     "standardTerm": "风瘙痒",
-    "aliases": []
+    "aliases": [
+      "皮肤瘙痒"
+    ]
   },
   {
     "standardTerm": "顽湿聚结",
@@ -3134,7 +3181,8 @@
   {
     "standardTerm": "粉刺",
     "aliases": [
-      "肺风粉刺"
+      "肺风粉刺",
+      "痘痘"
     ]
   },
   {
@@ -3146,7 +3194,8 @@
   {
     "standardTerm": "酒齄鼻",
     "aliases": [
-      "酒糟鼻"
+      "酒糟鼻",
+      "玫瑰痤疮"
     ]
   },
   {
@@ -3155,7 +3204,9 @@
   },
   {
     "standardTerm": "黧黑斑",
-    "aliases": []
+    "aliases": [
+      "黄褐斑"
+    ]
   },
   {
     "standardTerm": "粉花疮",
@@ -3164,7 +3215,8 @@
   {
     "standardTerm": "日晒疮",
     "aliases": [
-      "日晒伤"
+      "日晒伤",
+      "日光性皮炎"
     ]
   },
   {
@@ -3235,7 +3287,9 @@
   },
   {
     "standardTerm": "白驳风",
-    "aliases": []
+    "aliases": [
+      "白癜风"
+    ]
   },
   {
     "standardTerm": "乌白癞",
@@ -3355,7 +3409,8 @@
   {
     "standardTerm": "疖",
     "aliases": [
-      "疖肿"
+      "疖肿",
+      "疖子"
     ]
   },
   {
@@ -3442,7 +3497,9 @@
   },
   {
     "standardTerm": "蛇眼疔",
-    "aliases": []
+    "aliases": [
+      "甲沟炎"
+    ]
   },
   {
     "standardTerm": "蛇头疔",
@@ -4064,7 +4121,9 @@
   {
     "standardTerm": "肛门湿疡",
     "aliases": [
-      "肛门顽湿"
+      "肛门顽湿",
+      "肛门湿疹",
+      "肛周湿疹"
     ]
   },
   {
@@ -4286,7 +4345,9 @@
   {
     "standardTerm": "月经类病",
     "aliases": [
-      "月经病"
+      "月经病",
+      "月经不调",
+      "月经紊乱"
     ]
   },
   {
@@ -4343,7 +4404,9 @@
   },
   {
     "standardTerm": "漏下",
-    "aliases": []
+    "aliases": [
+      "经漏"
+    ]
   },
   {
     "standardTerm": "经间期出血",
@@ -5178,7 +5241,9 @@
   },
   {
     "standardTerm": "积滞",
-    "aliases": []
+    "aliases": [
+      "饮食积滞"
+    ]
   },
   {
     "standardTerm": "乳积",
@@ -5475,7 +5540,9 @@
   },
   {
     "standardTerm": "迎风冷泪",
-    "aliases": []
+    "aliases": [
+      "迎风流泪"
+    ]
   },
   {
     "standardTerm": "热泪",
@@ -5761,7 +5828,8 @@
     "standardTerm": "圆翳内障",
     "aliases": [
       "如银内障",
-      "老年性白内障"
+      "老年性白内障",
+      "白内障"
     ]
   },
   {
@@ -5774,7 +5842,9 @@
     "standardTerm": "云雾移睛",
     "aliases": [
       "蝇翅黑花",
-      "玻璃体混浊"
+      "玻璃体混浊",
+      "飞蚊症",
+      "飞蚊"
     ]
   },
   {
@@ -6083,7 +6153,8 @@
     "standardTerm": "乳蛾",
     "aliases": [
       "扁桃体炎",
-      "喉蛾"
+      "喉蛾",
+      "乳娥"
     ]
   },
   {
@@ -6288,7 +6359,8 @@
       "盆腔包块",
       "左侧附件囊性包块",
       "附件囊性包块",
-      "卵巢巧克力囊肿"
+      "卵巢巧克力囊肿",
+      "症瘕"
     ]
   },
   {
@@ -6325,7 +6397,9 @@
   {
     "standardTerm": "筋瘤",
     "aliases": [
-      "下肢静脉曲张"
+      "下肢静脉曲张",
+      "静脉曲张",
+      "静脉曲张病"
     ]
   },
   {
@@ -6405,7 +6479,9 @@
   },
   {
     "standardTerm": "口臭",
-    "aliases": []
+    "aliases": [
+      "口气"
+    ]
   },
   {
     "standardTerm": "脚气",
@@ -6474,7 +6550,9 @@
   {
     "standardTerm": "喉痹",
     "aliases": [
-      "咽喉肿痛"
+      "咽喉肿痛",
+      "咽痹",
+      "咽炎"
     ]
   },
   {
@@ -6561,7 +6639,9 @@
   },
   {
     "standardTerm": "痞证",
-    "aliases": []
+    "aliases": [
+      "痞症"
+    ]
   },
   {
     "standardTerm": "胆囊息肉",

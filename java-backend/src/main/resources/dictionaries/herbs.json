@@ -163,7 +163,9 @@
       "人参须",
       "边条参",
       "糖参",
-      "白参"
+      "白参",
+      "全须生晒参",
+      "林下山参"
     ]
   },
   {
@@ -1009,7 +1011,9 @@
     "standardTerm": "天竺黄",
     "aliases": [
       "天竹黄",
-      "竹黄"
+      "竹黄",
+      "天然天竺黄",
+      "人工天竺黄"
     ]
   },
   {
@@ -2435,7 +2439,9 @@
   },
   {
     "standardTerm": "油松节",
-    "aliases": []
+    "aliases": [
+      "松节"
+    ]
   },
   {
     "standardTerm": "泽兰",
@@ -3253,7 +3259,8 @@
       "复花",
       "伏花",
       "炙旋覆花",
-      "金沸花"
+      "金沸花",
+      "旋复花"
     ]
   },
   {
@@ -3597,7 +3604,9 @@
   },
   {
     "standardTerm": "锦灯笼",
-    "aliases": []
+    "aliases": [
+      "挂金灯"
+    ]
   },
   {
     "standardTerm": "矮地茶",
@@ -4332,5 +4341,165 @@
       "紫珠草",
       "杜虹花"
     ]
+  },
+  {
+    "standardTerm": "紫荆皮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鸡矢藤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "绿萼梅",
+    "aliases": []
+  },
+  {
+    "standardTerm": "甜菊叶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白茄根",
+    "aliases": []
+  },
+  {
+    "standardTerm": "牡荆子",
+    "aliases": []
+  },
+  {
+    "standardTerm": "穿山甲",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白英",
+    "aliases": []
+  },
+  {
+    "standardTerm": "海浮石",
+    "aliases": []
+  },
+  {
+    "standardTerm": "白马骨",
+    "aliases": []
+  },
+  {
+    "standardTerm": "椒目",
+    "aliases": []
+  },
+  {
+    "standardTerm": "橘络",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荷梗",
+    "aliases": []
+  },
+  {
+    "standardTerm": "灶心土",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石楠叶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "穿破石",
+    "aliases": []
+  },
+  {
+    "standardTerm": "望江南",
+    "aliases": []
+  },
+  {
+    "standardTerm": "猫须草",
+    "aliases": []
+  },
+  {
+    "standardTerm": "绞股蓝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "秫米",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木槿皮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "透骨草",
+    "aliases": []
+  },
+  {
+    "standardTerm": "石见穿",
+    "aliases": []
+  },
+  {
+    "standardTerm": "草红藤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "代代花",
+    "aliases": []
+  },
+  {
+    "standardTerm": "雷公藤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "夜明砂",
+    "aliases": []
+  },
+  {
+    "standardTerm": "爵床",
+    "aliases": []
+  },
+  {
+    "standardTerm": "凤凰衣",
+    "aliases": []
+  },
+  {
+    "standardTerm": "桃花",
+    "aliases": []
+  },
+  {
+    "standardTerm": "七叶莲",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蝼蛄",
+    "aliases": []
+  },
+  {
+    "standardTerm": "楮桃叶",
+    "aliases": []
+  },
+  {
+    "standardTerm": "鱼脑石",
+    "aliases": []
+  },
+  {
+    "standardTerm": "素馨花",
+    "aliases": []
+  },
+  {
+    "standardTerm": "火硝",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蛴螬",
+    "aliases": []
+  },
+  {
+    "standardTerm": "秋石",
+    "aliases": []
+  },
+  {
+    "standardTerm": "蟋蟀",
+    "aliases": []
+  },
+  {
+    "standardTerm": "荨麻",
+    "aliases": []
   }
 ]

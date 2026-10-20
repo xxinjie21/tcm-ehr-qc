@@ -7219,7 +7219,9 @@
   },
   {
     "standardTerm": "加味逍遥散",
-    "aliases": []
+    "aliases": [
+      "丹栀逍遥散"
+    ]
   },
   {
     "standardTerm": "补肝散",
@@ -11347,6 +11349,30 @@
   },
   {
     "standardTerm": "五味消毒饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "锡类散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "木香流气饮",
+    "aliases": []
+  },
+  {
+    "standardTerm": "四妙散",
+    "aliases": []
+  },
+  {
+    "standardTerm": "加味藿香正气丸",
+    "aliases": []
+  },
+  {
+    "standardTerm": "上焦宣痹汤",
+    "aliases": []
+  },
+  {
+    "standardTerm": "缩脾饮",
     "aliases": []
   }
 ]

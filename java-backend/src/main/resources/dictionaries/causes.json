@@ -494,5 +494,29 @@
   {
     "standardTerm": "寄生虫",
     "aliases": []
+  },
+  {
+    "standardTerm": "气虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "血虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阴虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "外感",
+    "aliases": []
+  },
+  {
+    "standardTerm": "阳虚",
+    "aliases": []
+  },
+  {
+    "standardTerm": "情志",
+    "aliases": []
   }
 ]
