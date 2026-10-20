@@ -19,6 +19,11 @@ export function getCleanBatch(id) {
   return request.get('/governance/clean/batch/' + id)
 }
 
+// 最近清洗任务列表（页面加载时据此恢复「运行中」任务，避免刷新后看不到进度）
+export function listCleanBatch() {
+  return request.get('/governance/clean/batch')
+}
+
 // 请求取消清洗任务
 export function cancelCleanBatch(id) {
   return request.post('/governance/clean/batch/' + id + '/cancel')

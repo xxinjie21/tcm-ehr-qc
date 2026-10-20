@@ -299,7 +299,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
-import { submitCleanBatch, getCleanBatch, cancelCleanBatch, governanceStats } from '@/api/governance'
+import { submitCleanBatch, getCleanBatch, cancelCleanBatch, listCleanBatch, governanceStats } from '@/api/governance'
 import { exportDataset, previewDataset } from '@/api/export'
 import { saveBlob } from '@/utils/download'
 import { fmtDate } from '@/utils/format'
@@ -433,8 +433,12 @@ const handleClean = async () => {
     clean.taskId = res.data?.id || null
     clean.status = res.data?.status || 'QUEUED'
     if (!clean.taskId) throw new Error('提交后未拿到任务 ID')
-    ElMessage.success('清洗任务已提交，可在下方查看进度')
-    // 5. 轮询进度
+    // 立刻进入「执行中」视觉，不等第一次轮询返回 —— 否则提交后这一两秒页面没反应，
+    // 用户会以为没点上。percent 由轮询推进。
+    clean.loading = true
+    clean.percent = 0
+    ElMessage.success('清洗任务已提交')
+    // 5. 轮询进度（startCleanPoll 内部会先 stop 再起，避免重复）
     startCleanPoll()
   } catch (e) {
     clean.error = {
@@ -445,11 +449,9 @@ const handleClean = async () => {
   }
 }
 
-// 轮询清洗进度：2s 一次，进终态即停并落结果
-const startCleanPoll = () => {
-  stopCleanPoll()
-  cleanTimer = setInterval(async () => {
-    if (!clean.taskId) { stopCleanPoll(); return }
+// 拉一次清洗任务状态（轮询体抽出来，供 setInterval 与「立即拉一次」共用）
+const pollCleanOnce = async () => {
+  if (!clean.taskId) { stopCleanPoll(); return }
     try {
       const r = await getCleanBatch(clean.taskId)
       const d = r.data || {}
@@ -476,10 +478,39 @@ const startCleanPoll = () => {
         }
         loadStats()
       }
-    } catch (e) {
-      // 轮询失败不立即停：可能只是瞬时抖动，下一次覆盖即可
-    }
-  }, 2000)
+  } catch (e) {
+    // 轮询失败不立即停：可能只是瞬时抖动，下一次覆盖即可
+  }
+}
+
+const startCleanPoll = () => {
+  stopCleanPoll()
+  // 先立即拉一次：提交后马上就有 total/percent，不用干等第一个 2s 周期
+  pollCleanOnce()
+  cleanTimer = setInterval(pollCleanOnce, 2000)
+}
+
+// 从任务列表恢复「运行中」的任务（2026-10-21）：
+// 清洗已异步化，切换页面 / 刷新后前端丢了 taskId，用户就看不到运行情况 ——
+// 明明任务在跑，界面却像什么都没发生，再点还被「已有任务在运行」挡住。
+// 挂载时拉一次最近任务，若有 QUEUED/RUNNING 的就接着轮询。
+const restoreRunningClean = async () => {
+  try {
+    const r = await listCleanBatch()
+    const items = r.data || []
+    const active = items.find((x) => x.status === 'QUEUED' || x.status === 'RUNNING')
+    if (!active) return
+    clean.taskId = active.id
+    clean.status = active.status
+    clean.loading = true
+    clean.doNormalize = !active.skipNormalize
+    const total = active.total || 0
+    const done = active.done || 0
+    clean.percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
+    startCleanPoll()
+  } catch (e) {
+    // 拉不到就安静跳过（权限/网络），不影响页面其它功能
+  }
 }
 
 // 停止清洗：只发取消信号，不自己改状态（终态由后端落）
@@ -684,6 +715,9 @@ const reExport = async (entry) => {
 onMounted(() => {
   loadStats()
   loadExportHistory()
+  // 恢复刷新/切页前正在跑的清洗任务：清洗已异步化，前端丢了 taskId 就看不到进度，
+  // 用户会以为任务没了（其实还在跑），再点还会被「已有任务在运行」挡住。
+  restoreRunningClean()
 })
 </script>
 
