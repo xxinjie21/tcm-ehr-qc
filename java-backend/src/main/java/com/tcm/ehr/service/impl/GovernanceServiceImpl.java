@@ -108,6 +108,13 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     @Transactional(rollbackFor = Exception.class)
     @Override
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters) {
+        // 旧签名保持行为不变（执行归一），内部委托新重载
+        return clean(recordIds, filters, false);
+    }
+
+    @Override
+    public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
+                              boolean skipNormalize) {
         // 批次12 · 12c（第二步）：由「整批载入」改为**惰性分页**。
         // 原实现把 3.5 万行一次读进内存，每行还带 1.3KB 的 structured_data（合计 43.8MB）——
         // 这是清洗的堆占用来源。下面保持 for-each 写法**一行不改**，只把数据源换成按页拉取。
@@ -243,6 +250,15 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             //    人工成果优先，所以这里直接不碰它的 structured_data。
             //    注意：合格但 structured_data 为空/空白的病历不在此列，它保持「待清洗」，
             //    因而不会被导出条件 governed=1 选中 —— 这是刻意的（没有结构化结果不算标准数据集）。
+            // 5.5 跳过归一开关（skipNormalize）：仍标记已清洗，只是不做第 5 步的词形归一。
+            //     为什么要 markGoverned：不标记会让这批病历永远落在「待清洗」，
+            //     且被导出条件 governed=1 永久排除 —— 那是「没清洗」，不是「清洗了但跳过归一」。
+            if (skipNormalize) {
+                if ("合格".equals(grade) && structured != null) {
+                    baseMapper.markGoverned(r.getId());
+                }
+                continue;
+            }
             if ("合格".equals(grade) && structured != null) {
                 // 人工标记读标量列（性能审查 P1-2#2）：manually_edited 是 STORED 生成列，
                 // 与 _meta.manuallyEdited 同源，无需在这里再解析一遍 JSON

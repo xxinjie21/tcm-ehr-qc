@@ -87,6 +87,17 @@
         </span>
       </div>
 
+      <!-- 术语归一开关（2026-10-20）：独立一行，不挤进按钮所在的 flex 容器
+           （挤进去会把居中按钮顶偏）。归一是五步里最耗时的一步，关掉可显著提速。 -->
+      <div class="clean-opt-row">
+        <el-checkbox v-model="clean.doNormalize" :disabled="clean.loading">
+          执行术语归一
+        </el-checkbox>
+        <span class="clean-opt-hint">
+          {{ clean.doNormalize ? '把原文统一为标准词（较慢）' : '只做去重 / 清理 / 隔离（快）' }}
+        </span>
+      </div>
+
       <!-- 28.14：后端是同步接口、拿不到真实百分比，用不确定进度条只表达「在推进」；
            刻意不显示百分比数字，避免暗示一个并不存在的精确进度 -->
       <el-progress
@@ -352,7 +363,7 @@ const loadStats = async () => {
 }
 
 // 28.14：clean.error 保存最近一次清洗失败的「原因 + 发生时间」，供失败报告展示
-const clean = reactive({ loading: false, result: null, error: null })
+const clean = reactive({ loading: false, result: null, error: null, doNormalize: true })
 
 // 执行数据清洗：先二次确认（文案明确「只标记不删除、不补医生未写内容」），
 // 再按当前 filters 提交；成功后写入分步结果与三级命中分布，并刷新顶部统计
@@ -397,7 +408,7 @@ const handleClean = async () => {
   clean.error = null
   try {
     // 4. 按当前范围提交清洗
-    const res = await cleanApi({ filters: { ...filters } })
+    const res = await cleanApi({ filters: { ...filters }, skipNormalize: !clean.doNormalize })
     // 5. 写入分步结果（三级命中分布由结果区自己渲染）
     clean.result = res.data
     // 6. 提示归一命中数；含人工修改被跳过时一并说明，避免「归一数变少」看起来像出错
@@ -854,6 +865,19 @@ onMounted(() => {
   white-space: nowrap;
   font-size: var(--fs-xs);
   color: var(--text-sub-strong);
+}
+
+/* 术语归一开关行（2026-10-20）：独立成行、居中，不参与按钮所在 flex 容器 */
+.clean-opt-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.clean-opt-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-sub);
 }
 
 /* 28.14：不确定进度条与失败报告 */

@@ -34,6 +34,13 @@ public interface IGovernanceService extends IService<Record> {
     CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters);
 
     /**
+     * 数据清洗（可跳过术语归一）。
+     *
+     * @param skipNormalize true=跳过第 5 步术语归一（最耗时的一步）；false=执行（默认）
+     */
+    CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters, boolean skipNormalize);
+
+    /**
      * 导出标准数据集。
      *
      * @param dto format=csv/json；filters=范围条件

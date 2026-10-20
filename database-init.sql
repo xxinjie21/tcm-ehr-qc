@@ -242,6 +242,38 @@ CREATE TABLE IF NOT EXISTS qc_task (
   INDEX idx_qc_task_org (org_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='质控批量重算任务表';
 
+-- 数据清洗任务表（2026-10-20）：清洗由「同步接口」改「异步任务」，支持进度查询与取消。
+-- 结构与 qc_task / nlp_task 同构（复用 AbstractBatchTask 的状态机与进度字段）。
+CREATE TABLE IF NOT EXISTS clean_task (
+  id VARCHAR(36) PRIMARY KEY COMMENT '任务ID(UUID)',
+  status VARCHAR(20) NOT NULL COMMENT '状态：QUEUED/RUNNING/COMPLETED/CANCELLED/INTERRUPTED/FAILED',
+  total INT NOT NULL DEFAULT 0 COMMENT '计划处理条数',
+  done INT NOT NULL DEFAULT 0 COMMENT '已处理条数',
+  success INT NOT NULL DEFAULT 0 COMMENT '成功条数',
+  failed INT NOT NULL DEFAULT 0 COMMENT '失败条数',
+  current_label VARCHAR(255) COMMENT '当前处理的病历标识',
+  filters_json TEXT COMMENT '筛选范围(JSON)',
+  request_key VARCHAR(64) NULL COMMENT '幂等键',
+  created_by VARCHAR(50) COMMENT '提交人用户名',
+  org_id VARCHAR(36) COMMENT '提交时所属组织快照，供 worker 重建 RecordFilter',
+  failure_list JSON COMMENT '失败清单(仅存前500条)',
+  failed_ids JSON NULL COMMENT '完整失败记录ID集合',
+  failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
+  skip_normalize TINYINT NOT NULL DEFAULT 0 COMMENT '1=跳过术语归一；0=执行归一（默认）',
+  deduped INT NOT NULL DEFAULT 0 COMMENT '去重标记数',
+  repaired INT NOT NULL DEFAULT 0 COMMENT '字段清理数',
+  isolated INT NOT NULL DEFAULT 0 COMMENT '脏数据隔离数',
+  normalized INT NOT NULL DEFAULT 0 COMMENT '术语归一实体数',
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  started_at DATETIME COMMENT '开始时间',
+  finished_at DATETIME COMMENT '结束时间',
+  cancel_requested TINYINT NOT NULL DEFAULT 0 COMMENT '1=已请求取消',
+  UNIQUE KEY uk_clean_task_req (org_id, request_key),
+  INDEX idx_clean_status (status),
+  INDEX idx_clean_create_time (create_time),
+  INDEX idx_clean_org (org_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据清洗任务表';
+
 CREATE TABLE IF NOT EXISTS dictionary_terms (
   id VARCHAR(36) PRIMARY KEY,
   org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层（不用 NULL，见注 1）",
