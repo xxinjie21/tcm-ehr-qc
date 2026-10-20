@@ -416,15 +416,18 @@ const handleClean = async () => {
       { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }))) {
     return
   }
-  // 用户确认后，若条数统计还没回来，等它回来（用户已确认，此时等一下无妨）；
-  // 取不到（-1）也照常清洗，不阻断。
-  try { await previewDone } catch { /* 已由 .catch 兜底 */ }
-  // 3. 置清洗中状态，并清掉上一次失败报告
+  // 3. 立即进入「执行中」视觉（2026-10-21 修）：
+  //    ⚠️ 原来这里先 await previewDone 再置 loading —— 而预览接口实测要 6~7 秒，
+  //    用户点完确认后这 6~7 秒按钮毫无反应，看起来像没点上。
+  //    改为立即置位，预览的等待挪进提交前的并行等待（不影响提交结果）。
   clean.loading = true
   clean.error = null
   clean.percent = 0
   clean.status = 'QUEUED'
   try {
+    // 若条数统计还没回来就等一下（此时按钮已显示「清洗执行中」，等待有反馈）；
+    // 取不到（-1）也照常清洗，不阻断。
+    try { await previewDone } catch { /* 已由 .catch 兜底 */ }
     // 4. 异步提交：立即返回任务 ID，不再等整批跑完（原来同步接口要挂 5 分钟超时）
     const res = await submitCleanBatch({
       filters: { ...filters },
