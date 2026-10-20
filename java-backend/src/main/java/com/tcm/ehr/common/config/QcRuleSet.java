@@ -59,15 +59,19 @@ public class QcRuleSet {
     /**
      * 出厂默认「术语归一范围」类型 —— <b>唯一权威</b>。
      *
-     * <p>取 9 类里有词典且默认参与归一的 8 类（疾病/证候/症状/中药/方剂/舌象/脉象/治法），
-     * <b>不含病因</b>：病因词典由用户自建、默认不勾选，故默认不归一。想要病因归一（且其词典已建好）
-     * 的组织，在「规则配置」里勾上即可。</p>
+     * <p>取 9 类有词典的全部类型（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法）。
+     * <b>病因已纳入默认归一范围</b>（2026-10-20）：病因词典 {@code causes.json} 已有 97 条词表，
+     * 原先「病因由用户自建、默认不勾」的前提不再成立。</p>
+     *
+     * <p><b>归一范围 ≠ 计分范围</b>：本清单只决定「做不做词形归一」，是否因未归一扣分由
+     * {@code standardization.elementTypes}（默认仅 疾病/证候/症状/中药/方剂 5 类）与它取交集决定。
+     * 故病因纳入归一后，实体能拿到标准词与 normLevel，但<b>不参与未归一扣分</b>。</p>
      *
      * <p>{@link #defaultNormalization()} 与 {@code QcRuleStore} 回填、{@code EntityNormalizer} 的
      * 兜底范围共用这一份，避免三处各写一张清单造成漂移。</p>
      */
     public static final List<String> DEFAULT_NORMALIZATION_TYPES = List.of(
-            "disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse", "treatment");
+            "disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse", "cause", "treatment");
 
     private Completeness completeness = new Completeness();
     private List<FormatRule> format = new ArrayList<>();
@@ -169,7 +173,7 @@ public class QcRuleSet {
      */
     @Data
     public static class Normalization {
-        /** 参与归一的术语类型：8 类有词典者（可在「规则配置」里增删，含病因） */
+        /** 参与归一的术语类型：9 类有词典者（可在「规则配置」里增删；是否计分另由 standardization 决定） */
         private List<String> elementTypes = new ArrayList<>();
     }
 
@@ -263,7 +267,7 @@ public class QcRuleSet {
      * 出厂默认术语归一范围（同上：供 {@link #defaults()} 与 {@code QcRuleStore.normalize()} 共用，
      * 每次返回新对象）。
      *
-     * <p>{@code elementTypes} 取 {@link #DEFAULT_NORMALIZATION_TYPES}（8 类，不含病因）。</p>
+     * <p>{@code elementTypes} 取 {@link #DEFAULT_NORMALIZATION_TYPES}（9 类，含病因）。</p>
      */
     static Normalization defaultNormalization() {
         Normalization n = new Normalization();

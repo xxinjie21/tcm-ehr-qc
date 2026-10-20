@@ -24,7 +24,7 @@ import java.util.Set;
  * ⚠️ 两类范围都<b>不再</b>由本目录硬编码，全部交给组织级规则集（用户在「规则配置」里改）：
  * <ul>
  *   <li><b>归一范围</b>：{@code QcRuleSet.normalization.elementTypes} 决定哪些类型做词形归一
- *       （出厂默认 8 类，不含病因）；</li>
+ *       （出厂默认 9 类，含病因 —— 但病因默认只归一、不计分）；</li>
  *   <li><b>扣分范围</b>：{@code QcRuleSet.standardization.elementTypes} 决定哪些类型计入
  *       「未归一扣分」（出厂默认 5 类），实际按它与归一范围<b>取交集</b>计分。</li>
  * </ul>

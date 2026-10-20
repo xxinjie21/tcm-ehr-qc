@@ -73,7 +73,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
 
-    /** 本组织参与归一的类型集合；无 store（单测）时退回出厂默认（8 类，不含病因） */
+    /** 本组织参与归一的类型集合；无 store（单测）时退回出厂默认（9 类，含病因） */
     private Set<String> normScope() {
         return qcRuleStore == null
                 ? Set.copyOf(com.tcm.ehr.common.config.QcRuleSet.DEFAULT_NORMALIZATION_TYPES)
@@ -407,9 +407,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * <p><b>不改的是什么</b>：预热只写召回缓存、不参与判定。命中与否仍由三级规则与 Dice 阈值决定，
      * 预取失败也不影响正确性（逐条归一照常走 ES）。</p>
      *
-     * <p><b>只预热本组织归一范围内的类型</b>（{@code normalization.elementTypes}，出厂默认含
-     * 疾病 / 证候 / 症状 / 中药 / 方剂；舌象 / 脉象 / 治法可勾选，病因默认不勾）。范围外的类型
-     * 清洗链路对其不调 ES（见 {@link #normalizeEntityList}），预热没有意义。</p>
+     * <p><b>只预热本组织归一范围内的类型</b>（{@code normalization.elementTypes}，出厂默认 9 类
+     * 全勾：疾病 / 证候 / 症状 / 中药 / 方剂 / 舌象 / 脉象 / 病因 / 治法；归一范围与计分范围是两个
+     * 独立开关）。范围外的类型清洗链路对其不调 ES（见 {@link #normalizeEntityList}），预热没有意义。</p>
      *
      * <p>预热粒度是「一页」而非整批：召回缓存本身有容量上限（{@code RECALL_CACHE_MAX}），
      * 一次问进远超用量的术语只会把先问进来的挤出去。一页正好是「问进来就马上用掉」的窗口。</p>

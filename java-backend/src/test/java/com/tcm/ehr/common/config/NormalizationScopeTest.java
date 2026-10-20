@@ -22,7 +22,7 @@ import static org.mockito.Mockito.mock;
  * 术语归一的「范围」口径：
  *
  * <ul>
- *   <li>出厂默认范围 = 8 类（不含病因）；</li>
+ *   <li>出厂默认范围 = 9 类（含病因；病因只归一、不计分）；</li>
  *   <li>{@link QcRuleStore} 无行时回退默认（不回退成 null / 空）；</li>
  *   <li>{@code QcScorer} 的未归一扣分范围 = 质控勾选 ∩ 归一勾选（未开归一的类型不计）。</li>
  * </ul>
@@ -39,15 +39,26 @@ class NormalizationScopeTest {
     }
 
     @Test
-    @DisplayName("出厂默认归一范围是 8 类，且不含病因")
-    void defaultNormalizationExcludesCause() {
+    @DisplayName("出厂默认归一范围是 9 类，且含病因")
+    void defaultNormalizationIncludesCause() {
         QcRuleSet r = QcRuleSet.defaults();
         assertNotNull(r.getNormalization(), "defaults() 必须带 normalization 块");
         Set<String> types = Set.copyOf(r.getNormalization().getElementTypes());
-        assertEquals(8, types.size());
+        assertEquals(9, types.size());
         assertTrue(types.contains("disease"));
         assertTrue(types.contains("treatment"));
-        assertFalse(types.contains("cause"), "病因默认不参与归一");
+        assertTrue(types.contains("cause"),
+                "病因词典（causes.json）已建全，默认纳入归一范围");
+    }
+
+    @Test
+    @DisplayName("病因纳入归一范围，但默认不在计分范围 —— 只归一不扣分")
+    void causeNormalizedButNotScored() {
+        QcRuleSet r = QcRuleSet.defaults();
+        assertTrue(r.getNormalization().getElementTypes().contains("cause"),
+                "病因应在归一范围内");
+        assertFalse(r.getStandardization().getElementTypes().contains("cause"),
+                "病因默认不在计分范围内：实体少、词典仍在扩充，计分会恒判未归一而误扣");
     }
 
     @Test
@@ -58,10 +69,12 @@ class NormalizationScopeTest {
     }
 
     @Test
-    @DisplayName("未归一扣分只算「质控勾选 ∩ 归一勾选」：范围外的类型不计")
+    @DisplayName("未归一扣分只算「质控勾选 ∩ 归一勾选」：归一范围外的类型不计")
     void qcCountsOnlyTypesInNormalizationScope() {
         QcRuleSet r = QcRuleSet.defaults();
-        // 质控同时勾了症状与病因；但病因不在默认归一范围（8 类不含病因）
+        // 归一范围里移除病因（模拟用户取消勾选），此时即便质控勾了病因也不计分
+        r.getNormalization().setElementTypes(new ArrayList<>(
+                List.of("disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse", "treatment")));
         r.getStandardization().setElementTypes(new ArrayList<>(List.of("symptom", "cause")));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("symptoms", List.of(ent("腰酸痛", null)));

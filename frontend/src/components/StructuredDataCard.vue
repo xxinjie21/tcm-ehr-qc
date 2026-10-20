@@ -26,9 +26,9 @@
     <template v-if="hasAny">
       <div v-for="sec in sections" :key="sec.key" class="sd-section">
         <div v-if="list(sec.key).length" class="sd-sec">
-          <!-- 分区标题带上「这个字段走不走词典归一」：9 类均有词典，但默认仅 8 类参与归一
-               （病因默认不勾），是否归一由组织规则配置决定；此处按默认范围给一次提示，
-               实体上只留真正有信息量的标签 -->
+          <!-- 分区标题带上「这个字段走不走词典归一」：9 类均有词典，默认 9 类全部参与归一
+               （2026-10-20 起病因也纳入；但病因不在默认计分范围，只归一不扣分），
+               是否归一由组织规则配置决定；此处按默认范围给一次提示，实体上只留真正有信息量的标签 -->
           <div class="sd-sec-title">
             {{ sec.label }}
             <span class="sd-sec-hint">{{ isNormalizedSection(sec.key) ? '走词典归一' : '保留原文' }}</span>

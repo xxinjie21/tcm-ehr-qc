@@ -32,7 +32,7 @@
 
       <div class="rc-hd">
         ② 术语归一（范围）
-        <el-tooltip placement="top" content="勾选哪几类实体做「原文 → 标准词」归一；未勾选的类型只保留原文，也不参与下方的未归一扣分。出厂默认 疾病/证候/症状/中药/方剂/舌象/脉象/治法（不含病因）。"><span class="rc-info" tabindex="0" aria-label="术语归一范围说明">ⓘ</span></el-tooltip>
+        <el-tooltip placement="top" content="勾选哪几类实体做「原文 → 标准词」归一；未勾选的类型只保留原文，也不参与下方的未归一扣分。出厂默认 疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法（9 类全勾）。注意：归一范围 ≠ 计分范围——病因默认归一但不计分（其实体量少、词表仍在扩充）。"><span class="rc-info" tabindex="0" aria-label="术语归一范围说明">ⓘ</span></el-tooltip>
       </div>
       <div v-if="form.rules.normalization" class="rc-line">
         术语归一：对

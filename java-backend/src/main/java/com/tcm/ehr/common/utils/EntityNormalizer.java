@@ -57,7 +57,7 @@ public class EntityNormalizer {
     private static final java.util.Set<String> FALLBACK_NORM_SCOPE =
             java.util.Set.copyOf(com.tcm.ehr.common.config.QcRuleSet.DEFAULT_NORMALIZATION_TYPES);
 
-    /** 本组织参与归一的类型集合；无 store 时退回出厂默认（8 类） */
+    /** 本组织参与归一的类型集合；无 store 时退回出厂默认（9 类，含病因） */
     private java.util.Set<String> normScope(String orgId) {
         return ruleStore == null ? FALLBACK_NORM_SCOPE : ruleStore.normalizationTypes(orgId);
     }

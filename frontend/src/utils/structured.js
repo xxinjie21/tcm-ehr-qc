@@ -29,7 +29,7 @@ export const ENTITY_SECTIONS = [
 /**
  * 默认参与「归一」的分区键（结构化字段名）。
  *
- * <p>与后端 {@code QcRuleSet.DEFAULT_NORMALIZATION_TYPES}（8 类，不含病因）对齐。
+ * <p>与后端 {@code QcRuleSet.DEFAULT_NORMALIZATION_TYPES}（9 类，含病因）对齐。
  * 归一执行由后端按组织级规则集决定；前端按此默认值把「未参与归一」的类型排除在
  * 归一率统计之外（否则其实体无 normLevel，会被误算成「未命中」）。</p>
  *
@@ -38,7 +38,7 @@ export const ENTITY_SECTIONS = [
  */
 export const DEFAULT_NORMALIZED_SECTIONS = new Set([
   'diseases', 'symptoms', 'tongueList', 'pulseList',
-  'patternList', 'treatmentList', 'formulaList', 'herbs'
+  'patternList', 'causeList', 'treatmentList', 'formulaList', 'herbs'
 ])
 
 /** 该分区是否默认参与归一（无词典或未纳入默认范围者返回 false） */
@@ -138,7 +138,7 @@ export function summarizeNorm(vo, normalizedSections = DEFAULT_NORMALIZED_SECTIO
  *
  * <p><b>口径与后端 {@code QcScorer.countUnnormalized} 对齐</b>：同一份
  * {@code ENTITY_SECTIONS}，同一判据（{@code normLevel} 为 null/undefined 即算未命中），
- * 并只列<b>参与归一</b>的分区（{@code normalizedSections}，默认 8 类、不含病因）。
+ * 并只列<b>参与归一</b>的分区（{@code normalizedSections}，默认 9 类、含病因）。
  * 若用户在规则配置里改了范围，后端按组织配置计、此处按传入/默认范围列，可能略有出入。</p>
  *
  * @param vo structuredData 对象

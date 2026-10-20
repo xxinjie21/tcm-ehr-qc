@@ -151,7 +151,7 @@ public final class QcRuleDescriber {
     /**
      * 可选要素目录：取自实体类型目录（9 类，中文名 ↔ 类型 key / structuredKey / 回退列），用户只选中文。
      *
-     * <p>{@code dict=true} 的项即术语标准化可勾选类型（有词典的 8 类，病因除外），
+     * <p>{@code dict=true} 的项即术语标准化可勾选类型（有词典的 9 类，含病因），
      * 前端据此筛出「术语标准化按哪几类计分」的下拉项。</p>
      */
     public static List<QcRuleSet.Element> catalogElements() {
