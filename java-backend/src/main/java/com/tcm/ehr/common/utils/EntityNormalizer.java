@@ -756,17 +756,23 @@ public class EntityNormalizer {
      */
     public void backfillFromRaw(NlpExtractVO vo, String prescription, String tcmDiagnosis, String pattern) {
         backfillFromRaw(vo, com.tcm.ehr.common.utils.RequestUtils.currentOrgId(),
-                prescription, tcmDiagnosis, pattern);
+                prescription, tcmDiagnosis, null, pattern);
     }
 
-    /** 组织级回填；批任务请传任务行上的 orgId 快照 */
+    /** 组织级回填（旧签名，不含西医诊断：兼容既有调用与测试，西医列待新重载传入）*/
     public void backfillFromRaw(NlpExtractVO vo, String orgId, String prescription,
                                 String tcmDiagnosis, String pattern) {
+        backfillFromRaw(vo, orgId, prescription, tcmDiagnosis, null, pattern);
+    }
+
+    /** 组织级回填；批任务请传任务行上的 orgId 快照；westernDiagnosis 为西医诊断列 */
+    public void backfillFromRaw(NlpExtractVO vo, String orgId, String prescription,
+                                String tcmDiagnosis, String westernDiagnosis, String pattern) {
         if (vo == null) {
             return;
         }
         boolean touched = backfillHerbs(vo, orgId, prescription);
-        touched |= backfillDiseases(vo, orgId, tcmDiagnosis);
+        touched |= backfillDiseases(vo, orgId, tcmDiagnosis, westernDiagnosis);
         touched |= backfillPatterns(vo, orgId, pattern);
         // 1. 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
         if (touched) {
@@ -807,8 +813,8 @@ public class EntityNormalizer {
     }
 
     /** 疾病回补：目标字段是 {@code Entity.content}，原料是中医诊断列 */
-    private boolean backfillDiseases(NlpExtractVO vo, String orgId, String tcmDiagnosis) {
-        if (TextUtil.isBlank(tcmDiagnosis)) {
+    private boolean backfillDiseases(NlpExtractVO vo, String orgId, String tcmDiagnosis, String westernDiagnosis) {
+        if (TextUtil.isBlank(tcmDiagnosis) && TextUtil.isBlank(westernDiagnosis)) {
             return false;
         }
         List<NlpExtractVO.Entity> diseases = vo.getDiseases();
@@ -816,7 +822,15 @@ public class EntityNormalizer {
         if (diseases != null && !diseases.isEmpty() && allNormalized(diseases, NlpExtractVO.Entity::getNormLevel)) {
             return false;
         }
-        Set<String> hits = termNormalizer.scan("disease", orgId, tcmDiagnosis);
+        // 疾病来源 = 中医诊断列 + 西医诊断列（质控 EntityTypes 的完整性来源即两列）
+        // 两列都扫：西医诊断如 '睾丸炎' 也是疾病，之前漏扫导致该字段未命中
+        Set<String> hits = new java.util.HashSet<>();
+        if (!TextUtil.isBlank(tcmDiagnosis)) {
+            hits.addAll(termNormalizer.scan("disease", orgId, tcmDiagnosis));
+        }
+        if (!TextUtil.isBlank(westernDiagnosis)) {
+            hits.addAll(termNormalizer.scan("disease", orgId, westernDiagnosis));
+        }
         if (hits.isEmpty()) {
             return false;
         }
