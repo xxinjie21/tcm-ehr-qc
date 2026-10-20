@@ -8,6 +8,9 @@ import com.tcm.ehr.service.IGovernanceService;
 import com.tcm.ehr.common.utils.OperationLogger;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.domain.vo.CleanResultVO;
+import com.tcm.ehr.domain.vo.CleanTaskVO;
+import com.tcm.ehr.service.ICleanBatchService;
+import org.springframework.web.bind.annotation.PathVariable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -36,6 +39,7 @@ public class GovernanceController {
 
     private final IGovernanceService governanceService;
     private final OperationLogger operationLogger;
+    private final ICleanBatchService cleanBatchService;
 
 
     /**
@@ -80,6 +84,42 @@ public class GovernanceController {
         operationLogger.log("数据清洗", RecordFilter.describe(dto == null ? null : dto.getFilters()), "共" + result.getTotal() + "条，去重" + result.getDeduped()
                 + "，隔离" + result.getIsolated() + "，归一" + result.getNormalized());
         return Result.ok(result);
+    }
+
+    /**
+     * 提交数据清洗任务（异步）。
+     *
+     * <p>提交即返回任务 ID，进度走 {@code GET /api/governance/clean/batch/{id}}，
+     * 取消走 {@code POST /api/governance/clean/batch/{id}/cancel}。
+     * 相比同步接口：可看真实进度、可中途停止、关页面不影响执行。</p>
+     *
+     * <p>{@code skipNormalize=true} 时跳过第 5 步术语归一（最耗时的一步）。</p>
+     */
+    @PostMapping("/governance/clean/batch")
+    public Result<CleanTaskVO> submitCleanBatch(@Valid @RequestBody(required = false) CleanDTO dto) {
+        return Result.ok("已提交，后台清洗中", cleanBatchService.submit(dto));
+    }
+
+    /** 查清洗任务进度 */
+    @GetMapping("/governance/clean/batch/{id}")
+    public Result<CleanTaskVO> cleanBatchStatus(@PathVariable String id) {
+        return Result.ok(cleanBatchService.status(id));
+    }
+
+    /** 最近清洗任务列表（按创建时间倒序，最多 20 条） */
+    @GetMapping("/governance/clean/batch")
+    public Result<java.util.List<CleanTaskVO>> cleanBatchList() {
+        return Result.ok(cleanBatchService.list());
+    }
+
+    /**
+     * 请求取消清洗任务。
+     *
+     * <p>只发取消信号，终态由执行方落 —— 见 {@code CleanBatchService#cancel} 的注释。</p>
+     */
+    @PostMapping("/governance/clean/batch/{id}/cancel")
+    public Result<CleanTaskVO> cancelCleanBatch(@PathVariable String id) {
+        return Result.ok("已取消", cleanBatchService.cancel(id));
     }
 
     /**

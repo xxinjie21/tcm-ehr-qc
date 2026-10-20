@@ -115,6 +115,20 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     @Override
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
                               boolean skipNormalize) {
+        return clean(recordIds, filters, skipNormalize, null);
+    }
+
+    /**
+     * 数据清洗（带进度回调，供异步任务上报进度 / 响应取消）。
+     *
+     * <p><b>为什么用回调而不是把进度逻辑写进本方法</b>：清洗逻辑（分页、预热、去重、
+     * 归一）已经调优过，不该为「异步」再改一遍；回调把「进度上报」与「取消判断」
+     * 交给调用方（{@code CleanBatchService}），同步调用传 null 即退化为原行为。</p>
+     *
+     * @param progress 每页回调一次（处理条数，返回 false 表示请求中止）；null=不上报不中止
+     */
+    public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
+                              boolean skipNormalize, java.util.function.IntPredicate progress) {
         // 批次12 · 12c（第二步）：由「整批载入」改为**惰性分页**。
         // 原实现把 3.5 万行一次读进内存，每行还带 1.3KB 的 structured_data（合计 43.8MB）——
         // 这是清洗的堆占用来源。下面保持 for-each 写法**一行不改**，只把数据源换成按页拉取。
@@ -145,7 +159,15 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // 每次又各自查库，4 万条就是约 16 万次 SQL；而 orgId 在整批内恒定，
         // 同一批也不该盖上两个不同的版本戳。
         DictMeta dictMeta = new DictMeta(termStore, RequestUtils.currentOrgId());
+        // 进度回调（异步任务用）：每处理 200 条回调一次，返回值 false = 请求中止。
+        // 粒度取 200 而不是每条：回调要写库更新进度，逐条写会把清洗拖慢；
+        // 200 条一页的粒度下，取消最迟在「当前页跑完」生效，用户感知足够快。
+        int processedCnt = 0;
         for (Record r : records) {
+            if (progress != null && (++processedCnt % 200 == 0) && !progress.test(processedCnt)) {
+                log.info("[清洗] 收到中止请求，已处理 {} 条，提前结束", processedCnt);
+                break;
+            }
             String status = r.getStatus();
             String grade = r.getGrade();
 

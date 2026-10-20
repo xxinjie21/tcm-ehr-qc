@@ -41,6 +41,14 @@ public interface IGovernanceService extends IService<Record> {
     CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters, boolean skipNormalize);
 
     /**
+     * 数据清洗（带进度回调，供异步任务上报进度 / 响应取消）。
+     *
+     * @param progress 每 200 条回调一次（已处理条数），返回 false 表示请求中止；null=不上报不中止
+     */
+    CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
+                        boolean skipNormalize, java.util.function.IntPredicate progress);
+
+    /**
      * 导出标准数据集。
      *
      * @param dto format=csv/json；filters=范围条件

@@ -81,6 +81,9 @@
         <el-button type="primary" size="large" :loading="clean.loading" @click="handleClean">
           {{ clean.loading ? '清洗执行中…' : '执行数据清洗' }}
         </el-button>
+        <el-button v-if="clean.loading" size="large" :loading="cancellingClean" @click="handleCancelClean">
+          停止清洗
+        </el-button>
         <!-- 执行期间说明「在做什么、要等多久、结果在哪看」，而不是只转一个圈-->
         <span v-if="clean.loading" class="tip">
           正在按 5 步依次处理，请勿关闭页面；完成后下方会给出分步结果
@@ -103,10 +106,10 @@
       <el-progress
         v-if="clean.loading"
         class="clean-progress"
-        :percentage="100"
-        :indeterminate="true"
+        :percentage="clean.percent"
+        :indeterminate="clean.percent === 0"
         :duration="2"
-        :show-text="false"
+        :show-text="clean.percent > 0"
       />
 
       <!-- 28.14：清洗失败时给出可操作的失败报告（原因 + 发生时间 + 会不会留下半成品），
@@ -287,14 +290,14 @@
 // 数据治理页：在「当前范围」内执行数据清洗与术语归一，并把质控合格病历导出为标准数据集。
 // 设计取舍：清洗只做去重标记 / 字段清理 / 空值规整 / 脏数据隔离 / 术语归一，既不删除病历、
 // 也不填充医生未书写的内容；导出恒只取质控合格病历，分级筛选只作用于清洗、不影响导出范围。
-import { reactive, ref, computed, onMounted, h } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount, h } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import RangeFilter from '@/components/RangeFilter.vue'
 import RecordDetailDialog from '@/components/RecordDetailDialog.vue'
-import { clean as cleanApi, governanceStats } from '@/api/governance'
+import { submitCleanBatch, getCleanBatch, cancelCleanBatch, governanceStats } from '@/api/governance'
 import { exportDataset, previewDataset } from '@/api/export'
 import { saveBlob } from '@/utils/download'
 import { fmtDate } from '@/utils/format'
@@ -363,7 +366,18 @@ const loadStats = async () => {
 }
 
 // 28.14：clean.error 保存最近一次清洗失败的「原因 + 发生时间」，供失败报告展示
-const clean = reactive({ loading: false, result: null, error: null, doNormalize: true })
+const clean = reactive({
+  loading: false, result: null, error: null, doNormalize: true,
+  taskId: null,       // 当前任务 ID（用于轮询 / 取消）
+  percent: 0,         // 真实进度（后端 done/total）
+  status: null        // QUEUED/RUNNING/COMPLETED/CANCELLED/FAILED
+})
+let cleanTimer = null   // 轮询定时器
+
+// 停止轮询（任务结束或页面卸载时调用，避免定时器泄漏）
+const stopCleanPoll = () => {
+  if (cleanTimer) { clearInterval(cleanTimer); cleanTimer = null }
+}
 
 // 执行数据清洗：先二次确认（文案明确「只标记不删除、不补医生未写内容」），
 // 再按当前 filters 提交；成功后写入分步结果与三级命中分布，并刷新顶部统计
@@ -406,29 +420,81 @@ const handleClean = async () => {
   // 3. 置清洗中状态，并清掉上一次失败报告
   clean.loading = true
   clean.error = null
+  clean.percent = 0
+  clean.status = 'QUEUED'
   try {
-    // 4. 按当前范围提交清洗
-    const res = await cleanApi({ filters: { ...filters }, skipNormalize: !clean.doNormalize })
-    // 5. 写入分步结果（三级命中分布由结果区自己渲染）
-    clean.result = res.data
-    // 6. 提示归一命中数；含人工修改被跳过时一并说明，避免「归一数变少」看起来像出错
-    const skipped = res.data.manualSkipped || 0
-    ElMessage.success(skipped > 0
-      ? `清洗完成：归一命中 ${res.data.normalized} 处，${skipped} 条含人工修改已跳过归一`
-      : `清洗完成：归一命中 ${res.data.normalized} 处`)
-    // 7. 刷新顶部统计（待清洗 / 已清洗会变化）
-    loadStats()
-  // 8. 失败由响应拦截器统一提示，这里再落一条可操作的失败报告供页面回看
+    // 4. 异步提交：立即返回任务 ID，不再等整批跑完（原来同步接口要挂 5 分钟超时）
+    const res = await submitCleanBatch({
+      filters: { ...filters },
+      skipNormalize: !clean.doNormalize
+    })
+    clean.taskId = res.data?.id || null
+    clean.status = res.data?.status || 'QUEUED'
+    if (!clean.taskId) throw new Error('提交后未拿到任务 ID')
+    ElMessage.success('清洗任务已提交，可在下方查看进度')
+    // 5. 轮询进度
+    startCleanPoll()
   } catch (e) {
     clean.error = {
-      message: e?.message || '清洗请求失败',
+      message: e?.message || '清洗任务提交失败',
       at: new Date().toLocaleTimeString('zh-CN', { hour12: false })
     }
-  // 9. 无论成败都关掉清洗中状态
-  } finally {
     clean.loading = false
   }
 }
+
+// 轮询清洗进度：2s 一次，进终态即停并落结果
+const startCleanPoll = () => {
+  stopCleanPoll()
+  cleanTimer = setInterval(async () => {
+    if (!clean.taskId) { stopCleanPoll(); return }
+    try {
+      const r = await getCleanBatch(clean.taskId)
+      const d = r.data || {}
+      clean.status = d.status
+      const total = d.total || 0
+      const done = d.done || 0
+      clean.percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
+      if (['COMPLETED', 'CANCELLED', 'INTERRUPTED', 'FAILED'].includes(d.status)) {
+        stopCleanPoll()
+        clean.loading = false
+        clean.percent = d.status === 'COMPLETED' ? 100 : clean.percent
+        clean.result = {
+          total: d.total, deduped: d.deduped, repaired: d.repaired,
+          isolated: d.isolated, normalized: d.normalized, manualSkipped: 0
+        }
+        if (d.status === 'COMPLETED') {
+          ElMessage.success('清洗完成：归一命中 ' + (d.normalized || 0) + ' 处')
+        } else if (d.status === 'CANCELLED') {
+          ElMessage.warning('清洗已停止：已处理 ' + (d.done || 0) + ' 条，已处理的部分保留')
+        } else if (d.status === 'INTERRUPTED') {
+          ElMessage.error('任务被中断（服务重启），可重新提交')
+        } else {
+          ElMessage.error('清洗失败')
+        }
+        loadStats()
+      }
+    } catch (e) {
+      // 轮询失败不立即停：可能只是瞬时抖动，下一次覆盖即可
+    }
+  }, 2000)
+}
+
+// 停止清洗：只发取消信号，不自己改状态（终态由后端落）
+const cancellingClean = ref(false)
+const handleCancelClean = async () => {
+  if (!clean.taskId || cancellingClean.value) return
+  cancellingClean.value = true
+  try {
+    await cancelCleanBatch(clean.taskId)
+    ElMessage.info('已请求停止，正在收尾…')
+  } catch (e) {
+    ElMessage.error(e?.message || '停止请求失败')
+  } finally {
+    cancellingClean.value = false
+  }
+}
+
 
 // 清洗范围：只作用于「质控合格」病历（后端同样强制合格），故不带分级维度。
 // 科室 / 就诊区间 / 导入区间 三个维度对清洗和导出都有效。
