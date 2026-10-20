@@ -276,7 +276,7 @@
 // 数据治理页：在「当前范围」内执行数据清洗与术语归一，并把质控合格病历导出为标准数据集。
 // 设计取舍：清洗只做去重标记 / 字段清理 / 空值规整 / 脏数据隔离 / 术语归一，既不删除病历、
 // 也不填充医生未书写的内容；导出恒只取质控合格病历，分级筛选只作用于清洗、不影响导出范围。
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted, h } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmBox } from '@/utils/confirm'
 import EmptyState from '@/components/EmptyState.vue'
@@ -357,25 +357,41 @@ const clean = reactive({ loading: false, result: null, error: null })
 // 执行数据清洗：先二次确认（文案明确「只标记不删除、不补医生未写内容」），
 // 再按当前 filters 提交；成功后写入分步结果与三级命中分布，并刷新顶部统计
 const handleClean = async () => {
-  // 1. 先取「本次会处理多少条」，再弹确认：数据清洗是会对范围内病历成批写入的操作，
-  //    用户点之前必须知道影响面（批次6）。条数走既有预览接口，不新增后端；
-  //    取不到（网络/权限）不阻断清洗，确认文案退化为只讲范围，绝不假装「0 条」。
-  let affected = 0
-  try {
-    const pv = await previewDataset(buildPayload())
-    affected = pv.data?.total || 0
-  } catch {
-    affected = 0
+  // 1. 弹窗先行、条数后补（2026-10-20 修卡顿）：
+  //    原实现先 await 预览接口拿条数、再弹窗，而那接口要数全库合格数并取样本脱敏，
+  //    实测 6~7.7 秒 —— 用户点完按钮要等这么久才看到确认框。
+  //    改为：用响应式 VNode 立即弹窗（先显示正在统计），预览请求并行发起，
+  //    结果回来时弹窗内文字自动更新为真实条数。用户随时可确认，不必等统计。
+  const affectedRef = ref(null)
+  const previewDone = previewDataset(buildPayload())
+    .then((pv) => { affectedRef.value = pv.data?.total ?? 0 })
+    .catch(() => { affectedRef.value = -1 })
+  // 给统计留一点时间：若很快回来就直接带上条数弹窗，避免闪一下统计中
+  await Promise.race([previewDone, new Promise((r) => setTimeout(r, 300))])
+
+  // 传「响应式组件」而不是静态 VNode：h() 在调用时就把内容定死，弹窗打开后
+  // affectedRef 再变也不会重渲染。用 setup 返回渲染函数的组件，ref 变化才会自动更新。
+  const MsgComp = {
+    setup() {
+      return () => h('div', [
+        h('div', '将对「' + scopeText.value + '」范围内的 '
+          + (affectedRef.value === null ? '若干' : String(affectedRef.value)) + ' 条病历执行数据清洗。'),
+        h('div', { style: 'margin-top:6px;color:#909399;font-size:12px' },
+          affectedRef.value === null
+            ? '正在统计影响条数…'
+            : '去重只标记、不删除，也不会填充医生未书写的内容。')
+      ])
+    }
   }
-  // 2. 二次确认，文案写明「只标记不删除、不补医生未写内容」，并带上影响条数
-  if (!(await confirmBox(
-      affected > 0
-        ? `将对「${scopeText.value}」范围内的 ${affected} 条病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`
-        : `将对「${scopeText.value}」范围内的病历执行数据清洗：去重只标记、不删除，也不会填充医生未书写的内容。确认？`,
-      '数据清洗',
-      { type: 'warning', confirmButtonText: affected > 0 ? `确认清洗 ${affected} 条` : '确认执行', cancelButtonText: '取消' }))) {
+
+  // 2. 弹窗立即出现（内容为响应式节点，条数后台填充）
+  if (!(await confirmBox(h(MsgComp), '数据清洗',
+      { type: 'warning', confirmButtonText: '确认执行', cancelButtonText: '取消' }))) {
     return
   }
+  // 用户确认后，若条数统计还没回来，等它回来（用户已确认，此时等一下无妨）；
+  // 取不到（-1）也照常清洗，不阻断。
+  try { await previewDone } catch { /* 已由 .catch 兜底 */ }
   // 3. 置清洗中状态，并清掉上一次失败报告
   clean.loading = true
   clean.error = null

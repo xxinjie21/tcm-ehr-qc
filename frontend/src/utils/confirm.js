@@ -10,7 +10,8 @@ import { ElMessageBox } from 'element-plus'
  * （控制台 `Uncaught (in promise)`）。项目里已踩过三次，所以收成一个函数，
  * 新代码直接用它就不会再犯。**交互形态（按钮、类型、文案位置）不受影响。**</p>
  *
- * @param {string} message 正文
+ * @param {string|import('vue').VNode} message 正文；传 VNode 可做「内容异步填充」
+ *        （如「统计中… → 共 N 条」），弹窗先出、数据后补，避免被慢接口阻塞）
  * @param {string} title 标题
  * @param {object} options 透传给 ElMessageBox.confirm 的其余选项
  * @returns {Promise<boolean>} 确认 true / 取消（含关闭）false
