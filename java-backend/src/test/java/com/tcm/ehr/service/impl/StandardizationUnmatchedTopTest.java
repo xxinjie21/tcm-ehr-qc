@@ -108,6 +108,44 @@ class StandardizationUnmatchedTopTest {
     }
 
     /** 服务用 ObjectMapper 解析 structuredData；按类型找到并注入，免依赖字段名。返回注入的实例供测试造行。 */
+    @Test
+    void topExcludesInquirySentences() throws Exception {
+        // 复现真实数据的频次结构：问诊整句频次远高于真实症状缺口
+        // 实测前 8 名被 大便日一行(469)/大便成形(410)/小便色略黄(216) 占满，
+        // 而「上下楼梯特别疼」这类真症状词排在 84 名之后 —— 只取前 8 的待办里永远看不到。
+        StandardizationReportServiceImpl svc = Mockito.mock(StandardizationReportServiceImpl.class);
+        ObjectMapper mapper = injectObjectMapper(svc);
+
+        List<Record> records = new ArrayList<>();
+        // 高频问诊整句（不应进「最该先补」）
+        records.add(recordWithRepeats("大便日一行", 12));
+        records.add(recordWithRepeats("大便成形", 10));
+        records.add(recordWithRepeats("小便色略黄", 9));
+        records.add(recordWithRepeats("夜寐一般", 8));
+        records.add(recordWithRepeats("饮水多", 7));
+        // 低频真实症状缺口（应进「最该先补」，即便频次被问诊整句压过）
+        records.add(recordWithRepeats("上下楼梯特别疼", 2));
+        records.add(recordWithRepeats("膝盖酸酸的没力气", 1));
+
+        StandardizationReportVO.UnmatchedBreakdown b =
+                invokeUnmatched(svc, rowsOf(mapper, records), Collections.emptySet());
+
+        Map<String, Integer> top = b.getTop();
+        // ① 问诊整句一律不得进入可行动清单
+        assertFalse(top.containsKey("大便日一行"), "问诊整句「大便日一行」不是症状词表缺口，不得进 top");
+        assertFalse(top.containsKey("大便成形"), "「大便成形」是二便问诊描述，不得进 top");
+        assertFalse(top.containsKey("小便色略黄"), "「小便色略黄」是小便问诊描述，不得进 top");
+        assertFalse(top.containsKey("夜寐一般"), "「夜寐一般」是睡眠问诊描述，不得进 top");
+        assertFalse(top.containsKey("饮水多"), "「饮水多」是饮水问诊描述，不得进 top");
+        // ② 真实症状缺口必须可见（不被问诊整句挤掉）
+        assertEquals(2, top.size(), "top 应只剩两条真实症状缺口");
+        assertEquals(2, top.get("上下楼梯特别疼"), "真实症状缺口应进 top 且保留次数");
+        assertTrue(top.containsKey("膝盖酸酸的没力气"), "低频真实症状缺口也应可见");
+        // ③ 统计口径不变：dictionaryGap 仍计全部未归一长词（过滤只影响 top 清单，不影响分项计数）
+        assertEquals(49, b.getDictionaryGap(),
+                "dictionaryGap 应照常统计全部 12+10+9+8+7+2+1 = 49 条，过滤只作用于 top");
+    }
+
     private static ObjectMapper injectObjectMapper(StandardizationReportServiceImpl svc) throws Exception {
         ObjectMapper mapper = tools.jackson.databind.json.JsonMapper.builder().build();
         for (Class<?> c = StandardizationReportServiceImpl.class; c != null && c != Object.class; c = c.getSuperclass()) {
