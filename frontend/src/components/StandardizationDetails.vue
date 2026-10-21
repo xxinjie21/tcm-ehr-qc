@@ -30,11 +30,15 @@
                本页**刻意不展示**它 —— 这页的读者是质控科业务用户（见文件头设计取向），
                而它的值是一串 type:hash 拼接（9 类各一段），属于技术口径，按要求"只在本文件内部使用"。
                后端字段保留：工程师排查「换词表前后数字变化」时仍可取到。 -->
-          <div>
+          <div title="分母=全部可质控病历（含待复核/无效）；无法质控的病历不计入，故与「合格病历数」不同">
             <span>质控完成</span>
             <b>{{ qcScored }} / {{ qcTotal }}{{ qcLast ? `（${qcLast}）` : '' }}</b>
           </div>
-          <div><span>病历总数</span><b>{{ report?.dataset?.recordCount ?? 0 }}</b></div>
+          <!-- 口径标注（2026-10-21）：本页同时出现三个数字、分母不同，必须标清，
+               否则用户会问「为什么质控 34154 条、病历总数却只有 28801 条」。 -->
+          <div title="质控合格且进入标准数据集的病历数（导出条件 grade=合格）">
+            <span>合格病历数</span><b>{{ report?.dataset?.recordCount ?? 0 }}</b>
+          </div>
           <div><span>主诉写法种类</span><b>{{ report?.dataset?.chiefComplaintTemplates ?? 0 }}</b></div>
           <div><span>来自患者口语的记录</span><b>{{ report?.dataset?.recordsWithColloquialSymptom ?? 0 }}</b></div>
           <div><span>评分区间</span><b>{{ scoreRange }}</b></div>
