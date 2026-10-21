@@ -189,11 +189,14 @@ const fmtDate = (d) => {
   return `${y}-${m}-${day}`
 }
 
-// 默认口径：今天导入的数据（不分科室）。
+// 默认口径：不限时间（全库，不分科室）。
 // 导入时间（importRange）与就诊时间（dateRange）是两个独立维度，可同时生效、取交集；
-// 用户想放宽到全量，把导入时间清空即可（后端按「未给」处理）。
-const today = fmtDate(new Date())
-const filters = reactive({ department: '', dateRange: null, grade: '', importRange: [today, today] })
+//
+// ⚠️ 2026-10-21 改：原先默认「今天导入」。但本页是「标准化质量报告」，用户要看的是
+// 整体数据质量，而多数日子并没有新导入 —— 默认今天会让页面一进去就是 0 / 「—」，
+// 看起来像系统坏了或数据丢了（实测把导入时间默认成今天时 recordCount=0）。
+// 想看某批新导入的质量，再自行选导入时间即可（后端两端齐全才生效）。
+const filters = reactive({ department: '', dateRange: null, grade: '', importRange: null })
 
 /** 时间快捷按钮：只改写 dateRange，随后立即查询 */
 function quickRange(years) {
@@ -207,8 +210,8 @@ const resetFilters = () => {
   filters.department = ''
   filters.dateRange = null
   filters.grade = ''
-  // 回到默认口径（今天导入），不是清空成全量 —— 与初始进入页面一致
-  filters.importRange = [today, today]
+  // 回到默认口径（不限时间 = 全库），与初始进入页面一致
+  filters.importRange = null
   loadReport()
 }
 
