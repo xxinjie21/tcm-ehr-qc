@@ -170,6 +170,12 @@ class EntityNormalizerCleanupTest {
         normalizer().normalize(vo, ORG);
 
         assertTrue(vo.getPulseList().isEmpty(), "拆不出词条的一律不挪");
-        assertEquals(List.of("大便日一行", "活动后缓解"), contents(vo.getSymptoms()));
+        assertTrue(vo.getTongueList().isEmpty(), "拆不出词条的一律不挪（舌象同）");
+        // 2026-10-21 方案 G（用户已批准）：病程 / 诱因是症状的**修饰**而非本体，没有独立标准词，
+        // 在归一阶段清理（原文仍保留在导出件的 13 个文本列里，信息不丢）。
+        // 「大便日一行」是问诊整句 —— **刻意不清理**：实测把它从 symptoms 移走会损失 7830 次
+        // 导出替换（面黄→面色萎黄、梦多→多梦 等），为指标牺牲数据价值不划算。
+        assertEquals(List.of("大便日一行"), contents(vo.getSymptoms()),
+                "「活动后缓解」属病程诱因应被清理；「大便日一行」是问诊整句，保留");
     }
 }

@@ -364,6 +364,90 @@ public class EntityNormalizer {
         }
     }
 
+    /** 精确命中（只用 LEVEL_EXACT）：路由判定必须精确，含/模糊会把「风湿性」归到「风湿」。 */
+    private boolean hitsExact(String type, String orgId, String raw) {
+        try {
+            EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
+            return r != null && r.level() == EsTermNormalizer.LEVEL_EXACT;
+        } catch (Exception ex) {
+            log.warn("[归一] 精确命中判定失败（type={}）: {}", type, ex.getMessage());
+            return false;
+        }
+    }
+
+    /** 把一批实体追加到目标列表（目标为 null 时新建），并渲染新（新增的在后）。 */
+    private static java.util.List<NlpExtractVO.Entity> appendAll(
+            java.util.List<NlpExtractVO.Entity> target,
+            java.util.List<NlpExtractVO.Entity> added) {
+        if (added.isEmpty()) {
+            return target;
+        }
+        java.util.List<NlpExtractVO.Entity> out =
+                target == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(target);
+        out.addAll(added);
+        return out;
+    }
+
+    /**
+     * 把误放进 {@code diseases} 的其它类型实体路由到各自字段（词典驱动，2026-10-21）。
+     *
+     * <p>实测依据（34154 份合格病历）：疾病字段 3864 条未归一里，<b>1567 条根本不是疾病名</b> ——
+     * 937 条是六淫/病理因素（风湿 655 / 风寒 113 / 郁热 51 / 水饮 45 …），
+     * 630 条是症状或证候（发热 / 气短 / 疲劳 / 脾虚 / 肾虚 …）。
+     * 它们留在 diseases 里既归不上，又把疾病标准化率从 88.9% 拖下来。</p>
+     *
+     * <p><b>路由优先级 cause &gt; symptom &gt; pattern</b>：那 937 条同时命中病因与证候词典，
+     * 逐词人工核对后确认全是六淫与病机（风/寒/湿/热/毒/气血虚），出现在「疾病」位置
+     * 只能是抽取把病因错分进来，故优先归病因。</p>
+     *
+     * <p><b>判据只用精确命中</b>：走 isHit（含/模糊）会把「风湿性」路由成「风湿」，
+     * 属 R7 类错映射。已在疾病词典精确命中的实体一律不动（它是合法疾病词）。</p>
+     */
+    private void rerouteCrossFieldDiseases(NlpExtractVO vo, String orgId) {
+        java.util.List<NlpExtractVO.Entity> dis = vo.getDiseases();
+        if (dis == null || dis.isEmpty()) {
+            return;
+        }
+        java.util.List<NlpExtractVO.Entity> kept = new java.util.ArrayList<>();
+        java.util.List<NlpExtractVO.Entity> toCause = new java.util.ArrayList<>();
+        java.util.List<NlpExtractVO.Entity> toSymptom = new java.util.ArrayList<>();
+        java.util.List<NlpExtractVO.Entity> toPattern = new java.util.ArrayList<>();
+        for (NlpExtractVO.Entity e : dis) {
+            if (e == null) {
+                continue;
+            }
+            String raw = rawOf(e.getContent(), e.getSourceText());
+            if (raw.isEmpty()) {
+                kept.add(e);
+                continue;
+            }
+            if (hitsExact("disease", orgId, raw)) {
+                kept.add(e);
+                continue;
+            }
+            if (hitsExact("cause", orgId, raw)) {
+                toCause.add(e);
+            } else if (hitsExact("symptom", orgId, raw)) {
+                toSymptom.add(e);
+            } else if (hitsExact("pattern", orgId, raw)) {
+                toPattern.add(e);
+            } else {
+                // 无落点：可能是真词表缺口（如「尿频病」），留在 diseases 等待补词
+                kept.add(e);
+            }
+        }
+        int moved = toCause.size() + toSymptom.size() + toPattern.size();
+        if (moved == 0) {
+            return;
+        }
+        vo.setDiseases(kept);
+        vo.setCauseList(appendAll(vo.getCauseList(), toCause));
+        vo.setSymptoms(appendAll(vo.getSymptoms(), toSymptom));
+        vo.setPatternList(appendAll(vo.getPatternList(), toPattern));
+        log.info("[归一] 疾病字段跨类路由 {} 条（病因 {} / 症状 {} / 证候 {}）",
+                moved, toCause.size(), toSymptom.size(), toPattern.size());
+    }
+
     /**
      * 精确命中回拉（任务 8·方案 A 精度收口，与 moveMisplacedPulseTongue 同层的兜底）：
      * python 的 _reroute_inquiry 只按前缀锚分批，可能把恰是症状词典标准词/别名的真症状
@@ -497,6 +581,9 @@ public class EntityNormalizer {
         //     （「脉细数」「左尺无力」「脉弦劲有力」「脉浮」）。不归位的话它们会以
         //     「未归一的症状」计入分母，既拉低症状归一率，也可能影响完整性判定。
         moveMisplacedPulseTongue(vo, orgId);
+        // 1.5b 疾病字段跨类路由（2026-10-21）：病因/症状/证候被抽进 diseases 时归位到各自字段。
+        //      必须在 normEntities 之前 —— 归位后它们才会按目标字段的词典正常归一。
+        rerouteCrossFieldDiseases(vo, orgId);
         // 1.6 丢弃单字残词（2026-10-05 修 #6）：实测症状/病因里有 135/50 条长度为 1 的实体
         //     （`双`50 `腰`34 `失`22 `口`10 `眼`9 …），全是「双下肢水肿」「腰酸」「失眠」这类
         //     被截断的残字。判据同样是**词典驱动**：长度为 1 **且不在该类型词典里**才丢 ——
@@ -585,6 +672,87 @@ public class EntityNormalizer {
     private static final java.util.regex.Pattern NOISE_SEVERITY = java.util.regex.Pattern.compile(
             "^(慢性|急性|过敏性|原发性|继发性|轻度|中度|重度|亚急性)$");
 
+    // ==================== 抽取残次品判定（2026-10-21）====================
+    // 背景：对导出数据集做全字段审计后发现，未归一实体里有一批**根本不该是实体**的东西，
+    // 它们拉低标准化率却不是词表缺口。逐类给出明确判据，只删「确定不可能是合法实体」的。
+
+    /** 化验指标名：检验结果不是中药。实测被 NER 抽成 herbs 421 条（甘油三酯 / 肌酐 / 血小板）。 */
+    private static final Set<String> LAB_INDICATORS = Set.of(
+            "甘油三酯", "总胆红素", "总胆固醇", "肌酐", "间接胆红素", "直接胆红素",
+            "血小板", "尿酸", "谷草", "谷丙", "尿素", "葡萄糖", "血红蛋白",
+            "白细胞", "红细胞", "转氨酶", "胆固醇", "胆红素", "血糖", "血脂",
+            "尿蛋白", "潜血", "隐血", "白蛋白", "球蛋白");
+
+    /** 脉诊手法：描述「怎么切脉」，既不是症状也不是脉象实体（实测 273 条）。 */
+    private static final String[] PULSE_MANUAL = {"不受按", "中取", "浮取", "沉取", "应指"};
+
+    /** 舌象子要素：属舌象字段的子成分，被单独抽成实体即错放（实测含「红点多」225 条）。 */
+    private static final String[] TONGUE_ELEMENT = {"红点", "瘀点", "齿痕", "裂纹", "边有"};
+
+    /**
+     * 病程 / 诱因前缀：是对症状的**修饰**而非本体（活动后缓解 / 遇劳加重 / 受凉后…）。
+     *
+     * <p>实测 1451 条。它们没有独立标准词可补，补进词表会让所有含该子串的实体被错误归并。</p>
+     */
+    private static final String[] PROCESS_DESC_LEAD = {
+            "活动后", "活动时", "活动则", "休息后", "休息时", "劳累后", "劳累时", "劳则",
+            "遇劳", "遇冷", "遇热", "遇风", "受凉后", "受寒后", "受风后",
+            "进食后", "进餐后", "服药后", "饮水后", "大便后", "小便后",
+            "持续性", "反复发作", "阵发性", "间歇性", "夜间明显", "晨起明显", "午后",
+            "加重", "减轻", "缓解", "好转", "自行缓解"};
+
+    /** 六经名：证候的构成成分，不是方剂 / 疾病实体（方剂里实测 8 条「太阴」「阳明」）。 */
+    private static final Set<String> LIUJING_BARE = Set.of(
+            "太阳", "阳明", "少阳", "太阴", "少阴", "厥阴");
+
+    /** 含标点 / 引号 / 括号 / 空白：抽取把残句或整句带进来了（实测脉象 321 + 舌象 414 条）。 */
+    private static final java.util.regex.Pattern CONTAINS_PUNCT = java.util.regex.Pattern.compile(
+            "[\\s（）()\\[\\]【】“”\"'、，。；;：]");
+
+    /** 方剂残片：处方头 / 剂型名不是方剂（实测 34 条「中草药」+ 45 条过短残片）。 */
+    private static final java.util.regex.Pattern FORMULA_FRAGMENT = java.util.regex.Pattern.compile(
+            "^(中草药|中草|中草药处|草药|汤剂|颗粒剂|中成药)$");
+
+    /** 含标点（抽取残句）。 */
+    private static boolean hasPunct(String s) {
+        return s != null && !s.isEmpty() && CONTAINS_PUNCT.matcher(s).find();
+    }
+
+    /** 化验指标名（不是中药）。 */
+    private static boolean isLabIndicator(String s) {
+        return s != null && LAB_INDICATORS.contains(s);
+    }
+
+    /**
+     * 抽取残次品：脉诊手法 / 舌象子要素 / 病程诱因 / 六经裸名。
+     *
+     * <p>这四类都没有独立标准词可落点，作为实体入库只会污染标准化率。</p>
+     */
+    private static boolean isExtractionArtifact(String s) {
+        if (s == null || s.isEmpty()) {
+            return false;
+        }
+        if (LIUJING_BARE.contains(s)) {
+            return true;
+        }
+        for (String p : PULSE_MANUAL) {
+            if (s.contains(p)) {
+                return true;
+            }
+        }
+        for (String p : TONGUE_ELEMENT) {
+            if (s.contains(p)) {
+                return true;
+            }
+        }
+        for (String p : PROCESS_DESC_LEAD) {
+            if (s.startsWith(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * 丢弃噪声碎片实体（2026-10-19）。
      *
@@ -602,7 +770,24 @@ public class EntityNormalizer {
         n += dropNoiseIn(vo.getSymptoms(), "symptom");
         n += dropNoiseIn(vo.getDiseases(), "disease");
         n += dropNoiseIn(vo.getTongueList(), "tongue");
+        // 2026-10-21 新增：脉象（手法 / 含标点残句）、方剂（处方头 / 剂型残片）、
+        // 中药（化验指标 / 含标点）—— 这几类此前完全没做噪声过滤，是未归一的主要来源之一。
+        n += dropNoiseIn(vo.getPulseList(), "pulse");
+        n += dropNoiseIn(vo.getFormulaList(), "formula");
+        n += dropNoiseHerbs(vo);
         return n;
+    }
+
+    /** 中药的噪声过滤（herbs 用 name 而非 content，故不能复用 {@link #dropNoiseIn}）。 */
+    private int dropNoiseHerbs(NlpExtractVO vo) {
+        java.util.List<NlpExtractVO.Herb> list = vo.getHerbs();
+        if (list == null || list.isEmpty()) {
+            return 0;
+        }
+        int before = list.size();
+        list.removeIf(h -> h != null && h.getNormLevel() == null
+                && isNoiseFragment("herb", rawOf(h.getName(), h.getSourceText())));
+        return before - list.size();
     }
 
     private int dropNoiseIn(List<NlpExtractVO.Entity> list, String type) {
@@ -619,6 +804,12 @@ public class EntityNormalizer {
         if (s == null || s.isEmpty()) {
             return false;
         }
+        // 2026-10-21 跨类型通用判定：这两类无论落在哪个字段都不该是实体。
+        // ① 含标点 / 引号 / 括号 —— 抽取把残句或整句带进来了；
+        // ② 脉诊手法 / 舌象子要素 / 病程诱因 / 六经裸名 —— 都没有独立标准词可落点。
+        if (hasPunct(s) || isExtractionArtifact(s)) {
+            return true;
+        }
         switch (type) {
             case "symptom":
                 return NOISE_BARE.contains(s) || NOISE_DESC.matcher(s).matches();
@@ -626,6 +817,13 @@ public class EntityNormalizer {
                 return NOISE_SEVERITY.matcher(s).matches();
             case "tongue":
                 return NOISE_TONGUE_BARE.contains(s);
+            case "formula":
+                return FORMULA_FRAGMENT.matcher(s).matches();
+            case "herb":
+                return isLabIndicator(s);
+            case "pulse":
+                // 手法与标点已由上方通用判定覆盖，脉象无其它噪声形态
+                return false;
             default:
                 return false;
         }
