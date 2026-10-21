@@ -75,6 +75,9 @@ public class CleanBatchService implements ICleanBatchService {
      */
     private static final int QUEUE_CAPACITY = 256;
 
+    /** 任务列表返回条数上限（原先在 SQL 里写死 LIMIT 20）。 */
+    private static final int LIST_LIMIT = 20;
+
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
     /** 运行中任务的取消位（内存快判；权威是 clean_task.cancel_requested 列） */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
@@ -249,7 +252,7 @@ public class CleanBatchService implements ICleanBatchService {
         @Override
     public List<CleanTaskVO> list() {
         List<CleanTask> ts = taskMapper.selectList(new QueryWrapper<CleanTask>()
-                .orderByDesc("create_time").last("LIMIT 20"));
+                .orderByDesc("create_time").last("LIMIT " + LIST_LIMIT));
         return ts.stream().map(t -> toVO(t, false)).toList();
     }
 

@@ -56,6 +56,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class DictProposalServiceImpl implements IDictProposalService {
+    /** 提案列表返回条数上限（原先两处在 SQL 里写死 LIMIT 200）。 */
+    private static final int PROPOSAL_LIST_LIMIT = 200;
 
     /** 同一 (org,type) 最多同时存在的待审提案数 */
     public static final int MAX_PENDING = 5;
@@ -195,7 +197,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
             // 成员只看自己提交的提案：否则能翻出别人的提交内容
             q.eq("submit_user_id", query.getSubmitUserId());
         }
-        q.orderByDesc("create_time").last("LIMIT 200");
+        q.orderByDesc("create_time").last("LIMIT " + PROPOSAL_LIST_LIMIT);
         List<DictProposal> rows = proposalMapper.selectList(q);
         // P2-7：快照条数一次 GROUP BY 取回，不再在循环里逐条 selectCount（N+1 → 2 次查询）
         Map<String, Integer> countByProposal = snapshotCounts(
@@ -418,7 +420,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
                 .eq("status", DictProposal.REJECTED)
                 .isNotNull("purge_after")
                 .lt("purge_after", LocalDateTime.now())
-                .last("LIMIT 200"));
+                .last("LIMIT " + PROPOSAL_LIST_LIMIT));
         if (expired.isEmpty()) {
             return;
         }
