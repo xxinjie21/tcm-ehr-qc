@@ -254,10 +254,23 @@ public interface RecordMapper extends BaseMapper<Record> {
             """)
     List<Map<String, Object>> selectScoreCounts(@Param(Constants.WRAPPER) Wrapper<Record> wrapper);
 
-    /** 质控评分结果回写：分数 / 分级 / 状态 / 预检单 */
+    /**
+     * 质控评分结果回写：分数 / 分级 / 状态 / 预检单。
+     *
+     * <p><b>为什么要在这里撤销 governed</b>（2026-10-21 一致性修复）：
+     * 清洗把 governed 置 1 的前提是「该病历质控合格」。但质控可以在清洗之后重跑，
+     * 把一条原本合格的病历改判为待复核 / 无效 —— 此时 governed 若不撤销，
+     * 这条病历会落进一个「既不可导出、也不在待清洗队列」的黑洞：
+     * 导出要求 {@code grade='合格' AND governed=1}，待清洗要求 {@code grade='合格' AND governed=0}，
+     * 两边都不匹配。实测存量有 160 条待复核病历处于该状态。</p>
+     *
+     * <p>故：grade 不是「合格」时把 governed 归零；是「合格」时不动它 ——
+     * 不能顺便置 1，否则会绕过清洗流程伪造「已清洗」（清洗才该置 1）。</p>
+     */
     @Update("""
             UPDATE records
-            SET score = #{score}, grade = #{grade}, status = #{status}, qc_results = #{qcResults}
+            SET score = #{score}, grade = #{grade}, status = #{status}, qc_results = #{qcResults},
+                governed = CASE WHEN #{grade} = '合格' THEN governed ELSE 0 END
             WHERE id = #{id}
             """)
     int updateScoreFields(@Param("id") String id,
