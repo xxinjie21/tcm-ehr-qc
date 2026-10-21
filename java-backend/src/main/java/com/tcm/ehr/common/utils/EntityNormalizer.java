@@ -676,12 +676,33 @@ public class EntityNormalizer {
     // 背景：对导出数据集做全字段审计后发现，未归一实体里有一批**根本不该是实体**的东西，
     // 它们拉低标准化率却不是词表缺口。逐类给出明确判据，只删「确定不可能是合法实体」的。
 
-    /** 化验指标名：检验结果不是中药。实测被 NER 抽成 herbs 421 条（甘油三酯 / 肌酐 / 血小板）。 */
-    private static final Set<String> LAB_INDICATORS = Set.of(
-            "甘油三酯", "总胆红素", "总胆固醇", "肌酐", "间接胆红素", "直接胆红素",
-            "血小板", "尿酸", "谷草", "谷丙", "尿素", "葡萄糖", "血红蛋白",
-            "白细胞", "红细胞", "转氨酶", "胆固醇", "胆红素", "血糖", "血脂",
-            "尿蛋白", "潜血", "隐血", "白蛋白", "球蛋白");
+    /**
+     * 非中药词素：化验指标 / 人体部位 / 食物，被 NER 误抽成 herbs 时的判定词表。
+     *
+     * <p><b>为什么用词根而非全称</b>：实测 NER 会把「总胆红素」截成「总胆红」、
+     * 「血常规」截成「血常」，全称黑名单拦不住。改用能覆盖截断形态的词根
+     * （胆红 / 血清 / 潜血 / 转氨 …），但避开会误伤真药名的宽词根
+     * （不用单独「胆」，否则「蛇胆陈皮」会被误杀；不用单独「桃」，否则「桃仁」遭殃）。</p>
+     *
+     * <p><b>与 python 层的关系</b>：python 侧 {@code nlp_filters.py} 的
+     * {@code HERB_LAB_TERMS} / {@code HERB_ANATOMY} / {@code HERB_FOOD} 是同一批词。
+     * 这里重复一份是<b>刻意</b>的：python 侧要重抽才生效，而本层跑一次归一即可 ——
+     * 两处判据等价、幂等（都只是删除同类噪声），重抽后双份生效也无害。</p>
+     *
+     * <p><b>零误伤保证</b>：{@link #dropNoiseIn} 只删 {@code normLevel == null} 的实体，
+     * 已归一的合法药材绝不会被这条规则命中。</p>
+     */
+    private static final String[] NON_HERB_TERMS = {
+            // 化验指标（含截断变体）
+            "甘油三", "胆红", "胆固醇", "肌酐", "尿酸", "尿素", "葡萄糖",
+            "血小板", "谷草", "谷丙转氨", "血红蛋白", "白细胞", "红细胞",
+            "血糖", "血脂", "总蛋白", "白蛋白", "球蛋白", "转氨酶", "尿素氮",
+            "血沉", "血常规", "血常", "潜血", "间胆", "总胆", "总胆汁酸",
+            "甘胆酸", "糖化血红蛋", "血清",
+            // 人体部位 / 器官被当成中药（实测「扁桃体肿大」被截成「扁桃」抽成药材）
+            "扁桃", "淋巴", "甲状腺", "脂肪肝", "肝内",
+            // 食物（患者自述「吃苹果」被抽成中药）
+            "胡萝卜", "苹果", "花菜", "空心菜"};
 
     /** 脉诊手法：描述「怎么切脉」，既不是症状也不是脉象实体（实测 273 条）。 */
     private static final String[] PULSE_MANUAL = {"不受按", "中取", "浮取", "沉取", "应指"};
@@ -718,9 +739,17 @@ public class EntityNormalizer {
         return s != null && !s.isEmpty() && CONTAINS_PUNCT.matcher(s).find();
     }
 
-    /** 化验指标名（不是中药）。 */
-    private static boolean isLabIndicator(String s) {
-        return s != null && LAB_INDICATORS.contains(s);
+    /** 是否非中药词素（化验指标 / 人体部位 / 食物）—— 用词根包含判定以覆盖截断变体。 */
+    private static boolean isNonHerbTerm(String s) {
+        if (s == null || s.isEmpty()) {
+            return false;
+        }
+        for (String w : NON_HERB_TERMS) {
+            if (s.contains(w)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -820,7 +849,7 @@ public class EntityNormalizer {
             case "formula":
                 return FORMULA_FRAGMENT.matcher(s).matches();
             case "herb":
-                return isLabIndicator(s);
+                return isNonHerbTerm(s);
             case "pulse":
                 // 手法与标点已由上方通用判定覆盖，脉象无其它噪声形态
                 return false;
