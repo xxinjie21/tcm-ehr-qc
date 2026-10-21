@@ -692,6 +692,15 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return rows;
     }
 
+    /**
+     * 「解析早于词表」判定的最小样本量。
+     *
+     * <p>判据是「有词表、抽到实体、却一条都没归一」，但样本极少时该推断不成立：
+     * 治法只抽到 1 条（正则误匹配「治法后缓解」）就被判成「解析早于词表」，
+     * 会让用户以为重跑解析没生效。样本不足时不下「陈旧」结论。</p>
+     */
+    private static final int STALE_MIN_SAMPLE = 10;
+
     /** 各类实体：抽取数 / 已归一数 */
     private List<StandardizationReportVO.TypeCoverage> coverage(List<Row> rows,
                                                                 Map<String, List<TermEntry>> dicts) {
@@ -724,7 +733,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             if (t.dict()) {
                 c.setTermCount(dicts.getOrDefault(t.key(), List.of()).size());
             }
-            c.setSuspectedStaleExtraction(c.getTermCount() > 0 && c.getTotal() > 0 && c.getNormalized() == 0);
+            // 加最小样本量门槛（2026-10-21）：判据原为「有词表 + 抽到实体 + 一条都没归一」，
+            // 但样本量极小时推断不成立 —— 实测治法只抽到 1 条实体（且是「治法后缓解」这种
+            // 正则误匹配，本来就归不上），却判成「解析早于词表」，让用户以为白重跑了解析。
+            // 低于门槛时不列为「陈旧」，前端按 total 展示「样本过少，暂不判定」。
+            c.setSuspectedStaleExtraction(c.getTermCount() > 0 && c.getTotal() >= STALE_MIN_SAMPLE
+                    && c.getNormalized() == 0);
         }
         return new ArrayList<>(byField.values());
     }
