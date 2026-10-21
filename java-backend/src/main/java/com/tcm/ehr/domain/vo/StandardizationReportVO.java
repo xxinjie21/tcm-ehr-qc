@@ -196,8 +196,17 @@ private int termCount;
          * {@code StandardizationReportServiceImpl.unmatched(...)}。</p>
          */
         private int fragment;
-        /** 分类错放：脉/舌要素进了症状，责任在抽取侧 */
+        /** 分类错放：脉/舌要素（脉细数 / 舌红）进了症状，责任在抽取侧 */
         private int misrouted;
+        /**
+         * 脉诊手法 / 舌象碎片被当成症状（不受按 / 中取不受按 / 红点多 / 边有红点…）。
+         *
+         * <p>2026-10-21 从 {@link #misrouted} 拆出。两类虽同在抽取侧，但修复方式不同：
+         * misrouted 是<strong>路由错</strong>（该去 pulseList/tongueList，改分类即可），
+         * 本桶是<strong>本不该成为实体</strong>（脉诊手法是描述脉象的动作、舌象碎片是子要素，
+         * 都没有独立标准词，应在抽取阶段就被消费掉）。合成一个数字会让上游改错方向。</p>
+         */
+        private int mistypeMarker;
         /** 体征错放：压痛等进了症状，责任在抽取侧 */
         private int physicalSign;
         /**

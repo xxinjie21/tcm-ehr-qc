@@ -248,7 +248,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         rows.add(List.of("未归一构成", "词表未收录", String.valueOf(u.getDictionaryGap()), "责任：词表"));
         rows.add(List.of("未归一构成", "问诊整句被当成症状", String.valueOf(u.getInquiryFragment()), "责任：抽取（该进 inquiry）"));
         rows.add(List.of("未归一构成", "病程/诱因描述", String.valueOf(u.getProcessDesc()), "责任：抽取（是修饰非症状）"));
-        rows.add(List.of("未归一构成", "脉/舌被当成症状", String.valueOf(u.getMisrouted()), "责任：抽取"));
+        rows.add(List.of("未归一构成", "脉/舌要素被当成症状", String.valueOf(u.getMisrouted()), "责任：抽取（该进脉象/舌象字段）"));
+        rows.add(List.of("未归一构成", "脉诊手法/舌象碎片", String.valueOf(u.getMistypeMarker()), "责任：抽取（本不该成为实体）"));
         rows.add(List.of("未归一构成", "体征被当成症状", String.valueOf(u.getPhysicalSign()), "责任：抽取"));
         // 措辞修正（2026-10-21）：原叫「抽取残词」是错的断言 —— 实测这 6542 条里单字 0 条、
         // 与 sourceText 等长（无截断痕迹），主体是词表未收录的二字症状词与属性词，
@@ -847,49 +848,45 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     content = str(m.get("sourceText"));
                 }
                 b.setTotal(b.getTotal() + 1);
-                // ① 具名错放优先：含体征关键字，或判为脉/舌错放
-                boolean namedMisroute = containsAny(content, PHYSICAL_SIGN)
-                        || isMisrouted(content);
-                if (namedMisroute) {
-                    if (containsAny(content, PHYSICAL_SIGN)) {
-                        b.setPhysicalSign(b.getPhysicalSign() + 1);
-                    } else {
-                        b.setMisrouted(b.getMisrouted() + 1);
-                    }
-                } else if (content.length() <= FRAGMENT_MAX_LEN) {
-                    // ② 长度 ≤ 2 的未归一实体（单桶，不按词频硬切）。
-                    //    ⚠️ 这一桶**不是**「抽取截断的残字」—— 2026-10-15 实测：36739 条里
-                    //    单字 0 条、全部 2 字，且每条的 content 与 sourceText 长度完全相等
-                    //    （没有截断痕迹）。
-                    //    ⚠️ 当时据此断言「主体是词表缺口，补词即可归一」，高频证据是
-                    //    鼻塞(1473)、咽痛(949)、咽痒(806)、腰酸(780) 这类完整规范症状词。
-                    //    **该断言已于 2026-10-20 失效**：词表扩到 535 标准词 / 1144 别名后，
-                    //    上述几个词实测频次已归 0（全部归上了）。当前 2 字桶实测构成：
-                    //    单字残字 0 条；体位描述（俯卧/仰卧）2.2%；问诊词根碎片（夜寐/大便）2.5%；
-                    //    否定式与属性词（不痛/偏黄/淡黄）3.7%；其余 91.3% 多为颜色性状形容词、
-                    //    时间场景碎片与部位名词（浑浊/凌晨/刷牙/唇暗…），**不是可批量登记的规范词**。
-                    //    ⇒ 补词必须人工研判口径：把「偏黄」「不痛」收成标准词会污染所有含该子串的
-                    //    实体，属错映射。故保持单桶，由前端如实描述构成而不给「补词即可」的结论。
-                    b.setFragment(b.getFragment() + 1);
-                } else if (containsAny(content, MISTYPE_MARKERS)) {
-                    // ③ 脉诊手法 / 舌象要素被当成症状（不受按 / 红点多 / 中取不受按…）→ 抽取侧。
-                    //    2026-10-21 从 dictionaryGap 拆出：正确归属是脉象 / 舌象字段。
+                // 判定顺序（2026-10-21 修正，原实现有 bug）：
+                // 语义判定必须全部前置，长度判定（<=2）放最后。
+                // 旧顺序把长度判定排在「脉诊手法/舌象碎片」之前，导致同一类词被劈成两桶：
+                // 「红点」(2 字) 进 fragment、「红点多」(3 字) 进 misrouted —— 于是
+                // 报告上「脉舌错放」与实际内容对不上，用户看到的描述不真实。
+                //
+                // 责任划分（同为抽取侧，但修复方式不同，必须分开说）：
+                //   physicalSign  体征（压痛）→ 该进症状但被标成体征词，属命名问题
+                //   misrouted     脉/舌要素（脉细数/舌红）→ 该路由到 pulseList/tongueList
+                //   mistypeMarker 脉诊手法/舌象碎片（不受按/红点多）→ 本不该成为实体
+                //   inquiry       十问子项（大便日一行/入睡转快）→ 该进 inquiry 字段
+                //   processDesc   病程诱因（活动后缓解）→ 是修饰，不该成为实体
+                if (containsAny(content, PHYSICAL_SIGN)) {
+                    b.setPhysicalSign(b.getPhysicalSign() + 1);
+                } else if (isMisrouted(content)) {
                     b.setMisrouted(b.getMisrouted() + 1);
+                } else if (containsAny(content, MISTYPE_MARKERS)) {
+                    b.setMistypeMarker(b.getMistypeMarker() + 1);
                 } else if (startsWithAny(content, INQUIRY_LEAD)
                         || containsAny(content, INQUIRY_MARKERS)) {
-                    // ③ 问诊整句被当成症状（大便日一行 / 入睡转快 / 夜寐一般…）→ 抽取侧。
-                    //    2026-10-21 从 dictionaryGap 拆出：它们的正确去向是抽取侧的 inquiry
-                    //    字段（十问子项），补成症状标准词属错映射。算进「词表缺口」会让报告
-                    //    声称「词表缺 N 条」，而补词表根本解决不了这批。
+                    // 问诊整句的正确去向是抽取侧的 inquiry 字段（十问子项），
+                    // 补成症状标准词属错映射 —— 算进「词表缺口」会让报告声称
+                    // 「词表缺 N 条」，而补词表根本解决不了这批。
                     b.setInquiryFragment(b.getInquiryFragment() + 1);
                 } else if (startsWithAny(content, PROCESS_DESC_LEAD)) {
-                    // ④ 病程 / 诱因描述（活动后缓解 / 遇劳加重 / 受凉后…）→ 抽取侧。
-                    //    同理拆出：它们是症状的修饰而非本体，没有独立标准词可补。
-                    //    判定顺序在问诊之后 —— 「夜寐俯卧」这类同时含两类前缀的，
-                    //    归问诊更准确（主体是卧位描述）。
+                    // 病程 / 诱因是症状的修饰而非本体，没有独立标准词可补。
+                    // 判定在问诊之后 —— 「夜寐俯卧」这类同时含两类前缀的归问诊更准确。
                     b.setProcessDesc(b.getProcessDesc() + 1);
+                } else if (content.length() <= FRAGMENT_MAX_LEN) {
+                    // 长度 <= 2 的未归一实体。
+                    // ⚠️ 这一桶**不是**「抽取截断的残字」—— 实测单字 0 条、全部 2 字，
+                    //    且 content 与 sourceText 长度相等（无截断痕迹）。
+                    // 实测构成：否定式与属性词（不痛/偏黄）、时间场景（凌晨）、
+                    //    真症状（咽喉/有梦）、动作（刷牙）—— 语义混杂，无法用单一规则拆净。
+                    // 故保持单桶、如实描述；补词必须人工研判口径（把「偏黄」收成标准词
+                    //  会污染所有含该子串的实体）。
+                    b.setFragment(b.getFragment() + 1);
                 } else {
-                    // ⑤ 其余：多为标准词但词表没有 → 词表侧（补词表即可改善）
+                    // 其余：多为标准词但词表没有 → 词表侧（补词表即可改善）
                     b.setDictionaryGap(b.getDictionaryGap() + 1);
                     gapCount.merge(content, 1, Integer::sum);
                 }

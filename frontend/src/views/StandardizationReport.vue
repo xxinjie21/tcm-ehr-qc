@@ -533,17 +533,45 @@ const todos = computed(() => {
       tagType: 'warning'
     })
   }
+  // 脉诊手法 / 舌象碎片被当成症状（2026-10-21 后端拆桶：mistypeMarker 与 misrouted 分开）
+  // misrouted 是「脉/舌要素（脉细数）路由错」，本桶是「本不该成为实体（不受按/红点多）」，
+  // 两者修复方式不同，故分别成条。
   if (u.misrouted > 0) {
     list.push({
-      title: '修复脉诊手法、舌象要素被当成症状',
-      // ⚠️ 2026-10-21 修正：原写「${u.misrouted} 条『脉细数』这类脉象要素」，
-      //    实测该桶主体不是「脉细数」那种形态，而是脉诊手法与舌象碎片：
-      //    红点多(225)、不受按(222)、中取不受按(115)、左不受按(54)…
-      //    它们的正确归属是脉象/舌象字段，与「脉细数」是完全不同的两类。
-      desc: `${u.misrouted} 条脉诊手法、舌象要素被归进了症状（如「不受按」「红点多」），`
-        + '正确归属是脉象 / 舌象字段，留在症状会拉低症状归一率。',
+      title: '修复脉/舌要素被当成症状',
+      desc: `${u.misrouted} 条脉象/舌象要素（如「脉细数」）被归进了症状，`
+        + '正确归属是 pulseList / tongueList 字段。',
       owner: '抽取',
       tagType: 'warning'
+    })
+  }
+  if (u.mistypeMarker > 0) {
+    list.push({
+      title: '脉诊手法、舌象碎片被当成症状',
+      desc: `${u.mistypeMarker} 条脉诊手法与舌象碎片被抽成了症状实体（如「不受按」「红点多」），`
+        + '它们没有独立的标准词可在症状里落点 —— 应在抽取阶段就被消费掉，而不是补进词表。',
+      owner: '抽取',
+      tagType: 'warning'
+    })
+  }
+  // 问诊整句：正确去向是抽取侧的 inquiry 字段，补进症状词表属错映射
+  if (u.inquiryFragment > 0) {
+    list.push({
+      title: '问诊整句被当成症状',
+      desc: `${u.inquiryFragment} 条十问子项（大便日一行 / 入睡转快 / 夜寐一般…）被抽成了症状实体，`
+        + '正确去向是抽取侧的 inquiry 字段，补成症状标准词属错映射。',
+      owner: '抽取',
+      tagType: 'info'
+    })
+  }
+  // 病程/诱因：是症状的修饰，不是症状本体
+  if (u.processDesc > 0) {
+    list.push({
+      title: '病程/诱因描述被当成症状',
+      desc: `${u.processDesc} 条病程或诱因描述（活动后缓解 / 遇劳加重 / 受凉后…）被抽成了症状实体。`
+        + '它们是症状的修饰而非本体，没有独立标准词可补。',
+      owner: '抽取',
+      tagType: 'info'
     })
   }
   const s = d.score || {}
