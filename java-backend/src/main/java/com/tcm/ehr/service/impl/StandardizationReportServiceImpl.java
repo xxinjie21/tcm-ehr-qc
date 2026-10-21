@@ -909,9 +909,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     private StandardizationReportVO.QcCoverage qcCoverage(List<Row> rows) {
         StandardizationReportVO.QcCoverage c = new StandardizationReportVO.QcCoverage();
-        c.setTotal(rows.size());
+        c.setTotal(0);   // 按「可质控病历」计数，见下方循环
         LocalDateTime latest = null;
         for (Row row : rows) {
+            if (row.grade == null) {
+                continue;   // 无可质控内容，不计入分母（否则 complete 永远不成立）
+            }
+            c.setTotal(c.getTotal() + 1);
             Map<String, Object> qc = row.qc;
             if (qc == null || row.score == null) {
                 continue;
