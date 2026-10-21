@@ -917,6 +917,17 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * （如 神疲乏力）是词表缺口本身，算进分母会把「补词表能改善多少」这个信号抹掉。
      */
     private StandardizationReportVO.NormalizableRate normalizableRate(List<Row> rows, Set<String> symptomDict) {
+        // ⚠️ 2026-10-21 口径修正（原实现恒 100%，无信息量）：
+        // 原分母 = 「在症状词表里」的实体 —— 而「在词表里」与「已归一」是同一件事，
+        // 于是分子恒等于分母，该指标永远是 100%，既衡量不了改进也无法据此判断。
+        // 原测试的意图是对的（「词表里没有的不该算归一失败」），但落在「排除不在词表的」
+        // 这条实现上就跑偏了 —— 词表缺口恰恰是最该被看到的失败。
+        //
+        // 新口径：分母 = 全部症状实体 − 抽取缺陷（脉舌错放 / 问诊整句 / 病程诱因），
+        // 分子 = 其中已归一。
+        //  - 词表为空时：分母 > 0、分子 = 0 ⇒ 0%（真实反映「没词表就归不了」）
+        //  - 补词表后上升 ⇒ 有区分度，可用于验证词表建设的进展
+        //  - 与 unmatched 的拆桶判据同源，两处口径不会打架
         StandardizationReportVO.NormalizableRate r = new StandardizationReportVO.NormalizableRate();
         for (Row row : rows) {
             for (Object item : row.symptoms) {
@@ -927,10 +938,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 if (content.isEmpty()) {
                     continue;
                 }
-                boolean defect = isMisrouted(content)
-                        || containsAny(content, PHYSICAL_SIGN)
-                        || content.length() <= FRAGMENT_MAX_LEN;
-                if (defect || !isInDict(content, symptomDict)) {
+                // 抽取缺陷（不该算症状）一律不进分母 —— 与 unmatched 的拆桶顺序保持一致
+                if (containsAny(content, PHYSICAL_SIGN)
+                        || isMisrouted(content)
+                        || containsAny(content, MISTYPE_MARKERS)
+                        || startsWithAny(content, INQUIRY_LEAD)
+                        || containsAny(content, INQUIRY_MARKERS)
+                        || startsWithAny(content, PROCESS_DESC_LEAD)) {
                     continue;
                 }
                 r.setDenominator(r.getDenominator() + 1);

@@ -188,18 +188,23 @@ class StandardizationReportServiceImplTest {
     }
 
     @Test
-    @DisplayName("可归一实体归一率：词表里没有的标准词不进分母")
-    void normalizableRateExcludesDictionaryGap() {
-        // 词表为空（mock 返回空），所以「发热」也不在词表内 → 分母应为 0
+    @DisplayName("可归一实体归一率：排除抽取缺陷，词表缺口算失败")
+    void normalizableRateExcludesExtractionDefectsOnly() {
+        // 2026-10-21 口径修正：原断言「词表里没有的不进分母」会让分子恒等于分母（恒 100%），
+        // 该指标失去意义。现改为「只排除抽取缺陷」—— 词表缺口是最该被看到的失败，须留在分母。
         givenRecords("{\"symptoms\":["
-                + entity("发热", "发热", true) + ","
-                + entity("神疲乏力", "神疲乏力", false) + "]}");
+                + entity("发热", "发热", true) + ","                    // 已归一
+                + entity("神疲乏力", "神疲乏力", false) + ","           // 未归一（词表缺口）
+                + entity("不受按", "不受按", false) + ","               // 抽取缺陷：脉诊手法
+                + entity("大便日一行", "大便日一行", false) + "]}");   // 抽取缺陷：问诊整句
 
         StandardizationReportVO.NormalizableRate r = svc.report().getNormalizable();
 
-        // 词表空 → 两个词都不在词表内 → 分母 0（补词表后这里才会有数）
-        assertEquals(0, r.getDenominator(),
-                "词表里没有的词不算进分母 —— 它们是词表缺口本身，不是归一失败");
+        assertEquals(2, r.getDenominator(),
+                "分母应为 2 —— 两条抽取缺陷不计入症状，词表缺口的「神疲乏力」必须留下");
+        assertEquals(1, r.getNumerator(), "分子应为 1（只有「发热」归一了）");
+        assertTrue(r.getDenominator() > r.getNumerator(),
+                "该指标必须有区分度 —— 恒等（100%）说明口径错了，等于没算");
     }
 
     @Test
