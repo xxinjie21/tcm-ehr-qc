@@ -1,0 +1,670 @@
+[
+ {
+  "route": "dashboard",
+  "data": {
+   "url": "/dashboard",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "质控趋势（按月）",
+     "rect": {
+      "top": 440,
+      "bottom": 761,
+      "left": 220,
+      "right": 1844,
+      "w": 1624,
+      "h": 321
+     }
+    },
+    {
+     "name": "评分分布",
+     "rect": {
+      "top": 771,
+      "bottom": 1068,
+      "left": 220,
+      "right": 1026,
+      "w": 806,
+      "h": 297
+     }
+    },
+    {
+     "name": "科室合格率",
+     "rect": {
+      "top": 771,
+      "bottom": 1068,
+      "left": 1038,
+      "right": 1844,
+      "w": 806,
+      "h": 297
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 1110,
+    "overflowY": true
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dashboard.png"
+ },
+ {
+  "route": "review",
+  "data": {
+   "url": "/review",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "待复核任务列表",
+     "rect": {
+      "top": 308,
+      "bottom": 877,
+      "left": 220,
+      "right": 1844,
+      "w": 1624,
+      "h": 569
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 921,
+    "overflowY": true
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_review.png"
+ },
+ {
+  "route": "records",
+  "data": {
+   "url": "/records",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "病历查询",
+     "rect": {
+      "top": 152,
+      "bottom": 825,
+      "left": 220,
+      "right": 1852,
+      "w": 1632,
+      "h": 672
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 902,
+    "overflowY": false
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_records.png"
+ },
+ {
+  "route": "nlp-extract",
+  "data": {
+   "url": "/nlp-extract",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "选择病历",
+     "rect": {
+      "top": 146,
+      "bottom": 1091,
+      "left": 220,
+      "right": 838,
+      "w": 618,
+      "h": 944
+     }
+    },
+    {
+     "name": "NLP 结构化解析",
+     "rect": {
+      "top": 152,
+      "bottom": 1079,
+      "left": 854,
+      "right": 1844,
+      "w": 990,
+      "h": 926
+     }
+    }
+   ],
+   "panes": [
+    {
+     "name": "pane",
+     "rect": {
+      "top": 146,
+      "bottom": 1091,
+      "left": 220,
+      "right": 838,
+      "w": 618,
+      "h": 944
+     }
+    },
+    {
+     "name": "pane",
+     "rect": {
+      "top": 101,
+      "bottom": 1091,
+      "left": 854,
+      "right": 1844,
+      "w": 990,
+      "h": 989
+     }
+    },
+    {
+     "name": "pane",
+     "rect": {
+      "top": 277,
+      "bottom": 1062,
+      "left": 871,
+      "right": 1374,
+      "w": 503,
+      "h": 785
+     }
+    },
+    {
+     "name": "pane",
+     "rect": {
+      "top": 277,
+      "bottom": 1062,
+      "left": 1390,
+      "right": 1827,
+      "w": 437,
+      "h": 785
+     }
+    }
+   ],
+   "dialogs": [],
+   "textareas": [
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    },
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false,
+     "placeholder": ""
+    }
+   ],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 1123,
+    "overflowY": true
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_nlp-extract.png"
+ },
+ {
+  "route": "qc-check",
+  "data": {
+   "url": "/qc-check",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "本范围扣分构成",
+     "rect": {
+      "top": 244,
+      "bottom": 1159,
+      "left": 220,
+      "right": 878,
+      "w": 658,
+      "h": 915
+     }
+    },
+    {
+     "name": "AI 预检列表 / 扣分明细点击行查看规则扣分明",
+     "rect": {
+      "top": 244,
+      "bottom": 1159,
+      "left": 890,
+      "right": 1844,
+      "w": 954,
+      "h": 915
+     }
+    },
+    {
+     "name": "最近重算任务",
+     "rect": {
+      "top": 1173,
+      "bottom": 1694,
+      "left": 220,
+      "right": 1844,
+      "w": 1624,
+      "h": 521
+     }
+    },
+    {
+     "name": "质控评分标准规则配置",
+     "rect": {
+      "top": 1706,
+      "bottom": 1823,
+      "left": 220,
+      "right": 1844,
+      "w": 1624,
+      "h": 117
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [
+    {
+     "cls": "el-scrollbar__wrap el-scrollbar__wrap--h",
+     "clientH": 368,
+     "scrollH": 476
+    }
+   ],
+   "main": {
+    "clientH": 902,
+    "scrollH": 1867,
+    "overflowY": true
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_qc-check.png"
+ },
+ {
+  "route": "governance",
+  "data": {
+   "url": "/governance",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "数据清洗与术语自动归一",
+     "rect": {
+      "top": 212,
+      "bottom": 538,
+      "left": 220,
+      "right": 1852,
+      "w": 1632,
+      "h": 326
+     }
+    },
+    {
+     "name": "标准数据集导出",
+     "rect": {
+      "top": 550,
+      "bottom": 752,
+      "left": 220,
+      "right": 1852,
+      "w": 1632,
+      "h": 202
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 902,
+    "overflowY": false
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_governance.png"
+ },
+ {
+  "route": "dictionary",
+  "data": {
+   "url": "/dictionary",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "词典查询（疾病）",
+     "rect": {
+      "top": 242,
+      "bottom": 1257,
+      "left": 220,
+      "right": 1852,
+      "w": 1632,
+      "h": 1015
+     }
+    },
+    {
+     "name": "基线更新提案",
+     "rect": {
+      "top": 0,
+      "bottom": 0,
+      "left": 0,
+      "right": 0,
+      "w": 0,
+      "h": 0
+     }
+    },
+    {
+     "name": "归档版本",
+     "rect": {
+      "top": 0,
+      "bottom": 0,
+      "left": 0,
+      "right": 0,
+      "w": 0,
+      "h": 0
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 902,
+    "overflowY": false
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dictionary.png"
+ },
+ {
+  "route": "dictionary/import",
+  "data": {
+   "url": "/dictionary/import",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "批量导入词典",
+     "rect": {
+      "top": 135,
+      "bottom": 1011,
+      "left": 220,
+      "right": 1412,
+      "w": 1192,
+      "h": 876
+     }
+    },
+    {
+     "name": "格式示例",
+     "rect": {
+      "top": 135,
+      "bottom": 1011,
+      "left": 1424,
+      "right": 1844,
+      "w": 420,
+      "h": 876
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [
+    {
+     "scrollH": 100,
+     "clientH": 100,
+     "clipped": false,
+     "placeholder": "神疲乏力\n食少纳呆\n恶风\t平时也"
+    }
+   ],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 1043,
+    "overflowY": true
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dictionary_import.png"
+ },
+ {
+  "route": "dictionary/mine",
+  "data": {
+   "url": "/dictionary/mine",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "个人词典（本地）",
+     "rect": {
+      "top": 137,
+      "bottom": 857,
+      "left": 220,
+      "right": 1852,
+      "w": 1632,
+      "h": 720
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 902,
+    "overflowY": false
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dictionary_mine.png"
+ },
+ {
+  "route": "audit-log",
+  "data": {
+   "url": "/audit-log",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "操作日志",
+     "rect": {
+      "top": 101,
+      "bottom": 976,
+      "left": 220,
+      "right": 1844,
+      "w": 1624,
+      "h": 874
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 924,
+    "overflowY": true
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_audit-log.png"
+ },
+ {
+  "route": "standardization-report",
+  "data": {
+   "url": "/standardization-report",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "本期图景 全部导入",
+     "rect": {
+      "top": 428,
+      "bottom": 842,
+      "left": 220,
+      "right": 1844,
+      "w": 1624,
+      "h": 414
+     }
+    },
+    {
+     "name": "建议的下一步",
+     "rect": {
+      "top": 854,
+      "bottom": 1135,
+      "left": 220,
+      "right": 1844,
+      "w": 1624,
+      "h": 281
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 1242,
+    "overflowY": true
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_standardization-report.png"
+ },
+ {
+  "route": "orgs",
+  "data": {
+   "url": "/orgs",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "组织管理",
+     "rect": {
+      "top": 101,
+      "bottom": 869,
+      "left": 220,
+      "right": 1852,
+      "w": 1632,
+      "h": 768
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 902,
+    "overflowY": false
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_orgs.png"
+ },
+ {
+  "route": "my-org",
+  "data": {
+   "url": "/my-org",
+   "vw": 1896,
+   "vh": 954,
+   "panels": [
+    {
+     "name": "我的组织",
+     "rect": {
+      "top": 101,
+      "bottom": 869,
+      "left": 220,
+      "right": 1852,
+      "w": 1632,
+      "h": 768
+     }
+    }
+   ],
+   "panes": [],
+   "dialogs": [],
+   "textareas": [],
+   "scrollables": [],
+   "main": {
+    "clientH": 902,
+    "scrollH": 902,
+    "overflowY": false
+   }
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_my-org.png"
+ }
+]

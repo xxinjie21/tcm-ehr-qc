@@ -1,0 +1,1335 @@
+[
+ {
+  "state": "s1_page20",
+  "data": {
+   "doc": {
+    "docScrollH": 954,
+    "bodyScrollH": 954,
+    "winH": 954
+   },
+   "main": {
+    "clientH": 902,
+    "scrollH": 1244,
+    "overflowY": true
+   },
+   "splitPicker": {
+    "top": 101,
+    "bottom": 1212,
+    "left": 220,
+    "right": 1844,
+    "w": 1624,
+    "h": 1111
+   },
+   "leftPane": {
+    "sel": ".split-picker > .pane:nth-child(1)",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1066,
+    "clientH": 1066
+   },
+   "leftCard": {
+    "sel": ".split-picker > .pane:nth-child(1) .panel",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1064,
+    "clientH": 1064
+   },
+   "leftFill": {
+    "sel": ".split-picker > .pane:nth-child(1) .fill-table",
+    "rect": {
+     "top": 411,
+     "bottom": 1111,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "visible",
+    "scrollH": 712,
+    "clientH": 700
+   },
+   "leftTable": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table",
+    "rect": {
+     "top": 423,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "hidden",
+    "scrollH": 700,
+    "clientH": 700
+   },
+   "leftBody": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table__body-wrapper",
+    "rect": {
+     "top": 455,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 668
+    },
+    "overflowY": "hidden",
+    "scrollH": 668,
+    "clientH": 668
+   },
+   "leftPager": {
+    "sel": ".split-picker > .pane:nth-child(1) .picker-pager",
+    "rect": {
+     "top": 1111,
+     "bottom": 1195,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 84
+    },
+    "overflowY": "visible",
+    "scrollH": 84,
+    "clientH": 84
+   },
+   "leftRows": 20,
+   "rightPane": {
+    "sel": ".split-picker > .pane:nth-child(2)",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightTabs": {
+    "sel": ".split-picker > .pane:nth-child(2) .nlp-tabs",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightContent": {
+    "sel": ".split-picker > .pane:nth-child(2) .el-tabs__content",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "hidden",
+    "scrollH": 1060,
+    "clientH": 1060
+   },
+   "rightPanel": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "visible",
+    "scrollH": 1058,
+    "clientH": 1058
+   },
+   "rightPanelBd": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel-bd",
+    "rect": {
+     "top": 206,
+     "bottom": 1211,
+     "left": 855,
+     "right": 1843,
+     "w": 988,
+     "h": 1005
+    },
+    "overflowY": "auto",
+    "scrollH": 1005,
+    "clientH": 1005
+   },
+   "compare": {
+    "sel": ".split-compare",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1827,
+     "w": 956,
+     "h": 919
+    },
+    "overflowY": "visible",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerLeft": {
+    "sel": ".split-compare > .pane:nth-child(1)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1374,
+     "w": 503,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerRight": {
+    "sel": ".split-compare > .pane:nth-child(2)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 1390,
+     "right": 1827,
+     "w": 437,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerLeftActions": {
+    "sel": ".split-compare > .pane:nth-child(1) .pane-actions",
+    "rect": {
+     "top": 1146,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1374,
+     "w": 503,
+     "h": 49
+    },
+    "overflowY": "visible",
+    "scrollH": 48,
+    "clientH": 48
+   },
+   "innerRightBranch": {
+    "sel": ".split-compare > .pane:nth-child(2) .sd-branch, .split-compare > .pane",
+    "rect": {
+     "top": 601,
+     "bottom": 903,
+     "left": 1390,
+     "right": 1827,
+     "w": 437,
+     "h": 302
+    },
+    "overflowY": "visible",
+    "scrollH": 302,
+    "clientH": 302
+   },
+   "innerRightCard": null,
+   "probeVisible": false,
+   "emptyReasonVisible": false,
+   "normStatVisible": false,
+   "loadedBarText": "请在上方「选择病历」列表中点选一份病历",
+   "textareas": [
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    }
+   ],
+   "scrollables": []
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\nlp_after_s1_page20.png"
+ },
+ {
+  "state": "s2_page50",
+  "data": {
+   "doc": {
+    "docScrollH": 954,
+    "bodyScrollH": 954,
+    "winH": 954
+   },
+   "main": {
+    "clientH": 902,
+    "scrollH": 1244,
+    "overflowY": true
+   },
+   "splitPicker": {
+    "top": 101,
+    "bottom": 1212,
+    "left": 220,
+    "right": 1844,
+    "w": 1624,
+    "h": 1111
+   },
+   "leftPane": {
+    "sel": ".split-picker > .pane:nth-child(1)",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1066,
+    "clientH": 1066
+   },
+   "leftCard": {
+    "sel": ".split-picker > .pane:nth-child(1) .panel",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1064,
+    "clientH": 1064
+   },
+   "leftFill": {
+    "sel": ".split-picker > .pane:nth-child(1) .fill-table",
+    "rect": {
+     "top": 411,
+     "bottom": 1111,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "visible",
+    "scrollH": 712,
+    "clientH": 700
+   },
+   "leftTable": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table",
+    "rect": {
+     "top": 423,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "hidden",
+    "scrollH": 700,
+    "clientH": 700
+   },
+   "leftBody": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table__body-wrapper",
+    "rect": {
+     "top": 455,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 668
+    },
+    "overflowY": "hidden",
+    "scrollH": 668,
+    "clientH": 668
+   },
+   "leftPager": {
+    "sel": ".split-picker > .pane:nth-child(1) .picker-pager",
+    "rect": {
+     "top": 1111,
+     "bottom": 1195,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 84
+    },
+    "overflowY": "visible",
+    "scrollH": 84,
+    "clientH": 84
+   },
+   "leftRows": 50,
+   "rightPane": {
+    "sel": ".split-picker > .pane:nth-child(2)",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightTabs": {
+    "sel": ".split-picker > .pane:nth-child(2) .nlp-tabs",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightContent": {
+    "sel": ".split-picker > .pane:nth-child(2) .el-tabs__content",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "hidden",
+    "scrollH": 1060,
+    "clientH": 1060
+   },
+   "rightPanel": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "visible",
+    "scrollH": 1058,
+    "clientH": 1058
+   },
+   "rightPanelBd": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel-bd",
+    "rect": {
+     "top": 206,
+     "bottom": 1211,
+     "left": 855,
+     "right": 1843,
+     "w": 988,
+     "h": 1005
+    },
+    "overflowY": "auto",
+    "scrollH": 1005,
+    "clientH": 1005
+   },
+   "compare": {
+    "sel": ".split-compare",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1827,
+     "w": 956,
+     "h": 919
+    },
+    "overflowY": "visible",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerLeft": {
+    "sel": ".split-compare > .pane:nth-child(1)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1374,
+     "w": 503,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerRight": {
+    "sel": ".split-compare > .pane:nth-child(2)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 1390,
+     "right": 1827,
+     "w": 437,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerLeftActions": {
+    "sel": ".split-compare > .pane:nth-child(1) .pane-actions",
+    "rect": {
+     "top": 1146,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1374,
+     "w": 503,
+     "h": 49
+    },
+    "overflowY": "visible",
+    "scrollH": 48,
+    "clientH": 48
+   },
+   "innerRightBranch": {
+    "sel": ".split-compare > .pane:nth-child(2) .sd-branch, .split-compare > .pane",
+    "rect": {
+     "top": 601,
+     "bottom": 903,
+     "left": 1390,
+     "right": 1827,
+     "w": 437,
+     "h": 302
+    },
+    "overflowY": "visible",
+    "scrollH": 302,
+    "clientH": 302
+   },
+   "innerRightCard": null,
+   "probeVisible": false,
+   "emptyReasonVisible": false,
+   "normStatVisible": false,
+   "loadedBarText": "请在上方「选择病历」列表中点选一份病历",
+   "textareas": [
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    }
+   ],
+   "scrollables": []
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\nlp_after_s2_page50.png"
+ },
+ {
+  "state": "s3_loaded",
+  "data": {
+   "doc": {
+    "docScrollH": 954,
+    "bodyScrollH": 954,
+    "winH": 954
+   },
+   "main": {
+    "clientH": 902,
+    "scrollH": 1244,
+    "overflowY": true
+   },
+   "splitPicker": {
+    "top": 101,
+    "bottom": 1212,
+    "left": 220,
+    "right": 1844,
+    "w": 1624,
+    "h": 1111
+   },
+   "leftPane": {
+    "sel": ".split-picker > .pane:nth-child(1)",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1066,
+    "clientH": 1066
+   },
+   "leftCard": {
+    "sel": ".split-picker > .pane:nth-child(1) .panel",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1064,
+    "clientH": 1064
+   },
+   "leftFill": {
+    "sel": ".split-picker > .pane:nth-child(1) .fill-table",
+    "rect": {
+     "top": 411,
+     "bottom": 1111,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "visible",
+    "scrollH": 712,
+    "clientH": 700
+   },
+   "leftTable": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table",
+    "rect": {
+     "top": 423,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "hidden",
+    "scrollH": 700,
+    "clientH": 700
+   },
+   "leftBody": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table__body-wrapper",
+    "rect": {
+     "top": 455,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 668
+    },
+    "overflowY": "hidden",
+    "scrollH": 668,
+    "clientH": 668
+   },
+   "leftPager": {
+    "sel": ".split-picker > .pane:nth-child(1) .picker-pager",
+    "rect": {
+     "top": 1111,
+     "bottom": 1195,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 84
+    },
+    "overflowY": "visible",
+    "scrollH": 84,
+    "clientH": 84
+   },
+   "leftRows": 20,
+   "rightPane": {
+    "sel": ".split-picker > .pane:nth-child(2)",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightTabs": {
+    "sel": ".split-picker > .pane:nth-child(2) .nlp-tabs",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightContent": {
+    "sel": ".split-picker > .pane:nth-child(2) .el-tabs__content",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "hidden",
+    "scrollH": 1060,
+    "clientH": 1060
+   },
+   "rightPanel": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "visible",
+    "scrollH": 1058,
+    "clientH": 1058
+   },
+   "rightPanelBd": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel-bd",
+    "rect": {
+     "top": 206,
+     "bottom": 1211,
+     "left": 855,
+     "right": 1843,
+     "w": 988,
+     "h": 1005
+    },
+    "overflowY": "auto",
+    "scrollH": 1005,
+    "clientH": 1005
+   },
+   "compare": {
+    "sel": ".split-compare",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1827,
+     "w": 956,
+     "h": 919
+    },
+    "overflowY": "visible",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerLeft": {
+    "sel": ".split-compare > .pane:nth-child(1)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1374,
+     "w": 503,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 1046,
+    "clientH": 919
+   },
+   "innerRight": {
+    "sel": ".split-compare > .pane:nth-child(2)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 1390,
+     "right": 1827,
+     "w": 437,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerLeftActions": {
+    "sel": ".split-compare > .pane:nth-child(1) .pane-actions",
+    "rect": {
+     "top": 1146,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1366,
+     "w": 495,
+     "h": 49
+    },
+    "overflowY": "visible",
+    "scrollH": 48,
+    "clientH": 48
+   },
+   "innerRightBranch": {
+    "sel": ".split-compare > .pane:nth-child(2) .sd-branch, .split-compare > .pane",
+    "rect": {
+     "top": 601,
+     "bottom": 903,
+     "left": 1390,
+     "right": 1827,
+     "w": 437,
+     "h": 302
+    },
+    "overflowY": "visible",
+    "scrollH": 302,
+    "clientH": 302
+   },
+   "innerRightCard": null,
+   "probeVisible": false,
+   "emptyReasonVisible": false,
+   "normStatVisible": false,
+   "loadedBarText": " 已载入病历：9384045810088744男 · 55 岁 · 中医内科 · 2025-12-26 07:17关闭详情将清空当前病历与抽取结果 关闭详情 ",
+   "textareas": [
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 100,
+     "clientH": 100,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 212,
+     "clientH": 212,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 77,
+     "clientH": 77,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 100,
+     "clientH": 100,
+     "ph": ""
+    }
+   ],
+   "scrollables": []
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\nlp_after_s3_loaded.png"
+ },
+ {
+  "state": "s4_extracted",
+  "data": {
+   "doc": {
+    "docScrollH": 954,
+    "bodyScrollH": 954,
+    "winH": 954
+   },
+   "main": {
+    "clientH": 902,
+    "scrollH": 1244,
+    "overflowY": true
+   },
+   "splitPicker": {
+    "top": 101,
+    "bottom": 1212,
+    "left": 220,
+    "right": 1844,
+    "w": 1624,
+    "h": 1111
+   },
+   "leftPane": {
+    "sel": ".split-picker > .pane:nth-child(1)",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1066,
+    "clientH": 1066
+   },
+   "leftCard": {
+    "sel": ".split-picker > .pane:nth-child(1) .panel",
+    "rect": {
+     "top": 146,
+     "bottom": 1212,
+     "left": 220,
+     "right": 838,
+     "w": 618,
+     "h": 1066
+    },
+    "overflowY": "visible",
+    "scrollH": 1064,
+    "clientH": 1064
+   },
+   "leftFill": {
+    "sel": ".split-picker > .pane:nth-child(1) .fill-table",
+    "rect": {
+     "top": 411,
+     "bottom": 1111,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "visible",
+    "scrollH": 712,
+    "clientH": 700
+   },
+   "leftTable": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table",
+    "rect": {
+     "top": 423,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 700
+    },
+    "overflowY": "hidden",
+    "scrollH": 700,
+    "clientH": 700
+   },
+   "leftBody": {
+    "sel": ".split-picker > .pane:nth-child(1) .el-table__body-wrapper",
+    "rect": {
+     "top": 455,
+     "bottom": 1123,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 668
+    },
+    "overflowY": "hidden",
+    "scrollH": 668,
+    "clientH": 668
+   },
+   "leftPager": {
+    "sel": ".split-picker > .pane:nth-child(1) .picker-pager",
+    "rect": {
+     "top": 1111,
+     "bottom": 1195,
+     "left": 237,
+     "right": 821,
+     "w": 584,
+     "h": 84
+    },
+    "overflowY": "visible",
+    "scrollH": 84,
+    "clientH": 84
+   },
+   "leftRows": 20,
+   "rightPane": {
+    "sel": ".split-picker > .pane:nth-child(2)",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightTabs": {
+    "sel": ".split-picker > .pane:nth-child(2) .nlp-tabs",
+    "rect": {
+     "top": 101,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1111
+    },
+    "overflowY": "visible",
+    "scrollH": 1111,
+    "clientH": 1111
+   },
+   "rightContent": {
+    "sel": ".split-picker > .pane:nth-child(2) .el-tabs__content",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "hidden",
+    "scrollH": 1060,
+    "clientH": 1060
+   },
+   "rightPanel": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel",
+    "rect": {
+     "top": 152,
+     "bottom": 1212,
+     "left": 854,
+     "right": 1844,
+     "w": 990,
+     "h": 1060
+    },
+    "overflowY": "visible",
+    "scrollH": 1058,
+    "clientH": 1058
+   },
+   "rightPanelBd": {
+    "sel": ".split-picker > .pane:nth-child(2) .panel-bd",
+    "rect": {
+     "top": 206,
+     "bottom": 1211,
+     "left": 855,
+     "right": 1843,
+     "w": 988,
+     "h": 1005
+    },
+    "overflowY": "auto",
+    "scrollH": 1005,
+    "clientH": 1005
+   },
+   "compare": {
+    "sel": ".split-compare",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1827,
+     "w": 956,
+     "h": 919
+    },
+    "overflowY": "visible",
+    "scrollH": 919,
+    "clientH": 919
+   },
+   "innerLeft": {
+    "sel": ".split-compare > .pane:nth-child(1)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1374,
+     "w": 503,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 1046,
+    "clientH": 919
+   },
+   "innerRight": {
+    "sel": ".split-compare > .pane:nth-child(2)",
+    "rect": {
+     "top": 277,
+     "bottom": 1195,
+     "left": 1390,
+     "right": 1827,
+     "w": 437,
+     "h": 919
+    },
+    "overflowY": "auto",
+    "scrollH": 1565,
+    "clientH": 919
+   },
+   "innerLeftActions": {
+    "sel": ".split-compare > .pane:nth-child(1) .pane-actions",
+    "rect": {
+     "top": 1146,
+     "bottom": 1195,
+     "left": 871,
+     "right": 1366,
+     "w": 495,
+     "h": 49
+    },
+    "overflowY": "visible",
+    "scrollH": 48,
+    "clientH": 48
+   },
+   "innerRightBranch": {
+    "sel": ".split-compare > .pane:nth-child(2) .sd-branch, .split-compare > .pane",
+    "rect": {
+     "top": 596,
+     "bottom": 1842,
+     "left": 1390,
+     "right": 1819,
+     "w": 429,
+     "h": 1247
+    },
+    "overflowY": "visible",
+    "scrollH": 1247,
+    "clientH": 1247
+   },
+   "innerRightCard": {
+    "sel": ".split-compare > .pane:nth-child(2) .sd-card",
+    "rect": {
+     "top": 596,
+     "bottom": 1842,
+     "left": 1390,
+     "right": 1819,
+     "w": 429,
+     "h": 1247
+    },
+    "overflowY": "visible",
+    "scrollH": 1247,
+    "clientH": 1247
+   },
+   "probeVisible": false,
+   "emptyReasonVisible": false,
+   "normStatVisible": true,
+   "loadedBarText": " 已载入病历：9384045810088744男 · 55 岁 · 中医内科 · 2025-12-26 07:17关闭详情将清空当前病历与抽取结果 关闭详情 ",
+   "textareas": [
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 100,
+     "clientH": 100,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 212,
+     "clientH": 212,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 55,
+     "clientH": 55,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 77,
+     "clientH": 77,
+     "ph": ""
+    },
+    {
+     "clipped": false,
+     "scrollH": 100,
+     "clientH": 100,
+     "ph": ""
+    }
+   ],
+   "scrollables": []
+  },
+  "errors": [],
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\nlp_after_s4_extracted.png"
+ }
+]

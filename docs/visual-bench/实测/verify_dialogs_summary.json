@@ -1,0 +1,302 @@
+[
+ {
+  "name": "record-detail",
+  "data": {
+   "dlg": {
+    "top": 57,
+    "bottom": 860,
+    "left": 358,
+    "right": 1538,
+    "w": 1180,
+    "h": 803
+   },
+   "title": "病历详情（原始字段只读）",
+   "cols": [
+    {
+     "cls": "el-tab-pane",
+     "rect": {
+      "top": 166,
+      "bottom": 796,
+      "left": 374,
+      "right": 1522,
+      "w": 1148,
+      "h": 630
+     }
+    },
+    {
+     "cls": "detail-2col",
+     "rect": {
+      "top": 166,
+      "bottom": 796,
+      "left": 374,
+      "right": 1522,
+      "w": 1148,
+      "h": 630
+     }
+    },
+    {
+     "cls": "detail-col",
+     "rect": {
+      "top": 166,
+      "bottom": 1243,
+      "left": 374,
+      "right": 936,
+      "w": 562,
+      "h": 1077
+     }
+    },
+    {
+     "cls": "col-hd",
+     "rect": {
+      "top": 166,
+      "bottom": 187,
+      "left": 374,
+      "right": 936,
+      "w": 562,
+      "h": 21
+     }
+    },
+    {
+     "cls": "detail-col",
+     "rect": {
+      "top": 166,
+      "bottom": 1243,
+      "left": 952,
+      "right": 1514,
+      "w": 562,
+      "h": 1077
+     }
+    },
+    {
+     "cls": "col-hd",
+     "rect": {
+      "top": 166,
+      "bottom": 187,
+      "left": 952,
+      "right": 1514,
+      "w": 562,
+      "h": 21
+     }
+    }
+   ],
+   "textareas": [],
+   "footerVisible": true,
+   "footerInViewport": true,
+   "body": {
+    "clientH": 681,
+    "scrollH": 681,
+    "overflowY": false
+   }
+  },
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dlg_record-detail.png"
+ },
+ null,
+ {
+  "name": "qc-deduction",
+  "data": {
+   "dlg": {
+    "top": 67,
+    "bottom": 544,
+    "left": 408,
+    "right": 1488,
+    "w": 1080,
+    "h": 478
+   },
+   "title": "规则预检单（扣分明细）",
+   "cols": [
+    {
+     "cls": "ded-col",
+     "rect": {
+      "top": 125,
+      "bottom": 480,
+      "left": 424,
+      "right": 1472,
+      "w": 1048,
+      "h": 356
+     }
+    },
+    {
+     "cls": "el-table_4_column_19",
+     "rect": {
+      "top": 372,
+      "bottom": 404,
+      "left": 424,
+      "right": 534,
+      "w": 110,
+      "h": 32
+     }
+    },
+    {
+     "cls": "el-table_4_column_20",
+     "rect": {
+      "top": 372,
+      "bottom": 404,
+      "left": 534,
+      "right": 624,
+      "w": 90,
+      "h": 32
+     }
+    },
+    {
+     "cls": "el-table_4_column_21",
+     "rect": {
+      "top": 372,
+      "bottom": 404,
+      "left": 624,
+      "right": 694,
+      "w": 70,
+      "h": 32
+     }
+    },
+    {
+     "cls": "el-table_4_column_22",
+     "rect": {
+      "top": 372,
+      "bottom": 404,
+      "left": 694,
+      "right": 1472,
+      "w": 778,
+      "h": 32
+     }
+    }
+   ],
+   "textareas": [],
+   "footerVisible": true,
+   "footerInViewport": true,
+   "body": {
+    "clientH": 356,
+    "scrollH": 356,
+    "overflowY": false
+   }
+  },
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dlg_qc-deduction.png"
+ },
+ {
+  "name": "qc-rules",
+  "data": {
+   "dlg": {
+    "top": 57,
+    "bottom": 866,
+    "left": 448,
+    "right": 1448,
+    "w": 1000,
+    "h": 809
+   },
+   "title": "规则配置（改完点保存即生效）",
+   "cols": [],
+   "textareas": [],
+   "footerVisible": true,
+   "footerInViewport": true,
+   "body": {
+    "clientH": 687,
+    "scrollH": 687,
+    "overflowY": false
+   }
+  },
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dlg_qc-rules.png"
+ },
+ {
+  "name": "llm-config",
+  "data": {
+   "dlg": {
+    "top": 57,
+    "bottom": 686,
+    "left": 498,
+    "right": 1398,
+    "w": 900,
+    "h": 628
+   },
+   "title": "我的 LLM",
+   "cols": [
+    {
+     "cls": "llm-col",
+     "rect": {
+      "top": 194,
+      "bottom": 622,
+      "left": 514,
+      "right": 936,
+      "w": 422,
+      "h": 428
+     }
+    },
+    {
+     "cls": "col-hd",
+     "rect": {
+      "top": 194,
+      "bottom": 222,
+      "left": 514,
+      "right": 936,
+      "w": 422,
+      "h": 28
+     }
+    },
+    {
+     "cls": "llm-col",
+     "rect": {
+      "top": 194,
+      "bottom": 622,
+      "left": 960,
+      "right": 1382,
+      "w": 422,
+      "h": 428
+     }
+    },
+    {
+     "cls": "col-hd",
+     "rect": {
+      "top": 194,
+      "bottom": 222,
+      "left": 985,
+      "right": 1382,
+      "w": 397,
+      "h": 28
+     }
+    }
+   ],
+   "textareas": [],
+   "footerVisible": true,
+   "footerInViewport": true,
+   "body": {
+    "clientH": 507,
+    "scrollH": 507,
+    "overflowY": false
+   }
+  },
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dlg_llm-config.png"
+ },
+ {
+  "name": "groups-archive",
+  "data": null,
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dlg_groups-archive.png"
+ },
+ {
+  "name": "mygroup-create",
+  "data": {
+   "dlg": {
+    "top": 57,
+    "bottom": 352,
+    "left": 708,
+    "right": 1188,
+    "w": 480,
+    "h": 295
+   },
+   "title": "创建组织",
+   "cols": [],
+   "textareas": [
+    {
+     "scrollH": 55,
+     "clientH": 55,
+     "clipped": false
+    }
+   ],
+   "footerVisible": true,
+   "footerInViewport": true,
+   "body": {
+    "clientH": 155,
+    "scrollH": 155,
+    "overflowY": false
+   }
+  },
+  "shot": "D:\\ZISHIKU\\AI\\tcm-ehr-qc\\docs\\visual-bench\\实测\\verify_dlg_mygroup-create.png"
+ }
+]

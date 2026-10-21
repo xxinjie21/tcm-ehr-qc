@@ -1,0 +1,242 @@
+{
+ "s1_page20": {
+  "mainScrollH": 1316,
+  "splitPicker": {
+   "top": 101,
+   "bottom": 1284,
+   "h": 1183,
+   "scrollH": 1183,
+   "clientH": 1183
+  },
+  "leftPane": {
+   "top": 146,
+   "bottom": 1284,
+   "h": 1138,
+   "scrollH": 1138,
+   "clientH": 1138
+  },
+  "leftFill": {
+   "top": 483,
+   "bottom": 1183,
+   "h": 700,
+   "scrollH": 712,
+   "clientH": 700
+  },
+  "leftTable": {
+   "top": 495,
+   "bottom": 1195,
+   "h": 700,
+   "scrollH": 700,
+   "clientH": 700
+  },
+  "leftPager": {
+   "top": 1183,
+   "bottom": 1267,
+   "h": 84,
+   "scrollH": 84,
+   "clientH": 84
+  },
+  "rightPane": {
+   "top": 101,
+   "bottom": 1212,
+   "h": 1111,
+   "scrollH": 1111,
+   "clientH": 1111
+  },
+  "innerLeft": {
+   "top": 277,
+   "bottom": 1195,
+   "h": 919,
+   "scrollH": 919,
+   "clientH": 919
+  },
+  "innerRight": {
+   "top": 277,
+   "bottom": 1195,
+   "h": 919,
+   "scrollH": 919,
+   "clientH": 919
+  },
+  "clippedTextareas": 0
+ },
+ "s2_page50": {
+  "mainScrollH": 1316,
+  "splitPicker": {
+   "top": 101,
+   "bottom": 1284,
+   "h": 1183,
+   "scrollH": 1183,
+   "clientH": 1183
+  },
+  "leftPane": {
+   "top": 146,
+   "bottom": 1284,
+   "h": 1138,
+   "scrollH": 1138,
+   "clientH": 1138
+  },
+  "leftFill": {
+   "top": 483,
+   "bottom": 1183,
+   "h": 700,
+   "scrollH": 712,
+   "clientH": 700
+  },
+  "leftTable": {
+   "top": 495,
+   "bottom": 1195,
+   "h": 700,
+   "scrollH": 700,
+   "clientH": 700
+  },
+  "leftPager": {
+   "top": 1183,
+   "bottom": 1267,
+   "h": 84,
+   "scrollH": 84,
+   "clientH": 84
+  },
+  "rightPane": {
+   "top": 101,
+   "bottom": 1212,
+   "h": 1111,
+   "scrollH": 1111,
+   "clientH": 1111
+  },
+  "innerLeft": {
+   "top": 277,
+   "bottom": 1195,
+   "h": 919,
+   "scrollH": 919,
+   "clientH": 919
+  },
+  "innerRight": {
+   "top": 277,
+   "bottom": 1195,
+   "h": 919,
+   "scrollH": 919,
+   "clientH": 919
+  },
+  "clippedTextareas": 0
+ },
+ "s3_loaded": {
+  "mainScrollH": 1316,
+  "splitPicker": {
+   "top": 101,
+   "bottom": 1284,
+   "h": 1183,
+   "scrollH": 1183,
+   "clientH": 1183
+  },
+  "leftPane": {
+   "top": 146,
+   "bottom": 1284,
+   "h": 1138,
+   "scrollH": 1138,
+   "clientH": 1138
+  },
+  "leftFill": {
+   "top": 483,
+   "bottom": 1183,
+   "h": 700,
+   "scrollH": 712,
+   "clientH": 700
+  },
+  "leftTable": {
+   "top": 495,
+   "bottom": 1195,
+   "h": 700,
+   "scrollH": 700,
+   "clientH": 700
+  },
+  "leftPager": {
+   "top": 1183,
+   "bottom": 1267,
+   "h": 84,
+   "scrollH": 84,
+   "clientH": 84
+  },
+  "rightPane": {
+   "top": 101,
+   "bottom": 1212,
+   "h": 1111,
+   "scrollH": 1111,
+   "clientH": 1111
+  },
+  "innerLeft": {
+   "top": 311,
+   "bottom": 1195,
+   "h": 885,
+   "scrollH": 2397,
+   "clientH": 885
+  },
+  "innerRight": {
+   "top": 311,
+   "bottom": 1195,
+   "h": 885,
+   "scrollH": 885,
+   "clientH": 885
+  },
+  "clippedTextareas": 0
+ },
+ "s4_extracted": {
+  "mainScrollH": 1316,
+  "splitPicker": {
+   "top": 101,
+   "bottom": 1284,
+   "h": 1183,
+   "scrollH": 1183,
+   "clientH": 1183
+  },
+  "leftPane": {
+   "top": 146,
+   "bottom": 1284,
+   "h": 1138,
+   "scrollH": 1138,
+   "clientH": 1138
+  },
+  "leftFill": {
+   "top": 483,
+   "bottom": 1183,
+   "h": 700,
+   "scrollH": 712,
+   "clientH": 700
+  },
+  "leftTable": {
+   "top": 495,
+   "bottom": 1195,
+   "h": 700,
+   "scrollH": 700,
+   "clientH": 700
+  },
+  "leftPager": {
+   "top": 1183,
+   "bottom": 1267,
+   "h": 84,
+   "scrollH": 84,
+   "clientH": 84
+  },
+  "rightPane": {
+   "top": 101,
+   "bottom": 1212,
+   "h": 1111,
+   "scrollH": 1111,
+   "clientH": 1111
+  },
+  "innerLeft": {
+   "top": 311,
+   "bottom": 1195,
+   "h": 885,
+   "scrollH": 2365,
+   "clientH": 885
+  },
+  "innerRight": {
+   "top": 311,
+   "bottom": 1195,
+   "h": 885,
+   "scrollH": 1779,
+   "clientH": 885
+  },
+  "clippedTextareas": 0
+ }
+}
