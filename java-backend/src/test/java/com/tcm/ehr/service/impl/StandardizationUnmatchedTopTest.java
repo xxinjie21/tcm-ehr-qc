@@ -141,9 +141,18 @@ class StandardizationUnmatchedTopTest {
         assertEquals(2, top.size(), "top 应只剩两条真实症状缺口");
         assertEquals(2, top.get("上下楼梯特别疼"), "真实症状缺口应进 top 且保留次数");
         assertTrue(top.containsKey("膝盖酸酸的没力气"), "低频真实症状缺口也应可见");
-        // ③ 统计口径不变：dictionaryGap 仍计全部未归一长词（过滤只影响 top 清单，不影响分项计数）
-        assertEquals(49, b.getDictionaryGap(),
-                "dictionaryGap 应照常统计全部 12+10+9+8+7+2+1 = 49 条，过滤只作用于 top");
+        // ③ 分项计数（2026-10-21 口径变更）：问诊整句不再计入 dictionaryGap，
+        //    而是单列到 inquiryFragment —— 让「词表缺口」只含真正该补的词，
+        //    否则报告会声称「词表缺 N 条」，而补词表根本解决不了问诊那批。
+        //    本用例 5 个问诊词共 12+10+9+8+7 = 46 条，2 个真症状缺口 2+1 = 3 条。
+        assertEquals(3, b.getDictionaryGap(), "dictionaryGap 只剩两条真症状缺口（2+1=3）");
+        assertEquals(46, b.getInquiryFragment(),
+                "问诊整句应单列到 inquiryFragment（12+10+9+8+7=46），不再混进词表缺口");
+        // ④ 分项之和必须仍等于未归一总数（拆桶不能丢数据）
+        assertEquals(b.getTotal(),
+                b.getDictionaryGap() + b.getInquiryFragment() + b.getProcessDesc()
+                        + b.getMisrouted() + b.getPhysicalSign() + b.getFragment(),
+                "各分项之和必须等于 total —— 拆桶只改归属，不得丢失或重复计数");
     }
 
     private static ObjectMapper injectObjectMapper(StandardizationReportServiceImpl svc) throws Exception {

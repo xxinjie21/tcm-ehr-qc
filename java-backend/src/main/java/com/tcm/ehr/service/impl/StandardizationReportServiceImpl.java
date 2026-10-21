@@ -149,6 +149,45 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             "晨起", "晨间", "清晨", "夜间", "夜里", "睡前", "醒后", "饭后", "食后", "平素",
             // 喜恶（喜趴睡 / 喜肉食 / 喜甜食 / 喜叹息）：问诊十问之「问喜恶」
             "喜"};
+    /**
+     * 病程 / 诱因描述的开头（活动后缓解 / 休息后缓解 / 遇劳加重 / 受凉后…）。
+     *
+     * <p>2026-10-21 新增，用于把这类实体从「词表缺口」里拆出来单列。它们是
+     * <strong>对症状的修饰</strong>（什么时候轻、什么时候重），不是症状本体；
+     * 补进症状词表会让所有含该子串的实体被错误归并（如把「活动后缓解」收成标准词，
+     * 会命中「活动后缓解不明显」等）。责任方是抽取侧，与「词表缺口」必须分开说。</p>
+     *
+     * <p>判定用 startsWith（前置于词首）而非 contains：这里列的都是完整词头
+     * （「受凉后」「遇劳」「活动后」），用 contains 会误伤「不活动后」这类边缘串。</p>
+     */
+    private static final String[] PROCESS_DESC_LEAD = {
+            "活动后", "活动时", "活动则", "休息后", "休息时", "劳累后", "劳累时", "劳则",
+            "遇劳", "遇冷", "遇热", "遇风", "受凉后", "受寒后", "受风后",
+            "进食后", "进餐后", "服药后", "饮水后", "大便后", "小便后",
+            "持续性", "反复发作", "阵发性", "间歇性", "夜间明显", "晨起明显", "午后",
+            "加重", "减轻", "缓解", "好转", "自行缓解"};
+
+    /**
+     * 脉诊手法 / 舌象要素被当成症状时的特征词（2026-10-21）。
+     *
+     * <p>正确归属是脉象 / 舌象字段，补进症状词表属错映射；且它们不以谓词开头，
+     * 逃过了 INQUIRY_LEAD 与 PROCESS_DESC_LEAD，会占据「最该先补」前排
+     * （实测 不受按 222 / 中取不受按 115 / 红点多 225）。</p>
+     *
+     * <p>用 contains 判定 —— 这些是词中/词尾的形态标记，不是词头。</p>
+     */
+    private static final String[] MISTYPE_MARKERS = {
+            "不受按", "中取", "浮取", "沉取", "应指",
+            "红点", "瘀点", "齿痕", "裂纹", "舌下", "边有"};
+
+    /**
+     * 问诊词根的扩展集（2026-10-21）。
+     *
+     * <p>INQUIRY_LEAD 只收了以谓词本身开头的情形；实测还有一批以「习惯性饮水」
+     * 「控制饮食」「精力体力可」这类修饰/并列形式出现，同样是十问子项而非症状本体。</p>
+     */
+    private static final String[] INQUIRY_MARKERS = {"饮水", "饮食", "精力", "体力", "控制", "习惯性"};
+
     /** 有意保留在页面上的声明，防止报告被当成科研级准确率引用 */
     private static final String DISCLAIMER =
             "本报告基于现有数据的实测统计。乙类（数据集覆盖度）只用于验证词表是否建全，"
@@ -204,10 +243,17 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     "抽取 " + c.getTotal() + " 条"));
         }
         StandardizationReportVO.UnmatchedBreakdown u = r.getUnmatched();
+        // 未归一构成：按<strong>责任方</strong>分列 —— 词表侧（补词表可改善）与抽取侧
+        // （补词表无效，得改抽取边界）必须分开，否则「词表缺 N 条」会把抽取问题算进词表账。
         rows.add(List.of("未归一构成", "词表未收录", String.valueOf(u.getDictionaryGap()), "责任：词表"));
+        rows.add(List.of("未归一构成", "问诊整句被当成症状", String.valueOf(u.getInquiryFragment()), "责任：抽取（该进 inquiry）"));
+        rows.add(List.of("未归一构成", "病程/诱因描述", String.valueOf(u.getProcessDesc()), "责任：抽取（是修饰非症状）"));
         rows.add(List.of("未归一构成", "脉/舌被当成症状", String.valueOf(u.getMisrouted()), "责任：抽取"));
         rows.add(List.of("未归一构成", "体征被当成症状", String.valueOf(u.getPhysicalSign()), "责任：抽取"));
-        rows.add(List.of("未归一构成", "抽取残词", String.valueOf(u.getFragment()), "责任：抽取"));
+        // 措辞修正（2026-10-21）：原叫「抽取残词」是错的断言 —— 实测这 6542 条里单字 0 条、
+        // 与 sourceText 等长（无截断痕迹），主体是词表未收录的二字症状词与属性词，
+        // 不是「抽取截断的残字」。按实测构成改名。
+        rows.add(List.of("未归一构成", "二字未归一实体", String.valueOf(u.getFragment()), "需人工研判口径"));
         rows.add(List.of("未归一构成", "合计", String.valueOf(u.getTotal()), ""));
         StandardizationReportVO.ScoreDistribution s = r.getScore();
         rows.add(List.of("评分", "扣分相同占比", s.getTotal() > 0 ? pct(s.getCapped(), s.getTotal()) : "—",
@@ -825,14 +871,27 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     //    ⇒ 补词必须人工研判口径：把「偏黄」「不痛」收成标准词会污染所有含该子串的
                     //    实体，属错映射。故保持单桶，由前端如实描述构成而不给「补词即可」的结论。
                     b.setFragment(b.getFragment() + 1);
+                } else if (containsAny(content, MISTYPE_MARKERS)) {
+                    // ③ 脉诊手法 / 舌象要素被当成症状（不受按 / 红点多 / 中取不受按…）→ 抽取侧。
+                    //    2026-10-21 从 dictionaryGap 拆出：正确归属是脉象 / 舌象字段。
+                    b.setMisrouted(b.getMisrouted() + 1);
+                } else if (startsWithAny(content, INQUIRY_LEAD)
+                        || containsAny(content, INQUIRY_MARKERS)) {
+                    // ③ 问诊整句被当成症状（大便日一行 / 入睡转快 / 夜寐一般…）→ 抽取侧。
+                    //    2026-10-21 从 dictionaryGap 拆出：它们的正确去向是抽取侧的 inquiry
+                    //    字段（十问子项），补成症状标准词属错映射。算进「词表缺口」会让报告
+                    //    声称「词表缺 N 条」，而补词表根本解决不了这批。
+                    b.setInquiryFragment(b.getInquiryFragment() + 1);
+                } else if (startsWithAny(content, PROCESS_DESC_LEAD)) {
+                    // ④ 病程 / 诱因描述（活动后缓解 / 遇劳加重 / 受凉后…）→ 抽取侧。
+                    //    同理拆出：它们是症状的修饰而非本体，没有独立标准词可补。
+                    //    判定顺序在问诊之后 —— 「夜寐俯卧」这类同时含两类前缀的，
+                    //    归问诊更准确（主体是卧位描述）。
+                    b.setProcessDesc(b.getProcessDesc() + 1);
                 } else {
-                    // ③ 多为标准词但词表没有 → 词表侧
+                    // ⑤ 其余：多为标准词但词表没有 → 词表侧（补词表即可改善）
                     b.setDictionaryGap(b.getDictionaryGap() + 1);
-                    // 计数照旧（dictionaryGap 统计全部），但「最该先补」清单排除问诊整句：
-                    // 它们的正确去向是抽取侧的 inquiry（方案A），补成症状标准词属错映射。
-                    if (!startsWithAny(content, INQUIRY_LEAD)) {
-                        gapCount.merge(content, 1, Integer::sum);
-                    }
+                    gapCount.merge(content, 1, Integer::sum);
                 }
             }
         }
