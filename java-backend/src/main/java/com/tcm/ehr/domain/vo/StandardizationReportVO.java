@@ -176,6 +176,33 @@ private int termCount;
          */
         private java.util.Map<String, Integer> top = new java.util.LinkedHashMap<>();
         public java.util.Map<String, Integer> getTop() { return top; }
+
+        /**
+         * 各抽取侧桶的 TOP 词（2026-10-21 新增）。
+         *
+         * <p>本页当前定位是<strong>给开发人员看</strong>：他们要根据本报告改抽取规则，
+         * 只知道「有 1353 条」无从下手，必须知道「是哪 1353 条」。故每个桶都带 TOP 词与频次。
+         * 与 {@link #top} 的区别：top 只收「词表缺口」（补词表可解决）；这四个是抽取侧，
+         * 补词表无效，要改的是抽取边界。</p>
+         */
+        private java.util.Map<String, Integer> inquiryFragmentTop = new java.util.LinkedHashMap<>();
+        public java.util.Map<String, Integer> getInquiryFragmentTop() { return inquiryFragmentTop; }
+        public void setInquiryFragmentTop(java.util.Map<String, Integer> v) { this.inquiryFragmentTop = v; }
+
+        /** 病程 / 诱因桶的 TOP 词 */
+        private java.util.Map<String, Integer> processDescTop = new java.util.LinkedHashMap<>();
+        public java.util.Map<String, Integer> getProcessDescTop() { return processDescTop; }
+        public void setProcessDescTop(java.util.Map<String, Integer> v) { this.processDescTop = v; }
+
+        /** 脉诊手法 / 舌象碎片桶的 TOP 词 */
+        private java.util.Map<String, Integer> mistypeMarkerTop = new java.util.LinkedHashMap<>();
+        public java.util.Map<String, Integer> getMistypeMarkerTop() { return mistypeMarkerTop; }
+        public void setMistypeMarkerTop(java.util.Map<String, Integer> v) { this.mistypeMarkerTop = v; }
+
+        /** 两字未归一实体桶的 TOP 词 */
+        private java.util.Map<String, Integer> fragmentTop = new java.util.LinkedHashMap<>();
+        public java.util.Map<String, Integer> getFragmentTop() { return fragmentTop; }
+        public void setFragmentTop(java.util.Map<String, Integer> v) { this.fragmentTop = v; }
         public void setTop(java.util.Map<String, Integer> top) { this.top = top; }
         /**
          * 靠 L2（包含）/ L3（模糊）**推断**命中的实体明细（G3）：键=实体原文，值=出现次数，按次数降序。

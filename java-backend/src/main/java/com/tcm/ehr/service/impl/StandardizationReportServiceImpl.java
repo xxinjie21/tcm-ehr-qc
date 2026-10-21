@@ -819,6 +819,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         StandardizationReportVO.UnmatchedBreakdown b = new StandardizationReportVO.UnmatchedBreakdown();
         // 批次2：同一次遍历内累积「词表缺口」项的次数（键=实体原文），不额外扫库
         java.util.Map<String, Integer> gapCount = new java.util.LinkedHashMap<>();
+        // 2026-10-21：各抽取侧桶也累积 TOP 词 —— 本页定位是给开发人员，
+        // 只有「有 N 条」无从下手，必须给出「是哪 N 条」（改抽取规则要按词核对）。
+        java.util.Map<String, Integer> inquiryTop = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Integer> processTop = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Integer> mistypeTop = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Integer> fragmentTop = new java.util.LinkedHashMap<>();
         // G3：L2/L3 推断命中的实体（同一次遍历累积，键=原文，值=次数）
         java.util.Map<String, Integer> inferred = new java.util.LinkedHashMap<>();
         for (Row row : rows) {
@@ -866,16 +872,19 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     b.setMisrouted(b.getMisrouted() + 1);
                 } else if (containsAny(content, MISTYPE_MARKERS)) {
                     b.setMistypeMarker(b.getMistypeMarker() + 1);
+                    mistypeTop.merge(content, 1, Integer::sum);
                 } else if (startsWithAny(content, INQUIRY_LEAD)
                         || containsAny(content, INQUIRY_MARKERS)) {
                     // 问诊整句的正确去向是抽取侧的 inquiry 字段（十问子项），
                     // 补成症状标准词属错映射 —— 算进「词表缺口」会让报告声称
                     // 「词表缺 N 条」，而补词表根本解决不了这批。
                     b.setInquiryFragment(b.getInquiryFragment() + 1);
+                    inquiryTop.merge(content, 1, Integer::sum);
                 } else if (startsWithAny(content, PROCESS_DESC_LEAD)) {
                     // 病程 / 诱因是症状的修饰而非本体，没有独立标准词可补。
                     // 判定在问诊之后 —— 「夜寐俯卧」这类同时含两类前缀的归问诊更准确。
                     b.setProcessDesc(b.getProcessDesc() + 1);
+                    processTop.merge(content, 1, Integer::sum);
                 } else if (content.length() <= FRAGMENT_MAX_LEN) {
                     // 长度 <= 2 的未归一实体。
                     // ⚠️ 这一桶**不是**「抽取截断的残字」—— 实测单字 0 条、全部 2 字，
@@ -885,6 +894,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     // 故保持单桶、如实描述；补词必须人工研判口径（把「偏黄」收成标准词
                     //  会污染所有含该子串的实体）。
                     b.setFragment(b.getFragment() + 1);
+                    fragmentTop.merge(content, 1, Integer::sum);
                 } else {
                     // 其余：多为标准词但词表没有 → 词表侧（补词表即可改善）
                     b.setDictionaryGap(b.getDictionaryGap() + 1);
@@ -897,6 +907,11 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
                 .limit(15)
                 .forEach(e -> b.getTop().put(e.getKey(), e.getValue()));
+        // 2026-10-21：四个抽取侧桶的 TOP15（开发人员据此核对抽取规则）
+        putTop(b.getInquiryFragmentTop(), inquiryTop);
+        putTop(b.getProcessDescTop(), processTop);
+        putTop(b.getMistypeMarkerTop(), mistypeTop);
+        putTop(b.getFragmentTop(), fragmentTop);
         // G3：推断命中同型降序装入（上限同 TopN），供「登记别名 / 人工确认」清单
         inferred.entrySet().stream()
                 .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
@@ -951,6 +966,19 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             }
         }
         return r;
+    }
+
+    /**
+     * 把计数表按次数降序装入前 15 项（各抽取侧桶的 TOP 清单）。
+     *
+     * <p>与 unmatched 里 top 的装入逻辑同型，抽出来避免四份重复代码。</p>
+     */
+    private static void putTop(java.util.Map<String, Integer> target,
+                               java.util.Map<String, Integer> counter) {
+        counter.entrySet().stream()
+                .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
+                .limit(15)
+                .forEach(e -> target.put(e.getKey(), e.getValue()));
     }
 
     /** 质控分数分布与封顶率；封顶率高说明评分失去区分度 */
