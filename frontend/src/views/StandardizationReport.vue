@@ -503,8 +503,6 @@ const todos = computed(() => {
   }
 
   if (u.dictionaryGap > 0) {
-    const real = realGapTypes.value
-    const realTotal = real.reduce((a, c) => a + (c.total - c.normalized), 0)
     // 批次2：后端新给的「词表缺口 TOP15」（键=实体原文，值=次数）—— 让这条待办从
     // 「有 N 条没归上」变成「先补这几个词」，用户可直接拿它去补词表（不再需要自己去翻数据）
     const topPairs = Object.entries(u.top || {})
@@ -515,10 +513,12 @@ const todos = computed(() => {
       title: b ? `补充${b.label}标准词表` : '补充标准词表',
       // 批次2：把 TOP8 词原文一并带上，供模板里的「复制待补词」按钮使用（可行动清单的出口）
       words: topPairs.map(([w]) => w),
+      // ⚠️ 2026-10-21 修正：原写「未归一的 106859 条分布在 疾病、证候、症状…」——
+      //    106859 是**全部字段**的未归一合计，而本条的标题是「补充症状标准词表」，
+      //    两者并列会让用户以为「补症状词表能解决这 10 万条」。实际症状词表能解决的
+      //    只有症状字段的 dictionaryGap（约 6.5 万条）。改为聚焦本类词表自己的缺口。
       desc: `${b ? b.label : '症状'}类现有 ${b ? b.termCount : 0} 条词，`
-        + (real.length > 1
-          ? `未归一的 ${realTotal} 条分布在 ${real.map((c) => c.label).join('、')}。`
-          : `未归一的 ${u.dictionaryGap} 条均属此类。`)
+        + `本类词表未收录的未归一实体共 ${u.dictionaryGap} 条。`
         // ⚠️ 2026-10-21 修正三处错误陈述：
         // 1) 原写「病因类若未归一，属词表尚未建全」—— 病因现已 100% 归一（26489/26489），
         //    该陈述过时且会让用户去查一个不存在的问题，删掉。
@@ -535,8 +535,13 @@ const todos = computed(() => {
   }
   if (u.misrouted > 0) {
     list.push({
-      title: '修复脉象、舌象被当成症状',
-      desc: `${u.misrouted} 条「脉细数」这类脉象要素被归进了症状，会拉低症状归一率。`,
+      title: '修复脉诊手法、舌象要素被当成症状',
+      // ⚠️ 2026-10-21 修正：原写「${u.misrouted} 条『脉细数』这类脉象要素」，
+      //    实测该桶主体不是「脉细数」那种形态，而是脉诊手法与舌象碎片：
+      //    红点多(225)、不受按(222)、中取不受按(115)、左不受按(54)…
+      //    它们的正确归属是脉象/舌象字段，与「脉细数」是完全不同的两类。
+      desc: `${u.misrouted} 条脉诊手法、舌象要素被归进了症状（如「不受按」「红点多」），`
+        + '正确归属是脉象 / 舌象字段，留在症状会拉低症状归一率。',
       owner: '抽取',
       tagType: 'warning'
     })
@@ -596,12 +601,6 @@ const emptyTip = computed(() => (isEmptyReport.value
 /** 词表非空、也抽到了实体，却一条都没归上 —— 这是解析早于词表建立，补词表无效 */
 const staleTypes = computed(() =>
   (report.value?.coverage || []).filter((c) => c.suspectedStaleExtraction)
-)
-
-/** 真正的「词表没收录」：排除了上述那类，剩下的才是补词表能解决的 */
-const realGapTypes = computed(() =>
-  (report.value?.coverage || [])
-    .filter((c) => c.total > 0 && !c.suspectedStaleExtraction && c.total - c.normalized > 0)
 )
 
 const scoreRange = computed(() => {
