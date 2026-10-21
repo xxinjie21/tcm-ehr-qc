@@ -97,6 +97,16 @@
             {{ clean.doNormalize ? '把原文统一为标准词（较慢）' : '只做去重、清理、隔离（快）' }}
           </span>
         </div>
+        <!-- 范围开关（2026-10-21）：清洗是数分钟级重活，通常只有新增/新解析的病历需要清洗；
+             默认不勾（保持「全范围清洗」的原行为），勾上则只处理 governed=0 的病历。 -->
+        <div class="ca-opt">
+          <el-checkbox v-model="clean.onlyUncleaned" :disabled="clean.loading" size="small">
+            只清洗未清洗的
+          </el-checkbox>
+          <span class="ca-opt-hint">
+            {{ clean.onlyUncleaned ? '跳过已清洗过的病历（快）' : '范围内全部重跑（慢）' }}
+          </span>
+        </div>
         <!-- 执行期间说明「在做什么」；清洗已改异步，关页面不影响执行 -->
         <div v-if="clean.loading" class="ca-state">
           {{ clean.status === 'QUEUED' ? '排队中…' : '正在处理，可随时「停止清洗」；关页面不影响执行' }}
@@ -371,6 +381,7 @@ const loadStats = async () => {
 const clean = reactive({
   loading: false, result: null, error: null, doNormalize: true,
   taskId: null,       // 当前任务 ID（用于轮询 / 取消）
+  onlyUncleaned: false, // 只清洗未清洗过的（governed=0）
   percent: 0,         // 真实进度（后端 done/total）
   status: null        // QUEUED/RUNNING/COMPLETED/CANCELLED/FAILED
 })
@@ -430,7 +441,7 @@ const handleClean = async () => {
     try { await previewDone } catch { /* 已由 .catch 兜底 */ }
     // 4. 异步提交：立即返回任务 ID，不再等整批跑完（原来同步接口要挂 5 分钟超时）
     const res = await submitCleanBatch({
-      filters: { ...filters },
+      filters: { ...filters, onlyUncleaned: clean.onlyUncleaned },
       skipNormalize: !clean.doNormalize
     })
     clean.taskId = res.data?.id || null
@@ -507,6 +518,8 @@ const restoreRunningClean = async () => {
     clean.status = active.status
     clean.loading = true
     clean.doNormalize = !active.skipNormalize
+    // 任务列表不回传 onlyUncleaned（它是提交时的范围条件，已固化进 filtersJson），
+    // 这里不还原开关值，避免给出与实际执行范围不符的暗示。
     const total = active.total || 0
     const done = active.done || 0
     clean.percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0

@@ -160,6 +160,18 @@ public final class RecordFilter {
     }
 
     /**
+     * 仅未清洗：{@code governed = 0}。
+     *
+     * <p>清洗是数分钟级的重活，但通常只有新增/新解析的病历需要清洗；
+     * 不加本条件每次都在全范围重跑。{@code governed} 由清洗完成时置 1（含「跳过归一」那类）。</p>
+     */
+    private static void andOnlyUncleaned(QueryWrapper<Record> wrapper, Boolean onlyUncleaned) {
+        if (Boolean.TRUE.equals(onlyUncleaned)) {
+            wrapper.eq("governed", 0);
+        }
+    }
+
+    /**
      * 数据域（行级权限）：限当前主组；无组时<b>返回空集</b>。
      *
      * <p>⚠️ 这里不得写成"无组就不加条件"——那等于看到全库，
@@ -422,6 +434,7 @@ public final class RecordFilter {
             }
             // 5. 仅未解析：structured_data 为 SQL NULL（该列是 JSON 类型，不能与 '' 比较）
             andOnlyUnparsed(wrapper, filterDto.getOnlyUnparsed());
+            andOnlyUncleaned(wrapper, filterDto.getOnlyUncleaned());
         }
         // 与 SearchDTO 重载同一个排序键：本工具的两种入参不该给出不同顺序（审查报告 L8）。
         // 注意 FiltersDTO 重载的调用方多是聚合 / 批处理 / 按范围删除，排序对它们无意义，

@@ -338,6 +338,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             scope.setDateRange(filters.getDateRange());
             scope.setIds(filters.getIds());
             scope.setOnlyUnparsed(filters.getOnlyUnparsed());
+            // 只清洗「没清洗过的」：清洗是数分钟级重活，而通常只有新增/新解析的病历需要清洗。
+            // 不加这一项时每次都在全范围重跑（本条件由调用方按需开启）。
+            scope.setOnlyUncleaned(filters.getOnlyUncleaned());
         }
         scope.setGrade("合格");
         return scope;

@@ -35,4 +35,15 @@ public class FiltersDTO {
      * <p>用于「只解析未解析的」：避免把已解析过的几万条再重抽一遍。缺省/为 false 时不加条件。</p>
      */
     private Boolean onlyUnparsed;
+
+    /**
+     * 仅处理「尚未清洗」的病历（{@code governed = 0}）。
+     *
+     * <p>用于「只清洗没清洗过的」：清洗是重活（几万条要数分钟），
+     * 而通常只有新增/新解析的病历需要清洗。缺省/为 false 时不加条件（保持原行为：全范围）。</p>
+     *
+     * <p>注意与「已清洗但跳过归一」的区别：那种病历 governed 已置 1，
+     * 不会再次落进本条件 —— 这是刻意的（见 GovernanceServiceImpl#clean 的 skipNormalize 分支）。</p>
+     */
+    private Boolean onlyUncleaned;
 }
