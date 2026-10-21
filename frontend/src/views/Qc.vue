@@ -133,7 +133,7 @@
               <!-- P0-2：撑满卡内剩余高度改由 CSS 决定（.fill-table 吃满弹性空间、
                     表格自身 height:100%），不再用 JS 量卡片像素反算 —— 见本文件样式段 -->
               <div class="fill-table fill-table--left">
-                <el-table :data="dedStats.byItem" border size="small" max-height="560">
+                <el-table :data="dedStats.byItem" border size="small" height="100%">
                   <el-table-column prop="type" label="类型" width="130" />
                   <el-table-column prop="item" label="项" width="110" />
                   <el-table-column prop="count" label="受影响病历数" width="110" />
@@ -933,6 +933,7 @@ onMounted(() => {
   min-height: 0;
 }
 .fill-table--left {
+  flex: 1 1 auto;
   min-height: 200px;
 }
 .fill-table--right {
