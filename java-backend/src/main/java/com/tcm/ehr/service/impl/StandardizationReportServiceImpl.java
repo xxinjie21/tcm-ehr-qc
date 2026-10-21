@@ -658,7 +658,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         // 本方法可能在 SWR 的后台重算线程里执行，那里读不到请求上下文。
         QueryWrapper<Record> wrapper = RecordFilter.buildForAggregate(
                 ctx.domainOrgId(), filters, ctx.viewAllOrgs());
-        wrapper.select("id", "visit_time", "score", "update_time", "chief_complaint", "self_report", "structured_data", "qc_results");
+        // grade 必须投影：归一率类统计要按「质控合格」收窄（见 computeReport 的 qualifiedOnly），
+        // 少了这一列 Row.grade 恒为 null，过滤后空集 —— 表现为报告归零。
+        wrapper.select("id", "grade", "visit_time", "score", "update_time", "chief_complaint", "self_report", "structured_data", "qc_results");
         return toRows(recordMapper.selectList(wrapper));
     }
 
