@@ -14,12 +14,18 @@
              用户不知道报告何时更新、该点哪个按钮才生效。 -->
         <div style="margin-bottom:8px; padding:var(--sp-2) var(--sp-3); font-size: var(--fs-xs); line-height:1.7;
                     color:var(--text); background:var(--ochre-light); border-left:3px solid var(--ochre); border-radius:4px;">
-          <b>本页不会自动刷新。</b>补了词表 → 重跑「解析 + 质控」；只改质控规则 → 「立即重跑质控」；
-          只是想再看一遍 → 点右上角「刷新」。若下方时效标签提示「解析早于词表」，说明有病历还没吃到新词表。
+          <!-- ⚠️ 2026-10-21 修正：原文写「补了词表 → 重跑『解析 + 质控』」。
+               补词表正确做法是重跑**归一**（在「清洗与导出」页），不必重跑解析 ——
+               解析只负责把文本抽成实体，词表只影响实体→标准词的映射。
+               重抽代价大得多（实测重抽约 1 小时 vs 仅归一约 17 分钟），
+               原文会把用户引向不必要的高成本操作。 -->
+          <b>本页不会自动刷新。</b>补了词表 → 在「清洗与导出」页重跑<b>归一</b>即可（不必重跑解析）；
+          只改质控规则 → 「立即重跑质控」；只是想再看一遍 → 点右上角「刷新」。
+          若下方时效标签提示「解析早于词表」，说明有病历还没吃到新词表。
         </div>
         <div class="misc-grid">
                     <FreshnessTag :time="report?.generatedAt" :stale="hasStaleRows"
-                        reason="部分病历的解析早于词表，需重跑" />
+                        reason="部分类型抽到实体却均未归一，可能解析早于词表" />
           <!-- 对标 A5 的口径见后端 StandardizationReportVO.sourceVersion：
                本页**刻意不展示**它 —— 这页的读者是质控科业务用户（见文件头设计取向），
                而它的值是一串 type:hash 拼接（9 类各一段），属于技术口径，按要求"只在本文件内部使用"。

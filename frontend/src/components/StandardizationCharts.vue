@@ -21,7 +21,11 @@
       <div class="sc-cell">
         <div class="sc-hd">
           各类术语归一率
-          <span v-if="!loading && !error && covBars.length" class="sc-sub">条长 = 归一率，越短越该先补</span>
+          <!-- ⚠️ 2026-10-21 修正：原文「条长 = 归一率，越短越该先补」会误导 ——
+               归一率低不等于该补词表：实测症状归一率最低（约 55%），但其未归一实体里
+               约 85% 是**抽取错位的噪声**（脉诊手法/舌象碎片/病程描述），补进词典属错映射。
+               该补哪类，应看下方「未归一实体 TOP」里的具体词，而非只看条长。 -->
+          <span v-if="!loading && !error && covBars.length" class="sc-sub">条长 = 归一率；低的原因需看下方未归一明细（可能是词表缺口，也可能是抽取错位）</span>
         </div>
         <div v-if="loading" class="sc-skel" aria-label="图表加载中" />
         <div v-else-if="error" class="sc-fail">

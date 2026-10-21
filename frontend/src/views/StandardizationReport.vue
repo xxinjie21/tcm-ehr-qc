@@ -32,10 +32,20 @@
           </p>
           <!-- 数据来源提示：只在真拿到报告后渲染 —— 加载中 / 失败时它会陈述「0 条病历」，
                那是错误陈述（不是 0 条，是还没读到 / 没读到）。 -->
+          <!-- ⚠️ 2026-10-21 修正：原写死「属测试数据」，但实测当前 28801 条病历对应
+               9141 种主诉写法（塌缩度极低），已是真实数据 —— 写死会在真实数据上给出
+               错误定性，用户会以为整页结论都不可用。改为按主诉模板塌缩度动态判断：
+               写法数远少于病历数（< 1/10）才是模板数据。 -->
           <p v-else-if="report && !loadError" class="rh-caveat">
             当前数据共 {{ report?.dataset?.recordCount ?? 0 }} 条病历、主诉
-            {{ report?.dataset?.chiefComplaintTemplates ?? 0 }} 种写法，属测试数据；
-            下列数字用于验证词典建设进度，不代表真实病历上的准确率。
+            {{ report?.dataset?.chiefComplaintTemplates ?? 0 }} 种写法。
+            <template v-if="looksLikeTemplateData">
+              写法数远少于病历数，疑似模板/演示数据，下列数字仅用于验证词典建设进度，
+              不代表真实病历上的准确率。
+            </template>
+            <template v-else>
+              写法分布正常（非模板数据），下列数字可直接用于评估词典覆盖能力。
+            </template>
           </p>
         </div>
       </div>
@@ -328,6 +338,19 @@ const hasStaleRows = computed(() => (report.value?.coverage || [])
 // ---------------- 空数据判据（P0-5）----------------
 // 「没有数据」绝不能渲染成「全部达标」：指标卡的绿色与结论条的绿色对勾都只在
 // 真有数据可评时才允许出现。展示分支判定，不动后端任何计算口径。
+/**
+ * 是否像「模板/演示数据」：主诉写法数不到病历数的 1/10。
+ *
+ * <p>判据取自 datasetShape 的设计意图 —— 模板数据的主诉会大量重复，
+ * 写法数远少于病历数；真实病历一一不同。实测当前 28801 条病历对应 9141 种写法
+ * （约 1/3），属真实数据。</p>
+ */
+const looksLikeTemplateData = computed(() => {
+  const n = report.value?.dataset?.recordCount ?? 0
+  const t = report.value?.dataset?.chiefComplaintTemplates ?? 0
+  return n > 0 && t > 0 && t * 10 < n
+})
+
 const isEmptyReport = computed(() => {
   const d = report.value
   if (!d) return false
@@ -492,15 +515,20 @@ const todos = computed(() => {
       title: b ? `补充${b.label}标准词表` : '补充标准词表',
       // 批次2：把 TOP8 词原文一并带上，供模板里的「复制待补词」按钮使用（可行动清单的出口）
       words: topPairs.map(([w]) => w),
-      desc: `${b ? b.label : '症状'}类现有 ${b ? b.termCount : 72} 条词，`
+      desc: `${b ? b.label : '症状'}类现有 ${b ? b.termCount : 0} 条词，`
         + (real.length > 1
           ? `未归一的 ${realTotal} 条分布在 ${real.map((c) => c.label).join('、')}。`
           : `未归一的 ${u.dictionaryGap} 条均属此类。`)
-        // 病因自本批次起有独立词表（causes.json，出厂可能为空），其未归一属**词表缺口**
-        // （尚未建词 / 未收录该词）而非解析问题；提示用户把病因标准词补上即可。
-        + '病因类若未归一，属词表尚未建全而非解析问题。'
-        + (topWords ? `最该先补：${topWords}。` : '')
-        + '补完需重跑解析。',
+        // ⚠️ 2026-10-21 修正三处错误陈述：
+        // 1) 原写「病因类若未归一，属词表尚未建全」—— 病因现已 100% 归一（26489/26489），
+        //    该陈述过时且会让用户去查一个不存在的问题，删掉。
+        // 2) 原写「补完需重跑解析」—— **错误指引**：补词表只需重跑**归一**（读新词典即可），
+        //    不必重跑解析；重抽是数倍耗时（实测重抽约 1 小时 vs 仅归一约 17 分钟）。
+        // 3) 原「最该先补」直接列 TOP8 词，但那批词（红点多/不受按/中取不受按…）实测是
+        //    **抽取错位的噪声**（脉诊手法、舌象碎片、病程描述），补进词典属错映射；
+        //    故文案改为「供研判」而非「先补这些」。
+        + (topWords ? `候选（需先研判，未必是现代症状词）：${topWords}。` : '')
+        + '补完在「清洗与导出」页跑一次归一即可，无需重跑解析。',
       owner: '词表',
       tagType: 'warning'
     })

@@ -17,16 +17,23 @@
     -->
     <!-- 导入后的重跑引导（批次 21）：
          词表改了不等于归一结果改了 —— structured_data 是解析时写下的快照。
-         不说清楚，用户会以为「导入没生效」，然后反复重传同一个文件。 -->
+         不说清楚，用户会以为「导入没生效」，然后反复重传同一个文件。
+
+         ⚠️ 2026-10-21 修正：原实现让用户重跑「结构化解析 + 质控」，方向错了。
+         解析只负责把文本抽成实体，实体→标准词的映射由**归一**完成；
+         补词表只需重跑归一（接口 /nlp/extract/batch/normalize-only），
+         不必重跑解析 —— 后者代价大得多（实测重抽约 1 小时 vs 仅归一约 17 分钟），
+         且会重算全部抽取结果，引入不必要的波动。
+         质控仍要重跑：归一结果变了，扣分明细跟着变。 -->
     <div v-if="rerunNeeded" class="rerun-hint">
-      <div class="rh-title">词表已生效，但还需要重跑一次解析</div>
+      <div class="rh-title">词表已生效，重跑一次归一即可套到已有病历</div>
       <div class="rh-desc">
-        术语归一的结果存在每条病历的结构化字段里，是<b>解析那一刻算好就固定下来的</b>。
-        刚导入的新词条不会自动套到已有病历上 —— 必须重跑「结构化解析 + 质控」才会生效。
+        术语归一的结果存在每条病历的结构化字段里，是<b>上次归一那一刻算好就固定下来的</b>。
+        刚导入的新词条不会自动套到已有病历上 —— 重跑<b>归一</b>（不必重跑解析）+ 质控即可生效。
       </div>
       <div class="rh-ops">
         <el-button type="primary" size="small" :loading="rerunning" @click="rerunAll">
-          立即重跑解析与质控
+          立即重跑归一与质控
         </el-button>
         <router-link class="rh-link" to="/standardization-report">查看质量报告</router-link>
         <!-- 与「查看质量报告」并排：导入完这一页的任务就结束了，用户要么去看结果，
@@ -393,7 +400,7 @@ import DictMergeDialog from '@/components/DictMergeDialog.vue'
 import { importDict, parseDictFile } from '@/api/dictionary'
 import { runTermSuggest } from '@/api/ai'
 import { getLlmConfig } from '@/api/llm'
-import { submitNlpBatch } from '@/api/nlp'
+import { submitNlpNormalizeBatch } from '@/api/nlp'
 import { recomputeQc } from '@/api/qc'
 import { confirmBox } from '@/utils/confirm'
 import { apiErrorMessage } from '@/utils/errorMessage'
@@ -951,14 +958,16 @@ const handleSubmit = async () => {
 
   const rerunAll = async () => {
     if (!(await confirmBox(
-      '将对本组织全部病历重跑「结构化解析 + 质控」。新词表要生效必须重跑：'
-      + '解析结果存在病历的结构化字段里，不重跑就还是旧的。',
-      '确认重跑解析与质控',
+      '将对本组织全部病历重跑「归一 + 质控」。新词表要生效必须重跑：'
+      + '归一结果存在病历的结构化字段里，不重跑就还是旧的。'
+      + '（只跑归一，不重跑解析 —— 解析与词典无关，重跑它更慢且没有必要。）',
+      '确认重跑归一与质控',
       { type: 'warning', confirmButtonText: '开始重跑', cancelButtonText: '取消' }
     ))) return
     rerunning.value = true
     try {
-      await submitNlpBatch()
+      // 只重跑归一（不重跑解析）：解析与词典无关，补词表只需让新词参与映射
+      await submitNlpNormalizeBatch()
       await recomputeQc()
       ElMessage.success('已提交重跑任务，完成后到「标准化质量报告」查看新结果')
       rerunHint.value = null

@@ -165,7 +165,7 @@
           :description="`本次新增的术语中，有 ${mergeImpact.hit.length} 个此前是未归一词：`
             + mergeImpact.hit.slice(0, 3).map((h) => `「${h.term}」${h.count} 条`).join('、')
             + (mergeImpact.hit.length > 3 ? ' 等' : '')
-            + `，合计 ${mergeImpact.total} 条病历的归一结果会变化（重跑解析后生效）。`"
+            + `，合计 ${mergeImpact.total} 条病历的归一结果会变化（重跑归一后生效，无需重跑解析）。`"
         />
       </div>
 
