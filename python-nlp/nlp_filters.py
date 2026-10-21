@@ -28,6 +28,12 @@ _SINGLE_CHAR_FIELDS = ("symptoms", "diseases", "patternList", "causeList", "trea
 HERB_STOP = ("蛋白", "细胞", "抗原", "抗体", "片段", "细菌", "病毒", "基因", "激素",
              "免疫", "检验", "检查", "结果", "报告", "医院", "大学", "学院", "研究院",
              "研究所", "中心", "妇保", "门诊", "科内", "系列")
+# 化验指标（2026-10-21 补）：实测「甘油三酯(41)/总胆红素(31)/总胆固醇(29)/肌酐(27)/
+# 间接胆红素(27)/血小板(22)/尿酸(22)/谷草(21)/直接胆红素(19)/尿素(17)/葡萄糖(17)」
+# 被当成中药抽出来 —— 它们全是化验单项目，不是药材。形态判据（全汉字 2~5 字）拦不住。
+HERB_LAB_TERMS = ("甘油三酯", "胆红素", "胆固醇", "肌酐", "尿酸", "尿素", "葡萄糖",
+                  "血小板", "谷草", "血红蛋白", "白细胞", "红细胞", "血糖", "血脂",
+                  "总蛋白", "白蛋白", "球蛋白", "转氨酶", "尿素氮")
 # 省份简称：`江西省` / `江西中`（后者是前者的截断）都以它开头
 PROVINCE_HEADS = ("北京", "上海", "天津", "重庆", "河北", "山西", "辽宁", "吉林", "黑龙江",
                   "江苏", "浙江", "安徽", "福建", "江西", "山东", "河南", "湖北", "湖南",
@@ -46,6 +52,8 @@ def is_plausible_herb(span: str) -> bool:
     if not (_all_cjk(span) and HERB_MIN_LEN <= len(span) <= HERB_MAX_LEN):
         return False
     if any(w in span for w in HERB_STOP):
+        return False
+    if any(w in span for w in HERB_LAB_TERMS):
         return False
     if span.startswith(PROVINCE_HEADS):
         return False
@@ -154,6 +162,89 @@ def _is_noisy_symptom(s: str) -> bool:
             or s in _NOISE_EXACT or bool(_NORMAL_STATE_RE.match(s)))
 
 
+# ---- F2b 中药截断残片 ----------------------------------------------------------
+# 实测：NER 把「焦神曲6g」抽成「焦神」、「炒白芍10g」抽成「炒白」、「炮附子12g」抽成「炮附」。
+# 判据：该词在原文中**没有任何一处**紧跟剂量（即原文并无这副药），
+#       且存在一个更长的、以它开头、且后面紧跟剂量的药名 → 它是那个更长药名的截断。
+# 这个判据不会误伤「瓜蒌 / 荆芥 / 茯苓」这类有效药名 ——
+#   只要原文有一处「瓜蒌10g」，_occurs_with_dose 即为真，直接保留。
+_HERB_DOSE_TAIL = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(g|克|ml|mg)")
+
+
+def _occurs_with_dose(name: str, text: str) -> bool:
+    """name 在 text 中是否至少有一处紧跟剂量。"""
+    if not name or not text:
+        return False
+    start = 0
+    while True:
+        idx = text.find(name, start)
+        if idx < 0:
+            return False
+        if _HERB_DOSE_TAIL.match(text[idx + len(name):]):
+            return True
+        start = idx + 1
+
+
+def drop_truncated_herbs(herbs: List, full_text: str) -> List:
+    """丢弃「原文里没有独立出现、但有更长的同名药+剂量」的截断残片。"""
+    if not full_text or not herbs:
+        return herbs
+    names = {(h.name or h.sourceText or "").strip() for h in herbs}
+    kept = []
+    for h in herbs:
+        n = (h.name or h.sourceText or "").strip()
+        if len(n) < 2 or _occurs_with_dose(n, full_text):
+            kept.append(h)
+            continue
+        if any(m != n and m.startswith(n) and _occurs_with_dose(m, full_text) for m in names):
+            continue          # 截断残片：更长的药名已被抽到，这条丢掉不丢信息
+        kept.append(h)
+    return kept
+
+
+# ---- F6 症状：脉舌要素 / 病程诱因不是症状 --------------------------------------
+# 2026-10-21：实测这两类共 2178 条未归一，且**导出替换损失为 0**（都不产生 sourceText→标准词 的替换），
+# 移走零风险。它们留在 symptoms 里只会拉低症状归一率、并挤占「最该先补」清单。
+_SYMPTOM_MISTYPE = (
+    # 脉诊手法：切脉动作描述，正确归属是脉象字段或直接丢弃（无独立标准词）
+    "不受按", "中取", "浮取", "沉取", "应指",
+    # 舌象碎片：舌体/舌苔的子要素，正确归属是 tongueList
+    "红点", "瘀点", "齿痕", "裂纹", "舌下", "边有",
+)
+_SYMPTOM_PROCESS_LEAD = (
+    # 病程/诱因：是对症状的修饰（什么时候轻/重），不是症状本体
+    "活动后", "活动时", "活动则", "休息后", "休息时", "劳累后", "劳累时", "劳则",
+    "遇劳", "遇冷", "遇热", "遇风", "受凉后", "受寒后", "受风后",
+    "进食后", "进餐后", "服药后", "饮水后", "大便后", "小便后",
+    "持续性", "反复发作", "阵发性", "间歇性", "夜间明显", "晨起明显", "午后",
+    "加重", "减轻", "缓解", "好转", "自行缓解",
+)
+
+
+def is_mistype_symptom(s: str) -> bool:
+    """脉舌要素 / 病程诱因被当成症状 —— 应在抽取阶段就消费掉。"""
+    s = (s or "").strip()
+    if not s:
+        return False
+    if any(m in s for m in _SYMPTOM_MISTYPE):
+        return True
+    return s.startswith(_SYMPTOM_PROCESS_LEAD)
+
+
+# ---- F7 方剂残片 ----------------------------------------------------------------
+# 实测：中草药(31)/中草(2)/中草药处(1) 是「中草药处方」的残片；太阴/阳明 是六经名不是方剂名。
+_LIUJING = ("太阳", "阳明", "少阳", "太阴", "少阴", "厥阴")
+
+
+def is_formula_fragment(s: str) -> bool:
+    s = (s or "").strip()
+    if not s:
+        return False
+    if s.startswith("中草药") or s == "中草":
+        return True
+    return s in _LIUJING
+
+
 def drop_noise(resp: ExtractResponse, full_text: str = "") -> Dict[str, int]:
     """就地过滤抽取结果，返回各字段丢弃条数（供日志/报表对账）。
 
@@ -182,6 +273,23 @@ def drop_noise(resp: ExtractResponse, full_text: str = "") -> Dict[str, int]:
     # F2 中药形态过滤（丢了的连着 dosage 一起丢）
     herbs = resp.herbs or []
     kept_h = [h for h in herbs if is_plausible_herb(h.name or h.sourceText or "")]
+    # F2b 中药截断残片（落在形态判据之后：先排除化验指标/机构名，再判截断）
+    before_trunc = len(kept_h)
+    kept_h = drop_truncated_herbs(kept_h, full_text)
     counts["herbs"] = len(herbs) - len(kept_h)
+    if before_trunc != len(kept_h):
+        counts["herbs_truncated"] = before_trunc - len(kept_h)
     resp.herbs = kept_h
+    # F6 症状：脉舌要素 / 病程诱因（零替换损失，已验证）
+    symptoms2 = resp.symptoms or []
+    kept_s2 = [e for e in symptoms2 if not is_mistype_symptom(e.content or e.sourceText or "")]
+    if len(kept_s2) != len(symptoms2):
+        counts["symptoms_mistype"] = counts.get("symptoms", 0) + (len(symptoms2) - len(kept_s2))
+    resp.symptoms = kept_s2
+    # F7 方剂残片
+    formulas = resp.formulaList or []
+    kept_f = [e for e in formulas if not is_formula_fragment(e.content or e.sourceText or "")]
+    if len(kept_f) != len(formulas):
+        counts["formulaList_fragment"] = len(formulas) - len(kept_f)
+    resp.formulaList = kept_f
     return {k: v for k, v in counts.items() if v}
