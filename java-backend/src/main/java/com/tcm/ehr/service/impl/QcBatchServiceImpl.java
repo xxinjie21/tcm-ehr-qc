@@ -107,7 +107,13 @@ public class QcBatchServiceImpl implements IQcBatchService {
     @Value("${qc.batch.max-records:40000}")
     private int maxRecords;
 
-    private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+    /**
+     * 任务队列容量上限（2026-10-21）：原为无界 LinkedBlockingQueue，长期快于消费会 OOM。
+     * 容量 256 已远超合理场景；打满时拒绝入队并落 FAILED（比默默堆积安全）。
+     */
+    private static final int QUEUE_CAPACITY = 256;
+
+    private final BlockingQueue<String> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
     /** 运行中任务的取消位 */
     /**
      * 已请求取消的任务 ID。
@@ -332,7 +338,14 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
         // 5. 入队后立即返回，由工作线程异步消费。
         //    批次 26.2：入队推迟到事务提交之后（行可见才投递），否则 worker 可能先于提交取到 id
-        DistLock.afterCommit(() -> queue.offer(t.getId()));
+        DistLock.afterCommit(() -> {
+            // 队满时落 FAILED，避免任务永远卡在 QUEUED。
+            if (!queue.offer(t.getId())) {
+                log.error("[批重算] 任务队列已满（容量 {}），任务 {} 无法入队，直接落 FAILED",
+                        QUEUE_CAPACITY, t.getId());
+                markFailed(t.getId());
+            }
+        });
         operationLogger.log("批量重算", RecordFilter.describe(filters), "提交任务，计划 " + total + " 条", operator, role);
         log.info("[批重算] 已提交任务 {}：计划 {} 条", t.getId(), total);
         return toVO(t, false);

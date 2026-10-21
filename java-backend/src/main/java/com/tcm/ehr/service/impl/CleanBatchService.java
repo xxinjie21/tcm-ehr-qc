@@ -63,7 +63,19 @@ public class CleanBatchService implements ICleanBatchService {
     @Value("${clean.batch.concurrency:1}")
     private int concurrency;
 
-    private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+    /**
+     * 任务队列容量上限（2026-10-21）。
+     *
+     * <p>原来是 {@code new LinkedBlockingQueue<>()} —— <b>无界</b>。提交速度长期快于消费速度时
+     * 队列会无限增长直至 OOM。虽然「同组织只允许一个 QUEUED/RUNNING 任务」已把实际堆积压到很低，
+     * 但那是业务约束、不是容量保证，故补一个硬上限兜底。</p>
+     *
+     * <p>容量取 256：单任务处理 3.4 万条要几十分钟，256 个待处理任务已远超任何合理场景；
+     * 真打满说明系统异常，此时<b>拒绝入队并落 FAILED</b> 比默默堆积更安全（用户能看到失败原因）。</p>
+     */
+    private static final int QUEUE_CAPACITY = 256;
+
+    private final BlockingQueue<String> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
     /** 运行中任务的取消位（内存快判；权威是 clean_task.cancel_requested 列） */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
 
@@ -210,7 +222,15 @@ public class CleanBatchService implements ICleanBatchService {
         // ⚠️ 必须在<b>事务提交后</b>才入队（与 QcBatchServiceImpl 同口径，用 DistLock.afterCommit）。
         // 在事务内 queue.offer 会让 worker 立刻 poll 到 id，但它去 selectById 时该行尚未提交
         // —— 读到 null，runTask 静默 return，任务永远停在 QUEUED（本 bug 的实际表现）。
-        DistLock.afterCommit(() -> queue.offer(t.getId()));
+        DistLock.afterCommit(() -> {
+            // 队满时不能静默丢 id —— 那样任务会永远停在 QUEUED、前端一直转圈。
+            // 直接落 FAILED，让用户在任务列表里看到明确结局并能重试。
+            if (!queue.offer(t.getId())) {
+                log.error("[清洗] 任务队列已满（容量 {}），任务 {} 无法入队，直接落 FAILED",
+                        QUEUE_CAPACITY, t.getId());
+                markFailed(t.getId());
+            }
+        });
         log.info("[清洗] 已提交任务 {}（组织={}，跳过归一={}）", t.getId(), orgId, skipNormalize);
         return toVO(t, true);
     }
