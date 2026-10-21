@@ -341,14 +341,21 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         List<Row> rows = filterByVisitTime(all, start, end);
         vo.setRange(rangeOf(all, rows, start, end, importStart, importEnd));
         vo.setByMonth(byMonth(rows));
-        vo.setCoverage(coverage(rows, dicts));
+        // 归一率类统计（coverage / unmatched / normalizable）**只看质控合格的病历**：
+        // 本页是「标准化质量报告」，衡量「进标准数据集的那批数据」的术语质量；
+        // 待复核 / 无效病历本身数据就有问题（缺核心要素、逻辑冲突），算进分母会把
+        // 「术语标准化质量」与「病历书写质量」混进同一根指标，用户无法据此判断该补词表还是修病历。
+        // 与导出条件（grade=合格）对齐后，报告数字可直接解释数据集品质。
+        // 分数分布 / qc 一致性 / 按月趋势仍用 rows —— 它们统计质控与数据本体，需全量。
+        List<Row> qualified = qualifiedOnly(rows);
+        vo.setCoverage(coverage(qualified, dicts));
         // A2：词表只读一次，两个统计器共用同一份（原先各自 new HashSet<>(symptomTerms()) 一遍）
         Set<String> symptomDict = new HashSet<>(symptomTerms(dicts));
-        vo.setUnmatched(unmatched(rows, symptomDict));
-        vo.setNormalizable(normalizableRate(rows, symptomDict));
+        vo.setUnmatched(unmatched(qualified, symptomDict));
+        vo.setNormalizable(normalizableRate(qualified, symptomDict));
         vo.setScore(scoreDistribution(rows));
         vo.setQc(qcCoverage(rows));
-        vo.setDataset(datasetShape(rows));
+        vo.setDataset(datasetShape(qualified));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         // 批次14 · 对标 A5：数字的血缘 —— 本报告出自哪一版词典。
@@ -376,6 +383,8 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         final Map<String, Object> structured;
         final Map<String, Object> qc;
         final List<?> symptoms;
+        /** 质控分级（合格/待复核/无效/null=未质控）；归一率类统计据此只看合格病历 */
+        final String grade;
 
         Row(Record r, Map<String, Object> structured, Map<String, Object> qc) {
             this.visitTime = r.getVisitTime();
@@ -385,6 +394,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             this.selfReport = r.getSelfReport();
             this.structured = structured;
             this.qc = qc;
+            this.grade = r.getGrade();
             Object sym = structured == null ? null : structured.get("symptoms");
             this.symptoms = sym instanceof List<?> l ? l : List.of();
         }
@@ -658,6 +668,20 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * <p>包级可见是为了让「解析一次」能被测试直接钉住 —— 生产路径与测试走同一个入口，
      * 不会出现「测试测的是一套、线上跑的是另一套」。</p>
      */
+    /**
+     * 只保留质控合格的病历（用于归一率类统计）。grade 为 null（未质控）也排除 ——
+     * 它们还没进入标准化数据集。
+     */
+    private static List<Row> qualifiedOnly(List<Row> rows) {
+        List<Row> out = new ArrayList<>();
+        for (Row r : rows) {
+            if ("合格".equals(r.grade)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
     List<Row> toRows(List<Record> records) {
         List<Row> rows = new ArrayList<>(records.size());
         for (Record r : records) {
@@ -906,7 +930,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return c;
     }
 
-    /** 数据集形态：模板塌缩度决定这批数据能不能代表真实病历 */
+    /**     * 数据集形态：模板塌缩度决定这批数据能不能代表真实病历。     *     * <p>入参是<b>质控合格</b>的那一份（qualified）：本项描述的是「标准数据集」的形态，     * 而导出条件就是 grade=合格 —— 用全部病历会让 recordCount 与「可导出数据集」对不上，     * 用户按这个数字估算导出规模会偏大（实测 34182 vs 28793）。</p>     */
     private StandardizationReportVO.DatasetShape datasetShape(List<Row> rows) {
         StandardizationReportVO.DatasetShape s = new StandardizationReportVO.DatasetShape();
         s.setRecordCount(rows.size());

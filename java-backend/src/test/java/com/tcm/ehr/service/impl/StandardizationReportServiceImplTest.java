@@ -83,6 +83,8 @@ class StandardizationReportServiceImplTest {
         r.setScore(95);
         r.setStructuredData(structuredData);
         r.setQcResults("{\"score\":95,\"deductions\":[{\"type\":\"术语未标准化\",\"points\":5}]}");
+        // 归一率类统计只看质控合格病历（2026-10-21 口径修正），测试数据须显式标合格
+        r.setGrade("合格");
         r.setChiefComplaint("失眠3月");
         r.setSelfReport("我这两天睡不着，浑身没力气");
         when(recordMapper.selectList(any())).thenReturn(new ArrayList<>(List.of(r)));
@@ -96,6 +98,7 @@ class StandardizationReportServiceImplTest {
         r.setScore(95);
         r.setStructuredData("{\"symptoms\":[]}");
         r.setQcResults("{\"score\":95,\"deductions\":[]}");
+        r.setGrade("合格");
         r.setVisitTime(java.time.LocalDateTime.parse(visitTime.replace(" ", "T")));
         return r;
     }
@@ -347,6 +350,7 @@ class StandardizationReportServiceImplTest {
         noTime.setOrgId("org-A");
         noTime.setScore(95);
         noTime.setStructuredData("{\"symptoms\":[]}");
+        noTime.setGrade("合格");
         givenTimedRecords(recordAt("a", "2024-03-15 09:00:00"), noTime);
 
         StandardizationReportVO vo = svc.report(null, null);
@@ -389,6 +393,7 @@ class StandardizationReportServiceImplTest {
             r.setOrgId("org-A");
             r.setScore(95);
             r.setStructuredData("{\"symptoms\":[]}");
+            r.setGrade("合格");
             r.setChiefComplaint(chiefs[i]);
             list.add(r);
         }
