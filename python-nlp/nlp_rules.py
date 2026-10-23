@@ -123,12 +123,21 @@ def _rules(text: str) -> Dict[str, List[Entity]]:
     pulse = [ent(seg) for seg in SEG_SPLIT.split(text)
              if seg and RULE_PULSE.match(seg)]
     # 无「左/右」前缀的脉位（寸/关/尺 打头，全汉字，2~6 字），如「寸略旺」「尺较沉」
-    pulse.extend(ent(seg) for seg in SEG_SPLIT.split(text)
-                 if _seg_cjk(seg) and 2 <= len(seg) <= 6
-                 and seg.startswith(_PULSE_HEADS) and not seg.startswith(_PT_BLACKLIST)
-                 and seg not in [p.content for p in pulse])
-    pulse.extend(ent(m.group(0)) for m in RULE_PULSE_POSITION.finditer(text)
-                 if m.group(0) not in [p.content for p in pulse])
+    # 去重改用 set 维护（2026-10-23）：原实现每评估一个候选都重建
+    # [p.content for p in pulse]，脉象多段长文本时是 O(n²)；set 查找 O(1)。
+    # 顺序与判据完全不变：先按标点段收，再收正则命中的脉位。
+    seen_pulse = {p.content for p in pulse}
+    for seg in SEG_SPLIT.split(text):
+        if _seg_cjk(seg) and 2 <= len(seg) <= 6 \
+                and seg.startswith(_PULSE_HEADS) and not seg.startswith(_PT_BLACKLIST) \
+                and seg not in seen_pulse:
+            pulse.append(ent(seg))
+            seen_pulse.add(seg)
+    for m in RULE_PULSE_POSITION.finditer(text):
+        hit = m.group(0)
+        if hit not in seen_pulse:
+            pulse.append(ent(hit))
+            seen_pulse.add(hit)
     # 脉位排在脉象之后：阅读顺序是「先读脉象，再看哪一部位异常」
     # 2. 病因走词表包含匹配；dict.fromkeys 的去重作用对此处是冗余的（RULE_CAUSE_WORDS 本身无重复项），只保证顺序与控制去重即可
     cause = [ent(w) for w in dict.fromkeys(RULE_CAUSE_WORDS) if w in text]
