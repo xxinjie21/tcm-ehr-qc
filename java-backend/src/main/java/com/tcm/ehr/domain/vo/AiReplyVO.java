@@ -8,8 +8,8 @@ import java.util.List;
 /**
  * AI 结果（出参，对应 openapi AiReplyVO；interpret / chat / review 共享）。
  *
- * <p>规则出结论 + LLM 叙述；LLM 不可用时 answer 为模板/规则降级、summary 为 null，
- * 规则结论（completeness / coreMissing / normHits / keyHints）始终保留。</p>
+ * 规则出结论 + LLM 叙述；LLM 不可用时 answer 为模板/规则降级、summary 为 null，
+ * 规则结论（completeness / coreMissing / normHits / keyHints）始终保留。
  */
 @Data
 public class AiReplyVO {
@@ -35,9 +35,9 @@ public class AiReplyVO {
     /**
      * 核心字段「漏抽」清单（interpret）：结构化结果里没有、但原始列有记录，可能未被抽取。
      *
-     * <p>{@link #coreMissing} 只覆盖真缺失，光看它会得出「核心字段齐全」——而质控侧的
+     * {@link #coreMissing} 只覆盖真缺失，光看它会得出「核心字段齐全」——而质控侧的
      * 「核心字段缺失」扣分是<b>两档</b>（真缺失 -12 / 漏抽 -6）。两者合起来才与质控同口径，
-     * 缺了本字段就会出现「同一份病历质控说缺、AI 说齐全」（审查报告 H1）。</p>
+     * 缺了本字段就会出现「同一份病历质控说缺、AI 说齐全」（审查报告 H1）。
      */
     private List<String> corePartial = new ArrayList<>();
 
@@ -50,8 +50,8 @@ public class AiReplyVO {
     /**
      * 术语补词建议（仅 termsuggest）；interpret / chat / review 时为 null。
      *
-     * <p>与 completeness、normHits 同样属于「按用途留空」的字段：
-     * 本 VO 被多个端点共用，每个端点只填自己那几项。</p>
+     * 与 completeness、normHits 同样属于「按用途留空」的字段：
+     * 本 VO 被多个端点共用，每个端点只填自己那几项。
      */
     private List<TermSuggestion> termSuggestions;
 
@@ -84,8 +84,8 @@ public class AiReplyVO {
     /**
      * 单条补词建议（termsuggest）。
      *
-     * <p>LLM 只出候选，落库必须由人工确认 —— 归一链路本身不消费本对象，
-     * 与「判定地基仍是规则引擎」一致。</p>
+     * LLM 只出候选，落库必须由人工确认 —— 归一链路本身不消费本对象，
+     * 与「判定地基仍是规则引擎」一致。
      */
     @Data
     public static class TermSuggestion {

@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * 质控规则 → 自然语言描述。
  *
- * <p>标准面板与规则配置弹窗都消费这里的句子，避免前端各写一套措辞。</p>
+ * 标准面板与规则配置弹窗都消费这里的句子，避免前端各写一套措辞。
  */
 public final class QcRuleDescriber {
 
@@ -18,7 +18,7 @@ public final class QcRuleDescriber {
     /**
      * 把一套质控规则摊成一组给业务用户看的句子，顺序为：完整性 → 格式 → 一致性 → 标准化 → 重复 → 分级。
      *
-     * <p>这里是规则文案的唯一来源：质控标准面板与规则配置弹窗都消费它，避免前端各写一套措辞。</p>
+     * 这里是规则文案的唯一来源：质控标准面板与规则配置弹窗都消费它，避免前端各写一套措辞。
      *
      * @param r 当前生效规则；为 {@code null} 时返回空列表
      * @return 逐条说明，顺序即界面展示顺序
@@ -128,9 +128,9 @@ public final class QcRuleDescriber {
     /**
      * 一致性规则的构成摘要，如某组织配了规则时输出「3 条（中药 3）」。
      *
-     * <p>由规则数据拼装、后端下发。<b>出厂默认无一致性规则（consistency 为空）</b>，
+     * 由规则数据拼装、后端下发。<b>出厂默认无一致性规则（consistency 为空）</b>，
      * 此时输出「0 条」—— 面板如实显示，不再写死条数（原写死「14 条（证候 → 中药 / 舌象 / 脉象）」，
-     * 与实际规则不符，审查报告 H2）。</p>
+     * 与实际规则不符，审查报告 H2）。
      */
     public static String consistencySummary(QcRuleSet r) {
         // 1. 没规则就说 0 条（出厂默认正是此分支）
@@ -151,8 +151,8 @@ public final class QcRuleDescriber {
     /**
      * 可选要素目录：取自实体类型目录（9 类，中文名 ↔ 类型 key / structuredKey / 回退列），用户只选中文。
      *
-     * <p>{@code dict=true} 的项即术语标准化可勾选类型（有词典的 9 类，含病因），
-     * 前端据此筛出「术语标准化按哪几类计分」的下拉项。</p>
+     * {@code dict=true} 的项即术语标准化可勾选类型（有词典的 9 类，含病因），
+     * 前端据此筛出「术语标准化按哪几类计分」的下拉项。
      */
     public static List<QcRuleSet.Element> catalogElements() {
         // 逐类转成可选项；带上 typeKey，配置弹窗提交时才知道对应哪个类型

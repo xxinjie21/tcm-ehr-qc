@@ -6,12 +6,12 @@ import lombok.Data;
 /**
  * 组织级词典索引版本（dictionary_versions，主键 {@code (org_id, type)}）。
  *
- * <p><b>这是「索引里灌的到底是哪一版」的唯一权威</b>：ES 上的 _meta.version 只是
+ * <b>这是「索引里灌的到底是哪一版」的唯一权威</b>：ES 上的 _meta.version 只是
  * 索引级的一个标，无法区分组织。ES 挂了不算「索引好了」—— 只有 indexedVersion
- * 追上 version，才算该组织的词全部进了 ES。</p>
+ * 追上 version，才算该组织的词全部进了 ES。
  *
- * <p>「基础层」也记一行（orgId 为空串）：否则基础层改了，别的组织行还是旧版本号，
- * 启动时误判「已同步」而跳过重建 → 归一用到过期基础层。</p>
+ * 「基础层」也记一行（orgId 为空串）：否则基础层改了，别的组织行还是旧版本号，
+ * 启动时误判「已同步」而跳过重建 → 归一用到过期基础层。
  */
 @Data
 @TableName("dictionary_versions")

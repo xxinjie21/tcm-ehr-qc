@@ -10,10 +10,10 @@ import java.util.Map;
  * 组织级词典存储的接口契约：词条落 dictionary_terms，版本对账落
  * dictionary_versions，导入前存档落 dictionary_backups。
  *
- * <p><b>组织维度语义</b>：orgId 为空串 {@code ""} = 基础层（全组织共享）。
- * 某组织没有自有词条时读到基础层，而不是读到空。</p>
+ * <b>组织维度语义</b>：orgId 为空串 {@code ""} = 基础层（全组织共享）。
+ * 某组织没有自有词条时读到基础层，而不是读到空。
  *
- * <p>实现见 com.tcm.ehr.service.impl.DictionaryTermStoreImpl。</p>
+ * 实现见 com.tcm.ehr.service.impl.DictionaryTermStoreImpl。
  */
 public interface IDictionaryTermStore {
 
@@ -42,18 +42,18 @@ public interface IDictionaryTermStore {
     /**
      * 读某组织某类型的有效词条。
      *
-     * <p>口径是<b>叠加</b>而非回退：基础层与本组织都有词条时取并集，
-     * 同一标准词以本组织为准；只有一侧有词条时就是那一侧。</p>
+     * 口径是<b>叠加</b>而非回退：基础层与本组织都有词条时取并集，
+     * 同一标准词以本组织为准；只有一侧有词条时就是那一侧。
      */
     List<TermEntry> readEffective(String orgId, String type);
 
     /**
      * 一次读回某组织「基础层 ∪ 本组织」生效的<b>全部类型</b>词条，按 type 分组。
      *
-     * <p>口径与逐类调用 {@link #readEffective} 逐位一致（同一标准词以本组织为准）。存在的意义是
+     * 口径与逐类调用 {@link #readEffective} 逐位一致（同一标准词以本组织为准）。存在的意义是
      * 消除 N+1：报告/看板要 8 类 × (基础层 + 本组织) = 最多 16 次读，每次都带一次版本查询 +
      * 一次词条查询（≈32 条 SQL）。这里用一条 {@code org_id IN ('', ?)} 取回两层、在内存里合并，
-     * 整趟只发 1 条 SQL。</p>
+     * 整趟只发 1 条 SQL。
      *
      * @param orgId 组织号；空串/null 视为基础层
      * @return type → 生效词条（无词条的类型不出现在返回里）
@@ -90,12 +90,12 @@ public interface IDictionaryTermStore {
     /**
      * 术语建议召回用的字符倒排索引，连同它所索引的那份生效词条表。
      *
-     * <p><b>为什么两者必须一起给</b>：postings 里的值指向 entries 的串编号，
-     * 分两次取（先取词条、再取索引）在词典刚好变更时会让两者对不上。一次取回就同源。</p>
+     * <b>为什么两者必须一起给</b>：postings 里的值指向 entries 的串编号，
+     * 分两次取（先取词条、再取索引）在词典刚好变更时会让两者对不上。一次取回就同源。
      *
-     * <p>用途是<b>把全表扫描缩成候选扫描</b>：召回门槛是「与原文重叠 ≥2 个字符」，
+     * 用途是<b>把全表扫描缩成候选扫描</b>：召回门槛是「与原文重叠 ≥2 个字符」，
      * 而重叠只可能发生在「出现在原文里的字符」上 —— 所以「出现在原文任一字符的倒排表里」
-     * 是入选的<b>必要条件</b>，据此取出的候选集是超集，结果集与全表扫描逐条一致。</p>
+     * 是入选的<b>必要条件</b>，据此取出的候选集是超集，结果集与全表扫描逐条一致。
      *
      * @param entries     生效词条（基础层 ∪ 本组织，口径同 {@link #readEffective}）
      * @param stringOwner 串编号 → 该串所属词条在 entries 中的下标
@@ -107,7 +107,7 @@ public interface IDictionaryTermStore {
     /**
      * 取某组织某类型的召回索引。
      *
-     * <p>随词典版本失效 —— 与词条缓存同一版本号，不新增失效通道。</p>
+     * 随词典版本失效 —— 与词条缓存同一版本号，不新增失效通道。
      *
      * @param orgId 组织号；空串/null 视为基础层
      * @param type  术语类型
@@ -117,14 +117,14 @@ public interface IDictionaryTermStore {
     /**
      * 取某组织某类型、<b>指定作用域</b>的召回索引。
      *
-     * <p>作用域与词典页的三档一一对应（{@link #SCOPE_BASE} / {@link #SCOPE_ORG} / 其余一律
-     * {@link #SCOPE_EFFECTIVE}），口径与 {@link #read} / {@link #readEffective} 完全一致。</p>
+     * 作用域与词典页的三档一一对应（{@link #SCOPE_BASE} / {@link #SCOPE_ORG} / 其余一律
+     * {@link #SCOPE_EFFECTIVE}），口径与 {@link #read} / {@link #readEffective} 完全一致。
      *
-     * <p><b>调用方必须拿 {@code entries()} 当词条真源</b>，不要再单独 read 一次：
-     * 索引里的串编号指向的就是 entries 的下标，分两次取在词典刚好变更时会对不上。</p>
+     * <b>调用方必须拿 {@code entries()} 当词条真源</b>，不要再单独 read 一次：
+     * 索引里的串编号指向的就是 entries 的下标，分两次取在词典刚好变更时会对不上。
      *
-     * <p>与 {@link #recallIndex(String, String)} 共用同一个 VersionedCache 与同一套版本号
-     * （本组织哈希 + 基础层哈希），只是缓存键多一档作用域 —— 不新增失效通道。</p>
+     * 与 {@link #recallIndex(String, String)} 共用同一个 VersionedCache 与同一套版本号
+     * （本组织哈希 + 基础层哈希），只是缓存键多一档作用域 —— 不新增失效通道。
      *
      * @param scope base = 仅基础层；org = 仅本组织；其余 = 基础层 ∪ 本组织
      */

@@ -8,11 +8,11 @@ import java.time.LocalDateTime;
 /**
  * 课题组。对应 organizations 表。
  *
- * <p>状态机（批次 6 起取消审核，只剩三态）：active ↔ stopped
- * （管理员停用，只挡登录、数据保留）→ archived（管理员手动，前提成员数为 0）。</p>
+ * 状态机（批次 6 起取消审核，只剩三态）：active ↔ stopped
+ * （管理员停用，只挡登录、数据保留）→ archived（管理员手动，前提成员数为 0）。
  *
- * <p>code 有 UNIQUE 约束，被拒时改写为 {@code rej_<orgId>_<原code>} 释放编码，
- * 否则一次拒绝会让该编码被永久占死。</p>
+ * code 有 UNIQUE 约束，被拒时改写为 {@code rej_<orgId>_<原code>} 释放编码，
+ * 否则一次拒绝会让该编码被永久占死。
  */
 @Data
 @TableName("organizations")
@@ -35,8 +35,8 @@ public class Organization {
     /**
      * 所有者用户 ID（批次 4 加列）。
      *
-     * <p><b>冗余展示字段</b>：权威是 {@code organization_members.role=owner}，
-     * 两者在任何写路径下都同事务更新（批次 6 的创建 / 转让 / 改派）。</p>
+     * <b>冗余展示字段</b>：权威是 {@code organization_members.role=owner}，
+     * 两者在任何写路径下都同事务更新（批次 6 的创建 / 转让 / 改派）。
      */
     private String ownerUserId;
     /** 申请人（= 首任组长） */

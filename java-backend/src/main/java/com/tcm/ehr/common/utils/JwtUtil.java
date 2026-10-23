@@ -17,16 +17,16 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * JWT 令牌工具：登录时签发，请求校验时解析出用户身份与角色。
  *
- * <p><b>令牌失效机制（批次 15）</b>：JWT 本身无状态、签发后 24h 内一直有效，
+ * <b>令牌失效机制（批次 15）</b>：JWT 本身无状态、签发后 24h 内一直有效，
  * 改密码或退出登录都不会让已发出去的令牌立刻作废。这里给每个用户维护一个
  * <b>令牌版本号</b>（{@code tcm:ehr:auth:ver:{userId}}，存 Redis）：签发时把当前版本写进
- * 令牌的 ver claim，请求时比对——版本对不上即视为失效。</p>
+ * 令牌的 ver claim，请求时比对——版本对不上即视为失效。
  *
- * <p>用版本号而不是「黑名单存 jti」：黑名单只增不减、Redis 内存无界；版本号
- * 每个用户只有一个整数，退出登录 / 改密码时 INCR 一次就作废该用户<b>全部</b>旧令牌。</p>
+ * 用版本号而不是「黑名单存 jti」：黑名单只增不减、Redis 内存无界；版本号
+ * 每个用户只有一个整数，退出登录 / 改密码时 INCR 一次就作废该用户<b>全部</b>旧令牌。
  *
- * <p><b>可用性取舍（与 JwtInterceptor 对组织解析同一口径）</b>：Redis 不可用时
- * 校验降级为「只看签名与有效期」，不抛异常——一次 Redis 抖动不该把全站打成 500。</p>
+ * <b>可用性取舍（与 JwtInterceptor 对组织解析同一口径）</b>：Redis 不可用时
+ * 校验降级为「只看签名与有效期」，不抛异常——一次 Redis 抖动不该把全站打成 500。
  */
 @Component
 public class JwtUtil {
@@ -37,7 +37,7 @@ public class JwtUtil {
     /**
      * 版本号 TTL 相对令牌寿命的富余量：1 小时。
      *
-     * <p>不变式是「<b>版本号 key 的存活时间 &gt; 令牌寿命</b>」——见 {@link #versionTtl()}。</p>
+     * 不变式是「<b>版本号 key 的存活时间 &gt; 令牌寿命</b>」——见 {@link #versionTtl()}。
      */
     private static final long VER_TTL_SLACK_HOURS = 1;
 
@@ -57,9 +57,9 @@ public class JwtUtil {
     /**
      * 派生好的签名 Key 缓存。
      *
-     * <p>secret 由 {@code @Value} 注入后不再变化，而验签是每请求热路径 ——
+     * secret 由 {@code @Value} 注入后不再变化，而验签是每请求热路径 ——
      * 每次重建都要重算一次字节数组并做长度校验，纯浪费。volatile 而非
-     * {@code @PostConstruct}：注入顺序与首次使用之间不必建立额外约定，懒初始化即可。</p>
+     * {@code @PostConstruct}：注入顺序与首次使用之间不必建立额外约定，懒初始化即可。
      */
     private volatile Key cachedKey;
 
@@ -122,9 +122,9 @@ public class JwtUtil {
     /**
      * 解析令牌并一次性完成「签名 / 有效期 / 令牌版本」三项校验。
      *
-     * <p>返回 {@code null} 表示不可用（过期 / 签名不符 / 格式非法 / 已被退出登录或改密码作废）；
+     * 返回 {@code null} 表示不可用（过期 / 签名不符 / 格式非法 / 已被退出登录或改密码作废）；
      * 可用则直接返回载荷。拦截器原先「先验签再 {@link #parseToken}」会对同一 token
-     * 做两遍 HMAC 验签 + Base64 + JSON 解析（全站最热路径），本方法把它们合并为一遍。</p>
+     * 做两遍 HMAC 验签 + Base64 + JSON 解析（全站最热路径），本方法把它们合并为一遍。
      *
      * @param token JWT 字符串
      * @return 可用时返回载荷（含 subject / username / role / ver），不可用返回 {@code null}
@@ -148,8 +148,8 @@ public class JwtUtil {
     /**
      * 取用户当前令牌版本；无记录（从未作废过）时返回 "0"。
      *
-     * <p>Redis 不可用返回 {@code "0"}：此时签发的令牌带 ver=0，而校验也降级为
-     * 「不比对版本」，自洽。见 {@link #versionMatches}。</p>
+     * Redis 不可用返回 {@code "0"}：此时签发的令牌带 ver=0，而校验也降级为
+     * 「不比对版本」，自洽。见 {@link #versionMatches}。
      */
     String currentVersion(String userId) {
         try {
@@ -163,20 +163,20 @@ public class JwtUtil {
     /**
      * 把该用户的版本号 key 续期到「覆盖本次签发的令牌」，不存在则落占位值 {@code "0"}。
      *
-     * <p><b>为什么需要占位</b>：改造前「从未作废过」的用户在 Redis 里根本没有 key，
+     * <b>为什么需要占位</b>：改造前「从未作废过」的用户在 Redis 里根本没有 key，
      * 校验时读到 {@code null} 就按「未作废」放行。可 key 一旦（因 TTL 到期）消失，
      * 计数就会从 {@code null + 1 = 1} 重新开始；若此前已经作废过一次（版本也是 1），
      * 那批旧令牌的 {@code ver=1} 就又对上了 —— <b>已作废的令牌复活</b>。
      * 落一个值为 {@code "0"} 的占位 key，让「从未作废」也是一个显式状态，
-     * 计数从此只增不减。</p>
+     * 计数从此只增不减。
      *
-     * <p><b>为什么已存在时只续 TTL、不写值</b>：写回「读到的值」会与并发的
+     * <b>为什么已存在时只续 TTL、不写值</b>：写回「读到的值」会与并发的
      * {@link #revokeAll} 形成「后写覆盖前写」—— 登录线程读到 1、登出线程把版本置 2、
      * 登录线程再把 1 写回去，作废就被无声撤销了。EXPIRE 只动存活时间、不动值，
-     * 不存在这个竞态。</p>
+     * 不存在这个竞态。
      *
-     * <p>Redis 不可用时不抛异常：校验路径本就有「读不到 = 降级放行」的口径，
-     * 这里写不进去也只是退回改造前的行为。</p>
+     * Redis 不可用时不抛异常：校验路径本就有「读不到 = 降级放行」的口径，
+     * 这里写不进去也只是退回改造前的行为。
      */
     private void anchorVersion(String userId) {
         String key = VER_KEY + userId;
@@ -197,15 +197,15 @@ public class JwtUtil {
     /**
      * 版本号 key 的 TTL：{@code expireHours + 1} 小时，再加 0–10 分钟随机抖动。
      *
-     * <p>① {@code +1} 小时是<b>不变式</b>：TTL 必须严格大于令牌寿命，否则 key 会先于
-     * 令牌消失，计数回落又会让旧令牌复活（见 {@link #anchorVersion}）。</p>
+     * ① {@code +1} 小时是<b>不变式</b>：TTL 必须严格大于令牌寿命，否则 key 会先于
+     * 令牌消失，计数回落又会让旧令牌复活（见 {@link #anchorVersion}）。
      *
-     * <p>② 抖动是为了拆散「批量登出」造成的同步过期：管理员一次停用一批账号时，
+     * ② 抖动是为了拆散「批量登出」造成的同步过期：管理员一次停用一批账号时，
      * 若 TTL 完全相同，这批 key 会在同一秒集体消失、同一秒集体回源重建。
-     * 抖动只向上取（0–10 分钟），不会破坏 ①。</p>
+     * 抖动只向上取（0–10 分钟），不会破坏 ①。
      *
-     * <p>不给 TTL（永久）被明确排除：实测 Redis {@code maxmemory=0}（不设上限），
-     * 无 TTL 的 key 会无限累积。</p>
+     * 不给 TTL（永久）被明确排除：实测 Redis {@code maxmemory=0}（不设上限），
+     * 无 TTL 的 key 会无限累积。
      */
     private Duration versionTtl() {
         int jitterMinutes = ThreadLocalRandom.current().nextInt(0, VER_TTL_JITTER_MINUTES + 1);
@@ -215,17 +215,17 @@ public class JwtUtil {
     /**
      * 作废该用户全部已签发的令牌：令牌版本 +1。
      *
-     * <p>退出登录与改密码都调它——两者语义一致：让这个用户的旧令牌立刻失效。</p>
+     * 退出登录与改密码都调它——两者语义一致：让这个用户的旧令牌立刻失效。
      *
-     * <p><b>为什么必须原子自增</b>（2026-10-13）：原实现是「get → 算 next → set」的
+     * <b>为什么必须原子自增</b>（2026-10-13）：原实现是「get → 算 next → set」的
      * 读-改-写。两次并发作废（双设备同时登出）会读到同一份当前值、写入同一个递增值，
      * 其中一次作废就此丢失——若恰好有一张新令牌在两次写之间签发（它读到的也是同一个
      * 版本号），这本该失效的令牌会继续有效到 24h。影响面仅限该用户自己的令牌
      * （版本号按用户隔离，不构成越权），但「撤销被撤销」正是 {@link #anchorVersion}
-     * 专门规避过的同一类竞态，没有理由在这里留着一个。</p>
+     * 专门规避过的同一类竞态，没有理由在这里留着一个。
      *
-     * <p>改用 {@link RedisLua#incrWithTtl}：INCR 在 Redis 端单线程执行，自增与续期
-     * 之间插不进别的命令；正确性也不再依赖「每个未来的写者都记得先拿同一把锁」。</p>
+     * 改用 {@link RedisLua#incrWithTtl}：INCR 在 Redis 端单线程执行，自增与续期
+     * 之间插不进别的命令；正确性也不再依赖「每个未来的写者都记得先拿同一把锁」。
      */
     public void revokeAll(String userId) {
         try {
@@ -245,8 +245,8 @@ public class JwtUtil {
     /**
      * 令牌里的版本是否等于当前版本。
      *
-     * <p>Redis 不可用时返回 {@code true}（降级放行）：否则一次 Redis 抖动会让
-     * 全站所有已登录用户瞬间被踢下线。安全与可用性在此明确取舍为「可用优先」。</p>
+     * Redis 不可用时返回 {@code true}（降级放行）：否则一次 Redis 抖动会让
+     * 全站所有已登录用户瞬间被踢下线。安全与可用性在此明确取舍为「可用优先」。
      */
     boolean versionMatches(String userId, Object verClaim) {
         try {

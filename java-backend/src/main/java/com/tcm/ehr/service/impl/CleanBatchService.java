@@ -39,13 +39,13 @@ import java.util.concurrent.TimeUnit;
 /**
  * 数据清洗的异步任务编排：提交 / 进度 / 取消 / 后台执行。
  *
- * <p><b>为什么改异步</b>：原 {@code POST /api/governance/clean} 是同步接口 —— 一个请求线程
+ * <b>为什么改异步</b>：原 {@code POST /api/governance/clean} 是同步接口 —— 一个请求线程
  * 从头跑到尾（全库 3.4 万条约数分钟），前端只能挂到超时，且<b>无法停止</b>。改为后台任务后
- * 提交即返回任务 ID，可轮询进度、可取消、关页面也不影响执行。</p>
+ * 提交即返回任务 ID，可轮询进度、可取消、关页面也不影响执行。
  *
- * <p><b>与 QcBatchServiceImpl 同构</b>：条件认领、取消位落库、终态兜底、重启标记中断这套
+ * <b>与 QcBatchServiceImpl 同构</b>：条件认领、取消位落库、终态兜底、重启标记中断这套
  * 口径完全照搬 —— 两处若各写一套，改状态机时必然漏一处。差异只在「跑什么」：
- * 质控是逐条评分，清洗是调一次 {@link IGovernanceService#clean} 并传进度回调。</p>
+ * 质控是逐条评分，清洗是调一次 {@link IGovernanceService#clean} 并传进度回调。
  */
 @Service
 public class CleanBatchService implements ICleanBatchService {
@@ -66,12 +66,12 @@ public class CleanBatchService implements ICleanBatchService {
     /**
      * 任务队列容量上限（2026-10-21）。
      *
-     * <p>原来是 {@code new LinkedBlockingQueue<>()} —— <b>无界</b>。提交速度长期快于消费速度时
+     * 原来是 {@code new LinkedBlockingQueue<>()} —— <b>无界</b>。提交速度长期快于消费速度时
      * 队列会无限增长直至 OOM。虽然「同组织只允许一个 QUEUED/RUNNING 任务」已把实际堆积压到很低，
-     * 但那是业务约束、不是容量保证，故补一个硬上限兜底。</p>
+     * 但那是业务约束、不是容量保证，故补一个硬上限兜底。
      *
-     * <p>容量取 256：单任务处理 3.4 万条要几十分钟，256 个待处理任务已远超任何合理场景；
-     * 真打满说明系统异常，此时<b>拒绝入队并落 FAILED</b> 比默默堆积更安全（用户能看到失败原因）。</p>
+     * 容量取 256：单任务处理 3.4 万条要几十分钟，256 个待处理任务已远超任何合理场景；
+     * 真打满说明系统异常，此时<b>拒绝入队并落 FAILED</b> 比默默堆积更安全（用户能看到失败原因）。
      */
     private static final int QUEUE_CAPACITY = 256;
 
@@ -178,8 +178,8 @@ public class CleanBatchService implements ICleanBatchService {
     /**
      * 提交清洗任务（异步入队，立即返回）。
      *
-     * <p>范围过滤与组织快照在提交线程冻结进 clean_task：worker 是后台线程，
-     * 读不到 RequestContextHolder。</p>
+     * 范围过滤与组织快照在提交线程冻结进 clean_task：worker 是后台线程，
+     * 读不到 RequestContextHolder。
      */
     @Transactional(rollbackFor = Exception.class)
         @Override
@@ -259,8 +259,8 @@ public class CleanBatchService implements ICleanBatchService {
     /**
      * 请求取消：只发取消信号，不自己把状态改成 CANCELLED。
      *
-     * <p>口径与质控重算一致：终态由执行方（worker 的 finally）落 —— 提交方直接改成
-     * CANCELLED 会与「任务其实已经跑完」竞争，把 COMPLETED 抹成 CANCELLED。</p>
+     * 口径与质控重算一致：终态由执行方（worker 的 finally）落 —— 提交方直接改成
+     * CANCELLED 会与「任务其实已经跑完」竞争，把 COMPLETED 抹成 CANCELLED。
      */
         @Override
     public CleanTaskVO cancel(String id) {
@@ -377,8 +377,8 @@ public class CleanBatchService implements ICleanBatchService {
     /**
      * 为后台 worker 绑定请求上下文（orgId 用任务快照；role 按管理员口径）。
      *
-     * <p>用自实现的 SimpleRequestAttributes 而不是 Spring 的 Servlet 实现：
-     * 后者要真的 HttpServletRequest，而 mock 包只在测试 classpath 上。</p>
+     * 用自实现的 SimpleRequestAttributes 而不是 Spring 的 Servlet 实现：
+     * 后者要真的 HttpServletRequest，而 mock 包只在测试 classpath 上。
      */
     private void bindWorkerContext(String orgId) {
         SimpleRequestAttributes attrs = new SimpleRequestAttributes();

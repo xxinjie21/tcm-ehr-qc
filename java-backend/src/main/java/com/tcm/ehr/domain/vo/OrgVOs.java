@@ -9,8 +9,8 @@ import java.util.List;
 /**
  * 组织相关视图（批次 5 改名，出参字段同步 group -> org）。
  *
- * <p>把「我的组织」「组织列表」「成员列表」等的出参集中在这一处，
- * 避免十几个接口各自拼 Map。成员函数返回嵌套视图对象。</p>
+ * 把「我的组织」「组织列表」「成员列表」等的出参集中在这一处，
+ * 避免十几个接口各自拼 Map。成员函数返回嵌套视图对象。
  */
 public final class OrgVOs {
 
@@ -26,8 +26,8 @@ public final class OrgVOs {
         /**
          * 当前成员的词典写授权位（成员级；管理员 / 所有者天然拥有，见前端 getter）。
          *
-         * <p>28.20：登录快照会过期（owner 改权限 / 移除成员后本机 localStorage 仍是旧的），
-         * 前端进主框架时据此接口重取一次，刷新后即生效。</p>
+         * 28.20：登录快照会过期（owner 改权限 / 移除成员后本机 localStorage 仍是旧的），
+         * 前端进主框架时据此接口重取一次，刷新后即生效。
          */
         private boolean canWriteDictionary;
         /** 当前成员的质控规则写授权位（同 {@link #canWriteDictionary}） */
@@ -88,8 +88,8 @@ public final class OrgVOs {
     /**
      * GET /api/orgs/users 出参：按用户名搜索到的候选人。
      *
-     * <p><b>刻意只有 id 与 username</b>：再加角色 / 状态 / 所属组织，
-     * 这个接口就成了「全站用户名 + 组织归属」的枚举器。</p>
+     * <b>刻意只有 id 与 username</b>：再加角色 / 状态 / 所属组织，
+     * 这个接口就成了「全站用户名 + 组织归属」的枚举器。
      */
     @Data
     public static class UserBriefVO {

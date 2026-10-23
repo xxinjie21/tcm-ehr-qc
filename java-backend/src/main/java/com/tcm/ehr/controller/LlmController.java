@@ -18,9 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * LLM 运行时配置：读取、保存、连通性探测。
  *
- * <p>三条都是<b>登录即可</b>，且都只作用于<b>当前用户自己</b>的配置：
+ * 三条都是<b>登录即可</b>，且都只作用于<b>当前用户自己</b>的配置：
  * 读取只回掩码、保存写自己的行、探测用自己的参数试连通。
- * 管理员同样只能改自己的 —— 配置含三方通道密钥，属个人设置而非系统级设置。</p>
+ * 管理员同样只能改自己的 —— 配置含三方通道密钥，属个人设置而非系统级设置。
  *
  * <ul>
  *   <li>保存只改运行时配置（落盘到 qc 之外的 llm-config.json），不写回 application.yml，重启仍沿用；</li>
@@ -38,7 +38,7 @@ public class LlmController {
     /**
      * 读取当前生效配置。
      *
-     * <p>【权限：登录即可】只回掩码，不给明文密钥。</p>
+     * 【权限：登录即可】只回掩码，不给明文密钥。
      *
      * @return enabled=是否启用；provider=通道；apiKeySet/apiKeyMask=密钥是否已配及其掩码
      */
@@ -50,9 +50,9 @@ public class LlmController {
     /**
      * 保存<b>本人</b>的 LLM 配置并立即生效。
      *
-     * <p>【权限：登录即可】写的是 user_llm_config 里自己那一行，
+     * 【权限：登录即可】写的是 user_llm_config 里自己那一行，
      * 管理员也只改自己的 —— 配置是「每个用户一份」，不是系统级设置。
-     * 密钥经 AES-256-GCM 加密落库，读取只回掩码。</p>
+     * 密钥经 AES-256-GCM 加密落库，读取只回掩码。
      *
      * @param dto provider=通道；baseUrl/apiKey/model/temperature/timeout 等连接参数
      * @return 保存后生效的配置
@@ -65,7 +65,7 @@ public class LlmController {
     /**
      * 探测与配置文件的连通性。
      *
-     * <p>【权限：登录即可】用请求体里的参数试，不改变当前生效配置；openai 通道缺密钥返回 400。</p>
+     * 【权限：登录即可】用请求体里的参数试，不改变当前生效配置；openai 通道缺密钥返回 400。
      *
      * @param dto 待试的连接参数，为空则用当前生效配置
      * @return ok=是否连通；provider/model/latencyMs=探测结果

@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 批量解析任务：提交、查询、取消、列表。
  *
- * <p>任务在服务端队列中执行，提交后不占用请求线程。</p>
+ * 任务在服务端队列中执行，提交后不占用请求线程。
  */
 public interface INlpBatchService {
 

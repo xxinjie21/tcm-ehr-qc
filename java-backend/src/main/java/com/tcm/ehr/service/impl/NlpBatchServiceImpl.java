@@ -61,15 +61,15 @@ import java.util.concurrent.TimeUnit;
 /**
  * NLP 批量解析任务服务实现。
  *
- * <p><b>DB 轮询认领</b>（批次 16.2）：任务落库为 QUEUED，固定 nlp.batch.concurrency
+ * <b>DB 轮询认领</b>（批次 16.2）：任务落库为 QUEUED，固定 nlp.batch.concurrency
  * 个工作线程各自轮询 nlp_task 并用「{@code UPDATE ... WHERE status='QUEUED'}」
  * 的原子性认领（受影响行数为 1 才算拿到）。不引入消息中间件 —— DB 是任务状态的唯一权威，
- * 多实例下同一任务只会被一个实例跑；前端可提交后离开、轮询进度。</p>
+ * 多实例下同一任务只会被一个实例跑；前端可提交后离开、轮询进度。
  *
- * <p><b>并发预算只有一份</b>：nlp.batch.concurrency 既是「可同时跑几个任务」，
+ * <b>并发预算只有一份</b>：nlp.batch.concurrency 既是「可同时跑几个任务」，
  * 也是「单个任务内并行处理几条病历」—— 两者共用同一个并行池（见 recordPool），
  * 所以同时跑几个任务，打给 Python 的请求总数都恒定。之所以必须有任务内并行：NLP 是这条链路
- * 唯一的吞吐瓶颈，而原先一个任务只用一个线程串行跑，单任务吞吐被钉死在「1 / 单条耗时」。</p>
+ * 唯一的吞吐瓶颈，而原先一个任务只用一个线程串行跑，单任务吞吐被钉死在「1 / 单条耗时」。
  *
  * <ul>
  * <li>取数走 {@link RecordFilter}（数据域 + 筛选）与分页循环，绝不一次载入全量；</li>
@@ -146,11 +146,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 任务内并行处理病历的线程池。
      *
-     * <p>与 {@link #workers} 分开：workers 负责「认领任务」，本池负责「把一个任务内的病历并行跑」。
-     * 两者不能共用同一个池 —— worker 占着线程等页内结果会死锁。</p>
+     * 与 {@link #workers} 分开：workers 负责「认领任务」，本池负责「把一个任务内的病历并行跑」。
+     * 两者不能共用同一个池 —— worker 占着线程等页内结果会死锁。
      *
-     * <p>池大小 = 并发预算，且<b>被所有任务共享</b>：所以同时跑几个任务，打给 Python 的请求
-     * 总数都不超过 nlp.batch.concurrency，不会因为任务数变多而压垮 NLP 服务。</p>
+     * 池大小 = 并发预算，且<b>被所有任务共享</b>：所以同时跑几个任务，打给 Python 的请求
+     * 总数都不超过 nlp.batch.concurrency，不会因为任务数变多而压垮 NLP 服务。
      */
     private ExecutorService recordPool;
 
@@ -269,11 +269,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 从库里认领一个排队中的任务（批次 16.2 的核心）。
      *
-     * <p>「取候选」故意不加锁：几个 worker / 几个实例查到同一批是常态。
+     * 「取候选」故意不加锁：几个 worker / 几个实例查到同一批是常态。
      * 真正的互斥发生在随后的条件更新上 ——
      * {@code UPDATE nlp_task SET status='RUNNING', started_at=? WHERE id=? AND status='QUEUED'}，
      * <b>受影响行数为 1 才算认领成功</b>；为 0 说明已被别人抢先，继续看下一个候选。
-     * 不写 cancel_requested：认领前后刚到达的取消必须保留，由执行期的取消位读取兜住。</p>
+     * 不写 cancel_requested：认领前后刚到达的取消必须保留，由执行期的取消位读取兜住。
      *
      * @return 认领到的任务 ID；当前没有可认领的任务时为 {@code null}
      */
@@ -315,9 +315,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 按筛选范围提交批量解析任务，异步入队后立即返回。
      *
-     * <p>先统计范围内病历数作为计划总数（{@code limit > 0} 时取较小值），筛选条件经严格序列化
+     * 先统计范围内病历数作为计划总数（{@code limit > 0} 时取较小值），筛选条件经严格序列化
      * 落库 —— 序列化失败直接拒绝提交，避免任务静默退化成全库扫描。任务以 QUEUED 状态入库，
-     * 由工作线程轮询认领（批次 16.2）；返回的视图不含失败明细。</p>
+     * 由工作线程轮询认领（批次 16.2）；返回的视图不含失败明细。
      *
      * @param dto 批量请求（filters + 可选 limit），可为 null
      * @param createdBy 提交人
@@ -412,7 +412,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 按 (组织, 幂等键) 查任务（批次 5）。
      *
-     * <p>orgId 为空时直接返回 null：早于组织标记的任务 org_id 为 NULL，不该被别的组织命中。</p>
+     * orgId 为空时直接返回 null：早于组织标记的任务 org_id 为 NULL，不该被别的组织命中。
      */
     private NlpTask findTaskByRequestKey(String orgId, String requestKey) {
         if (orgId == null || requestKey == null) {
@@ -427,8 +427,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 按病历 ID 集合提交批量解析任务（导入后自动解析走这里）。
      *
-     * <p>任务以 QUEUED 状态入库，ID 集合仅保存在内存（重启后任务被标记为已中断，不会续跑）。
-     * ID 集合为空时直接返回 null，视为无需提交。</p>
+     * 任务以 QUEUED 状态入库，ID 集合仅保存在内存（重启后任务被标记为已中断，不会续跑）。
+     * ID 集合为空时直接返回 null，视为无需提交。
      *
      * @param ids 待解析病历 ID 列表
      * @param createdBy 提交人
@@ -512,9 +512,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 仅重试失败：读原任务的完整失败记录 ID，按同一模式重新提交一个只含这批 ID 的任务。
      *
-     * <p>复用 {@link #submit}（因此沿用同一套幂等/防重/执行路径）；范围用 filters.ids
+     * 复用 {@link #submit}（因此沿用同一套幂等/防重/执行路径）；范围用 filters.ids
      * 收窄到失败集合，数据域仍由 {@link RecordFilter} 兜住（不越权）。新任务同样会记录自己的
-     * 失败集合，可继续「重试的重试」。</p>
+     * 失败集合，可继续「重试的重试」。
      */
     @Override
     public NlpTaskVO retryFailed(String id, String createdBy) {
@@ -580,8 +580,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 取消任务。
      *
-     * <p>排队中的任务直接置为已取消并记完成时间；运行中的任务只置内存取消位，由工作线程在
-     * 条 / 页边界退出，状态待其收尾时落库。已到终态的任务不再变更。</p>
+     * 排队中的任务直接置为已取消并记完成时间；运行中的任务只置内存取消位，由工作线程在
+     * 条 / 页边界退出，状态待其收尾时落库。已到终态的任务不再变更。
      *
      * @param id 任务 ID
      * @return 取消操作后的任务视图
@@ -636,7 +636,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 列出最近任务（最多 {@value #LIST_LIMIT} 条，按创建时间倒序），只读。
      *
-     * <p>返回项不含失败明细，需要明细请用 {@link #get(String)}。</p>
+     * 返回项不含失败明细，需要明细请用 {@link #get(String)}。
      *
      * @return 任务列表 + 截断标记（多取一条精确判定，不靠 size == 上限猜）
      */
@@ -753,20 +753,20 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 取该任务**尚未处理**的病历 ID（按提交顺序）。
      *
-     * <p>批次 16 #3 的核心：ID 集合落库后，重启也能从这里读回断点。
+     * 批次 16 #3 的核心：ID 集合落库后，重启也能从这里读回断点。
      * 两条性质缺一不可，且都被测试钉住：
      * ① <b>只读 PENDING</b> —— 跑完的（DONE）不能再跑一遍，否则重复抽取会覆盖
      *    同一份结构化数据；
      * ② <b>按 seq 排序</b> —— 进度游标按提交顺序推进，不能靠主键（批量插入下主键顺序
-     *    与提交顺序不保证一致）。</p>
+     * 与提交顺序不保证一致）。
      */
     /**
      * 该任务是否**按 ID 集合提交**（＝有没有明细行）。
      *
-     * <p>这是任务分流的唯一判据，也是 2026-10-05 那次静默回归的所在：筛选型任务**本来就没有明细**，
+     * 这是任务分流的唯一判据，也是 2026-10-05 那次静默回归的所在：筛选型任务**本来就没有明细**，
      * 若无条件去读明细会得到空集合，进而被判成「已处理完」而直接收尾（表现为 500 条任务
      * `COMPLETED · 已处理 0`）。抽出成独立方法是为了让它能被同步测试钉住 —— 线程里的流程难测，
-     * 但「判据本身」好测，而会犯错的恰恰是判据。</p>
+     * 但「判据本身」好测，而会犯错的恰恰是判据。
      *
      * @return true = ID 型（读 PENDING 续跑）；false = 筛选型（走 runByFilter）
      */
@@ -786,7 +786,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 终态选择（P0-1/P0-2，2026-10-05 抽出以便同步测试）。
      *
-     * <p>四种终态互斥且都不许撒谎：</p>
+     * 四种终态互斥且都不许撒谎：
      * <ul>
      *   <li>执行期抛异常 → FAILED</li>
      *   <li><b>一条都没处理（done=0 且 total&gt;0）→ INTERRUPTED</b>：这是 2026-10-05 实测到的事故
@@ -794,8 +794,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      *   <li>取消 → CANCELLED</li>
      *   <li>其余按完成度判定（{@link #endStatus}）</li>
      * </ul>
-     * <p>抽成方法的原因：线程里的流程难测，但「终态怎么选」是可同步断言、可变异验证的纯逻辑 ——
-     * 而会犯错、且犯错了用户看不出来的，恰恰是它。</p>
+     *
+     * 抽成方法的原因：线程里的流程难测，但「终态怎么选」是可同步断言、可变异验证的纯逻辑 ——
+     * 而会犯错、且犯错了用户看不出来的，恰恰是它。
      */
     String terminalStatus(boolean failed, boolean nothingDone, boolean running,
                           boolean cancelled, int done, int total) {
@@ -955,11 +956,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * {@link #processPage} 的三态出口。
      *
-     * <p><b>为什么必须是三态</b>：改造前 processPage 返回 {@code boolean}，
+     * <b>为什么必须是三态</b>：改造前 processPage 返回 {@code boolean}，
      * 而外层把 {@code true} 理解成「已取消」、{@code false} 理解成「继续翻页」。
      * 但 processPage 里还有一个出口是「已达 limit 上限」，它也返回了 {@code false} ——
      * 于是 limit 触顶后外层继续翻页，把整个匹配集翻完（{@code total=0} 的任务同样如此）。
-     * 三态把这个歧义消掉。</p>
+     * 三态把这个歧义消掉。
      */
     private enum PageOutcome {
         /** 本页处理完毕，未取消、未触顶 */
@@ -971,9 +972,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         /**
          * 应用正在停机、任务内并行池已拒绝提交（B4）。
          *
-         * <p>刻意与 {@link #CANCELED} 分开：这不是用户的取消意图，不能落 CANCELLED。
+         * 刻意与 {@link #CANCELED} 分开：这不是用户的取消意图，不能落 CANCELLED。
          * 调用方按「未被取消」收尾，由 {@link #endStatus} 依「已停机 + 未跑完」落
-         * INTERRUPTED（endStatus 里 cancelled 优先于停机判定）。</p>
+         * INTERRUPTED（endStatus 里 cancelled 优先于停机判定）。
          */
         ABORTED
     }
@@ -981,17 +982,17 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 并行处理一批病历（两条取数路径共用）；返回 {@link PageOutcome} 区分「继续翻页 / 被取消 / 已达 limit 上限」。
      *
-     * <p><b>为什么要并行</b>：原先这里是一个 {@code for} 循环串行调 processOne，而单条
+     * <b>为什么要并行</b>：原先这里是一个 {@code for} 循环串行调 processOne，而单条
      * NLP 推理要数百毫秒 —— 单任务吞吐被钉死在「1 / 单条耗时」（32 核机器上实测约 7 条/s）。
      * 把病历并行跑，才能让一个任务就吃满 NLP 服务的吞吐上限（实测约 10.3 条/s）。
-     * 注意：单纯调大 nlp.batch.concurrency 没有这个效果，它只是多起几个任务。</p>
+     * 注意：单纯调大 nlp.batch.concurrency 没有这个效果，它只是多起几个任务。
      *
-     * <p><b>只并行「算」</b>：{@link #processOne} 只算不写（P1-4 攒批），因此可安全并行；
+     * <b>只并行「算」</b>：{@link #processOne} 只算不写（P1-4 攒批），因此可安全并行；
      * 进度、失败明细、攒批回写全部收敛到下面的<b>单线程汇总循环</b>里更新，
-     * 不需要给 NlpTask 加锁，也不会出现「两条同时改 done」。</p>
+     * 不需要给 NlpTask 加锁，也不会出现「两条同时改 done」。
      *
-     * <p><b>取消响应</b>：按 concurrency 条一块推进，块与块之间查取消位 ——
-     * 最坏等待一块（约 1 秒），不会因为并行化变成「跑完整页才发现要停」。</p>
+     * <b>取消响应</b>：按 concurrency 条一块推进，块与块之间查取消位 ——
+     * 最坏等待一块（约 1 秒），不会因为并行化变成「跑完整页才发现要停」。
      *
      * @param limit 本任务允许处理的总条数<b>硬上限</b>（筛选型任务的 total）。
      *              {@code 0} 表示一条都不处理 —— 这是原语义，不能理解成「不限」；
@@ -1079,8 +1080,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 并行执行体：只调 {@link #processOne}。
      *
-     * <p>异常一律转成失败结果而不是抛出 —— 池里的线程抛出去只会变成一个没人看的
-     * ExecutionException，而这里必须把它变成「这条病历失败」的进度。</p>
+     * 异常一律转成失败结果而不是抛出 —— 池里的线程抛出去只会变成一个没人看的
+     * ExecutionException，而这里必须把它变成「这条病历失败」的进度。
      */
     private StepOutcome runOne(Record r, String orgId, DictMeta dictMeta, String mode) {
         try {
@@ -1109,12 +1110,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 批量回写 structured_data（P1-4）。
      *
-     * <p>走 MyBatis 的 ExecutorType.BATCH 会话：500 条一次 {@code flushStatements()}，
+     * 走 MyBatis 的 ExecutorType.BATCH 会话：500 条一次 {@code flushStatements()}，
      * 配合 JDBC 的 {@code rewriteBatchedStatements=true} 合并成少量往返。
-     * 原实现是逐条 updateStructuredData，每条各自 autocommit —— 4 万条 = 4 万次提交。</p>
+     * 原实现是逐条 updateStructuredData，每条各自 autocommit —— 4 万条 = 4 万次提交。
      *
-     * <p>未装配 SqlSessionFactory（单测直接 new）时退化为逐条写，语义与改造前一致。
-     * 批写整体失败时同样退回逐条写，保证已算好的归一结果不会因为一次批写异常而丢失。</p>
+     * 未装配 SqlSessionFactory（单测直接 new）时退化为逐条写，语义与改造前一致。
+     * 批写整体失败时同样退回逐条写，保证已算好的归一结果不会因为一次批写异常而丢失。
      */
     private void flushStructuredData(List<StructuredWrite> pending) {
         if (pending.isEmpty()) {
@@ -1144,8 +1145,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 读 DB 判「是否已请求取消」。
      *
-     * <p>内存 cancelFlags 只有本进程可见，多实例下会失效；这里以列为准。</p>
-     * <p>查库失败按<b>未取消</b>：宁可多跑几条，也不因一次抖动中断长任务。</p>
+     * 内存 cancelFlags 只有本进程可见，多实例下会失效；这里以列为准。
+     *
+     * 查库失败按<b>未取消</b>：宁可多跑几条，也不因一次抖动中断长任务。
      */
     private boolean isCancelRequested(String id) {
         try {
@@ -1167,8 +1169,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 单条：按模式处理，<b>只算不写</b>，返回待回写的 JSON（P1-4）。
      *
-     * <p>写库交给调用方的攒批通道（{@link #flushStructuredData}）：逐条写在这个量级下
-     * 每条一次 autocommit，是本链路的主要 SQL 开销来源。</p>
+     * 写库交给调用方的攒批通道（{@link #flushStructuredData}）：逐条写在这个量级下
+     * 每条一次 autocommit，是本链路的主要 SQL 开销来源。
      *
      * @param mode {@link NlpTask#MODE_EXTRACT}（抽取+归一）或 {@link NlpTask#MODE_NORMALIZE_ONLY}（仅归一）
      * @return 打好词典版本戳的 structured_data JSON
@@ -1208,11 +1210,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 仅归一：不调 Python，读已有 structured_data，对其中每个实体重跑 ES 归一。
      *
-     * <p>用于「补词典后让新词生效」：实体（含 sourceText 原文与 normLevel）
-     * 已在首次解析时落库，归一化只依赖 ES 词典，重跑即可命中新词，省掉整段实体抽取时间。</p>
+     * 用于「补词典后让新词生效」：实体（含 sourceText 原文与 normLevel）
+     * 已在首次解析时落库，归一化只依赖 ES 词典，重跑即可命中新词，省掉整段实体抽取时间。
      *
-     * <p>复用 {@link EntityNormalizer#normalizeMap}（已有测试保证不丢 _meta 等 VO 没有的键），
-     * 再打当前词典版本戳。人工修改优先：manuallyEdited 记录跳过，不撤销人工修正。</p>
+     * 复用 {@link EntityNormalizer#normalizeMap}（已有测试保证不丢 _meta 等 VO 没有的键），
+     * 再打当前词典版本戳。人工修改优先：manuallyEdited 记录跳过，不撤销人工修正。
      *
      * @return 重新归一并打好版本戳的 structured_data JSON
      * @throws SkipRecordException 该记录含人工修改，按跳过处理
@@ -1270,15 +1272,15 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 任务收尾时的最终状态。
      *
-     * <p>停机（{@code running == false}）且<b>没跑完</b> → INTERRUPTED：不能声称「已完成」。
+     * 停机（{@code running == false}）且<b>没跑完</b> → INTERRUPTED：不能声称「已完成」。
      * 这里必须自己判 running —— {@link #runByFilter} / {@link #runByIds} 只认 cancelFlags、
-     * 不看 running，在途任务会在停机窗口里继续跑到取数循环自然结束。</p>
+     * 不看 running，在途任务会在停机窗口里继续跑到取数循环自然结束。
      *
-     * <p>反过来也要留神：停机窗口内<b>恰好跑完</b>的（{@code done == total}）仍是
-     * COMPLETED，别把真跑完的误标成中断。取消优先于中断。</p>
+     * 反过来也要留神：停机窗口内<b>恰好跑完</b>的（{@code done == total}）仍是
+     * COMPLETED，别把真跑完的误标成中断。取消优先于中断。
      *
-     * <p>单独抽出来是为了能直接测这三条分支：靠「停一次服务」验证成本很高 ——
-     * Windows 上 SIGTERM 是硬杀（TerminateProcess），根本不跑 {@code @PreDestroy}。</p>
+     * 单独抽出来是为了能直接测这三条分支：靠「停一次服务」验证成本很高 ——
+     * Windows 上 SIGTERM 是硬杀（TerminateProcess），根本不跑 {@code @PreDestroy}。
      */
     static String endStatus(boolean running, boolean cancelled, Integer done, Integer total) {
         // 1. 停机且没跑完 → 中断（不能声称"已完成"）
@@ -1319,12 +1321,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 提交期的严格序列化：失败即抛，任务不提交。
      *
-     * <p>筛选条件序列化失败若被吞掉，{@link #readFilters} 会把结果读成 {@code null}，
-     * 任务就从「指定范围」静默退化成「全库扫描」—— 用户以为只跑了筛出来的几百条。</p>
+     * 筛选条件序列化失败若被吞掉，{@link #readFilters} 会把结果读成 {@code null}，
+     * 任务就从「指定范围」静默退化成「全库扫描」—— 用户以为只跑了筛出来的几百条。
      *
-     * <p>注意 {@code o == null} 不是失败：Jackson 把 null 序列化成字符串 {@code "null"}，
+     * 注意 {@code o == null} 不是失败：Jackson 把 null 序列化成字符串 {@code "null"}，
      * 读回时同样得到 {@code null}，语义是「不限范围」，这是<b>合法</b>路径
-     * （提交时不带 filters 就是全库），不要连它一起禁掉。</p>
+     * （提交时不带 filters 就是全库），不要连它一起禁掉。
      */
     static String writeJsonStrict(ObjectMapper mapper, Object o) {
         // 序列化失败即抛：筛选条件丢了会让任务从"指定范围"静默变成"全库扫描"
@@ -1338,8 +1340,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 进度落库用的宽松序列化：失败退回 {@code "null"}（读回即「无失败明细」）。
      *
-     * <p>刻意与提交路径分开：这条在任务收尾里被调用，抛异常会盖掉任务本身的收尾；
-     * 而失败明细丢了不影响任务语义。</p>
+     * 刻意与提交路径分开：这条在任务收尾里被调用，抛异常会盖掉任务本身的收尾；
+     * 而失败明细丢了不影响任务语义。
      */
     private String writeJson(Object o) {
         // 1. 序列化失败退回 "null"（读回即无明细），不抛
@@ -1353,9 +1355,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 还原任务落库时冻结的筛选条件。
      *
-     * <p>⚠️ <b>解析失败必须抛，不能退化成 null</b>：{@code null} 在下游表示「不限范围」，
+     * ⚠️ <b>解析失败必须抛，不能退化成 null</b>：{@code null} 在下游表示「不限范围」，
      * 解析失败若也返回 null，<b>指定范围的任务会静默变成全库解析</b>。
-     * 提交侧已用 writeJsonStrict 保证写入合法，此处是「历史脏数据」的兜底。</p>
+     * 提交侧已用 writeJsonStrict 保证写入合法，此处是「历史脏数据」的兜底。
      */
     private FiltersDTO readFilters(String json) {
         // 1. null / 空 / 字面 "null" 都表示「提交时未限定范围」
@@ -1374,10 +1376,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * § 6.3 缺点 10：任务是否属于当前组（不含管理员特权：管理员也走组过滤，与病历访问同一口径）。
      *
-     * <p>口径委托 {@link RequestUtils#sameOrgScope}，与列表的
+     * 口径委托 {@link RequestUtils#sameOrgScope}，与列表的
      * {@code org_id = currentOrgId()} 等值查询保持一致：无组织用户的任务
      * {@code org_id=''} 两边都空，判权放行，否则会出现「列表看得见、详情 404、
-     * 取消说任务不存在」的自相矛盾。真正的组织仍要求严格相等。</p>
+     * 取消说任务不存在」的自相矛盾。真正的组织仍要求严格相等。
      */
     private boolean satisfiesGroup(NlpTask t) {
         return t != null && RequestUtils.sameOrgScope(t.getOrgId());

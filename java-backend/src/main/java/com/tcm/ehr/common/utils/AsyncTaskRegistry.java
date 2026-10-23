@@ -21,16 +21,16 @@ import java.util.function.UnaryOperator;
 /**
  * 长耗时任务的异步登记基类（提交拿任务号 + 轮询结果）。
  *
- * <p><b>为什么要有它</b>：解读 / 问答 / 复核预检 / 单条 NLP 抽取原来都是「同步等下游」——
+ * <b>为什么要有它</b>：解读 / 问答 / 复核预检 / 单条 NLP 抽取原来都是「同步等下游」——
  * 一次生成要几十秒，那段时间里 Tomcat 的请求线程被占着。虽然连接池有 200 线程，
  * 但并发十几个长请求就会把线程吃光，其它接口跟着排队。改成「提交拿任务号 + 轮询结果」后，
- * 请求线程只做提交与查询，长响应跑在专用线程池里。</p>
+ * 请求线程只做提交与查询，长响应跑在专用线程池里。
  *
- * <p><b>形态选择</b>：计划文档允许「任务式接口或 SSE」，这里选**任务式**（提交 + 轮询）：
+ * <b>形态选择</b>：计划文档允许「任务式接口或 SSE」，这里选**任务式**（提交 + 轮询）：
  * 少一层连接管理（SSE 要处理断线重连、代理缓冲），且天然支持「用户离开页面再回来」——
- * 轮询只要再查一次任务号即可。</p>
+ * 轮询只要再查一次任务号即可。
  *
- * <p><b>三个必须做对的地方</b>：</p>
+ * <b>三个必须做对的地方</b>：
  * <ol>
  * <li><b>请求上下文要显式传播</b>：任务体内部会读 {@code RequestUtils.currentOrgId()}，
  *     而异步线程没有 RequestContext（与批任务 worker 同一个坑，代码里已有多处告诫）。
@@ -42,11 +42,11 @@ import java.util.function.UnaryOperator;
  *     故状态落共享层（Redis，{@code <前缀>{taskId}}，TTL 600s），进程内表退化为**一级缓存**。</li>
  * </ol>
  *
- * <p>线程池与登记表都**有界**：池是 Spring 的 {@link ThreadPoolTaskExecutor}（有界队列、满载即拒，
+ * 线程池与登记表都**有界**：池是 Spring 的 {@link ThreadPoolTaskExecutor}（有界队列、满载即拒，
  * 由 {@link #submit} 回 503 而不是静默排队），登记表按条数与存活时间双重淘汰。
- * 共享层缺失（未装配 Redis）时自动退化为纯进程内行为，功能不降级为「不可用」。</p>
+ * 共享层缺失（未装配 Redis）时自动退化为纯进程内行为，功能不降级为「不可用」。
  *
- * <p><b>子类只提供两件事</b>：共享层 key 前缀与结果载荷类型（用于跨实例反序列化）。</p>
+ * <b>子类只提供两件事</b>：共享层 key 前缀与结果载荷类型（用于跨实例反序列化）。
  *
  * @param <T> 任务结果载荷类型
  */
@@ -71,11 +71,11 @@ public abstract class AsyncTaskRegistry<T> {
     /**
      * 共享层（Redis）的持久形态，与 {@link Task} 一一对应。
      *
-     * <p>结果载荷存成 <b>JSON 字符串</b>而非内联对象：反序列化需要知道具体类型，
-     * 而泛型在运行期被擦除 —— 由子类给出的 {@link #payloadType()} 决定读回什么类型。</p>
+     * 结果载荷存成 <b>JSON 字符串</b>而非内联对象：反序列化需要知道具体类型，
+     * 而泛型在运行期被擦除 —— 由子类给出的 {@link #payloadType()} 决定读回什么类型。
      *
-     * <p>时间用毫秒时间戳而非 LocalDateTime：共享层不依赖调用方的时区与
-     * JavaTime 序列化配置，少一处跨实例不一致的来源。</p>
+     * 时间用毫秒时间戳而非 LocalDateTime：共享层不依赖调用方的时区与
+     * JavaTime 序列化配置，少一处跨实例不一致的来源。
      */
     private record TaskJson(String orgId, String userId, String state, String payloadJson,
                             String error, long createdAtMs) {
@@ -95,8 +95,8 @@ public abstract class AsyncTaskRegistry<T> {
     /**
      * 任务线程池：由 Spring 装配（见 AsyncConfig），有界队列 + AbortPolicy。
      *
-     * <p>满载时由 {@link #submit} 转成 503 —— 若用无界队列则提交永不拒绝，前端 150s 放弃后
-     * 任务还堆在队列里空转。</p>
+     * 满载时由 {@link #submit} 转成 503 —— 若用无界队列则提交永不拒绝，前端 150s 放弃后
+     * 任务还堆在队列里空转。
      */
     private final ThreadPoolTaskExecutor executor;
 
@@ -116,9 +116,9 @@ public abstract class AsyncTaskRegistry<T> {
     /**
      * 可选装配共享层：Redis 与 ObjectMapper 都在时才启用。
      *
-     * <p>刻意用 {@code required = false}：本类被单测直接 {@code new} 出来跑请求上下文传播，
+     * 刻意用 {@code required = false}：本类被单测直接 {@code new} 出来跑请求上下文传播，
      * 也允许在未启用 Redis 的环境里退化为纯进程内（与改造前行为一致），
-     * 不让「共享层缺失」变成「功能不可用」。</p>
+     * 不让「共享层缺失」变成「功能不可用」。
      */
     @Autowired(required = false)
     public void setRedis(StringRedisTemplate redis) {

@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * 基线归档（批次 17）的接口契约：每次基线被改动后存一份合并后的快照，供历史查看与回滚。
  *
- * <p>实现见 com.tcm.ehr.service.impl.DictArchiveServiceImpl。</p>
+ * 实现见 com.tcm.ehr.service.impl.DictArchiveServiceImpl。
  */
 public interface IDictArchiveService {
 
@@ -28,9 +28,9 @@ public interface IDictArchiveService {
     /**
      * 归档一份基线快照，<b>失败不抛</b>，把原因收敛成警告返回。
      *
-     * <p>调用方（如管理员直写导入）在调用本方法时基线<b>已经写入并提交</b>。
+     * 调用方（如管理员直写导入）在调用本方法时基线<b>已经写入并提交</b>。
      * 归档只是随后的记账动作：失败若抛出去会把整个请求变成 500，让用户以为导入没成，
-     * 实际已生效（重试还会再合并一次）。故由服务层兜住，原因写进响应体、栈入日志。</p>
+     * 实际已生效（重试还会再合并一次）。故由服务层兜住，原因写进响应体、栈入日志。
      *
      * @return 成功时 versionNo 非空、warning 为空；失败反之
      */

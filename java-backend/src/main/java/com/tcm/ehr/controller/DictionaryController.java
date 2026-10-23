@@ -328,20 +328,20 @@ public class DictionaryController {
 /**
  * 提案与当前基线的差异（实时计算，不落表）。
  *
- * <p>【权限】管理员一律可看；基础层提案（{@code org_id=''}）语义上属于全站，按
+ * 【权限】管理员一律可看；基础层提案（{@code org_id=''}）语义上属于全站，按
  * org_id 等值比较时任何组织都「不等于」它，故单独归入「仅管理员」；
- * 其余要求<b>提案自身的 org_id 等于当前组织</b>，且调用者是提交者本人或该组织的组长。</p>
+ * 其余要求<b>提案自身的 org_id 等于当前组织</b>，且调用者是提交者本人或该组织的组长。
  *
- * <p>⚠️ 只看 {@code isOrgOwner()} 是不够的：它只说明「我在<b>我自己</b>的组织里是组长」，
+ * ⚠️ 只看 {@code isOrgOwner()} 是不够的：它只说明「我在<b>我自己</b>的组织里是组长」，
  * 与目标提案属于哪个组织无关 —— 那样任一组织的组长拿任意提案号就能读到别组的词条快照
  * （2026-10-05 之前审核路径就是这么漏的，见 DictProposalServiceImpl.requireAuditable；
- * diff 是漏网的第三处，2026-10-13 补上）。</p>
+ * diff 是漏网的第三处，2026-10-13 补上）。
  *
- * <p>⚠️ 比对对象必须是 username，不是 userId：submit_user_id 列存的是
+ * ⚠️ 比对对象必须是 username，不是 userId：submit_user_id 列存的是
  * RequestUtils.currentUsername()（见本类 submit），而 JWT 的 subject 是 user.getId()，
  * 两者是不同的值。此前这里误用 currentUserId() 去比，普通成员永远打不开
  * 自己提案的差异，只会拿到「无权查看该提案」。list 与 editTerms 两处都比 username，
- * 只有 diff 写错。回归测试见 DictionaryControllerDiffTest。</p>
+ * 只有 diff 写错。回归测试见 DictionaryControllerDiffTest。
  */
     @GetMapping("/proposals/{id}/diff")
     public ResponseEntity<Result<DictProposalDiffVO>> diff(@PathVariable("id") String id) {
@@ -361,8 +361,8 @@ public class DictionaryController {
      * 能否查看某条提案的差异：管理员一律可看；其余要求提案属于当前组织，
      * 且调用者是提交者本人或当前组织的组长。
      *
-     * <p>与 DictProposalServiceImpl.requireAuditable 的归属判定同一口径，
-     * 只是把「能否写」换成「能否读」。单独抽方法是为了让边界在测试里可被逐条钉住。</p>
+     * 与 DictProposalServiceImpl.requireAuditable 的归属判定同一口径，
+     * 只是把「能否写」换成「能否读」。单独抽方法是为了让边界在测试里可被逐条钉住。
      */
     private boolean canViewProposalDiff(DictProposal p) {
         if (RequestUtils.isAdmin()) {

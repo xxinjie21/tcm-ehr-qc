@@ -8,17 +8,17 @@ import java.time.LocalDateTime;
 /**
  * 病历批处理扫描的 keyset（游标）分页条件 —— 唯一实现，两处服务复用。
  *
- * <p>为什么需要 keyset（性能审查 P0-2）：offset 分页每页「{@code ORDER BY ...
+ * 为什么需要 keyset（性能审查 P0-2）：offset 分页每页「{@code ORDER BY ...
  * LIMIT offset, 1000}」都要把**剩余全表**重排一遍，扫 4 万行 ≈ 41 页 = 41 次 filesort；
  * keyset 锚定上一页末条的 {@code (visit_time, id)} 后只做区间扫描（配
- * idx_records_org_vt_id 后实测 4.9s → 0.2s）。</p>
+ * idx_records_org_vt_id 后实测 4.9s → 0.2s）。
  *
- * <p><b>严格全序前提</b>：id 是唯一主键 → 组合键 {@code (visit_time, id)}
+ * <b>严格全序前提</b>：id 是唯一主键 → 组合键 {@code (visit_time, id)}
  * 唯一，游标既不会漏行也不会重复。锚点取「上一页**末条**」且必含 id
- * （同 visit_time 有多条时只比 visit_time 会漏）。</p>
+ * （同 visit_time 有多条时只比 visit_time 会漏）。
  *
- * <p>注意：visit_time 须非空（与既有排序 / 分页口径一致）；MySQL 对
- * NULL 比较是 UNKNOWN，若数据存在空接诊时间需先补数。</p>
+ * 注意：visit_time 须非空（与既有排序 / 分页口径一致）；MySQL 对
+ * NULL 比较是 UNKNOWN，若数据存在空接诊时间需先补数。
  */
 public final class RecordKeyset {
 

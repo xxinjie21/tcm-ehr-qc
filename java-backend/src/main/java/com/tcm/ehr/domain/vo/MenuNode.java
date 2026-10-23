@@ -8,8 +8,8 @@ import java.util.List;
 /**
  * 菜单节点（登录响应 menus 树的元素，批次 17）。
  *
- * <p>父项没有 children 时就是叶子节点。前端 MainLayout 按
- * children 是否为空决定渲染成叶子项还是分组。</p>
+ * 父项没有 children 时就是叶子节点。前端 MainLayout 按
+ * children 是否为空决定渲染成叶子项还是分组。
  */
 @Data
 public class MenuNode {
@@ -20,8 +20,8 @@ public class MenuNode {
     /**
      * 前端路由路径。
      *
-     * <p>父项「术语词典」本身也有路径（{@code /dictionary}）—— 用户点父项直接进入
-     * 日常的词典管理，而不是展开一个需要展开交互的树。</p>
+     * 父项「术语词典」本身也有路径（{@code /dictionary}）—— 用户点父项直接进入
+     * 日常的词典管理，而不是展开一个需要展开交互的树。
      */
     private String path;
 

@@ -20,9 +20,9 @@ import java.util.List;
 /**
  * 词典文件**只读**服务：每类术语一个 JSON。
  *
- * <p>默认打包在 <b>classpath:{@code dictionaries/}</b>（随 jar 一起发布，服务器上无需另放文件）；
+ * 默认打包在 <b>classpath:{@code dictionaries/}</b>（随 jar 一起发布，服务器上无需另放文件）；
  * 需要外部目录时用 dictionary.dir 覆盖（可填 {@code classpath:xxx} 或文件系统路径）。
- * 词典真源已在 dictionary_terms，本文件仅用于基础层首次播种。</p>
+ * 词典真源已在 dictionary_terms，本文件仅用于基础层首次播种。
  */
 @Slf4j
 @Service
@@ -51,7 +51,7 @@ public class DictionaryFileServiceImpl implements IDictionaryFileService {
     /**
      * 读取某类词典的全部词条。
      *
-     * <p>文件不存在视为「该类词典为空」并返回空列表，而非报错 —— 首次导入时目录尚无文件。</p>
+     * 文件不存在视为「该类词典为空」并返回空列表，而非报错 —— 首次导入时目录尚无文件。
      *
      * @throws IOException 文件存在但读取或 JSON 解析失败
      */

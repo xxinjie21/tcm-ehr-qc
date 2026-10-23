@@ -11,12 +11,12 @@ import java.util.Map;
 /**
  * 结构化数据落库前的元信息打点。
  *
- * <p>在 structured_data JSON 顶层写入保留键 _meta，记录该份结构化数据
- * <b>依据哪一版术语词典</b>产生，供前端展示"参照词典版本 xxx"（可追溯）。</p>
+ * 在 structured_data JSON 顶层写入保留键 _meta，记录该份结构化数据
+ * <b>依据哪一版术语词典</b>产生，供前端展示"参照词典版本 xxx"（可追溯）。
  *
- * <p><b>为什么安全</b>：所有下游消费者（StatsServiceImpl / QcScorer）都按
+ * <b>为什么安全</b>：所有下游消费者（StatsServiceImpl / QcScorer）都按
  * <b>指定 key</b> 取实体（如 {@code data.get("patternList")}），不遍历全 key，故 _meta
- * 不会被当成实体或词频统计进去；前端 StructuredDataCard 也按固定分区渲染。</p>
+ * 不会被当成实体或词频统计进去；前端 StructuredDataCard 也按固定分区渲染。
  */
 public final class StructuredDataMeta {
 
@@ -65,9 +65,9 @@ public final class StructuredDataMeta {
     /**
      * 给<b>已解析</b>的结构化数据 Map 打上词典版本元信息（自动流程：抽取 / 清洗）。
      *
-     * <p>与 {@link #stamp(ObjectMapper, String, String, Integer)} 的差别只在入参形态：调用方
+     * 与 {@link #stamp(ObjectMapper, String, String, Integer)} 的差别只在入参形态：调用方
      * 已经持有解析结果时走这条，省掉「序列化 → 解析 → 再序列化」的一次完整往返。语义完全一致
-     * —— dictVersion 为空时同样不写 _meta，只把数据原样序列化回去。</p>
+     * —— dictVersion 为空时同样不写 _meta，只把数据原样序列化回去。
      *
      * @param data          已解析的结构化数据顶层 Map
      * @param dictVersion   词典版本串；空则不打点
@@ -95,13 +95,13 @@ public final class StructuredDataMeta {
     /**
      * 给结构化数据 JSON 打上<b>人工修改</b>标记（人工流程：复核提交 / 手工改结构化数据）。
      *
-     * <p><b>标记一律由后端写</b>，前端传不进来 —— 否则用户可以伪称或漏称，
+     * <b>标记一律由后端写</b>，前端传不进来 —— 否则用户可以伪称或漏称，
      * 这个标记就失去可信度；而它唯一的用途正是「评估模型准确率时排除人工补过的数据」，
-     * 一旦可自报就等于没有。</p>
+     * 一旦可自报就等于没有。
      *
-     * <p>与 {@link #stamp} 的区别：本方法<b>替换</b>整个 _meta（只留人工修改三要素），
+     * 与 {@link #stamp} 的区别：本方法<b>替换</b>整个 _meta（只留人工修改三要素），
      * 而 stamp 只写版本相关字段。人工修改后旧的版本戳本就失效（内容已被改），
-     * 继续显示「依据某一版词典」是误导。</p>
+     * 继续显示「依据某一版词典」是误导。
      *
      * @param json     结构化数据 JSON
      * @param editedBy 操作人（当前登录用户名）
@@ -145,8 +145,8 @@ public final class StructuredDataMeta {
     /**
      * 读出这份结构化数据是否含人工修改。
      *
-     * <p>清洗归一会重跑标准化，把人工改成非标准词的术语又归一回标准词 ——
-     * 方案 A 决定<b>跳过</b>人工修改过的病历，所以这个判断同时用于「清洗跳过」与「列表标记」。</p>
+     * 清洗归一会重跑标准化，把人工改成非标准词的术语又归一回标准词 ——
+     * 方案 A 决定<b>跳过</b>人工修改过的病历，所以这个判断同时用于「清洗跳过」与「列表标记」。
      *
      * @param mapper 用于解析的 ObjectMapper（由调用方注入，避免每次 new）
      * @param json   structured_data 列的原文

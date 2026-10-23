@@ -3,10 +3,10 @@ package com.tcm.ehr.common.utils;
 /**
  * 分页条数收敛：把「每页条数」钳到合理区间。
  *
- * <p>不加约束时 {@code pageSize=999999} 会直接变成 {@code LIMIT 999999}，
+ * 不加约束时 {@code pageSize=999999} 会直接变成 {@code LIMIT 999999}，
  * 一次把整表读进内存 —— 日志表、复核任务表都是只增不减的，几十万行时足以拖垮进程。
  * 故所有分页接口统一经 {@link #clamp(int)} 收口，<b>只在这里定义一次</b>，
- * 避免每个 Controller 各写一遍上限导致口径漂移。</p>
+ * 避免每个 Controller 各写一遍上限导致口径漂移。
  */
 public final class PageSizeGuard {
 

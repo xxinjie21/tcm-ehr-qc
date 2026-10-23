@@ -33,12 +33,12 @@ import java.util.Map;
 /**
  * 复核提交的写库段（批次 26.4 / 26.e 定案 A）。
  *
- * <p>原来「ES 归一 + 写库」同处一个 {@code @Transactional} 方法，而归一要走 ES 网络往返，
+ * 原来「ES 归一 + 写库」同处一个 {@code @Transactional} 方法，而归一要走 ES 网络往返，
  * 期间数据库连接一直被占着，ES 一慢连接池就被拖住。现在归一上移到事务外，
- * 见 {@link ReviewServiceImpl#review}；本类只承载事务内的读改写。</p>
+ * 见 {@link ReviewServiceImpl#review}；本类只承载事务内的读改写。
  *
- * <p>语义不变：归一失败发生在进入本类之前，异常照旧上抛（ES 不可用 → 503）且零写入；
- * 权限、隔离、防丢更新的读时指纹校验都仍在事务内原位。</p>
+ * 语义不变：归一失败发生在进入本类之前，异常照旧上抛（ES 不可用 → 503）且零写入；
+ * 权限、隔离、防丢更新的读时指纹校验都仍在事务内原位。
  */
 @Slf4j
 @Service
@@ -53,7 +53,7 @@ public class ReviewWriteServiceImpl implements IReviewWriteService {
     /**
      * 事务内完成「校验 → 回写结构化数据 → 自动重算 → 任务流转」。
      *
-     * <p>三段写库必须同生共死，否则中途失败会出现「分数已回写、任务仍 pending」的对不上。</p>
+     * 三段写库必须同生共死，否则中途失败会出现「分数已回写、任务仍 pending」的对不上。
      *
      * @param recordId 病历 ID
      * @param dto      已由调用方在事务外归一的复核数据（correctedData 会被就地改写）

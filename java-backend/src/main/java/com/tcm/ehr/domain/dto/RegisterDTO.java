@@ -9,9 +9,9 @@ import lombok.Data;
 /**
  * 注册请求（入参）：用户名 / 密码，可选「同时申请建组」（阶段2）。
  *
- * <p><b>安全约束</b>：注册账号角色固定为「用户」，不开放管理员注册，
+ * <b>安全约束</b>：注册账号角色固定为「用户」，不开放管理员注册，
  * 故本 DTO 不接收 role 字段（即使前端传入也会被 Jackson 忽略）；
- * 管理员账号由 database-init.sql 预置。</p>
+ * 管理员账号由 database-init.sql 预置。
  */
 @Data
 public class RegisterDTO {
@@ -19,18 +19,18 @@ public class RegisterDTO {
     /**
      * 用户名合法形式：字母 / 数字 / 下划线 / 中文，长度 2~20。
      *
-     * <p>长度也写进正则、<b>不再单用 {@code @Size}</b>：否则空字符串会同时触发
+     * 长度也写进正则、<b>不再单用 {@code @Size}</b>：否则空字符串会同时触发
      * {@code @Size(min=2)} 与 {@code @NotBlank}，用户拿到两条重复提示。
-     * 另外正则<b>放行纯空白</b>，空值与空白一律由 {@code @NotBlank} 给出更准确的文案。</p>
+     * 另外正则<b>放行纯空白</b>，空值与空白一律由 {@code @NotBlank} 给出更准确的文案。
      */
     public static final String USERNAME_PATTERN = "^\\s*$|^[A-Za-z0-9_\\u4e00-\\u9fa5]{2,20}$";
 
     /**
      * 课题组编码：字母 / 数字 / 短横线 / 下划线，长度 2~50。
      *
-     * <p>与用户名<b>刻意用不同的字符集</b>：编码会出现在 URL 与组列表里，
+     * 与用户名<b>刻意用不同的字符集</b>：编码会出现在 URL 与组列表里，
      * 放开中文会让路径编码与日志出现转义歧义。强度要求同 USERNAME_PATTERN
-     * （空值交由父对象的 {@code @NotBlank} 管）。</p>
+     * （空值交由父对象的 {@code @NotBlank} 管）。
      */
     public static final String GROUP_CODE_PATTERN = "^\\s*$|^[A-Za-z0-9_-]{2,50}$";
 
@@ -50,9 +50,9 @@ public class RegisterDTO {
     /**
      * 可选：同时申请创建课题组。
      *
-     * <p><b>本段已过期并于 2026-10-05 校正</b>：现实现「注册即 active、无审核、无待分配池」。
+     * <b>本段已过期并于 2026-10-05 校正</b>：现实现「注册即 active、无审核、无待分配池」。
      * 组织由用户自助创建（创建者即 owner），不存在 pending 组与管理员审批；
-     * 历史遗留的「待分配池 / 首任组长审批」描述已不再适用。</p>
+     * 历史遗留的「待分配池 / 首任组长审批」描述已不再适用。
      */
     @Valid
     private CreateGroup createGroup;

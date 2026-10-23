@@ -26,8 +26,8 @@ import java.util.List;
 /**
  * 统计接口：首页指标卡、科室选项、看板一次拉取与扩展统计、按类型统计。
  *
- * <p>【权限：登录即可】但受组织数据域约束：管理员看全部，其余身份只看本组织。所有聚合都必须带数据域，
- * 漏一处就能读到跨组织的分级分布与词频。</p>
+ * 【权限：登录即可】但受组织数据域约束：管理员看全部，其余身份只看本组织。所有聚合都必须带数据域，
+ * 漏一处就能读到跨组织的分级分布与词频。
  */
 @RestController
 @RequestMapping("/api/stats")
@@ -41,16 +41,16 @@ public class StatsController {
     /**
      * 标准化质量报告。
      *
-     * <p>【权限：登录即可 + 数据域】只读，不触发任何重算。</p>
+     * 【权限：登录即可 + 数据域】只读，不触发任何重算。
      *
-     * <p>报告分甲乙两层：甲类是标准符合度（与数据无关），乙类是数据集覆盖度
+     * 报告分甲乙两层：甲类是标准符合度（与数据无关），乙类是数据集覆盖度
      * （只用于验证词表建全与否，<b>不代表真实病历准确率</b>）。响应里的
-     * disclaimer 会原样带到页面，禁止前端隐藏。</p>
+     * disclaimer 会原样带到页面，禁止前端隐藏。
      *
-     * <p>两个时间维度相互独立、可同时生效（取交集）：start/end 是
+     * 两个时间维度相互独立、可同时生效（取交集）：start/end 是
      * <b>接诊时间</b>（visit_time，Java 侧过滤，range.excluded 口径由此而来）；
      * importStart/importEnd 是<b>导入时间</b>（records.create_time，
-     * 下推 SQL）。页面默认按「今天导入」收窄，正是这一维度。</p>
+     * 下推 SQL）。页面默认按「今天导入」收窄，正是这一维度。
      *
      * @param department  科室，空表示不限
      * @param start       接诊时间起（yyyy-MM-dd），空表示不限
@@ -73,9 +73,9 @@ public class StatsController {
     /**
      * 导出标准化质量报告 CSV（批次 28 · 28.23）。
      *
-     * <p>【权限：登录即可 + 数据域】与页面同源同域。改由后端生成并与另外两条导出
+     * 【权限：登录即可 + 数据域】与页面同源同域。改由后端生成并与另外两条导出
      * （数据集 / 日志）一样返回文件流，前端不再自行拼 CSV。参数语义与报告接口一致，
-     * 含导入时间维度（页面默认值会一并带入导出文件）。</p>
+     * 含导入时间维度（页面默认值会一并带入导出文件）。
      *
      * @param department  科室，空表示不限
      * @param start       接诊时间起（yyyy-MM-dd），空表示不限
@@ -102,8 +102,8 @@ public class StatsController {
     /**
      * 首页指标卡。
      *
-     * <p>【权限：登录即可 + 数据域】3 张指标卡（总数 / 合格率 / 无效）随 department + start/end
-     * 收窄；待复核数仍为全量口径（待办条入口须与全量列表一致）。不传参即全量总览。</p>
+     * 【权限：登录即可 + 数据域】3 张指标卡（总数 / 合格率 / 无效）随 department + start/end
+     * 收窄；待复核数仍为全量口径（待办条入口须与全量列表一致）。不传参即全量总览。
      *
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
@@ -120,7 +120,7 @@ public class StatsController {
     /**
      * 科室下拉选项。
      *
-     * <p>【权限：登录即可】取当前数据域内的科室去重值。</p>
+     * 【权限：登录即可】取当前数据域内的科室去重值。
      *
      * @return 科室名称列表
      */
@@ -132,7 +132,7 @@ public class StatsController {
     /**
      * 看板一次拉取：指标卡 + 四类统计。
      *
-     * <p>【权限：登录即可 + 数据域】</p>
+     * 【权限：登录即可 + 数据域】
      *
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
@@ -151,7 +151,7 @@ public class StatsController {
     /**
      * 看板扩展统计：趋势、科室合格率、评分分布、词典规模。
      *
-     * <p>【权限：登录即可 + 数据域】</p>
+     * 【权限：登录即可 + 数据域】
      *
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
@@ -170,8 +170,8 @@ public class StatsController {
     /**
      * 按类型统计词频或分布。
      *
-     * <p>【权限：登录即可 + 数据域】recordIds 为空表示统计全范围；type 非法由
-     * GlobalExceptionHandler 统一返回 400。</p>
+     * 【权限：登录即可 + 数据域】recordIds 为空表示统计全范围；type 非法由
+     * GlobalExceptionHandler 统一返回 400。
      *
      * @param dto type=统计类型；recordIds=限定病历集合，可空
      * @return 该类型的词频或分布结果
@@ -184,8 +184,8 @@ public class StatsController {
     /**
      * GET 查询参数 → 统一的范围过滤对象（两个时间维度都需上下界同时存在）。
      *
-     * <p>与 QcController.filters 同构：接诊时间与导入时间是独立维度、可同时生效。
-     * overview / all / extra 不暴露导入时间，传 null 即「不限」（现状不变）。</p>
+     * 与 QcController.filters 同构：接诊时间与导入时间是独立维度、可同时生效。
+     * overview / all / extra 不暴露导入时间，传 null 即「不限」（现状不变）。
      */
     private FiltersDTO filters(String department, String start, String end, String grade,
                                String importStart, String importEnd) {

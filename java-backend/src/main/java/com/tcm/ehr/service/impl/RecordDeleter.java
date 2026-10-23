@@ -20,18 +20,18 @@ import java.util.List;
 /**
  * 病历删除（批次 13 · 13.3 的第一个抽取对象）。
  *
- * <p><b>为什么先抽它</b>：它是 `RecordServiceImpl` 里最自洽的一块 —— 三个私有方法
+ * <b>为什么先抽它</b>：它是 `RecordServiceImpl` 里最自洽的一块 —— 三个私有方法
  * （filterAccessibleIds / doDelete / hasAnyFilter）与一个常量
  * DELETE_CHUNK 只服务于删除两条入口（按 ID、按范围），对外零依赖，
- * 且已经有 6 个测试用例兜底（守卫 4 例 + 执行 2 例）。抽它风险最小、也最能验证抽取流程本身。</p>
+ * 且已经有 6 个测试用例兜底（守卫 4 例 + 执行 2 例）。抽它风险最小、也最能验证抽取流程本身。
  *
- * <p><b>为什么 mappers 由调用方传入而不是构造注入</b>：RecordServiceImpl 继承
+ * <b>为什么 mappers 由调用方传入而不是构造注入</b>：RecordServiceImpl 继承
  * MyBatis-Plus 的 ServiceImpl，它的 baseMapper 是 protected 字段、由框架
  * **构造之后**注入。如果这里构造注入，构造时拿到的会是 null。因此由调用方在**每次调用时**
  * 用 {@code getBaseMapper()} 取当前值传进来 —— 顺带也让现有测试里「反射注入 baseMapper」
- * 的做法继续有效，抽取不会把既有安全网打掉。</p>
+ * 的做法继续有效，抽取不会把既有安全网打掉。
  *
- * <p>三条从原代码带过来的规则，务必保持：</p>
+ * 三条从原代码带过来的规则，务必保持：
  * <ol>
  * <li><b>先删子表再删主表</b>：review_tasks.record_id 有外键指向 records.id，顺序反了会撞约束；</li>
  * <li><b>按范围删必须有筛选条件</b>：否则就是删全库，直接拒绝；</li>
@@ -50,8 +50,8 @@ public class RecordDeleter {
     /**
      * 按 ID 删除：先按数据域过滤请求体里的 id，再交给 {@link #doDelete}。
      *
-     * <p>注：事务注解在调用方（RecordServiceImpl.deleteRecords）的 public 方法上 ——
-     * 注解加在私有方法或本类内部自调用上不经过代理，等于没加。</p>
+     * 注：事务注解在调用方（RecordServiceImpl.deleteRecords）的 public 方法上 ——
+     * 注解加在私有方法或本类内部自调用上不经过代理，等于没加。
      */
     public DeleteRecordsVO deleteByIds(DeleteRecordsDTO dto) {
         // 1. 没选 id 直接拒：空删会静默「成功」，用户以为删掉了
@@ -67,16 +67,16 @@ public class RecordDeleter {
     /**
      * 按筛选范围删除：keyset 游标分批「边取边删」，内存恒定 {@link #DELETE_CHUNK} 条 id。
      *
-     * <p>性能审查 A4：原先 `selectList(全部 id)` 会把 4 万条 id 一次性拉进堆（≈1.1~1.7s +
+     * 性能审查 A4：原先 `selectList(全部 id)` 会把 4 万条 id 一次性拉进堆（≈1.1~1.7s +
      * 40 万字符），随后再分 80 轮 IN 删除。改为每页 ≤500 条（已含 id + visit_time 锚点
-     * 列）、取到即删，内存恒定一页。</p>
+     * 列）、取到即删，内存恒定一页。
      *
-     * <p><b>事务口径</b>：整个循环在调用方（RecordServiceImpl.deleteByFilter）的
+     * <b>事务口径</b>：整个循环在调用方（RecordServiceImpl.deleteByFilter）的
      * 一个 {@code @Transactional(timeout=60)} 事务内 —— all-or-nothing 语义与现状完全一致，
      * 失败 = 一条都没删。额外的收益是 keyset 一致性：InnoDB 默认 REPEATABLE READ，
-     * **第一个读建立快照**，80 页游标读的都是同一份快照，翻页期间新增行不会造成锚点漂移。</p>
+     * **第一个读建立快照**，80 页游标读的都是同一份快照，翻页期间新增行不会造成锚点漂移。
      *
-     * <p>两条安全网不变：{@link #hasAnyFilter} 守卫 + {@link RecordFilter} 数据域过滤。</p>
+     * 两条安全网不变：{@link #hasAnyFilter} 守卫 + {@link RecordFilter} 数据域过滤。
      */
     public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
         // 1. 必须至少有一个筛选条件，否则就是「删全库」
@@ -122,11 +122,11 @@ public class RecordDeleter {
     /**
      * 按当前数据域筛出可访问的病历 id，供按 ID 删除做前置过滤。
      *
-     * <p>本方法存在的唯一理由：按 ID 删除与按范围删除必须同一口径。按范围删除经
+     * 本方法存在的唯一理由：按 ID 删除与按范围删除必须同一口径。按范围删除经
      * {@link RecordFilter#build} 天然带数据域，而按 ID 删除的 id 来自请求体，少了这一步
-     * 就能删掉别组病历（连带其 review_tasks）。</p>
+     * 就能删掉别组病历（连带其 review_tasks）。
      *
-     * <p>不可访问的 id 直接剔除、不报错：一条 id 属不属于本组是授权问题，不是业务错误。</p>
+     * 不可访问的 id 直接剔除、不报错：一条 id 属不属于本组是授权问题，不是业务错误。
      */
     private List<String> filterAccessibleIds(List<String> ids) {
         List<String> accessible = new ArrayList<>();

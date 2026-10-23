@@ -7,7 +7,7 @@ import com.tcm.ehr.domain.vo.LlmTestVO;
 /**
  * LLM 运行时配置：读取、保存、连通性探测。
  *
- * <p>配置只在内存与配置文件之间合并，不写回 application.yml。</p>
+ * 配置只在内存与配置文件之间合并，不写回 application.yml。
  */
 public interface ILlmConfigService {
 

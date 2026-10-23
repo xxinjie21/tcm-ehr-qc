@@ -11,14 +11,14 @@ import java.util.List;
 /**
  * 词典基线更新提案（批次 17）的接口契约：导出基线、查看差异、编辑、审批、回滚。
  *
- * <p>实现见 com.tcm.ehr.service.impl.DictProposalServiceImpl。</p>
+ * 实现见 com.tcm.ehr.service.impl.DictProposalServiceImpl。
  */
 public interface IDictProposalService {
 
     /**
      * 导出某组织某类型的词条，供「我的词典」存成本地副本。
      *
-     * <p><b>两种口径别混用</b>（这是历史上被混用过的地方）：</p>
+     * <b>两种口径别混用</b>（这是历史上被混用过的地方）：
      * <ul>
      *   <li>org —— 只导出<b>本组织自有词条</b>。这是<b>提案的基线</b>：
      *       审核通过走的是整快照替换本组织层（见 audit），所以基线必须是组织层本身，

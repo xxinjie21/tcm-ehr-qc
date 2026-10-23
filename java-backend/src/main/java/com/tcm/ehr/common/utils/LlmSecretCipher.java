@@ -10,25 +10,25 @@ import org.springframework.stereotype.Component;
 /**
  * LLM 密钥的落库加密（AES-256-GCM）。
  *
- * <p>为什么必须加密落库：配置改成「每个用户一份」后，密钥会跟着每个用户
- * 落进数据库。裸存意味着「拿到库就能拿到所有人的三方密钥」。</p>
+ * 为什么必须加密落库：配置改成「每个用户一份」后，密钥会跟着每个用户
+ * 落进数据库。裸存意味着「拿到库就能拿到所有人的三方密钥」。
  *
- * <p>为什么用 GCM 而不是 CBC：GCM 带认证标签，密文被改动会在解密时报错，
- * 而不是悄悄解出一段垃圾明文。</p>
+ * 为什么用 GCM 而不是 CBC：GCM 带认证标签，密文被改动会在解密时报错，
+ * 而不是悄悄解出一段垃圾明文。
  *
- * <p><b>加解密交给 spring-security-crypto 的 {@link Encryptors}</b>（《自研组件替换计划》#2）：
+ * <b>加解密交给 spring-security-crypto 的 {@link Encryptors}</b>（《自研组件替换计划》#2）：
  * 原实现手写 javax.crypto 的 IV 生成、拼接与 Base64 编解码，属重复实现通用能力。
  * 现在用 {@code Encryptors.delux(password, salt)} —— AES-256-GCM，密钥由 password + salt
- * 经 PBKDF2 派生，密文为 {@code hex(IV‖密文‖tag)}（每次加密随机 IV）。</p>
+ * 经 PBKDF2 派生，密文为 {@code hex(IV‖密文‖tag)}（每次加密随机 IV）。
  *
- * <p><b>配置形态随之改变（raw key → password + salt）</b>：
+ * <b>配置形态随之改变（raw key → password + salt）</b>：
  * 口令取自环境变量 TCM_LLM_ENC_KEY（其次配置项 {@code llm.crypto-password}），
  * 盐取自 TCM_LLM_ENC_SALT（其次 {@code llm.crypto-salt}，为十六进制偶数长度）。
  * 口令不再要求「32 字节 Base64」，任意非空字符串均可。两者任一缺失或盐不是合法 hex 时
- * {@link #available()} 为 false —— <b>不阻塞启动</b>，只是无法解密已有密文（按「未配置密钥」处理）。</p>
+ * {@link #available()} 为 false —— <b>不阻塞启动</b>，只是无法解密已有密文（按「未配置密钥」处理）。
  *
- * <p><b>换密钥的代价</b>：GCM 密文绑定密钥，换密钥后旧密文解不开。此时
- * {@link #decrypt} 返回空串并告警一次，用户重新填一次密钥即可恢复。</p>
+ * <b>换密钥的代价</b>：GCM 密文绑定密钥，换密钥后旧密文解不开。此时
+ * {@link #decrypt} 返回空串并告警一次，用户重新填一次密钥即可恢复。
  */
 @Slf4j
 @Component

@@ -91,9 +91,9 @@ public class DictProposalServiceImpl implements IDictProposalService {
     /**
      * 导出某组织某类型的词条给前端存本地个人词典。
      *
-     * <p>两种口径（scope）的区别见接口 javadoc，这里只强调一点：
+     * 两种口径（scope）的区别见接口 javadoc，这里只强调一点：
      * org 是<b>提案基线</b>（审核走整快照替换组织层），
-     * effective 是<b>生效词典</b>（供查看 / 导出 / 当编辑起点）。</p>
+     * effective 是<b>生效词典</b>（供查看 / 导出 / 当编辑起点）。
      *
      * @param orgId 组织；"" = 基础层
      * @param type  术语类型
@@ -435,13 +435,13 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
     /**
      * 查询路径专用的惰性清理：清理失败只降级为「本次不清理」，不能让列表查不出来。
      *
-     * <p>与 {@link #purgeExpiredSnapshots()} 的差别只在错误处理。本方法是 {@code GET /api/dictionary/proposals}
+     * 与 {@link #purgeExpiredSnapshots()} 的差别只在错误处理。本方法是 {@code GET /api/dictionary/proposals}
      * 的入口调用的，而清理（删 dict_proposal_term 里的过期快照行）是「顺手做」的附属动作 ——
      * 它失败（DB 抖动、purge_after 脏值）不该把用户的提案列表整页打成 500。
-     * 清理是幂等的，这次跳过，下次进列表会再试一次。</p>
+     * 清理是幂等的，这次跳过，下次进列表会再试一次。
      *
-     * <p>提交路径（{@link #submit}）仍直调原方法、失败随事务回滚 —— 那是刻意保留的保守行为：
-     * 它本身就在事务里，吞掉异常会让连接带着「事务已标记回滚」继续写，反而更危险。</p>
+     * 提交路径（{@link #submit}）仍直调原方法、失败随事务回滚 —— 那是刻意保留的保守行为：
+     * 它本身就在事务里，吞掉异常会让连接带着「事务已标记回滚」继续写，反而更危险。
      */
     private void purgeExpiredSnapshotsQuietly() {
         try {
@@ -512,7 +512,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
      * 多条提案的快照行数（P2-7）：一次 {@code GROUP BY proposal_id} 取回，替代循环内逐条
      * selectCount。列表最多 200 条，原先就是 200 次查询。
      *
-     * <p>结果里没有的提案 = 快照 0 行（被惰性清理过），调用方按 0 处理，与逐条查时一致。</p>
+     * 结果里没有的提案 = 快照 0 行（被惰性清理过），调用方按 0 处理，与逐条查时一致。
      */
     private Map<String, Integer> snapshotCounts(List<String> proposalIds) {
         if (proposalIds.isEmpty()) {

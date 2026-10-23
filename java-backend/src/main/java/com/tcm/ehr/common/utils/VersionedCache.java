@@ -36,9 +36,9 @@ public final class VersionedCache<V> {
     /**
      * 版本一致则复用，否则用 loader 重算并记住新版本。
      *
-     * <p><b>loader 在锁内执行</b>：适合「回源读一行 DB + 解析 JSON」这种微秒级的装载。
+     * <b>loader 在锁内执行</b>：适合「回源读一行 DB + 解析 JSON」这种微秒级的装载。
      * 若装载是一次网络往返（如 ES 检索），请改用 {@link #getIfPresent} / {@link #put}
-     * 自己拼两段式 —— 否则所有并发请求会在锁上排队，等于把并发检索串行化。</p>
+     * 自己拼两段式 —— 否则所有并发请求会在锁上排队，等于把并发检索串行化。
      *
      * @param key     缓存键（userId / orgId / orgId+type）
      * @param version 本次从 DB 读到的版本串；调用方保证「版本变了 = 值该重算」
@@ -60,13 +60,13 @@ public final class VersionedCache<V> {
     /**
      * 只读缓存、不回源：没有这个键（或版本对不上）就返回 null。
      *
-     * <p>给「装载必须放在锁外」的调用方用（典型是 ES 检索这类网络往返）。两段式写法：
+     * 给「装载必须放在锁外」的调用方用（典型是 ES 检索这类网络往返）。两段式写法：
      * <pre>
      *   V v = cache.getIfPresent(key);
      *   if (v == null) { v = loadOutsideLock(); cache.put(key, v); }
      * </pre>
      * 并发下同一键可能被装载两次（两个线程都没命中），这是**有意的取舍**：宁可偶发多查一次，
-     * 也不把慢装载放进锁里。缓存只是优化、不是权威，重复装载不会读到错的值。</p>
+     * 也不把慢装载放进锁里。缓存只是优化、不是权威，重复装载不会读到错的值。
      *
      * @param key 缓存键
      * @return 命中的值；未命中返回 null
@@ -79,8 +79,8 @@ public final class VersionedCache<V> {
     /**
      * 只写缓存、不做版本比对；与 {@link #getIfPresent} 配套用于「装载在锁外」的两段式。
      *
-     * <p>写入的条目不带版本串，因此**只应被 {@link #getIfPresent} 读取**。
-     * 失效靠调用方显式调 {@link #invalidate} / {@link #clear}。</p>
+     * 写入的条目不带版本串，因此**只应被 {@link #getIfPresent} 读取**。
+     * 失效靠调用方显式调 {@link #invalidate} / {@link #clear}。
      *
      * @param key   缓存键
      * @param value 要缓存的值（不应为 null；null 在读取侧表示「未命中」）

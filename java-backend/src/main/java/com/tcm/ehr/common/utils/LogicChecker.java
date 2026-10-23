@@ -10,8 +10,8 @@ import java.util.Map;
 /**
  * 诊疗逻辑一致性评估。
  *
- * <p>规则来自 {@link QcRuleSet#getConsistency()}：当【触发类型】实体命中【触发值】时，
- * 若病历记录了【期望类型】实体，则其须命中【期望值】之一，否则记冲突；期望类型实体缺失 → 不适用。</p>
+ * 规则来自 {@link QcRuleSet#getConsistency()}：当【触发类型】实体命中【触发值】时，
+ * 若病历记录了【期望类型】实体，则其须命中【期望值】之一，否则记冲突；期望类型实体缺失 → 不适用。
  */
 public final class LogicChecker {
 

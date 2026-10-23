@@ -5,8 +5,8 @@ import com.tcm.ehr.domain.po.Record;
 /**
  * 病历公共工具。
  *
- * <p>原始文本去重哈希口径由数据清洗（GovernanceServiceImpl）与病历导入
- * （RecordServiceImpl）共用，避免两处各写一份导致去重标准漂移。</p>
+ * 原始文本去重哈希口径由数据清洗（GovernanceServiceImpl）与病历导入
+ * （RecordServiceImpl）共用，避免两处各写一份导致去重标准漂移。
  */
 public final class RecordUtil {
 
@@ -16,11 +16,11 @@ public final class RecordUtil {
     /**
      * 按属性名取病历的列值（空白视作无值）。
      *
-     * <p>为什么放这里：质控评分（QcScorer）与质控明细（QcServiceImpl）
+     * 为什么放这里：质控评分（QcScorer）与质控明细（QcServiceImpl）
      * 各写了一份「属性名 → 列值」的 switch，映射同一个 Record，而两份**覆盖不同**：
      * 明细那份没有 department/doctorId 两个 case。规则里引用这两个字段时，明细侧会
      * 静默取到 null —— 看上去像"这条病历没填"，而不是"程序没认这个字段名"。
-     * 两份的取值与空白口径逐字相同，合并后只留一处。</p>
+     * 两份的取值与空白口径逐字相同，合并后只留一处。
      *
      * @param r     病历，可为 null
      * @param field Record 属性名（由规则集配置），可为 null
@@ -60,18 +60,18 @@ public final class RecordUtil {
     /**
      * 原始文本哈希（21 字段固定顺序拼接 → MD5(UTF-8) 32 位十六进制），用于去重。
      *
-     * <p><b>字段顺序（勿改，变更需回归去重，否则历史数据会被误判）</b>：
+     * <b>字段顺序（勿改，变更需回归去重，否则历史数据会被误判）</b>：
      * registrationNo → outpatientNo → gender → age → westernDiagnosis → tcmDiagnosis →
      * presentIllness → chiefComplaint → selfReport → inspection → pulse → tongue →
      * physicalExam → pattern → prescription → followUp → treatmentEffect → department →
-     * doctorId → visitCount → visitTime</p>
+     * doctorId → visitCount → visitTime
      *
-     * <p>原实现用 {@code String.hashCode()}（32 位 int，碰撞率高），改为 MD5(UTF-8)。</p>
+     * 原实现用 {@code String.hashCode()}（32 位 int，碰撞率高），改为 MD5(UTF-8)。
      *
-     * <p><b>每个字段按「长度:值;」拼接（长度前缀）</b>：原先用 {@code String.join("|", ...)}
+     * <b>每个字段按「长度:值;」拼接（长度前缀）</b>：原先用 {@code String.join("|", ...)}
      * 无长度前缀，任一字段内含 {@code "|"} 都会让字段边界串扰 —— 两条<b>内容不同</b>的病历
      * 可能拼出同一串、算出同一哈希，第二条被误判「重复病历」而导入失败。长度前缀让拼接
-     * 严格可逆，不同内容必得不同串。</p>
+     * 严格可逆，不同内容必得不同串。
      */
     public static String textHash(Record r) {
         StringBuilder sb = new StringBuilder(256);

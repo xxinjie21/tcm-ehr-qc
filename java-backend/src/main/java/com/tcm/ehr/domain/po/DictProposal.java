@@ -10,11 +10,11 @@ import java.time.LocalDateTime;
 /**
  * 词典基线更新提案（dict_proposal）。
  *
- * <p>成员不能直接改小组基线，只能提交一份「完整目标词典」提案；组长审核通过后
- * 才合并进 dictionary_terms 并生成归档版本。</p>
+ * 成员不能直接改小组基线，只能提交一份「完整目标词典」提案；组长审核通过后
+ * 才合并进 dictionary_terms 并生成归档版本。
  *
- * <p><b>主记录永久保留</b>（含被驳回的），只有 dict_proposal_term 快照会在
- * purge_after 到期后被惰性清理 —— 提案本身是审计凭据。</p>
+ * <b>主记录永久保留</b>（含被驳回的），只有 dict_proposal_term 快照会在
+ * purge_after 到期后被惰性清理 —— 提案本身是审计凭据。
  */
 @Data
 @TableName("dict_proposal")

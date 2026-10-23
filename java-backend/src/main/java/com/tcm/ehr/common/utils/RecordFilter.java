@@ -12,18 +12,18 @@ import java.util.Map;
 /**
  * 病历公共过滤：**数据域（行级权限）→ 用户筛选** 顺序固定、取交集。
  *
- * <p>所有病历读取（查询 / 原始查看 / 后续图谱等）统一走本工具，禁止在业务方法中手写 where，
- * 避免口径漂移与"筛选条件绕过数据域"的越权。</p>
+ * 所有病历读取（查询 / 原始查看 / 后续图谱等）统一走本工具，禁止在业务方法中手写 where，
+ * 避免口径漂移与"筛选条件绕过数据域"的越权。
  *
- * <p><b>数据域 = 课题组（阶段 2）</b>：原本用 grade（质控结论）当权限维度，现已改为
+ * <b>数据域 = 课题组（阶段 2）</b>：原本用 grade（质控结论）当权限维度，现已改为
  * {@code org_id = 当前用户的主组}。grade 从此只做业务筛选（供应商可选），
- * 不再影响任何一个人能看到哪些数据。</p>
+ * 不再影响任何一个人能看到哪些数据。
  *
- * <p>原设计的两个后果正是本次改造的动机：复核通过一份病历后会
- * <b>立刻失去访问它的权限</b>；一次批量重算会<b>批量翻转可见性</b>。</p>
+ * 原设计的两个后果正是本次改造的动机：复核通过一份病历后会
+ * <b>立刻失去访问它的权限</b>；一次批量重算会<b>批量翻转可见性</b>。
  *
- * <p>⚠️ <b>fail-closed 是本类最关键的一行</b>：orgId 为空时必须生成<b>返回空集</b>的查询，
- * 而不能不加条件 —— 不加条件 = 看到全库 = 最严重的越权。</p>
+ * ⚠️ <b>fail-closed 是本类最关键的一行</b>：orgId 为空时必须生成<b>返回空集</b>的查询，
+ * 而不能不加条件 —— 不加条件 = 看到全库 = 最严重的越权。
  */
 public final class RecordFilter {
 
@@ -39,8 +39,8 @@ public final class RecordFilter {
     /**
      * 按主组取数据域上下文（就是 {@link #currentOrgId()} 的别名）。
      *
-     * <p>为什么不直接用 {@code RequestUtils.currentOrgId()}：这里需要能被单测直接接窗口
-     * 动态传入 orgId（RecordIsolationTest 就是这么做的），而不是固定读线程上下文。</p>
+     * 为什么不直接用 {@code RequestUtils.currentOrgId()}：这里需要能被单测直接接窗口
+     * 动态传入 orgId（RecordIsolationTest 就是这么做的），而不是固定读线程上下文。
      */
     public static String currentOrgId() {
         return RequestUtils.currentOrgId();
@@ -49,7 +49,7 @@ public final class RecordFilter {
     /**
      * 构建查询条件：先数据域、后用户筛选。
      *
-     * <p>管理员「看全部」（{@link RequestUtils#viewAllOrgs()}）时<b>不加组织条件</b>。</p>
+     * 管理员「看全部」（{@link RequestUtils#viewAllOrgs()}）时<b>不加组织条件</b>。
      */
     public static QueryWrapper<Record> build(String orgId, SearchDTO dto) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
@@ -149,9 +149,9 @@ public final class RecordFilter {
     /**
      * 仅未解析过滤：{@code structured_data IS NULL}（缺省/为 false 不加条件）。
      *
-     * <p>列类型是 MySQL JSON，<b>不能</b>写成 {@code structured_data = ''}（会触发
+     * 列类型是 MySQL JSON，<b>不能</b>写成 {@code structured_data = ''}（会触发
      * “Invalid JSON text”，且空串在 JSON 列里本就存不进去）。已解析的记录该列必为一段合法 JSON，
-     * 故「未解析 ⇔ IS NULL」。</p>
+     * 故「未解析 ⇔ IS NULL」。
      */
     private static void andOnlyUnparsed(QueryWrapper<Record> wrapper, Boolean onlyUnparsed) {
         if (Boolean.TRUE.equals(onlyUnparsed)) {
@@ -162,8 +162,8 @@ public final class RecordFilter {
     /**
      * 仅未清洗：{@code governed = 0}。
      *
-     * <p>清洗是数分钟级的重活，但通常只有新增/新解析的病历需要清洗；
-     * 不加本条件每次都在全范围重跑。governed 由清洗完成时置 1（含「跳过归一」那类）。</p>
+     * 清洗是数分钟级的重活，但通常只有新增/新解析的病历需要清洗；
+     * 不加本条件每次都在全范围重跑。governed 由清洗完成时置 1（含「跳过归一」那类）。
      */
     private static void andOnlyUncleaned(QueryWrapper<Record> wrapper, Boolean onlyUncleaned) {
         if (Boolean.TRUE.equals(onlyUncleaned)) {
@@ -174,9 +174,9 @@ public final class RecordFilter {
     /**
      * 数据域（行级权限）：限当前主组；无组时<b>返回空集</b>。
      *
-     * <p>⚠️ 这里不得写成"无组就不加条件"——那等于看到全库，
+     * ⚠️ 这里不得写成"无组就不加条件"——那等于看到全库，
      * 是本次改造中最严重的越权。它也是防止写退出一个不可能的 id：
-     * 以后若有人导入了它，无组用户就会看到那一条。</p>
+     * 以后若有人导入了它，无组用户就会看到那一条。
      */
     private static void operatorScope(QueryWrapper<Record> wrapper, String orgId, boolean viewAllOrgs) {
         // 0. 管理员看全部：明确「不加组织条件」。
@@ -197,7 +197,7 @@ public final class RecordFilter {
     /**
      * 查询前的越权自检：当前用户是否能看这条病历。
      *
-     * <p>用于 selectById 类“查后校验”的路径（它们不能用 wrapper）。</p>
+     * 用于 selectById 类“查后校验”的路径（它们不能用 wrapper）。
      *
      * @return true = 可访问；false = 不可访问（调用方应返回 404，不泄露"存在但看不到"）
      */
@@ -223,10 +223,10 @@ public final class RecordFilter {
     /**
      * 把「无类型 Map」形态的 filters 翻译成 {@link FiltersDTO}。
      *
-     * <p>stats 契约与导出契约的 filters 都是 {@code Map<String,Object>}，字段名与
+     * stats 契约与导出契约的 filters 都是 {@code Map<String,Object>}，字段名与
      * {@link FiltersDTO} 一致。有了这个翻译，那两处就不必各自手搓条件 —— 否则会多出
      * 第二套「范围组装」，排序键、数据域这类口径就跟着漂（实测就漂过一次：
-     * 导出/预览自己 build wrapper，于是拿不到本工具的 ORDER BY）。</p>
+     * 导出/预览自己 build wrapper，于是拿不到本工具的 ORDER BY）。
      */
     public static FiltersDTO fromMap(Map<String, Object> filters) {
         // 1. 无 filters 给空 DTO（= 不限范围）
@@ -253,8 +253,8 @@ public final class RecordFilter {
     /**
      * 把范围条件拼成审计用的一行，给 OperationLog.target 用。
      *
-     * <p>批量操作（数据清洗 / 数据集导出被拒 / 批量解析 / 批量重算）原来一律传 {@code null}，
-     * 日志页「操作对象」列恒空，事后追责看不出那次操作动了哪个范围（审查报告 M4）。</p>
+     * 批量操作（数据清洗 / 数据集导出被拒 / 批量解析 / 批量重算）原来一律传 {@code null}，
+     * 日志页「操作对象」列恒空，事后追责看不出那次操作动了哪个范围（审查报告 M4）。
      *
      * @param filters {@link FiltersDTO}，或 stats 契约里的 Map（两种都要支持：
      * 导出走 Map、其余走 DTO）
@@ -325,14 +325,14 @@ public final class RecordFilter {
     /**
      * 数据域落在 org_id 列上的取值（即当前主组）。
      *
-     * <p>给 QueryWrapper 表达不了的聚合 SQL 用 —— Mapper 里以
+     * 给 QueryWrapper 表达不了的聚合 SQL 用 —— Mapper 里以
      * {@code WHERE (#{orgId} IS NULL OR org_id = #{orgId})} 落地。
      * 存在的意义是让「数据域是哪个组」这个口径仍然只有一处，
-     * 不在 Mapper 里再写一遍。</p>
+     * 不在 Mapper 里再写一遍。
      *
-     * <p>为何取值不能简单地是去掉空值：无组用户必须看不到任何数据，
+     * 为何取值不能简单地是去掉空值：无组用户必须看不到任何数据，
      * 而 {@code WHERE #{orgId} IS NULL OR ...} 的语义是「无组 → 不限」——恰好相反。
-     * 故这里返回不可能值，让 SQL 自然落到空集。</p>
+     * 故这里返回不可能值，让 SQL 自然落到空集。
      */
     public static String domainOrgId() {
         return groupIdForSql(currentOrgId());
@@ -356,12 +356,12 @@ public final class RecordFilter {
     /**
      * 聚合专用：只出 WHERE 口径，**不追加排序键**。
      *
-     * <p>为什么单独开一个入口：看板词频已下沉到 SQL 侧（JSON_TABLE + {@code GROUP BY}，
+     * 为什么单独开一个入口：看板词频已下沉到 SQL 侧（JSON_TABLE + {@code GROUP BY}，
      * 性能审查 P0-3#3），而 {@code ORDER BY} 与 {@code GROUP BY} 在同一层不能共存 ——
-     * 排序条件留在 wrapper 里会让 {@code ${ew.customSqlSegment}} 拼出非法 SQL。</p>
+     * 排序条件留在 wrapper 里会让 {@code ${ew.customSqlSegment}} 拼出非法 SQL。
      *
-     * <p>筛选口径仍然只有这一处：本方法与 {@link #build(String, FiltersDTO)} 共用同一段组装代码，
-     * 只在最后一步不追加排序键。聚合结果本就没有「行顺序」的概念，去掉它不改变任何口径。</p>
+     * 筛选口径仍然只有这一处：本方法与 {@link #build(String, FiltersDTO)} 共用同一段组装代码，
+     * 只在最后一步不追加排序键。聚合结果本就没有「行顺序」的概念，去掉它不改变任何口径。
      *
      * @param orgId     当前机构
      * @param filterDto 用户筛选，可为 null（表示不限）
@@ -374,11 +374,11 @@ public final class RecordFilter {
     /**
      * 聚合专用（显式给定「是否看全部」）—— 供<b>后台线程</b>调用。
      *
-     * <p>与 2 参重载的唯一差别是「看全部」由调用方显式传入，而不是现读
+     * 与 2 参重载的唯一差别是「看全部」由调用方显式传入，而不是现读
      * {@link RequestUtils#viewAllOrgs()}。原因同 {@link #buildWithinOrg}：后台线程里
      * {@code viewAllOrgs()} 恒为 false（读不到 RequestContextHolder），
      * 若在后台按它构建条件，管理员视角的数据域会悄悄退化成「只看本组」，算出错误结果。
-     * 故调用方必须在<b>提交线程</b>把该标记捕获下来，再交给后台重算。</p>
+     * 故调用方必须在<b>提交线程</b>把该标记捕获下来，再交给后台重算。
      */
     public static QueryWrapper<Record> buildForAggregate(String orgId, FiltersDTO filterDto,
                                                          boolean viewAllOrgs) {
@@ -450,8 +450,8 @@ public final class RecordFilter {
     /**
      * 时间区间条件：两端齐全才生效（缺一端当没给），补全时分秒保证含首尾两天。
      *
-     * <p>visit_time（接诊时间）与 create_time（导入时间）两个维度的判据逐字相同、
-     * 只是列名不同，两条 build 路径原本各写两遍，收敛到此处（审查报告 §2.4）。</p>
+     * visit_time（接诊时间）与 create_time（导入时间）两个维度的判据逐字相同、
+     * 只是列名不同，两条 build 路径原本各写两遍，收敛到此处（审查报告 §2.4）。
      *
      * @param column 目标列名（visit_time / create_time）
      * @param range  [开始日期, 结束日期]（yyyy-MM-dd），可为 null

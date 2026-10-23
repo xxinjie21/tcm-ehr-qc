@@ -15,19 +15,19 @@ import java.util.concurrent.TimeUnit;
 /**
  * 跨实例互斥（批次 16.1：Redisson 分布式锁）。
  *
- * <p>锁粒度按业务 key（如 dict:herb:org-A），不用全局单键 ——
- * 全局单键会让「A 组织导词典」与「B 组织跑质控」互相排队，明明毫无关系。</p>
+ * 锁粒度按业务 key（如 dict:herb:org-A），不用全局单键 ——
+ * 全局单键会让「A 组织导词典」与「B 组织跑质控」互相排队，明明毫无关系。
  *
- * <p><b>为什么是 Redis/Redisson</b>：synchronized / ReentrantLock 在多实例下
+ * <b>为什么是 Redis/Redisson</b>：synchronized / ReentrantLock 在多实例下
  * <b>静默失效</b>（不报错、只是不互斥）；上一版用 MySQL 命名锁 GET_LOCK，
  * 那是「借 DB 的连接级锁」，语义与连接绑定、跨服务边界不好复用。Redisson 的 RLock 是
- * 所有实例共享的锁，且自带看门狗续期：不进事务的长临界区也不会因为固定 lease 突然过期。</p>
+ * 所有实例共享的锁，且自带看门狗续期：不进事务的长临界区也不会因为固定 lease 突然过期。
  *
- * <p><b>fail-closed</b>：拿不到锁抛 {@link ConcurrentOperationException}；
+ * <b>fail-closed</b>：拿不到锁抛 {@link ConcurrentOperationException}；
  * Redis 本身不可用抛 {@link ServiceNotReadyException}（503）。两者都<b>绝不放行</b> ——
- * 写成「拿不到锁就继续」等于没有锁，且只在高并发时发作，极难复现。</p>
+ * 写成「拿不到锁就继续」等于没有锁，且只在高并发时发作，极难复现。
  *
- * <p>锁只降冲突概率，正确性仍由 DB 唯一键与事务承担。</p>
+ * 锁只降冲突概率，正确性仍由 DB 唯一键与事务承担。
  */
 @Slf4j
 @Component
@@ -37,17 +37,17 @@ public class DistLock {
     /**
      * 默认等待秒数：用于<b>批任务提交</b>与<b>启动期对账</b>这类「稍等一下也没关系」的场景。
      *
-     * <p>在线写路径（词典导入 / 提案合并 / 索引重建）应显式传 {@code 0}
-     * —— 见 {@link #runLocked(String, int, java.util.function.Supplier)}。</p>
+     * 在线写路径（词典导入 / 提案合并 / 索引重建）应显式传 {@code 0}
+     * —— 见 {@link #runLocked(String, int, java.util.function.Supplier)}。
      */
     private static final int WAIT_SECONDS = 3;
 
     /**
      * 在线写路径的等待秒数：<b>不等待</b>，锁被占就立刻回 409。
      *
-     * <p>为什么在线路径要等 0：等待时长会被直接叠加到用户的 HTTP 响应时间上，
+     * 为什么在线路径要等 0：等待时长会被直接叠加到用户的 HTTP 响应时间上，
      * 而冲突本身就说明「有人正在做同一件事」，让用户等 3 秒再告诉他同一句话没有意义。
-     * 批任务提交不同 —— 那里的锁冲突意味着「已有任务在跑」，等一下往往就能提交上。</p>
+     * 批任务提交不同 —— 那里的锁冲突意味着「已有任务在跑」，等一下往往就能提交上。
      */
     public static final int NO_WAIT = 0;
 
@@ -57,8 +57,8 @@ public class DistLock {
      * 在锁内执行，使用默认等待时长（3 秒）；拿不到锁抛
      * {@link ConcurrentOperationException}（409 + code=409，可展示）。
      *
-     * <p>仅用于批任务提交 / 启动期对账这类可以稍等的场景；在线写路径请用
-     * {@link #runLocked(String, int, java.util.function.Supplier)} 并传 {@link #NO_WAIT}。</p>
+     * 仅用于批任务提交 / 启动期对账这类可以稍等的场景；在线写路径请用
+     * {@link #runLocked(String, int, java.util.function.Supplier)} 并传 {@link #NO_WAIT}。
      *
      * @param lockName 锁名（建议格式 业务:key）
      * @param body     临界区
@@ -107,8 +107,8 @@ public class DistLock {
     /**
      * 取锁：不传 leaseTime，走 Redisson 看门狗（默认 30s，持有期间自动续期）。
      *
-     * <p>{@code waitSeconds = 0} 时 Redisson 只做一次尝试（waitTime ≤ 0 视为「不等待」），
-     * 正好对应在线写路径的「锁被占就立刻 409」。</p>
+     * {@code waitSeconds = 0} 时 Redisson 只做一次尝试（waitTime ≤ 0 视为「不等待」），
+     * 正好对应在线写路径的「锁被占就立刻 409」。
      */
     private boolean tryLock(RLock lock, String lockName, int waitSeconds) {
         try {
@@ -127,9 +127,9 @@ public class DistLock {
     /**
      * 释放失败只记录。
      *
-     * <p>看门狗停止续期后锁会自然过期（默认 30s），不该因放锁失败掩盖业务结果；
+     * 看门狗停止续期后锁会自然过期（默认 30s），不该因放锁失败掩盖业务结果；
      * 也不能在未持有时硬调 {@code unlock()} —— 那会抛
-     * IllegalMonitorStateException 把一次成功的业务请求变成 500。</p>
+     * IllegalMonitorStateException 把一次成功的业务请求变成 500。
      */
     private void unlockQuietly(RLock lock, String lockName) {
         try {
@@ -144,8 +144,8 @@ public class DistLock {
     /**
      * 提交后执行（批次 26.2）。
      *
-     * <p>入队必须等事务提交、任务行可见之后再做，否则工作线程可能在行可见前就取到 id、
-     * 查不到任务。没有活动事务时立即执行（单测 / 直调路径）。</p>
+     * 入队必须等事务提交、任务行可见之后再做，否则工作线程可能在行可见前就取到 id、
+     * 查不到任务。没有活动事务时立即执行（单测 / 直调路径）。
      */
     public static void afterCommit(Runnable action) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

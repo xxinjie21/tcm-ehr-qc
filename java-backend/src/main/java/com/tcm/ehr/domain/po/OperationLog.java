@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
  * 操作日志：审计页（{@code GET /api/logs}）的唯一数据源，读 operation_log 表做分页 / 筛选 / 导出。
  * 字段与 database-init.sql 的 operation_log 表一一对应。
  *
- * <p><b>不记 IP</b>（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原先的 ip 列已从表中移除，
- * 唯一权威建表脚本是 {@code database-init.sql}。</p>
+ * <b>不记 IP</b>（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原先的 ip 列已从表中移除，
+ * 唯一权威建表脚本是 {@code database-init.sql}。
  */
 @Data
 @TableName("operation_log")
@@ -32,8 +32,8 @@ public class OperationLog {
     /**
      * 对象类型（对标 D3）：如 record。与 {@link #objectId} 成对使用。
      *
-     * <p>可为 null，且**批量操作应当为 null**：批量重算/数据清洗没有单一对象，
-     * 给它编一个假对象只会让「按对象查历史」查出错误的结果。</p>
+     * 可为 null，且**批量操作应当为 null**：批量重算/数据清洗没有单一对象，
+     * 给它编一个假对象只会让「按对象查历史」查出错误的结果。
      */
     private String objectType;
     /** 对象 ID（对标 D3），如病历 ID；与 {@link #objectType} 成对 */
@@ -48,9 +48,9 @@ public class OperationLog {
     /**
      * 所属组织名称（<b>不落库</b>）：由 LogServiceImpl 按 orgId 批量解析后回填。
      *
-     * <p>日志表只存 org_id。直接把这个 UUID 显示给用户没有意义，
+     * 日志表只存 org_id。直接把这个 UUID 显示给用户没有意义，
      * 而「这条日志该不该被我看」又正是三档可见范围要回答的问题，
-     * 所以列表里补一列组织名。</p>
+     * 所以列表里补一列组织名。
      */
     @TableField(exist = false)
     private String orgName;

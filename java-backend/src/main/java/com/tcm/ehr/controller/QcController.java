@@ -38,7 +38,7 @@ import java.util.List;
 /**
  * 质控：事前检查、逻辑一致性、单条评分、批量重算，以及评分规则的读/写/重置与扣分聚合。
  *
- * <p>评分口径由 {@link QcRuleSet} 决定，判定不经过 LLM。</p>
+ * 评分口径由 {@link QcRuleSet} 决定，判定不经过 LLM。
  */
 @RestController
 @RequiredArgsConstructor
@@ -53,7 +53,7 @@ public class QcController {
     /**
      * 事前质控：要素缺失与格式校验。
      *
-     * <p>【权限：登录即可】缺失按"结构化与原始列都为空"判定。</p>
+     * 【权限：登录即可】缺失按"结构化与原始列都为空"判定。
      *
      * @param dto recordId=病历ID（必填）；structuredData=可选，缺省时读取库中结构化数据
      * @return missingFields=缺失的核心要素；formatErrors=年龄/性别格式问题
@@ -66,7 +66,7 @@ public class QcController {
     /**
      * 诊疗逻辑一致性检查。
      *
-     * <p>【权限：登录即可】按当前规则表判定，规则未覆盖的要素不判冲突。</p>
+     * 【权限：登录即可】按当前规则表判定，规则未覆盖的要素不判冲突。
      *
      * @param dto patternList/treatmentList/formulaList 待判定的要素
      * @return conflicts=冲突描述；consistent=是否无冲突
@@ -79,7 +79,7 @@ public class QcController {
     /**
      * 单条病历评分（不落库）。
      *
-     * <p>【权限：登录即可】</p>
+     * 【权限：登录即可】
      *
      * @param dto recordId=病历ID；structuredData=可选，缺省时读取库中结构化数据
      * @return score=得分；grade=分级；deductions=扣分明细
@@ -92,11 +92,11 @@ public class QcController {
     /**
      * 提交批量重算任务（异步，§七 L5）。
      *
-     * <p>【权限：登录即可】提交后立即返回 taskId，不再同步跑到尾。
-     * 任务会覆盖既有分数并同步复核任务状态；超上限或已有任务在跑返回 400。</p>
+     * 【权限：登录即可】提交后立即返回 taskId，不再同步跑到尾。
+     * 任务会覆盖既有分数并同步复核任务状态；超上限或已有任务在跑返回 400。
      *
-     * <p>⚠️ <b>破坏性变更</b>：原来返回分级汇总，现在只返回任务状态；
-     * 分级汇总改为轮询 {@code GET /api/qc/score/batch/{id}} 获取。</p>
+     * ⚠️ <b>破坏性变更</b>：原来返回分级汇总，现在只返回任务状态；
+     * 分级汇总改为轮询 {@code GET /api/qc/score/batch/{id}} 获取。
      *
      * @param dto filters=范围条件，为空表示全库
      * @return id=任务ID；status=QUEUED；total=计划处理条数
@@ -109,7 +109,7 @@ public class QcController {
     /**
      * 查询批量重算任务进度（含分级汇总）。
      *
-     * <p>【权限：登录即可】</p>
+     * 【权限：登录即可】
      *
      * @param id 任务ID
      * @return 进度与分级汇总；任务不存在时返回 404
@@ -127,8 +127,8 @@ public class QcController {
     /**
      * 列出最近的批量重算任务（最多 50 条）。
      *
-     * <p>【权限：登录即可】不含失败明细（看明细请走详情接口）。
-     * 回包带 truncated 截断标记，供页面区分「这就是全部」与「更早的已省略」。</p>
+     * 【权限：登录即可】不含失败明细（看明细请走详情接口）。
+     * 回包带 truncated 截断标记，供页面区分「这就是全部」与「更早的已省略」。
      *
      * @return 按提交时间倒序的任务列表 + 截断标记
      */
@@ -140,8 +140,8 @@ public class QcController {
     /**
      * 取消批量重算任务。
      *
-     * <p>【权限：登录即可】排队中的直接落已取消；
-     * 运行中的置取消位，由 worker 在页边界退出并落库。</p>
+     * 【权限：登录即可】排队中的直接落已取消；
+     * 运行中的置取消位，由 worker 在页边界退出并落库。
      *
      * @param id 任务ID
      * @return 取消后的任务状态；任务不存在时返回 404
@@ -156,7 +156,7 @@ public class QcController {
     /**
      * 仅重试失败的记录：按原任务失败集合重新提交一个只跑这批病历的重算任务。
      *
-     * <p>【权限：登录即可】任务不存在返回 404；无失败记录返回 400。</p>
+     * 【权限：登录即可】任务不存在返回 404；无失败记录返回 400。
      *
      * @param id 原任务ID
      * @return 新任务的进度视图
@@ -169,7 +169,7 @@ public class QcController {
     /**
      * 读取当前生效的质控规则。
      *
-     * <p>【权限：登录即可】返回<b>当前组织</b>生效的规则。</p>
+     * 【权限：登录即可】返回<b>当前组织</b>生效的规则。
      *
      * @return rules=规则集；descriptions=自然语言描述；warnings=加载告警
      */
@@ -181,8 +181,8 @@ public class QcController {
     /**
      * 保存质控规则并立即生效。
      *
-     * <p>【权限：管理员 / 所有者 / 被授权成员】保存到<b>当前组织</b>（qc_rules 表），
-     * 其他组织不受影响；缺项按内置默认补齐。</p>
+     * 【权限：管理员 / 所有者 / 被授权成员】保存到<b>当前组织</b>（qc_rules 表），
+     * 其他组织不受影响；缺项按内置默认补齐。
      *
      * @param rules 规则集
      * @return 保存后的规则集
@@ -196,8 +196,8 @@ public class QcController {
     /**
      * 恢复默认质控规则。
      *
-     * <p>【权限：管理员 / 所有者 / 授权成员】删除<b>当前组织</b>在 qc_rules
-     * 表里的规则行，该组织随即回退内置默认；其他组织不受影响。</p>
+     * 【权限：管理员 / 所有者 / 授权成员】删除<b>当前组织</b>在 qc_rules
+     * 表里的规则行，该组织随即回退内置默认；其他组织不受影响。
      *
      * @return 恢复后的规则集
      */
@@ -210,7 +210,7 @@ public class QcController {
     /**
      * 汇总范围内的扣分分布。
      *
-     * <p>【权限：登录即可】优先读已落库的 qc_results，未算过的按当前规则现算。</p>
+     * 【权限：登录即可】优先读已落库的 qc_results，未算过的按当前规则现算。
      *
      * @param department 科室，空表示不限
      * @param start      接诊时间下界（yyyy-MM-dd），与 end 同时给才生效
@@ -259,8 +259,8 @@ public class QcController {
     /**
      * 质控规则写门槛：管理员 / 组织所有者 / 被授权成员。
      *
-     * <p>不做成注解是因为它要查 DB 里的成员授权位（不是只看 JWT 里的 role），
-     * 与 {@code @RequireRole} 的能力不同。</p>
+     * 不做成注解是因为它要查 DB 里的成员授权位（不是只看 JWT 里的 role），
+     * 与 {@code @RequireRole} 的能力不同。
      */
     private void requireRuleWrite() {
         String userId = RequestUtils.currentUserId();

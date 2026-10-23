@@ -16,9 +16,9 @@ public final class OrgDTOs {
     /**
      * 自助创建组织（批次 6）：任何登录用户可创建，创建者自动成为 owner。
      *
-     * <p>code 可空 —— 留空则由服务端生成。给定时必须匹配编码规则：
+     * code 可空 —— 留空则由服务端生成。给定时必须匹配编码规则：
      * 大写字母、数字、连字符，长度 2~50。这条白名单是防滥用的第一道闸
-     * （否则能创建出 {@code ../} 之类的 code，日志与文件名都会被污染）。</p>
+     * （否则能创建出 {@code ../} 之类的 code，日志与文件名都会被污染）。
      */
     @Data
     public static class CreateOrgRequest {
@@ -53,9 +53,9 @@ public final class OrgDTOs {
     /**
      * 授权/回收成员的写权限（批次 6）。
      *
-     * <p>两个开关<b>独立</b>：owner 可以只给「词典写」或只给「质控规则写」。
+     * 两个开关<b>独立</b>：owner 可以只给「词典写」或只给「质控规则写」。
      * 字段为 {@code Boolean}（可空）—— null 表示「不改这一位」，
-     * 否则前端只提交其中一个开关就会把另一个误清零。</p>
+     * 否则前端只提交其中一个开关就会把另一个误清零。
      */
     @Data
     public static class SetPermissionsRequest {

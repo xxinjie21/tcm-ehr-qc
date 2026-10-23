@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * 课题组（阶段2 R5）。
  *
- * <p>权限分三层：</p>
+ * 权限分三层：
  * <ul>
  *   <li><b>我的组</b>：登录即可（无组也能看自己是待分配池还是审批中）；</li>
  *   <li><b>管理 / 审批</b>：仅管理员（{@link RequireRole}）；</li>
@@ -32,8 +32,8 @@ import java.util.List;
  *       （{@link RequireOrgRole("owner")}，拦截器二次兜底）。</li>
  * </ul>
  *
- * <p>错误码统一走既有约定：参数/状态非法 → 400；资源不存在 → 404（1006）；
- * 越权 → 403（由拦截器与 ForbiddenException 出口）。</p>
+ * 错误码统一走既有约定：参数/状态非法 → 400；资源不存在 → 404（1006）；
+ * 越权 → 403（由拦截器与 ForbiddenException 出口）。
  */
 @RestController
 @RequiredArgsConstructor
@@ -55,7 +55,7 @@ public class OrgController {
     /**
      * 当前用户所属的所有 active 组织（含「是否当前组织」标记）。
      *
-     * <p>供右上角「切换组织」下拉使用。只列 active 组织。</p>
+     * 供右上角「切换组织」下拉使用。只列 active 组织。
      */
     @GetMapping("/api/orgs/mine")
     public Result<List<OrgVOs.MyOrgItem>> myOrgs() {
@@ -65,9 +65,9 @@ public class OrgController {
     /**
      * 切换到指定组织（多组织）。
      *
-     * <p>【权限：登录即可，服务层校验「是该成员 且 组织 active」】
+     * 【权限：登录即可，服务层校验「是该成员 且 组织 active」】
      * 注意：<b>不能</b>加 {@code @RequireOrgRole} —— 切换前 currentOrg 仍是旧组织，
-     * 加了会被「路径机构 != 当前机构」拦掉，永远切不过去。</p>
+     * 加了会被「路径机构 != 当前机构」拦掉，永远切不过去。
      */
     @PostMapping("/api/orgs/{id}/switch")
     public Result<Void> switchOrg(@PathVariable String id) {
@@ -87,8 +87,8 @@ public class OrgController {
     /**
      * 自助创建组织（批次 6）。
      *
-     * <p>【权限：登录即可】创建者自动成为 owner。<b>只挂新路径</b>：这是新增能力，
-     * 旧路径下本来不存在「自助创建」，给两个名字只会让人以为旧路径也能调。</p>
+     * 【权限：登录即可】创建者自动成为 owner。<b>只挂新路径</b>：这是新增能力，
+     * 旧路径下本来不存在「自助创建」，给两个名字只会让人以为旧路径也能调。
      */
     @PostMapping("/api/orgs")
     public Result<OrgVOs.OrgInfo> createOrg(@Valid @RequestBody OrgDTOs.CreateOrgRequest body) {
@@ -126,7 +126,7 @@ public class OrgController {
     /**
      * 改派所有者（仅管理员）：owner 账号丢失时的兜底。
      *
-     * <p>【权限：仅管理员】没有它，唯一能让组织脱离「无人可管」的方式是等原 owner 回来。</p>
+     * 【权限：仅管理员】没有它，唯一能让组织脱离「无人可管」的方式是等原 owner 回来。
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/orgs/{id}/reassign-owner")
@@ -139,7 +139,7 @@ public class OrgController {
     /**
      * 按用户名搜索可拉入的成员（登录即可）。
      *
-     * <p>【权限：登录即可】关键词至少 2 字符、最多回 20 条，且只返回 id 与 username。</p>
+     * 【权限：登录即可】关键词至少 2 字符、最多回 20 条，且只返回 id 与 username。
      */
     @GetMapping("/api/orgs/users")
     public Result<List<OrgVOs.UserBriefVO>> searchUsers(@RequestParam String keyword) {
@@ -239,7 +239,7 @@ public class OrgController {
     /**
      * 授予 / 回收成员的两个写开关（批次 6）。
      *
-     * <p>【权限：所有者（本组织）】两个开关独立，null 表示「这一位不改」。</p>
+     * 【权限：所有者（本组织）】两个开关独立，null 表示「这一位不改」。
      */
     @RequireOrgRole(value = "owner", pathVar = "id")
     @PutMapping({"/api/orgs/{id}/members/{userId}/permissions",

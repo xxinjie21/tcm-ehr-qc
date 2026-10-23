@@ -9,8 +9,8 @@ import java.util.List;
 /**
  * 质控批量重算任务视图（§七 L5）。公共字段见 {@link AbstractTaskVO}。
  *
- * <p>进度接口与列表接口复用同一套字段；分级汇总（qualified / pendingReview / invalid）
- * 直接用 {@link QcBatchResultVO} 的那三个计数，本类不重复定义，避免两处口径漂移。</p>
+ * 进度接口与列表接口复用同一套字段；分级汇总（qualified / pendingReview / invalid）
+ * 直接用 {@link QcBatchResultVO} 的那三个计数，本类不重复定义，避免两处口径漂移。
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

@@ -6,16 +6,16 @@ import com.tcm.ehr.domain.vo.StandardizationReportVO;
 /**
  * 标准化质量报告服务（批次 21）。
  *
- * <p>只读：不改库、不重建索引、不触发重算。报告里的每个数字都来自现有数据，
- * 一次请求内算完即返回。</p>
+ * 只读：不改库、不重建索引、不触发重算。报告里的每个数字都来自现有数据，
+ * 一次请求内算完即返回。
  */
 public interface IStandardizationReportService {
 
     /**
      * 生成标准化质量报告（不限时间）。
      *
-     * <p>【权限：登录即可】但受组织数据域约束：乙类（病历相关）只统计当前可见的病历；
-     * 甲类（词典质量）看的是本组织 + 基础层的词表，与病历无关。</p>
+     * 【权限：登录即可】但受组织数据域约束：乙类（病历相关）只统计当前可见的病历；
+     * 甲类（词典质量）看的是本组织 + 基础层的词表，与病历无关。
      *
      * @return 甲类标准符合度 + 乙类数据集覆盖度
      */
@@ -24,9 +24,9 @@ public interface IStandardizationReportService {
     /**
      * 按接诊时间区间生成报告。
      *
-     * <p>为什么要区间：病历接诊时间跨度大（实测 2019-01 ~ 2025-12），
+     * 为什么要区间：病历接诊时间跨度大（实测 2019-01 ~ 2025-12），
      * 混在一起看不出「换了词表之后有没有变好」—— 新词表只对重跑过解析的病历生效，
-     * 而不同批次解析的病历接诊时间往往不同。</p>
+     * 而不同批次解析的病历接诊时间往往不同。
      *
      * @param start 起（yyyy-MM-dd），为空表示不限
      * @param end   止（yyyy-MM-dd），为空表示不限。只给一端按「未给」处理
@@ -37,9 +37,9 @@ public interface IStandardizationReportService {
     /**
      * 按范围过滤生成报告（科室 / 就诊时间 / 证候）。
      *
-     * <p>未知字段（分级等）不影响口径；时间仍要求 dateRange 两端齐全才生效，
+     * 未知字段（分级等）不影响口径；时间仍要求 dateRange 两端齐全才生效，
      * 只给一端按「未给」处理，与 {@link #report(String, String)} 同一约定。甲类
-     * （词典质量）字典全域、不随范围收窄，只有乙类（病历相关）按范围过滤。</p>
+     * （词典质量）字典全域、不随范围收窄，只有乙类（病历相关）按范围过滤。
      *
      * @param filters 范围过滤；为空表示不限
      * @return 同上
@@ -49,10 +49,10 @@ public interface IStandardizationReportService {
     /**
      * 把报告导出为 CSV（批次 28 · 28.23）。
      *
-     * <p>与 {@link #report(String, String)} 同一数据源、同一数据域，走同一套
+     * 与 {@link #report(String, String)} 同一数据源、同一数据域，走同一套
      * 「登录即可 + 组织数据域」约束；之所以放在后端生成，是为了和另外两条导出
      * （数据集导出 {@code POST /api/export/dataset}、日志导出 {@code GET /api/logs/export}）
-     * 对齐 —— 前端只负责收文件流落盘。</p>
+     * 对齐 —— 前端只负责收文件流落盘。
      *
      * @param start 起（yyyy-MM-dd），为空表示不限
      * @param end   止（yyyy-MM-dd），为空表示不限

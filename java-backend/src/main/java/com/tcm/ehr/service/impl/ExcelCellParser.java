@@ -12,13 +12,13 @@ import java.util.regex.Pattern;
 /**
  * Excel 单元格 → 值（批次 13 · 13.3 的第二个抽取对象）。
  *
- * <p><b>为什么抽它</b>：这一组（取文本 + 接诊时间解析）是「把一个单元格变成 Java 值」这一件事，
- * 与病历的业务逻辑无关，也不碰数据库。抽出来后 RecordServiceImpl 只负责业务编排。</p>
+ * <b>为什么抽它</b>：这一组（取文本 + 接诊时间解析）是「把一个单元格变成 Java 值」这一件事，
+ * 与病历的业务逻辑无关，也不碰数据库。抽出来后 RecordServiceImpl 只负责业务编排。
  *
- * <p>核心是接诊时间的归一：导入源这一列是 14 位紧凑数字串（{@code 20221224090613}），
+ * 核心是接诊时间的归一：导入源这一列是 14 位紧凑数字串（{@code 20221224090613}），
  * 单元格类型为数值、格式为 General —— 既不是日期格式、也不含分隔符。只按
  * {@code yyyy-MM-dd HH:mm:ss} 硬解析会全部落到 null，表现为列表「接诊时间」整列空白。
- * 这里统一收口五类写法：</p>
+ * 这里统一收口五类写法：
  *
  * <ul>
  * <li>纯数字紧凑串 8 / 12 / 14 位：{@code 20221224} / {@code 202212240906} / {@code 20221224090613}</li>
@@ -28,8 +28,8 @@ import java.util.regex.Pattern;
  * <li>多余部分：ISO 的 T 换成空格，小数秒与时区后缀截掉</li>
  * </ul>
  *
- * <p>认不出来的一律返回 null（而不是给一个「看起来合法」的时间）：宁可缺接诊时间，
- * 也不要让整行导入失败，更不要把错误时间写进病历。</p>
+ * 认不出来的一律返回 null（而不是给一个「看起来合法」的时间）：宁可缺接诊时间，
+ * 也不要让整行导入失败，更不要把错误时间写进病历。
  */
 final class ExcelCellParser {
 
@@ -47,9 +47,9 @@ final class ExcelCellParser {
     /**
      * 标准格式的 formatter（{@code yyyy-MM-dd HH:mm:ss}）。
      *
-     * <p>暴露它是为了让调用方写 {@code LocalDateTime.parse(normalizeDateTime(s), ExcelCellParser.formatter())} ——
+     * 暴露它是为了让调用方写 {@code LocalDateTime.parse(normalizeDateTime(s), ExcelCellParser.formatter())} ——
      * 与搬家前的写法**逐字等价**（包括「解析失败抛异常」这一点），
-     * 而不是换成「返回 null」的版本，那会悄悄改掉调用方的错误处理。</p>
+     * 而不是换成「返回 null」的版本，那会悄悄改掉调用方的错误处理。
      */
     static DateTimeFormatter formatter() {
         return DT;
@@ -122,9 +122,9 @@ final class ExcelCellParser {
     /**
      * 单元格取文本：按显示格式取值，数字/日期型统一转字符串。
      *
-     * <p><b>这是全仓唯一的「单元格 → 文本」实现</b>（批次14 审核后收敛，见下方 FORMULA 的取舍）。
+     * <b>这是全仓唯一的「单元格 → 文本」实现</b>（批次14 审核后收敛，见下方 FORMULA 的取舍）。
      * 词典导入原本自己写了一份，两份在 <b>BOOLEAN</b>（这里给 "true"/"false"，那份落 default 给 null）
-     * 与 <b>FORMULA</b> 上不一致 —— 同一个 .xlsx 从不同页面导入会读出不同的文本。</p>
+     * 与 <b>FORMULA</b> 上不一致 —— 同一个 .xlsx 从不同页面导入会读出不同的文本。
      */
     static String cellText(Cell cell) {
         // 1. 空单元格给 null

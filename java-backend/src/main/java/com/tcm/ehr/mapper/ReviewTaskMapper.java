@@ -21,16 +21,16 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTask> {
     /**
      * 幂等 upsert：把该病历唯一一条未作废任务刷成「待复核 + 最新评分」。
      *
-     * <p><b>为什么必须是 SQL 语义</b>：批次 4 给 review_tasks 加了唯一键
+     * <b>为什么必须是 SQL 语义</b>：批次 4 给 review_tasks 加了唯一键
      * uk_record_active，它建在生成列 active_key 上 —— 只对「未作废」的行唯一
      * （作废行不参与，故同一病历可以留多条历史）。原先的
      * 「先 selectList 再 update/insert」是 check-then-act，两个并发线程都能查到空、
      * 都去 insert，其中一个撞唯一键 → 从「静默重复」变成「整批 500」。
-     * {@code INSERT ... ON DUPLICATE KEY UPDATE} 由唯一索引直接仲裁，不存在这个窗口。</p>
+     * {@code INSERT ... ON DUPLICATE KEY UPDATE} 由唯一索引直接仲裁，不存在这个窗口。
      *
-     * <p>「先作废历史、再插入新的」这条老路（作废而不是删除，保留复核轨迹）仍然需要，
+     * 「先作废历史、再插入新的」这条老路（作废而不是删除，保留复核轨迹）仍然需要，
      * 所以本方法只覆盖「同一 (record_id, is_obsolete=0) 这唯一一行」的刷新，
-     * 作废动作由 {@link #obsoleteActive(Long, java.time.LocalDateTime)} 单独做。</p>
+     * 作废动作由 {@link #obsoleteActive(Long, java.time.LocalDateTime)} 单独做。
      *
      * @param recordId 病历 ID
      * @param score    最新评分

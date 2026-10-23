@@ -30,8 +30,8 @@ import java.util.Map;
 /**
  * AI 消费端服务实现。
  *
- * <p>规则优先：解读结论由规则产出；LLM 只做叙述增强，异常/不可用一律降级，
- * 绝不阻塞主流程（与 LlmClient 约定一致）。读取受组织数据域约束。</p>
+ * 规则优先：解读结论由规则产出；LLM 只做叙述增强，异常/不可用一律降级，
+ * 绝不阻塞主流程（与 LlmClient 约定一致）。读取受组织数据域约束。
  */
 @Slf4j
 @Service
@@ -56,7 +56,7 @@ public class AiServiceImpl implements IAiService {
     /**
      * 解读：规则先出结论（完整性/核心缺项/归一命中/关键提示），LLM 只做叙述增强。
      *
-     * <p>LLM 不可用或返回非 JSON 时保留规则模板叙述，结论始终可用。</p>
+     * LLM 不可用或返回非 JSON 时保留规则模板叙述，结论始终可用。
      *
      * @param dto 含 recordId 的解读请求；病历不属于当前组时返回 {@code null}
      * @return 解读结果，由 Controller 转 止 404
@@ -230,7 +230,7 @@ public class AiServiceImpl implements IAiService {
     /**
      * 核心要素缺失，直接问评分器，两侧共用同一份要素清单与判空口径。
      *
-     * <p>也分两档：真缺失 / 漏抽（原始病历有记录但未结构化）。</p>
+     * 也分两档：真缺失 / 漏抽（原始病历有记录但未结构化）。
      */
     private QcScorer.Missing coreMissing(Map<String, Object> data, Record r) {
         // 与质控页同口径：按当前组织取规则，不能用进程内基线 get()
@@ -263,8 +263,8 @@ public class AiServiceImpl implements IAiService {
     /**
      * 关键提示：常见空缺 + 核心要素缺失/漏抽。
      *
-     * <p>core 由调用方传入 —— 它与 vo.coreMissing 是同一份结果，
-     * 本方法不再自己算一遍（P2-13）。</p>
+     * core 由调用方传入 —— 它与 vo.coreMissing 是同一份结果，
+     * 本方法不再自己算一遍（P2-13）。
      */
     private List<String> keyHints(Map<String, Object> data, Record r, QcScorer.Missing core) {
         List<String> hints = new ArrayList<>();
@@ -288,7 +288,7 @@ public class AiServiceImpl implements IAiService {
     /**
      * 复核预检：结论来自规则重算（与 records.qc_results 同源），LLM 只补建议。
      *
-     * <p>LLM 不可用时直接回规则预检单，保证"有结论可看"。</p>
+     * LLM 不可用时直接回规则预检单，保证"有结论可看"。
      *
      * @param dto 含 recordId 的预检请求；无权时返回 {@code null}
      * @return 预检单，由 Controller 转 止 404
@@ -437,10 +437,10 @@ public class AiServiceImpl implements IAiService {
     /**
      * null 保持 null，其余按 String.valueOf 转字符串（<b>不 trim</b>）。
      *
-     * <p>与 GovernanceServiceImpl.toTrimmedOrNull（会 trim、空串归 null）、
+     * 与 GovernanceServiceImpl.toTrimmedOrNull（会 trim、空串归 null）、
      * EsTermIndexServiceImpl.nullToEmpty（null 变空串）是三种不同语义，
      * 所以名字各不相同 —— 原来三处都叫 {@code str(Object)}，光看调用点无法判断
-     * 拿到的是 null 还是空串。</p>
+     * 拿到的是 null 还是空串。
      */
     private static String rawOrNull(Object value) {
         return value == null ? null : String.valueOf(value);
@@ -462,22 +462,22 @@ public class AiServiceImpl implements IAiService {
     /**
      * 召回门槛：与原文重叠的字符数低于此值即视为噪声，不放进候选。
      *
-     * <p>实测（72 条症状词典 × 质量报告里的 8 个待补词）：门槛取 1 时会把
+     * 实测（72 条症状词典 × 质量报告里的 8 个待补词）：门槛取 1 时会把
      * 「食少纳呆 ← 多饮多食多尿」「面红目赤 ← 目盲」这种只共用一个字的候选塞给模型，
      * 而模型<b>倾向于硬凑给定的上下文</b> —— 噪声候选反而会诱导它做出错误归类。
-     * 取 2 后只剩「心烦易怒 ← 急躁易怒」「头晕头重 ← 头晕头痛」这类真正有用的。</p>
+     * 取 2 后只剩「心烦易怒 ← 急躁易怒」「头晕头重 ← 头晕头痛」这类真正有用的。
      */
     private static final int RECALL_MIN_OVERLAP = 2;
 
     /**
      * 术语补词建议：先按字面召回候选，再让 LLM 在候选约束下判断该怎么补。
      *
-     * <p><b>两步的顺序不能颠倒</b>：召回是纯规则能力（不依赖 LLM），先算出来放进兜底结果，
+     * <b>两步的顺序不能颠倒</b>：召回是纯规则能力（不依赖 LLM），先算出来放进兜底结果，
      * 这样 LLM 不可用或输出解析失败时，用户至少还能看到「词表里有哪些字面相近的词」。
-     * 与 {@link #interpret} 的「规则先出结论、LLM 只做增强」是同一套降级思路。</p>
+     * 与 {@link #interpret} 的「规则先出结论、LLM 只做增强」是同一套降级思路。
      *
-     * <p><b>本方法只出候选，不落库。</b>建议要经人工逐条确认才会进词典 ——
-     * 归一链路本身不消费本结果，与「判定地基仍是规则引擎」一致。</p>
+     * <b>本方法只出候选，不落库。</b>建议要经人工逐条确认才会进词典 ——
+     * 归一链路本身不消费本结果，与「判定地基仍是规则引擎」一致。
      */
     @Override
     public AiReplyVO suggestTerms(AiQueryDTO dto) {
@@ -531,20 +531,20 @@ public class AiServiceImpl implements IAiService {
     /**
      * 从词表里按<b>字面</b>相似度为原文召回候选。
      *
-     * <p>只做字面、不做语义 —— 语义判断交给 LLM。召回的作用是给它一个
-     * 「系统已经认这些词」的约束，避免凭空造词。</p>
+     * 只做字面、不做语义 —— 语义判断交给 LLM。召回的作用是给它一个
+     * 「系统已经认这些词」的约束，避免凭空造词。
      *
-     * <p><b>P1-15 / S1：先用倒排表把候选缩出来，再在候选内按原口径打分。</b>
+     * <b>P1-15 / S1：先用倒排表把候选缩出来，再在候选内按原口径打分。</b>
      * 原实现对每个待补词全量扫一遍词表（O(T×D×L²)）：证候类 2080 条时单条约两三千次字符比对，
-     * 国标全量导入后（D≈3 万）单条约 4.5 万次、T=500 就是千万级。</p>
+     * 国标全量导入后（D≈3 万）单条约 4.5 万次、T=500 就是千万级。
      *
-     * <p><b>为什么结果集不变</b>：门槛是「与原文重叠 ≥{@value #RECALL_MIN_OVERLAP} 个字符」，
+     * <b>为什么结果集不变</b>：门槛是「与原文重叠 ≥{@value #RECALL_MIN_OVERLAP} 个字符」，
      * 而重叠只可能发生在「出现在原文里的字符」上 ⇒「出现在原文任一字符的倒排表里」是入选的
      * <b>必要条件</b>。按它取候选是超集，落选的那些本来重叠就是 0，过不了门槛。
-     * 过滤阶段零精度损失；打分函数（{@link #overlap}）一字未动。</p>
+     * 过滤阶段零精度损失；打分函数（{@link #overlap}）一字未动。
      *
-     * <p>包级可见是为了让「与全表扫描逐条一致」这条性质能被同步测试直接钉住 ——
-     * 它正是这次改造唯一可能出错的地方。</p>
+     * 包级可见是为了让「与全表扫描逐条一致」这条性质能被同步测试直接钉住 ——
+     * 它正是这次改造唯一可能出错的地方。
      */
     static List<TermEntry> recallCandidates(String content, IDictionaryTermStore.RecallIndex index) {
         return recallCandidates(content, index, new boolean[index.entries().size()], new ArrayList<>());
@@ -553,9 +553,9 @@ public class AiServiceImpl implements IAiService {
     /**
      * 召回主实现：marked / candidates 由调用方提供并复用（见 {@link #suggestTerms}）。
      *
-     * <p>复用它们是因为「一次建议请求要跑 T 个待补词」：国标全量（D≈3 万）下，
+     * 复用它们是因为「一次建议请求要跑 T 个待补词」：国标全量（D≈3 万）下，
      * 每个词各分配一份标记数组就是 T×30KB 的瞬时垃圾，而每个词各扫一遍全表又是 T×D 次判断。
-     * 包级可见同样是为了可测：复用的暂存区若漏复位，会静默把上一个词条的候选带进下一个。</p>
+     * 包级可见同样是为了可测：复用的暂存区若漏复位，会静默把上一个词条的候选带进下一个。
      */
     static List<TermEntry> recallCandidates(String content, IDictionaryTermStore.RecallIndex index,
                                             boolean[] marked, List<Integer> candidates) {
@@ -632,8 +632,8 @@ public class AiServiceImpl implements IAiService {
     /**
      * LLM 不可用时的兜底：把召回候选原样列出，action 一律 unknown 交给人工判断。
      *
-     * <p>刻意<b>不猜</b> action —— 猜错会让用户以为系统已经判过了，
-     * 反而更容易把口语当成标准词录进去。</p>
+     * 刻意<b>不猜</b> action —— 猜错会让用户以为系统已经判过了，
+     * 反而更容易把口语当成标准词录进去。
      */
     private static List<AiReplyVO.TermSuggestion> fallbackSuggestions(List<String> terms,
                                                                      Map<String, List<TermEntry>> recalled) {
@@ -685,9 +685,9 @@ public class AiServiceImpl implements IAiService {
     /**
      * 解析模型输出的 JSON 数组。
      *
-     * <p>模型不一定听话：可能包 markdown 围栏、可能少给元素。这里只做两件事 ——
+     * 模型不一定听话：可能包 markdown 围栏、可能少给元素。这里只做两件事 ——
      * 剥围栏后按数组解析；解析不出来就返回空集合，由调用方保留召回兜底。
-     * <b>不做「字段缺了就补猜」的补救</b>，因为补出来的 action 会误导人工复核。</p>
+     * <b>不做「字段缺了就补猜」的补救</b>，因为补出来的 action 会误导人工复核。
      */
     private List<AiReplyVO.TermSuggestion> parseSuggestions(String raw, List<String> terms) {
         try {

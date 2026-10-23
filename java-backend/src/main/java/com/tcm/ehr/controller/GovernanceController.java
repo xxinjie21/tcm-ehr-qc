@@ -30,7 +30,7 @@ import java.util.Map;
 /**
  * 数据清洗：术语标准化、批量清洗、标准数据集导出与预览、清洗状态统计。
  *
- * <p>清洗只规整与标记，不填充医生未书写的内容，也不删除病历。</p>
+ * 清洗只规整与标记，不填充医生未书写的内容，也不删除病历。
  */
 @RestController
 @RequestMapping("/api")
@@ -45,7 +45,7 @@ public class GovernanceController {
     /**
      * 把一个术语归一到标准写法。
      *
-     * <p>【权限：登录即可】未命中词典时原样返回；type 非法返回 400 + code=4001。</p>
+     * 【权限：登录即可】未命中词典时原样返回；type 非法返回 400 + code=4001。
      *
      * @param dto type=术语类型；term=待归一术语
      * @return standardTerm=标准词（未命中时为原文）；level=命中层级（0=未命中）
@@ -71,7 +71,7 @@ public class GovernanceController {
     /**
      * 对指定范围执行清洗。
      *
-     * <p>【权限：登录即可】五步流水线：去重（只标记）→ 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。</p>
+     * 【权限：登录即可】五步流水线：去重（只标记）→ 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。
      *
      * @param dto recordIds=限定病历集合；filters=范围条件，二选一
      * @return total/deduped/repaired/isolated/normalized=各步处理条数
@@ -89,11 +89,11 @@ public class GovernanceController {
     /**
      * 提交数据清洗任务（异步）。
      *
-     * <p>【权限：登录即可】提交即返回任务 ID，进度走 {@code GET /api/governance/clean/batch/{id}}，
+     * 【权限：登录即可】提交即返回任务 ID，进度走 {@code GET /api/governance/clean/batch/{id}}，
      * 取消走 {@code POST /api/governance/clean/batch/{id}/cancel}。
-     * 相比同步接口：可看真实进度、可中途停止、关页面不影响执行。</p>
+     * 相比同步接口：可看真实进度、可中途停止、关页面不影响执行。
      *
-     * <p>{@code skipNormalize=true} 时跳过第 5 步术语归一（最耗时的一步）。</p>
+     * {@code skipNormalize=true} 时跳过第 5 步术语归一（最耗时的一步）。
      */
     @PostMapping("/governance/clean/batch")
     public Result<CleanTaskVO> submitCleanBatch(@Valid @RequestBody(required = false) CleanDTO dto) {
@@ -122,7 +122,7 @@ public class GovernanceController {
     /**
      * 请求取消清洗任务。
      *
-     * <p>【权限：登录即可】只发取消信号，终态由执行方落 —— 见 {@code CleanBatchService#cancel} 的注释。</p>
+     * 【权限：登录即可】只发取消信号，终态由执行方落 —— 见 {@code CleanBatchService#cancel} 的注释。
      */
     @PostMapping("/governance/clean/batch/{id}/cancel")
     public Result<CleanTaskVO> cancelCleanBatch(@PathVariable String id) {
@@ -132,7 +132,7 @@ public class GovernanceController {
     /**
      * 导出标准数据集。
      *
-     * <p>【权限：登录即可】只导出质控合格且已清洗的病历；范围内无合格数据时返回 400 + code=2001。</p>
+     * 【权限：登录即可】只导出质控合格且已清洗的病历；范围内无合格数据时返回 400 + code=2001。
      *
      * @param dto format=csv/json；filters=范围条件
      * @return 文件流（带 UTF-8 文件名的附件）
@@ -162,7 +162,7 @@ public class GovernanceController {
     /**
      * 预览导出结果。
      *
-     * <p>【权限：登录即可】只返回条数与样本，不生成文件。</p>
+     * 【权限：登录即可】只返回条数与样本，不生成文件。
      *
      * @param dto format=csv/json；filters=范围条件
      * @return total=命中条数；sample=前 10 条样本
@@ -175,7 +175,7 @@ public class GovernanceController {
     /**
      * 查询清洗状态统计。
      *
-     * <p>【权限：登录即可】</p>
+     * 【权限：登录即可】
      *
      * @return qualified=质控合格数；pendingGovern=待清洗数；governedCount=已清洗数
      */

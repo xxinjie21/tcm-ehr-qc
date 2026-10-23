@@ -67,9 +67,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 组织级「归一范围」来源（normalization.elementTypes）。
      *
-     * <p><b>字段注入而非构造参数</b>：GovernanceCleanContractTest / GovernanceCleanIdempotentTest
+     * <b>字段注入而非构造参数</b>：GovernanceCleanContractTest / GovernanceCleanIdempotentTest
      * 直接用 4 参构造 {@code new GovernanceServiceImpl(norm, mapper, store, taskMapper)}，把本依赖加成
-     * final 字段会改变构造签名、破坏它们。{@code required=false}：单测无此 bean 时退回出厂默认范围。</p>
+     * final 字段会改变构造签名、破坏它们。{@code required=false}：单测无此 bean 时退回出厂默认范围。
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.tcm.ehr.common.config.QcRuleStore qcRuleStore;
@@ -84,8 +84,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 单条术语归一（清洗页的「归一测试」入口）。
      *
-     * <p>只接受有独立词典的类型（{@link com.tcm.ehr.common.config.EntityTypes#dictKeys()}，现 9 类），
-     * 其余类型直接拒绝，避免调用方以为没有词典的类型也能查。</p>
+     * 只接受有独立词典的类型（{@link com.tcm.ehr.common.config.EntityTypes#dictKeys()}，现 9 类），
+     * 其余类型直接拒绝，避免调用方以为没有词典的类型也能查。
      *
      * @param type 实体类型 key
      * @param term 待归一原文
@@ -104,7 +104,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 数据清洗五步流水线：去重 → 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。
      *
-     * <p>只规整与标记，<b>不填充医生未书写的内容，也不删除任何病历</b>；各步的判断口径见方法体注释。</p>
+     * 只规整与标记，<b>不填充医生未书写的内容，也不删除任何病历</b>；各步的判断口径见方法体注释。
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -122,9 +122,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 数据清洗（带进度回调，供异步任务上报进度 / 响应取消）。
      *
-     * <p><b>为什么用回调而不是把进度逻辑写进本方法</b>：清洗逻辑（分页、预热、去重、
+     * <b>为什么用回调而不是把进度逻辑写进本方法</b>：清洗逻辑（分页、预热、去重、
      * 归一）已经调优过，不该为「异步」再改一遍；回调把「进度上报」与「取消判断」
-     * 交给调用方（CleanBatchService），同步调用传 null 即退化为原行为。</p>
+     * 交给调用方（CleanBatchService），同步调用传 null 即退化为原行为。
      *
      * @param progress 每页回调一次（处理条数，返回 false 表示请求中止）；null=不上报不中止
      */
@@ -323,14 +323,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 清洗范围条件：只作用于「质控合格」病历，<b>无视</b>传入的分级。
      *
-     * <p>设计口径是「对合格数据做清洗、归一，产出标准数据集」——待复核 / 无效既不归一、
+     * 设计口径是「对合格数据做清洗、归一，产出标准数据集」——待复核 / 无效既不归一、
      * 也不参与导出。调用方传了别的分级也一律按「合格」收窄：范围里若按「全部」扫，
      * 「清洗总病历」会是整库条数，远大于页面顶部「质控合格病历」卡，用户看到的就是
-     * 「明明只有几千合格，却清洗了几万」。</p>
+     * 「明明只有几千合格，却清洗了几万」。
      *
-     * <p>刻意<b>不</b>改动入参 filters：Controller 在 {@code clean()} 之后还要用它写
+     * 刻意<b>不</b>改动入参 filters：Controller 在 {@code clean()} 之后还要用它写
      * 操作日志（{@link RecordFilter#describe}），就地改分级会让日志范围与实际执行的不一致。
-     * 故这里复制一份再覆盖分级。</p>
+     * 故这里复制一份再覆盖分级。
      */
     private FiltersDTO qualifiedScope(FiltersDTO filters) {
         FiltersDTO scope = new FiltersDTO();
@@ -353,15 +353,15 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 惰性游标分页取病历（P1-3 / AI-8 / C3）。
      *
-     * <p>3.5 万行的堆占用从「一次全驻留」降到「一页」。分页本身由 keyset 承担：
+     * 3.5 万行的堆占用从「一次全驻留」降到「一页」。分页本身由 keyset 承担：
      * offset 分页的末页要扫过前 3.9 万行（4 万条 40 页，累计扫描量约为实际行数的 20 倍），
      * 游标锚定上一页末条 {@code (visit_time, id)} 后是纯区间扫描（配
-     * idx_records_org_visit_time 后实测 4.9s → 0.2s）。</p>
+     * idx_records_org_visit_time 后实测 4.9s → 0.2s）。
      *
-     * <p>⚠️ wrapperFactory 每页调用一次：{@code QueryWrapper.and()} 是原地追加，
-     * 复用同一份 wrapper 会让 WHERE 逐页累积。</p>
+     * ⚠️ wrapperFactory 每页调用一次：{@code QueryWrapper.and()} 是原地追加，
+     * 复用同一份 wrapper 会让 WHERE 逐页累积。
      *
-     * <p><b>取完</b>定义为「取到空页」或「不满一页」——两者都表示没有下一页。</p>
+     * <b>取完</b>定义为「取到空页」或「不满一页」——两者都表示没有下一页。
      *
      * @param onPage 每取到一页就回调一次（**在该页任何一条被消费之前**）。
      *               P1-17 用它做「本页术语召回预热」：预热必须早于逐条归一，否则毫无意义；
@@ -419,8 +419,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 解析 structured_data（T16：校验与解析合并为同一次）。
      *
-     * <p>解析不了 = 无法修复的脏数据；此时返回 {@code null}，由调用方按「不可解析」处理，
-     * 不再另设一个 isValidJson 先 readTree 一遍。</p>
+     * 解析不了 = 无法修复的脏数据；此时返回 {@code null}，由调用方按「不可解析」处理，
+     * 不再另设一个 isValidJson 先 readTree 一遍。
      *
      * @param s structured_data 列原文
      * @return 解析后的顶层 Map；不可解析返回 {@code null}
@@ -437,8 +437,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 取本页留档的解析结果；不在留档里（理论上不该发生）就现解析一次。
      *
-     * <p>用 containsKey 而不是 {@code get != null} 判断：解析失败时留档的就是 {@code null}，
-     * 那同样是「已解析过」的结论，不能据此再解析一遍。</p>
+     * 用 containsKey 而不是 {@code get != null} 判断：解析失败时留档的就是 {@code null}，
+     * 那同样是「已解析过」的结论，不能据此再解析一遍。
      */
     private Map<String, Object> structuredOf(Map<String, Map<String, Object>> pageParsed, Record r) {
         if (pageParsed.containsKey(r.getId())) {
@@ -450,23 +450,23 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 按页预热术语召回（P1-17 / T3）：把本页所有待归一原文按类型收集好，一类一次问完 ES。
      *
-     * <p><b>改的是什么</b>：清洗链路原先逐实体调 normalize，每个实体一次 ES 往返 ——
+     * <b>改的是什么</b>：清洗链路原先逐实体调 normalize，每个实体一次 ES 往返 ——
      * 一页 1000 条病历、每条十几个实体，就是上万次往返。这里在<b>本页任何一条被归一之前</b>
      * 先批量问一次，随后逐条归一全部命中召回缓存。复用解析链路既有的
-     * {@link EsTermNormalizer#prefetch}（内部走 _msearch），不新增批量查询接口。</p>
+     * {@link EsTermNormalizer#prefetch}（内部走 _msearch），不新增批量查询接口。
      *
-     * <p><b>不改的是什么</b>：预热只写召回缓存、不参与判定。命中与否仍由三级规则与 Dice 阈值决定，
-     * 预取失败也不影响正确性（逐条归一照常走 ES）。</p>
+     * <b>不改的是什么</b>：预热只写召回缓存、不参与判定。命中与否仍由三级规则与 Dice 阈值决定，
+     * 预取失败也不影响正确性（逐条归一照常走 ES）。
      *
-     * <p><b>只预热本组织归一范围内的类型</b>（normalization.elementTypes，出厂默认 9 类
+     * <b>只预热本组织归一范围内的类型</b>（normalization.elementTypes，出厂默认 9 类
      * 全勾：疾病 / 证候 / 症状 / 中药 / 方剂 / 舌象 / 脉象 / 病因 / 治法；归一范围与计分范围是两个
-     * 独立开关）。范围外的类型清洗链路对其不调 ES（见 {@link #normalizeEntityList}），预热没有意义。</p>
+     * 独立开关）。范围外的类型清洗链路对其不调 ES（见 {@link #normalizeEntityList}），预热没有意义。
      *
-     * <p>预热粒度是「一页」而非整批：召回缓存本身有容量上限（RECALL_CACHE_MAX），
-     * 一次问进远超用量的术语只会把先问进来的挤出去。一页正好是「问进来就马上用掉」的窗口。</p>
+     * 预热粒度是「一页」而非整批：召回缓存本身有容量上限（RECALL_CACHE_MAX），
+     * 一次问进远超用量的术语只会把先问进来的挤出去。一页正好是「问进来就马上用掉」的窗口。
      *
-     * <p>顺带把本页的 structured_data 解析结果留在 pageParsed 里供逐条清洗复用 ——
-     * 预热要读同一份内容，不共用就得为预热再解析一遍（T16 的「只解析一次」不能因预热回退）。</p>
+     * 顺带把本页的 structured_data 解析结果留在 pageParsed 里供逐条清洗复用 ——
+     * 预热要读同一份内容，不共用就得为预热再解析一遍（T16 的「只解析一次」不能因预热回退）。
      */
     private void prefetchPage(List<Record> page, String orgId,
                               Map<String, Map<String, Object>> pageParsed) {
@@ -559,9 +559,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 实体归一（8 类）+ 中药归一的同源入口，返回 {@code [改写着色数, 精确, 包含, 模糊]}。
      *
-     * <p>包级可见是给同包测试用的**可见入口**（GovernanceCleanIdempotentTest），
+     * 包级可见是给同包测试用的**可见入口**（GovernanceCleanIdempotentTest），
      * 生产路径由 {@link #normalizeStructuredData} 调用它 —— 不新增生产逻辑，只是把
-     * 两个私有方法开放给同包测试，避免测试直接反射私有方法。</p>
+     * 两个私有方法开放给同包测试，避免测试直接反射私有方法。
      */
     int[] normalizeForTest(Map<String, Object> data) {
         int[] stat = {0, 0, 0, 0};
@@ -681,7 +681,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 某一类实体的"同标准词去重"，直接复用解析链路的 {@link EntityNormalizer#dedupByTerm}。
      *
-     * <p>合并键取 termField（实体 content、中药 name）；代表条目的选取规则见该方法注释。</p>
+     * 合并键取 termField（实体 content、中药 name）；代表条目的选取规则见该方法注释。
      */
     @SuppressWarnings("unchecked")
     private List<Object> dedupStructuredList(List<?> list, String termField) {
@@ -725,14 +725,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 标准数据集导出：只含质控合格病历，文本字段已就地标准化，并对手机号/身份证号脱敏。
      *
-     * <p><b>「标准数据集」的含义</b>：导出的不是库内原文的拷贝，而是把每条病历里
+     * <b>「标准数据集」的含义</b>：导出的不是库内原文的拷贝，而是把每条病历里
      * 「被归一过的术语」在原文中就替换成标准词之后的版本（见 {@link #standardizeMap}）。
      * 这样一份导出件可以直接当训练/统计语料用，不必再对一遍词典。库内原文不受影响 ——
-     * 本链路只读。</p>
+     * 本链路只读。
      *
-     * <p>CSV 额外带一列「标准化对照」，记录该行实际发生的替换，便于逐条回溯到原文。</p>
+     * CSV 额外带一列「标准化对照」，记录该行实际发生的替换，便于逐条回溯到原文。
      *
-     * <p>范围内无合格病历时返回 {@code null}，由 Controller 转 400 + code=2001。</p>
+     * 范围内无合格病历时返回 {@code null}，由 Controller 转 400 + code=2001。
      */
     @Override
     public ExportedFile export(ExportDTO dto) throws IOException {
@@ -776,8 +776,8 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 导出预览：返回总条数 + 前 10 条样本。
      *
-     * <p>不带证候筛选时走 COUNT 与 LIMIT 两条轻查询，不把全表读进内存；
-     * 带证候筛选时证候在 JSON 里 SQL 表达不了，退化为"SQL 收窄后内存筛 + 取前 10"。</p>
+     * 不带证候筛选时走 COUNT 与 LIMIT 两条轻查询，不把全表读进内存；
+     * 带证候筛选时证候在 JSON 里 SQL 表达不了，退化为"SQL 收窄后内存筛 + 取前 10"。
      */
     @Override
     public Map<String, Object> previewDataset(ExportDTO dto) {
@@ -812,10 +812,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 样本按导出同一口径处理：先就地标准化、再序列化、再打码、最后解析回结构，键名与类型不变。
      *
-     * <p>标准化必须在这里也做一遍，否则「预览里看到的还是原文、下载下来却是标准词」——
-     * 预览的意义就是让用户先确认导出件长什么样。</p>
+     * 标准化必须在这里也做一遍，否则「预览里看到的还是原文、下载下来却是标准词」——
+     * 预览的意义就是让用户先确认导出件长什么样。
      *
-     * <p>刻意不捕获异常：脱敏失败就让这次预览失败，而不是静默返回未脱敏的样本。</p>
+     * 刻意不捕获异常：脱敏失败就让这次预览失败，而不是静默返回未脱敏的样本。
      */
     private Object maskedSample(List<Record> sample) {
         List<Map<String, Object>> standardized = new ArrayList<>(sample.size());
@@ -867,12 +867,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * batchConsumer。证候筛选已在 SQL 层完成（A8：RecordFilter 的 pattern OR
      * structured_data 并集），这里**不再**二次内存筛，否则会与列表口径二次分叉。
      *
-     * <p>性能审查 A7：formerly filterQualified 用 selectList 一次性把全部
+     * 性能审查 A7：formerly filterQualified 用 selectList 一次性把全部
      * 匹配行（4 万 ≈320MB）物化进堆，带证候时再逐条 readValue 4 万次。keyset 分批后
      * 内存恒定一页；实现与 RecordKeyset 的锚点语义一致（{@code visit_time DESC, id ASC}
-     * 全序），不漏行不重复。</p>
+     * 全序），不漏行不重复。
      *
-     * <p><b>锚点取 SQL 返回的末条</b>（含被本页筛掉的行不适用——已无内存筛，每行都是命中）。</p>
+     * <b>锚点取 SQL 返回的末条</b>（含被本页筛掉的行不适用——已无内存筛，每行都是命中）。
      *
      * @param dto           导出/预览请求
      * @param batchConsumer 每批回调；回调内不得改批次内容
@@ -924,11 +924,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * trim 后为空（null / 空串 / 纯空白）一律归成 {@code null}，否则原样返回。
      *
-     * <p>脱敏与清洗要的是「这个字段真的没有值」，不是「它是个空字符串」——
-     * 留着空串会让下游把它当成一个有内容的字段继续处理。</p>
+     * 脱敏与清洗要的是「这个字段真的没有值」，不是「它是个空字符串」——
+     * 留着空串会让下游把它当成一个有内容的字段继续处理。
      *
-     * <p>与 AiServiceImpl.rawOrNull（不 trim、null 保持 null）语义不同，
-     * 与 EsTermIndexServiceImpl.nullToEmpty（null 变空串）也相反。</p>
+     * 与 AiServiceImpl.rawOrNull（不 trim、null 保持 null）语义不同，
+     * 与 EsTermIndexServiceImpl.nullToEmpty（null 变空串）也相反。
      */
     private String toTrimmedOrNull(Object o) {
         if (o == null) return null;
@@ -966,7 +966,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 写一行 CSV：所有单元格加引号并转义内部引号/换行；就诊时间规整为 YYYY-MM-DD。
      *
-     * <p>文本单元格先按 pairs 就地标准化，最后一列固定写「标准化对照」。</p>
+     * 文本单元格先按 pairs 就地标准化，最后一列固定写「标准化对照」。
      */
     private void appendCsvRow(ByteArrayOutputStream out, Record r, List<String> cols,
                               List<Map.Entry<String, String>> pairs) {
@@ -999,11 +999,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 取一条病历的「归一前原文 → 标准词」替换对，按原词长度<b>降序</b>。
      *
-     * <p>只用该病历自己的 structured_data：归一结果本来就是逐条产生的，
+     * 只用该病历自己的 structured_data：归一结果本来就是逐条产生的，
      * 别条病历抽到的术语在这条病历里没有对应的原文片段，硬套没有依据。
-     * 反过来这也让替换量恒定在「本条病历的实体数」量级，不会随数据集变大而变慢。</p>
+     * 反过来这也让替换量恒定在「本条病历的实体数」量级，不会随数据集变大而变慢。
      *
-     * <p>降序是为了长词优先 —— 否则「柴胡」会先把「柴胡桂枝汤」打成「标准柴胡名+桂枝汤」。</p>
+     * 降序是为了长词优先 —— 否则「柴胡」会先把「柴胡桂枝汤」打成「标准柴胡名+桂枝汤」。
      */
     private List<Map.Entry<String, String>> replacementsOf(Record r) {
         String json = r.getStructuredData();
@@ -1064,12 +1064,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * 会被标准化的字段：医生手写的文本字段 —— 21 个原始字段里除编号 / 性别 / 年龄 /
      * 就诊次数 / 科室 / 工号 / 接诊时间之外的 13 个。
      *
-     * <p>刻意<b>不</b>做成「所有字符串字段都过一遍」：那样 department 这类短文本
+     * 刻意<b>不</b>做成「所有字符串字段都过一遍」：那样 department 这类短文本
      * 会被误伤 —— 例如术语「内科 → 中医内科」会把 {@code department="中医内科"} 替换成
-     * 「中医中医内科」。漏替换只是少做一步，误替换是污染数据，两者不对等。</p>
+     * 「中医中医内科」。漏替换只是少做一步，误替换是污染数据，两者不对等。
      *
-     * <p>顺带也把 structuredData 挡在外面：它里面的 sourceText 正是
-     * 「这条病历原本怎么写」的唯一依据，一起替换掉就等于把溯源信息抹了。</p>
+     * 顺带也把 structuredData 挡在外面：它里面的 sourceText 正是
+     * 「这条病历原本怎么写」的唯一依据，一起替换掉就等于把溯源信息抹了。
      */
     private static final List<String> STANDARDIZABLE_FIELDS = List.of(
             "westernDiagnosis", "tcmDiagnosis", "presentIllness", "chiefComplaint", "selfReport",
@@ -1079,15 +1079,15 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 把一条病历转成 Map 并对上述文本字段做就地标准化（<b>不改动入参 Record</b>）。
      *
-     * <p>两步都只作用于导出的副本：① 术语替换（把归一过的原文换成标准词）；② <b>标点规整</b>
+     * 两步都只作用于导出的副本：① 术语替换（把归一过的原文换成标准词）；② <b>标点规整</b>
      * （{@link TextUtil#normalizePunctuation}：合并重复标点、半角转全角、去标点两侧空白）。
-     * 库里的病历原文一个字节都不动 —— 与清洗同理，这是「导出标准数据集」而非「改写病历」。</p>
+     * 库里的病历原文一个字节都不动 —— 与清洗同理，这是「导出标准数据集」而非「改写病历」。
      *
-     * <p>顺序不能反：先术语替换、后标点规整。若先规整，半角逗号会被转成全角，
-     * {@link #standardizeText} 就匹配不到原文片段、漏掉替换。</p>
+     * 顺序不能反：先术语替换、后标点规整。若先规整，半角逗号会被转成全角，
+     * {@link #standardizeText} 就匹配不到原文片段、漏掉替换。
      *
-     * <p>用 convertValue 而不是直接改 Record：导出的记录对象可能还在 MyBatis
-     * 一级缓存里，就地改会污染后续读取。</p>
+     * 用 convertValue 而不是直接改 Record：导出的记录对象可能还在 MyBatis
+     * 一级缓存里，就地改会污染后续读取。
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> standardizeMap(Record r, List<Map.Entry<String, String>> pairs) {
@@ -1110,10 +1110,10 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 否定判定的分句界：否定**不跨分句**作用。
      *
-     * <p>2026-10-18 实测的 bug：〈湿热下注，血行不畅；湿热下注…〉里第二个「湿热下注」前
+     * 2026-10-18 实测的 bug：〈湿热下注，血行不畅；湿热下注…〉里第二个「湿热下注」前
      * 6 字含「不」（来自上句「血行不畅」），旧实现把它判成否定语境 → 跳过替换，
      * 于是同一字段里同一个术语**部分替换、部分不替换**，导出件自相矛盾。同因还有
-     * 「脉较弦，欠流利。；脉较弦」被「欠」误伤。修法：回看遇到分句界即截断。</p>
+     * 「脉较弦，欠流利。；脉较弦」被「欠」误伤。修法：回看遇到分句界即截断。
      */
     private static final String NEG_STOP = "。；;！？，,：:\n";
     /**
@@ -1126,13 +1126,13 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 按替换对做「受控」文本替换（E1~E3）。
      *
-     * <p><b>为什么不能再用 String.replace</b>：它对每次调用做全文替换，且不区分位置 ——
+     * <b>为什么不能再用 String.replace</b>：它对每次调用做全文替换，且不区分位置 ——
      * 2026-10-18 实测一条病历里 {@code 血 → 血分证} 命中 17 处（把「血行不畅」「血块」「经血色暗红」
      * 全改成「血分证行不畅」「血分证块」）、{@code 有 → 有汗} 命中 11 处（「伴有腰酸痛」→「伴有汗腰酸痛」）。
-     * 导出的标准数据集是要直接拿去分析/训练的，这种污染比"少替换一次"严重得多。</p>
+     * 导出的标准数据集是要直接拿去分析/训练的，这种污染比"少替换一次"严重得多。
      *
-     * <p>扫描规则：① 丢弃码点 &lt; {@link #MIN_REPLACE_LEN} 的对；② 对每个位置按 key 长度降序试匹配，
-     * 命中即消费该区间（最长匹配 + 不重叠）；③ 命中位置前 {@link #NEG_WINDOW} 字含否定词则跳过。</p>
+     * 扫描规则：① 丢弃码点 &lt; {@link #MIN_REPLACE_LEN} 的对；② 对每个位置按 key 长度降序试匹配，
+     * 命中即消费该区间（最长匹配 + 不重叠）；③ 命中位置前 {@link #NEG_WINDOW} 字含否定词则跳过。
      */
     private static String standardizeText(String s, List<Map.Entry<String, String>> pairs) {
         if (s == null || s.isEmpty() || pairs.isEmpty()) {

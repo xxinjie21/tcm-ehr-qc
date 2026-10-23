@@ -51,9 +51,9 @@ import java.util.UUID;
  * <li>导入<b>同步执行</b>：接口返回即本轮完成，status 直接为「已完成」。</li>
  * </ul>
  *
- * <p><b>进度查询已删除</b>：原「内存 Map 记 taskId + 查进度」的那套状态存储与
+ * <b>进度查询已删除</b>：原「内存 Map 记 taskId + 查进度」的那套状态存储与
  * {@code GET /api/records/import/{taskId}/status} 端点已在 P5.11 移除（导入是同步的，
- * 内存进度表没有任何读取方）。进度由前端按文件逐个统计，不再向服务端要状态。</p>
+ * 内存进度表没有任何读取方）。进度由前端按文件逐个统计，不再向服务端要状态。
  */
 @Slf4j
 @Service
@@ -82,11 +82,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * Excel 批量导入病历（同步执行，返回即本轮完成）。
      *
-     * <p>逐文件校验扩展名、大小（≤50MB）与必需列「登记号」「接诊时间」，逐行映射为 21 字段；
+     * 逐文件校验扩展名、大小（≤50MB）与必需列「登记号」「接诊时间」，逐行映射为 21 字段；
      * 缺列、解析失败、门诊号为空的行计入失败明细，不影响其余行。去重先按登记号预取库内病历哈希、
      * 再与本批内哈希比对（与数据清洗同口径的 21 字段文本哈希），命中的按重复记失败。落库走
      * saveBatch 一次批量插入。导入是同步的，
-     * autoExtract 且有成功记录时，另行提交后台 NLP 批解析任务，导入本身不阻塞等待。</p>
+     * autoExtract 且有成功记录时，另行提交后台 NLP 批解析任务，导入本身不阻塞等待。
      *
      * @param files 上传的 Excel 文件数组（最多 20 个）
      * @param autoExtract 是否在导入后自动提交结构化解析任务
@@ -204,10 +204,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 批量落库并回填成功数。
      *
-     * <p>并发导入同一份文件时，上面的「先查后插」会双双通过，其中一个撞
+     * 并发导入同一份文件时，上面的「先查后插」会双双通过，其中一个撞
      * uk_records_org_text_hash —— 整批抛出去会让「已入库的前若干行」与回执对不上
      * （用户看到失败，库里却已有数据）。这里退化为逐行插入：撞键的行计入失败明细，
-     * 其余行照常入库，成功数与库内实际新增一致。</p>
+     * 其余行照常入库，成功数与库内实际新增一致。
      */
     private void insertRecords(ImportSummaryVO summary, List<Record> toInsert) {
         if (toInsert.isEmpty()) {
@@ -236,8 +236,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 仅重传失败行：把前端（可能已编辑）回传的字段键值表当病历重新入库，复用导入同一套去重 / 插入口径。
      *
-     * <p>失败明细里的 row 就是回传载荷；用户改正后点「重传失败行」即走这里。
-     * 永久失败（如仍缺少门诊号 / 日期仍无法解析）会再次计入失败，不会静默丢。</p>
+     * 失败明细里的 row 就是回传载荷；用户改正后点「重传失败行」即走这里。
+     * 永久失败（如仍缺少门诊号 / 日期仍无法解析）会再次计入失败，不会静默丢。
      */
     @Override
     public ImportSummaryVO importRows(List<Map<String, String>> rows) {
@@ -281,8 +281,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 单条新增病历。
      *
-     * <p>仅做「登记号 / 门诊号非空」的必填校验，不做重复校验；主键由服务端生成 UUID，
-     * 21 个原始字段原样落库。</p>
+     * 仅做「登记号 / 门诊号非空」的必填校验，不做重复校验；主键由服务端生成 UUID，
+     * 21 个原始字段原样落库。
      *
      * @param dto 新增请求，登记号与门诊号必填
      * @return 新病历 ID
@@ -342,8 +342,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 查询单条原始病历（含结构化数据与质控结果），只读。
      *
-     * <p>先按组织数据域校验：不满足即拒绝而非返回空。
-     * 病历不存在时返回 null。</p>
+     * 先按组织数据域校验：不满足即拒绝而非返回空。
+     * 病历不存在时返回 null。
      *
      * @param recordId 病历 ID
      * @return 原始病历视图；不存在时为 null
@@ -397,8 +397,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 更新病历的结构化数据（原始 21 字段只读）。
      *
-     * <p>请求体若显式携带任一原始字段即整体拒绝；仅接受 structuredData，序列化后打上
-     * 当前词典版本戳再落库，保证结构化结果可追溯。</p>
+     * 请求体若显式携带任一原始字段即整体拒绝；仅接受 structuredData，序列化后打上
+     * 当前词典版本戳再落库，保证结构化结果可追溯。
      *
      * @param recordId 病历 ID
      * @param body 请求体，需含 structuredData
@@ -453,9 +453,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 按 id 删除。
      *
-     * <p>事务加在这个 public 方法上，<b>不能</b>加在 private 的 doDelete 上 ——
+     * 事务加在这个 public 方法上，<b>不能</b>加在 private 的 doDelete 上 ——
      * 后者只被同类自调用，注解不经过代理、等于没加
-     * （fk_review_record 存在，先删 review_tasks 再删 records，中途失败会留下孤儿状态）。</p>
+     * （fk_review_record 存在，先删 review_tasks 再删 records，中途失败会留下孤儿状态）。
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -477,10 +477,10 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 取删除器。
      *
-     * <p>用继承来的 baseMapper **字段**而不是 {@code getBaseMapper()}：后者在 mapper 为 null 时
+     * 用继承来的 baseMapper **字段**而不是 {@code getBaseMapper()}：后者在 mapper 为 null 时
      * 自己就抛 MybatisPlusException，而那会让「防误删守卫先于任何 mapper 访问」这条设计失效
      * （守卫用例期望 IllegalArgumentException，实测拿到的是 MybatisPlusException）。读字段不抛异常，
-     * 守卫得以在真正需要 mapper 之前先判并拒绝。</p>
+     * 守卫得以在真正需要 mapper 之前先判并拒绝。
      */
     private RecordDeleter deleter() {
         return new RecordDeleter(baseMapper, reviewTaskMapper);
@@ -490,8 +490,8 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
      * 按当前数据域筛出可访问的病历 id、分块删除、以及「是否有筛选条件」的判定，
      * 都已随批次 13 · 13.3 一起搬到 {@link RecordDeleter}。
      *
-     * <p>保留这两个入口在此类，是因为它们是 IRecordService 的接口方法，
-     * 而且事务必须加在这里的 public 方法上（见上）。</p>
+     * 保留这两个入口在此类，是因为它们是 IRecordService 的接口方法，
+     * 而且事务必须加在这里的 public 方法上（见上）。
      */
     @Transactional(rollbackFor = Exception.class, timeout = 60)
     @Override
@@ -511,9 +511,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 分页检索病历列表，只读。
      *
-     * <p>分页参数非法时回退为第 1 页 / 每页 20 条；查询条件统一经 {@link RecordFilter} 组装
+     * 分页参数非法时回退为第 1 页 / 每页 20 条；查询条件统一经 {@link RecordFilter} 组装
      * （先数据域、后用户筛选取交集），不手写 where。列表项摘要取主诉，缺失时依次回退中医诊断、
-     * 西医诊断，超过 40 字截断。</p>
+     * 西医诊断，超过 40 字截断。
      *
      * @param dto 检索请求（分页 + 筛选），可为 null
      * @return 命中总数与当前页列表项
@@ -549,8 +549,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
 
     /**
      * 只统计筛选范围内的病历总数（与 {@link #searchRecords} 同一 wrapper 口径）。
-     * <p>性能审查 P1-5：原「只取 total」用 {@code pageSize=1} 走 SELECT —— 即便只回 1 行，
-     * 后端仍会对 4 万行做一次 filesort/读全表；改成 selectCount 后是纯 COUNT。</p>
+     *
+     * 性能审查 P1-5：原「只取 total」用 {@code pageSize=1} 走 SELECT —— 即便只回 1 行，
+     * 后端仍会对 4 万行做一次 filesort/读全表；改成 selectCount 后是纯 COUNT。
      */
     @Override
     public long countMatched(SearchDTO dto) {

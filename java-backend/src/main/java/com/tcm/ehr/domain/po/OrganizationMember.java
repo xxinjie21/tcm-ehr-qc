@@ -8,12 +8,12 @@ import java.time.LocalDateTime;
 /**
  * 课题组成员。对应 organization_members 表。
  *
- * <p>组内角色刻意与 users.role 分开：后者是系统级（管理员/用户），
+ * 组内角色刻意与 users.role 分开：后者是系统级（管理员/用户），
  * 前者是组内级（组长/组员），作用域不同，混在一张表上就无法表达「既是组长又是组员」。
  *
- * <p>isPrimary 当前恒为 1（一人一组由应用层约束），但<b>必须带上</b>：
+ * isPrimary 当前恒为 1（一人一组由应用层约束），但<b>必须带上</b>：
  * 查组 SQL 少了它，多组场景下取到哪组取决于 SQL 返回顺序，
- * 会让同一用户在不同请求看到不同数据。</p>
+ * 会让同一用户在不同请求看到不同数据。
  */
 @Data
 @TableName("organization_members")
@@ -31,8 +31,8 @@ public class OrganizationMember {
     /**
      * 词典写授权位（批次 4 加列）：1=可写导入/回滚。
      *
-     * <p>只对 {@code role=member} 有意义 —— 管理员与所有者本来就能写，
-     * 不依赖这一位（见 IOrgService.setPermissions）。</p>
+     * 只对 {@code role=member} 有意义 —— 管理员与所有者本来就能写，
+     * 不依赖这一位（见 IOrgService.setPermissions）。
      */
     private Integer canWriteDictionary;
 

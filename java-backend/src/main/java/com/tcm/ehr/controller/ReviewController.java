@@ -25,7 +25,7 @@ import java.util.List;
 /**
  * 人工复核：待复核任务列表 + 人工校正提交。
  *
- * <p>超时只在前端高亮，没有定时任务、不会自动流转。</p>
+ * 超时只在前端高亮，没有定时任务、不会自动流转。
  */
 @RestController
 @RequestMapping("/api")
@@ -38,9 +38,9 @@ public class ReviewController {
     /**
      * 查询待复核任务。
      *
-     * <p>【权限：登录即可】已作废的任务不返回。范围参数（科室 / 接诊时间 / 导入时间）
+     * 【权限：登录即可】已作废的任务不返回。范围参数（科室 / 接诊时间 / 导入时间）
      * 按<b>关联病历</b>收窄（review_tasks 表本身没有这些列）；两个时间维度都两端齐全才生效，
-     * 与病历数据、质控等页同一套 RangeFilter 口径。不给范围 = 全部（跨导入日期的积压队列默认可见）。</p>
+     * 与病历数据、质控等页同一套 RangeFilter 口径。不给范围 = 全部（跨导入日期的积压队列默认可见）。
      *
      * @param page     页码，从 1 开始
      * @param pageSize 每页条数，上限 {@value PageSizeGuard#MAX_PAGE_SIZE}（超出按上限截断）
@@ -70,9 +70,9 @@ public class ReviewController {
     /**
      * 复核概览统计：一次返回「待复核 / 已完成 / 待复核超期」三个数。
      *
-     * <p>【权限：登录即可】与 {@code GET /review/tasks} 同一 wrapper 口径（含范围），只 COUNT
+     * 【权限：登录即可】与 {@code GET /review/tasks} 同一 wrapper 口径（含范围），只 COUNT
      * 不 SELECT —— 替代原先的三次 {@code pageSize=1} 列表查询（性能审查 P1-5）。
-     * 三个数随范围联动：卡片是「点进去看到的那个队列」的入口，数字与点击后的列表一致。</p>
+     * 三个数随范围联动：卡片是「点进去看到的那个队列」的入口，数字与点击后的列表一致。
      *
      * @return pending / done / overdue 三个计数
      */
@@ -89,8 +89,8 @@ public class ReviewController {
     /**
      * GET 查询参数 → 统一的范围过滤对象（两个时间维度都需上下界同时存在）。
      *
-     * <p>与 QcController.filters 同一形状，只是复核任务不适用「分级」，
-     * 故不设 grade。分级是病历的分级，复核任务的入参里本来就没有它。</p>
+     * 与 QcController.filters 同一形状，只是复核任务不适用「分级」，
+     * 故不设 grade。分级是病历的分级，复核任务的入参里本来就没有它。
      */
     private FiltersDTO filters(String department, String start, String end,
                                String importStart, String importEnd) {
@@ -117,7 +117,7 @@ public class ReviewController {
     /**
      * 提交人工复核结果。
      *
-     * <p>【权限：登录即可】校正后的结构化数据会回流重算分级。</p>
+     * 【权限：登录即可】校正后的结构化数据会回流重算分级。
      *
      * @param recordId 病历ID
      * @param dto      correctedData=人工校正后的结构化数据；remark=复核意见，均可为空

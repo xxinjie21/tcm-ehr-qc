@@ -28,8 +28,8 @@ import java.util.TreeMap;
 /**
  * 统计服务实现：指标卡聚合 + 按type统计（500条内内存聚合）+ 看板扩展。
  *
- * <p>看板扩展的过滤统一走 {@link RecordFilter}（先数据域、后用户筛选），
- * 与病历读取同域（按组织过滤）。</p>
+ * 看板扩展的过滤统一走 {@link RecordFilter}（先数据域、后用户筛选），
+ * 与病历读取同域（按组织过滤）。
  */
 @Slf4j
 @Service
@@ -64,10 +64,10 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 允许下推到 SQL 的实体数组路径白名单。
      *
-     * <p>RecordMapper.selectTermFreq 的路径用 MyBatis {@code ${}} 做文本替换
+     * RecordMapper.selectTermFreq 的路径用 MyBatis {@code ${}} 做文本替换
      * （MySQL 的 JSON_TABLE 要求路径是字面量，不能用绑定参数），所以这里必须挡一道：
      * 任何非本类常量的取值都直接拒绝，杜绝外部输入进入 SQL 文本。
-     * 证候走 selectPatternFreq（多一段兜底逻辑），不在此列。</p>
+     * 证候走 selectPatternFreq（多一段兜底逻辑），不在此列。
      */
     private static final Set<String> ALLOWED_JSON_PATHS = Set.of(
             "$.diseases[*]", "$.symptoms[*]", "$.formulaList[*]", "$.herbs[*]");
@@ -80,7 +80,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 查询可选科室列表，只读。
      *
-     * <p>按当前请求的组织数据域取，供筛选下拉使用。</p>
+     * 按当前请求的组织数据域取，供筛选下拉使用。
      *
      * @return 去重后的科室名列表
      */
@@ -103,9 +103,9 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 指标卡总览，只读。
      *
-     * <p>3 张指标卡（总数 / 合格率 / 无效）在数据域之上叠加用户筛选（科室 + 就诊区间）；
+     * 3 张指标卡（总数 / 合格率 / 无效）在数据域之上叠加用户筛选（科室 + 就诊区间）；
      * 待复核数仍是全量口径 —— 它是待办条入口，点击跳到全量复核列表，数字须与列表一致。
-     * 合格率保留一位小数（百分数），总数为 0 时记 0。</p>
+     * 合格率保留一位小数（百分数），总数为 0 时记 0。
      *
      * @param filters 范围条件，null 表示不限
      * @return 总览指标
@@ -138,7 +138,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 按类型统计：先按数据域收窄范围，再按调用方给的 ID 或筛选条件圈定。
      *
-     * <p>数据域必须在最前面叠加，否则登录即可的接口会读到跨组织词频。</p>
+     * 数据域必须在最前面叠加，否则登录即可的接口会读到跨组织词频。
      */
     @Override
     public StatsVO stats(StatsDTO dto) {
@@ -163,8 +163,8 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 看板汇总，只读。
      *
-     * <p>病历范围经数据域 + 用户筛选圈定后，一次性产出疾病 / 症状 / 证型 / 处方四类词频 Top10；
-     * 总览指标单独按数据域聚合。</p>
+     * 病历范围经数据域 + 用户筛选圈定后，一次性产出疾病 / 症状 / 证型 / 处方四类词频 Top10；
+     * 总览指标单独按数据域聚合。
      *
      * @param filters 用户筛选条件，可为 null（表示不限）
      * @return 总览 + 四类统计
@@ -205,9 +205,9 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 看板扩展统计，只读。
      *
-     * <p>病历范围经数据域 + 用户筛选圈定后，产出四块：质控趋势（按就诊月份升序、最多最近 12
+     * 病历范围经数据域 + 用户筛选圈定后，产出四块：质控趋势（按就诊月份升序、最多最近 12
      * 个月，含合格 / 待复核数与合格率）、科室合格率（按总数降序）、评分分布（固定分桶顺序）与
-     * 词典规模（疾病 / 症状 / 证型 / 中药 / 方剂，直接读 dictionary_terms，读取失败按 -1 上报）。</p>
+     * 词典规模（疾病 / 症状 / 证型 / 中药 / 方剂，直接读 dictionary_terms，读取失败按 -1 上报）。
      *
      * @param filters 用户筛选条件，可为 null（表示不限）
      * @return 趋势、科室合格率、评分分布与词典规模
@@ -314,9 +314,9 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 按类型统计词频 Top10（性能审查 P0-3#3）：**全部在 SQL 侧聚合**，只把 TopN 带回 JVM。
      *
-     * <p>原实现把命中病历整体物化进堆、再逐条解析 structured_data 后在 Java 里计数；
+     * 原实现把命中病历整体物化进堆、再逐条解析 structured_data 后在 Java 里计数；
      * 现在中间计数留在 DB。口径不变：中药 / 方剂不回退原始列，证候在结构化缺失时回退
-     * （见 {@link com.tcm.ehr.mapper.RecordMapper#selectPatternFreq}）。</p>
+     * （见 {@link com.tcm.ehr.mapper.RecordMapper#selectPatternFreq}）。
      */
     private StatsVO statsFor(QueryWrapper<Record> wrapper, String type) {
         StatsVO vo = new StatsVO();
@@ -390,9 +390,9 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * SQL 聚合结果（term / cnt）→ 契约形态 {@code {键名: 词, count: 次数}}。
      *
-     * <p>契约不能改：StatsVO 的三个列表字段与前端图表都按这个形状读。
+     * 契约不能改：StatsVO 的三个列表字段与前端图表都按这个形状读。
      * cnt 由 {@code COUNT(*)} 回来是 Long，这里收敛成 int —— 与改前的
-     * {@code Map<String,Integer>} 一致，避免同一接口在两种实现下给出不同类型。</p>
+     * {@code Map<String,Integer>} 一致，避免同一接口在两种实现下给出不同类型。
      */
     private static List<Map<String, Object>> toTop(List<Map<String, Object>> rows, String keyName) {
         List<Map<String, Object>> out = new java.util.ArrayList<>();

@@ -33,14 +33,14 @@ import java.util.UUID;
 /**
  * 组织服务实现（批次 6：自助创建、成员搜索、授权开关、归档 / 改派）。
  *
- * <p>成员管理接口全部要求 owner 且有 {@code @RequireOrgRole("owner")} 拦截器兜底，
- * 本类内再校验一次「操作者是本组织所有者、目标行存在」的交错关系，双保险防越权。</p>
+ * 成员管理接口全部要求 owner 且有 {@code @RequireOrgRole("owner")} 拦截器兜底，
+ * 本类内再校验一次「操作者是本组织所有者、目标行存在」的交错关系，双保险防越权。
  *
- * <p>一人一组织的应用层约束：一个 user_id 只允许出现在一个<b>未归档</b>组织的
- * 成员表里（结构保留 is_primary 以便将来支持多组织而无需改表）。</p>
+ * 一人一组织的应用层约束：一个 user_id 只允许出现在一个<b>未归档</b>组织的
+ * 成员表里（结构保留 is_primary 以便将来支持多组织而无需改表）。
  *
- * <p><b>防滥用</b>（自助创建放开后必须自己兜住）：创建配额 + 编码白名单 + 名称去重，
- * 见 {@link #createOrg}。</p>
+ * <b>防滥用</b>（自助创建放开后必须自己兜住）：创建配额 + 编码白名单 + 名称去重，
+ * 见 {@link #createOrg}。
  */
 @Slf4j
 @Service
@@ -101,8 +101,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * GET /api/my-org：当前用户的组织上下文。
      *
-     * <p>批次 6 去审核后<b>没有「审批中」这个状态</b>：无组织就是无组织，
-     * 前端据此落到「我的组织」引导页（可自助创建 / 等所有者邀请）。</p>
+     * 批次 6 去审核后<b>没有「审批中」这个状态</b>：无组织就是无组织，
+     * 前端据此落到「我的组织」引导页（可自助创建 / 等所有者邀请）。
      */
     @Override
     public OrgVOs.MyOrgVO myOrg() {
@@ -126,8 +126,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 当前用户所属的所有 active 组织（含「是否当前组织」标记）。
      *
-     * <p>供右上角「切换组织」下拉使用。只列 active 组织 —— 停用的组织切过去也登不了、
-     * 看不到数据，列出来只会让人以为能切。</p>
+     * 供右上角「切换组织」下拉使用。只列 active 组织 —— 停用的组织切过去也登不了、
+     * 看不到数据，列出来只会让人以为能切。
      */
     @Override
     public List<OrgVOs.MyOrgItem> myOrgs() {
@@ -154,9 +154,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 切换到指定组织（多组织）。
      *
-     * <p>校验「调用者是该成员 且 组织 active」，然后事务内把旧 primary 置 0、目标置 1
+     * 校验「调用者是该成员 且 组织 active」，然后事务内把旧 primary 置 0、目标置 1
      * （顺序不能反，否则瞬时两个 primary）。切换是用户显式动作，立即生效 ——
-     * 不进 JWT，由 {@link #resolvePrimaryOrg} 每请求按 is_primary 解析。</p>
+     * 不进 JWT，由 {@link #resolvePrimaryOrg} 每请求按 is_primary 解析。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -179,7 +179,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 多组织：删/退了某条成员后，若该用户已无 primary，把其另一条 active 成员提升为 primary。
      *
-     * <p>只在「已无 primary」时提升 —— 否则会覆盖用户当前正在用的组织。</p>
+     * 只在「已无 primary」时提升 —— 否则会覆盖用户当前正在用的组织。
      */
     private void promotePrimaryIfRemoved(String userId, String removedId) {
         Long primaries = memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
@@ -219,7 +219,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 自助创建组织（批次 6）：任何登录用户可创建，创建者自动成为 owner，<b>无审核</b>。
      *
-     * <p><b>放开自助创建后，这三道闸就是防滥用的全部手段</b>，少一道都可能被刷：</p>
+     * <b>放开自助创建后，这三道闸就是防滥用的全部手段</b>，少一道都可能被刷：
      * <ol>
      *   <li><b>创建配额</b>：每人同时最多持有 {@value #MAX_ACTIVE_ORGS_PER_USER} 个未归档组织。
      *       没有它，一个账号可以建几百个空组织，把组织列表冲垮（管理员页是全表查询）。</li>
@@ -228,7 +228,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
      *   <li><b>名称去重</b>：同名会让 owner 在列表里分不清自己的组织。</li>
      * </ol>
      *
-     * <p>code 留空时服务端生成 {@code ORG-<8位大写>}，避免并发抢同一个自增序列。</p>
+     * code 留空时服务端生成 {@code ORG-<8位大写>}，避免并发抢同一个自增序列。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -362,11 +362,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 归档（仅管理员）：前提「成员数为 0」。
      *
-     * <p><b>为什么要求成员数为 0</b>：归档的语义是「这个组织已经没人用了」，
+     * <b>为什么要求成员数为 0</b>：归档的语义是「这个组织已经没人用了」，
      * 若带着成员归档，这些人的账号会因为「查不到 active 组织」而登录不了，
-     * 而组织列表里又看不到有未处理的人 —— 变成无声的账号丢失。</p>
+     * 而组织列表里又看不到有未处理的人 —— 变成无声的账号丢失。
      *
-     * <p><b>不自动归档</b>：自动归档会误伤「沉睡但仍有效」的组织。</p>
+     * <b>不自动归档</b>：自动归档会误伤「沉睡但仍有效」的组织。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -392,9 +392,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 改派所有者（仅管理员）：owner 账号丢失 / 人离职时的兜底。
      *
-     * <p>没有它，唯一能让组织脱离「无人可管」状态的方式是等原 owner 回来 ——
+     * 没有它，唯一能让组织脱离「无人可管」状态的方式是等原 owner 回来 ——
      * 管理员只能停用。applications.owner_user_id 与成员行的 owner
-     * <b>必须同事务改两处</b>，否则两者会指向不同的人。</p>
+     * <b>必须同事务改两处</b>，否则两者会指向不同的人。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -456,8 +456,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 按用户名搜索可拉入的候选人（登录即可）。
      *
-     * <p>两道限制防止它变成枚举器 / 扫描器：关键词至少 2 个字符（单字符会撞上
-     * 全站绝大多数用户名）、{@value #USER_SEARCH_LIMIT} 条封顶。</p>
+     * 两道限制防止它变成枚举器 / 扫描器：关键词至少 2 个字符（单字符会撞上
+     * 全站绝大多数用户名）、{@value #USER_SEARCH_LIMIT} 条封顶。
      */
     @Override
     public List<OrgVOs.UserBriefVO> searchUsers(String keyword) {
@@ -645,11 +645,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 授予 / 回收成员的两个写开关（批次 6）。
      *
-     * <p><b>两个开关独立</b>：owner 可以只给「词典写」或只给「质控规则写」。
+     * <b>两个开关独立</b>：owner 可以只给「词典写」或只给「质控规则写」。
      * 参数为 {@code Boolean} 且<b>可空</b> —— null 表示「这一位不改」，
-     * 否则前端只提交其中一个开关就会把另一个误清零。</p>
+     * 否则前端只提交其中一个开关就会把另一个误清零。
      *
-     * <p>不能给 owner 自己授权：owner 本来就能写，授权位只对 member 有意义。</p>
+     * 不能给 owner 自己授权：owner 本来就能写，授权位只对 member 有意义。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)

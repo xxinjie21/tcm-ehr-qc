@@ -50,8 +50,8 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     /**
      * 组装复核任务查询条件（未失效 + 数据域 + 状态 / 超期 + 范围），列表与统计共用。
      *
-     * <p>§6.3 缺点 7：不能看到别组的复核任务 —— 管理员「看全部」时不加 org 条件
-     * （与病历列表/详情同一口径，RecordFilter.canAccess 已按 viewAllOrgs 放行）。</p>
+     * §6.3 缺点 7：不能看到别组的复核任务 —— 管理员「看全部」时不加 org 条件
+     * （与病历列表/详情同一口径，RecordFilter.canAccess 已按 viewAllOrgs 放行）。
      *
      * @param scope 范围过滤（科室 / 接诊时间 / 导入时间）；可空表示不限
      */
@@ -80,18 +80,18 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
      * 把范围过滤落到<b>关联病历</b>上：用 {@code record_id IN (SELECT id FROM records WHERE …)}
      * 收窄任务集合，列表与统计共用同一段组装。
      *
-     * <p>为什么是子查询而不是 JOIN：review_tasks 本身没有科室 / 接诊时间 /
+     * 为什么是子查询而不是 JOIN：review_tasks 本身没有科室 / 接诊时间 /
      * 导入时间列（表见 ReviewTask），任务的范围只能由关联病历的字段定义；
      * 而 listTasks 是高频路径，MyBatis-Plus 的 QueryWrapper 不便 JOIN，
-     * 子查询让「范围」与「状态 / 数据域」仍在同一个 wrapper 里，口径只有一处。</p>
+     * 子查询让「范围」与「状态 / 数据域」仍在同一个 wrapper 里，口径只有一处。
      *
-     * <p><b>子查询里不再叠加 org 条件</b>：数据域由 review_tasks.org_id 那层
+     * <b>子查询里不再叠加 org 条件</b>：数据域由 review_tasks.org_id 那层
      * 负责（管理员看全部时不加），在子查询里再按 records.org_id 过滤会把
-     * viewAllOrgs 旁路抵消掉 —— 管理员就会漏看别组导入病历产生的任务。</p>
+     * viewAllOrgs 旁路抵消掉 —— 管理员就会漏看别组导入病历产生的任务。
      *
-     * <p>时间口径与 RecordFilter.applyRange 逐字相同：两端齐全才生效，
+     * 时间口径与 RecordFilter.applyRange 逐字相同：两端齐全才生效，
      * 补 00:00:00 / 23:59:59 保证含首尾两天；department 经 apply 的
-     * {@code {n}} 占位符走参数绑定，不拼字符串（用户输入）。</p>
+     * {@code {n}} 占位符走参数绑定，不拼字符串（用户输入）。
      */
     private void applyRecordScope(QueryWrapper<ReviewTask> w, FiltersDTO scope) {
         if (scope == null) {
@@ -147,9 +147,9 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     /**
      * 分页查询复核任务列表，只读。
      *
-     * <p>只取未失效任务（{@code is_obsolete=0}），按创建时间倒序；只返回本组织任务
+     * 只取未失效任务（{@code is_obsolete=0}），按创建时间倒序；只返回本组织任务
      * 域，其余角色按传入状态过滤（兼容中文与英文状态名）。关联病历缺失的任务直接跳过，不占位。
-     * 范围条件（科室 / 接诊时间 / 导入时间）经关联病历子查询收窄，与统计同一口径。</p>
+     * 范围条件（科室 / 接诊时间 / 导入时间）经关联病历子查询收窄，与统计同一口径。
      *
      * @param page 页码，非法时取第 1 页
      * @param pageSize 每页条数，非法时取 20
@@ -203,14 +203,14 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     /**
      * 人工复核入口（批次 26.4 / 26.e 定案 A）。
      *
-     * <p>归一先于事务：normalizeMap 要走 ES，若和写库同处一个 {@code @Transactional}，
+     * 归一先于事务：normalizeMap 要走 ES，若和写库同处一个 {@code @Transactional}，
      * ES 一慢就会一直占着数据库连接。这里在事务外归一，失败即抛（ES 不可用 → 503）
      * 且一个字节都没写 —— 与原先版本「整单回滚」的用户可见语义一致。
-     * 事务内的校验与三段写库见 {@link IReviewWriteService#review}。</p>
+     * 事务内的校验与三段写库见 {@link IReviewWriteService#review}。
      *
-     * <p>归一是为了复核员新输入的词带上 normLevel：不加的话
+     * 归一是为了复核员新输入的词带上 normLevel：不加的话
      * QcScorer.countUnnormalized 会把「无 normLevel」算作未标准化，
-     * 结果是人工修正反而扣分。</p>
+     * 结果是人工修正反而扣分。
      */
     @Override
     public ReviewResultVO review(String recordId, ReviewDTO dto) {

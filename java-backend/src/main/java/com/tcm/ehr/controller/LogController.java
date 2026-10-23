@@ -17,11 +17,11 @@ import java.util.Map;
 /**
  * 操作日志审计：分页查询、类型选项、CSV 导出。
  *
- * <p>§七 L3：归档清理（{@code POST /api/logs/purge}）已删 —— 日志只增不删，
- * 无界增长为已知未闭环项，清理只能由运维人工归档。</p>
+ * §七 L3：归档清理（{@code POST /api/logs/purge}）已删 —— 日志只增不删，
+ * 无界增长为已知未闭环项，清理只能由运维人工归档。
  *
- * <p>数据源唯一：operation_log 表。§七 L2 起不再有文件副本，
- * 导出与查询都直接读库。</p>
+ * 数据源唯一：operation_log 表。§七 L2 起不再有文件副本，
+ * 导出与查询都直接读库。
  */
 @RestController
 @RequiredArgsConstructor
@@ -60,8 +60,8 @@ public class LogController {
     /**
      * 按对象查活动流（对标 D3）：病历详情页的「活动 / 历史」用它。
      *
-     * <p>【权限：登录即可】可见范围与 {@code GET /api/logs} 完全一致（同一套 buildWrapper），
-     * 只额外按对象精确过滤 —— 不能因为「是按 ID 查」就绕过数据域。</p>
+     * 【权限：登录即可】可见范围与 {@code GET /api/logs} 完全一致（同一套 buildWrapper），
+     * 只额外按对象精确过滤 —— 不能因为「是按 ID 查」就绕过数据域。
      *
      * @param objectType 对象类型，如 record（必填）
      * @param objectId   对象 ID（必填）
@@ -82,7 +82,7 @@ public class LogController {
     /**
      * 查询操作类型选项。
      *
-     * <p>【权限：登录即可】取库中出现过的值（同三档），前端据此渲染下拉，避免写死清单与调用点漂移。</p>
+     * 【权限：登录即可】取库中出现过的值（同三档），前端据此渲染下拉，避免写死清单与调用点漂移。
      *
      * @return 去重后的操作类型列表
      */
@@ -94,7 +94,7 @@ public class LogController {
     /**
      * 导出操作日志为 CSV。
      *
-     * <p>【权限：登录即可】文件流直出（同三档），不套 Result 包装。</p>
+     * 【权限：登录即可】文件流直出（同三档），不套 Result 包装。
      *
      * @param action  操作类型，空表示导出全部
      * @param keyword 关键字

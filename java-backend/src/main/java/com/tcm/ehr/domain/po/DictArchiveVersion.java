@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 /**
  * 基线归档版本元信息（dict_archive_version）。
  *
- * <p><b>永久保留</b>：即使 {@link DictArchiveTerm} 快照因 5 份限额被清理，
- * 这一行仍在 —— 版本号连续性与「某次合并由谁做的」是审计链的依据。</p>
+ * <b>永久保留</b>：即使 {@link DictArchiveTerm} 快照因 5 份限额被清理，
+ * 这一行仍在 —— 版本号连续性与「某次合并由谁做的」是审计链的依据。
  */
 @Data
 @TableName("dict_archive_version")

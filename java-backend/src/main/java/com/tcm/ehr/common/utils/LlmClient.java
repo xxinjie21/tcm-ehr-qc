@@ -31,12 +31,12 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * LLM 统一入口（Spring AI 2.0 承载）。
  *
- * <p><b>职责</b>：供 ①病历解读 ②复核预检意见 ③术语补词 统一复用；
+ * <b>职责</b>：供 ①病历解读 ②复核预检意见 ③术语补词 统一复用；
  * 双通道 {@code provider=ollama}（本机，无需 api-key）/ {@code provider=openai}（OpenAI 及兼容三方网关，
  * DeepSeek / 通义 / 智谱等改 {@code llm.base-url} 即可接入）。
- * <b>判定地基仍是规则引擎</b>——评分 / 分级 / 归一不依赖本类，本类只负责把规则结论叙述成人话。</p>
+ * <b>判定地基仍是规则引擎</b>——评分 / 分级 / 归一不依赖本类，本类只负责把规则结论叙述成人话。
  *
- * <p><b>三条硬约束</b>（与《开发指南与待办》「二、开发规范 · 后端」一致）：</p>
+ * <b>三条硬约束</b>（与《开发指南与待办》「二、开发规范 · 后端」一致）：
  * <ol>
  * <li><b>不阻塞启动</b>：ChatClient 懒构造，首次调用才装配；配置缺失或非法只降级，
  * 绝不抛到启动期。Spring AI 的 {@code OpenAi*AutoConfiguration} 在缺 api-key 时会急切校验凭据、
@@ -74,21 +74,21 @@ public class LlmClient {
     /**
      * 已装配的客户端缓存：key = {@code userId|版本}。
      *
-     * <p><b>为什么按用户缓存</b>：配置改成「每人一份」后，单个 ChatClient
-     * 复用就会让 A 的请求发到 B 的通道上 —— 配置与客户端必须成对。</p>
+     * <b>为什么按用户缓存</b>：配置改成「每人一份」后，单个 ChatClient
+     * 复用就会让 A 的请求发到 B 的通道上 —— 配置与客户端必须成对。
      *
-     * <p><b>为什么设上限</b>：每个 ChatClient 内部持有 HTTP 客户端与连接池，
-     * 按用户无限增长等于把内存泄漏进来。</p>
+     * <b>为什么设上限</b>：每个 ChatClient 内部持有 HTTP 客户端与连接池，
+     * 按用户无限增长等于把内存泄漏进来。
      *
-     * <p><b>为什么用 {@link VersionedCache} 而不是自己继承 LinkedHashMap</b>（批次14 审核）：
+     * <b>为什么用 {@link VersionedCache} 而不是自己继承 LinkedHashMap</b>（批次14 审核）：
      * ①「有界 + LRU 逐出」这件事全仓已有 owner，再写一份就是两套逐出口径；
      * ②**更要紧的是线程安全** —— {@code resolve()} 跑在请求线程上，而
      * {@code LinkedHashMap(accessOrder=true)} 的 get 会改动内部访问序链表，
-     * 并发 get/put 不加锁可能丢项、甚至死循环。VersionedCache 的读写都是 synchronized。</p>
+     * 并发 get/put 不加锁可能丢项、甚至死循环。VersionedCache 的读写都是 synchronized。
      *
-     * <p>键里已经带了配置版本（{@code userId|版本}），所以不需要版本比对那一套，用它的两段式接口：
+     * 键里已经带了配置版本（{@code userId|版本}），所以不需要版本比对那一套，用它的两段式接口：
      * getIfPresent → <b>锁外</b>装配 → put。装配必须在锁外，
-     * 因为 {@code ChatClient.builder(...).build()} 会建 HTTP 连接池，是慢操作。</p>
+     * 因为 {@code ChatClient.builder(...).build()} 会建 HTTP 连接池，是慢操作。
      */
     private static final int CLIENT_CACHE_MAX = 20;
     private final VersionedCache<ChatClient> clients = new VersionedCache<>(CLIENT_CACHE_MAX);
@@ -96,13 +96,13 @@ public class LlmClient {
     /**
      * 记录「已经试过但装配失败」的配置，避免坏配置被反复重试。
      *
-     * <p>key = userId，value = 最近一次装配失败的配置版本。原先用 {@code Set<"userId|版本">}
+     * key = userId，value = 最近一次装配失败的配置版本。原先用 {@code Set<"userId|版本">}
      * 会随「保存配置 → 装配失败」反复累积：同一个用户改 10 次坏配置就留 10 个 key，
-     * 而这些 key 再也不会被读到 —— 是只增不减的慢泄漏。按 userId 收敛后容量天然等于用户数。</p>
+     * 而这些 key 再也不会被读到 —— 是只增不减的慢泄漏。按 userId 收敛后容量天然等于用户数。
      *
-     * <p><b>为什么不换成有界 LRU</b>：逐出后那个旧版本会重新触发装配，坏配置（如 key 写错）
+     * <b>为什么不换成有界 LRU</b>：逐出后那个旧版本会重新触发装配，坏配置（如 key 写错）
      * 每次调用都打一次外部连接，变成重试风暴；而「只留最新失败版本」不会 —— 用户一旦改好配置，
-     * 版本号变化，旧记录立刻失效，无需清理。</p>
+     * 版本号变化，旧记录立刻失效，无需清理。
      */
     private final Map<String, String> failedKeys = new ConcurrentHashMap<>();
 
@@ -116,11 +116,11 @@ public class LlmClient {
     /**
      * 单轮对话，并按<b>这个 AI 功能自己的开关</b>门控。
      *
-     * <p>feature 传 {@code null} 表示不关心功能维度（如探测、未归类的调用），
-     * 只判「LLM 整体是否可用」。</p>
+     * feature 传 {@code null} 表示不关心功能维度（如探测、未归类的调用），
+     * 只判「LLM 整体是否可用」。
      *
-     * <p>该功能被单独关掉时同样返回 {@code null} —— 调用方本就有「LLM 不可用就走规则」的
-     * 分支，两种降级同路，调用方不必再判一次。</p>
+     * 该功能被单独关掉时同样返回 {@code null} —— 调用方本就有「LLM 不可用就走规则」的
+     * 分支，两种降级同路，调用方不必再判一次。
      *
      * @param feature 哪个 AI 功能，可为 {@code null}
      * @param systemPrompt 系统提示词，可为 {@code null}
@@ -156,8 +156,8 @@ public class LlmClient {
      * 连通性探测：用<b>给定参数</b>（而非当前生效配置）
      * 装配模型并发一轮最小请求，让用户可以先试再存。
      *
-     * <p>与 {@link #chat(AiFeature, String, String)} 相反，本方法<b>不吞异常</b>——
-     * 探测的意义就是把失败原因交给调用方。调用方必须对异常信息做脱敏（抹掉 api-key）后再回传。</p>
+     * 与 {@link #chat(AiFeature, String, String)} 相反，本方法<b>不吞异常</b>——
+     * 探测的意义就是把失败原因交给调用方。调用方必须对异常信息做脱敏（抹掉 api-key）后再回传。
      *
      * @return 模型的回复内容
      * @throws IllegalStateException 参数非法或连接/鉴权失败
@@ -179,8 +179,8 @@ public class LlmClient {
     /**
      * AI 质控解读系统提示词：规则出结论，LLM 只负责叙述与要点摘要。
      *
-     * <p>要求「严格输出 JSON」便于调用方解析 summary 段；模型不一定听话，
-     * 调用方仍须剥离可能包裹的 markdown 代码块，解析失败则只取原文作 narrative。</p>
+     * 要求「严格输出 JSON」便于调用方解析 summary 段；模型不一定听话，
+     * 调用方仍须剥离可能包裹的 markdown 代码块，解析失败则只取原文作 narrative。
      */
     public static final String AI_INTERPRET_SYSTEM_PROMPT = """
             你是中医电子病历质控助理。用户会给你一条病历的「规则预检结论」与「结构化数据」。
@@ -210,12 +210,12 @@ public class LlmClient {
     /**
      * 术语补词建议系统提示词：在「现有词表召回候选」的约束下判断原文该怎么补。
      *
-     * <p><b>为什么要把候选喂进来而不是让模型自由发挥</b>：模型凭记忆生成的标准词可能并不存在，
+     * <b>为什么要把候选喂进来而不是让模型自由发挥</b>：模型凭记忆生成的标准词可能并不存在，
      * 它还会给出看起来很像的「出处」；而这些词一旦入库，归一就认它了 —— 等于用幻觉污染词表。
-     * 给了候选，模型多数情况下只是在「系统已认的词」里做判断，可靠性完全不同。</p>
+     * 给了候选，模型多数情况下只是在「系统已认的词」里做判断，可靠性完全不同。
      *
-     * <p>仍然要求「严格输出 JSON 数组」，与 {@link #AI_INTERPRET_SYSTEM_PROMPT} 同一套约定：
-     * 模型不一定听话，调用方须剥离 markdown 围栏，解析失败则整体降级。</p>
+     * 仍然要求「严格输出 JSON 数组」，与 {@link #AI_INTERPRET_SYSTEM_PROMPT} 同一套约定：
+     * 模型不一定听话，调用方须剥离 markdown 围栏，解析失败则整体降级。
      */
     public static final String AI_TERM_SUGGEST_SYSTEM_PROMPT = """
             你是中医术语标准化助手。用户会给你一批「待规范的原文词」，以及系统从现有词典里
@@ -257,9 +257,9 @@ public class LlmClient {
     /**
      * 解析当前用户的客户端，并带出生效配置。
      *
-     * <p>AI-1：配置与版本由 {@link LlmConfigStore#resolveFor} <b>一次查询</b>同时给出 ——
+     * AI-1：配置与版本由 {@link LlmConfigStore#resolveFor} <b>一次查询</b>同时给出 ——
      * 原来 getFor 与 versionFor 各查一次 user_llm_config，
-     * 每请求多一次 DB 往返。</p>
+     * 每请求多一次 DB 往返。
      */
     private ResolvedClient resolveDetailed() {
         // 1. 按当前用户解析配置：配置改成每人一份，客户端必须与配置成对

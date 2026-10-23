@@ -23,10 +23,10 @@ public class AiQueryDTO {
     /**
      * 待规范的术语原文（<b>仅 termsuggest 必填</b>）。
      *
-     * <p>不能加 {@code @NotEmpty}：本 DTO 被三个端点共用，加上会让
+     * 不能加 {@code @NotEmpty}：本 DTO 被三个端点共用，加上会让
      * interpret / review 在进入 Controller 之前就被 Bean Validation 拦掉
      * —— 「某个端点必填」的约束属于<b>该端点</b>，放在共用 DTO 上必然误伤其它端点。
-     * termsuggest 的必填在 Controller 里校验。</p>
+     * termsuggest 的必填在 Controller 里校验。
      */
     @Size(max = 50, message = "单次最多 50 个待补词")
     private List<String> terms;
@@ -34,8 +34,8 @@ public class AiQueryDTO {
     /**
      * 术语类型（仅 termsuggest；如 symptom / disease / pattern）。
      *
-     * <p>留空按 symptom —— 质量报告的「待补词」清单恒来自症状类
-     * （{@code StandardizationReportServiceImpl.unmatched()} 只遍历 structured_data 的 symptoms）。</p>
+     * 留空按 symptom —— 质量报告的「待补词」清单恒来自症状类
+     * （{@code StandardizationReportServiceImpl.unmatched()} 只遍历 structured_data 的 symptoms）。
      */
     private String termType;
 }

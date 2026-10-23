@@ -31,7 +31,7 @@ import java.util.Map;
 /**
  * 病历数据：批量导入、单条新增、原始查看、修改、删除、多条件查询。
  *
- * <p>导入进度查询按 LogController 之外的审计链路处理；写操作统一记入操作日志。</p>
+ * 导入进度查询按 LogController 之外的审计链路处理；写操作统一记入操作日志。
  */
 @RestController
 @RequiredArgsConstructor
@@ -44,7 +44,7 @@ public class RecordController {
     /**
      * 批量导入病历文件。
      *
-     * <p>【权限：登录即可】单文件 ≤50MB、单次 ≤20 个；21 字段全一致的记录视为重复并跳过。</p>
+     * 【权限：登录即可】单文件 ≤50MB、单次 ≤20 个；21 字段全一致的记录视为重复并跳过。
      *
      * @param files       病历文件（.xlsx/.xls）
      * @param autoExtract 是否在导入后自动投递结构化解析任务
@@ -64,8 +64,8 @@ public class RecordController {
     /**
      * 仅重传失败行。
      *
-     * <p>【权限：登录即可】把（可能已编辑的）失败行按导入同一套口径重新入库，
-     * 免去重传整份文件。每行为「字段名 → 文本」，字段名与失败明细里的 row 一致。</p>
+     * 【权限：登录即可】把（可能已编辑的）失败行按导入同一套口径重新入库，
+     * 免去重传整份文件。每行为「字段名 → 文本」，字段名与失败明细里的 row 一致。
      *
      * @param rows 失败行集合
      * @return summary=本轮成功/失败条数与失败明细
@@ -82,7 +82,7 @@ public class RecordController {
     /**
      * 单条新增病历。
      *
-     * <p>【权限：登录即可】</p>
+     * 【权限：登录即可】
      *
      * @param dto 21 字段原始记录，登记号必填；字段级校验由 @Valid 触发
      * @return id=新病历ID
@@ -95,7 +95,7 @@ public class RecordController {
     /**
      * 查看病历原始数据。
      *
-     * <p>【权限：登录即可 + 数据域】21 个原始字段只读，附结构化数据与评分结果；不存在返回 404。</p>
+     * 【权限：登录即可 + 数据域】21 个原始字段只读，附结构化数据与评分结果；不存在返回 404。
      *
      * @param recordId 病历ID
      * @return 21 原始字段 + structuredData + score/grade
@@ -115,8 +115,8 @@ public class RecordController {
      *
      * 【权限：登录即可】只允许改 structuredData，携带原始字段按只读冲突返回 400。
      *
-     * <p>入参是「部分更新」语义的有序 Map（带原始字段要报冲突，不能收窄成 DTO），
-     * 所以无法用 Bean Validation，改在入口做守卫：空体与不带 structuredData 一律 400。</p>
+     * 入参是「部分更新」语义的有序 Map（带原始字段要报冲突，不能收窄成 DTO），
+     * 所以无法用 Bean Validation，改在入口做守卫：空体与不带 structuredData 一律 400。
      *
      * @param recordId 病历ID
      * @param body     仅接受 structuredData 键
@@ -162,7 +162,7 @@ public class RecordController {
     /**
      * 按筛选范围批量删除病历。
      *
-     * <p>【权限：登录即可】条件全空时拒绝，避免误删全库。</p>
+     * 【权限：登录即可】条件全空时拒绝，避免误删全库。
      *
      * @param filters department/dateRange/pattern/grade，至少一项非空
      * @return deletedCount=实际删除条数
@@ -181,7 +181,7 @@ public class RecordController {
     /**
      * 多条件分页查询病历。
      *
-     * <p>【权限：登录即可 + 数据域】按当前组织过滤。</p>
+     * 【权限：登录即可 + 数据域】按当前组织过滤。
      *
      * @param dto 查询条件与分页参数
      * @return total=总条数；records=当前页摘要列表
@@ -194,9 +194,9 @@ public class RecordController {
     /**
      * 只返回筛选范围内的病历总数。
      *
-     * <p>【权限：登录即可】与 {@link #search} 同一数据域 / 筛选口径，只 COUNT 不
+     * 【权限：登录即可】与 {@link #search} 同一数据域 / 筛选口径，只 COUNT 不
      * SELECT —— 供「只要 total」的调用替换 {@code pageSize=1}（后者会附带一次
-     * 全表排序，4 万行下是列表查询的主要成本，见性能审查 P1-5）。</p>
+     * 全表排序，4 万行下是列表查询的主要成本，见性能审查 P1-5）。
      *
      * @param dto 查询条件（page / pageSize 忽略）
      * @return 命中总数

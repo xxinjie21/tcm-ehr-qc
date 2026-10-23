@@ -17,7 +17,7 @@ public class FiltersDTO {
     /**
      * [开始日期, 结束日期]（yyyy-MM-dd），按病历**导入时间**（records.create_time）过滤。
      *
-     * <p>与 {@link #dateRange}（接诊时间）相互独立，可同时生效、取交集；缺省或两端不齐时不生效。</p>
+     * 与 {@link #dateRange}（接诊时间）相互独立，可同时生效、取交集；缺省或两端不齐时不生效。
      */
     private List<String> importRange;
     /** 分级：合格/待复核/无效 */
@@ -25,25 +25,25 @@ public class FiltersDTO {
     /**
      * 仅按这些病历 ID 过滤（可空）。用于「仅重试失败」——把任务失败的那批记录 ID 作为范围重跑。
      *
-     * <p>为空/缺省时不影响任何现有调用；非空时在数据域之上再收窄到这些 ID。</p>
+     * 为空/缺省时不影响任何现有调用；非空时在数据域之上再收窄到这些 ID。
      */
     private List<String> ids;
 
     /**
      * 仅处理「尚未结构化解析」的病历（{@code structured_data IS NULL}）。
      *
-     * <p>用于「只解析未解析的」：避免把已解析过的几万条再重抽一遍。缺省/为 false 时不加条件。</p>
+     * 用于「只解析未解析的」：避免把已解析过的几万条再重抽一遍。缺省/为 false 时不加条件。
      */
     private Boolean onlyUnparsed;
 
     /**
      * 仅处理「尚未清洗」的病历（{@code governed = 0}）。
      *
-     * <p>用于「只清洗没清洗过的」：清洗是重活（几万条要数分钟），
-     * 而通常只有新增/新解析的病历需要清洗。缺省/为 false 时不加条件（保持原行为：全范围）。</p>
+     * 用于「只清洗没清洗过的」：清洗是重活（几万条要数分钟），
+     * 而通常只有新增/新解析的病历需要清洗。缺省/为 false 时不加条件（保持原行为：全范围）。
      *
-     * <p>注意与「已清洗但跳过归一」的区别：那种病历 governed 已置 1，
-     * 不会再次落进本条件 —— 这是刻意的（见 GovernanceServiceImpl#clean 的 skipNormalize 分支）。</p>
+     * 注意与「已清洗但跳过归一」的区别：那种病历 governed 已置 1，
+     * 不会再次落进本条件 —— 这是刻意的（见 GovernanceServiceImpl#clean 的 skipNormalize 分支）。
      */
     private Boolean onlyUncleaned;
 }

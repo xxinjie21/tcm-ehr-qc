@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  * AI 消费端接口：质控解读、复核预检、术语补词。
  *
- * <p>读病历受组织数据域约束；LLM 不可用时降级为规则输出，不阻塞也不外泄底层异常。</p>
+ * 读病历受组织数据域约束；LLM 不可用时降级为规则输出，不阻塞也不外泄底层异常。
  */
 @RestController
 @RequestMapping("/api/ai")
@@ -40,15 +40,15 @@ public class AiController {
     /**
      * AI 接口限流（P2-31 / R12）：每用户 {@value #AI_RATE_LIMIT} 次 / {@value #AI_RATE_WINDOW_MINUTES} 分钟。
      *
-     * <p><b>为什么只限 AI、不限登录与词典导入</b>：AI 链路是「登录即可」且<b>每次请求都可能
+     * <b>为什么只限 AI、不限登录与词典导入</b>：AI 链路是「登录即可」且<b>每次请求都可能
      * 产生一次真实的大模型调用（有成本）</b>，不限的话一个账号就能把额度打光。
      * 另两处刻意不加，避免同一件事做两遍：登录已有「连续失败 N 次锁定」的独立机制
      * （AuthServiceImpl），再叠一层限流只是换个名字的同一个闸门；
-     * 词典导入是管理员专属接口（{@code POST /api/dictionary/import}），不存在自助滥用面。</p>
+     * 词典导入是管理员专属接口（{@code POST /api/dictionary/import}），不存在自助滥用面。
      *
-     * <p>限额取 60 次 / 5 分钟：AI 调用都由人手点击触发，正常使用远达不到；
+     * 限额取 60 次 / 5 分钟：AI 调用都由人手点击触发，正常使用远达不到；
      * 撞上这个数的只可能是脚本化滥用。Redis 不可用时 {@link RateLimiter} 放行（fail-open），
-     * 不让一次 Redis 抖动把 AI 全打成 429。</p>
+     * 不让一次 Redis 抖动把 AI 全打成 429。
      */
     private static final int AI_RATE_LIMIT = 60;
     private static final int AI_RATE_WINDOW_MINUTES = 5;
@@ -62,11 +62,11 @@ public class AiController {
     /**
      * 异步提交一次 AI 生成（批次 15 · 15.1）。
      *
-     * <p>【权限：登录即可】与同步接口**同一套校验**，只是把「等 LLM 生成」搬到专用线程池：请求线程立即返回
+     * 【权限：登录即可】与同步接口**同一套校验**，只是把「等 LLM 生成」搬到专用线程池：请求线程立即返回
      * 202 + 任务号，前端轮询 {@code GET /api/ai/async/{taskId}}。这样长响应不再占请求线程，
-     * 用户也可以离开页面再回来取结果（15.2 的「可离开页面」）。</p>
+     * 用户也可以离开页面再回来取结果（15.2 的「可离开页面」）。
      *
-     * <p>同步接口保留不动：调用方按需选择，向后兼容。termsuggest 只有异步这一条路。</p>
+     * 同步接口保留不动：调用方按需选择，向后兼容。termsuggest 只有异步这一条路。
      *
      * @param kind interpret | review | termsuggest
      * @return 202 + {taskId}
@@ -108,8 +108,8 @@ public class AiController {
     /**
      * 查异步任务结果（批次 15 · 15.1）。
      *
-     * <p>【权限：登录即可】任务不存在、已过期、或不属于调用者，一律返回同一个 404 —— 不区分「不存在」与
-     * 「不是你的」，否则任务号可以被用来探测。</p>
+     * 【权限：登录即可】任务不存在、已过期、或不属于调用者，一律返回同一个 404 —— 不区分「不存在」与
+     * 「不是你的」，否则任务号可以被用来探测。
      *
      * @return state=RUNNING|DONE|FAILED；DONE 带 reply；FAILED 带 error（前端据此给可重试提示）
      */
@@ -129,7 +129,7 @@ public class AiController {
     /**
      * 生成单份病历的质控解读。
      *
-     * <p>【权限：登录即可】规则出结论，LLM 仅做叙述增强；病历不存在返回 404。</p>
+     * 【权限：登录即可】规则出结论，LLM 仅做叙述增强；病历不存在返回 404。
      *
      * @param dto recordId=病历ID（必填）
      * @return answer=解读正文；source=结果来源（rule/llm）；llmAvailable=LLM 是否可用
@@ -152,7 +152,7 @@ public class AiController {
     /**
      * 生成复核预检意见。
      *
-     * <p>【权限：登录即可】基于规则重算的扣分明细给出建议，病历不存在返回 404。</p>
+     * 【权限：登录即可】基于规则重算的扣分明细给出建议，病历不存在返回 404。
      *
      * @param dto recordId=病历ID（必填）
      * @return answer=预检建议；source=rule/llm；llmAvailable=LLM 是否可用

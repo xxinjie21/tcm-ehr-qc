@@ -12,17 +12,17 @@ import java.time.LocalDateTime;
  * 操作日志（文档必做2）：关键操作（清洗 / 导出 / 词典导入 / 词典回滚 / 人工复核 / 批量重算）
  * <b>只入库</b>，写 operation_log 表，是审计页 {@code GET /api/logs} 的唯一数据源。
  *
- * <p>§七 L2 起不再落文件：原「文件 + 库」双写已删，配置项 {@code log.operation-file}
+ * §七 L2 起不再落文件：原「文件 + 库」双写已删，配置项 {@code log.operation-file}
  * 与 {@code logs/operation.log} 一并作废（{@code logs/} 目录此后后端零引用，
- * {@code .gitignore} 里的 {@code logs/} 保留无害）。</p>
+ * {@code .gitignore} 里的 {@code logs/} 保留无害）。
  *
- * <p>§七 L1 起不记 IP（PIPL 最小必要）。</p>
+ * §七 L1 起不记 IP（PIPL 最小必要）。
  *
- * <p><b>已知代价</b>（用户已同意）：入库失败时没有文件兜底，仅打 WARN。该条操作在审计页缺失。</p>
+ * <b>已知代价</b>（用户已同意）：入库失败时没有文件兜底，仅打 WARN。该条操作在审计页缺失。
  *
- * <p>操作人 / 角色取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。
+ * 操作人 / 角色取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。
  * ⚠️ 后台线程（异步任务）读不到线程绑定的 request 属性，会取到 {@code "unknown"}；
- * 异步任务须用 {@link #log(String, String, String, String, String)} 显式传提交时捕获的操作人与角色。</p>
+ * 异步任务须用 {@link #log(String, String, String, String, String)} 显式传提交时捕获的操作人与角色。
  */
 @Slf4j
 @Component
@@ -56,10 +56,10 @@ public class OperationLogger {
     /**
      * 记录一条关键操作，<b>操作人与角色由调用方指定</b>。
      *
-     * <p>供后台线程（批量重算 / 批量解析等异步任务）使用：这些线程没有
+     * 供后台线程（批量重算 / 批量解析等异步任务）使用：这些线程没有
      * RequestContextHolder 上下文，{@link #log(String, String, String)} 会把操作人
      * 记成 {@code "unknown"}。异步任务应在<b>提交线程</b>捕获操作人与角色，
-     * 由 worker 线程回填 —— 与 qc_task.role 快照是同一个理由。</p>
+     * 由 worker 线程回填 —— 与 qc_task.role 快照是同一个理由。
      *
      * @param action   操作类型
      * @param target   操作对象，可为 null
@@ -76,10 +76,10 @@ public class OperationLogger {
     /**
      * 记录一条关键操作，<b>操作人 / 角色 / 组由调用方指定</b>。
      *
-     * <p>异步任务的收尾日志必须用它：worker 线程既拿不到 operator / role，
+     * 异步任务的收尾日志必须用它：worker 线程既拿不到 operator / role，
      * 也拿不到 orgId（RequestContextHolder 不在该线程上）。
      * orgId 若在提交线程即时为空（提交线程尚未确定组织时），这里应传空串，这里应传空串，
-     * 落库的 org_id 即为 NULL —— 该操作永远只对操作人本人可见。</p>
+     * 落库的 org_id 即为 NULL —— 该操作永远只对操作人本人可见。
      *
      * @param action   操作类型
      * @param target   操作对象，可为 null
@@ -95,14 +95,14 @@ public class OperationLogger {
     /**
      * 记录一条**对象级**操作（对标 D3「活动流 / 变更审计」）。
      *
-     * <p>为什么单独一个方法名而不是再加一个 log 重载：它的参数表
+     * 为什么单独一个方法名而不是再加一个 log 重载：它的参数表
      * （action/target/detail/objectType/objectId）与既有的
      * {@code log(action,target,detail,operator,role)} **同为 5 个 String** ——
-     * 同名会直接撞签名，编译器不会给我们第二次机会。</p>
+     * 同名会直接撞签名，编译器不会给我们第二次机会。
      *
-     * <p>对象标识的作用：让「这条病历被谁改过、改了什么」可以被**查出来**，
+     * 对象标识的作用：让「这条病历被谁改过、改了什么」可以被**查出来**，
      * 而不是靠人翻「病历修改」这类操作再肉眼比对 detail（实测加这两列之前，
-     * 全库 0 条日志提到任何病历 ID）。</p>
+     * 全库 0 条日志提到任何病历 ID）。
      *
      * @param action     操作类型
      * @param target     操作对象文本，可为 null

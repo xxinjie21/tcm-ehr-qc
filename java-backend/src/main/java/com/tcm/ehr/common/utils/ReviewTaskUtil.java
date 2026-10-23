@@ -5,11 +5,11 @@ import java.time.LocalDateTime;
 /**
  * 复核任务工具。
  *
- * <p><b>无后台定时任务</b>：超时仅由前端/出参计算属性做视觉提醒，不自动流转任务状态。</p>
+ * <b>无后台定时任务</b>：超时仅由前端/出参计算属性做视觉提醒，不自动流转任务状态。
  *
- * <p><b>读时指纹</b>（批次 25.15）：复核页读病历详情时由服务端按本类算一个内容哈希，
+ * <b>读时指纹</b>（批次 25.15）：复核页读病历详情时由服务端按本类算一个内容哈希，
  * 提交时原样带回；写库前重算比对，不一致即 409 —— 防的是「甲读、乙读、甲先提交、
- * 乙后提交把甲的修正静默覆盖」的 lost update。</p>
+ * 乙后提交把甲的修正静默覆盖」的 lost update。
  */
 public final class ReviewTaskUtil {
 
@@ -24,14 +24,14 @@ public final class ReviewTaskUtil {
     /**
      * 复核提交的读时指纹（批次 25.15）。
      *
-     * <p>纳入 structuredData（复核会覆盖的对象）与 score/grade
+     * 纳入 structuredData（复核会覆盖的对象）与 score/grade
      * （复核重算会改写的结论）；<b>不纳入</b> update_time ——
      * RecordMapper.updateStructuredData / updateScoreFields 两条回写 SQL 都不
      * bump 它，用时间戳会比用内容更容易漏判。也不要求对 JSON 做规范化：前端把读到的
-     * 指纹原样回传，服务端用同一函数对当前行重算，两边口径一致即可。</p>
+     * 指纹原样回传，服务端用同一函数对当前行重算，两边口径一致即可。
      *
-     * <p>null 与空串一律按空值参与哈希（不复用 String.valueOf，避免把 null 当成
-     * 字面量 "null" 与真实内容 "null" 撞哈希）。</p>
+     * null 与空串一律按空值参与哈希（不复用 String.valueOf，避免把 null 当成
+     * 字面量 "null" 与真实内容 "null" 撞哈希）。
      *
      * @param structuredData 结构化数据 JSON，可为 null
      * @param score          当前评分，可为 null

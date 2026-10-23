@@ -8,8 +8,8 @@ import java.util.List;
 /**
  * 词典文件**只读**：每类术语一个 JSON（默认打包在 classpath:dictionaries）。
  *
- * <p>词典真源已入库（dictionary_terms），本接口只保留 {@code read()} 用于基础层首次播种，
- * 以及 {@code fileNameOf()} 的文件名映射。备份/回滚/版本由归档版本体系承担。</p>
+ * 词典真源已入库（dictionary_terms），本接口只保留 {@code read()} 用于基础层首次播种，
+ * 以及 {@code fileNameOf()} 的文件名映射。备份/回滚/版本由归档版本体系承担。
  */
 public interface IDictionaryFileService {
 

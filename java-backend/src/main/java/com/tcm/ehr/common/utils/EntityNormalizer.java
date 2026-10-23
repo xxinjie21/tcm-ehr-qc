@@ -16,22 +16,22 @@ import java.util.function.Function;
 /**
  * 实体术语归一：把抽取出的 9 类实体就地归一到标准术语。
  *
- * <p><b>与清洗链路的分工</b>：本类服务于<b>解析链路</b>（`POST /api/nlp/extract` 返回前即时归一），
+ * <b>与清洗链路的分工</b>：本类服务于<b>解析链路</b>（`POST /api/nlp/extract` 返回前即时归一），
  * 目的是让用户在解析页当场看到「原文 → 标准词」的对照，而不是等到清洗阶段才知道术语是否规范。
  * 清洗链路（GovernanceServiceImpl.normalizeStructuredData）仍保留<b>兜底补归一</b>——
- * 因为病历可能来自导入、手工新增等未经解析页的入口。</p>
+ * 因为病历可能来自导入、手工新增等未经解析页的入口。
  *
- * <p><b>为什么不会重复归一</b>：两处都只做「原文 → 标准词」的单向替换，标准词本身在词典中
+ * <b>为什么不会重复归一</b>：两处都只做「原文 → 标准词」的单向替换，标准词本身在词典中
  * 是精确命中项，二次归一得到的仍是同一标准词；清洗链路另有「标准词与原值不同才计数」的判据，
- * 因此已归一实体不会被重复计入统计。</p>
+ * 因此已归一实体不会被重复计入统计。
  *
- * <p><b>为什么不下推判定到 ES</b>：与 {@link EsTermNormalizer} 一致——ES 只负责召回候选，
- * 精确 / 包含 / 字符 Dice≥0.8 三级判定仍在 Java 侧完成。</p>
+ * <b>为什么不下推判定到 ES</b>：与 {@link EsTermNormalizer} 一致——ES 只负责召回候选，
+ * 精确 / 包含 / 字符 Dice≥0.8 三级判定仍在 Java 侧完成。
  *
- * <p><b>同标准词去重</b>：归一本身会把不同原文折叠到同一标准词上——原文里同时有
+ * <b>同标准词去重</b>：归一本身会把不同原文折叠到同一标准词上——原文里同时有
  * 「嗳气」与「嗳气频作」时，后者按「包含命中」也归成「嗳气」，于是列表里出现两个一模一样的
  * 「嗳气」，用户会以为系统出错。{@link #dedupByTerm} 是<b>唯一去重口径</b>，解析链路与清洗链路
- * 共用（与 {@link #dictionaryType} 同一思路：口径只写一处，避免两处漂移）。</p>
+ * 共用（与 {@link #dictionaryType} 同一思路：口径只写一处，避免两处漂移）。
  */
 @Slf4j
 @Component
@@ -45,10 +45,10 @@ public class EntityNormalizer {
     /**
      * 组织级「归一范围」来源（normalization.elementTypes）—— 哪些实体类型做词形归一。
      *
-     * <p><b>刻意用字段注入而非构造参数</b>：{@code @RequiredArgsConstructor} 会把新增的 final
+     * <b>刻意用字段注入而非构造参数</b>：{@code @RequiredArgsConstructor} 会把新增的 final
      * 字段加进构造签名，而 EntityNormalizerMapTest 等直接
      * {@code new EntityNormalizer(term, mapper)} 构造，加参数会破坏它们。
-     * 标 {@code required=false}：单测无此 bean 时退回出厂默认范围（与旧行为一致）。</p>
+     * 标 {@code required=false}：单测无此 bean 时退回出厂默认范围（与旧行为一致）。
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.tcm.ehr.common.config.QcRuleStore ruleStore;
@@ -65,10 +65,10 @@ public class EntityNormalizer {
     /**
      * 否定语境里被「包含命中」拦下、未写 normLevel 的实体数（仅观测，不参与命中统计）。
      *
-     * <p>存在的理由：这类拦截会让症状未归一次数**变多**（本会误归的现在保持未归一），
+     * 存在的理由：这类拦截会让症状未归一次数**变多**（本会误归的现在保持未归一），
      * 报表上看着像「归一变差了」。有这个计数才能对账：
      * 拦截量 + 误归量 = 不拦截时的包含命中量。测试据此断言「拦的是否证句，
-     * 没有把干净命中一起拦掉」。</p>
+     * 没有把干净命中一起拦掉」。
      */
     private final java.util.concurrent.atomic.AtomicInteger negatedSkip =
             new java.util.concurrent.atomic.AtomicInteger();
@@ -95,10 +95,10 @@ public class EntityNormalizer {
     /**
      * 附录A 字段名 → 词典类型（唯一映射，解析链路与清洗链路共用，避免两处口径漂移）。
      *
-     * <p>取自 {@link com.tcm.ehr.common.config.EntityTypes}：9 类实体现均有独立词典
+     * 取自 {@link com.tcm.ehr.common.config.EntityTypes}：9 类实体现均有独立词典
      * （病因自本批次起有 causes.json），故凡登记过的字段都返回其词典类型 key；
      * 只有<b>未登记</b>的字段名返回 {@code null}。<b>是否真的归一</b>还取决于该类型是否在
-     * 本组织「归一范围」内（见 {@link #normScope}），二者不是一回事。</p>
+     * 本组织「归一范围」内（见 {@link #normScope}），二者不是一回事。
      *
      * @return 词典类型；该字段无独立词典时返回 {@code null}
      */
@@ -110,20 +110,20 @@ public class EntityNormalizer {
     /**
      * 同一标准词只留一条代表（唯一去重口径，解析链路与清洗链路共用）。
      *
-     * <p><b>去重范围＝调用方给的那一个列表</b>，即<b>字段内</b>，不跨字段——「风寒」同时出现在
-     * 疾病与病因是两个不同的语义槽位，各自保留。</p>
+     * <b>去重范围＝调用方给的那一个列表</b>，即<b>字段内</b>，不跨字段——「风寒」同时出现在
+     * 疾病与病因是两个不同的语义槽位，各自保留。
      *
-     * <p><b>保留哪一条</b>（依次比较，先满足者胜）：
+     * <b>保留哪一条</b>（依次比较，先满足者胜）：
      * ① sourceText 更长优先——原文更完整（「嗳气频作」优于「嗳气」），
      * 且「原文 → 标准词」的对照才看得见，否则归一结果看起来什么都没发生；
      * ② 等长时 normLevel 更小优先（1 精确 &lt; 2 包含 &lt; 3 模糊 &lt; 未命中）；
-     * ③ 再相等时保留<b>先出现</b>的那条（{@link LinkedHashMap} 保序，重复键 put 不改位置）。</p>
+     * ③ 再相等时保留<b>先出现</b>的那条（{@link LinkedHashMap} 保序，重复键 put 不改位置）。
      *
-     * <p>代表条目<b>整条</b>保留自己的 confidence，不跨条取最大值——置信度描述的是它那条 span，
-     * 拼装会让数字与展示的原文对不上。</p>
+     * 代表条目<b>整条</b>保留自己的 confidence，不跨条取最大值——置信度描述的是它那条 span，
+     * 拼装会让数字与展示的原文对不上。
      *
-     * <p>术语键为空的条目<b>不参与合并</b>（各自用唯一键占位）——否则所有缺 content 的条目
-     * 会被并成一条。</p>
+     * 术语键为空的条目<b>不参与合并</b>（各自用唯一键占位）——否则所有缺 content 的条目
+     * 会被并成一条。
      *
      * @param items 待去重列表，可为 null
      * @param termOf 取「归一后标准词」；为空则该条不参与合并
@@ -189,22 +189,22 @@ public class EntityNormalizer {
     /**
      * 组织级归一：按 orgId 限定的词典范围（基础层 + 该组织）召回。
      *
-     * <p><b>批任务必须传任务行上的 orgId 快照</b>，不能走无参版：worker 线程没有
+     * <b>批任务必须传任务行上的 orgId 快照</b>，不能走无参版：worker 线程没有
      * RequestContext，{@code currentOrgId()} 会拿到空串 → 静默只查基础层，
-     * 组织自定义词条对批任务完全失效，而且不报错。</p>
+     * 组织自定义词条对批任务完全失效，而且不报错。
      */
     /**
      * 组织级归一（就地改 structured_data 的 Map 形态）。
      *
-     * <p><b>用途</b>：人工复核提交修正后写回前用。复核员<b>新输入</b>的词只带
+     * <b>用途</b>：人工复核提交修正后写回前用。复核员<b>新输入</b>的词只带
      * {@code content/name}，没有 normLevel；而 QcScorer.countUnnormalized
      * 把「无 normLevel」算作未标准化 → <b>人工修正反而扣分</b>（weightEach=1、封顶 5）。
-     * 这里在写回前跑一遍与模型抽取完全相同的归一，口径统一。</p>
+     * 这里在写回前跑一遍与模型抽取完全相同的归一，口径统一。
      *
-     * <p><b>为什么不在 Map 与 VO 之间整体来回转换</b>：NlpExtractVO 里没有
+     * <b>为什么不在 Map 与 VO 之间整体来回转换</b>：NlpExtractVO 里没有
      * _meta / modelAvailable / truncated，整体转换会丢键，
      * 也会给未赋值的属性写出 {@code null} 键（JSON 变胖）。所以这里只把 9 个实体列表
-     * 与 herbs 的归一结果<b>写回原 Map</b>，其余键原样保留。</p>
+     * 与 herbs 的归一结果<b>写回原 Map</b>，其余键原样保留。
      *
      * @param data  structured_data 的 Map 形态（就地修改）
      * @param orgId 组织号
@@ -246,19 +246,19 @@ public class EntityNormalizer {
      * 把误放进 symptoms 的脉象/舌象实体挪到各自字段（<b>词典驱动，不看词形</b>）。
 
     *
-    * <p><b>归属约定（P2-11，2026-10-05）</b>：实体类型的<b>源头判定在抽取侧</b>（python-nlp 的抽取服务）；
+    * <b>归属约定（P2-11，2026-10-05）</b>：实体类型的<b>源头判定在抽取侧</b>（python-nlp 的抽取服务）；
     * 本方法只是<b>兜底</b> —— 用于两类情形：① 历史数据里已经错分的实体；② 抽取侧判错时的补救。
     * 它<b>不应成为常态</b>：若统计或日志显示本方法频繁生效，正确做法是修抽取侧的类型判定，
-    * 而不是继续在这里加规则（Java 侧只做校验与兜底，不承担类型判定职责）。</p>
+    * 而不是继续在这里加规则（Java 侧只做校验与兜底，不承担类型判定职责）。
      *
-     * <p>为什么用词典命中而不是词形匹配：像「酸软无力」这种真正的症状也含「无力」，
+     * 为什么用词典命中而不是词形匹配：像「酸软无力」这种真正的症状也含「无力」，
      * 按词形挪会误伤它（实测确有 50 条「酸软无力」）。判据与中药那段一致 ——
      * 归一命中词典即视为「本类型术语」，{@link EsTermNormalizer.NormalizeResult#level()}
-     * 落在命中区间（{@link EsTermNormalizer#isHit(int)}）。</p>
+     * 落在命中区间（{@link EsTermNormalizer#isHit(int)}）。
      *
-     * <p>顺序：先试脉象、未命中再试舌象（两次 ES 查询只在确有症状实体时才发生，
+     * 顺序：先试脉象、未命中再试舌象（两次 ES 查询只在确有症状实体时才发生，
      * 且第二次靠短路避免无谓查询）。命中的实体带着原 content/sourceText 挪过去，
-     * 随后的 normEntities 会照常给它们打上 normLevel。</p>
+     * 随后的 normEntities 会照常给它们打上 normLevel。
      */
     private void moveMisplacedPulseTongue(NlpExtractVO vo, String orgId) {
         if (vo == null || vo.getSymptoms() == null || vo.getSymptoms().isEmpty()) {
@@ -305,14 +305,14 @@ public class EntityNormalizer {
     /**
      * 丢弃单字残词（#6，2026-10-05）。
      *
-     * <p>实测：症状字段里长度 1 的实体 135 条、病因 50 条，内容是 `双`/`腰`/`失`/`口`/`眼`/`下`/`遇`/`胸`/`心`
+     * 实测：症状字段里长度 1 的实体 135 条、病因 50 条，内容是 `双`/`腰`/`失`/`口`/`眼`/`下`/`遇`/`胸`/`心`
      * 这类截断残字（来自「双下肢水肿」「腰酸」「失眠」等）。它们必然未归一，既拉低归一率，
-     * 又让复核员在列表里看到一堆无意义的字。</p>
+     * 又让复核员在列表里看到一堆无意义的字。
      *
-     * <p>判据：<b>长度为 1 且不在该类型词典里</b>才丢。为什么不是「长度为 1 就丢」——
+     * 判据：<b>长度为 1 且不在该类型词典里</b>才丢。为什么不是「长度为 1 就丢」——
      * 词典里确有 5 个单字标准词（如单字术语），一刀切会误删合法术语；
      * 而「在词典里」的单字能正常归一，本就不该丢。无词典的类型（4 类无词典实体）
-     * 因为没有可依据的词典，按残词处理（实测那几类里同样只有截断字）。</p>
+     * 因为没有可依据的词典，按残词处理（实测那几类里同样只有截断字）。
      */
     private void dropSingleCharFragments(NlpExtractVO vo, String orgId) {
         if (vo == null) {
@@ -391,17 +391,17 @@ public class EntityNormalizer {
     /**
      * 把误放进 diseases 的其它类型实体路由到各自字段（词典驱动，2026-10-21）。
      *
-     * <p>实测依据（34154 份合格病历）：疾病字段 3864 条未归一里，<b>1567 条根本不是疾病名</b> ——
+     * 实测依据（34154 份合格病历）：疾病字段 3864 条未归一里，<b>1567 条根本不是疾病名</b> ——
      * 937 条是六淫/病理因素（风湿 655 / 风寒 113 / 郁热 51 / 水饮 45 …），
      * 630 条是症状或证候（发热 / 气短 / 疲劳 / 脾虚 / 肾虚 …）。
-     * 它们留在 diseases 里既归不上，又把疾病标准化率从 88.9% 拖下来。</p>
+     * 它们留在 diseases 里既归不上，又把疾病标准化率从 88.9% 拖下来。
      *
-     * <p><b>路由优先级 cause &gt; symptom &gt; pattern</b>：那 937 条同时命中病因与证候词典，
+     * <b>路由优先级 cause &gt; symptom &gt; pattern</b>：那 937 条同时命中病因与证候词典，
      * 逐词人工核对后确认全是六淫与病机（风/寒/湿/热/毒/气血虚），出现在「疾病」位置
-     * 只能是抽取把病因错分进来，故优先归病因。</p>
+     * 只能是抽取把病因错分进来，故优先归病因。
      *
-     * <p><b>判据只用精确命中</b>：走 isHit（含/模糊）会把「风湿性」路由成「风湿」，
-     * 属 R7 类错映射。已在疾病词典精确命中的实体一律不动（它是合法疾病词）。</p>
+     * <b>判据只用精确命中</b>：走 isHit（含/模糊）会把「风湿性」路由成「风湿」，
+     * 属 R7 类错映射。已在疾病词典精确命中的实体一律不动（它是合法疾病词）。
      */
     private void rerouteCrossFieldDiseases(NlpExtractVO vo, String orgId) {
         java.util.List<NlpExtractVO.Entity> dis = vo.getDiseases();
@@ -506,11 +506,11 @@ public class EntityNormalizer {
     /**
      * 预取召回（批次12 · 12b）：在逐条归一**之前**，把本次要归一的术语按类型一次批量问 ES。
      *
-     * <p>不改判定、只预热：EsTermNormalizer.prefetch 走 _msearch 一次往返，
-     * 并把结果写进与单条 search 相同的缓存键，随后的逐条归一因此全部命中缓存。</p>
+     * 不改判定、只预热：EsTermNormalizer.prefetch 走 _msearch 一次往返，
+     * 并把结果写进与单条 search 相同的缓存键，随后的逐条归一因此全部命中缓存。
      *
-     * <p>类型 key 由 structuredKey 反查 {@link com.tcm.ehr.common.config.EntityTypes} 得到 ——
-     * 复用那一份登记，不在本类里再写一张「字段名→类型」的表。</p>
+     * 类型 key 由 structuredKey 反查 {@link com.tcm.ehr.common.config.EntityTypes} 得到 ——
+     * 复用那一份登记，不在本类里再写一张「字段名→类型」的表。
      */
     private void prefetchRecall(NlpExtractVO vo, String orgId, java.util.Set<String> scope) {
         java.util.Map<String, java.util.LinkedHashSet<String>> byStructuredKey = new java.util.LinkedHashMap<>();
@@ -679,18 +679,18 @@ public class EntityNormalizer {
     /**
      * 非中药词素：化验指标 / 人体部位 / 食物，被 NER 误抽成 herbs 时的判定词表。
      *
-     * <p><b>为什么用词根而非全称</b>：实测 NER 会把「总胆红素」截成「总胆红」、
+     * <b>为什么用词根而非全称</b>：实测 NER 会把「总胆红素」截成「总胆红」、
      * 「血常规」截成「血常」，全称黑名单拦不住。改用能覆盖截断形态的词根
      * （胆红 / 血清 / 潜血 / 转氨 …），但避开会误伤真药名的宽词根
-     * （不用单独「胆」，否则「蛇胆陈皮」会被误杀；不用单独「桃」，否则「桃仁」遭殃）。</p>
+     * （不用单独「胆」，否则「蛇胆陈皮」会被误杀；不用单独「桃」，否则「桃仁」遭殃）。
      *
-     * <p><b>与 python 层的关系</b>：python 侧 nlp_filters.py 的
+     * <b>与 python 层的关系</b>：python 侧 nlp_filters.py 的
      * HERB_LAB_TERMS / HERB_ANATOMY / HERB_FOOD 是同一批词。
      * 这里重复一份是<b>刻意</b>的：python 侧要重抽才生效，而本层跑一次归一即可 ——
-     * 两处判据等价、幂等（都只是删除同类噪声），重抽后双份生效也无害。</p>
+     * 两处判据等价、幂等（都只是删除同类噪声），重抽后双份生效也无害。
      *
-     * <p><b>零误伤保证</b>：{@link #dropNoiseIn} 只删 {@code normLevel == null} 的实体，
-     * 已归一的合法药材绝不会被这条规则命中。</p>
+     * <b>零误伤保证</b>：{@link #dropNoiseIn} 只删 {@code normLevel == null} 的实体，
+     * 已归一的合法药材绝不会被这条规则命中。
      */
     private static final String[] NON_HERB_TERMS = {
             // 化验指标（含截断变体）
@@ -713,7 +713,7 @@ public class EntityNormalizer {
     /**
      * 病程 / 诱因前缀：是对症状的**修饰**而非本体（活动后缓解 / 遇劳加重 / 受凉后…）。
      *
-     * <p>实测 1451 条。它们没有独立标准词可补，补进词表会让所有含该子串的实体被错误归并。</p>
+     * 实测 1451 条。它们没有独立标准词可补，补进词表会让所有含该子串的实体被错误归并。
      */
     private static final String[] PROCESS_DESC_LEAD = {
             "活动后", "活动时", "活动则", "休息后", "休息时", "劳累后", "劳累时", "劳则",
@@ -755,7 +755,7 @@ public class EntityNormalizer {
     /**
      * 抽取残次品：脉诊手法 / 舌象子要素 / 病程诱因 / 六经裸名。
      *
-     * <p>这四类都没有独立标准词可落点，作为实体入库只会污染标准化率。</p>
+     * 这四类都没有独立标准词可落点，作为实体入库只会污染标准化率。
      */
     private static boolean isExtractionArtifact(String s) {
         if (s == null || s.isEmpty()) {
@@ -785,12 +785,12 @@ public class EntityNormalizer {
     /**
      * 丢弃噪声碎片实体（2026-10-19）。
      *
-     * <p>实测（34154 份）：症状字段里 7354 条是「成形」「大便」「色黄」「晨起」这类
+     * 实测（34154 份）：症状字段里 7354 条是「成形」「大便」「色黄」「晨起」这类
      * 单维描述或裸部位残词，既不可能归一、也不是一条症状发现；疾病字段另有 47 条
-     * 「慢性」「过敏性」这种被截断的分级词。</p>
+     * 「慢性」「过敏性」这种被截断的分级词。
      *
-     * <p><b>只丢未归一的</b>：已命中词典的实体一律保留 —— 判据是「归一失败 + 形状是碎片」，
-     * 而不是「词形像碎片」。这样即使某个碎片恰好是合法标准词，也不会被误删。</p>
+     * <b>只丢未归一的</b>：已命中词典的实体一律保留 —— 判据是「归一失败 + 形状是碎片」，
+     * 而不是「词形像碎片」。这样即使某个碎片恰好是合法标准词，也不会被误删。
      *
      * @return 丢弃条数
      */
@@ -958,23 +958,23 @@ public class EntityNormalizer {
     /**
      * 从原始字段回补抽取漏掉 / 截断的实体（§九 9.2 第 ④ 步）。
      *
-     * <p><b>解决什么</b>：NER + 规则兜底会把长词切短（本数据集 500 条里 100 条的
+     * <b>解决什么</b>：NER + 规则兜底会把长词切短（本数据集 500 条里 100 条的
      * 「左尺无力」这类脉位被丢掉；处方里的中药名也常只出前一个字，如 "天"）。
      * 这些残词既归不上标准词、又占着列表，用户看到的是「一堆没归一的碎片」。
      * 处方与中医诊断这两列是<b>原文必然存在</b>的，实体却可能没被抽全 ——
-     * 拿它们当「事实来源」回补，比调模型可靠。</p>
+     * 拿它们当「事实来源」回补，比调模型可靠。
      *
-     * <p><b>处理顺序</b>：① 剔除截断项 → ② append 完整词 → ③ 再走一次
+     * <b>处理顺序</b>：① 剔除截断项 → ② append 完整词 → ③ 再走一次
      * {@link #normalize}（由它统一填 level / source / code 并按标准词去重）。
      * 刻意<b>不</b>在本方法里自己判命中层级：那是 EsTermNormalizer.judge 的职责，
-     * 复制一份就会两处漂移。二次归一是幂等的（标准词本身是精确命中项）。</p>
+     * 复制一份就会两处漂移。二次归一是幂等的（标准词本身是精确命中项）。
      *
-     * <p><b>截断项判据</b>：归一失败（无 normLevel）<b>且</b> content/name 是某个
+     * <b>截断项判据</b>：归一失败（无 normLevel）<b>且</b> content/name 是某个
      * scan 命中词的<b>真子串</b>。刻意<b>不用</b>「长度为 1」这类启发式 ——
-     * 单字本身可能就是合法的标准词（如药名 "姜"），按长度砍会误删。</p>
+     * 单字本身可能就是合法的标准词（如药名 "姜"），按长度砍会误删。
      *
-     * <p><b>异常触发</b>：只在该字段<b>确有未归一项</b>时才动手。全部已归一就完全不调
-     * scan，不给每次批量解析白加一次 ES 查询。</p>
+     * <b>异常触发</b>：只在该字段<b>确有未归一项</b>时才动手。全部已归一就完全不调
+     * scan，不给每次批量解析白加一次 ES 查询。
      *
      * @param vo           归一后的抽取结果，就地修改
      * @param prescription 原始处方列（可空）
@@ -1082,12 +1082,12 @@ public class EntityNormalizer {
     /**
      * 证候回补：目标字段是 Entity.content，原料是辨证结论列（pattern）。
      *
-     * <p><b>为什么需要它</b>：证候只有模型一条来源（{@code python-nlp} 的规则兜底不含
+     * <b>为什么需要它</b>：证候只有模型一条来源（{@code python-nlp} 的规则兜底不含
      * patternList），实测 1000 条里 200 条模型漏抽 —— 而词典里那些词都在。
-     * 中医诊断列有疾病回补、处方列有中药回补，辨证结论列同样该有。</p>
+     * 中医诊断列有疾病回补、处方列有中药回补，辨证结论列同样该有。
      *
-     * <p>用 scan 而不是按顿号裸切分：切分不查词典，会把「经络不通」这类
-     * 非标准词原样塞进 patternList，反而制造未归一项（统计模块曾有一份这样的局部兜底）。</p>
+     * 用 scan 而不是按顿号裸切分：切分不查词典，会把「经络不通」这类
+     * 非标准词原样塞进 patternList，反而制造未归一项（统计模块曾有一份这样的局部兜底）。
      */
     private boolean backfillPatterns(NlpExtractVO vo, String orgId, String pattern) {
         if (TextUtil.isBlank(pattern)) {
@@ -1148,12 +1148,12 @@ public class EntityNormalizer {
     /**
      * 归一原文：优先 sourceText（抽取时的原文 span），无则退 content。
      *
-     * <p><b>为什么优先 sourceText</b>（2026-10-19）：content 可能是<b>上一轮归一写回的标准词</b>
+     * <b>为什么优先 sourceText</b>（2026-10-19）：content 可能是<b>上一轮归一写回的标准词</b>
      * ——「仅归一」就地重跑时，拿 content 再归一等于<b>自命中</b>：
      * 首轮的模糊命中（{@code 大便成形→便溏}）会在第二轮被固化成精确命中，原文里的组合短语
      * （{@code 右寸关缓滑}）也永远拆不出来（content 已成「右寸」）。以原文为准则两轮幂等，
      * 且每次都用最新词典与拆解规则重新判定。
-     * </p>
+     *
      */
     private static String rawSpan(NlpExtractVO.Entity e) {
         if (e == null) {
@@ -1179,22 +1179,22 @@ public class EntityNormalizer {
     /**
      * 该实体文本是否处于<b>否定语境</b>（症状不存在的陈述）。
      *
-     * <p>只用于「二级·包含命中的拦截」，判据取病历里表达否证 / 已愈的固定说法：
+     * 只用于「二级·包含命中的拦截」，判据取病历里表达否证 / 已愈的固定说法：
      * 无、不、未、莫、非、缺、少见、偶见、未曾 等，以及「已 + 痊愈类词」。
      * 判定用**包含**而非前缀 —— 否定词常落在症状词前面而不是句首
-     * （「便前已无肠鸣」「无夜寐流涎」的主语在更前面）。</p>
+     * （「便前已无肠鸣」「无夜寐流涎」的主语在更前面）。
      *
-     * <p><b>为什么不用句法分析</b>：这些实体是被 NER 切出来的短 span，
+     * <b>为什么不用句法分析</b>：这些实体是被 NER 切出来的短 span，
      * 没有完整句子结构可析；而且这里是命中后的兜底拦截，误拦的代价是
-     * 「少归一一条」，误放的代价是「语义反转 + 质控倒加分」，故口径从紧。</p>
+     * 「少归一一条」，误放的代价是「语义反转 + 质控倒加分」，故口径从紧。
      *
-     * <p>已知代价（诚实记账）：「不饥」「不渴」这类**本身是否定式的规范症状**
+     * 已知代价（诚实记账）：「不饥」「不渴」这类**本身是否定式的规范症状**
      * （饥不欲食 / 口渴不欲饮）会被一起拦下。但它们在精确命中层不受影响
      * （词典里就是正式条目），只有被当包含命中捞到时才会被拦 —— 那种情况下
-     * 归一结果本来就可疑。</p>
+     * 归一结果本来就可疑。
      *
-     * <p>2026-10-18 起判据迁到 {@link TermGuard#isNegatedContext(String)}：清洗链路也要用同一条，
-     * 口径只写一处。本方法保留原签名、内部委托，既有调用点与测试不动。</p>
+     * 2026-10-18 起判据迁到 {@link TermGuard#isNegatedContext(String)}：清洗链路也要用同一条，
+     * 口径只写一处。本方法保留原签名、内部委托，既有调用点与测试不动。
      */
     static boolean isNegated(String raw) {
         return TermGuard.isNegatedContext(raw);

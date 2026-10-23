@@ -6,7 +6,7 @@ import com.tcm.ehr.domain.vo.AiReplyVO;
 /**
  * AI 消费端：质控解读、复核预检、术语补词。
  *
- * <p>规则先出结论，LLM 只做叙述增强；LLM 不可用时降级为规则输出，不阻塞主流程。</p>
+ * 规则先出结论，LLM 只做叙述增强；LLM 不可用时降级为规则输出，不阻塞主流程。
  */
 public interface IAiService {
 
@@ -29,9 +29,9 @@ public interface IAiService {
     /**
      * 为一批待规范术语给出补词建议（termsuggest）。
      *
-     * <p>先按字面相似度从现有词表召回候选，再让 LLM 在候选约束下判断
+     * 先按字面相似度从现有词表召回候选，再让 LLM 在候选约束下判断
      * 「挂别名 / 新建标准词 / 忽略」。<b>只出候选，不落库</b> ——
-     * 录入必须由人工确认，归一链路不消费本结果。</p>
+     * 录入必须由人工确认，归一链路不消费本结果。
      *
      * @param dto terms=待规范原文（必填）；termType=术语类型，留空按 symptom
      * @return 建议列表；LLM 不可用时降级为「仅召回候选」，恒不返回 {@code null}

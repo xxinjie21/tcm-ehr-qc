@@ -10,11 +10,11 @@ import java.time.LocalDateTime;
 /**
  * 用户私有 LLM 配置（对应 user_llm_config 表）。
  *
- * <p><b>每人一行</b>：配置含三方通道密钥，是「用户自己的 LLM 设置」，
- * 不是系统级设置 —— 所以这里按 user_id 主键存，不做「全局一份」。</p>
+ * <b>每人一行</b>：配置含三方通道密钥，是「用户自己的 LLM 设置」，
+ * 不是系统级设置 —— 所以这里按 user_id 主键存，不做「全局一份」。
  *
- * <p>{@link #apiKey} 存 <b>AES-256-GCM 密文</b>（Base64），明文永不落库；
- * 读取时由 LlmSecretCipher 解密。解密失败按「未配置密钥」处理。</p>
+ * {@link #apiKey} 存 <b>AES-256-GCM 密文</b>（Base64），明文永不落库；
+ * 读取时由 LlmSecretCipher 解密。解密失败按「未配置密钥」处理。
  */
 @Data
 @TableName("user_llm_config")

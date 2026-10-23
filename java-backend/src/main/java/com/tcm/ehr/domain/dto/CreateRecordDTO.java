@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 单条新增病历请求。
  * 契约见 openapi CreateRecordDTO；registrationNo / outpatientNo 必填由服务层校验。
  *
- * <p>校验注解与 DB 列宽、质控规则对齐，避免「前端拦得住、直调 API 绕得过」：</p>
+ * 校验注解与 DB 列宽、质控规则对齐，避免「前端拦得住、直调 API 绕得过」：
  * <ul>
  *   <li>就诊次数 {@code @Min(1)} —— 与前端 Records.vue 的 min=1 一致</li>
  *   <li>性别 {@code @Pattern} —— 白名单取 {@link QcRuleSet#GENDER_VALUES}（唯一权威）</li>

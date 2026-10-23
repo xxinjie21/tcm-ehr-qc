@@ -26,12 +26,12 @@ import java.util.List;
  * 1. 验证Redis/ES连接
  * 2. 加载 {@code classpath:dictionaries/*.json} -> 基础层(dictionary_terms) -> ES 索引重建
  *
- * <p>2026-09-23 起不再往内存里塞一份词典缓存 —— 归一改为只认 ES 索引，
- * 加载只做「文件 -> 库 -> ES」这几步。</p>
+ * 2026-09-23 起不再往内存里塞一份词典缓存 —— 归一改为只认 ES 索引，
+ * 加载只做「文件 -> 库 -> ES」这几步。
  *
- * <p>2026-10-15 起基础层<b>以文件为准</b>：每次启动都比对文件内容指纹与库内基础层版本，
+ * 2026-10-15 起基础层<b>以文件为准</b>：每次启动都比对文件内容指纹与库内基础层版本，
  * 不一致就整层重播。故改完 {@code resources/dictionaries/*.json} <b>重启即生效</b>，
- * 不再需要手工清库。组织层（{@code org_id <> ''}）不受影响。</p>
+ * 不再需要手工清库。组织层（{@code org_id <> ''}）不受影响。
  */
 @Slf4j
 @Component
@@ -98,18 +98,18 @@ public class DataInitializationListener implements ApplicationRunner {
     /**
      * 等 Elasticsearch 就绪：总预算 {@value #ES_READY_BUDGET_MS} 毫秒，退避 2s 起翻倍、上限 15s。
      *
-     * <p><b>为什么启动要等</b>：ES 不可用时 {@link #loadDictionaries} 里 8 类词典会逐类抛异常、
+     * <b>为什么启动要等</b>：ES 不可用时 {@link #loadDictionaries} 里 8 类词典会逐类抛异常、
      * 只记日志不重试，本轮对账直接作废；dictionary_versions.indexed_version 没追上的类
-     * 要等下次重启才会重建。等几秒比让用户「重启一次再说」便宜得多。</p>
+     * 要等下次重启才会重建。等几秒比让用户「重启一次再说」便宜得多。
      *
-     * <p><b>为什么必须 catch Exception</b>：ES 连不上时 ping 抛的是
+     * <b>为什么必须 catch Exception</b>：ES 连不上时 ping 抛的是
      * ElasticsearchException（unchecked，内部包着 ExecutionException /
      * ConnectionClosedException），只抓 IOException 会让它一路冒到 SpringApplication，
      * 把整个启动炸掉（实测过）。ES 不可用应当是「归一不可用」（接口返回 503 说明原因），
-     * 而不是「系统起不来」。</p>
+     * 而不是「系统起不来」。
      *
-     * <p>超时后<b>不</b>中断启动：继续往下走，词典对账会逐类报 error，归一仍走已有索引，
-     * 系统可用性不受影响。</p>
+     * 超时后<b>不</b>中断启动：继续往下走，词典对账会逐类报 error，归一仍走已有索引，
+     * 系统可用性不受影响。
      */
     private void awaitEsReady() {
         long delayMs = 2000;
@@ -167,20 +167,20 @@ public class DataInitializationListener implements ApplicationRunner {
     /**
      * 基础层与词典文件对账：文件内容指纹与库内基础层版本不一致时整层重播。
      *
-     * <p><b>为什么不再「只播种空基础层」</b>：原实现只在基础层为空时读文件，于是
+     * <b>为什么不再「只播种空基础层」</b>：原实现只在基础层为空时读文件，于是
      * {@code resources/dictionaries/*.json} 改完后重启<b>不生效</b> —— 基础层非空就早退，
      * 而 ES 又是从库里的旧内容重建的，文件改动永远进不来。现改为每轮启动都拿文件指纹
      * 与 dictionary_versions 里的基础层内容版本比对：不一致才
      * replace（先删后插），随后 {@link #reconcileLayer} 顺理成章地重建 ES；
-     * 一致则直接返回，不产生任何写操作（绝大多数启动走这条）。</p>
+     * 一致则直接返回，不产生任何写操作（绝大多数启动走这条）。
      *
-     * <p><b>语义</b>：基础层以文件为准。经应用（导入 / 归档回滚）改过的基础层会在下次启动
+     * <b>语义</b>：基础层以文件为准。经应用（导入 / 归档回滚）改过的基础层会在下次启动
      * 被文件覆盖；组织层（{@code org_id <> ''}）不受影响。文件为空视为「不播种」而非
-     * 「清空」，避免误删。</p>
+     * 「清空」，避免误删。
      *
-     * <p><b>为什么必须加分布式锁（B2）</b>：replace 是「先删后插」。多实例同时启动时
+     * <b>为什么必须加分布式锁（B2）</b>：replace 是「先删后插」。多实例同时启动时
      * 两个实例若都判定「需重播」会交错删/插，其中一个撞 uk_org_type_term 抛异常 ⇒
-     * 该类型整轮被 {@link #loadDictionaries} 的外层 try 跳过，归一不可用。</p>
+     * 该类型整轮被 {@link #loadDictionaries} 的外层 try 跳过，归一不可用。
      */
     private void syncBaseFromFile(String type) {
         // 1. 锁外先读文件、算指纹：绝大多数启动文件没变，走下面这条直接返回，不必抢锁

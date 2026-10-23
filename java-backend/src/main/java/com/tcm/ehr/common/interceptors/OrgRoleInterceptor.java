@@ -19,10 +19,10 @@ import java.util.Map;
  * 组内角色校验：{@link RequireOrgRole} 标注的方法只放组长（owner），
  * 且注解声明的路径变量必须等于当前机构（组长只能管自己的组）。
  *
- * <p>为什么多此一举 —— {@link RequireRole} 只管系统级角色：
+ * 为什么多此一举 —— {@link RequireRole} 只管系统级角色：
  * R5 的成员管理接口（拉人 / 移人 / 转让 / 退出）对「组长」开放，
  * 而组长在 users.role 里就是人人皆是的「用户」，
- * 用 {@code RequireRole("用户")} 等于没拦。维度不同，不能互相替代。</p>
+ * 用 {@code RequireRole("用户")} 等于没拦。维度不同，不能互相替代。
  *
  * ⚠️ 路径变量名由注解的 pathVar 声明，不能在这里写死：原实现写死
  * {@code vars.get("orgId")}，而所有被保护路由的变量都叫 id，

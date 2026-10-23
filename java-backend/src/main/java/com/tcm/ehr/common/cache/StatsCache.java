@@ -29,31 +29,31 @@ import java.util.regex.Pattern;
 /**
  * 统计短 TTL 缓存（性能审查 P2-3 / B1 + 缓存审查方案）。
  *
- * <p><b>两类入口</b>：① {@link #wordFreq} 只缓「/stats/all 的词频分布」，按数据域分片、命中率高；
+ * <b>两类入口</b>：① {@link #wordFreq} 只缓「/stats/all 的词频分布」，按数据域分片、命中率高；
  * ② {@link #getOrLoad} 是通用入口，供报告（report）/ 看板扩展（extra）/
- * 扣分分布（deduction）等聚合用，<b>版本号走全局段</b>（见该方法）。</p>
+ * 扣分分布（deduction）等聚合用，<b>版本号走全局段</b>（见该方法）。
  *
- * <p><b>失效用版本号前缀，不用 KEYS</b>（R3-③ / W3）：数据 key 形如
+ * <b>失效用版本号前缀，不用 KEYS</b>（R3-③ / W3）：数据 key 形如
  * {@code tcm:ehr:cache:stats:{scope}:v{n}:...}（词频）或 {@code tcm:ehr:cache:stats:{kind}:v{n}:...}（通用），
  * 失效只把 {@code tcm:ehr:cache:stats:ver:{seg}} 自增。
  * 这同时解决三件事 —— ① 不再有 O(N) 全库扫描 + Redis 单线程阻塞（生产禁用级）；
  * ② key 空间不再靠通配删除清理；③ 「读-回填」竞态自然消失：并发读按旧版本算出的值会写回
- * 旧版本 key，新请求读的是新版本 key，读不到它。</p>
+ * 旧版本 key，新请求读的是新版本 key，读不到它。
  *
- * <p><b>键空间与过期（R3-①②）</b>：① TTL 带抖动（基准 ± 10s），避免全部 key 同秒过期、
+ * <b>键空间与过期（R3-①②）</b>：① TTL 带抖动（基准 ± 10s），避免全部 key 同秒过期、
  * 一起回源；② 过滤条件先过白名单，不在白名单内的一律<b>绕过缓存直接现算</b> ——
  * key 由 {@code md5(params)} 决定，任意字符串会让 key 无界增长、命中率趋零；
  * ③ 空结果也缓存（10s），区分「查过且为空」与「没查过」；④ 同一 key 并发未命中时单飞，
- * 只让一个请求现算，其余短暂等待后读缓存，避免热点 key 失效瞬间一起回源。</p>
+ * 只让一个请求现算，其余短暂等待后读缓存，避免热点 key 失效瞬间一起回源。
  *
- * <p><b>Redis 不可用 = 自动降级</b>：读/写缓存任何异常都会被吞掉、直接走 loader 现算 ——
- * 统计页不能因为缓存挂了而连页面都打不开（医疗数据要的是「准」，不是「缓存优先」）。</p>
+ * <b>Redis 不可用 = 自动降级</b>：读/写缓存任何异常都会被吞掉、直接走 loader 现算 ——
+ * 统计页不能因为缓存挂了而连页面都打不开（医疗数据要的是「准」，不是「缓存优先」）。
  *
- * <p><b>SWR（stale-while-revalidate，见 {@link #getOrLoadSwr}）</b>：给「冷算特别贵」的报告用。
+ * <b>SWR（stale-while-revalidate，见 {@link #getOrLoadSwr}）</b>：给「冷算特别贵」的报告用。
  * 值仍存 dataKey（TTL 拉长到基准 ×10），另用 {@code dataKey:fresh} 作新鲜标记
  * （TTL = 基准）。时间到期后值仍在、只是标记没了 ⇒ <b>立即返回旧值 + 后台单飞重算</b>，
  * 那几秒不再挡在用户前面；而写入走版本号前缀（{@link #invalidateForWrite()}）⇒ key 变 ⇒
- * 两把 key 都落空 ⇒ <b>仍阻塞现算新值</b>（正确性优先：绝不把写前的旧数字端出去）。</p>
+ * 两把 key 都落空 ⇒ <b>仍阻塞现算新值</b>（正确性优先：绝不把写前的旧数字端出去）。
  */
 @Slf4j
 @Component
@@ -66,7 +66,7 @@ public class StatsCache {
     /**
      * 通用 kind（report/extra/overview/deduction）的全局版本段：任一写入都自增它 ⇒ 全部 kind 失效。
      *
-     * <p>作用域与「数据实际所属 org」无关，故管理员写入落别组也不会漏失效（见 {@link #getOrLoad}）。</p>
+     * 作用域与「数据实际所属 org」无关，故管理员写入落别组也不会漏失效（见 {@link #getOrLoad}）。
      */
     private static final String GLOBAL_SCOPE = "GLOBAL";
     /** 单飞锁 key 前缀 */
@@ -92,8 +92,8 @@ public class StatsCache {
     /**
      * SWR 硬过期倍率：dataKey 的 TTL = 基准 ×该值（180s → 30min）。
      *
-     * <p>它是「后台重算迟迟不成功」的上界 —— 旧值最多被端出这么久，之后 dataKey 也过期，
-     * 回落成阻塞现算（宁可让用户等一次，也不能无限期用旧数）。</p>
+     * 它是「后台重算迟迟不成功」的上界 —— 旧值最多被端出这么久，之后 dataKey 也过期，
+     * 回落成阻塞现算（宁可让用户等一次，也不能无限期用旧数）。
      */
     private static final long SWR_HARD_FACTOR = 10L;
 
@@ -103,8 +103,8 @@ public class StatsCache {
     /**
      * 分级白名单（2026-10-23）：改为引用 {@link QcScorer} 的常量，不再自维护一份。
      *
-     * <p>原先这里独立写死三个中文字面量，与 QcScorer 是两份「事实」—— 若分级取值调整，
-     * 缓存白名单会把新值判为非法而直接绕过缓存（静默降低命中率），且不会有人察觉。</p>
+     * 原先这里独立写死三个中文字面量，与 QcScorer 是两份「事实」—— 若分级取值调整，
+     * 缓存白名单会把新值判为非法而直接绕过缓存（静默降低命中率），且不会有人察觉。
      */
     private static final Set<String> GRADES = Set.of(
             QcScorer.GRADE_QUALIFIED, QcScorer.GRADE_PENDING, QcScorer.GRADE_INVALID);
@@ -115,8 +115,8 @@ public class StatsCache {
     /**
      * SWR 后台重算池：1~2 线程、有界队列、守护线程，满则丢弃（DiscardPolicy）。
      *
-     * <p>有界而非无界：重算很贵（报告 ~5s），不能因为一次热点集中过期就把任务堆爆内存；
-     * 丢弃的只是「这次刷新机会」，下次读还会再触发，不会丢数据。</p>
+     * 有界而非无界：重算很贵（报告 ~5s），不能因为一次热点集中过期就把任务堆爆内存；
+     * 丢弃的只是「这次刷新机会」，下次读还会再触发，不会丢数据。
      */
     private final ExecutorService refreshPool = new ThreadPoolExecutor(
             1, 2, 60L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(16),
@@ -155,11 +155,11 @@ public class StatsCache {
     /**
      * 通用统计缓存：报告 / 看板扩展 / 指标卡 / 扣分分布等聚合都走这里。
      *
-     * <p><b>版本号用全局段</b>（{@link #GLOBAL_SCOPE}）：任一次写入（{@link #invalidateForWrite()}）
+     * <b>版本号用全局段</b>（{@link #GLOBAL_SCOPE}）：任一次写入（{@link #invalidateForWrite()}）
      * 都自增它 ⇒ 所有 kind 立即失效。选「全局版本」而非「按 org 失效」，是为了避开
      * 《缓存场景审查与改造方案》§3.6 的缺口 —— 失效取的是<b>请求者</b>视角（管理员 = ALL），
      * 而数据落地的 org 可能不同；全局版本与 org 无关，管理员写入落别组也不会让该组普通用户脏读。
-     * 代价：任一组写入会作废其它组的统计缓存 —— 本项目单组织、写入低频，可接受。</p>
+     * 代价：任一组写入会作废其它组的统计缓存 —— 本项目单组织、写入低频，可接受。
      *
      * @param kind      缓存类别（作 key 段），如 extra / report / deduction
      * @param keyParams 参与摘要、决定命中范围的参数；若为 {@link FiltersDTO} 会先过白名单
@@ -176,8 +176,8 @@ public class StatsCache {
     /**
      * 同 {@link #getOrLoad(String, Object, Duration, Supplier, Class)}，额外用 salt 参与 key。
      *
-     * <p>用于「参数一样但结果会因外部版本变化」的场景：报告页的入参（时间范围 / 科室）不变，
-     * 但换过词典后数字会变 —— 必须把词典版本作为 salt 拼进 key，否则换词表后仍命中旧缓存。</p>
+     * 用于「参数一样但结果会因外部版本变化」的场景：报告页的入参（时间范围 / 科室）不变，
+     * 但换过词典后数字会变 —— 必须把词典版本作为 salt 拼进 key，否则换词表后仍命中旧缓存。
      *
      * @param salt 附加版本串（如词典版本号）；null / 空白视为不加
      */
@@ -204,10 +204,10 @@ public class StatsCache {
      * 同 {@link #getOrLoad(String, Object, String, Duration, Supplier, Class)}，但时间到期后
      * <b>stale-while-revalidate</b>：先秒回旧值，再后台重算。
      *
-     * <p>给「冷算特别贵」的接口用（本项目的标准化报告：全量拉数据域 + 每条解析 2 次 JSON，
-     * 冷算约 5s，其中 ~3s 是读 110MB JSON 的磁盘 I/O，SQL 侧已无优化空间）。</p>
+     * 给「冷算特别贵」的接口用（本项目的标准化报告：全量拉数据域 + 每条解析 2 次 JSON，
+     * 冷算约 5s，其中 ~3s 是读 110MB JSON 的磁盘 I/O，SQL 侧已无优化空间）。
      *
-     * <p><b>语义边界（务必理解）</b>：</p>
+     * <b>语义边界（务必理解）</b>：
      * <ul>
      *   <li><b>时间到期</b>（数据没变，只是缓存老了）→ 秒回旧值 + 后台刷新。用户不必为
      *       「缓存该续期了」这件事等 5s；旧值本身仍然正确。</li>
@@ -215,10 +215,10 @@ public class StatsCache {
      *       → <b>阻塞现算新值</b>。绝不用 SWR 掩盖「数据真的变了」，否则会端出写前的旧数字。</li>
      * </ul>
      *
-     * <p><b>loader 必须与请求上下文无关</b>：陈旧分支会在<b>后台线程</b>里调用它，那里没有
+     * <b>loader 必须与请求上下文无关</b>：陈旧分支会在<b>后台线程</b>里调用它，那里没有
      * RequestContextHolder（RequestUtils / RecordFilter 读到的是
      * {@code "unknown"} 且 fail-closed）。调用方需在请求线程先把 orgId / viewAllOrgs 等
-     * 捕获进闭包再传进来。</p>
+     * 捕获进闭包再传进来。
      */
     public <T> T getOrLoadSwr(String kind, Object keyParams, String salt, Duration baseTtl,
                               Supplier<T> loader, Class<T> type) {
@@ -301,8 +301,8 @@ public class StatsCache {
     /**
      * 后台单飞重算（SWR 专用）：不占用请求线程，任何失败都只记日志。
      *
-     * <p>复用 {@link #LOCK_PREFIX} 那把锁 ⇒ 多实例 / 并发读只会有一个真重算，
-     * 其余（含正在阻塞现算的冷请求）看到锁被占即退出，不重复干活。</p>
+     * 复用 {@link #LOCK_PREFIX} 那把锁 ⇒ 多实例 / 并发读只会有一个真重算，
+     * 其余（含正在阻塞现算的冷请求）看到锁被占即退出，不重复干活。
      */
     private <T> void refreshAsync(String key, Duration baseTtl, Supplier<T> loader, Class<T> type) {
         try {
@@ -426,8 +426,8 @@ public class StatsCache {
     /**
      * 失效 = 版本号自增（替代原先的 KEYS + DEL）。
      *
-     * <p>版本号 key <b>不设 TTL</b>：它只是一个自增整数，数量上界 = 组织数 + 3（含 ALL /
-     * GLOBAL）；若给它设 TTL，过期后版本回落会重新读到旧版本 key 下的残留值，反而制造脏读。</p>
+     * 版本号 key <b>不设 TTL</b>：它只是一个自增整数，数量上界 = 组织数 + 3（含 ALL /
+     * GLOBAL）；若给它设 TTL，过期后版本回落会重新读到旧版本 key 下的残留值，反而制造脏读。
      */
     private void bumpVersion(String scope) {
         try {
@@ -463,8 +463,8 @@ public class StatsCache {
     /**
      * 过滤条件是否在白名单内（R3-②）。
      *
-     * <p>不在白名单 = <b>绕过缓存</b>（照常返回正确结果，只是不落 key），而不是「归一成别的值」——
-     * 后者会把两个不同科室映射到同一个 key，直接返回错误数据。</p>
+     * 不在白名单 = <b>绕过缓存</b>（照常返回正确结果，只是不落 key），而不是「归一成别的值」——
+     * 后者会把两个不同科室映射到同一个 key，直接返回错误数据。
      */
     private static boolean cacheable(FiltersDTO f) {
         if (f == null) {
@@ -502,9 +502,9 @@ public class StatsCache {
     /**
      * 参数 → md5 摘要（决定 key 的命中范围）。
      *
-     * <p>摘要口径收敛到 {@link RecordUtil#md5Hex}（《自研组件替换计划》#12）。外层 try 兜的是
+     * 摘要口径收敛到 {@link RecordUtil#md5Hex}（《自研组件替换计划》#12）。外层 try 兜的是
      * Jackson 序列化失败，与 md5Hex 内部兜的 NoSuchAlgorithmException 不是一回事，
-     * 这里降级为「退空串」（所有同类请求共用一个 key，仍有版本段隔离，可接受）。</p>
+     * 这里降级为「退空串」（所有同类请求共用一个 key，仍有版本段隔离，可接受）。
      */
     private String digestOf(Object params) {
         try {

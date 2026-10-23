@@ -16,9 +16,9 @@ import java.util.Set;
  * （causes.json）与其余 8 类同时到位，故 {@code dictKeys()} 现为 9 类。
  * 不落盘、不做用户自定义——词典范围限定在 NLP 能提取的实体。
  *
- * <p>{@code dictKeys()} 的 9 类与 python-nlp 的 LABEL_FIELD 5 类都只是
+ * {@code dictKeys()} 的 9 类与 python-nlp 的 LABEL_FIELD 5 类都只是
  * {@code all()} 的过滤视图，不是并列清单：前者按 dict 标志筛（25.b 防漂移测试钉住），
- * 后者是模型能输出的 NER 标签集（病名/症状/证型/方剂/本草），维度不同、不要求等长。</p>
+ * 后者是模型能输出的 NER 标签集（病名/症状/证型/方剂/本草），维度不同、不要求等长。
  *
  *
  * ⚠️ 两类范围都<b>不再</b>由本目录硬编码，全部交给组织级规则集（用户在「规则配置」里改）：
@@ -85,14 +85,14 @@ public final class EntityTypes {
     /**
      * {@link #all()} / {@link #dictKeys()} 的缓存视图（审查报告 §4.7）。
      *
-     * <p>两者都只是上面那张 9 类常量表的过滤视图，内容在类加载后不再变化；原先每次调用
+     * 两者都只是上面那张 9 类常量表的过滤视图，内容在类加载后不再变化；原先每次调用
      * 都新建一份集合（{@code all()} 在单次标准化报表里被调 4 次）。缓存为不可变视图，
-     * 调用方一律只读。</p>
+     * 调用方一律只读。
      *
-     * <p>DICT_KEYS 用 {@code unmodifiableSet(LinkedHashSet)} 而<b>不是</b>
+     * DICT_KEYS 用 {@code unmodifiableSet(LinkedHashSet)} 而<b>不是</b>
      * Set.copyOf：后者的迭代顺序未定义（按每次 JVM 启动的 SALT 打乱），会破坏
      * 「顺序稳定」这条契约 —— {@code QcRuleSet.defaults()} 的 elementTypes 顺序
-     * 与 EntityTypesDictionaryRegistrationTest 都依赖它。</p>
+     * 与 EntityTypesDictionaryRegistrationTest 都依赖它。
      */
     private static final List<EntityType> ALL_VIEW;
     private static final Set<String> DICT_KEYS;
@@ -132,9 +132,9 @@ public final class EntityTypes {
     /**
      * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法，顺序稳定，共 9 类）。
      *
-     * <p>这 9 类即「规则配置」弹窗里术语归一 / 术语标准化可勾选的范围；<b>实际生效范围</b>
+     * 这 9 类即「规则配置」弹窗里术语归一 / 术语标准化可勾选的范围；<b>实际生效范围</b>
      * 由规则集的 normalization.elementTypes（归一）与 standardization.elementTypes
-     * （未归一扣分）决定。本方法给「可选项」，规则集给「已选项」。</p>
+     * （未归一扣分）决定。本方法给「可选项」，规则集给「已选项」。
      */
     public static Set<String> dictKeys() {
         return DICT_KEYS;

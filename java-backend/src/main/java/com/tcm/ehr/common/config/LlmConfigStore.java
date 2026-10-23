@@ -15,16 +15,16 @@ import java.util.Map;
 /**
  * LLM 配置存储：<b>系统基线</b> + <b>每人一份私有配置</b>。
  *
- * <p><b>基线</b>：启动时以 {@link LlmProperties}（application.yml 的 llm 段）为准，
- * 再用可选的 {@code classpath:llm-config.json}（若打包了）覆盖非密钥字段 —— 只读，不回写。</p>
+ * <b>基线</b>：启动时以 {@link LlmProperties}（application.yml 的 llm 段）为准，
+ * 再用可选的 {@code classpath:llm-config.json}（若打包了）覆盖非密钥字段 —— 只读，不回写。
  *
- * <p><b>私有配置</b>：user_llm_config 每人一行，密钥经
- * {@link LlmSecretCipher} 以 AES-256-GCM 加密落库；用户没配则回落到基线。</p>
+ * <b>私有配置</b>：user_llm_config 每人一行，密钥经
+ * {@link LlmSecretCipher} 以 AES-256-GCM 加密落库；用户没配则回落到基线。
  *
- * <p>⚠️ <b>保存个人配置绝不回写全局文件</b>：那等于把一个人的密钥变成所有人的默认值。</p>
+ * ⚠️ <b>保存个人配置绝不回写全局文件</b>：那等于把一个人的密钥变成所有人的默认值。
  *
- * <p>版本机制：{@link #versionFor(String)} 供 LlmClient 判断是否需要重建客户端，
- * 版本变化即丢弃已装配的 ChatClient，实现「保存即生效、无需重启」。</p>
+ * 版本机制：{@link #versionFor(String)} 供 LlmClient 判断是否需要重建客户端，
+ * 版本变化即丢弃已装配的 ChatClient，实现「保存即生效、无需重启」。
  */
 @Slf4j
 @Component
@@ -66,7 +66,7 @@ public class LlmConfigStore {
     /**
      * 取<b>某个用户</b>生效的配置：用户行覆盖基线，用户没配则用基线。
      *
-     * <p>没有用户上下文（后台线程 / 启动期）时返回基线 —— 那时无法判断「谁的配置」。</p>
+     * 没有用户上下文（后台线程 / 启动期）时返回基线 —— 那时无法判断「谁的配置」。
      */
     public LlmConfig getFor(String userId) {
         return resolveFor(userId).config();
@@ -75,9 +75,9 @@ public class LlmConfigStore {
     /**
      * 「生效配置 + 配置版本串」的组合（AI-1）。
      *
-     * <p>LlmClient 原先分别调 {@link #getFor} 与 {@link #versionFor}，各自
+     * LlmClient 原先分别调 {@link #getFor} 与 {@link #versionFor}，各自
      * selectById 一次 —— 缓存只省掉了逐字段合并，没省 DB 往返。本方法一次查询
-     * 同时给出两者，调用方不必为同一用户查两次库。</p>
+     * 同时给出两者，调用方不必为同一用户查两次库。
      */
     public record Resolved(LlmConfig config, String version) {
     }
@@ -85,7 +85,7 @@ public class LlmConfigStore {
     /**
      * 一次查询同时返回<b>生效配置</b>与<b>配置版本串</b>（AI-1）。
      *
-     * <p>版本串要由用户行算出来，故查询无法省；能省的是「同一用户查两次」。</p>
+     * 版本串要由用户行算出来，故查询无法省；能省的是「同一用户查两次」。
      */
     public Resolved resolveFor(String userId) {
         if (userId == null || userId.isBlank()) {
@@ -99,8 +99,8 @@ public class LlmConfigStore {
     /**
      * 保存<b>某个用户</b>的配置（密钥加密落库）。
      *
-     * <p>⚠️ 这里<b>不写全局配置文件</b>：配置是「每个用户一份」，把某人的配置写进全局基线
-     * 等于让 A 的密钥变成所有人的默认值。</p>
+     * ⚠️ 这里<b>不写全局配置文件</b>：配置是「每个用户一份」，把某人的配置写进全局基线
+     * 等于让 A 的密钥变成所有人的默认值。
      *
      * @param userId 用户 ID
      * @param cfg    已合并好的完整配置
@@ -157,8 +157,8 @@ public class LlmConfigStore {
     /**
      * 某个用户的配置版本串（基线版本 + 用户行指纹），供 LlmClient 判断是否重建客户端。
      *
-     * <p>与 {@link #getFor} 共用同一次解析（{@link #resolveFor}）：版本与配置必须来自同一行，
-     * 分两次查库既多一次往返、又可能在两次查询之间读到不同版本。</p>
+     * 与 {@link #getFor} 共用同一次解析（{@link #resolveFor}）：版本与配置必须来自同一行，
+     * 分两次查库既多一次往返、又可能在两次查询之间读到不同版本。
      */
     public String versionFor(String userId) {
         return resolveFor(userId).version();
@@ -167,12 +167,12 @@ public class LlmConfigStore {
     /**
      * 用户行的版本指纹。
      *
-     * <p><b>基线版本必须参与</b>：用户没有自有配置时生效的是基线，基线一变该用户的生效
+     * <b>基线版本必须参与</b>：用户没有自有配置时生效的是基线，基线一变该用户的生效
      * 配置就跟着变。若版本串里只有用户行、没有基线版本，无自有配置的用户会一直命中
-     * 旧缓存，表现为「改了却不生效」—— 且很难一眼看出。</p>
+     * 旧缓存，表现为「改了却不生效」—— 且很难一眼看出。
      *
-     * <p>只用 update_time 也不够：它精度到秒，同一秒内改两次会漏判成「没变」。
-     * 故并入各字段值 + 密文长度兜底。</p>
+     * 只用 update_time 也不够：它精度到秒，同一秒内改两次会漏判成「没变」。
+     * 故并入各字段值 + 密文长度兜底。
      */
     private String versionOf(UserLlmConfig row) {
         long v = version();

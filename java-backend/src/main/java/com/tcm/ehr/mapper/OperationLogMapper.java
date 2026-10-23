@@ -23,10 +23,10 @@ public interface OperationLogMapper extends BaseMapper<OperationLog> {
     /**
      * 库中实际出现过的操作类型。
      *
-     * <p>§七 L7：普通用户的下拉不能显示别人的操作类型（轻度信息泄漏 —— 能从
+     * §七 L7：普通用户的下拉不能显示别人的操作类型（轻度信息泄漏 —— 能从
      * 「存在 X 操作」推断出系统里有人干过那件事）。过滤口径与 buildWrapper
      * 保持同一套三档：管理员全部 / 组长本组 / 组员与无组仅自己。
-     * 传 {@code orgId=null} 表示不按组过滤（管理员）。</p>
+     * 传 {@code orgId=null} 表示不按组过滤（管理员）。
      *
      * @param orgId 所属组；null = 不按组过滤（仅管理员路径）
      * @param operator 操作人；null = 不过滤（管理员 / 组长）

@@ -66,8 +66,8 @@ public class StandardizationReportVO {
     /**
      * 本报告出自哪一版词典（批次14 · 对标 A5「派生数字可回溯血缘」）。
      *
-     * <p>与 {@link #generatedAt} 配对：前者答「按什么算的」，后者答「什么时候算的」。
-     * 换过词表之后归一率会变，没有这一项就只能猜变化的原因。</p>
+     * 与 {@link #generatedAt} 配对：前者答「按什么算的」，后者答「什么时候算的」。
+     * 换过词表之后归一率会变，没有这一项就只能猜变化的原因。
      */
     private String sourceVersion;
 
@@ -96,9 +96,9 @@ public class StandardizationReportVO {
         /**
          * 实际生效的导入时间起止（yyyy-MM-dd）；为空表示不限。
          *
-         * <p>与 {@link #start}/{@link #end}（接诊时间）是两个独立维度，可同时生效、取交集。
+         * 与 {@link #start}/{@link #end}（接诊时间）是两个独立维度，可同时生效、取交集。
          * 导入时间过滤下推到 SQL（records.create_time），其排除量<b>不计入</b>
-         * {@link #excluded} —— excluded 只反映接诊时间过滤排除的条数。</p>
+         * {@link #excluded} —— excluded 只反映接诊时间过滤排除的条数。
          */
         private String importStart;
         private String importEnd;
@@ -180,10 +180,10 @@ private int termCount;
         /**
          * 各抽取侧桶的 TOP 词（2026-10-21 新增）。
          *
-         * <p>本页当前定位是<strong>给开发人员看</strong>：他们要根据本报告改抽取规则，
+         * 本页当前定位是<strong>给开发人员看</strong>：他们要根据本报告改抽取规则，
          * 只知道「有 1353 条」无从下手，必须知道「是哪 1353 条」。故每个桶都带 TOP 词与频次。
          * 与 {@link #top} 的区别：top 只收「词表缺口」（补词表可解决）；这四个是抽取侧，
-         * 补词表无效，要改的是抽取边界。</p>
+         * 补词表无效，要改的是抽取边界。
          */
         private java.util.Map<String, Integer> inquiryFragmentTop = new java.util.LinkedHashMap<>();
         public java.util.Map<String, Integer> getInquiryFragmentTop() { return inquiryFragmentTop; }
@@ -207,8 +207,8 @@ private int termCount;
         /**
          * 靠 L2（包含）/ L3（模糊）**推断**命中的实体明细（G3）：键=实体原文，值=出现次数，按次数降序。
          *
-         * <p>这批不是「词表缺口」（它们已被归一），但归一结论是猜出来的 —— 与 {@link #top} 同型
-         * 单列，供前端提示「需登记别名或人工确认」，避免把推断命中混进词表缺口清单。</p>
+         * 这批不是「词表缺口」（它们已被归一），但归一结论是猜出来的 —— 与 {@link #top} 同型
+         * 单列，供前端提示「需登记别名或人工确认」，避免把推断命中混进词表缺口清单。
          */
         private java.util.Map<String, Integer> inferred = new java.util.LinkedHashMap<>();
         public java.util.Map<String, Integer> getInferred() { return inferred; }
@@ -218,9 +218,9 @@ private int termCount;
         /**
          * 长度 ≤ 2 的未归一实体。
          *
-         * <p><b>不是「抽取残字」的判定结果</b> —— 实测这批词里单字 0 条、也没有截断痕迹，
+         * <b>不是「抽取残字」的判定结果</b> —— 实测这批词里单字 0 条、也没有截断痕迹，
          * 主体是词表未收录的完整二字症状词（鼻塞、咽痛…）。归属词表侧，见
-         * {@code StandardizationReportServiceImpl.unmatched(...)}。</p>
+         * {@code StandardizationReportServiceImpl.unmatched(...)}。
          */
         private int fragment;
         /** 分类错放：脉/舌要素（脉细数 / 舌红）进了症状，责任在抽取侧 */
@@ -228,10 +228,10 @@ private int termCount;
         /**
          * 脉诊手法 / 舌象碎片被当成症状（不受按 / 中取不受按 / 红点多 / 边有红点…）。
          *
-         * <p>2026-10-21 从 {@link #misrouted} 拆出。两类虽同在抽取侧，但修复方式不同：
+         * 2026-10-21 从 {@link #misrouted} 拆出。两类虽同在抽取侧，但修复方式不同：
          * misrouted 是<strong>路由错</strong>（该去 pulseList/tongueList，改分类即可），
          * 本桶是<strong>本不该成为实体</strong>（脉诊手法是描述脉象的动作、舌象碎片是子要素，
-         * 都没有独立标准词，应在抽取阶段就被消费掉）。合成一个数字会让上游改错方向。</p>
+         * 都没有独立标准词，应在抽取阶段就被消费掉）。合成一个数字会让上游改错方向。
          */
         private int mistypeMarker;
         /** 体征错放：压痛等进了症状，责任在抽取侧 */
@@ -239,19 +239,19 @@ private int termCount;
         /**
          * 问诊整句被当成症状（大便日一行 / 入睡转快 / 夜寐一般…），责任在抽取侧。
          *
-         * <p>2026-10-21 从 {@link #dictionaryGap} 拆出：这批词的<strong>正确去向是抽取侧的
+         * 2026-10-21 从 {@link #dictionaryGap} 拆出：这批词的<strong>正确去向是抽取侧的
          * inquiry 字段</strong>（十问子项），补成症状标准词属错映射 —— 把它们算进
          * 「词表缺口」会让报告声称「词表缺 N 条」，而实际补词表根本解决不了。
          * 判定口径与 python-nlp 的 _INQUIRY_LEAD 同源（见 STANDARDIZATION_REPORT 的
-         * INQUIRY_LEAD 常量）。</p>
+         * INQUIRY_LEAD 常量）。
          */
         private int inquiryFragment;
         /**
          * 病程 / 诱因描述（活动后缓解 / 休息后缓解 / 遇劳加重 / 受凉后…），责任在抽取侧。
          *
-         * <p>2026-10-21 从 {@link #dictionaryGap} 拆出：它们是<strong>对症状的修饰</strong>
+         * 2026-10-21 从 {@link #dictionaryGap} 拆出：它们是<strong>对症状的修饰</strong>
          * 而非症状本体，没有独立标准词可补（补「活动后缓解」进症状词表会让所有含该子串的
-         * 实体被错误归并）。</p>
+         * 实体被错误归并）。
          */
         private int processDesc;
         /** 其余：多为标准词，责任在词表侧（补词表即可改善） */

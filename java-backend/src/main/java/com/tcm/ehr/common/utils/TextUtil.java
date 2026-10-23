@@ -3,14 +3,14 @@ package com.tcm.ehr.common.utils;
 /**
  * 文本小工具（阶段3 P3.2 去重收敛）。
  *
- * <p>{@link #stripCodeFence} 原在 AiServiceImpl 与 DictionaryServiceImpl
+ * {@link #stripCodeFence} 原在 AiServiceImpl 与 DictionaryServiceImpl
  * 各有一份逐字相同的实现 —— 两份代码漂移后，剥错一边就会让整条链路静默解析失败。
- * 统一收敛到此处，两处调用点共用。</p>
+ * 统一收敛到此处，两处调用点共用。
  *
- * <p>2026-10 新增标点规整 {@link #normalizePunctuation} / {@link #stripPunctuationBoundary}：
+ * 2026-10 新增标点规整 {@link #normalizePunctuation} / {@link #stripPunctuationBoundary}：
  * 导出的病历文本与术语归一共用同一套标点口径 —— 原文里有「。。」「，，」这类重复标点、
  * 半角标点或标点旁的游离空格时，统一规整后再使用。该口径<b>只作用于导出与归一</b>，
- * 不改动库里的病历原文。</p>
+ * 不改动库里的病历原文。
  */
 public final class TextUtil {
 
@@ -55,7 +55,7 @@ public final class TextUtil {
     /**
      * 标点规整：合并重复标点、半角标点转中文全角、去掉中文标点两侧的空白。
      *
-     * <p><b>只做「明显不恰当」的规整，不改写文字本身。</b>三条规则：</p>
+     * <b>只做「明显不恰当」的规整，不改写文字本身。</b>三条规则：
      * <ol>
      *   <li><b>合并重复标点</b>：{@code 。。→。}、{@code ，，，→，}（同一标点连续出现只留一个；
      *       {@code ……} 省略号、{@code ——} 破折号成对出现属正常写法，不折叠）。</li>
@@ -65,7 +65,7 @@ public final class TextUtil {
      *   <li><b>去标点两侧空白</b>：{@code 好转 ，继续} → {@code 好转，继续}；标点后的游离空格也去掉。</li>
      * </ol>
      *
-     * <p>null / 空串原样返回；单次线性扫描，无正则。</p>
+     * null / 空串原样返回；单次线性扫描，无正则。
      */
     public static String normalizePunctuation(String s) {
         if (s == null || s.isEmpty()) {
@@ -106,8 +106,8 @@ public final class TextUtil {
     /**
      * 去掉术语首尾的标点（中英文都算）：{@code 胃痛。。→胃痛}、{@code (发热)→发热}。
      *
-     * <p>供术语归一的候选词使用：抽取到的术语常带尾巴标点，留着会让「精确/包含」判定失准。
-     * 只剥首尾，不动中间（{@code 天麻10g，菊花10g} 这种段落不该被当成一个术语清洗）。</p>
+     * 供术语归一的候选词使用：抽取到的术语常带尾巴标点，留着会让「精确/包含」判定失准。
+     * 只剥首尾，不动中间（{@code 天麻10g，菊花10g} 这种段落不该被当成一个术语清洗）。
      */
     public static String stripPunctuationBoundary(String s) {
         if (s == null || s.isEmpty()) {
@@ -155,8 +155,8 @@ public final class TextUtil {
     /**
      * 某一位置是否紧邻汉字（前侧或后侧，跳过空白）。
      *
-     * <p>跳过空白是为了让 {@code 发热 , 咳嗽} 这种「标点两侧带空格」的写法也能识别出中文语境：
-     * 只看紧挨的一位会漏判（紧挨的是空格），于是半角逗号既没转全角、空格也没去掉。</p>
+     * 跳过空白是为了让 {@code 发热 , 咳嗽} 这种「标点两侧带空格」的写法也能识别出中文语境：
+     * 只看紧挨的一位会漏判（紧挨的是空格），于是半角逗号既没转全角、空格也没去掉。
      */
     private static boolean adjacentToCjk(String s, int i) {
         for (int j = i - 1; j >= 0; j--) {

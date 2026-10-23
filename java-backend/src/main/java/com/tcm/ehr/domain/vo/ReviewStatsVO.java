@@ -5,8 +5,8 @@ import lombok.Data;
 /**
  * 人工复核页概览统计：待复核 / 已完成 / 待复核超期 三个数。
  *
- * <p>由 GET /api/review/tasks/count 一次性返回 —— 替代原先的三次
- * {@code pageSize=1} 列表查询（每个都会附带一次全表排序，见性能审查 P1-5）。</p>
+ * 由 GET /api/review/tasks/count 一次性返回 —— 替代原先的三次
+ * {@code pageSize=1} 列表查询（每个都会附带一次全表排序，见性能审查 P1-5）。
  */
 @Data
 public class ReviewStatsVO {

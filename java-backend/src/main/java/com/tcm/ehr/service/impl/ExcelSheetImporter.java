@@ -18,13 +18,13 @@ import java.util.Set;
 /**
  * Excel 行/表头 → 病历实体的解析（批次 13 · 13.3 的第五个抽取对象）。
  *
- * <p>这一块是导入流程里「读表」的部分：建表头索引、校验必需列、逐行映射并记账、流式读 xlsx。
+ * 这一块是导入流程里「读表」的部分：建表头索引、校验必需列、逐行映射并记账、流式读 xlsx。
  * 它不含任何数据库或业务决策 —— 谁入库、入哪个组、怎么去重，仍由
- * RecordServiceImpl 决定。</p>
+ * RecordServiceImpl 决定。
  *
- * <p>两条读法（POI 全量读 .xls/.xlsx 与 SAX 流式读 .xlsx）**共用**这里的列映射与记账逻辑，
+ * 两条读法（POI 全量读 .xls/.xlsx 与 SAX 流式读 .xlsx）**共用**这里的列映射与记账逻辑，
  * 这是原代码刻意的设计，搬过来时一并保留：若各写一份，迟早出现「xlsx 导入少一列、xls 正常」
- * 这类只在某种格式下复现的问题。</p>
+ * 这类只在某种格式下复现的问题。
  */
 final class ExcelSheetImporter {
 
@@ -34,24 +34,24 @@ final class ExcelSheetImporter {
     /**
      * 单次导入的行数上限（**跨文件累计**，批次 25 · 25.2，与 26.3 合并评估）。
      *
-     * <p>为什么体积闸门不够：xlsx 是压缩包，50MB 完全可能是数百万行的纯文本表，
+     * 为什么体积闸门不够：xlsx 是压缩包，50MB 完全可能是数百万行的纯文本表，
      * 而解析结果在 saveBatch 之前全部驻留内存。实测过 20 万行就会先撞 POI 的单记录上限，
      * 真实数据集 35355 份（计划 §9 的 27.11）则要能一次进来 —— 故取 50000，
-     * 与词典导入 DictionaryServiceImpl.MAX_ROWS 同口径。</p>
+     * 与词典导入 DictionaryServiceImpl.MAX_ROWS 同口径。
      *
-     * <p>注：HTTP 层 {@code spring.servlet.multipart.max-request-size=50MB} 已经把
+     * 注：HTTP 层 {@code spring.servlet.multipart.max-request-size=50MB} 已经把
      * 「20 × 50MB ≈ 1GB」这条输入路径封死，26.3 的真正边界是行数而非总字节；
-     * POI 自带的 ZipSecureFile.minInflateRatio（默认 0.01）已覆盖 zip 膨胀。</p>
+     * POI 自带的 ZipSecureFile.minInflateRatio（默认 0.01）已覆盖 zip 膨胀。
      */
     static final int MAX_ROWS = 50000;
 
     /**
      * 是否已达行数上限；到达即记一条**文件级**失败并返回 true。
      *
-     * <p>两条读法（POI 全量读、SAX 流式读）与跨文件入口都调它，口径只此一份。
+     * 两条读法（POI 全量读、SAX 流式读）与跨文件入口都调它，口径只此一份。
      * 记成文件级失败而不是行级，是因为这不是「某一行有问题」，而是「这个文件不再继续读」，
      * 与「文件为空 / 单文件超过 50MB」同类；也绝不静默截断 —— 静默截断会让用户
-     * 以为整份文件都进来了。</p>
+     * 以为整份文件都进来了。
      */
     static boolean rowLimitReached(ImportSummaryVO summary, String filename) {
         if (summary.getTotal() < MAX_ROWS) {
@@ -70,14 +70,14 @@ final class ExcelSheetImporter {
      * 解析一个文件：文件级问题（空 / 超限 / 后缀不符 / 缺表头 / 缺必需列）记失败并返回；
      * 行级问题记失败明细；成功的行列进 parsedRows 并累积待查重登记号。
      *
-     * <p>「接诊时间」有值却解析不出的行按<b>行级失败</b>处理、不入库（见 {@link #requireParsedVisitTime}）：
+     * 「接诊时间」有值却解析不出的行按<b>行级失败</b>处理、不入库（见 {@link #requireParsedVisitTime}）：
      * 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、日期范围筛选、去重哈希
      * 同时悄悄退化（2026-09-28 的实际故障）；更严重的是两条仅日期不同的病历会被折成同一
-     * 去重哈希，后一条被误判「重复」而导入失败。</p>
+     * 去重哈希，后一条被误判「重复」而导入失败。
      *
-     * <p>按后缀分流：{@code .xlsx} 走 SAX 流式读（大文件不整本进内存），
+     * 按后缀分流：{@code .xlsx} 走 SAX 流式读（大文件不整本进内存），
      * 其余（{@code .xls}）走 POI 全量读。两条路径共用 {@link ExcelRowReader} 与
-     * {@link #processRow}，所以列映射口径一致。</p>
+     * {@link #processRow}，所以列映射口径一致。
      */
     static void importFile(MultipartFile file, ImportSummaryVO summary, List<Object[]> parsedRows,
                            Set<String> batchRegNos) {
@@ -267,8 +267,8 @@ final class ExcelSheetImporter {
     /**
      * 把一行按「字段名 → 文本」导出（仅非空字段）。
      *
-     * <p>供失败明细携带原始数据（让用户看到「失败的是哪一条、内容是什么」），
-     * 也是「仅重传失败行」编辑后回传的载荷形态。</p>
+     * 供失败明细携带原始数据（让用户看到「失败的是哪一条、内容是什么」），
+     * 也是「仅重传失败行」编辑后回传的载荷形态。
      */
     static Map<String, String> dumpRow(ExcelRowReader.RowAccess row, Map<String, Integer> idx) {
         Map<String, String> out = new LinkedHashMap<>();
@@ -284,11 +284,11 @@ final class ExcelSheetImporter {
     /**
      * 「接诊时间」校验：单元格有原值却解析不出 ⇒ 抛错（由调用侧记为该行失败、不入库）。
      *
-     * <p>原来只记 warn、照旧以 null 入库，后果是：两条<b>仅接诊时间不同</b>的病历
+     * 原来只记 warn、照旧以 null 入库，后果是：两条<b>仅接诊时间不同</b>的病历
      * 在库里都变成 null，去重哈希相同 ⇒ 第二条被误判「重复病历（21 字段完全一致）」而导入失败。
-     * 明确报错后，用户能看到「第 N 行接诊时间无法解析：<原文>」，修正源数据即可导入。</p>
+     * 明确报错后，用户能看到「第 N 行接诊时间无法解析：<原文>」，修正源数据即可导入。
      *
-     * <p>空单元格（原值也为空）不算失败：接诊时间允许缺失，只是不参与时间维度统计。</p>
+     * 空单元格（原值也为空）不算失败：接诊时间允许缺失，只是不参与时间维度统计。
      *
      * @param rawVisit 该行「接诊时间」列的原文本（可为空）
      * @throws IllegalArgumentException 有原值但解析失败时抛出
@@ -334,7 +334,7 @@ final class ExcelSheetImporter {
     /**
      * 「字段名 → 文本」→ 病历实体（用于「仅重传失败行」：前端编辑失败行后回传的载荷）。
      *
-     * <p>与 {@link #mapRow} 同一套字段口径，只是数据源从 Excel 行换成前端回传的键值表。</p>
+     * 与 {@link #mapRow} 同一套字段口径，只是数据源从 Excel 行换成前端回传的键值表。
      */
     static Record fromFields(Map<String, String> f) {
         Record r = new Record();

@@ -32,8 +32,9 @@ public class NlpExtractVO {
     private List<Herb> herbs = new ArrayList<>();
     /**
      * 问诊子项（任务 8·方案 A）：二便 / 睡眠 / 饮食 / 喜好 / 卧位 / 精神 / 面色 的整句。
-     * <p>抽取侧（python-nlp）把这类从 symptoms 挪进来；本字段<b>不参与归一 / 质控 / 统计</b>，
-     * 在 EntityNormalizer.normalizeMap 里原样透传，只为保留临床信息不被误判为症状未归一。</p>
+     *
+     * 抽取侧（python-nlp）把这类从 symptoms 挪进来；本字段<b>不参与归一 / 质控 / 统计</b>，
+     * 在 EntityNormalizer.normalizeMap 里原样透传，只为保留临床信息不被误判为症状未归一。
      */
     private List<Entity> inquiry = new ArrayList<>();
     private boolean modelAvailable;
@@ -41,10 +42,10 @@ public class NlpExtractVO {
     /**
      * 是否因文本过长被截断（Python 侧 NER 的 token 上限为 510）。
      *
-     * <p>截断时模型只看得到前 510 个 token，尾部实体静默丢失而响应照样说
+     * 截断时模型只看得到前 510 个 token，尾部实体静默丢失而响应照样说
      * {@code modelAvailable=true} —— 调用方无从判断「结果不完整」。
      * 规则兜底（舌象 / 脉象 / 病因 / 治法）始终用全文，所以这个标记只说明
-     * <b>模型那条路没看全</b>。（审查报告 L11）</p>
+     * <b>模型那条路没看全</b>。（审查报告 L11）
      */
     private boolean truncated;
 
@@ -52,9 +53,9 @@ public class NlpExtractVO {
      * 降级原因（{@link #REASON_DISABLED} / {@link #REASON_UNREACHABLE} / {@link #REASON_MODEL_MISSING}）；
      * 正常有产出时为 {@code null}。
      *
-     * <p>之前只下发一个 modelAvailable 布尔值，「功能没开」与「服务挂了」在前端
+     * 之前只下发一个 modelAvailable 布尔值，「功能没开」与「服务挂了」在前端
      * 无法区分，页面横幅只能写成「未开启，或抽取服务暂时不可用」，用户看不出该找谁、也不知道
-     * 能不能自助解决。这里把判定结果显式下发，前端即可按原因给不同的结论与下一步。</p>
+     * 能不能自助解决。这里把判定结果显式下发，前端即可按原因给不同的结论与下一步。
      */
     private String unavailableReason;
 

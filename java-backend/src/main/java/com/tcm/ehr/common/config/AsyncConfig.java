@@ -20,19 +20,19 @@ import java.util.concurrent.ThreadPoolExecutor;
  *       页内结果会死锁）。</li>
  * </ul>
  *
- * <p>所有池都用守护线程：进程退出不被非守护线程吊住。批量池的大小与属性取值一致，
- * 认领 worker 数 = qc.batch.concurrency / nlp.batch.concurrency。</p>
+ * 所有池都用守护线程：进程退出不被非守护线程吊住。批量池的大小与属性取值一致，
+ * 认领 worker 数 = qc.batch.concurrency / nlp.batch.concurrency。
  *
- * <p><b>关停策略：刻意不等在跑任务</b>（不设 setWaitForTasksToCompleteOnShutdown /
+ * <b>关停策略：刻意不等在跑任务</b>（不设 setWaitForTasksToCompleteOnShutdown /
  * setAwaitTerminationSeconds，两者默认 false）。在跑的可能是 150s 级的长响应，
  * 等它跑完会让关停迟迟不返回；宁可丢弃（前端会收到连接中断，可重试）也不阻塞关停。
- * 这是取舍、不是遗漏 —— 见《common组件审查报告》§4.9。</p>
+ * 这是取舍、不是遗漏 —— 见《common组件审查报告》§4.9。
  *
- * <p><b>线程命名与守护位交给 Spring 原生</b>（《common组件审查报告》§1.2）：不再自写
+ * <b>线程命名与守护位交给 Spring 原生</b>（《common组件审查报告》§1.2）：不再自写
  * ThreadFactory + AtomicInteger。{@link ThreadPoolTaskExecutor} 未显式设
  * ThreadFactory 时<b>以自身为工厂</b>，而它继承 CustomizableThreadFactory →
  * CustomizableThreadCreator，故 setThreadNamePrefix / setDaemon
- * 直接生效，线程名仍是 {@code <prefix><序号>}（序号从 1 起），与原先逐字一致。</p>
+ * 直接生效，线程名仍是 {@code <prefix><序号>}（序号从 1 起），与原先逐字一致。
  */
 @Configuration
 public class AsyncConfig {
@@ -72,10 +72,10 @@ public class AsyncConfig {
     /**
      * 数据清洗任务的常驻 worker 池，大小 = clean.batch.concurrency（默认 1）。
      *
-     * <p><b>必须独立成池，不能复用 qcBatchExecutor</b>：批量 worker 是
+     * <b>必须独立成池，不能复用 qcBatchExecutor</b>：批量 worker 是
      * {@code while(running)} 的常驻循环，会<b>永久占满</b>它所在池的全部线程；
      * 池大小本就是「常驻 worker 数」。若清洗 worker 也 submit 到质控池，
-     * 它只会排在队列里<b>永不执行</b>（表现为任务永远停在 QUEUED）。</p>
+     * 它只会排在队列里<b>永不执行</b>（表现为任务永远停在 QUEUED）。
      */
     @Bean
     public ThreadPoolTaskExecutor cleanBatchExecutor(@Value("${clean.batch.concurrency:1}") int concurrency) {

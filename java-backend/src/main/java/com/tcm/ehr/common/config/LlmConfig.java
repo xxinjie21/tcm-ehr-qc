@@ -3,9 +3,9 @@ package com.tcm.ehr.common.config;
 /**
  * LLM 生效配置的一份快照。
  *
- * <p>与 {@link LlmProperties}（application.yml 基线）区分：本记录表示<b>当前实际生效</b>的参数，
+ * 与 {@link LlmProperties}（application.yml 基线）区分：本记录表示<b>当前实际生效</b>的参数，
  * 可能来自配置文件，也可能来自运行时覆盖（topbar「导入 LLM」弹窗）。覆盖只改内存、不写回
- * application.yml，因此重启后回到配置文件基线。</p>
+ * application.yml，因此重启后回到配置文件基线。
  */
 public record LlmConfig(boolean enabled, String provider, String baseUrl, String apiKey,
                         String model, Double temperature, int timeout,
@@ -17,8 +17,8 @@ public record LlmConfig(boolean enabled, String provider, String baseUrl, String
     /**
      * 不含功能开关的构造：所有功能默认跟随总开关开启。
      *
-     * <p>保留它是为了让「只关心连接参数」的调用点（连通性探测、单元测试）
-     * 不必为三个开关操心 —— 它们本来就不该管功能维度的启停。</p>
+     * 保留它是为了让「只关心连接参数」的调用点（连通性探测、单元测试）
+     * 不必为三个开关操心 —— 它们本来就不该管功能维度的启停。
      */
     public LlmConfig(boolean enabled, String provider, String baseUrl, String apiKey,
                      String model, Double temperature, int timeout) {

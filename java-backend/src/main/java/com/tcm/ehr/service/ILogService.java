@@ -29,8 +29,8 @@ public interface ILogService {
     /**
      * 按对象查该对象的活动流（对标 D3）。
      *
-     * <p>与 {@link #page} 同一套可见范围（成员只见本组织、看全部的组织不加 operator 限制），
-     * 只额外按 object_type + object_id 精确过滤 —— 这是「这条病历被谁改过」的查询入口。</p>
+     * 与 {@link #page} 同一套可见范围（成员只见本组织、看全部的组织不加 operator 限制），
+     * 只额外按 object_type + object_id 精确过滤 —— 这是「这条病历被谁改过」的查询入口。
      *
      * @param objectType 对象类型，如 record
      * @param objectId   对象 ID
@@ -76,8 +76,8 @@ public interface ILogService {
     /**
      * 某操作人最近的 n 条日志。
      *
-     * <p><b>当前无消费方</b>：原为「AI 助手」拼装「我做了什么」上下文所用，该功能已移除。
-     * 保留是因为日志页的「按操作人查」正需要这个形态的查询，不必再写一遍。</p>
+     * <b>当前无消费方</b>：原为「AI 助手」拼装「我做了什么」上下文所用，该功能已移除。
+     * 保留是因为日志页的「按操作人查」正需要这个形态的查询，不必再写一遍。
      *
      * @param operator 操作人用户名
      * @param limit    最多返回条数

@@ -39,8 +39,8 @@ public class GlobalExceptionHandler {
     /**
      * 统一错误响应：HTTP 状态 + {@code Result{code,msg}}。
      *
-     * <p>本类的 handler 几乎都是这个形状，原先各写一遍 {@code ResponseEntity.status(..).body(Result.error(..))}；
-     * 收敛到此处一处，新增 handler 不会再漏掉统一形态（审查报告 §2.8）。</p>
+     * 本类的 handler 几乎都是这个形状，原先各写一遍 {@code ResponseEntity.status(..).body(Result.error(..))}；
+     * 收敛到此处一处，新增 handler 不会再漏掉统一形态（审查报告 §2.8）。
      */
     private static ResponseEntity<Result<Void>> error(HttpStatus status, int code, String msg) {
         return ResponseEntity.status(status).body(Result.error(code, msg));
@@ -315,10 +315,10 @@ public class GlobalExceptionHandler {
      * 响应媒体类型不可接受（客户端 Accept 里没有服务端能产出的类型，
      * 例如带 {@code Accept: text/plain} 调一个 JSON 端点）。
      *
-     * <p><b>为什么返回空 body（C1）</b>：走到这里说明内容协商已经失败过一次 ——
+     * <b>为什么返回空 body（C1）</b>：走到这里说明内容协商已经失败过一次 ——
      * 再返回 Result 包装体，Spring 仍协商不出可写的媒体类型，会**再抛同一个异常**，
      * 最终落成 500。Spring 自带的 ResponseEntityExceptionHandler 对同一异常也是
-     * 返回空 body 的 406，此处与之一致。修复前该异常没有处理器，直接落兜底的 500。</p>
+     * 返回空 body 的 406，此处与之一致。修复前该异常没有处理器，直接落兜底的 500。
      *
      * @param e 媒体类型异常
      * @return HTTP 406（无 body）

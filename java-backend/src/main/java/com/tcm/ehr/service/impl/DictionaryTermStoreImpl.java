@@ -32,13 +32,13 @@ import java.util.UUID;
  * 组织级词典存储：词条落 dictionary_terms，版本对账落 dictionary_versions，
  * 导入前存档落 dictionary_backups。
  *
- * <p><b>组织维度语义</b>：orgId 为空串 {@code ""} = <b>基础层</b>（全组织共享）。
+ * <b>组织维度语义</b>：orgId 为空串 {@code ""} = <b>基础层</b>（全组织共享）。
  * 某组织没有自有词条时<b>读到基础层</b>，而不是读到空 —— 空会让归一把该组织的所有术语
- * 判成「词典里没有」，分数全塌。</p>
+ * 判成「词典里没有」，分数全塌。
  *
- * <p><b>为什么版本号入表</b>：ES 的 _meta.version 是索引级的，分不清组织。
+ * <b>为什么版本号入表</b>：ES 的 _meta.version 是索引级的，分不清组织。
  * 灌完 ES 只更新 dictionary_versions.indexed_version，没灌成功就不动它 ——
- * 这样「DB 已改、ES 没跟上」在启动对账时能被真实地看见，而不是被一个索引级标记掩盖。</p>
+ * 这样「DB 已改、ES 没跟上」在启动对账时能被真实地看见，而不是被一个索引级标记掩盖。
  */
 @Slf4j
 @Service
@@ -53,9 +53,9 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 召回索引缓存（P1-15 / S1）：键 {@code org|type}，版本 = 「本组织内容哈希 + 基础层内容哈希」。
      *
-     * <p>与 termsCache 同一套版本号，因此失效走的是同一条通道（写路径主动失效 +
+     * 与 termsCache 同一套版本号，因此失效走的是同一条通道（写路径主动失效 +
      * 版本比对），没有新增任何失效机制。基础层变更会改变版本串的前半段，
-     * 于是所有组织的索引一并自然失效。</p>
+     * 于是所有组织的索引一并自然失效。
      */
     private final com.tcm.ehr.common.utils.VersionedCache<RecallIndex> recallIndexCache =
             new com.tcm.ehr.common.utils.VersionedCache<>(64);
@@ -75,13 +75,13 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 版本号缓存（批次 12 · 12a）：键 {@code org|type}，TTL 5 秒 + 写路径主动失效。
      *
-     * <p>为什么值得缓存：read 每次都要查一次 dictionary_versions 才知道词条缓存是否
+     * 为什么值得缓存：read 每次都要查一次 dictionary_versions 才知道词条缓存是否
      * 失效，而 readEffective 要读两层 ⇒ 一次读就是 <b>2 次</b>版本查询；NLP 归一按记录反复
-     * 调它，同一份版本号被查了成百上千次 —— 这正是 12a 说的「每条查 4 次词典元数据」。</p>
+     * 调它，同一份版本号被查了成百上千次 —— 这正是 12a 说的「每条查 4 次词典元数据」。
      *
-     * <p><b>不脏读的做法</b>：① 写路径（{@link #replace} 与 saveVersion）主动失效 ⇒
+     * <b>不脏读的做法</b>：① 写路径（{@link #replace} 与 saveVersion）主动失效 ⇒
      * 本实例内的改动立即生效；② 仍留 5 秒 TTL，覆盖「别的实例改了词表」的情况 ——
-     * 跨实例最多迟 5 秒。词表改动不是高频操作，5 秒的可感延迟远小于「每条记录查一次库」的代价。</p>
+     * 跨实例最多迟 5 秒。词表改动不是高频操作，5 秒的可感延迟远小于「每条记录查一次库」的代价。
      */
     private static final long VERSION_CACHE_TTL_MS = 5_000L;
 
@@ -129,12 +129,12 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 一次读回某组织「基础层 ∪ 本组织」生效的全部词条，按 type 分组（消除报告/看板的 N+1）。
      *
-     * <p>与逐类调用 {@link #readEffective} 同口径（本组织同标准词覆盖基础层）：用一条
+     * 与逐类调用 {@link #readEffective} 同口径（本组织同标准词覆盖基础层）：用一条
      * {@code org_id IN ('', ?)} 取回两层，再在内存里按 type 合并。整趟只发 1 条 SQL，
-     * 替代「8 类 × 2 层」最多 32 条（每条 read 都带一次版本查询 + 一次词条查询）。</p>
+     * 替代「8 类 × 2 层」最多 32 条（每条 read 都带一次版本查询 + 一次词条查询）。
      *
-     * <p>刻意<b>不走</b> termsCache：它按 (org,type) 分片缓存，缓存命中要逐个类型查版本号，
-     * 反而无法一趟取回。这里一次库查询的代价远低于逐类版本查询，且结果一次用完即弃。</p>
+     * 刻意<b>不走</b> termsCache：它按 (org,type) 分片缓存，缓存命中要逐个类型查版本号，
+     * 反而无法一趟取回。这里一次库查询的代价远低于逐类版本查询，且结果一次用完即弃。
      */
     @Override
     public Map<String, List<TermEntry>> readEffectiveAll(String orgId) {
@@ -178,12 +178,12 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 取召回索引（P1-15 / S1）：生效词条表 + 它的字符倒排表，一次装载、同源返回。
      *
-     * <p><b>为什么缓存的是「合并后的生效词条」</b>：{@link #readEffective} 每次都要把两层
+     * <b>为什么缓存的是「合并后的生效词条」</b>：{@link #readEffective} 每次都要把两层
      * 合并一遍（O(D)），而召回索引本来就要遍历一遍全部词条 —— 合并与建表在同一次装载里做完，
-     * 之后按版本复用。</p>
+     * 之后按版本复用。
      *
-     * <p>版本串取「本组织哈希 + 基础层哈希」两段：任一层内容变了版本必变，
-     * 不必区分「这次变的是哪一层」。基础层为空时对应的那段是空串，不影响判等。</p>
+     * 版本串取「本组织哈希 + 基础层哈希」两段：任一层内容变了版本必变，
+     * 不必区分「这次变的是哪一层」。基础层为空时对应的那段是空串，不影响判等。
      */
     @Override
     public RecallIndex recallIndex(String orgId, String type) {
@@ -193,8 +193,8 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 按作用域取召回索引（P2-9：词典页搜索复用同一份倒排表）。
      *
-     * <p>缓存键比 2 参版多一档作用域，版本号与失效通道完全共用 —— 任一层内容变了，
-     * 三个作用域的索引一起自然失效。</p>
+     * 缓存键比 2 参版多一档作用域，版本号与失效通道完全共用 —— 任一层内容变了，
+     * 三个作用域的索引一起自然失效。
      */
     @Override
     public RecallIndex recallIndex(String orgId, String type, String scope) {
@@ -234,13 +234,13 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 由词条表建字符倒排索引。
      *
-     * <p>登记范围是「标准词 + 各别名」—— 与 overlap 的比对范围一致（一个词条的多串取最大），
-     * 少登记任何一串都会让本该入选的词条漏掉。空串 / null 不登记（它们与任何原文的交集都是 0）。</p>
+     * 登记范围是「标准词 + 各别名」—— 与 overlap 的比对范围一致（一个词条的多串取最大），
+     * 少登记任何一串都会让本该入选的词条漏掉。空串 / null 不登记（它们与任何原文的交集都是 0）。
      *
-     * <p>每个串的编号按「词条序 → 串序」递增分配，因此各字符的倒排表天然按下标升序，
-     * 调用方可以直接顺序扫描。</p>
+     * 每个串的编号按「词条序 → 串序」递增分配，因此各字符的倒排表天然按下标升序，
+     * 调用方可以直接顺序扫描。
      *
-     * <p>包级可见是为了让「索引与全表扫描召回结果一致」这条性质能被同步测试直接钉住。</p>
+     * 包级可见是为了让「索引与全表扫描召回结果一致」这条性质能被同步测试直接钉住。
      */
     static RecallIndex buildRecallIndex(List<TermEntry> entries) {
         // 1. 逐词条登记它参与比对的串，并记下「串 → 词条」的归属
@@ -301,8 +301,8 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 取版本号，带 5 秒 TTL 的缓存（批次 12 · 12a）。
      *
-     * <p>写路径会主动失效 ⇒ 本实例内的改动立即生效；跨实例最多迟 {@link #VERSION_CACHE_TTL_MS}。
-     * 「版本行不存在」（null）也会被缓存：那种行随后会被 upsertVersion 写入并失效缓存。</p>
+     * 写路径会主动失效 ⇒ 本实例内的改动立即生效；跨实例最多迟 {@link #VERSION_CACHE_TTL_MS}。
+     * 「版本行不存在」（null）也会被缓存：那种行随后会被 upsertVersion 写入并失效缓存。
      */
     private DictionaryVersion cachedVersion(String org, String type) {
         String key = org + "|" + type;
@@ -319,9 +319,9 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 提交后让两层缓存失效（批次 26.8）。
      *
-     * <p>在事务内提前失效，别的线程可能在词条行尚未提交时就按旧版本回填缓存，
+     * 在事务内提前失效，别的线程可能在词条行尚未提交时就按旧版本回填缓存，
      * 之后一直读到旧内容；推迟到 afterCommit 才能保证「提交即可见」。
-     * 无活动事务时（单测直调 replace）立即失效。</p>
+     * 无活动事务时（单测直调 replace）立即失效。
      */
     private void invalidateCachesAfterCommit(String org, String type) {
         Runnable invalidate = () -> {
@@ -371,8 +371,8 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 覆盖写入某组织的整类词条，并更新内容版本。
      *
-     * <p>写入与版本更新在<b>同一事务</b>：否则「词条换了、版本没换」会让启动对账
-     * 判定「已同步」而跳过重建，ES 里就永远停在这一版。</p>
+     * 写入与版本更新在<b>同一事务</b>：否则「词条换了、版本没换」会让启动对账
+     * 判定「已同步」而跳过重建，ES 里就永远停在这一版。
      *
      * @param orgId   组织号
      * @param type    术语类型
@@ -413,8 +413,8 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 记录「已灌入 ES」的版本。
      *
-     * <p>只在 ES 灌成功<b>之后</b>调用。灌失败绝不能调：调了就是「谎报已同步」，
-     * 启动对账会跳过重建，归一永远用旧索引。</p>
+     * 只在 ES 灌成功<b>之后</b>调用。灌失败绝不能调：调了就是「谎报已同步」，
+     * 启动对账会跳过重建，归一永远用旧索引。
      */
     public void markIndexed(String orgId, String type, String indexedVersion) {
         String org = norm(orgId);
@@ -467,7 +467,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 该层是否「已同步到 ES」：有版本行且 indexedVersion 追上 version。
      *
-     * <p>基础层改动会让所有组织的行都落后，故额外要求基础层也同步过。</p>
+     * 基础层改动会让所有组织的行都落后，故额外要求基础层也同步过。
      */
     public boolean isSynced(String orgId, String type) {
         DictionaryVersion v = findVersion(orgId, type);
@@ -492,8 +492,8 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
                         /**
      * 内容版本：标准词排序后取 SHA-256 前 32 位。
      *
-     * <p>排序是必须的：不排序的话同一份词条换个导入顺序就换版本，
-     * 每次导入都触发一次全量 ES 重建。</p>
+     * 排序是必须的：不排序的话同一份词条换个导入顺序就换版本，
+     * 每次导入都触发一次全量 ES 重建。
      */
     public String contentVersion(List<TermEntry> entries) {
         // 哈希输入必须覆盖「归一判定真正用到的字段」：只哈希标准词的话，
@@ -523,12 +523,12 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 该组织归一<b>实际用到</b>的词典状态摘要：5 类词典各自「本组织 → 基础层」的有效版本。
      *
-     * <p><b>为什么不能用文件哈希</b>（原 {@code currentVersion()}）：词典源在批次 8b 已从文件
+     * <b>为什么不能用文件哈希</b>（原 {@code currentVersion()}）：词典源在批次 8b 已从文件
      * 改成这张表，文件哈希从此<b>冻结不变</b> —— 库里 500 条记录的 dictVersion
-     * 全都是同一个值，既无法区分、也<b>不代表真正用的那版词典</b>。</p>
+     * 全都是同一个值，既无法区分、也<b>不代表真正用的那版词典</b>。
      *
-     * <p>实现上只读 dictionary_versions（每 (org,type) 一行），
-     * 是两次轻查询；不重读词条 —— 词条量大（pattern 类两千多条）时重读会拖慢批量解析。</p>
+     * 实现上只读 dictionary_versions（每 (org,type) 一行），
+     * 是两次轻查询；不重读词条 —— 词条量大（pattern 类两千多条）时重读会拖慢批量解析。
      *
      * @param orgId 组织号；空串/null 视为基础层
      * @return 5 类有效版本拼成的摘要串（未收录的类型跳过）
@@ -563,8 +563,8 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 该组织归一实际覆盖的词典词条总数（5 类求和，按「本组织 → 基础层」取其一）。
      *
-     * <p>用来把版本串翻译成「依据 N 条词条」——用户看到的是一个哈希时无从判断它代表什么，
-     * 看到「依据 3,589 条词条 · 采集于 2026-10-02」才知道用的是多大的词库。</p>
+     * 用来把版本串翻译成「依据 N 条词条」——用户看到的是一个哈希时无从判断它代表什么，
+     * 看到「依据 3,589 条词条 · 采集于 2026-10-02」才知道用的是多大的词库。
      */
     public int effectiveTermCount(String orgId) {
         String org = norm(orgId);

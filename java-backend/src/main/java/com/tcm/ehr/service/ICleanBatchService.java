@@ -8,8 +8,8 @@ import java.util.List;
 /**
  * 数据清洗任务编排（异步）：提交 / 查进度 / 取消 / 列表。
  *
- * <p>清洗由同步接口改异步任务后，任务生命周期（排队、进度、取消、终态）
- * 单独成服务，与清洗业务逻辑（{@link IGovernanceService#clean}）解耦。</p>
+ * 清洗由同步接口改异步任务后，任务生命周期（排队、进度、取消、终态）
+ * 单独成服务，与清洗业务逻辑（{@link IGovernanceService#clean}）解耦。
  */
 public interface ICleanBatchService {
 

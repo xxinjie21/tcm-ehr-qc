@@ -79,9 +79,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 单条完整性 + 格式检查，只读、不落库。
      *
-     * <p>结构化数据取请求优先、病历回退（缺省时按 recordId 载入）；完整性元素在
+     * 结构化数据取请求优先、病历回退（缺省时按 recordId 载入）；完整性元素在
      * 「结构化字段缺失且原始字段回退也为空」时记入缺失清单，格式规则仅对已载入的原始病历逐条
-     * 校验。单条检查不做重复判定，duplicate 恒为 false。</p>
+     * 校验。单条检查不做重复判定，duplicate 恒为 false。
      *
      * @param dto 检查请求（recordId + 可选 structuredData），可为 null
      * @return 缺失字段清单与格式错误清单
@@ -121,10 +121,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 一致性（逻辑冲突）检查，只读。
      *
-     * <p>把请求中的证型 / 治法 / 中药 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
-     * dto 为 null 时按空数据检查，结果视为无冲突。</p>
-     * <p>⚠️ 中药的 map key 必须是 herbs（= EntityTypes 里 herb 的 structuredKey），
-     * 写成 herbList（DTO 的属性名）会让「证候 → 中药」规则永远取不到值。</p>
+     * 把请求中的证型 / 治法 / 中药 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
+     * dto 为 null 时按空数据检查，结果视为无冲突。
+     *
+     * ⚠️ 中药的 map key 必须是 herbs（= EntityTypes 里 herb 的 structuredKey），
+     * 写成 herbList（DTO 的属性名）会让「证候 → 中药」规则永远取不到值。
      *
      * @param dto 含 patternList / treatmentList / formulaList / herbList 的检查请求，可为 null
      * @return 冲突清单及「是否一致」标志（冲突为空即一致）
@@ -153,8 +154,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 单条评分，只读（不写回 records，也不生成复核任务）。
      *
-     * <p>结构化数据取请求优先、病历回退；structuredData 与 recordId 至少提供
-     * 其一。评分按当前规则执行，重复标志固定为 false。</p>
+     * 结构化数据取请求优先、病历回退；structuredData 与 recordId 至少提供
+     * 其一。评分按当前规则执行，重复标志固定为 false。
      *
      * @param dto 评分请求（recordId + 可选 structuredData），可为 null
      * @return 得分、等级与扣分明细
@@ -179,18 +180,18 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 处理单条：现算评分 → 回写 records → 幂等 upsert 复核任务 → 计入分级统计。
      *
-     * <p>§七 L5：供异步 worker（QcBatchServiceImpl）复用本方法处理单条，
-     * 避免在两个类里实现两份「现算 + 回写 + 复核任务」逻辑（两者口径一旦分岔就会让重算结果对不上）。</p>
+     * §七 L5：供异步 worker（QcBatchServiceImpl）复用本方法处理单条，
+     * 避免在两个类里实现两份「现算 + 回写 + 复核任务」逻辑（两者口径一旦分岔就会让重算结果对不上）。
      *
-     * <p><b>为什么是 public</b>：Spring 基于代理的 {@code @Transactional} <b>只对 public 方法生效</b>。
+     * <b>为什么是 public</b>：Spring 基于代理的 {@code @Transactional} <b>只对 public 方法生效</b>。
      * 本方法原为包级可见，注解加在上面等于没加（编译通过、运行期静默不开事务）；
-     * 调用方是<b>另一个 Bean</b>（QcBatchServiceImpl），走的是代理，改 public 后才真正生效。</p>
+     * 调用方是<b>另一个 Bean</b>（QcBatchServiceImpl），走的是代理，改 public 后才真正生效。
      *
-     * <p><b>事务边界</b>：本方法先写 records 再 upsert review_tasks，
+     * <b>事务边界</b>：本方法先写 records 再 upsert review_tasks，
      * 中途异常会留下「分数已写、复核任务未建」的脏状态，故整段包在一个事务里。
      * {@code rollbackFor = Exception.class} 必写：默认只回滚 RuntimeException，
      * 而本方法 {@code throws Exception}，漏了会静默不回滚。
-     * 逐条一个事务是<b>刻意的</b>：调用方按条 catch，一条失败不该把整批已成功的回滚掉。</p>
+     * 逐条一个事务是<b>刻意的</b>：调用方按条 catch，一条失败不该把整批已成功的回滚掉。
      */
     @Transactional(rollbackFor = Exception.class)
     public void processOne(Record r, QcBatchResultVO result, Set<String> seenHash, QcRuleSet rules) throws Exception {
@@ -225,15 +226,15 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 复核任务幂等 upsert：待复核则新增/更新，否则把该病历未作废的任务置为作废。
      *
-     * <p>作废而不是删除：历史复核轨迹要留，查询侧按 {@code is_obsolete=0} 过滤。</p>
+     * 作废而不是删除：历史复核轨迹要留，查询侧按 {@code is_obsolete=0} 过滤。
      *
-     * <p><b>为什么走 SQL 语义 upsert 而不再「先查后写」</b>（批次 4）：DB 侧已加
+     * <b>为什么走 SQL 语义 upsert 而不再「先查后写」</b>（批次 4）：DB 侧已加
      * uk_record_active（生成列，约束「一个病历至多一条活跃任务」）。
      * 原来的 {@code selectList → update / insert} 是 check-then-act，并发两个线程
      * 都能查到空、都去 insert，其中一个撞唯一键 → 从「静默重复」变成「整批 500」。
-     * {@code INSERT ... ON DUPLICATE KEY UPDATE} 由唯一索引直接仲裁，没有这个窗口。</p>
+     * {@code INSERT ... ON DUPLICATE KEY UPDATE} 由唯一索引直接仲裁，没有这个窗口。
      *
-     * <p>作废路径不需要唯一键仲裁（更新不产生新行），仍用一条 UPDATE。</p>
+     * 作废路径不需要唯一键仲裁（更新不产生新行），仍用一条 UPDATE。
      */
     private void upsertReviewTask(Record r, ScoreResultVO vo) {
         LocalDateTime now = LocalDateTime.now().withNano(0);
@@ -285,7 +286,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 读取当前生效的质控规则，只读。
      *
-     * <p>返回规则本体、自然语言描述、字段目录、加载告警与一致性摘要（同一来源组装）。</p>
+     * 返回规则本体、自然语言描述、字段目录、加载告警与一致性摘要（同一来源组装）。
      *
      * @return 当前规则视图
      */
@@ -297,7 +298,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 覆盖当前质控规则，并返回覆盖后的视图。
      *
-     * <p>规则写入 {@link QcRuleStore} 后立即生效，后续检查 / 评分 / 重算都使用新规则。</p>
+     * 规则写入 {@link QcRuleStore} 后立即生效，后续检查 / 评分 / 重算都使用新规则。
      *
      * @param rules 新的规则集
      * @return 覆盖后的规则视图（含加载告警）
@@ -338,22 +339,22 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 扣分聚合统计，只读。
      *
-     * <p>范围先经数据域过滤，按 1000 条/页扫描，最多扫描 {@value #MAX_SCAN_RECORDS} 条；
+     * 范围先经数据域过滤，按 1000 条/页扫描，最多扫描 {@value #MAX_SCAN_RECORDS} 条；
      * 触顶时置 truncated 标记并停止。等级分布按 grade 列直接统计，
      * 扣分数据优先读库内已存评分结果（qc_results），缺失则按当前规则现算，
-     * 再按扣分类型与「类型|条目」两级聚合次数和分值。明细按分值降序取前 20。</p>
+     * 再按扣分类型与「类型|条目」两级聚合次数和分值。明细按分值降序取前 20。
      *
-     * <p><b>两段式扫描（§七 L4）</b>：主扫描只 SELECT {@code id / grade / qc_results} 三列
+     * <b>两段式扫描（§七 L4）</b>：主扫描只 SELECT {@code id / grade / qc_results} 三列
      * —— 原来的 selectPage 拉的是整行，含 present_illness /
      * chief_complaint 等 TEXT 大字段，40000 条会把这些列全部拉进堆里。
      * 只有「qc_results 为空」的记录才需要现算，而现算必须拿到
      * structured_data + 19 个原始列（QcScorer 的回退要用），
      * 故这些 id 收集起来、分批回查整行再算（慢路径，重算后通常几乎为空集）。
-     * ⚠️ 不可「只选 3 列就直接现算」—— 那样未评分记录会被误判为「要素全缺失」而扣满分。</p>
+     * ⚠️ 不可「只选 3 列就直接现算」—— 那样未评分记录会被误判为「要素全缺失」而扣满分。
      *
-     * <p><b>已知边界</b>：导入后未重算时 qc_results 全为空 → 回退子集 = 全库，
+     * <b>已知边界</b>：导入后未重算时 qc_results 全为空 → 回退子集 = 全库，
      * 两段式退化为「全量回查」，收益归零（与改造前同慢）。重算后才几乎命中不到回退。
-     * 若首屏仍慢，先跑一次重算（§七 L5），或给本接口加 60s Redis 缓存。</p>
+     * 若首屏仍慢，先跑一次重算（§七 L5），或给本接口加 60s Redis 缓存。
      *
      * @param filters 用户筛选条件，可为 null（表示不限）
      * @return 类型 / 条目扣分聚合、等级分布、扫描条数与是否被截断
@@ -483,9 +484,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 快路径：只读库内已存的 qc_results；没有或解析失败返回 {@code null}（交慢路径现算）。
      *
-     * <p>单独拆出来是因为它<b>不需要任何原始列</b>，可以在「只 SELECT id/grade/qc_results」
+     * 单独拆出来是因为它<b>不需要任何原始列</b>，可以在「只 SELECT id/grade/qc_results」
      * 的窄扫描里跑完；慢路径 {@link #scoreOf} 则依赖 structured_data 与 19 个原始列，
-     * 必须回查整行。</p>
+     * 必须回查整行。
      */
     private ScoreResultVO readStoredScore(Record r) {
         if (r.getQcResults() == null || r.getQcResults().isBlank()) {
@@ -524,8 +525,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 按 ID 取病历；ID 为空返回 null（由上层转 400/404）。
      *
-     * <p>§ 6.3 缺点 6：取到后验证组，不属于本组返回 null
-     * （统一按不存在处理，不泄露“存在但看不到”）。</p>
+     * § 6.3 缺点 6：取到后验证组，不属于本组返回 null
+     * （统一按不存在处理，不泄露“存在但看不到”）。
      */
     private Record loadRaw(String recordId) {
         if (recordId == null || recordId.isBlank()) {
