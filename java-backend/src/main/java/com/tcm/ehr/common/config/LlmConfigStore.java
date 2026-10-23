@@ -188,9 +188,18 @@ public class LlmConfigStore {
                 + "|" + row.getReviewEnabled() + "|" + row.getTermSuggestEnabled();
     }
 
-    /** 用户行没配（迁移前的历史行留着 NULL）时沿用基线 */
-    private static boolean flag(Boolean value, boolean base) {
-        return value == null ? base : value;
+    /**
+     * 取用户行配置值，未配置时回落基线。
+     *
+     * 迁移前的历史行这三个开关列是 NULL（不是 false），必须与「显式关闭」区分开：
+     * false 是用户主动关掉的，NULL 才代表「还没配过、沿用基线」。
+     *
+     * @param userValue 用户行配置值，null 表示未配置
+     * @param baseline  基线默认值（用户未配置时采用）
+     * @return 实际生效的开关值
+     */
+    private static boolean resolveFlag(Boolean userValue, boolean baseline) {
+        return userValue == null ? baseline : userValue;
     }
 
     /** 用户行覆盖基线；用户没配就返回基线本身 */
@@ -207,9 +216,9 @@ public class LlmConfigStore {
                 row.getModel() != null ? row.getModel() : base.model(),
                 row.getTemperature() != null ? row.getTemperature() : base.temperature(),
                 row.getTimeout() != null ? row.getTimeout() : base.timeout(),
-                flag(row.getInterpretEnabled(), base.interpretEnabled()),
-                flag(row.getReviewEnabled(), base.reviewEnabled()),
-                flag(row.getTermSuggestEnabled(), base.termSuggestEnabled()));
+                resolveFlag(row.getInterpretEnabled(), base.interpretEnabled()),
+                resolveFlag(row.getReviewEnabled(), base.reviewEnabled()),
+                resolveFlag(row.getTermSuggestEnabled(), base.termSuggestEnabled()));
     }
 
     /** 当前生效配置 */
