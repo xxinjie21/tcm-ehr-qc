@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.QcScorer;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import tools.jackson.core.JacksonException;
@@ -189,7 +190,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             String textHash = RecordUtil.textHash(r);
             if (!seenTextHash.add(textHash)) {
                 baseMapper.updateCleanFields(r.getId(), trim(r.getGender()), trim(r.getAge()),
-                        trim(r.getPattern()), trim(r.getPrescription()), "invalid", "无效");
+                        trim(r.getPattern()), trim(r.getPrescription()), "invalid", QcScorer.GRADE_INVALID);
                 // 与下面「不可修复」分支同理：隔离必须同步作废待复核任务
                 reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
                 vo.setDeduped(vo.getDeduped() + 1);
@@ -231,7 +232,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (isolatedNow) {
                 vo.setIsolated(vo.getIsolated() + 1);
                 status = "invalid";
-                grade = "无效";
+                grade = QcScorer.GRADE_INVALID;
                 // 隔离必须同步作废待复核任务：不作废的话它仍挂在复核页，
                 // 而复核会按当前数据重算，把「无效」翻回「合格」——隔离结论就被撤销了
                 reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
@@ -268,7 +269,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 } catch (DataIntegrityViolationException dup) {
                     // 撞唯一键 = 该机构内已有一条内容相同的病历，与本方法开头的去重是同一结论
                     log.warn("[清洗] 病历 {} 回写 text_hash 撞唯一键，按重复处理并置为无效", r.getId());
-                    baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, "invalid", "无效");
+                    baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, "invalid", QcScorer.GRADE_INVALID);
                     reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
                     vo.setDeduped(vo.getDeduped() + 1);
                     continue;
@@ -285,12 +286,12 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             //     为什么要 markGoverned：不标记会让这批病历永远落在「待清洗」，
             //     且被导出条件 governed=1 永久排除 —— 那是「没清洗」，不是「清洗了但跳过归一」。
             if (skipNormalize) {
-                if ("合格".equals(grade) && structured != null) {
+                if (QcScorer.GRADE_QUALIFIED.equals(grade) && structured != null) {
                     baseMapper.markGoverned(r.getId());
                 }
                 continue;
             }
-            if ("合格".equals(grade) && structured != null) {
+            if (QcScorer.GRADE_QUALIFIED.equals(grade) && structured != null) {
                 // 人工标记读标量列（性能审查 P1-2#2）：manually_edited 是 STORED 生成列，
                 // 与 _meta.manuallyEdited 同源，无需在这里再解析一遍 JSON
                 if (Boolean.TRUE.equals(r.getManuallyEdited())) {
@@ -342,7 +343,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             // 不加这一项时每次都在全范围重跑（本条件由调用方按需开启）。
             scope.setOnlyUncleaned(filters.getOnlyUncleaned());
         }
-        scope.setGrade("合格");
+        scope.setGrade(QcScorer.GRADE_QUALIFIED);
         return scope;
     }
 
@@ -851,7 +852,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // 2. 追加导出自己的硬约束：只导「合格且已清洗」的病历。
         //    governed=1 是清洗完成的标记（术语归一跑过、且不是人工跳过的那一类），
         //    少了它，从未归一过的结构化数据会以「标准数据集」的名义被导出去
-        wrapper.eq("grade", "合格");
+        wrapper.eq("grade", QcScorer.GRADE_QUALIFIED);
         wrapper.eq("governed", 1);
         return wrapper;
     }
