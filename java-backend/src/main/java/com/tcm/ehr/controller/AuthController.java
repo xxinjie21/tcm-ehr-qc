@@ -30,7 +30,7 @@ public class AuthController {
     /**
      * 注册账号（阶段2 起有两种形态）。
      *
-     * <p>角色由后端固定为「用户」，不采信前端传入的角色；用户名重复、参数非法、
+     * <p>【权限：匿名可访问】角色由后端固定为「用户」，不采信前端传入的角色；用户名重复、参数非法、
      * 课题组编码被占用时返回 400。</p>
      *
      * <p><b>① 只注册</b> → 账号一律 {@code active}，无组织时登录后进入「我的组织」引导页。
@@ -53,7 +53,7 @@ public class AuthController {
     /**
      * 登录并下发访问凭证。
      *
-     * <p>用户名或密码错误返回 401；账号被停用（{@code status=disabled}）
+     * <p>【权限：匿名可访问】用户名或密码错误返回 401；账号被停用（{@code status=disabled}）
      * 或所属课题组被停用（{@code status=stopped}）同样拒绝，
      * 由 GlobalExceptionHandler 统一转换。</p>
      *

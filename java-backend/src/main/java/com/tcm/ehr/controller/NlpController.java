@@ -76,7 +76,7 @@ public class NlpController {
     /**
      * 异步提交单条抽取（AI-18）。
      *
-     * <p>与 {@link #extract} 同一套入参校验，只是把「转发 Python + ES 归一」搬到专用线程池：
+     * <p>【权限：登录即可】与 {@link #extract} 同一套入参校验，只是把「转发 Python + ES 归一」搬到专用线程池：
      * 请求线程立即返回 202 + 任务号，前端轮询 {@link #extractAsyncResult}。原同步接口保留不动。</p>
      *
      * @param dto text=待抽取文本
@@ -96,7 +96,7 @@ public class NlpController {
     /**
      * 查单条抽取结果（AI-18）。
      *
-     * <p>任务不存在、已过期或不属于调用者一律返回同一个 404。</p>
+     * <p>【权限：登录即可】任务不存在、已过期或不属于调用者一律返回同一个 404。</p>
      *
      * @return state=RUNNING|DONE|FAILED；DONE 带 reply；FAILED 带 error
      */
