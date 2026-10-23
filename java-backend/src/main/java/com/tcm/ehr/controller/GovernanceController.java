@@ -78,7 +78,7 @@ public class GovernanceController {
      */
     @PostMapping("/governance/clean")
     public Result<CleanResultVO> clean(@Valid @RequestBody CleanDTO dto) {
-        // 1. 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
+        // 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
         CleanResultVO result = governanceService.clean(dto.getRecordIds(), dto.getFilters(),
                 Boolean.TRUE.equals(dto.getSkipNormalize()));
         operationLogger.log("数据清洗", RecordFilter.describe(dto == null ? null : dto.getFilters()), "共" + result.getTotal() + "条，去重" + result.getDeduped()

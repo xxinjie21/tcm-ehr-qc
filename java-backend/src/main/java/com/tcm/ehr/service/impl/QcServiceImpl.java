@@ -268,7 +268,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private LocalDateTime addWorkdays(LocalDateTime start, int days) {
         LocalDateTime d = start;
         int added = 0;
-        // 1. 逐日推进，只在工作日计数；周末不消耗额度
+        // 逐日推进，只在工作日计数；周末不消耗额度
         while (added < days) {
             d = d.plusDays(1);
             DayOfWeek w = d.getDayOfWeek();
@@ -390,7 +390,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             //   复用同一个实例会在 41 页后把 WHERE 条件累加成 40 多个（逐页越扫越慢、结果还错）。
             //   build() 已自带 ORDER BY visit_time DESC, id ASC（RecordFilter.java:315）。
             QueryWrapper<Record> pageWrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
-            // 2. 主扫描只取 3 列（见方法注释的「两段式扫描」）
+            // 3.1 主扫描只取 3 列（见方法注释的「两段式扫描」）
             pageWrapper.select("id", "grade", "qc_results");
             if (!firstPage) {
                 // keyset 条件：取 「上一页末条 (cursorVt, cursorId) 之后」的全序区间，
@@ -402,33 +402,33 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 break;
             }
             for (Record r : records) {
-                // 5.1 触顶即置截断标记，停止本页剩余累计
+                // 3.2 触顶即置截断标记，停止本页剩余累计
                 if (scanned >= MAX_SCAN_RECORDS) {
                     vo.setTruncated(true);
                     break;
                 }
-                // 5.2 计入扫描数并累计等级分布（未评分的归入「未评分」）
+                // 3.3 计入扫描数并累计等级分布（未评分的归入「未评分」）
                 scanned++;
                 gradeDist.merge(r.getGrade() == null ? "未评分" : r.getGrade(), 1, Integer::sum);
-                // 5.3 快路径：qc_results 命中即直接聚合，无需任何原始列
+                // 3.4 快路径：qc_results 命中即直接聚合，无需任何原始列
                 ScoreResultVO sr = readStoredScore(r);
                 if (sr != null) {
                     totalPoints += accumulate(sr, byType, byItem);
                 } else {
-                    // 5.4 慢路径：记下 id，等主扫描结束后回查整行再算
+                    // 3.5 慢路径：记下 id，等主扫描结束后回查整行再算
                     fallbackIds.add(r.getId());
                 }
             }
             if (vo.isTruncated() || records.size() < BATCH_PAGE_SIZE) {
                 break;
             }
-            // 5.5 记下上一页末条作为下一页锚点（取「末条」不是「首条」，且必含 id）
+            // 3.6 记下上一页末条作为下一页锚点（取「末条」不是「首条」，且必含 id）
             Record last = records.get(records.size() - 1);
             cursorVt = last.getVisitTime();
             cursorId = last.getId();
             firstPage = false;
         }
-        // 6. 慢路径：分批回查整行（含 structured_data 与 19 个原始列）后现算并聚合
+        // 4. 慢路径：分批回查整行（含 structured_data 与 19 个原始列）后现算并聚合
         for (int i = 0; i < fallbackIds.size(); i += FALLBACK_CHUNK) {
             List<String> chunk = fallbackIds.subList(i, Math.min(i + FALLBACK_CHUNK, fallbackIds.size()));
             List<Record> full = baseMapper.selectList(new QueryWrapper<Record>().select().in("id", chunk));
@@ -439,11 +439,11 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
                 }
             }
         }
-        // 8. 组装类型聚合结果
+        // 5. 组装类型聚合结果
         for (Map.Entry<String, int[]> e : byType.entrySet()) {
             vo.getByType().add(new DeductionStatsVO.ByType(e.getKey(), e.getValue()[0], e.getValue()[1]));
         }
-        // 9. 组装条目明细，按分值降序取前 20
+        // 6. 组装条目明细，按分值降序取前 20
         List<DeductionStatsVO.ByItem> items = new ArrayList<>();
         for (Map.Entry<String, int[]> e : byItem.entrySet()) {
             String[] k = e.getKey().split("\\|", 2);
@@ -453,7 +453,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         vo.setByItem(new ArrayList<>(items.subList(0, Math.min(20, items.size()))));
         // P5.2：明细被截断时告知前端，避免“为什么只看到 20 条”的隔屏疑问
         vo.setItemsTruncated(items.size() > 20);
-        // 10. 回填扫描条数、总分与等级分布
+        // 7. 回填扫描条数、总分与等级分布
         vo.setScanned(scanned);
         vo.setTotalPoints(totalPoints);
         vo.setGradeDist(gradeDist);
@@ -565,7 +565,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 原始列里任一回退字段有值（判"漏抽"：病历写了但没被抽出来） */
     private boolean rawPresent(List<String> fields, Record raw) {
-        // 1. 任一回退字段有值就算「病历写了」——用于区分真缺失与漏抽
+        // 任一回退字段有值就算「病历写了」——用于区分真缺失与漏抽
         if (raw == null || fields == null) {
             return false;
         }

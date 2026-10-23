@@ -190,7 +190,7 @@ public class EsTermNormalizer {
      * 变成 500「系统异常」—— 实测踩过。索引查不动（无论什么原因）在语义上都等于索引不可用。
      */
     private List<TermEntry> recall(String type, String orgId, String input) {
-        // 1. 检索失败必须抛出：静默返回空列表等于把「索引挂了」伪装成「词典没这个词」
+        // 检索失败必须抛出：静默返回空列表等于把「索引挂了」伪装成「词典没这个词」
         try {
             return esTermIndexService.search(type, orgId == null ? "" : orgId, input, RECALL_SIZE);
         } catch (Exception e) {

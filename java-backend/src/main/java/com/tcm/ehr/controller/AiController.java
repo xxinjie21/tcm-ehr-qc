@@ -159,7 +159,7 @@ public class AiController {
      */
     @PostMapping("/review")
     public ResponseEntity<Result<AiReplyVO>> review(@Valid @RequestBody AiQueryDTO dto) {
-        // 1. 必填校验 2. 病历不存在回 404
+        // 必填校验 2. 病历不存在回 404
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }

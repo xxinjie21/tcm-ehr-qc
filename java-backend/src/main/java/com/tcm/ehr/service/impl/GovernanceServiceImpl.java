@@ -94,7 +94,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
-        // 1. 只收有独立词典的类型：没词典的类型归一了也没有权威结果可依
+        // 只收有独立词典的类型：没词典的类型归一了也没有权威结果可依
         if (!com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(type)) {
             throw new IllegalArgumentException("type 必须为有独立词典的类型");
         }
@@ -534,9 +534,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private int[] normalizeStructuredData(Record r, Map<String, Object> data, DictMeta dictMeta) {
         int[] stat = {0, 0, 0, 0};
         try {
-            // 1+2. 8 类 entity 与中药归一（P3.4 拆出；与测试入口 normalizeForTest 同源）
+            // 1. 8 类 entity 与中药归一（P3.4 拆出；与测试入口 normalizeForTest 同源）
             stat = normalizeForTest(data);
-            // 3. 打上词典版本再写库：归一结果与当时词典版本必须成对
+            // 2. 打上词典版本再写库：归一结果与当时词典版本必须成对
             //    T16：入参已是解析好的 Map，走 Map 重载，去掉「序列化 → 解析 → 再序列化」的回环。
             //    ⚠️ 版本源是 IDictionaryTermStore：原先用
             //    dictionaryFileService.currentVersion()（词典还在文件时代的文件哈希），
@@ -703,7 +703,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 取 structuredData 实体里的字符串字段；非 Map 或字段缺失返回 null */
     private static String mapStr(Object item, String field) {
-        // 1. 非 Map（脏数据）返回 null 2. 取字段值并转字符串
+        // 非 Map（脏数据）返回 null 2. 取字段值并转字符串
         if (!(item instanceof Map<?, ?> m)) return null;
         Object v = m.get(field);
         return v == null ? null : String.valueOf(v);

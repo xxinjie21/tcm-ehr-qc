@@ -119,7 +119,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
             ExcelSheetImporter.importFile(file, summary, parsedRows, batchRegNos);
         }
 
-        // 库内已存在哈希（按登记号预筛，避免全表扫描）
+        // 5. 库内已存在哈希（按登记号预筛，避免全表扫描）
         Set<String> existingHash = existingHashFor(batchRegNos);
 
         // 6. 逐行去重并收进待插入列表（P3.4 拆出 dedupeAndCollect）

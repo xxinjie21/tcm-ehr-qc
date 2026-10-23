@@ -31,7 +31,7 @@ public final class QcRuleDescriber {
         }
 
         // 2. 完整性：列出全部要素名 + 两档扣分
-        // 完整性
+        // 1. 完整性
         List<QcRuleSet.Element> elements = r.getCompleteness().getElements();
         List<String> names = new ArrayList<>();
         for (QcRuleSet.Element e : elements) {
@@ -67,7 +67,7 @@ public final class QcRuleDescriber {
         }
 
         // 4. 一致性：每条规则一句（触发 → 期望 → 扣分）
-        // 一致性
+        // 2. 一致性
         for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
             if (c.getTriggerType() == null || c.getExpectType() == null) {
                 continue;
@@ -115,10 +115,10 @@ public final class QcRuleDescriber {
         }
 
         // 6. 重复与分级：两条固定说明
-        // 重复
+        // 3. 重复
         out.add("与其它病历内容完全重复的，扣 " + r.getDuplicateWeight() + " 分。");
 
-        // 分级
+        // 4. 分级
         QcRuleSet.Thresholds t = r.getThresholds();
         out.add("分级：< " + t.getInvalid() + " 分为无效；存在逻辑冲突为待复核；≥ "
                 + t.getReviewUpper() + " 分为合格；其余为待复核。");

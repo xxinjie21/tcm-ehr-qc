@@ -83,7 +83,7 @@ public final class RecordFilter {
             // 导入时间区间（records.create_time）：与就诊时间是两个独立维度，可同时生效取交集。
             // 判据与上一条完全一致 —— 两端齐全才成立，含首尾两天（补 00:00:00 / 23:59:59）。
             applyRange(wrapper, "create_time", dto.getImportRange());
-            // 5. 仅未解析：structured_data 为 SQL NULL（用 IS NULL —— 该列是 JSON 类型，不能与 '' 比较）
+            // 3. 仅未解析：structured_data 为 SQL NULL（用 IS NULL —— 该列是 JSON 类型，不能与 '' 比较）
             andOnlyUnparsed(wrapper, dto.getOnlyUnparsed());
         }
 // 排序键必须是列表实际展示的那一列（visit_time 接诊时间）。
@@ -314,7 +314,7 @@ public final class RecordFilter {
     }
 
     private static String text(Object o) {
-        // 1. 空值直接返回 2. 空白与字面 "null" 归成 null（前端会传字符串 "null"）
+        // 空值直接返回 2. 空白与字面 "null" 归成 null（前端会传字符串 "null"）
         if (o == null) {
             return null;
         }

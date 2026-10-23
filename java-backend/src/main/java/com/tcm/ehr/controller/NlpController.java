@@ -65,7 +65,7 @@ public class NlpController {
      */
     @PostMapping("/extract")
     public ResponseEntity<Result<NlpExtractVO>> extract(@Valid @RequestBody NlpExtractDTO dto) {
-        // 1. 取待抽取文本，为空回 400（其余情况一律降级）
+        // 取待抽取文本，为空回 400（其余情况一律降级）
         String text = dto == null ? null : dto.text();
         if (text == null || text.isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入待抽取文本"));
@@ -216,7 +216,7 @@ public class NlpController {
      */
     @GetMapping("/extract/batch/{id}")
     public ResponseEntity<Result<NlpTaskVO>> batchStatus(@PathVariable String id) {
-        // 1. 取任务；2. 不存在回 404（前端轮询时据此停止轮询）
+        // 取任务；2. 不存在回 404（前端轮询时据此停止轮询）
         NlpTaskVO vo = nlpBatchService.get(id);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "任务不存在"));

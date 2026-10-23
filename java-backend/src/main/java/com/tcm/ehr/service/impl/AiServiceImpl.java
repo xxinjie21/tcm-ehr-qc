@@ -132,7 +132,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 解读 prompt：把规则结论 + 病历关键字段拼给模型，要求只回 JSON */
     private String interpretPrompt(AiReplyVO vo, Record r) {
-        // 1. 先给规则结论，模型只做叙述加工，避免它自己下结论
+        // 先给规则结论，模型只做叙述加工，避免它自己下结论
         StringBuilder sb = new StringBuilder("【规则预检结论】\n");
         sb.append("- 完整性：21 字段完整 ").append(vo.getCompleteness().getPresent())
                 .append(" 项，缺失：").append(join(vo.getCompleteness().getMissing())).append('\n');
@@ -347,7 +347,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 复核 prompt：预检单 + 结构化要素，要求给出复核建议 */
     private String reviewPrompt(String precheck, Record r, Map<String, Object> data) {
-        // 1. 先给规则预检单（判定地基），再给结构化要素供模型对照
+        // 先给规则预检单（判定地基），再给结构化要素供模型对照
         StringBuilder sb = new StringBuilder("【规则预检单】\n").append(precheck).append('\n');
         sb.append("【结构化数据】\n")
                 .append("证候：").append(join(contents(data, "patternList"))).append('\n')

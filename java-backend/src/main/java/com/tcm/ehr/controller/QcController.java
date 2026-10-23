@@ -116,7 +116,7 @@ public class QcController {
      */
     @GetMapping("/score/batch/{id}")
     public ResponseEntity<Result<QcTaskVO>> scoreBatchStatus(@PathVariable String id) {
-        // 1. 进度在表里；任务不存在与「任务被清理」同一表现
+        // 进度在表里；任务不存在与「任务被清理」同一表现
         QcTaskVO vo = qcBatchService.get(id);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "任务不存在"));

@@ -53,7 +53,7 @@ public class RecordController {
     @PostMapping("/import")
     public Result<ImportTaskVO> importRecords(@RequestParam("files") MultipartFile[] files,
                                               @RequestParam(value = "autoExtract", defaultValue = "false") boolean autoExtract) {
-        // 1. 导入并逐行给失败原因 2. 留痕（含是否已提交后台解析）
+        // 导入并逐行给失败原因 2. 留痕（含是否已提交后台解析）
         ImportTaskVO vo = recordService.importRecords(files, autoExtract);
         operationLogger.log("病历导入", "文件" + files.length + "个",
                 "成功" + vo.getSummary().getSuccess() + "条，失败" + vo.getSummary().getFailed() + "条"
@@ -102,7 +102,7 @@ public class RecordController {
      */
     @GetMapping("/raw/{recordId}")
     public ResponseEntity<Result<RawRecordVO>> rawRecord(@PathVariable String recordId) {
-        // 1. 取原始数据；不存在与无权限都归为 404：数据域过滤在 service 内完成，不泄露"存在但看不到"
+        // 取原始数据；不存在与无权限都归为 404：数据域过滤在 service 内完成，不泄露"存在但看不到"
         RawRecordVO vo = recordService.getRawRecord(recordId);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "病历不存在"));

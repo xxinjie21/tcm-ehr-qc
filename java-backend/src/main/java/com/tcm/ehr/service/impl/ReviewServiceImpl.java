@@ -167,9 +167,9 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         QueryWrapper<ReviewTask> w = buildTaskWrapper(status, overdueOnly, scope);
         w.orderByDesc("create_time");
 
-        // 4. 分页查询
+        // 3. 分页查询
         Page<ReviewTask> pg = baseMapper.selectPage(new Page<>(p, s), w);
-        // 5. 组装返回：总数与任务列表项（关联病历缺失的跳过，不占位）
+        // 4. 组装返回：总数与任务列表项（关联病历缺失的跳过，不占位）
         ReviewTasksVO vo = new ReviewTasksVO();
         vo.setTotal(pg.getTotal());
         // P5.2：关联病历已删的任务会跳过，计数后告知前端。原先每行 selectById 是 N+1

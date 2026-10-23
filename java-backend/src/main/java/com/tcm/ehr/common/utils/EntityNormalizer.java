@@ -1001,7 +1001,7 @@ public class EntityNormalizer {
         boolean touched = backfillHerbs(vo, orgId, prescription);
         touched |= backfillDiseases(vo, orgId, tcmDiagnosis, westernDiagnosis);
         touched |= backfillPatterns(vo, orgId, pattern);
-        // 1. 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
+        // 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
         if (touched) {
             normalize(vo, orgId);
         }

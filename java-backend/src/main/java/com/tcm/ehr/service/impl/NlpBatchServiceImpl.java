@@ -1340,7 +1340,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 而失败明细丢了不影响任务语义。
      */
     private String writeJson(Object o) {
-        // 1. 序列化失败退回 "null"（读回即无明细），不抛
+        // 序列化失败退回 "null"（读回即无明细），不抛
         try {
             return objectMapper.writeValueAsString(o);
         } catch (Exception e) {

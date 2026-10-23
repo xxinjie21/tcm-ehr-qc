@@ -202,12 +202,12 @@ public class QcRuleSet {
         r.standardization = defaultStandardization();
         r.normalization = defaultNormalization();
 
-        // 格式
+        // 1. 格式
         // 年龄正则与 hint 见 AGE_PATTERN / AGE_HINT（与前端下拉目录共用，避免两边漂移）
         r.format.add(format("age", "regex", AGE_PATTERN, List.of(), "年龄", "年龄格式不正确", AGE_HINT));
         r.format.add(format("gender", "enum", null, GENDER_VALUES, "性别", "性别非 男/女/未知的性别", null));
 
-        // 一致性：出厂默认**不含任何规则**（consistency 为空）。
+        // 2. 一致性：出厂默认**不含任何规则**（consistency 为空）。
         // 原内置 9 条「证候 → 中药」在真实病历上误报率 25%~80%（同一证候对应的是复方治法，
         // 不是固定两味药），实测把约 1031 次"医生用了别的药"误判成逻辑冲突、强拉待复核；
         // 权威（《中医病案质量控制中心建设与管理指南（试行）》）也把理法方药一致性列为

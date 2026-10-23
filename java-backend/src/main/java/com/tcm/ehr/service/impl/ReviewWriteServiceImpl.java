@@ -176,7 +176,7 @@ public class ReviewWriteServiceImpl implements IReviewWriteService {
     }
 
     private String issueType(ScoreResultVO vo) {
-        // 1. 从重到轻取第一项：逻辑冲突 > 缺失字段 > 评分不达标
+        // 从重到轻取第一项：逻辑冲突 > 缺失字段 > 评分不达标
         if (!vo.getLogicConflicts().isEmpty()) {
             return "逻辑冲突";
         }

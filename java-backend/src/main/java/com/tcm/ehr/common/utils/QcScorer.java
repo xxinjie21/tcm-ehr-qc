@@ -294,7 +294,7 @@ public final class QcScorer {
     }
 
     private static String reasonFor(com.tcm.ehr.common.config.QcRuleSet.Element el, boolean rawHas) {
-        // 1. 两档给不同说法：用户要能分清「该写没写」和「写了没抽出来」
+        // 两档给不同说法：用户要能分清「该写没写」和「写了没抽出来」
         if (rawHas) {
             return "结构化结果中无" + el.getName() + "（原始病历有记录，可能未被抽取）";
         }

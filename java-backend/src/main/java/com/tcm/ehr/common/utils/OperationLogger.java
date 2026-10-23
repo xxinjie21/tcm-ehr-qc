@@ -49,7 +49,7 @@ public class OperationLogger {
      * @param detail 操作明细，可为 null
      */
     public void log(String action, String target, String detail) {
-        // 1. 从当前请求取操作人上下文（脱离 Web 请求时各字段为 "unknown"）
+        // 从当前请求取操作人上下文（脱离 Web 请求时各字段为 "unknown"）
         log(action, target, detail, RequestUtils.currentUsername(), RequestUtils.currentRole());
     }
 

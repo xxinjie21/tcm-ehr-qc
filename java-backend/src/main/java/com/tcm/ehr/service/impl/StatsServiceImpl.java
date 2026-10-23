@@ -421,11 +421,13 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      * 全部未命中则落最后一项（兜底桶）。
      */
     private static String bucketOf(int score) {
+        // 1. 按 BUCKET_MIN 降序匹配，命中第 i 个阈值即取同下标的桶名
         for (int i = 0; i < BUCKET_MIN.length; i++) {
             if (score >= BUCKET_MIN[i]) {
                 return SCORE_BUCKETS.get(i);
             }
         }
+        // 2. 全部阈值都未命中 -> 落最后一项（兜底桶）
         return SCORE_BUCKETS.get(SCORE_BUCKETS.size() - 1);
     }
 
