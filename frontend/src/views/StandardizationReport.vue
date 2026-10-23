@@ -279,7 +279,7 @@ const chartRangeLabel = computed(() => {
 
 const pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : '—')
 
-// ---------------- 质控完成度（决定报告有没有意义）
+// ===== 质控完成度 =====
 // 三态而不是两态：未加载 / 已加载且未完成 / 已加载且完成。
 // 早前只用两态，页面打开时 report 还是 null，complete 取到 false，
 // 「质控没跑完」的告警会先闪一下再消失 —— 看着像出了故障。
@@ -335,7 +335,7 @@ const hasStaleRows = computed(() => (report.value?.coverage || [])
       .sort((a, b) => (b.unmatched - a.unmatched) || (a.termCount - b.termCount))[0]
   })
 
-// ---------------- 空数据判据（P0-5）----------------
+// ===== 空数据判据 =====
 // 「没有数据」绝不能渲染成「全部达标」：指标卡的绿色与结论条的绿色对勾都只在
 // 真有数据可评时才允许出现。展示分支判定，不动后端任何计算口径。
 /**
@@ -357,7 +357,7 @@ const isEmptyReport = computed(() => {
   return (d.dataset?.recordCount ?? 0) === 0 || (d.coverage || []).length === 0
 })
 
-// ---------------- 关键卡 ----------------
+// ===== 关键卡 =====
 // 三张卡各回答一个业务问题：词典够不够、归一顺不顺、评分灵不灵
 const kpis = computed(() => {
   const d = report.value
@@ -413,7 +413,7 @@ function symRateValue(d) {
   return sym && sym.total ? sym.normalized / sym.total : 0
 }
 
-// ---------------- 一句话结论（报告头状态）----------------
+// ===== 一句话结论 =====
 // 五态互斥：加载失败 / 质控未完成 / 加载中 / 无数据 / 有话要说。
 // 前两态此前各占一条独立横幅，现统一由报告头表达，操作就近放在右侧。
 const headline = computed(() => {
@@ -479,7 +479,7 @@ const headline = computed(() => {
   }
 })
 
-// ---------------- 待办清单 ----------------
+// ===== 待办清单 =====
 // 按影响面排序，每条说清「做什么、归谁、能解决多少」
 const todos = computed(() => {
   const d = report.value
@@ -630,7 +630,7 @@ const emptyTip = computed(() => (isEmptyReport.value
   ? '本期无可评估数据，暂无待办建议。'
   : '当前没有明显短板。词典规模、归一与评分都处在合理区间。'))
 
-// ---------------- 明细 ----------------
+// ===== 明细 =====
 /** 词表非空、也抽到了实体，却一条都没归上 —— 这是解析早于词表建立，补词表无效 */
 const staleTypes = computed(() =>
   (report.value?.coverage || []).filter((c) => c.suspectedStaleExtraction)
