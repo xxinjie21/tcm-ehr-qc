@@ -59,23 +59,21 @@ import java.util.concurrent.TimeUnit;
  * 生产/消费：{@link #queue} 存待跑任务 ID，固定 qc.batch.concurrency
  * （默认 1）个工作线程消费；任务与进度写 qc_task 表，故提交后可关页面、回来轮询。
  *
- * <ul>
- *   <li>角色快照（最关键）：{@code RequestUtils.currentRole()} 读的是线程绑定的
+ * - 角色快照（最关键）：{@code RequestUtils.currentRole()} 读的是线程绑定的
  *   RequestContextHolder，worker 线程里取到的是字符串 {@code "unknown"}（不是 null）。
  *   若拿它去 RecordFilter.build，domainGrade 返回 null，数据域过滤会退化成
  *   「不过滤 = 全库」—— 表面跑通了，实际重算了用户看不见的病历。故提交线程把角色写进
  *   qc_task.role，worker 用捕获值重建过滤器。
  *   同理结尾的审计日志用 {@link OperationLogger#log(String, String, String, String, String)}
- *   显式回填操作人，否则会记成 {@code "unknown"}。</li>
- *   <li>防重不用 Redis 锁：改为「表中是否已有 QUEUED/RUNNING」。原来的
+ *   显式回填操作人，否则会记成 {@code "unknown"}。
+ * - 防重不用 Redis 锁：改为「表中是否已有 QUEUED/RUNNING」。原来的
  *   {@code tcm:task:batch} 是全局单键，任意管理员的提交会让其他人排队，TTL 900s 固定
- *   还会在长任务中途过期导致并发双跑；查表更准、也没有 TTL 问题。</li>
- *   <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 failure_truncated；</li>
- *   <li>取消：QUEUED 用带 {@code status='QUEUED'} 条件的更新落 CANCELLED，
+ *   还会在长任务中途过期导致并发双跑；查表更准、也没有 TTL 问题。
+ * - 失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 failure_truncated；
+ * - 取消：QUEUED 用带 {@code status='QUEUED'} 条件的更新落 CANCELLED，
  *       RUNNING 置取消位、worker 在页边界退出；认领（{@link #runTask} 第 2 步）带同样的条件，
- *       因此取消不会被认领覆写、认领也不会把取消后的行重新拉起；</li>
- *   <li>重启：RUNNING/QUEUED 一律标 INTERRUPTED，可重跑。</li>
- * </ul>
+ *       因此取消不会被认领覆写、认领也不会把取消后的行重新拉起；
+ * - 重启：RUNNING/QUEUED 一律标 INTERRUPTED，可重跑。
  */
 @Slf4j
 @Service

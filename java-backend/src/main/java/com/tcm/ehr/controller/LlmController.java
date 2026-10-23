@@ -22,11 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
  * 读取只回掩码、保存写自己的行、探测用自己的参数试连通。
  * 管理员同样只能改自己的 —— 配置含三方通道密钥，属个人设置而非系统级设置。
  *
- * <ul>
- *   <li>保存只改运行时配置（落盘到 qc 之外的 llm-config.json），不写回 application.yml，重启仍沿用；</li>
- *   <li>密钥不落明文：读取只回掩码，保存时空值或掩码都表示"不修改"；</li>
- *   <li>先试后存：探测用请求里的参数试连通，不改变当前生效配置。</li>
- * </ul>
+ * - 保存只改运行时配置（落盘到 qc 之外的 llm-config.json），不写回 application.yml，重启仍沿用；
+ * - 密钥不落明文：读取只回掩码，保存时空值或掩码都表示"不修改"；
+ * - 先试后存：探测用请求里的参数试连通，不改变当前生效配置。
  */
 @RestController
 @RequestMapping("/api/llm")

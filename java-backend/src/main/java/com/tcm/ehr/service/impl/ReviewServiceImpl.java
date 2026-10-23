@@ -33,11 +33,9 @@ import java.util.Set;
 /**
  * 复核服务实现。
  *
- * <ul>
- * <li>列表：review_tasks 过滤 is_obsolete=0，并按组织数据域过滤；</li>
- * <li>复核：合并人工修正 → QcScorer 自动重算 → 合格/无效则任务完成，仍待复核则任务保持并更新分数；</li>
- * <li>超时仅计算属性（ReviewTaskUtil），无后台定时任务、不自动流转。</li>
- * </ul>
+ * - 列表：review_tasks 过滤 is_obsolete=0，并按组织数据域过滤；
+ * - 复核：合并人工修正 → QcScorer 自动重算 → 合格/无效则任务完成，仍待复核则任务保持并更新分数；
+ * - 超时仅计算属性（ReviewTaskUtil），无后台定时任务、不自动流转。
  */
 @Service
 @RequiredArgsConstructor

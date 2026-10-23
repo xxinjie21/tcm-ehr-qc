@@ -8,11 +8,9 @@ import java.util.List;
 /**
  * AI 解读/复核/术语补词请求。
  *
- * <ul>
- *   <li>interpret：recordId 必填；</li>
- *   <li>review：recordId 必填；</li>
- *   <li>termsuggest：terms 必填，termType 可选。</li>
- * </ul>
+ * - interpret：recordId 必填；
+ * - review：recordId 必填；
+ * - termsuggest：terms 必填，termType 可选。
  */
 @Data
 public class AiQueryDTO {

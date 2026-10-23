@@ -33,9 +33,9 @@ import java.util.List;
  *
  * 三条从原代码带过来的规则，务必保持：
  * <ol>
- * <li>先删子表再删主表：review_tasks.record_id 有外键指向 records.id，顺序反了会撞约束；</li>
- * <li>按范围删必须有筛选条件：否则就是删全库，直接拒绝；</li>
- * <li>请求体里的 id 不可信：按 ID 删只删「按数据域查得到」的那些，查不到的静默剔除。</li>
+ * - 先删子表再删主表：review_tasks.record_id 有外键指向 records.id，顺序反了会撞约束；
+ * - 按范围删必须有筛选条件：否则就是删全库，直接拒绝；
+ * - 请求体里的 id 不可信：按 ID 删只删「按数据域查得到」的那些，查不到的静默剔除。
  * </ol>
  */
 @RequiredArgsConstructor

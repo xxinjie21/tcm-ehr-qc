@@ -38,14 +38,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * 三条硬约束（与《开发指南与待办》「二、开发规范 · 后端」一致）：
  * <ol>
- * <li>不阻塞启动：ChatClient 懒构造，首次调用才装配；配置缺失或非法只降级，
+ * - 不阻塞启动：ChatClient 懒构造，首次调用才装配；配置缺失或非法只降级，
  * 绝不抛到启动期。Spring AI 的 {@code OpenAi*AutoConfiguration} 在缺 api-key 时会急切校验凭据、
- * 让整个上下文启动失败，故 {@code spring.ai.model.*} 已统一置 none，模型改由本类自行构造。</li>
- * <li>不泄漏底层异常：调用异常统一捕获 → 记 WARN → 返回 {@code null}，
+ * 让整个上下文启动失败，故 {@code spring.ai.model.*} 已统一置 none，模型改由本类自行构造。
+ * - 不泄漏底层异常：调用异常统一捕获 → 记 WARN → 返回 {@code null}，
  * 由调用方回退规则/模板兜底。唯一例外是 {@link #probe}——连通性探测的目的就是报出失败原因，
- * 由调用方负责脱敏后再返回给用户。</li>
- * <li>配置可变：生效参数来自 {@link LlmConfigStore} 而非直接读 application.yml，
- * 存储的版本号变化时会丢弃旧 ChatClient 并按新参数重建，实现「保存即生效、无需重启」。</li>
+ * 由调用方负责脱敏后再返回给用户。
+ * - 配置可变：生效参数来自 {@link LlmConfigStore} 而非直接读 application.yml，
+ * 存储的版本号变化时会丢弃旧 ChatClient 并按新参数重建，实现「保存即生效、无需重启」。
  * </ol>
  */
 @Slf4j

@@ -44,12 +44,10 @@ import java.util.UUID;
 /**
  * 病历数据服务实现：Excel 批量导入 + 单条新增。
  *
- * <ul>
- * <li>解析：POI {@link WorkbookFactory}（兼容 .xlsx / .xls）；表头中文名 → 21 字段；</li>
- * <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；
- *     并写入 text_hash 列，DB 侧 uk_records_org_text_hash 兜底并发重复；</li>
- * <li>导入同步执行：接口返回即本轮完成，status 直接为「已完成」。</li>
- * </ul>
+ * - 解析：POI {@link WorkbookFactory}（兼容 .xlsx / .xls）；表头中文名 → 21 字段；
+ * - 去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；
+ *     并写入 text_hash 列，DB 侧 uk_records_org_text_hash 兜底并发重复；
+ * - 导入同步执行：接口返回即本轮完成，status 直接为「已完成」。
  *
  * 进度查询已删除：原「内存 Map 记 taskId + 查进度」的那套状态存储与
  * {@code GET /api/records/import/{taskId}/status} 端点已在 P5.11 移除（导入是同步的，

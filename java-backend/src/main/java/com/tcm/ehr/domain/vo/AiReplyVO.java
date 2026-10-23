@@ -95,12 +95,10 @@ public class AiReplyVO {
 
         /**
          * 建议动作：
-         * <ul>
-         *   <li>alias —— 原文是某个已有标准词的口语/异名，挂为其别名；</li>
-         *   <li>{@code new} —— 原文本身是规范术语但词表漏收，新建标准词；</li>
-         *   <li>ignore —— 抽取碎片或体征错放，不该进词表；</li>
-         *   <li>unknown —— LLM 不可用时的兜底，需人工判断。</li>
-         * </ul>
+         * - alias —— 原文是某个已有标准词的口语/异名，挂为其别名；
+         * - {@code new} —— 原文本身是规范术语但词表漏收，新建标准词；
+         * - ignore —— 抽取碎片或体征错放，不该进词表；
+         * - unknown —— LLM 不可用时的兜底，需人工判断。
          */
         private String action;
 

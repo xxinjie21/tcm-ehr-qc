@@ -32,10 +32,7 @@ import java.util.Set;
 /**
  * 标准化质量报告实现（批次 24）。
  *
- *
  * 只读：只 select，不写库、不重建索引、不触发质控重算。
- *
- *
  *
  * 为什么报告要分甲乙两层：甲类只取决于词表建得对不对（与数据无关），
  *
@@ -83,15 +80,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 首字撞上脉诊三部 / 舌诊专名，但确实是症状的前缀，一律不当错放。
      *
      * 五个都是实测踩出来的坑（首字撞上，语义却属症状域）：
-     * <ul>
-     *   <li>关节 —— 关节痛 / 关节怕冷 / 关节屈伸不利 …… 实测症状里有 90+
-     *       个不同写法（关节痛 一条 164 次），是量最大的一类；</li>
-     *   <li>尺肤 —— 尺部皮肤，诊断体征（尺肤热 / 尺肤凉 / 尺肤粘），
-     *       与脉象是两回事；</li>
-     *   <li>苔藓 —— 皮肤病（苔藓 / 苔藓样皮损），不是舌苔；</li>
-     *   <li>尖锐 —— 声音 / 湿疣等义（尖锐声），脉象里没有「尖锐」；</li>
-     *   <li>脉下 —— 脉位下方的部位描述（左脉下有一囊肿），是症状不是脉象。</li>
-     * </ul>
+     * - 关节 —— 关节痛 / 关节怕冷 / 关节屈伸不利 …… 实测症状里有 90+
+     *       个不同写法（关节痛 一条 164 次），是量最大的一类；
+     * - 尺肤 —— 尺部皮肤，诊断体征（尺肤热 / 尺肤凉 / 尺肤粘），
+     *       与脉象是两回事；
+     * - 苔藓 —— 皮肤病（苔藓 / 苔藓样皮损），不是舌苔；
+     * - 尖锐 —— 声音 / 湿疣等义（尖锐声），脉象里没有「尖锐」；
+     * - 脉下 —— 脉位下方的部位描述（左脉下有一囊肿），是症状不是脉象。
      *
      * 误判会把真症状判成「不可归一」：症状归一率虚高、错放数虚高，
      * 两边都是假信号。口径与 Python 侧 _PT_BLACKLIST 完全一致。
@@ -312,14 +307,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 只有乙类（病历相关统计）按范围过滤。
      *
      * 两个时间维度的过滤位置不同、各有理由：
-     * <ul>
-     *   <li>接诊时间（dateRange）留在 Java 侧（{@link #filterByVisitTime}），
+     * - 接诊时间（dateRange）留在 Java 侧（{@link #filterByVisitTime}），
      *       因为 range.excluded（「已排除 N 条区间外数据」）要的是
-     *       「范围内但因时间被排除的条数」，只有「先取范围全集、再按时间筛」两步才能算出来；</li>
-     *   <li>导入时间（importRange）下推到 SQL（records.create_time），
+     *       「范围内但因时间被排除的条数」，只有「先取范围全集、再按时间筛」两步才能算出来；
+     * - 导入时间（importRange）下推到 SQL（records.create_time），
      *       与病历列表 / Qc 页同一口径；它的排除量不进 excluded（那本是接诊时间的语义），
-     *       回显走 {@code range.importStart/importEnd}。</li>
-     * </ul>
+     *       回显走 {@code range.importStart/importEnd}。
      *
      * 不随范围收窄的还有证候：该页是组织级口径、无证候维度展示，且证候是
      * LIKE 子串模糊匹配，子集统计的参考性弱 —— 2026-10-17 定案不再暴露（接口与前端
@@ -451,7 +444,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 按接诊时间过滤。
      *
-     *
      * 必须上下界同时给才生效，只给一端按「未给」处理 ——
      *
      * 与 StatsController 的区间口径一致。只给一端会被理解成「从某时到最新」，
@@ -537,7 +529,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     /**
      * 按接诊月份分组。
-     *
      *
      * 为什么要按月而不是按年：词表补一批、解析重跑一批，通常只覆盖某些月份的数据；
      *
@@ -813,7 +804,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 症状未归一实体的四类构成；责任方不同，不能合并看。
      *
-     *
      * 判定顺序要紧：具名错放先于长度判定。像「压痛」这种体征只有 2 个字，
      *
      * 若先按「长度 ≤ 2 = 抽取碎片」判，它会被归到碎片里 —— 但它其实是被完整抽出来的，
@@ -927,7 +917,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 可归一实体归一率。
      *
-     *
      * 分母只算「已抽取 + 非抽取缺陷 + 已在症状词表内」：词表里根本没有的标准词
      *
      * （如 神疲乏力）是词表缺口本身，算进分母会把「补词表能改善多少」这个信号抹掉。
@@ -1016,7 +1005,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     /**
      * 质控完成度。
-     *
      *
      * 判据不是「有没有 qc_results」而是「qc_results 里的 score 与 records.score 是否一致」：
      *

@@ -14,14 +14,12 @@ public interface OrgMemberMapper extends BaseMapper<OrganizationMember> {
      * 取某用户的主组，且该组必须处于 active 状态。
      *
      * 两个条件缺一不可，漏掉任一条都会留下真实漏洞：
-     * <ul>
-     *   <li>漏 {@code is_primary = 1}：表上是 {@code UNIQUE(org_id,user_id)}，
+     * - 漏 {@code is_primary = 1}：表上是 {@code UNIQUE(org_id,user_id)}，
      *       允许一人多组；不指定主组时取到哪组取决于 SQL 返回顺序 →
-     *       同一用户不同请求可能看到不同数据。</li>
-     *   <li>漏 {@code g.status = 'active'}：停用组只挡了登录，
+     *       同一用户不同请求可能看到不同数据。
+     * - 漏 {@code g.status = 'active'}：停用组只挡了登录，
      *       organization_members 的行仍在 → 查组照常返回 orgId →
-     *       旧 token 在 24h 内照样能看数据（停用形同虚设）。</li>
-     * </ul>
+     *       旧 token 在 24h 内照样能看数据（停用形同虚设）。
      *
      * 走 {@code INDEX idx_member_user(user_id, is_primary)}，不写这个
      * {@code @Select} 的话每请求就是一次全表扫。

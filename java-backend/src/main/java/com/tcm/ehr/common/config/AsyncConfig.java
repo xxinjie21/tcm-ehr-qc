@@ -11,14 +11,12 @@ import java.util.concurrent.ThreadPoolExecutor;
  * 异步执行的线程池：统一交给 Spring 框架（{@link ThreadPoolTaskExecutor}），
  * 不再各处手写 Executors.newFixedThreadPool / {@code new ThreadPoolExecutor}。
  *
- * <ul>
- *   <li>aiAsyncExecutor / nlpAsyncExecutor：AI、NLP 单条长响应的异步任务池。
+ * - aiAsyncExecutor / nlpAsyncExecutor：AI、NLP 单条长响应的异步任务池。
  *       4 线程 + 有界队列 100、满载即拒（AbortPolicy）—— 让「池满」变成前端可见的 503
- *       而不是静默排队，且 150s 后前端已放弃时任务不会还堆在无界队列里。</li>
- *   <li>qcBatchExecutor / nlpBatchExecutor：批量任务的「认领任务」常驻 worker 池。</li>
- *   <li>nlpRecordExecutor：NLP 单个任务内并行处理病历的池（与认领池分开，否则占着线程等
- *       页内结果会死锁）。</li>
- * </ul>
+ *       而不是静默排队，且 150s 后前端已放弃时任务不会还堆在无界队列里。
+ * - qcBatchExecutor / nlpBatchExecutor：批量任务的「认领任务」常驻 worker 池。
+ * - nlpRecordExecutor：NLP 单个任务内并行处理病历的池（与认领池分开，否则占着线程等
+ *       页内结果会死锁）。
  *
  * 所有池都用守护线程：进程退出不被非守护线程吊住。批量池的大小与属性取值一致，
  * 认领 worker 数 = qc.batch.concurrency / nlp.batch.concurrency。

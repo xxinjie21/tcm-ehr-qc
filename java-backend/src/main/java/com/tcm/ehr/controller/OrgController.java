@@ -25,12 +25,10 @@ import java.util.List;
  * 课题组（阶段2 R5）。
  *
  * 权限分三层：
- * <ul>
- *   <li>我的组：登录即可（无组也能看自己是待分配池还是审批中）；</li>
- *   <li>管理 / 审批：仅管理员（{@link RequireRole}）；</li>
- *   <li>成员管理：组长 + 路径 orgId 必须等于当前组
- *       （{@link RequireOrgRole("owner")}，拦截器二次兜底）。</li>
- * </ul>
+ * - 我的组：登录即可（无组也能看自己是待分配池还是审批中）；
+ * - 管理 / 审批：仅管理员（{@link RequireRole}）；
+ * - 成员管理：组长 + 路径 orgId 必须等于当前组
+ *       （{@link RequireOrgRole("owner")}，拦截器二次兜底）。
  *
  * 错误码统一走既有约定：参数/状态非法 → 400；资源不存在 → 404（1006）；
  * 越权 → 403（由拦截器与 ForbiddenException 出口）。

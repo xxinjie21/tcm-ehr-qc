@@ -41,13 +41,11 @@ import java.util.Set;
 /**
  * 质控服务实现。
  *
- * <ul>
- * <li>判定地基 = 规则引擎（QcScorer + LogicChecker），规则来自 {@link QcRuleStore}；</li>
- * <li>批量重算（§七 L5 起异步）：不在本类的请求线程里跑，改由 QcBatchServiceImpl
+ * - 判定地基 = 规则引擎（QcScorer + LogicChecker），规则来自 {@link QcRuleStore}；
+ * - 批量重算（§七 L5 起异步）：不在本类的请求线程里跑，改由 QcBatchServiceImpl
  * 以 qc_task 表 + 固定并发 1 的 worker 执行；本类只保留单条处理
- * {@link #processOne}，分页取数、进度落库、取消与防重都在那边。</li>
- * <li>review_tasks 幂等 upsert（查询过滤 is_obsolete=0）。</li>
- * </ul>
+ * {@link #processOne}，分页取数、进度落库、取消与防重都在那边。
+ * - review_tasks 幂等 upsert（查询过滤 is_obsolete=0）。
  */
 @Slf4j
 @Service

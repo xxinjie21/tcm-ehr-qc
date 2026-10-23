@@ -10,7 +10,6 @@ import java.util.Set;
 /**
  * 实体类型目录：结构化解析 / 术语词典 / 质控规则 三模块的单一来源。
  *
- *
  * 唯一权威是 {@link #all()}：固定 9 类（对齐 NLP 可抽取的实体）。
  * 9 类均有独立词典（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法）——病因词典
  * （causes.json）与其余 8 类同时到位，故 {@code dictKeys()} 现为 9 类。
@@ -20,14 +19,11 @@ import java.util.Set;
  * {@code all()} 的过滤视图，不是并列清单：前者按 dict 标志筛（25.b 防漂移测试钉住），
  * 后者是模型能输出的 NER 标签集（病名/症状/证型/方剂/本草），维度不同、不要求等长。
  *
- *
  * ⚠️ 两类范围都不再由本目录硬编码，全部交给组织级规则集（用户在「规则配置」里改）：
- * <ul>
- *   <li>归一范围：QcRuleSet.normalization.elementTypes 决定哪些类型做词形归一
- *       （出厂默认 9 类，含病因 —— 但病因默认只归一、不计分）；</li>
- *   <li>扣分范围：QcRuleSet.standardization.elementTypes 决定哪些类型计入
- *       「未归一扣分」（出厂默认 5 类），实际按它与归一范围取交集计分。</li>
- * </ul>
+ * - 归一范围：QcRuleSet.normalization.elementTypes 决定哪些类型做词形归一
+ *       （出厂默认 9 类，含病因 —— 但病因默认只归一、不计分）；
+ * - 扣分范围：QcRuleSet.standardization.elementTypes 决定哪些类型计入
+ *       「未归一扣分」（出厂默认 5 类），实际按它与归一范围取交集计分。
  * 本目录只声明类型元数据。
  */
 public final class EntityTypes {

@@ -26,14 +26,12 @@ import java.util.List;
  * 事务语义（关键，不要改）：SqlHelper.executeBatch 取到的会话由
  * SpringManagedTransactionFactory 装配，连接取自 DataSourceUtils.getConnection
  * —— 即当前事务的连接。因此：
- * <ul>
- *   <li>写入落在调用方的事务里，随外层事务一起提交 / 回滚；</li>
- *   <li>{@code SpringManagedTransaction.commit()} / {@code rollback()} 在连接是
+ * - 写入落在调用方的事务里，随外层事务一起提交 / 回滚；
+ * - {@code SpringManagedTransaction.commit()} / {@code rollback()} 在连接是
  *       事务连接时直接返回（不真正提交 / 回滚），所以框架内部的 {@code commit()} /
- *       {@code rollback()} 在事务内都是空操作，在事务外才是真动作 —— 两种上下文都对；</li>
- *   <li>异常一律向上抛，不做逐条重试：唯一键冲突等错误必须让外层事务回滚，
- *       与改造前「第 k 条插入即抛」的原子性一致，不能被吞掉。</li>
- * </ul>
+ *       {@code rollback()} 在事务内都是空操作，在事务外才是真动作 —— 两种上下文都对；
+ * - 异常一律向上抛，不做逐条重试：唯一键冲突等错误必须让外层事务回滚，
+ *       与改造前「第 k 条插入即抛」的原子性一致，不能被吞掉。
  */
 public final class BatchInsert {
 

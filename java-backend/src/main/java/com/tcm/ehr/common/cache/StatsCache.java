@@ -208,12 +208,10 @@ public class StatsCache {
      * 冷算约 5s，其中 ~3s 是读 110MB JSON 的磁盘 I/O，SQL 侧已无优化空间）。
      *
      * 语义边界（务必理解）：
-     * <ul>
-     *   <li>时间到期（数据没变，只是缓存老了）→ 秒回旧值 + 后台刷新。用户不必为
-     *       「缓存该续期了」这件事等 5s；旧值本身仍然正确。</li>
-     *   <li>写入（{@link #invalidateForWrite()} 自增版本号）→ key 段变化 → 新 key 落空
-     *       → 阻塞现算新值。绝不用 SWR 掩盖「数据真的变了」，否则会端出写前的旧数字。</li>
-     * </ul>
+     * - 时间到期（数据没变，只是缓存老了）→ 秒回旧值 + 后台刷新。用户不必为
+     *       「缓存该续期了」这件事等 5s；旧值本身仍然正确。
+     * - 写入（{@link #invalidateForWrite()} 自增版本号）→ key 段变化 → 新 key 落空
+     *       → 阻塞现算新值。绝不用 SWR 掩盖「数据真的变了」，否则会端出写前的旧数字。
      *
      * loader 必须与请求上下文无关：陈旧分支会在后台线程里调用它，那里没有
      * RequestContextHolder（RequestUtils / RecordFilter 读到的是

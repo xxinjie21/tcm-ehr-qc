@@ -71,15 +71,13 @@ import java.util.concurrent.TimeUnit;
  * 所以同时跑几个任务，打给 Python 的请求总数都恒定。之所以必须有任务内并行：NLP 是这条链路
  * 唯一的吞吐瓶颈，而原先一个任务只用一个线程串行跑，单任务吞吐被钉死在「1 / 单条耗时」。
  *
- * <ul>
- * <li>取数走 {@link RecordFilter}（数据域 + 筛选）与分页循环，绝不一次载入全量；</li>
- * <li>每条：{@link NlpTextComposer} 拼文本 → 抽取 → {@link EntityNormalizer} 归一 →
- * 打词典版本 → 写 records.structured_data（与单条抽取口径一致）；</li>
- * <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 failure_truncated；</li>
- * <li>取消：QUEUED 直接置 CANCELLED；RUNNING 置取消位，工作线程在条/页边界退出；</li>
- * <li>重启（K-c）：RUNNING 标记 INTERRUPTED（无法续跑，可重跑）；
- * QUEUED 是持久待认领队列，重启后由任意实例认领续跑，不再清理。</li>
- * </ul>
+ * - 取数走 {@link RecordFilter}（数据域 + 筛选）与分页循环，绝不一次载入全量；
+ * - 每条：{@link NlpTextComposer} 拼文本 → 抽取 → {@link EntityNormalizer} 归一 →
+ * 打词典版本 → 写 records.structured_data（与单条抽取口径一致）；
+ * - 失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 failure_truncated；
+ * - 取消：QUEUED 直接置 CANCELLED；RUNNING 置取消位，工作线程在条/页边界退出；
+ * - 重启（K-c）：RUNNING 标记 INTERRUPTED（无法续跑，可重跑）；
+ * QUEUED 是持久待认领队列，重启后由任意实例认领续跑，不再清理。
  */
 @Slf4j
 @Service
@@ -787,13 +785,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 终态选择（P0-1/P0-2，2026-10-05 抽出以便同步测试）。
      *
      * 四种终态互斥且都不许撒谎：
-     * <ul>
-     *   <li>执行期抛异常 → FAILED</li>
-     *   <li>一条都没处理（done=0 且 total&gt;0）→ INTERRUPTED：这是 2026-10-05 实测到的事故
-     *       （500 条筛选型任务 0 处理却 COMPLETED，界面说完成、数据是空的，用户无法自查）</li>
-     *   <li>取消 → CANCELLED</li>
-     *   <li>其余按完成度判定（{@link #endStatus}）</li>
-     * </ul>
+     * - 执行期抛异常 → FAILED
+     * - 一条都没处理（done=0 且 total&gt;0）→ INTERRUPTED：这是 2026-10-05 实测到的事故
+     *       （500 条筛选型任务 0 处理却 COMPLETED，界面说完成、数据是空的，用户无法自查）
+     * - 取消 → CANCELLED
+     * - 其余按完成度判定（{@link #endStatus}）
      *
      * 抽成方法的原因：线程里的流程难测，但「终态怎么选」是可同步断言、可变异验证的纯逻辑 ——
      * 而会犯错、且犯错了用户看不出来的，恰恰是它。
