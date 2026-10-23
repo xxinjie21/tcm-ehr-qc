@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.domain.PageOutcome;
 import com.tcm.ehr.common.cache.StatsCacheInvalidator;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -247,7 +248,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             try {
                 id = claimNextTask();
             } catch (Exception e) {
-                // 认领本身失败（DB 抖动）不能让 worker 线程死掉：告警后退避重试
+                // 2. 认领本身失败（DB 抖动）不能让 worker 线程死掉：告警后退避重试
                 log.warn("[批解析] 认领排队任务失败，{}ms 后重试: {}", POLL_INTERVAL_MS, e.getMessage());
             }
             if (id == null) {
@@ -356,7 +357,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         //     不报错、只是不互斥。批次 16.1：DistLock 用 Redisson 锁；它在事务内把放锁
         //     推迟到提交之后（否则并发的查重会读到未提交的空结果，防重形同虚设）。
         return distLock.runLocked(SUBMIT_LOCK, () -> {
-            // 防重按组织隔离：A 组在排队不该挡住 B 组提交（与 QcBatchServiceImpl 同口径）。
+            // 5. 防重按组织隔离：A 组在排队不该挡住 B 组提交（与 QcBatchServiceImpl 同口径）。
             // orgId 取的是当前提交人的组织快照，与下面 RecordFilter.build(orgId, …) 同一口径。
             Long active = taskMapper.selectCount(new QueryWrapper<NlpTask>()
                     .eq("org_id", orgId)
@@ -380,7 +381,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             t.setFailed(0);
             t.setFiltersJson(writeJsonStrict(objectMapper, filters));
             t.setCreatedBy(createdBy);
-            // 提交线程捕获组快照，供 worker 重建 RecordFilter（§ 6.3 缺点 13）
+            // 8. 提交线程捕获组快照，供 worker 重建 RecordFilter（§ 6.3 缺点 13）
             t.setOrgId(orgId);
             t.setFailureList("[]");
             t.setFailureTruncated(false);
@@ -390,7 +391,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             try {
                 taskMapper.insert(t);
             } catch (org.springframework.dao.DuplicateKeyException dup) {
-                // 并发同键：另一线程刚插入成功 ⇒ 查回那条任务返回，绝不重跑
+                // 9. 并发同键：另一线程刚插入成功 ⇒ 查回那条任务返回，绝不重跑
                 NlpTask existed = findTaskByRequestKey(t.getOrgId(), idempotencyKey);
                 if (existed != null) {
                     log.info("[批解析] 并发同键：key={} 复用任务 {}", idempotencyKey, existed.getId());
@@ -484,10 +485,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             item.setUpdateTime(now);
             items.add(item);
         }
-        // P2-8：明细攒批插入，不再逐条 insert —— 一次 500 条的导入就是 500 行 = 500 次往返。
+        // 6. P2-8：明细攒批插入，不再逐条 insert —— 一次 500 条的导入就是 500 行 = 500 次往返。
         // 主键是 IdType.AUTO，由库生成；本链路只写不读回自增 id，故批写不影响主键语义。
         BatchInsert.insert(sqlSessionFactory, NlpTaskItemMapper.class, nlpTaskItemMapper, items);
-        // 保留策略（批次 16 #3）：明细是「一行一条病历」，一次 500 条的导入就是 500 行 ——
+        // 7. 保留策略（批次 16 #3）：明细是「一行一条病历」，一次 500 条的导入就是 500 行 ——
         // 不清理会只增不减。这里在提交路径顺带清掉 30 天前的明细（不引入调度器：
         // 提交是低频写操作，够用；且按时间清理是幂等的）。任务主表 nlp_task 不动，
         // 历史任务的进度与失败清单仍在，只是明细（用于重启续跑）过期后不再保留。
@@ -499,10 +500,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 log.info("[批解析] 清理 30 天前的任务明细 {} 行（保留策略）", pruned);
             }
         } catch (Exception e) {
-            // 清理失败不能挡住提交
+            // 8. 清理失败不能挡住提交
             log.warn("[批解析] 清理过期任务明细失败（不影响提交）: {}", e.getMessage());
         }
-        // 批次 16.2：不再内存投递；任务已落库为 QUEUED，worker 轮询会认领它。
+        // 9. 批次 16.2：不再内存投递；任务已落库为 QUEUED，worker 轮询会认领它。
         log.info("[批解析] 已提交按ID任务 {}：计划 {} 条", t.getId(), ids.size());
         return toVO(t, false);
     }
@@ -527,7 +528,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (failed.isEmpty()) {
             throw new IllegalArgumentException("该任务没有失败记录，无需重试");
         }
-        // 组织化为 filters.ids：只重跑失败那批；模式沿用原任务（解析 / 仅归一）
+        // 1. 组织化为 filters.ids：只重跑失败那批；模式沿用原任务（解析 / 仅归一）
         FiltersDTO filters = new FiltersDTO();
         filters.setIds(failed);
         NlpBatchDTO dto = new NlpBatchDTO();
@@ -560,7 +561,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     @Override
     public NlpTaskVO get(String id) {
         NlpTask t = taskMapper.selectById(id);
-        // § 6.3 缺点 10：不能看别组任务进度。
+        // 1. § 6.3 缺点 10：不能看别组任务进度。
         // 不属于本组统一返回 null（按不存在处理）
         if (t != null && !satisfiesGroup(t)) {
             return null;
@@ -568,7 +569,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (t == null) {
             return null;
         }
-        // 运行中（排队/进行中）不回传失败明细：明细每轮询都在变，前端此时也不展示，
+        // 2. 运行中（排队/进行中）不回传失败明细：明细每轮询都在变，前端此时也不展示，
         // 却要每 2 秒把整包 JSON 回传一次。终态才带上 —— 省流量，也避免前端反复重渲染长表。
         boolean terminal = !NlpTask.QUEUED.equals(t.getStatus())
                 && !NlpTask.RUNNING.equals(t.getStatus());
@@ -592,7 +593,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         if (t == null) {
             throw new IllegalArgumentException("任务不存在");
         }
-        // § 6.3 缺点 10：不能取消别组任务（写操作，该报 Forbidden）
+        // 2. § 6.3 缺点 10：不能取消别组任务（写操作，该报 Forbidden）
         if (!satisfiesGroup(t)) {
             throw new ForbiddenException("无权操作该任务");
         }
@@ -610,10 +611,10 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             if (cancelled == 1) {
                 t.setStatus(NlpTask.CANCELLED);
                 t.setFinishedAt(LocalDateTime.now().withNano(0));
-                // 内存取消位一并置：本实例 worker 可能刚认领成功、还没读到状态
+                // 4. 内存取消位一并置：本实例 worker 可能刚认领成功、还没读到状态
                 cancelFlags.add(id);
             } else {
-                // 受影响行数为 0：已被认领（或已进终态）。重读一次再决定走哪个分支
+                // 5. 受影响行数为 0：已被认领（或已进终态）。重读一次再决定走哪个分支
                 t = taskMapper.selectById(id);
                 claimedByWorker = t != null && NlpTask.RUNNING.equals(t.getStatus());
             }
@@ -671,7 +672,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             cancelFlags.remove(id);
             return;
         }
-        // 批次 16 #3：ID 集合改为从明细表读 —— 内存那份在进程重启后是空的，
+        // 2. 批次 16 #3：ID 集合改为从明细表读 —— 内存那份在进程重启后是空的，
         // 任务会永远停在「进行中」。读不到（本次部署前提交的旧任务，或历史数据）再回落到内存，
         // 这样切换本身不会让任何在跑的任务断掉。
         // ⚠️ 只有「按 ID 集合提交」的任务才有明细；**筛选型任务本来就没有明细**（也不该有）。
@@ -691,7 +692,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
 
         // 3. 按取数来源分派：导入来的按 ID 集合，其余按筛选范围
         List<NlpTaskVO.Failure> failures = new ArrayList<>();
-        // 需求3：完整失败记录 ID（不受 failure_list 500 条截断），供「仅重试失败」按完整集合重跑
+        // 5. 需求3：完整失败记录 ID（不受 failure_list 500 条截断），供「仅重试失败」按完整集合重跑
         List<String> failedIds = new ArrayList<>();
         boolean[] truncated = {false};
         int[] processed = {0};
@@ -701,12 +702,12 @@ public class NlpBatchServiceImpl implements INlpBatchService {
             cancelled = idSource != null
                     ? runByIds(id, idSource, t, failures, failedIds, truncated, processed)
                     : runByFilter(id, t, failures, failedIds, truncated, processed);
-            // 批量解析改写 structured_data → 统计词频过期，主动失效（B1）
+            // 6. 批量解析改写 structured_data → 统计词频过期，主动失效（B1）
             if (!cancelled) {
                 StatsCacheInvalidator.invalidateStats();
             }
         } catch (Exception e) {
-            // 执行期异常必须落 FAILED，且不能指望 workerLoop 的 markFailed：
+            // 7. 执行期异常必须落 FAILED，且不能指望 workerLoop 的 markFailed：
             // 它的 satisfiesGroup 读的是请求上下文，worker 线程里恒为空 → 每次直接 return
             failed = true;
             log.error("[批解析] 任务 {} 执行异常，落 FAILED", id, e);
@@ -722,14 +723,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 log.error("[批解析] 任务 {} 未处理任何记录（0/{}），判为异常终止："
                         + "请检查任务分流与明细读取，不要据此认为已完成", id, t.getTotal());
             }
-            // P0-1/P0-2：终态选择抽成 terminalStatus（可同步测试的四态纯逻辑）
+            // 9. P0-1/P0-2：终态选择抽成 terminalStatus（可同步测试的四态纯逻辑）
             t.setStatus(terminalStatus(failed, nothingDone, running, cancelled, t.getDone(), t.getTotal()));
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
-            // 需求3：完整失败 ID 集合先落库，供「仅重试失败」取用（不受 500 条截断）
+            // 10. 需求3：完整失败 ID 集合先落库，供「仅重试失败」取用（不受 500 条截断）
             t.setFailedIds(writeJson(failedIds));
             persistProgress(t, failures, truncated[0]);
-            // 批次 16 #3：任务**真正跑完**时，把该任务剩下的待处理明细批量标为 DONE。
+            // 11. 批次 16 #3：任务**真正跑完**时，把该任务剩下的待处理明细批量标为 DONE。
             // 否则重启后会把已处理过的再跑一遍（至少一次语义 → 重复抽取会覆盖同一份结构化数据）。
             // 取消 / 中断 / 失败时**刻意保持 PENDING** —— 那正是「重启后从断点继续」的依据。
             if (NlpTask.COMPLETED.equals(t.getStatus())) {
@@ -739,7 +740,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                             .eq("status", NlpTaskItem.PENDING)
                             .set("status", NlpTaskItem.DONE));
                 } catch (Exception e) {
-                    // 标记失败不影响任务结论：最多是重启后重跑一遍（回到至少一次）
+                    // 12. 标记失败不影响任务结论：最多是重启后重跑一遍（回到至少一次）
                     log.warn("[批解析] 任务 {} 标记明细完成态失败: {}", id, e.getMessage());
                 }
             }
@@ -811,7 +812,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         // 1. 还原落库时的筛选条件（条件是提交时冻结的，不随数据变化）；filtersJson 只反序列化一次
         int limit = t.getTotal() == null ? 0 : t.getTotal();
         com.tcm.ehr.domain.dto.FiltersDTO frozenFilters = readFilters(t.getFiltersJson());
-        // 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
+        // 2. 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
         DictMeta dictMeta = new DictMeta(termStore, t.getOrgId());
         // 2. 游标分页循环取数（P1-3 / AI-8）：keyset 锚定上一页末条 (visit_time, id) 而非 offset ——
         //    offset 每页都要重排剩余全表（4 万条 200 页，累计扫描量约为实际行数的 20 倍）。
@@ -845,7 +846,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 if (outcome == PageOutcome.CANCELED) {
                     return true;
                 }
-                // limit 触顶 / 停机被拒：后面的页一条都不该再处理，直接收尾。
+                // 6. limit 触顶 / 停机被拒：后面的页一条都不该再处理，直接收尾。
                 // 两者都不是「取消」—— 触顶是正常收尾，停机由 endStatus 依「已停机 + 未跑完」落 INTERRUPTED
                 // （改造前是循环内 return false，processPage 改成多态出口后必须在这里显式 break）
                 if (outcome != PageOutcome.CONTINUE) {
@@ -895,9 +896,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 .select("id").eq("org_id", t.getOrgId()).in("id", ids)
                 .last("LIMIT " + ids.size()))
                 .stream().map(Record::getId).toList();
-        // 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
+        // 3. 批次 25.3：词典元数据一批只取一次（惰性，见 DictMeta）
         DictMeta dictMeta = new DictMeta(termStore, t.getOrgId());
-        // P1-4：与 runByFilter 同一套攒批回写；任何出口（含取消/异常）都要刷掉尾批
+        // 4. P1-4：与 runByFilter 同一套攒批回写；任何出口（含取消/异常）都要刷掉尾批
         List<StructuredWrite> pending = new ArrayList<>();
         try {
             // 1. 按页大小切块：IN 过长会让 SQL 变慢
@@ -909,13 +910,13 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 List<String> chunk = ids.subList(off, Math.min(off + PAGE_SIZE, ids.size()));
                 // 3. 一次批量取回该块，再逐条处理（库里的取消位同样每 PROGRESS_EVERY 条查一次）
                 List<Record> list = recordMapper.selectBatchIds(chunk);
-                // ID 型任务没有「总数上限」的概念：上限给 Integer.MAX_VALUE（等价于不限）
+                // 8. ID 型任务没有「总数上限」的概念：上限给 Integer.MAX_VALUE（等价于不限）
                 PageOutcome outcome = processPage(id, list, t, dictMeta, failures, failedIds, truncated,
                         processed, pending, Integer.MAX_VALUE);
                 if (outcome == PageOutcome.CANCELED) {
                     return true;
                 }
-                // limit 传 Integer.MAX_VALUE ⇒ remain 恒 > 0，不可能出现 LIMIT_REACHED；
+                // 9. limit 传 Integer.MAX_VALUE ⇒ remain 恒 > 0，不可能出现 LIMIT_REACHED；
                 // 剩下只可能是停机被拒（ABORTED）—— 同样收尾，由 endStatus 落 INTERRUPTED
                 if (outcome == PageOutcome.ABORTED) {
                     break;
@@ -950,32 +951,6 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /**
-     * {@link #processPage} 的三态出口。
-     *
-     * 为什么必须是三态：改造前 processPage 返回 {@code boolean}，
-     * 而外层把 {@code true} 理解成「已取消」、{@code false} 理解成「继续翻页」。
-     * 但 processPage 里还有一个出口是「已达 limit 上限」，它也返回了 {@code false} ——
-     * 于是 limit 触顶后外层继续翻页，把整个匹配集翻完（{@code total=0} 的任务同样如此）。
-     * 三态把这个歧义消掉。
-     */
-    private enum PageOutcome {
-        /** 本页处理完毕，未取消、未触顶 */
-        CONTINUE,
-        /** 检测到取消请求 */
-        CANCELED,
-        /** 已达 limit 硬上限，后续页一条都不该再处理 */
-        LIMIT_REACHED,
-        /**
-         * 应用正在停机、任务内并行池已拒绝提交（B4）。
-         *
-         * 刻意与 {@link #CANCELED} 分开：这不是用户的取消意图，不能落 CANCELLED。
-         * 调用方按「未被取消」收尾，由 {@link #endStatus} 依「已停机 + 未跑完」落
-         * INTERRUPTED（endStatus 里 cancelled 优先于停机判定）。
-         */
-        ABORTED
-    }
-
-    /**
      * 并行处理一批病历（两条取数路径共用）；返回 {@link PageOutcome} 区分「继续翻页 / 被取消 / 已达 limit 上限」。
      *
      * 为什么要并行：原先这里是一个 {@code for} 循环串行调 processOne，而单条
@@ -1002,7 +977,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         List<Record> page = list;
         int remain = limit - processed[0];
         if (remain <= 0) {
-            // A2：这里是「已达上限」，不是「未取消」—— 原先返回 false 会被外层当成「继续翻页」，
+            // 2. A2：这里是「已达上限」，不是「未取消」—— 原先返回 false 会被外层当成「继续翻页」，
             // limit 触顶后仍把整个匹配集翻完（total=0 的任务也一样）。
             return PageOutcome.LIMIT_REACHED;
         }
@@ -1030,7 +1005,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                             : recordPool.submit(() -> runOne(r, t.getOrgId(), dictMeta, t.modeOrDefault())));
                 }
             } catch (RejectedExecutionException e) {
-                // B4：停机时池已 shutdownNow，再提交会被拒。这是「应用要停了」而不是「任务失败」——
+                // 6. B4：停机时池已 shutdownNow，再提交会被拒。这是「应用要停了」而不是「任务失败」——
                 // 若让它冒到 runTask 的 catch，任务会落 FAILED，而设计意图是 INTERRUPTED。
                 log.warn("[批解析] 任务 {} 提交并行处理被拒（应用正在停机），按中断收尾", taskId);
                 return PageOutcome.ABORTED;
@@ -1041,14 +1016,14 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                 StepOutcome outcome = awaitOutcome(futures.get(i));
                 processed[0]++;
                 if (outcome.skipped()) {
-                    // 人工修改优先：有意跳过，不算成功也不算失败（不回写，避免撤销人工修正）
+                    // 8. 人工修改优先：有意跳过，不算成功也不算失败（不回写，避免撤销人工修正）
                     t.setSuccess(t.getSuccess() + 1);
                 } else if (outcome.json() != null) {
                     t.setSuccess(t.getSuccess() + 1);
                     pending.add(new StructuredWrite(r.getId(), outcome.json()));
                 } else {
                     t.setFailed(t.getFailed() + 1);
-                    // 完整失败 ID 集合：供「仅重试失败」按完整集合重跑，不受 500 条截断
+                    // 9. 完整失败 ID 集合：供「仅重试失败」按完整集合重跑，不受 500 条截断
                     failedIds.add(r.getId());
                     if (failures.size() < MAX_FAILURES) {
                         failures.add(new NlpTaskVO.Failure(labelOf(r), outcome.reason(), r.getId()));
@@ -1083,7 +1058,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         try {
             return StepOutcome.ok(processOne(r, orgId, dictMeta, mode));
         } catch (SkipRecordException s) {
-            // 人工修改优先：仅归一主动跳过（不计失败、不回写）
+            // 1. 人工修改优先：仅归一主动跳过（不计失败、不回写）
             return StepOutcome.skip();
         } catch (Exception e) {
             return StepOutcome.fail(reasonOf(e));
@@ -1147,7 +1122,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      */
     private boolean isCancelRequested(String id) {
         try {
-            // C5：只取 cancel_requested 单列。原先 selectById 会把整行读回来 ——
+            // 1. C5：只取 cancel_requested 单列。原先 selectById 会把整行读回来 ——
             // 含 failure_list（可能很长的 JSON）与 filters_json，而本方法每 PROGRESS_EVERY 条
             // 就调一次，纯属白读。口径与 QcBatchServiceImpl 的 P2-5 写法一致。
             // ⚠️ 用实体方法引用而不是 .select("cancel_requested") 字面量：列名走实体映射
@@ -1192,7 +1167,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         entityNormalizer.backfillFromRaw(vo, orgId, r.getPrescription(), r.getTcmDiagnosis(), r.getWesternDiagnosis(), r.getPattern());
         // 4. 打上词典版本再写库：归一结果与当时词典版本必须成对，否则事后无法判断该不该重算
         String json = objectMapper.writeValueAsString(vo);
-        // ⚠️ 原先打的是 dictionaryFileService.currentVersion() —— 那是词典还在文件时代
+        // 6. ⚠️ 原先打的是 dictionaryFileService.currentVersion() —— 那是词典还在文件时代
         //    的文件哈希。词典源在批次 8b 已入库，文件哈希从此冻结不变，库里 500 条记录
         //   的 dictVersion 全是同一个值，既无法区分、也不是真正用的那版词典。
         //    这里改用「本组织归一实际覆盖的 5 类词典」的有效版本 + 词条数。
@@ -1218,11 +1193,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     private String normalizeStored(Record r, String orgId, DictMeta dictMeta) throws Exception {
         String existing = r.getStructuredData();
         if (existing == null || existing.isBlank()) {
-            // 从未解析过 → 没有可归一的实体；重试也不会成功，属永久失败
+            // 1. 从未解析过 → 没有可归一的实体；重试也不会成功，属永久失败
             throw new IllegalArgumentException("该病历尚无结构化数据，请先批量解析");
         }
         if (Boolean.TRUE.equals(r.getManuallyEdited())) {
-            // 人工成果优先：跳过，避免把人工改过的术语归一回去
+            // 2. 人工成果优先：跳过，避免把人工改过的术语归一回去
             throw new SkipRecordException();
         }
         Map<String, Object> data = objectMapper.readValue(existing,
@@ -1231,7 +1206,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
         String json = StructuredDataMeta.stamp(objectMapper, data,
                 dictMeta.version(), dictMeta.termCount());
         if (json == null) {
-            // 序列化失败：宁可算这条失败，也不写 null 把整列结构化数据清空
+            // 3. 序列化失败：宁可算这条失败，也不写 null 把整列结构化数据清空
             throw new IllegalStateException("结构化数据序列化失败");
         }
         return json;
@@ -1289,7 +1264,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     private static boolean isTerminal(String status) {
-        // 四个终态：完成 / 取消 / 中断 / 失败
+        // 1. 四个终态：完成 / 取消 / 中断 / 失败
         return NlpTask.COMPLETED.equals(status) || NlpTask.CANCELLED.equals(status)
                 || NlpTask.INTERRUPTED.equals(status) || NlpTask.FAILED.equals(status);
     }
@@ -1340,7 +1315,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 而失败明细丢了不影响任务语义。
      */
     private String writeJson(Object o) {
-        // 序列化失败退回 "null"（读回即无明细），不抛
+        // 1. 序列化失败退回 "null"（读回即无明细），不抛
         try {
             return objectMapper.writeValueAsString(o);
         } catch (Exception e) {
