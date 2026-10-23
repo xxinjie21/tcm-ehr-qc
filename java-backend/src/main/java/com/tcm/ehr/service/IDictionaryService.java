@@ -25,7 +25,7 @@ public interface IDictionaryService {
      * @param size    每页条数，仅 {@code page > 0} 时生效
      * @param scope   词典作用域，取值见 {@link IDictionaryTermStore}：
      *                effective（默认，基础层∪本组织）/ base（仅系统默认）
-     *                / org（仅本组自有）。<b>输入联想与下拉必须用 effective</b>，
+     *                / org（仅本组自有）。输入联想与下拉必须用 effective，
      *                否则会选到归一里不生效的词
      * @return 视图含 terms（词条列表）与 total（命中总数）
      * @throws IOException 词典读取失败
@@ -43,11 +43,11 @@ public interface IDictionaryService {
     ImportResultVO importDictionary(String type, MultipartFile file) throws IOException;
 
     /**
-     * 导入到<b>指定组织层</b>（批次 17）。
+     * 导入到指定组织层（批次 17）。
      *
      * 与 {@link #importDictionary(String, MultipartFile)} 的差别只在落库目标：
      * 那个固定写当前组织，这个允许管理员显式写基础层（{@code orgId = ""}）。
-     * 刻意<b>不</b>开放任意 orgId 入参给普通用户 —— 提案流程才是成员改基线的唯一入口。
+     * 刻意不开放任意 orgId 入参给普通用户 —— 提案流程才是成员改基线的唯一入口。
      *
      * @param type   术语类型
      * @param file   文件（.xlsx/.xls/.csv/.json）
@@ -64,11 +64,11 @@ public interface IDictionaryService {
     java.util.List<com.tcm.ehr.domain.po.TermEntry> currentTerms(String orgId, String type);
 
     /**
-     * 只解析文件、<b>不落库</b>（供「成员上传词典文件 → 生成提案」用）。
+     * 只解析文件、不落库（供「成员上传词典文件 → 生成提案」用）。
      *
      * 为什么需要它：{@link #importDictionary} 会直接写基线，那是管理员特权通道；
-     * 普通成员按设计<b>不能</b>直接改基线（必须走提案审核）。但成员同样需要
-     * 「批量导入词典」的便利 —— 让他上传文件后<b>生成提案</b>，组长审核通过才合并，
+     * 普通成员按设计不能直接改基线（必须走提案审核）。但成员同样需要
+     * 「批量导入词典」的便利 —— 让他上传文件后生成提案，组长审核通过才合并，
      * 既给了便利，又不破坏审核约定。
      *
      * @param type 术语类型
@@ -100,7 +100,7 @@ public interface IDictionaryService {
      * 用于「库里词条是对的、但索引落后」的自愈：ES 重建失败时 indexed_version
      * 不会被更新，启动对账下次会补；这个接口让它不必重启就能立刻补。
      *
-     * 只重建<b>当前组织这一层</b>。基础层或别的组织若也落后，重建它们会让那一层
+     * 只重建当前组织这一层。基础层或别的组织若也落后，重建它们会让那一层
      * 同时进入空窗（归一 503），不该由一次手动操作顺带触发。
      *
      * @param type 术语类型
@@ -110,7 +110,7 @@ public interface IDictionaryService {
     /**
      * 手动重建 ES 索引（仅管理员；ES 是可丢弃可重放的派生索引，本入口用于「库里对、索引落后」）。
      *
-     * 默认只重建<b>当前组织 + 指定类型</b>：基础层或别的组织若也落后，重建它们会让那一层
+     * 默认只重建当前组织 + 指定类型：基础层或别的组织若也落后，重建它们会让那一层
      * 同时进入空窗（归一 503），不该由一次手动操作顺带触发。要全量重放必须显式传参 ——
      * 那是「索引大面积丢失」时的灾难恢复入口。
      *

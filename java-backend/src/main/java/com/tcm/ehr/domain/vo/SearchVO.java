@@ -45,9 +45,9 @@ public class SearchVO {
         /**
          * 该条结构化数据是否含人工修改。
          *
-         * 来自 structured_data._meta.manuallyEdited，由后端在两个<b>人工</b>写入口
+         * 来自 structured_data._meta.manuallyEdited，由后端在两个人工写入口
          * （复核提交修正、{@code PUT /api/records/{id}}）打上。清洗归一这类自动流程不打，
-         * 且遇到人工修改过的病历会<b>跳过</b>归一（方案 A），所以这个标记能稳定成立。
+         * 且遇到人工修改过的病历会跳过归一（方案 A），所以这个标记能稳定成立。
          *
          * 用途有二：列表上一眼看出「这条不是模型原样抽的」；以及评估模型准确率时
          * 排除人工补过的数据。

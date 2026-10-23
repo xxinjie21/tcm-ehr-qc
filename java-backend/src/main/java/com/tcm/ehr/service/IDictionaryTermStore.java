@@ -10,7 +10,7 @@ import java.util.Map;
  * 组织级词典存储的接口契约：词条落 dictionary_terms，版本对账落
  * dictionary_versions，导入前存档落 dictionary_backups。
  *
- * <b>组织维度语义</b>：orgId 为空串 {@code ""} = 基础层（全组织共享）。
+ * 组织维度语义：orgId 为空串 {@code ""} = 基础层（全组织共享）。
  * 某组织没有自有词条时读到基础层，而不是读到空。
  *
  * 实现见 com.tcm.ehr.service.impl.DictionaryTermStoreImpl。
@@ -42,13 +42,13 @@ public interface IDictionaryTermStore {
     /**
      * 读某组织某类型的有效词条。
      *
-     * 口径是<b>叠加</b>而非回退：基础层与本组织都有词条时取并集，
+     * 口径是叠加而非回退：基础层与本组织都有词条时取并集，
      * 同一标准词以本组织为准；只有一侧有词条时就是那一侧。
      */
     List<TermEntry> readEffective(String orgId, String type);
 
     /**
-     * 一次读回某组织「基础层 ∪ 本组织」生效的<b>全部类型</b>词条，按 type 分组。
+     * 一次读回某组织「基础层 ∪ 本组织」生效的全部类型词条，按 type 分组。
      *
      * 口径与逐类调用 {@link #readEffective} 逐位一致（同一标准词以本组织为准）。存在的意义是
      * 消除 N+1：报告/看板要 8 类 × (基础层 + 本组织) = 最多 16 次读，每次都带一次版本查询 +
@@ -90,12 +90,12 @@ public interface IDictionaryTermStore {
     /**
      * 术语建议召回用的字符倒排索引，连同它所索引的那份生效词条表。
      *
-     * <b>为什么两者必须一起给</b>：postings 里的值指向 entries 的串编号，
+     * 为什么两者必须一起给：postings 里的值指向 entries 的串编号，
      * 分两次取（先取词条、再取索引）在词典刚好变更时会让两者对不上。一次取回就同源。
      *
-     * 用途是<b>把全表扫描缩成候选扫描</b>：召回门槛是「与原文重叠 ≥2 个字符」，
+     * 用途是把全表扫描缩成候选扫描：召回门槛是「与原文重叠 ≥2 个字符」，
      * 而重叠只可能发生在「出现在原文里的字符」上 —— 所以「出现在原文任一字符的倒排表里」
-     * 是入选的<b>必要条件</b>，据此取出的候选集是超集，结果集与全表扫描逐条一致。
+     * 是入选的必要条件，据此取出的候选集是超集，结果集与全表扫描逐条一致。
      *
      * @param entries     生效词条（基础层 ∪ 本组织，口径同 {@link #readEffective}）
      * @param stringOwner 串编号 → 该串所属词条在 entries 中的下标
@@ -115,12 +115,12 @@ public interface IDictionaryTermStore {
     RecallIndex recallIndex(String orgId, String type);
 
     /**
-     * 取某组织某类型、<b>指定作用域</b>的召回索引。
+     * 取某组织某类型、指定作用域的召回索引。
      *
      * 作用域与词典页的三档一一对应（{@link #SCOPE_BASE} / {@link #SCOPE_ORG} / 其余一律
      * {@link #SCOPE_EFFECTIVE}），口径与 {@link #read} / {@link #readEffective} 完全一致。
      *
-     * <b>调用方必须拿 {@code entries()} 当词条真源</b>，不要再单独 read 一次：
+     * 调用方必须拿 {@code entries()} 当词条真源，不要再单独 read 一次：
      * 索引里的串编号指向的就是 entries 的下标，分两次取在词典刚好变更时会对不上。
      *
      * 与 {@link #recallIndex(String, String)} 共用同一个 VersionedCache 与同一套版本号

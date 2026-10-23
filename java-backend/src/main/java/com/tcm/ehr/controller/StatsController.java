@@ -44,12 +44,12 @@ public class StatsController {
      * 【权限：登录即可 + 数据域】只读，不触发任何重算。
      *
      * 报告分甲乙两层：甲类是标准符合度（与数据无关），乙类是数据集覆盖度
-     * （只用于验证词表建全与否，<b>不代表真实病历准确率</b>）。响应里的
+     * （只用于验证词表建全与否，不代表真实病历准确率）。响应里的
      * disclaimer 会原样带到页面，禁止前端隐藏。
      *
      * 两个时间维度相互独立、可同时生效（取交集）：start/end 是
-     * <b>接诊时间</b>（visit_time，Java 侧过滤，range.excluded 口径由此而来）；
-     * importStart/importEnd 是<b>导入时间</b>（records.create_time，
+     * 接诊时间（visit_time，Java 侧过滤，range.excluded 口径由此而来）；
+     * importStart/importEnd 是导入时间（records.create_time，
      * 下推 SQL）。页面默认按「今天导入」收窄，正是这一维度。
      *
      * @param department  科室，空表示不限

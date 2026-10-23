@@ -32,11 +32,11 @@ import java.util.UUID;
  * 组织级词典存储：词条落 dictionary_terms，版本对账落 dictionary_versions，
  * 导入前存档落 dictionary_backups。
  *
- * <b>组织维度语义</b>：orgId 为空串 {@code ""} = <b>基础层</b>（全组织共享）。
- * 某组织没有自有词条时<b>读到基础层</b>，而不是读到空 —— 空会让归一把该组织的所有术语
+ * 组织维度语义：orgId 为空串 {@code ""} = 基础层（全组织共享）。
+ * 某组织没有自有词条时读到基础层，而不是读到空 —— 空会让归一把该组织的所有术语
  * 判成「词典里没有」，分数全塌。
  *
- * <b>为什么版本号入表</b>：ES 的 _meta.version 是索引级的，分不清组织。
+ * 为什么版本号入表：ES 的 _meta.version 是索引级的，分不清组织。
  * 灌完 ES 只更新 dictionary_versions.indexed_version，没灌成功就不动它 ——
  * 这样「DB 已改、ES 没跟上」在启动对账时能被真实地看见，而不是被一个索引级标记掩盖。
  */
@@ -76,10 +76,10 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      * 版本号缓存（批次 12 · 12a）：键 {@code org|type}，TTL 5 秒 + 写路径主动失效。
      *
      * 为什么值得缓存：read 每次都要查一次 dictionary_versions 才知道词条缓存是否
-     * 失效，而 readEffective 要读两层 ⇒ 一次读就是 <b>2 次</b>版本查询；NLP 归一按记录反复
+     * 失效，而 readEffective 要读两层 ⇒ 一次读就是 2 次版本查询；NLP 归一按记录反复
      * 调它，同一份版本号被查了成百上千次 —— 这正是 12a 说的「每条查 4 次词典元数据」。
      *
-     * <b>不脏读的做法</b>：① 写路径（{@link #replace} 与 saveVersion）主动失效 ⇒
+     * 不脏读的做法：① 写路径（{@link #replace} 与 saveVersion）主动失效 ⇒
      * 本实例内的改动立即生效；② 仍留 5 秒 TTL，覆盖「别的实例改了词表」的情况 ——
      * 跨实例最多迟 5 秒。词表改动不是高频操作，5 秒的可感延迟远小于「每条记录查一次库」的代价。
      */
@@ -133,7 +133,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      * {@code org_id IN ('', ?)} 取回两层，再在内存里按 type 合并。整趟只发 1 条 SQL，
      * 替代「8 类 × 2 层」最多 32 条（每条 read 都带一次版本查询 + 一次词条查询）。
      *
-     * 刻意<b>不走</b> termsCache：它按 (org,type) 分片缓存，缓存命中要逐个类型查版本号，
+     * 刻意不走 termsCache：它按 (org,type) 分片缓存，缓存命中要逐个类型查版本号，
      * 反而无法一趟取回。这里一次库查询的代价远低于逐类版本查询，且结果一次用完即弃。
      */
     @Override
@@ -178,7 +178,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 取召回索引（P1-15 / S1）：生效词条表 + 它的字符倒排表，一次装载、同源返回。
      *
-     * <b>为什么缓存的是「合并后的生效词条」</b>：{@link #readEffective} 每次都要把两层
+     * 为什么缓存的是「合并后的生效词条」：{@link #readEffective} 每次都要把两层
      * 合并一遍（O(D)），而召回索引本来就要遍历一遍全部词条 —— 合并与建表在同一次装载里做完，
      * 之后按版本复用。
      *
@@ -371,7 +371,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 覆盖写入某组织的整类词条，并更新内容版本。
      *
-     * 写入与版本更新在<b>同一事务</b>：否则「词条换了、版本没换」会让启动对账
+     * 写入与版本更新在同一事务：否则「词条换了、版本没换」会让启动对账
      * 判定「已同步」而跳过重建，ES 里就永远停在这一版。
      *
      * @param orgId   组织号
@@ -413,7 +413,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 记录「已灌入 ES」的版本。
      *
-     * 只在 ES 灌成功<b>之后</b>调用。灌失败绝不能调：调了就是「谎报已同步」，
+     * 只在 ES 灌成功之后调用。灌失败绝不能调：调了就是「谎报已同步」，
      * 启动对账会跳过重建，归一永远用旧索引。
      */
     public void markIndexed(String orgId, String type, String indexedVersion) {
@@ -521,11 +521,11 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     }
 
     /**
-     * 该组织归一<b>实际用到</b>的词典状态摘要：5 类词典各自「本组织 → 基础层」的有效版本。
+     * 该组织归一实际用到的词典状态摘要：5 类词典各自「本组织 → 基础层」的有效版本。
      *
-     * <b>为什么不能用文件哈希</b>（原 {@code currentVersion()}）：词典源在批次 8b 已从文件
-     * 改成这张表，文件哈希从此<b>冻结不变</b> —— 库里 500 条记录的 dictVersion
-     * 全都是同一个值，既无法区分、也<b>不代表真正用的那版词典</b>。
+     * 为什么不能用文件哈希（原 {@code currentVersion()}）：词典源在批次 8b 已从文件
+     * 改成这张表，文件哈希从此冻结不变 —— 库里 500 条记录的 dictVersion
+     * 全都是同一个值，既无法区分、也不代表真正用的那版词典。
      *
      * 实现上只读 dictionary_versions（每 (org,type) 一行），
      * 是两次轻查询；不重读词条 —— 词条量大（pattern 类两千多条）时重读会拖慢批量解析。

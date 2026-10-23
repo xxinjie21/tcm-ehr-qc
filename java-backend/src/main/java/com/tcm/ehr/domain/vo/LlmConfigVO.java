@@ -5,7 +5,7 @@ import lombok.Data;
 /**
  * LLM 当前生效配置。
  *
- * <b>密钥只回传掩码</b>：apiKeyMask 形如 {@code sk-****abcd}，明文密钥永不离开服务端，
+ * 密钥只回传掩码：apiKeyMask 形如 {@code sk-****abcd}，明文密钥永不离开服务端，
  * 前端也不得写入 localStorage。apiKeySet 用于让弹窗提示「已配置 / 未配置」。
  */
 @Data

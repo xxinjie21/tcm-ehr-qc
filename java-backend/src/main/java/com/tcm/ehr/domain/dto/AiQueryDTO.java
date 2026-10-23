@@ -21,11 +21,11 @@ public class AiQueryDTO {
     private String recordId;
 
     /**
-     * 待规范的术语原文（<b>仅 termsuggest 必填</b>）。
+     * 待规范的术语原文（仅 termsuggest 必填）。
      *
      * 不能加 {@code @NotEmpty}：本 DTO 被三个端点共用，加上会让
      * interpret / review 在进入 Controller 之前就被 Bean Validation 拦掉
-     * —— 「某个端点必填」的约束属于<b>该端点</b>，放在共用 DTO 上必然误伤其它端点。
+     * —— 「某个端点必填」的约束属于该端点，放在共用 DTO 上必然误伤其它端点。
      * termsuggest 的必填在 Controller 里校验。
      */
     @Size(max = 50, message = "单次最多 50 个待补词")

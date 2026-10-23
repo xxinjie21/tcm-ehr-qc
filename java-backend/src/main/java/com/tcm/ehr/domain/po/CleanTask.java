@@ -7,12 +7,12 @@ import lombok.EqualsAndHashCode;
 /**
  * 数据清洗任务。对应 clean_task 表。
  *
- * <b>为什么由同步改异步</b>：原 {@code POST /api/governance/clean} 一个请求线程从头跑到尾，
- * 全库 3.4 万条须数分钟，前端只能挂到超时、且<b>无法停止</b>。改为后台任务后：
+ * 为什么由同步改异步：原 {@code POST /api/governance/clean} 一个请求线程从头跑到尾，
+ * 全库 3.4 万条须数分钟，前端只能挂到超时、且无法停止。改为后台任务后：
  * 提交即返回任务 ID，可轮询进度、可取消（{@link AbstractBatchTask#cancelRequested}）、
  * 关页面也不影响执行。
  *
- * <b>与 qc_task / nlp_task 同构</b>：状态机与进度字段全部继承自 {@link AbstractBatchTask}，
+ * 与 qc_task / nlp_task 同构：状态机与进度字段全部继承自 {@link AbstractBatchTask}，
  * 本类只加清洗特有的四个计数与「是否归一」开关。
  */
 @Data

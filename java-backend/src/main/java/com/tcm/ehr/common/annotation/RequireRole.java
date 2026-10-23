@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * 角色校验：
  * 标注在 Controller 方法或类上，由 RoleInterceptor 读取 request 属性 currentRole 做
- * <b>包含匹配</b>（任一角色命中即放行），未命中返回 HTTP 403 + Result{code=403}。
+ * 包含匹配（任一角色命中即放行），未命中返回 HTTP 403 + Result{code=403}。
  *
  * 不标注 = 「登录即可」（JwtInterceptor 已保证鉴权），无需额外注解。
  *

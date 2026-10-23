@@ -39,11 +39,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * 数据清洗的异步任务编排：提交 / 进度 / 取消 / 后台执行。
  *
- * <b>为什么改异步</b>：原 {@code POST /api/governance/clean} 是同步接口 —— 一个请求线程
- * 从头跑到尾（全库 3.4 万条约数分钟），前端只能挂到超时，且<b>无法停止</b>。改为后台任务后
+ * 为什么改异步：原 {@code POST /api/governance/clean} 是同步接口 —— 一个请求线程
+ * 从头跑到尾（全库 3.4 万条约数分钟），前端只能挂到超时，且无法停止。改为后台任务后
  * 提交即返回任务 ID，可轮询进度、可取消、关页面也不影响执行。
  *
- * <b>与 QcBatchServiceImpl 同构</b>：条件认领、取消位落库、终态兜底、重启标记中断这套
+ * 与 QcBatchServiceImpl 同构：条件认领、取消位落库、终态兜底、重启标记中断这套
  * 口径完全照搬 —— 两处若各写一套，改状态机时必然漏一处。差异只在「跑什么」：
  * 质控是逐条评分，清洗是调一次 {@link IGovernanceService#clean} 并传进度回调。
  */
@@ -66,12 +66,12 @@ public class CleanBatchService implements ICleanBatchService {
     /**
      * 任务队列容量上限（2026-10-21）。
      *
-     * 原来是 {@code new LinkedBlockingQueue<>()} —— <b>无界</b>。提交速度长期快于消费速度时
+     * 原来是 {@code new LinkedBlockingQueue<>()} —— 无界。提交速度长期快于消费速度时
      * 队列会无限增长直至 OOM。虽然「同组织只允许一个 QUEUED/RUNNING 任务」已把实际堆积压到很低，
      * 但那是业务约束、不是容量保证，故补一个硬上限兜底。
      *
      * 容量取 256：单任务处理 3.4 万条要几十分钟，256 个待处理任务已远超任何合理场景；
-     * 真打满说明系统异常，此时<b>拒绝入队并落 FAILED</b> 比默默堆积更安全（用户能看到失败原因）。
+     * 真打满说明系统异常，此时拒绝入队并落 FAILED 比默默堆积更安全（用户能看到失败原因）。
      */
     private static final int QUEUE_CAPACITY = 256;
 
@@ -222,7 +222,7 @@ public class CleanBatchService implements ICleanBatchService {
         t.setFiltersJson(writeJson(filters));
         t.setCreateTime(LocalDateTime.now().withNano(0));
         taskMapper.insert(t);
-        // ⚠️ 必须在<b>事务提交后</b>才入队（与 QcBatchServiceImpl 同口径，用 DistLock.afterCommit）。
+        // ⚠️ 必须在事务提交后才入队（与 QcBatchServiceImpl 同口径，用 DistLock.afterCommit）。
         // 在事务内 queue.offer 会让 worker 立刻 poll 到 id，但它去 selectById 时该行尚未提交
         // —— 读到 null，runTask 静默 return，任务永远停在 QUEUED（本 bug 的实际表现）。
         DistLock.afterCommit(() -> {

@@ -6,7 +6,7 @@ import lombok.Data;
 /**
  * 组织级词典索引版本（dictionary_versions，主键 {@code (org_id, type)}）。
  *
- * <b>这是「索引里灌的到底是哪一版」的唯一权威</b>：ES 上的 _meta.version 只是
+ * 这是「索引里灌的到底是哪一版」的唯一权威：ES 上的 _meta.version 只是
  * 索引级的一个标，无法区分组织。ES 挂了不算「索引好了」—— 只有 indexedVersion
  * 追上 version，才算该组织的词全部进了 ES。
  *

@@ -19,10 +19,10 @@ public final class QcScorer {
     /**
      * 质控分级的三个取值（2026-10-23 收敛为单一事实源）。
      *
-     * <b>为什么必须集中定义</b>：这三个字面量此前散落在 12 处 —— 本类赋值 4 处、
+     * 为什么必须集中定义：这三个字面量此前散落在 12 处 —— 本类赋值 4 处、
      * GovernanceServiceImpl 5 处、QcServiceImpl 5 处、ReviewServiceImpl 2 处，
      * 且 StatsCache 还自维护一份 GRADES 白名单。改一处漏十一处时
-     * <b>编译器完全不会报错</b>：{@code switch} 落到 default、导出条件一条都匹配不上、
+     * 编译器完全不会报错：{@code switch} 落到 default、导出条件一条都匹配不上、
      * 待办列表变空 —— 属于静默数据错乱。故收敛到此，下游一律引用常量。
      */
     public static final String GRADE_QUALIFIED = "合格";
@@ -159,13 +159,13 @@ public final class QcScorer {
     /**
      * 「核心要素」的缺失情况，分两档。
      *
-     * <b>与 {@link #score} 的完整性扣分同源</b>：同一份要素清单
+     * 与 {@link #score} 的完整性扣分同源：同一份要素清单
      * （{@code rules.getCompleteness().getElements()}）、同一套判空原语
      * （{@link #structuredPresent} / {@link #rawPresent}）。存在的意义是让 AI 解读 / 助手
      * 不再手写一份要素清单 —— 那正是「同一份病历质控说缺、AI 说齐全」的根因。
      *
-     * @param full <b>真缺失</b>：结构化结果与原始列都没有记录
-     * @param partial <b>漏抽</b>：结构化结果里没有，但原始列有记录（可能未被抽取）
+     * @param full 真缺失：结构化结果与原始列都没有记录
+     * @param partial 漏抽：结构化结果里没有，但原始列有记录（可能未被抽取）
      */
     public record Missing(List<String> full, List<String> partial) {
     }

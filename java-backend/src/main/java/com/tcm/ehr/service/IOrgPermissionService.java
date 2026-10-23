@@ -3,7 +3,7 @@ package com.tcm.ehr.service;
 /**
  * 组织内写权限查询（授权位来自 organization_members）。
  *
- * 「词典写 / 质控规则写」两个开关是<b>成员级</b>授权：管理员与组织所有者天然拥有，
+ * 「词典写 / 质控规则写」两个开关是成员级授权：管理员与组织所有者天然拥有，
  * 不依赖这两位（给他们授权没有意义）。
  */
 public interface IOrgPermissionService {

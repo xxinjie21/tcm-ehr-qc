@@ -11,27 +11,27 @@ import java.util.List;
 /**
  * 批量插入通道（P2-8）：把「循环内逐条 insert」换成批处理会话。
  *
- * <b>为什么需要它</b>：逐条 insert 每行一次往返；整份词典（疾病类上千条）
+ * 为什么需要它：逐条 insert 每行一次往返；整份词典（疾病类上千条）
  * 或一次 500 条的导入，就是上千次往返。走 ExecutorType.BATCH 会话后每
  * {@value #BATCH_SIZE} 条 flush 一次，配合 JDBC 的 {@code rewriteBatchedStatements=true}
  * 合并成多值 INSERT，往返数从「条数」降到「条数 / 500」。
  *
- * <b>批写机制已交给 MyBatis-Plus 官方 {@link SqlHelper#executeBatch}</b>
+ * 批写机制已交给 MyBatis-Plus 官方 {@link SqlHelper#executeBatch}
  * （《自研组件替换计划》#11）：原实现自己 {@code openSession(BATCH, false)}、
  * 手写「每 N 条 flush 一次 + 补尾批 + commit」，属重复实现框架已提供的能力。
  * 本类只保留两件框架没有的东西 —— ① 统一的 {@value #BATCH_SIZE} 口径与调用签名；
- * ② <b>sqlSessionFactory 为 null 时退化为逐条写</b>（单测直接 {@code new} 服务类、
+ * ② sqlSessionFactory 为 null 时退化为逐条写（单测直接 {@code new} 服务类、
  * 未走 Spring 装配时的既有契约，BatchInsertTransactionTest 钉着）。
  *
- * <b>事务语义（关键，不要改）</b>：SqlHelper.executeBatch 取到的会话由
+ * 事务语义（关键，不要改）：SqlHelper.executeBatch 取到的会话由
  * SpringManagedTransactionFactory 装配，连接取自 DataSourceUtils.getConnection
- * —— 即<b>当前事务的连接</b>。因此：
+ * —— 即当前事务的连接。因此：
  * <ul>
  *   <li>写入落在调用方的事务里，随外层事务一起提交 / 回滚；</li>
  *   <li>{@code SpringManagedTransaction.commit()} / {@code rollback()} 在连接是
  *       事务连接时直接返回（不真正提交 / 回滚），所以框架内部的 {@code commit()} /
  *       {@code rollback()} 在事务内都是空操作，在事务外才是真动作 —— 两种上下文都对；</li>
- *   <li>异常一律向上抛，<b>不做逐条重试</b>：唯一键冲突等错误必须让外层事务回滚，
+ *   <li>异常一律向上抛，不做逐条重试：唯一键冲突等错误必须让外层事务回滚，
  *       与改造前「第 k 条插入即抛」的原子性一致，不能被吞掉。</li>
  * </ul>
  */

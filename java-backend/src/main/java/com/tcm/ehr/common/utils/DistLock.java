@@ -18,13 +18,13 @@ import java.util.concurrent.TimeUnit;
  * 锁粒度按业务 key（如 dict:herb:org-A），不用全局单键 ——
  * 全局单键会让「A 组织导词典」与「B 组织跑质控」互相排队，明明毫无关系。
  *
- * <b>为什么是 Redis/Redisson</b>：synchronized / ReentrantLock 在多实例下
- * <b>静默失效</b>（不报错、只是不互斥）；上一版用 MySQL 命名锁 GET_LOCK，
+ * 为什么是 Redis/Redisson：synchronized / ReentrantLock 在多实例下
+ * 静默失效（不报错、只是不互斥）；上一版用 MySQL 命名锁 GET_LOCK，
  * 那是「借 DB 的连接级锁」，语义与连接绑定、跨服务边界不好复用。Redisson 的 RLock 是
  * 所有实例共享的锁，且自带看门狗续期：不进事务的长临界区也不会因为固定 lease 突然过期。
  *
- * <b>fail-closed</b>：拿不到锁抛 {@link ConcurrentOperationException}；
- * Redis 本身不可用抛 {@link ServiceNotReadyException}（503）。两者都<b>绝不放行</b> ——
+ * fail-closed：拿不到锁抛 {@link ConcurrentOperationException}；
+ * Redis 本身不可用抛 {@link ServiceNotReadyException}（503）。两者都绝不放行 ——
  * 写成「拿不到锁就继续」等于没有锁，且只在高并发时发作，极难复现。
  *
  * 锁只降冲突概率，正确性仍由 DB 唯一键与事务承担。
@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 public class DistLock {
 
     /**
-     * 默认等待秒数：用于<b>批任务提交</b>与<b>启动期对账</b>这类「稍等一下也没关系」的场景。
+     * 默认等待秒数：用于批任务提交与启动期对账这类「稍等一下也没关系」的场景。
      *
      * 在线写路径（词典导入 / 提案合并 / 索引重建）应显式传 {@code 0}
      * —— 见 {@link #runLocked(String, int, java.util.function.Supplier)}。
@@ -43,7 +43,7 @@ public class DistLock {
     private static final int WAIT_SECONDS = 3;
 
     /**
-     * 在线写路径的等待秒数：<b>不等待</b>，锁被占就立刻回 409。
+     * 在线写路径的等待秒数：不等待，锁被占就立刻回 409。
      *
      * 为什么在线路径要等 0：等待时长会被直接叠加到用户的 HTTP 响应时间上，
      * 而冲突本身就说明「有人正在做同一件事」，让用户等 3 秒再告诉他同一句话没有意义。

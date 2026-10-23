@@ -48,10 +48,10 @@ import java.util.UUID;
  * <li>解析：POI {@link WorkbookFactory}（兼容 .xlsx / .xls）；表头中文名 → 21 字段；</li>
  * <li>去重：复用 {@link RecordUtil#textHash}（21 字段固定顺序 MD5），与数据清洗同口径；
  *     并写入 text_hash 列，DB 侧 uk_records_org_text_hash 兜底并发重复；</li>
- * <li>导入<b>同步执行</b>：接口返回即本轮完成，status 直接为「已完成」。</li>
+ * <li>导入同步执行：接口返回即本轮完成，status 直接为「已完成」。</li>
  * </ul>
  *
- * <b>进度查询已删除</b>：原「内存 Map 记 taskId + 查进度」的那套状态存储与
+ * 进度查询已删除：原「内存 Map 记 taskId + 查进度」的那套状态存储与
  * {@code GET /api/records/import/{taskId}/status} 端点已在 P5.11 移除（导入是同步的，
  * 内存进度表没有任何读取方）。进度由前端按文件逐个统计，不再向服务端要状态。
  */
@@ -453,7 +453,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     /**
      * 按 id 删除。
      *
-     * 事务加在这个 public 方法上，<b>不能</b>加在 private 的 doDelete 上 ——
+     * 事务加在这个 public 方法上，不能加在 private 的 doDelete 上 ——
      * 后者只被同类自调用，注解不经过代理、等于没加
      * （fk_review_record 存在，先删 review_tasks 再删 records，中途失败会留下孤儿状态）。
      */

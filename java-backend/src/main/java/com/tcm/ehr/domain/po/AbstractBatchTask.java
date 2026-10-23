@@ -59,8 +59,8 @@ public abstract class AbstractBatchTask {
     /**
      * 完整失败记录 ID 集合（JSON 数组），任务收尾时写一次。
      *
-     * 与 {@link #failureList} 的分工：后者只存<b>前 500 条</b>失败明细（供界面展示），
-     * 本列存<b>全部</b>失败记录 ID —— 「仅重试失败」要按完整集合重跑，不能被 500 条截断漏掉。
+     * 与 {@link #failureList} 的分工：后者只存前 500 条失败明细（供界面展示），
+     * 本列存全部失败记录 ID —— 「仅重试失败」要按完整集合重跑，不能被 500 条截断漏掉。
      */
     private String failedIds;
     private LocalDateTime createTime;

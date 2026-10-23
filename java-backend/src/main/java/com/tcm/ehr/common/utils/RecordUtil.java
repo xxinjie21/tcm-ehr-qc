@@ -60,7 +60,7 @@ public final class RecordUtil {
     /**
      * 原始文本哈希（21 字段固定顺序拼接 → MD5(UTF-8) 32 位十六进制），用于去重。
      *
-     * <b>字段顺序（勿改，变更需回归去重，否则历史数据会被误判）</b>：
+     * 字段顺序（勿改，变更需回归去重，否则历史数据会被误判）：
      * registrationNo → outpatientNo → gender → age → westernDiagnosis → tcmDiagnosis →
      * presentIllness → chiefComplaint → selfReport → inspection → pulse → tongue →
      * physicalExam → pattern → prescription → followUp → treatmentEffect → department →
@@ -68,8 +68,8 @@ public final class RecordUtil {
      *
      * 原实现用 {@code String.hashCode()}（32 位 int，碰撞率高），改为 MD5(UTF-8)。
      *
-     * <b>每个字段按「长度:值;」拼接（长度前缀）</b>：原先用 {@code String.join("|", ...)}
-     * 无长度前缀，任一字段内含 {@code "|"} 都会让字段边界串扰 —— 两条<b>内容不同</b>的病历
+     * 每个字段按「长度:值;」拼接（长度前缀）：原先用 {@code String.join("|", ...)}
+     * 无长度前缀，任一字段内含 {@code "|"} 都会让字段边界串扰 —— 两条内容不同的病历
      * 可能拼出同一串、算出同一哈希，第二条被误判「重复病历」而导入失败。长度前缀让拼接
      * 严格可逆，不同内容必得不同串。
      */

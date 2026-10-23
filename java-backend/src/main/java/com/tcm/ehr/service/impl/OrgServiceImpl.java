@@ -36,10 +36,10 @@ import java.util.UUID;
  * 成员管理接口全部要求 owner 且有 {@code @RequireOrgRole("owner")} 拦截器兜底，
  * 本类内再校验一次「操作者是本组织所有者、目标行存在」的交错关系，双保险防越权。
  *
- * 一人一组织的应用层约束：一个 user_id 只允许出现在一个<b>未归档</b>组织的
+ * 一人一组织的应用层约束：一个 user_id 只允许出现在一个未归档组织的
  * 成员表里（结构保留 is_primary 以便将来支持多组织而无需改表）。
  *
- * <b>防滥用</b>（自助创建放开后必须自己兜住）：创建配额 + 编码白名单 + 名称去重，
+ * 防滥用（自助创建放开后必须自己兜住）：创建配额 + 编码白名单 + 名称去重，
  * 见 {@link #createOrg}。
  */
 @Slf4j
@@ -101,7 +101,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * GET /api/my-org：当前用户的组织上下文。
      *
-     * 批次 6 去审核后<b>没有「审批中」这个状态</b>：无组织就是无组织，
+     * 批次 6 去审核后没有「审批中」这个状态：无组织就是无组织，
      * 前端据此落到「我的组织」引导页（可自助创建 / 等所有者邀请）。
      */
     @Override
@@ -217,15 +217,15 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     }
 
     /**
-     * 自助创建组织（批次 6）：任何登录用户可创建，创建者自动成为 owner，<b>无审核</b>。
+     * 自助创建组织（批次 6）：任何登录用户可创建，创建者自动成为 owner，无审核。
      *
-     * <b>放开自助创建后，这三道闸就是防滥用的全部手段</b>，少一道都可能被刷：
+     * 放开自助创建后，这三道闸就是防滥用的全部手段，少一道都可能被刷：
      * <ol>
-     *   <li><b>创建配额</b>：每人同时最多持有 {@value #MAX_ACTIVE_ORGS_PER_USER} 个未归档组织。
+     *   <li>创建配额：每人同时最多持有 {@value #MAX_ACTIVE_ORGS_PER_USER} 个未归档组织。
      *       没有它，一个账号可以建几百个空组织，把组织列表冲垮（管理员页是全表查询）。</li>
-     *   <li><b>编码白名单</b>：{@code ^[A-Z0-9][A-Z0-9-]{1,49}$}（DTO 侧已校验，这里再兜一次）。
+     *   <li>编码白名单：{@code ^[A-Z0-9][A-Z0-9-]{1,49}$}（DTO 侧已校验，这里再兜一次）。
      *       编码会进日志、导出文件名与接口路径，放任 {@code ../} 会污染这三处。</li>
-     *   <li><b>名称去重</b>：同名会让 owner 在列表里分不清自己的组织。</li>
+     *   <li>名称去重：同名会让 owner 在列表里分不清自己的组织。</li>
      * </ol>
      *
      * code 留空时服务端生成 {@code ORG-<8位大写>}，避免并发抢同一个自增序列。
@@ -362,11 +362,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 归档（仅管理员）：前提「成员数为 0」。
      *
-     * <b>为什么要求成员数为 0</b>：归档的语义是「这个组织已经没人用了」，
+     * 为什么要求成员数为 0：归档的语义是「这个组织已经没人用了」，
      * 若带着成员归档，这些人的账号会因为「查不到 active 组织」而登录不了，
      * 而组织列表里又看不到有未处理的人 —— 变成无声的账号丢失。
      *
-     * <b>不自动归档</b>：自动归档会误伤「沉睡但仍有效」的组织。
+     * 不自动归档：自动归档会误伤「沉睡但仍有效」的组织。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -394,7 +394,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
      *
      * 没有它，唯一能让组织脱离「无人可管」状态的方式是等原 owner 回来 ——
      * 管理员只能停用。applications.owner_user_id 与成员行的 owner
-     * <b>必须同事务改两处</b>，否则两者会指向不同的人。
+     * 必须同事务改两处，否则两者会指向不同的人。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -645,8 +645,8 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
     /**
      * 授予 / 回收成员的两个写开关（批次 6）。
      *
-     * <b>两个开关独立</b>：owner 可以只给「词典写」或只给「质控规则写」。
-     * 参数为 {@code Boolean} 且<b>可空</b> —— null 表示「这一位不改」，
+     * 两个开关独立：owner 可以只给「词典写」或只给「质控规则写」。
+     * 参数为 {@code Boolean} 且可空 —— null 表示「这一位不改」，
      * 否则前端只提交其中一个开关就会把另一个误清零。
      *
      * 不能给 owner 自己授权：owner 本来就能写，授权位只对 member 有意义。

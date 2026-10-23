@@ -38,7 +38,7 @@ public interface RecordMapper extends BaseMapper<Record> {
     /**
      * 指标卡聚合（数据域路径）：{@code WHERE org_id = ?}，只统计本机构。
      *
-     * ⚠️ <b>fail-closed</b>：这里永远是「org_id 等值过滤」，不存在任何「没传 org → 不限」
+     * ⚠️ fail-closed：这里永远是「org_id 等值过滤」，不存在任何「没传 org → 不限」
      * 的分支 —— orgId 传哨兵值（RecordFilter.NO_GROUP_SENTINEL）、空串或
      * {@code null} 时自然查到 0 行，绝不会退化成全表（那会跨机构泄漏）。
      * 与 {@link com.tcm.ehr.common.utils.RecordFilter#operatorScope} 同口径。
@@ -60,7 +60,7 @@ public interface RecordMapper extends BaseMapper<Record> {
      * 指标卡聚合（随筛选路径）：在数据域之上再叠加用户筛选（科室 / 就诊区间），
      * 供首页 3 张指标卡「随上方筛选变化」。
      *
-     * 只算 <b>总数 / 合格数 / 无效数</b>三项 —— 待复核数仍走无参口径
+     * 只算 总数 / 合格数 / 无效数三项 —— 待复核数仍走无参口径
      * （{@link #selectOverviewAll} / {@link #selectOverviewOrg}）：待复核是待办条入口，
      * 点击跳到全量复核列表，数字必须与列表一致，不能随筛选漂移。
      *
@@ -179,11 +179,11 @@ public interface RecordMapper extends BaseMapper<Record> {
     /**
      * 看板质控趋势：按就诊月份聚合（性能审查 P2-10，**SQL 侧聚合**）。
      *
-     * <b>替代了什么</b>：原实现把命中病历（4 万行 × 5 列投影）整份物化进堆，再遍历一遍按
+     * 替代了什么：原实现把命中病历（4 万行 × 5 列投影）整份物化进堆，再遍历一遍按
      * {@code LocalDateTime.toString().substring(0,7)} 分月计数 —— 回传行数 = 病历数。现在
      * 中间计数留在 DB，回传行数 = 月份数（≤ 记录跨度的月数）。
      *
-     * <b>口径与 Java 实现逐条对齐</b>：visit_time 为空的行不进趋势
+     * 口径与 Java 实现逐条对齐：visit_time 为空的行不进趋势
      * （{@code DATE_FORMAT(NULL,…)} 产出 NULL 分组，由调用方丢弃，等价于原来的
      * 「monthOf 返回 null 就 continue」）；合格 / 待复核按 grade 精确等值，
      * 与 {@code "合格".equals(r.getGrade())} 同口径（grade 为 NULL 时不匹配任何一档）。
@@ -191,7 +191,7 @@ public interface RecordMapper extends BaseMapper<Record> {
      * {@code DATE_FORMAT(visit_time,'%Y-%m')} 与 {@code LocalDateTime.toString()} 的前 7 位
      * 同为 {@code yyyy-MM}。
      *
-     * <b>只留已质控的月份</b>：{@code HAVING COUNT(grade) > 0} —— 某月全部病历都还没质控
+     * 只留已质控的月份：{@code HAVING COUNT(grade) > 0} —— 某月全部病历都还没质控
      * （grade 全 NULL）时该月不出现在趋势里。否则一批刚导入、日期落在更近月份的病历
      * 会把「最近 12 个月」窗口整体顶到那批未质控的月份上，两条线全压 0、看着像没数据
      * （2026-10-15 导入 500 条 visit_time 散落到 2025 各月即此况）。
@@ -257,7 +257,7 @@ public interface RecordMapper extends BaseMapper<Record> {
     /**
      * 质控评分结果回写：分数 / 分级 / 状态 / 预检单。
      *
-     * <b>为什么要在这里撤销 governed</b>（2026-10-21 一致性修复）：
+     * 为什么要在这里撤销 governed（2026-10-21 一致性修复）：
      * 清洗把 governed 置 1 的前提是「该病历质控合格」。但质控可以在清洗之后重跑，
      * 把一条原本合格的病历改判为待复核 / 无效 —— 此时 governed 若不撤销，
      * 这条病历会落进一个「既不可导出、也不在待清洗队列」的黑洞：
@@ -281,29 +281,29 @@ public interface RecordMapper extends BaseMapper<Record> {
 
     /**
      * 单类实体词频 TopN（性能审查 P0-3#3）：把 structured_data 里的一个实体数组
-     * 在 <b>DB 侧</b> 用 JSON_TABLE 展开成行、{@code GROUP BY} 计数，只把 TopN 带回 JVM。
+     * 在 DB 侧 用 JSON_TABLE 展开成行、{@code GROUP BY} 计数，只把 TopN 带回 JVM。
      *
-     * <b>替代了什么</b>：原实现把命中的全部病历（4 万行时含 ~3.7KB/行的 structured_data）
+     * 替代了什么：原实现把命中的全部病历（4 万行时含 ~3.7KB/行的 structured_data）
      * 一次物化进堆，再在 Java 里逐条解析并聚合 —— 4 万行下约 150MB 堆峰值 + 4 万次 JSON 解析，
      * 且 TopN 之前的中间计数全留在 JVM。现在中间结果留在 DB，返回行数恒为 TopN。
      *
-     * <b>取值口径与改造前的 Java 实现一致</b>（原实现已随本次下沉一并删除，其口径即下面三条）：
+     * 取值口径与改造前的 Java 实现一致（原实现已随本次下沉一并删除，其口径即下面三条）：
      * 对象元素取 content（为空回退 name，对应 Entity / Herb 两种形态）；
      * 纯字符串元素（旧格式）取元素自身；其余（数字 / null / 空串）一律不计。
      * 数组缺失、structured_data 为 NULL、根不是对象时该记录不产出任何词
      * —— 与原实现「解析不出就按没抽到处理」同结论。
      *
-     * <b>排序规则显式 utf8mb4_bin</b>：Java 侧 counter.merge 是精确匹配
+     * 排序规则显式 utf8mb4_bin：Java 侧 counter.merge 是精确匹配
      * （等价 _bin），而 JSON_TABLE 派生出的字符串与 records 各列的
      * utf8mb4_unicode_ci 不同源，两路混用（见 {@link #selectPatternFreq}）会让
      * UNION 直接报 1712（Illegal mix of collations）。
      *
-     * <b>同次数的次序为词名升序</b>：原 Java 实现的 Javadoc 早已声明「同次数按名称升序
+     * 同次数的次序为词名升序：原 Java 实现的 Javadoc 早已声明「同次数按名称升序
      * 保证稳定」，但代码只按次数排、同次数落到 LinkedHashMap 的插入序（即病历顺序）。
      * 这里真正按词名升序，让实现与既有声明一致 —— 代价是并列词的展示集合可能与改前不同。
      *
      * ⚠️ jsonPath 用 {@code ${}} 做文本替换：MySQL 的 JSON_TABLE 要求路径是
-     * <b>字面量</b>（绑定参数直接语法错误），因此只允许传入本仓的编译期常量；
+     * 字面量（绑定参数直接语法错误），因此只允许传入本仓的编译期常量；
      * 调用方 StatsServiceImpl 另有一层白名单校验，绝不接受外部输入。
      *
      * @param wrapper  只含数据域 + 用户筛选的条件，**不含 ORDER BY**
@@ -342,13 +342,13 @@ public interface RecordMapper extends BaseMapper<Record> {
      * 看板四类实体（疾病 / 症状 / 方剂 / 中药）词频 TopN，**一趟扫完**（性能审查 P0-3#3）。
      *
      * 为什么不复用 {@link #selectTermFreq} 调四次：JSON_TABLE 对每一行都要解析
-     * 一次 structured_data，调四次就是四次全表解析。这里用<b>同级 NESTED PATH</b>
-     * 一次调用展开 4 个数组 —— MySQL 对同级嵌套路径产出的是各路径行的<b>并集</b>，
+     * 一次 structured_data，调四次就是四次全表解析。这里用同级 NESTED PATH
+     * 一次调用展开 4 个数组 —— MySQL 对同级嵌套路径产出的是各路径行的并集，
      * 于是每条病历的 JSON 只解析一次，靠「哪一列非空」回推 kind。
      *
-     * <b>实测（4 万行 / structured_data 合计 157MB）</b>：
-     * 本方法 <b>1.05~1.61s</b>；改为四次 {@link #selectTermFreq} 为 <b>3.26~3.83s</b>；
-     * 改为一趟 UNION ALL 五路为 <b>5.07~5.08s</b>（UNION 会把各路结果全物化后才分组）。
+     * 实测（4 万行 / structured_data 合计 157MB）：
+     * 本方法 1.05~1.61s；改为四次 {@link #selectTermFreq} 为 3.26~3.83s；
+     * 改为一趟 UNION ALL 五路为 5.07~5.08s（UNION 会把各路结果全物化后才分组）。
      * 原 Java 实现同场景约 9~10s 且堆峰值约 320MB。
      *
      * 取值口径与 {@link #selectTermFreq} 完全一致；差别只有一处：为兼容旧格式字符串元素，

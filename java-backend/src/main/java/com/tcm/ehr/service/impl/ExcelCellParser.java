@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 /**
  * Excel 单元格 → 值（批次 13 · 13.3 的第二个抽取对象）。
  *
- * <b>为什么抽它</b>：这一组（取文本 + 接诊时间解析）是「把一个单元格变成 Java 值」这一件事，
+ * 为什么抽它：这一组（取文本 + 接诊时间解析）是「把一个单元格变成 Java 值」这一件事，
  * 与病历的业务逻辑无关，也不碰数据库。抽出来后 RecordServiceImpl 只负责业务编排。
  *
  * 核心是接诊时间的归一：导入源这一列是 14 位紧凑数字串（{@code 20221224090613}），
@@ -122,9 +122,9 @@ final class ExcelCellParser {
     /**
      * 单元格取文本：按显示格式取值，数字/日期型统一转字符串。
      *
-     * <b>这是全仓唯一的「单元格 → 文本」实现</b>（批次14 审核后收敛，见下方 FORMULA 的取舍）。
-     * 词典导入原本自己写了一份，两份在 <b>BOOLEAN</b>（这里给 "true"/"false"，那份落 default 给 null）
-     * 与 <b>FORMULA</b> 上不一致 —— 同一个 .xlsx 从不同页面导入会读出不同的文本。
+     * 这是全仓唯一的「单元格 → 文本」实现（批次14 审核后收敛，见下方 FORMULA 的取舍）。
+     * 词典导入原本自己写了一份，两份在 BOOLEAN（这里给 "true"/"false"，那份落 default 给 null）
+     * 与 FORMULA 上不一致 —— 同一个 .xlsx 从不同页面导入会读出不同的文本。
      */
     static String cellText(Cell cell) {
         // 1. 空单元格给 null

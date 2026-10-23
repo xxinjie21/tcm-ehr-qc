@@ -39,7 +39,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * 登录 / 注册服务实现（阶段2：加入课题组维度）。
  *
- * 角色分两层，作用域不同，<b>不塞进同一个枚举</b>：
+ * 角色分两层，作用域不同，不塞进同一个枚举：
  * <pre>
  * users.role          {管理员, 用户}          ← 系统级
  * organization_members.role  {owner(组长), member(组员)} ← 组内级
@@ -76,12 +76,12 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     /**
      * 菜单树（批次 17 从平铺字符串列表升级为带 children 的结构）。
      *
-     * <b>为什么升级</b>：「术语批量导入」是「术语词典」的子项，平铺列表表达不了父子关系。
+     * 为什么升级：「术语批量导入」是「术语词典」的子项，平铺列表表达不了父子关系。
      * 名称与前端 MainLayout 的 ALL_MENUS[].title 对应。
      *
-     * 「术语词典」父项<b>所有人可见</b>（它是日常高频入口）；其子项
-     * 「术语批量导入」也<b>所有人可见</b> —— 所有人（含普通成员）都能在该页把文件
-     * 导入<b>本机个人词典</b>（{@code POST /dictionary/parse} 只解析、不落库），
+     * 「术语词典」父项所有人可见（它是日常高频入口）；其子项
+     * 「术语批量导入」也所有人可见 —— 所有人（含普通成员）都能在该页把文件
+     * 导入本机个人词典（{@code POST /dictionary/parse} 只解析、不落库），
      * 管理员在那里还能选「直接生效」写小组基线（{@code POST /dictionary/import} 仅管理员）。
      * 因此前端不会出现「点了撞 403」的入口。
      */
@@ -131,7 +131,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * 所有者菜单：本组数据 + 本组成员管理 + 共用只读（术语词典/日志审计）。
      *
      * 术语词典的读取与日志审计均为「登录即可」（后者按组织三档可见，见 §七 L7），
-     * 故所有者/成员也能用；「术语批量导入」子项同样给到 —— 默认导入<b>本机个人词典</b>，
+     * 故所有者/成员也能用；「术语批量导入」子项同样给到 —— 默认导入本机个人词典，
      * 不写小组基线，成员要推广再到「我的词典」提交提案，不绕过审核。
      */
     private static final List<MenuNode> OWNER_MENUS = menus(true,
@@ -141,7 +141,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     /**
      * 成员菜单：本组数据 + 共用只读（术语词典/日志审计）+ 「我的组织」。
      *
-     * 「我的组织」对所有<b>有组</b>用户开放：该页对成员是只读的（看组织信息 / 成员名录，
+     * 「我的组织」对所有有组用户开放：该页对成员是只读的（看组织信息 / 成员名录，
      * 管理动作按 {@code myRole=owner} 才显示），后端的成员管理接口仍由
      * {@code @RequireOrgRole("owner")} 把关 —— 菜单入口不再等同写权限。
      */
@@ -150,7 +150,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             "清洗与导出", DICT_TITLE, "标准化质量报告", "日志审计", "我的组织");
 
     /**
-     * 待分配池 / 审批中的菜单：<b>空列表</b>。
+     * 待分配池 / 审批中的菜单：空列表。
      *
      * 空菜单不是「没做完」，是刻意的：让前端落到引导页，说明「在等组长接收」或
      * 「申请已提交」，而不是给一个点进去全是空态的侧栏。
@@ -259,7 +259,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * 菜单四套：管理员 / 所有者 / 成员 / 待分配池（空）。
      *
      * 管理员与其它身份的区别是「能不能管组织、能不能写配置」，
-     * <b>不是</b>「能不能看数据」—— 后者由 {@code auth.admin-can-view-data} 控制
+     * 不是「能不能看数据」—— 后者由 {@code auth.admin-can-view-data} 控制
      * （数据层 fail-closed），不在菜单层体现。
      */
     private List<MenuNode> menusOf(User user, OrgResolution g) {
@@ -282,10 +282,10 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     }
 
     /**
-     * 该用户是否属于一个<b>已停用</b>的组织（状态为 stopped）。
+     * 该用户是否属于一个已停用的组织（状态为 stopped）。
      *
      * ⚠️ 不能简化成「有成员行但解析不到 active 组」——那会把
-     * <b>审批中的建组申请人</b>（状态 pending）误判成「组织已停用」而拒绝登录。
+     * 审批中的建组申请人（状态 pending）误判成「组织已停用」而拒绝登录。
      * 申请人本就该能登录（进引导页看审批进度）。故这里显式只看
      * {@code organizations.status = 'stopped'}。
      */
@@ -324,9 +324,9 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * 用 Redis INCR + 首次设置过期时间：进程内计数在多实例下会各算各的，
      * 挡不住并发爆破；Redis 是共享的。
      *
-     * <b>P2-21：INCR 与 EXPIRE 必须原子</b>。原先两条命令分开发，
+     * P2-21：INCR 与 EXPIRE 必须原子。原先两条命令分开发，
      * 若 INCR 成功而 EXPIRE 失败（超时 / 连接断开 / 进程被杀），
-     * 计数 key 就永久留在 Redis 里，该账号从此<b>无限期锁死</b>，且没有任何异常可查。
+     * 计数 key 就永久留在 Redis 里，该账号从此无限期锁死，且没有任何异常可查。
      * 现改为一段 Lua 脚本，两条命令在 Redis 端一次执行完（见 {@link RedisLua}）。
      */
     private void recordLoginFailure(String username) {

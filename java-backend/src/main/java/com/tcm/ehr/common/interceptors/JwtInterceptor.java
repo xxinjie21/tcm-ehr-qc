@@ -20,13 +20,13 @@ import tools.jackson.databind.ObjectMapper;
  * 拦截 /api/**，放行 /api/auth/login；校验通过后把当前操作人与当前组写入 request 属性
  * （供角色校验、数据域过滤与操作日志使用）。
  *
- * <b>组为什么不放进 JWT</b>：移出成员 / 转让组长 / 停用组必须<b>立即</b>生效，
+ * 组为什么不放进 JWT：移出成员 / 转让组长 / 停用组必须立即生效，
  * 而 token 有效期是 24h。所以 {@code userId/username/role} 走 claim，
  * {@code orgId/groupRole} 每请求查 organization_members
  * （走 {@code INDEX(user_id,is_primary)}，本项目规模下开销可忽略）。
  *
- * <b>代价与可用性耦合（必须知道）</b>：本类从「纯解析 JWT、不碰 DB」变成<b>每请求查库</b>。
- * DB 不可用时<b>不能抛异常</b> —— 那会让一次数据库抖动把全站打成 500（含登录与只读接口）。
+ * 代价与可用性耦合（必须知道）：本类从「纯解析 JWT、不碰 DB」变成每请求查库。
+ * DB 不可用时不能抛异常 —— 那会让一次数据库抖动把全站打成 500（含登录与只读接口）。
  * 故 {@link IOrgService#resolvePrimaryOrg} 在 DB 故障时降级为「无组」，
  * 由 RecordFilter 的 fail-closed 兜住：用户看到空态，而不是报错，更不是越权。
  */
@@ -43,7 +43,7 @@ public class JwtInterceptor implements HandlerInterceptor {
      * 管理员能否看到各组数据（阶段2 §4.4）。
      *
      * {@code true}（默认）：管理员按自己所在的组看数据，与其它身份无差别。
-     * {@code false}：管理员的 orgId 被<b>置空</b> → 复用 fail-closed → 看不到任何数据。
+     * {@code false}：管理员的 orgId 被置空 → 复用 fail-closed → 看不到任何数据。
      * 数据层、SQL、前端、openapi 零改动，收紧只需改这一行配置 —— 这就是选「开关 + 置空」
      * 而不是「逐接口加 isAdmin」的原因：后者散落多处，漏一处就漏一个出口。
      */

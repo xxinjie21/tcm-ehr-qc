@@ -33,7 +33,7 @@ public class NlpExtractVO {
     /**
      * 问诊子项（任务 8·方案 A）：二便 / 睡眠 / 饮食 / 喜好 / 卧位 / 精神 / 面色 的整句。
      *
-     * 抽取侧（python-nlp）把这类从 symptoms 挪进来；本字段<b>不参与归一 / 质控 / 统计</b>，
+     * 抽取侧（python-nlp）把这类从 symptoms 挪进来；本字段不参与归一 / 质控 / 统计，
      * 在 EntityNormalizer.normalizeMap 里原样透传，只为保留临床信息不被误判为症状未归一。
      */
     private List<Entity> inquiry = new ArrayList<>();
@@ -45,7 +45,7 @@ public class NlpExtractVO {
      * 截断时模型只看得到前 510 个 token，尾部实体静默丢失而响应照样说
      * {@code modelAvailable=true} —— 调用方无从判断「结果不完整」。
      * 规则兜底（舌象 / 脉象 / 病因 / 治法）始终用全文，所以这个标记只说明
-     * <b>模型那条路没看全</b>。（审查报告 L11）
+     * 模型那条路没看全。（审查报告 L11）
      */
     private boolean truncated;
 

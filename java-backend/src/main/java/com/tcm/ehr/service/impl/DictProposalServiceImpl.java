@@ -92,8 +92,8 @@ public class DictProposalServiceImpl implements IDictProposalService {
      * 导出某组织某类型的词条给前端存本地个人词典。
      *
      * 两种口径（scope）的区别见接口 javadoc，这里只强调一点：
-     * org 是<b>提案基线</b>（审核走整快照替换组织层），
-     * effective 是<b>生效词典</b>（供查看 / 导出 / 当编辑起点）。
+     * org 是提案基线（审核走整快照替换组织层），
+     * effective 是生效词典（供查看 / 导出 / 当编辑起点）。
      *
      * @param orgId 组织；"" = 基础层
      * @param type  术语类型

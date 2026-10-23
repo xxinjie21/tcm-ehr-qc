@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * 操作日志：审计页（{@code GET /api/logs}）的唯一数据源，读 operation_log 表做分页 / 筛选 / 导出。
  * 字段与 database-init.sql 的 operation_log 表一一对应。
  *
- * <b>不记 IP</b>（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原先的 ip 列已从表中移除，
+ * 不记 IP（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原先的 ip 列已从表中移除，
  * 唯一权威建表脚本是 {@code database-init.sql}。
  */
 @Data
@@ -46,7 +46,7 @@ public class OperationLog {
     private String orgId;
 
     /**
-     * 所属组织名称（<b>不落库</b>）：由 LogServiceImpl 按 orgId 批量解析后回填。
+     * 所属组织名称（不落库）：由 LogServiceImpl 按 orgId 批量解析后回填。
      *
      * 日志表只存 org_id。直接把这个 UUID 显示给用户没有意义，
      * 而「这条日志该不该被我看」又正是三档可见范围要回答的问题，

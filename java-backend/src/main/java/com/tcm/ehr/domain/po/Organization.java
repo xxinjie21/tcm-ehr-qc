@@ -35,7 +35,7 @@ public class Organization {
     /**
      * 所有者用户 ID（批次 4 加列）。
      *
-     * <b>冗余展示字段</b>：权威是 {@code organization_members.role=owner}，
+     * 冗余展示字段：权威是 {@code organization_members.role=owner}，
      * 两者在任何写路径下都同事务更新（批次 6 的创建 / 转让 / 改派）。
      */
     private String ownerUserId;

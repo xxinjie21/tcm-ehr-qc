@@ -10,7 +10,7 @@ import java.util.List;
  *
  * 索引与检索放在同一处，字段名与映射只有一份权威。
  *
- * <b>组织级</b>：文档带 org_id（空串 {@code ""} = 基础层）。同一个
+ * 组织级：文档带 org_id（空串 {@code ""} = 基础层）。同一个
  * {@code (type, org_id)} 的词条写到同一索引内，用 org_id 过滤来避免跨组织串词。
  * 这是「ES 是归一唯一权威」的组织隔离闭环。
  */
@@ -38,7 +38,7 @@ public interface IEsTermIndexService {
      * 判据：org_id 必须是 keyword。索引不存在、或 org_id 被动态映射成
      * text（旧版本升级会这样）都返回 {@code false}。
      *
-     * <b>为什么启动对账要用它</b>：dictionary_versions 只记「内容版本对不对得上」，
+     * 为什么启动对账要用它：dictionary_versions 只记「内容版本对不对得上」，
      * 记不了「索引结构对不对」。旧版本升级后内容版本可能已标为同步，但索引结构是坏的 ——
      * 只信版本号会跳过重建，坏索引就永远修不好（实测：全库归一「未收录」）。
      *
@@ -84,7 +84,7 @@ public interface IEsTermIndexService {
      * 召回候选词条（宽松，宁多勿漏）。
      *
      * ES 是归一的唯一权威：未召回即视为未命中。索引不可用时抛 IOException，
-     * 由上层包成 503 返回；<b>不要在这里吞异常或返回空列表</b>，那会把"索引挂了"
+     * 由上层包成 503 返回；不要在这里吞异常或返回空列表，那会把"索引挂了"
      * 伪装成"词典没这个词"。命中与否由 EsTermNormalizer 按三级规则与 Dice 阈值判定。
      *
      * @param type          术语类型
@@ -99,7 +99,7 @@ public interface IEsTermIndexService {
      * 批量召回（批次 12 · 12b）：一次 ES 往返查多个术语。
      *
      * 用 ES 的 _msearch 而不是手写 bool.should：msearch 的每个子查询与
-     * {@link #search} 逐字相同、响应按提交顺序返回，因此<b>结果与逐个查逐条一致</b>是结构上成立的，
+     * {@link #search} 逐字相同、响应按提交顺序返回，因此结果与逐个查逐条一致是结构上成立的，
      * 而不是靠对账；手写 should 则无法把命中归属回输入。
      *
      * 入参里的重复项与空白项由实现负责处理（重复只查一次、空白直接给空结果），

@@ -14,7 +14,7 @@ package com.tcm.ehr.common.utils;
  * {@code spring.data.redis.*}（见 RedissonConfig），一处配置改动即同时迁移
  * 缓存与分布式锁，不需要在 yml 里维护第二份地址配置。
  *
- * <b>所有 key 都必须以 {@link #PREFIX} 开头</b>：新增 key 请写
+ * 所有 key 都必须以 {@link #PREFIX} 开头：新增 key 请写
  * {@code RedisKeys.PREFIX + "业务段:..."}，不要再写字面量前缀。
  */
 public final class RedisKeys {

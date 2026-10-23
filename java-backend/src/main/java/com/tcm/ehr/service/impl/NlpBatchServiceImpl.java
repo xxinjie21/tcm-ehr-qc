@@ -61,12 +61,12 @@ import java.util.concurrent.TimeUnit;
 /**
  * NLP 批量解析任务服务实现。
  *
- * <b>DB 轮询认领</b>（批次 16.2）：任务落库为 QUEUED，固定 nlp.batch.concurrency
+ * DB 轮询认领（批次 16.2）：任务落库为 QUEUED，固定 nlp.batch.concurrency
  * 个工作线程各自轮询 nlp_task 并用「{@code UPDATE ... WHERE status='QUEUED'}」
  * 的原子性认领（受影响行数为 1 才算拿到）。不引入消息中间件 —— DB 是任务状态的唯一权威，
  * 多实例下同一任务只会被一个实例跑；前端可提交后离开、轮询进度。
  *
- * <b>并发预算只有一份</b>：nlp.batch.concurrency 既是「可同时跑几个任务」，
+ * 并发预算只有一份：nlp.batch.concurrency 既是「可同时跑几个任务」，
  * 也是「单个任务内并行处理几条病历」—— 两者共用同一个并行池（见 recordPool），
  * 所以同时跑几个任务，打给 Python 的请求总数都恒定。之所以必须有任务内并行：NLP 是这条链路
  * 唯一的吞吐瓶颈，而原先一个任务只用一个线程串行跑，单任务吞吐被钉死在「1 / 单条耗时」。
@@ -149,7 +149,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 与 {@link #workers} 分开：workers 负责「认领任务」，本池负责「把一个任务内的病历并行跑」。
      * 两者不能共用同一个池 —— worker 占着线程等页内结果会死锁。
      *
-     * 池大小 = 并发预算，且<b>被所有任务共享</b>：所以同时跑几个任务，打给 Python 的请求
+     * 池大小 = 并发预算，且被所有任务共享：所以同时跑几个任务，打给 Python 的请求
      * 总数都不超过 nlp.batch.concurrency，不会因为任务数变多而压垮 NLP 服务。
      */
     private ExecutorService recordPool;
@@ -272,7 +272,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 「取候选」故意不加锁：几个 worker / 几个实例查到同一批是常态。
      * 真正的互斥发生在随后的条件更新上 ——
      * {@code UPDATE nlp_task SET status='RUNNING', started_at=? WHERE id=? AND status='QUEUED'}，
-     * <b>受影响行数为 1 才算认领成功</b>；为 0 说明已被别人抢先，继续看下一个候选。
+     * 受影响行数为 1 才算认领成功；为 0 说明已被别人抢先，继续看下一个候选。
      * 不写 cancel_requested：认领前后刚到达的取消必须保留，由执行期的取消位读取兜住。
      *
      * @return 认领到的任务 ID；当前没有可认领的任务时为 {@code null}
@@ -755,9 +755,9 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      *
      * 批次 16 #3 的核心：ID 集合落库后，重启也能从这里读回断点。
      * 两条性质缺一不可，且都被测试钉住：
-     * ① <b>只读 PENDING</b> —— 跑完的（DONE）不能再跑一遍，否则重复抽取会覆盖
+     * ① 只读 PENDING —— 跑完的（DONE）不能再跑一遍，否则重复抽取会覆盖
      *    同一份结构化数据；
-     * ② <b>按 seq 排序</b> —— 进度游标按提交顺序推进，不能靠主键（批量插入下主键顺序
+     * ② 按 seq 排序 —— 进度游标按提交顺序推进，不能靠主键（批量插入下主键顺序
      * 与提交顺序不保证一致）。
      */
     /**
@@ -789,7 +789,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 四种终态互斥且都不许撒谎：
      * <ul>
      *   <li>执行期抛异常 → FAILED</li>
-     *   <li><b>一条都没处理（done=0 且 total&gt;0）→ INTERRUPTED</b>：这是 2026-10-05 实测到的事故
+     *   <li>一条都没处理（done=0 且 total&gt;0）→ INTERRUPTED：这是 2026-10-05 实测到的事故
      *       （500 条筛选型任务 0 处理却 COMPLETED，界面说完成、数据是空的，用户无法自查）</li>
      *   <li>取消 → CANCELLED</li>
      *   <li>其余按完成度判定（{@link #endStatus}）</li>
@@ -956,7 +956,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * {@link #processPage} 的三态出口。
      *
-     * <b>为什么必须是三态</b>：改造前 processPage 返回 {@code boolean}，
+     * 为什么必须是三态：改造前 processPage 返回 {@code boolean}，
      * 而外层把 {@code true} 理解成「已取消」、{@code false} 理解成「继续翻页」。
      * 但 processPage 里还有一个出口是「已达 limit 上限」，它也返回了 {@code false} ——
      * 于是 limit 触顶后外层继续翻页，把整个匹配集翻完（{@code total=0} 的任务同样如此）。
@@ -982,19 +982,19 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 并行处理一批病历（两条取数路径共用）；返回 {@link PageOutcome} 区分「继续翻页 / 被取消 / 已达 limit 上限」。
      *
-     * <b>为什么要并行</b>：原先这里是一个 {@code for} 循环串行调 processOne，而单条
+     * 为什么要并行：原先这里是一个 {@code for} 循环串行调 processOne，而单条
      * NLP 推理要数百毫秒 —— 单任务吞吐被钉死在「1 / 单条耗时」（32 核机器上实测约 7 条/s）。
      * 把病历并行跑，才能让一个任务就吃满 NLP 服务的吞吐上限（实测约 10.3 条/s）。
      * 注意：单纯调大 nlp.batch.concurrency 没有这个效果，它只是多起几个任务。
      *
-     * <b>只并行「算」</b>：{@link #processOne} 只算不写（P1-4 攒批），因此可安全并行；
-     * 进度、失败明细、攒批回写全部收敛到下面的<b>单线程汇总循环</b>里更新，
+     * 只并行「算」：{@link #processOne} 只算不写（P1-4 攒批），因此可安全并行；
+     * 进度、失败明细、攒批回写全部收敛到下面的单线程汇总循环里更新，
      * 不需要给 NlpTask 加锁，也不会出现「两条同时改 done」。
      *
-     * <b>取消响应</b>：按 concurrency 条一块推进，块与块之间查取消位 ——
+     * 取消响应：按 concurrency 条一块推进，块与块之间查取消位 ——
      * 最坏等待一块（约 1 秒），不会因为并行化变成「跑完整页才发现要停」。
      *
-     * @param limit 本任务允许处理的总条数<b>硬上限</b>（筛选型任务的 total）。
+     * @param limit 本任务允许处理的总条数硬上限（筛选型任务的 total）。
      *              {@code 0} 表示一条都不处理 —— 这是原语义，不能理解成「不限」；
      *              ID 型任务无此概念，传 {@link Integer#MAX_VALUE}
      */
@@ -1147,7 +1147,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      *
      * 内存 cancelFlags 只有本进程可见，多实例下会失效；这里以列为准。
      *
-     * 查库失败按<b>未取消</b>：宁可多跑几条，也不因一次抖动中断长任务。
+     * 查库失败按未取消：宁可多跑几条，也不因一次抖动中断长任务。
      */
     private boolean isCancelRequested(String id) {
         try {
@@ -1167,7 +1167,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     }
 
     /**
-     * 单条：按模式处理，<b>只算不写</b>，返回待回写的 JSON（P1-4）。
+     * 单条：按模式处理，只算不写，返回待回写的 JSON（P1-4）。
      *
      * 写库交给调用方的攒批通道（{@link #flushStructuredData}）：逐条写在这个量级下
      * 每条一次 autocommit，是本链路的主要 SQL 开销来源。
@@ -1272,11 +1272,11 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 任务收尾时的最终状态。
      *
-     * 停机（{@code running == false}）且<b>没跑完</b> → INTERRUPTED：不能声称「已完成」。
+     * 停机（{@code running == false}）且没跑完 → INTERRUPTED：不能声称「已完成」。
      * 这里必须自己判 running —— {@link #runByFilter} / {@link #runByIds} 只认 cancelFlags、
      * 不看 running，在途任务会在停机窗口里继续跑到取数循环自然结束。
      *
-     * 反过来也要留神：停机窗口内<b>恰好跑完</b>的（{@code done == total}）仍是
+     * 反过来也要留神：停机窗口内恰好跑完的（{@code done == total}）仍是
      * COMPLETED，别把真跑完的误标成中断。取消优先于中断。
      *
      * 单独抽出来是为了能直接测这三条分支：靠「停一次服务」验证成本很高 ——
@@ -1325,7 +1325,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
      * 任务就从「指定范围」静默退化成「全库扫描」—— 用户以为只跑了筛出来的几百条。
      *
      * 注意 {@code o == null} 不是失败：Jackson 把 null 序列化成字符串 {@code "null"}，
-     * 读回时同样得到 {@code null}，语义是「不限范围」，这是<b>合法</b>路径
+     * 读回时同样得到 {@code null}，语义是「不限范围」，这是合法路径
      * （提交时不带 filters 就是全库），不要连它一起禁掉。
      */
     static String writeJsonStrict(ObjectMapper mapper, Object o) {
@@ -1355,8 +1355,8 @@ public class NlpBatchServiceImpl implements INlpBatchService {
     /**
      * 还原任务落库时冻结的筛选条件。
      *
-     * ⚠️ <b>解析失败必须抛，不能退化成 null</b>：{@code null} 在下游表示「不限范围」，
-     * 解析失败若也返回 null，<b>指定范围的任务会静默变成全库解析</b>。
+     * ⚠️ 解析失败必须抛，不能退化成 null：{@code null} 在下游表示「不限范围」，
+     * 解析失败若也返回 null，指定范围的任务会静默变成全库解析。
      * 提交侧已用 writeJsonStrict 保证写入合法，此处是「历史脏数据」的兜底。
      */
     private FiltersDTO readFilters(String json) {

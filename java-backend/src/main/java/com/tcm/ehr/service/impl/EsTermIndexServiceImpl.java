@@ -63,11 +63,11 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      * 键 = {@code type|org|input}。同一次解析里同一个术语会被反复归一（一个症状会出现在很多份
      * 病历里），每次都发一次 ES 往返；缓存后重复术语只查一次。
      *
-     * <b>失效必须做对</b>：词表重建会改变召回结果，所以 {@link #rebuild} 一开始就清空整个缓存
+     * 失效必须做对：词表重建会改变召回结果，所以 {@link #rebuild} 一开始就清空整个缓存
      * —— 否则重建后仍命中旧结果，表现就是「改了词表却看不到变化」的脏读，正是 12g 要避免的那一类。
      * 上限固定（LRU 逐出），避免长跑进程里无界增长。
      *
-     * <b>为什么改用 {@link VersionedCache} 而不是自己包一层 LinkedHashMap</b>（批次14 审核）：
+     * 为什么改用 {@link VersionedCache} 而不是自己包一层 LinkedHashMap（批次14 审核）：
      * 「有界 + LRU 逐出」这件事全仓已有 owner，自己再写一份等于两套逐出口径。
      * 但**不能**直接换成 {@code VersionedCache.get(key, version, loader)} —— 那个方法把 loader
      * 放在锁里执行，而本类的装载是一次 ES 网络往返，放进锁里会把并发检索全部串行化（性能回退）。

@@ -36,7 +36,7 @@ public final class VersionedCache<V> {
     /**
      * 版本一致则复用，否则用 loader 重算并记住新版本。
      *
-     * <b>loader 在锁内执行</b>：适合「回源读一行 DB + 解析 JSON」这种微秒级的装载。
+     * loader 在锁内执行：适合「回源读一行 DB + 解析 JSON」这种微秒级的装载。
      * 若装载是一次网络往返（如 ES 检索），请改用 {@link #getIfPresent} / {@link #put}
      * 自己拼两段式 —— 否则所有并发请求会在锁上排队，等于把并发检索串行化。
      *

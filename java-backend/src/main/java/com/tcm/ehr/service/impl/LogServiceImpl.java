@@ -63,7 +63,7 @@ public class LogServiceImpl implements ILogService {
     /**
      * 按对象查活动流（对标 D3）。
      *
-     * <b>刻意复用 {@link #buildWrapper}</b>：它带着三档可见范围（成员只见本组织的日志）。
+     * 刻意复用 {@link #buildWrapper}：它带着三档可见范围（成员只见本组织的日志）。
      * 新入口若图省事自己拼一个 wrapper，就会绕开数据域 —— 这类回归最危险，
      * 因为功能看起来完全正常，只是多了不该看到的行。
      */
@@ -182,7 +182,7 @@ public class LogServiceImpl implements ILogService {
     /**
      * 批量把 orgId 解析成组织名回填到 orgName。
      *
-     * <b>一次查询回填整页</b>：逐行查组织名会让「每页 20 条」变成 20 次查询，
+     * 一次查询回填整页：逐行查组织名会让「每页 20 条」变成 20 次查询，
      * 日志页是高频访问路径。这里先去重再一次性 IN 查询。
      *
      * 解析不到（组织已删 / 该行为历史数据无归属）时置「—」而不是留空：

@@ -21,12 +21,12 @@ import java.util.Set;
  * 后者是模型能输出的 NER 标签集（病名/症状/证型/方剂/本草），维度不同、不要求等长。
  *
  *
- * ⚠️ 两类范围都<b>不再</b>由本目录硬编码，全部交给组织级规则集（用户在「规则配置」里改）：
+ * ⚠️ 两类范围都不再由本目录硬编码，全部交给组织级规则集（用户在「规则配置」里改）：
  * <ul>
- *   <li><b>归一范围</b>：QcRuleSet.normalization.elementTypes 决定哪些类型做词形归一
+ *   <li>归一范围：QcRuleSet.normalization.elementTypes 决定哪些类型做词形归一
  *       （出厂默认 9 类，含病因 —— 但病因默认只归一、不计分）；</li>
- *   <li><b>扣分范围</b>：QcRuleSet.standardization.elementTypes 决定哪些类型计入
- *       「未归一扣分」（出厂默认 5 类），实际按它与归一范围<b>取交集</b>计分。</li>
+ *   <li>扣分范围：QcRuleSet.standardization.elementTypes 决定哪些类型计入
+ *       「未归一扣分」（出厂默认 5 类），实际按它与归一范围取交集计分。</li>
  * </ul>
  * 本目录只声明类型元数据。
  */
@@ -89,7 +89,7 @@ public final class EntityTypes {
      * 都新建一份集合（{@code all()} 在单次标准化报表里被调 4 次）。缓存为不可变视图，
      * 调用方一律只读。
      *
-     * DICT_KEYS 用 {@code unmodifiableSet(LinkedHashSet)} 而<b>不是</b>
+     * DICT_KEYS 用 {@code unmodifiableSet(LinkedHashSet)} 而不是
      * Set.copyOf：后者的迭代顺序未定义（按每次 JVM 启动的 SALT 打乱），会破坏
      * 「顺序稳定」这条契约 —— {@code QcRuleSet.defaults()} 的 elementTypes 顺序
      * 与 EntityTypesDictionaryRegistrationTest 都依赖它。
@@ -132,7 +132,7 @@ public final class EntityTypes {
     /**
      * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法，顺序稳定，共 9 类）。
      *
-     * 这 9 类即「规则配置」弹窗里术语归一 / 术语标准化可勾选的范围；<b>实际生效范围</b>
+     * 这 9 类即「规则配置」弹窗里术语归一 / 术语标准化可勾选的范围；实际生效范围
      * 由规则集的 normalization.elementTypes（归一）与 standardization.elementTypes
      * （未归一扣分）决定。本方法给「可选项」，规则集给「已选项」。
      */

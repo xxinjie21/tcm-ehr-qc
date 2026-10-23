@@ -25,16 +25,16 @@ import java.util.Map;
 /**
  * 基线归档（批次 17）。
  *
- * 每次「基线被改动」后（提案合并通过、或管理员直写导入）都存一份<b>合并后</b>的快照，
+ * 每次「基线被改动」后（提案合并通过、或管理员直写导入）都存一份合并后的快照，
  * 供历史查看与回滚。
  *
- * <b>限额口径</b>：每 {@code (org_id, type)} 最多保留最近 5 份<b>快照</b>；
+ * 限额口径：每 {@code (org_id, type)} 最多保留最近 5 份快照；
  * 超限时只删最老的 dict_archive_term，dict_archive_version 元信息
- * <b>永久保留</b> —— 版本号连续性与「某次合并由谁做的」是审计链，删不得。
+ * 永久保留 —— 版本号连续性与「某次合并由谁做的」是审计链，删不得。
  * 被清理过快照的版本仍会出现在列表里（{@code snapshotPresent=false}），
  * 但不能再用于回滚。
  *
- * {@code org_id = ''} 是基础层，与各组织层<b>独立计数</b>：
+ * {@code org_id = ''} 是基础层，与各组织层独立计数：
  * 全局基础词库和各组织自有词库的归档历史互不干扰。
  */
 @Slf4j
@@ -63,7 +63,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
     /**
      * 生成一份归档版本：写入元信息 + 当前基线全量快照，并按 5 份限额清理最老的快照。
      *
-     * 必须在<b>基线写入完成之后</b>调用：快照取的是「改动之后」的基线。
+     * 必须在基线写入完成之后调用：快照取的是「改动之后」的基线。
      *
      * @param orgId      组织；{@code ""} = 基础层
      * @param type       术语类型
@@ -216,7 +216,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
     /**
      * 下一个版本号 = MAX(version_no) + 1；该 {@code (org_id, type)} 还没有归档时为 1。
      *
-     * <b>聚合列必须别名成 version_no</b>：结果集列名要能与实体属性对上
+     * 聚合列必须别名成 version_no：结果集列名要能与实体属性对上
      * （下划线转驼峰只认 version_no → versionNo）。换成对不上的别名，
      * 映射后 {@code getVersionNo()} 恒为 null，每次归档都算出 1 ——
      * 第二次同类型归档必然撞 {@code uk_org_type_no (org_id, type, version_no)}。
@@ -236,7 +236,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
     }
 
     /**
-     * 按 5 份限额清理最老的<b>快照</b>；元信息一律保留。
+     * 按 5 份限额清理最老的快照；元信息一律保留。
      *
      * 做法：把保留窗口外的版本 id 查出来，只删它们的 dict_archive_term。
      * 刻意不删 dict_archive_version —— 删了版本号就会断档，审计链失效。

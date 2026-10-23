@@ -36,7 +36,7 @@ public interface IOrgService extends IService<Organization> {
     List<OrgVOs.OrgInfo> listOrgs(String status);
 
     /**
-     * POST /api/orgs —— 自助创建组织，<b>创建者自动成为 owner</b>，无审核。
+     * POST /api/orgs —— 自助创建组织，创建者自动成为 owner，无审核。
      *
      * 创建者同时被写入 {@code users.status=active}（此前他是「无归属」状态）。
      */
@@ -60,7 +60,7 @@ public interface IOrgService extends IService<Organization> {
     /**
      * GET /api/orgs/users?keyword= —— 按用户名搜索可拉入的候选人。
      *
-     * 返回刻意<b>只有 id 与 username</b>：不返回角色 / 状态 / 所属组织，
+     * 返回刻意只有 id 与 username：不返回角色 / 状态 / 所属组织，
      * 否则就是一个「全站用户名 + 组织归属」的枚举接口。
      */
     List<OrgVOs.UserBriefVO> searchUsers(String keyword);

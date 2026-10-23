@@ -15,21 +15,21 @@ import java.util.Map;
  * 所有病历读取（查询 / 原始查看 / 后续图谱等）统一走本工具，禁止在业务方法中手写 where，
  * 避免口径漂移与"筛选条件绕过数据域"的越权。
  *
- * <b>数据域 = 课题组（阶段 2）</b>：原本用 grade（质控结论）当权限维度，现已改为
+ * 数据域 = 课题组（阶段 2）：原本用 grade（质控结论）当权限维度，现已改为
  * {@code org_id = 当前用户的主组}。grade 从此只做业务筛选（供应商可选），
  * 不再影响任何一个人能看到哪些数据。
  *
  * 原设计的两个后果正是本次改造的动机：复核通过一份病历后会
- * <b>立刻失去访问它的权限</b>；一次批量重算会<b>批量翻转可见性</b>。
+ * 立刻失去访问它的权限；一次批量重算会批量翻转可见性。
  *
- * ⚠️ <b>fail-closed 是本类最关键的一行</b>：orgId 为空时必须生成<b>返回空集</b>的查询，
+ * ⚠️ fail-closed 是本类最关键的一行：orgId 为空时必须生成返回空集的查询，
  * 而不能不加条件 —— 不加条件 = 看到全库 = 最严重的越权。
  */
 public final class RecordFilter {
 
     /**
      * fail-closed 用的不可能值、与 records.id 的 UUID 不可能相等。
-     * 它不是"这个 id 不存在"的东西，而是一个<b>不可能被任何导入数据命中</b>的值。
+     * 它不是"这个 id 不存在"的东西，而是一个不可能被任何导入数据命中的值。
      */
     private static final String NO_GROUP_SENTINEL = "\u0000__no_group__";
 
@@ -49,7 +49,7 @@ public final class RecordFilter {
     /**
      * 构建查询条件：先数据域、后用户筛选。
      *
-     * 管理员「看全部」（{@link RequestUtils#viewAllOrgs()}）时<b>不加组织条件</b>。
+     * 管理员「看全部」（{@link RequestUtils#viewAllOrgs()}）时不加组织条件。
      */
     public static QueryWrapper<Record> build(String orgId, SearchDTO dto) {
         QueryWrapper<Record> wrapper = new QueryWrapper<>();
@@ -149,7 +149,7 @@ public final class RecordFilter {
     /**
      * 仅未解析过滤：{@code structured_data IS NULL}（缺省/为 false 不加条件）。
      *
-     * 列类型是 MySQL JSON，<b>不能</b>写成 {@code structured_data = ''}（会触发
+     * 列类型是 MySQL JSON，不能写成 {@code structured_data = ''}（会触发
      * “Invalid JSON text”，且空串在 JSON 列里本就存不进去）。已解析的记录该列必为一段合法 JSON，
      * 故「未解析 ⇔ IS NULL」。
      */
@@ -172,7 +172,7 @@ public final class RecordFilter {
     }
 
     /**
-     * 数据域（行级权限）：限当前主组；无组时<b>返回空集</b>。
+     * 数据域（行级权限）：限当前主组；无组时返回空集。
      *
      * ⚠️ 这里不得写成"无组就不加条件"——那等于看到全库，
      * 是本次改造中最严重的越权。它也是防止写退出一个不可能的 id：
@@ -372,13 +372,13 @@ public final class RecordFilter {
     }
 
     /**
-     * 聚合专用（显式给定「是否看全部」）—— 供<b>后台线程</b>调用。
+     * 聚合专用（显式给定「是否看全部」）—— 供后台线程调用。
      *
      * 与 2 参重载的唯一差别是「看全部」由调用方显式传入，而不是现读
      * {@link RequestUtils#viewAllOrgs()}。原因同 {@link #buildWithinOrg}：后台线程里
      * {@code viewAllOrgs()} 恒为 false（读不到 RequestContextHolder），
      * 若在后台按它构建条件，管理员视角的数据域会悄悄退化成「只看本组」，算出错误结果。
-     * 故调用方必须在<b>提交线程</b>把该标记捕获下来，再交给后台重算。
+     * 故调用方必须在提交线程把该标记捕获下来，再交给后台重算。
      */
     public static QueryWrapper<Record> buildForAggregate(String orgId, FiltersDTO filterDto,
                                                          boolean viewAllOrgs) {

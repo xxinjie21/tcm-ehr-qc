@@ -50,7 +50,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 分桶阈值：长度 ≤ 2 的未归一实体。
      *
-     * <b>它只回答「这条实体短不短」，不回答「是不是抽取截断的残字」。</b>
+     * 它只回答「这条实体短不短」，不回答「是不是抽取截断的残字」。
      * 原注释写的是「残词（归一不可能命中标准词）」，这个前提已被实测推翻：
      * 症状词典只有 110 条标准词，而高频未归一 2 字实体恰恰是「鼻塞」「咽痛」「咽痒」
      * 这类**完整**的症状词 —— 它们是词表没收录，不是归一命不中。分项归属见
@@ -60,7 +60,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 分类错放：脉象/舌象要素不该出现在症状里。
      *
-     * 判据除「脉」「舌」前缀外，还覆盖<b>书写时省略了前缀</b>的两类 ——
+     * 判据除「脉」「舌」前缀外，还覆盖书写时省略了前缀的两类 ——
      * 脉诊三部（尺/寸/关 打头：尺沉、寸浮、关缓）与舌诊专名（尖/根/苔 打头：
      * 尖红=舌尖红、根苔=舌根苔、苔平）。三部与舌诊专名都是脉诊/舌诊的固定用语，
      * 症状域不会出现，故可无歧义判定，且**不限字数**（实测 3~7 字的描述性短语
@@ -80,17 +80,17 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             "尖", "根", "苔"            // 舌诊专名（省略「舌」）
     };
     /**
-     * 首字撞上脉诊三部 / 舌诊专名，但<b>确实是症状</b>的前缀，一律不当错放。
+     * 首字撞上脉诊三部 / 舌诊专名，但确实是症状的前缀，一律不当错放。
      *
      * 五个都是实测踩出来的坑（首字撞上，语义却属症状域）：
      * <ul>
-     *   <li><b>关节</b> —— 关节痛 / 关节怕冷 / 关节屈伸不利 …… 实测症状里有 90+
+     *   <li>关节 —— 关节痛 / 关节怕冷 / 关节屈伸不利 …… 实测症状里有 90+
      *       个不同写法（关节痛 一条 164 次），是量最大的一类；</li>
-     *   <li><b>尺肤</b> —— 尺部皮肤，诊断体征（尺肤热 / 尺肤凉 / 尺肤粘），
+     *   <li>尺肤 —— 尺部皮肤，诊断体征（尺肤热 / 尺肤凉 / 尺肤粘），
      *       与脉象是两回事；</li>
-     *   <li><b>苔藓</b> —— 皮肤病（苔藓 / 苔藓样皮损），不是舌苔；</li>
-     *   <li><b>尖锐</b> —— 声音 / 湿疣等义（尖锐声），脉象里没有「尖锐」；</li>
-     *   <li><b>脉下</b> —— 脉位下方的部位描述（左脉下有一囊肿），是症状不是脉象。</li>
+     *   <li>苔藓 —— 皮肤病（苔藓 / 苔藓样皮损），不是舌苔；</li>
+     *   <li>尖锐 —— 声音 / 湿疣等义（尖锐声），脉象里没有「尖锐」；</li>
+     *   <li>脉下 —— 脉位下方的部位描述（左脉下有一囊肿），是症状不是脉象。</li>
      * </ul>
      *
      * 误判会把真症状判成「不可归一」：症状归一率虚高、错放数虚高，
@@ -101,7 +101,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 方位 / 数量前缀：脉位常写成「两关偏浮」「右寸后关前」「双寸关」「左关偏浮」，
      * 首字不是三部，只判首字会漏（2026-10-19 实测存量这批 4318 条）。
      *
-     * 只剥<b>一个</b>字符：既覆盖上述写法，又不会把「两手手指略自温」
+     * 只剥一个字符：既覆盖上述写法，又不会把「两手手指略自温」
      * 「左侧肩颈痠痛」这类症状误判成错放（剥掉首字后仍不以舌脉专名开头）。
      * 口径与 Python 侧 _PT_QUALIFIERS / 工具脚本同源。
      */
@@ -131,17 +131,17 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     /**
      * 问诊整句的词根锚：以这些词开头的未归一实体属「问诊子项描述」
-     * （大便日一行 / 小便色略黄 / 夜寐一般 / 饮水多 …），<b>不是症状词表缺口</b>。
+     * （大便日一行 / 小便色略黄 / 夜寐一般 / 饮水多 …），不是症状词表缺口。
      *
-     * <b>为什么要在「最该先补」清单里排除它们</b>：实测 dictionaryGap 桶 116127 条里，
+     * 为什么要在「最该先补」清单里排除它们：实测 dictionaryGap 桶 116127 条里，
      * 问诊整句的频次远高于真实症状缺口 —— 前 8 名被「大便日一行(469)、大便成形(410)、
      * 大便一日一次(352)、大便日(235)、小便色略黄(216)…」占满，而真正该补的症状词
      * （如「上下楼梯特别疼」50 次）排在 84 名之后，永远不会出现在只取前 8 的待办里。
-     * 把它们推荐给用户「补进症状词典」是<b>错误方向</b>：那是抽取边界问题（应由
+     * 把它们推荐给用户「补进症状词典」是错误方向：那是抽取边界问题（应由
      * python 侧 inquiry 抽离解决），补成症状标准词会污染所有含该子串的实体。
      *
      * 口径与 {@code python-nlp/nlp_rules.py#_INQUIRY_LEAD} 同源（方案A），
-     * 但此处<b>只用于报告排序过滤、不改数据</b>，故取更长的一组以免误伤真症状词。
+     * 但此处只用于报告排序过滤、不改数据，故取更长的一组以免误伤真症状词。
      */
     private static final String[] INQUIRY_LEAD = {
             "大便", "小便", "二便", "排便", "夜寐", "睡眠", "入睡", "饮食", "食欲", "饮水",
@@ -313,15 +313,15 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      *
      * 两个时间维度的过滤位置不同、各有理由：
      * <ul>
-     *   <li><b>接诊时间</b>（dateRange）留在 Java 侧（{@link #filterByVisitTime}），
+     *   <li>接诊时间（dateRange）留在 Java 侧（{@link #filterByVisitTime}），
      *       因为 range.excluded（「已排除 N 条区间外数据」）要的是
      *       「范围内但因时间被排除的条数」，只有「先取范围全集、再按时间筛」两步才能算出来；</li>
-     *   <li><b>导入时间</b>（importRange）下推到 SQL（records.create_time），
+     *   <li>导入时间（importRange）下推到 SQL（records.create_time），
      *       与病历列表 / Qc 页同一口径；它的排除量不进 excluded（那本是接诊时间的语义），
      *       回显走 {@code range.importStart/importEnd}。</li>
      * </ul>
      *
-     * 不随范围收窄的还有<b>证候</b>：该页是组织级口径、无证候维度展示，且证候是
+     * 不随范围收窄的还有证候：该页是组织级口径、无证候维度展示，且证候是
      * LIKE 子串模糊匹配，子集统计的参考性弱 —— 2026-10-17 定案不再暴露（接口与前端
      * 同步移除，FiltersDTO 的 pattern 字段仍服务于病历列表 / 统计看板）。
      */
@@ -349,7 +349,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /**
-     * 报告现算所需的请求上下文快照（在<b>请求线程</b>捕获）。
+     * 报告现算所需的请求上下文快照（在请求线程捕获）。
      *
      * SWR 的陈旧分支会在后台线程重算，那里读不到 RequestContextHolder
      * （RequestUtils 一律返回 {@code "unknown"}、RecordFilter fail-closed）。
@@ -415,9 +415,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     /**
      * 报告行的扁平中间结构（A1/T2）：每条病历的 structured_data 与 qc_results
-     * <b>各只解析一次</b>，各统计器共用这一份。
+     * 各只解析一次，各统计器共用这一份。
      *
-     * 刻意<b>不</b>建 {@code Map<recordId, Map<String,Object>>} 那种请求内解析缓存 ——
+     * 刻意不建 {@code Map<recordId, Map<String,Object>>} 那种请求内解析缓存 ——
      * 那只是把同一份解析结果换个容器多存一遍，省不掉解析，还多一次哈希查找。
      *
      * symptoms 缺失时归一成空列表，调用方无需再判空。
@@ -506,7 +506,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 复制一份去掉**接诊时间**区间的范围：该维度由 Java 侧过滤（要算 excluded），
      * 不能与 SQL 重复；导入时间（importRange）刻意保留 —— 它下推到
      * RecordFilter 的 create_time 条件，与病历列表 / Qc 页同口径。
-     * 证候（pattern）刻意<b>不</b>复制 —— 见 {@link #report(FiltersDTO)} 的说明。
+     * 证候（pattern）刻意不复制 —— 见 {@link #report(FiltersDTO)} 的说明。
      */
     private FiltersDTO withoutVisitRange(FiltersDTO f) {
         FiltersDTO copy = new FiltersDTO();

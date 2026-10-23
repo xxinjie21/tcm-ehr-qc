@@ -77,7 +77,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     }
 
     /**
-     * 把范围过滤落到<b>关联病历</b>上：用 {@code record_id IN (SELECT id FROM records WHERE …)}
+     * 把范围过滤落到关联病历上：用 {@code record_id IN (SELECT id FROM records WHERE …)}
      * 收窄任务集合，列表与统计共用同一段组装。
      *
      * 为什么是子查询而不是 JOIN：review_tasks 本身没有科室 / 接诊时间 /
@@ -85,7 +85,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
      * 而 listTasks 是高频路径，MyBatis-Plus 的 QueryWrapper 不便 JOIN，
      * 子查询让「范围」与「状态 / 数据域」仍在同一个 wrapper 里，口径只有一处。
      *
-     * <b>子查询里不再叠加 org 条件</b>：数据域由 review_tasks.org_id 那层
+     * 子查询里不再叠加 org 条件：数据域由 review_tasks.org_id 那层
      * 负责（管理员看全部时不加），在子查询里再按 records.org_id 过滤会把
      * viewAllOrgs 旁路抵消掉 —— 管理员就会漏看别组导入病历产生的任务。
      *

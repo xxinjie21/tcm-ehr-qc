@@ -24,7 +24,7 @@ public interface IDictionaryLintService {
     DictionaryLintVO lint(String type, List<TermEntry> entries);
 
     /**
-     * 体检一份词表，<b>失败时返回一份空结论而不抛</b>。
+     * 体检一份词表，失败时返回一份空结论而不抛。
      *
      * 体检只是「提醒」：如果它自己抛异常就把整个解析带崩，用户连文件内容都看不到 ——
      * 那是本末倒置。兜底放在服务层而非 Controller，后者只负责编排、不做异常兜底。

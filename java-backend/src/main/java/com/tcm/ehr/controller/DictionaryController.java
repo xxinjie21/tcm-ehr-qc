@@ -110,7 +110,7 @@ public class DictionaryController {
      *
      * @param scope 词典作用域（前端滑动按钮）：effective 默认=基础层∪本组织；
      *              base=仅系统默认词典；org=仅本组自有词条。
-     *              <b>输入联想 / 质控下拉不要传 base/org</b> —— 那会给出归一里不生效的词
+     *              输入联想 / 质控下拉不要传 base/org —— 那会给出归一里不生效的词
      */
     @GetMapping("/terms")
     public ResponseEntity<Result<Map<String, Object>>> terms(
@@ -139,8 +139,8 @@ public class DictionaryController {
      *
      * （本地词典不会自动同步回小组基线）。
      *
-     * @param scope org（默认）= 本组自有词条，这是<b>提案基线</b>（审核走整快照替换组织层）；
-     *              effective = 基础层 ∪ 本组织，即<b>生效词典</b>。
+     * @param scope org（默认）= 本组自有词条，这是提案基线（审核走整快照替换组织层）；
+     *              effective = 基础层 ∪ 本组织，即生效词典。
      *              两者不是同一个东西，别混用 —— 详见 {@link IDictProposalService#exportBaseline}
      */
     @GetMapping("/baseline/export")
@@ -330,9 +330,9 @@ public class DictionaryController {
  *
  * 【权限】管理员一律可看；基础层提案（{@code org_id=''}）语义上属于全站，按
  * org_id 等值比较时任何组织都「不等于」它，故单独归入「仅管理员」；
- * 其余要求<b>提案自身的 org_id 等于当前组织</b>，且调用者是提交者本人或该组织的组长。
+ * 其余要求提案自身的 org_id 等于当前组织，且调用者是提交者本人或该组织的组长。
  *
- * ⚠️ 只看 {@code isOrgOwner()} 是不够的：它只说明「我在<b>我自己</b>的组织里是组长」，
+ * ⚠️ 只看 {@code isOrgOwner()} 是不够的：它只说明「我在我自己的组织里是组长」，
  * 与目标提案属于哪个组织无关 —— 那样任一组织的组长拿任意提案号就能读到别组的词条快照
  * （2026-10-05 之前审核路径就是这么漏的，见 DictProposalServiceImpl.requireAuditable；
  * diff 是漏网的第三处，2026-10-13 补上）。

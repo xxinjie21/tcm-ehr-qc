@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 /**
  * 操作日志（文档必做2）：关键操作（清洗 / 导出 / 词典导入 / 词典回滚 / 人工复核 / 批量重算）
- * <b>只入库</b>，写 operation_log 表，是审计页 {@code GET /api/logs} 的唯一数据源。
+ * 只入库，写 operation_log 表，是审计页 {@code GET /api/logs} 的唯一数据源。
  *
  * §七 L2 起不再落文件：原「文件 + 库」双写已删，配置项 {@code log.operation-file}
  * 与 {@code logs/operation.log} 一并作废（{@code logs/} 目录此后后端零引用，
@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
  *
  * §七 L1 起不记 IP（PIPL 最小必要）。
  *
- * <b>已知代价</b>（用户已同意）：入库失败时没有文件兜底，仅打 WARN。该条操作在审计页缺失。
+ * 已知代价（用户已同意）：入库失败时没有文件兜底，仅打 WARN。该条操作在审计页缺失。
  *
  * 操作人 / 角色取自 JwtInterceptor 写入的 request 属性（见 {@link RequestUtils}）。
  * ⚠️ 后台线程（异步任务）读不到线程绑定的 request 属性，会取到 {@code "unknown"}；
@@ -54,11 +54,11 @@ public class OperationLogger {
     }
 
     /**
-     * 记录一条关键操作，<b>操作人与角色由调用方指定</b>。
+     * 记录一条关键操作，操作人与角色由调用方指定。
      *
      * 供后台线程（批量重算 / 批量解析等异步任务）使用：这些线程没有
      * RequestContextHolder 上下文，{@link #log(String, String, String)} 会把操作人
-     * 记成 {@code "unknown"}。异步任务应在<b>提交线程</b>捕获操作人与角色，
+     * 记成 {@code "unknown"}。异步任务应在提交线程捕获操作人与角色，
      * 由 worker 线程回填 —— 与 qc_task.role 快照是同一个理由。
      *
      * @param action   操作类型
@@ -74,7 +74,7 @@ public class OperationLogger {
     }
 
     /**
-     * 记录一条关键操作，<b>操作人 / 角色 / 组由调用方指定</b>。
+     * 记录一条关键操作，操作人 / 角色 / 组由调用方指定。
      *
      * 异步任务的收尾日志必须用它：worker 线程既拿不到 operator / role，
      * 也拿不到 orgId（RequestContextHolder 不在该线程上）。

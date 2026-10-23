@@ -88,7 +88,7 @@ public final class OrgVOs {
     /**
      * GET /api/orgs/users 出参：按用户名搜索到的候选人。
      *
-     * <b>刻意只有 id 与 username</b>：再加角色 / 状态 / 所属组织，
+     * 刻意只有 id 与 username：再加角色 / 状态 / 所属组织，
      * 这个接口就成了「全站用户名 + 组织归属」的枚举器。
      */
     @Data

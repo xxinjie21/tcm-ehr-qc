@@ -97,7 +97,7 @@ public class StandardizationReportVO {
          * 实际生效的导入时间起止（yyyy-MM-dd）；为空表示不限。
          *
          * 与 {@link #start}/{@link #end}（接诊时间）是两个独立维度，可同时生效、取交集。
-         * 导入时间过滤下推到 SQL（records.create_time），其排除量<b>不计入</b>
+         * 导入时间过滤下推到 SQL（records.create_time），其排除量不计入
          * {@link #excluded} —— excluded 只反映接诊时间过滤排除的条数。
          */
         private String importStart;
@@ -218,7 +218,7 @@ private int termCount;
         /**
          * 长度 ≤ 2 的未归一实体。
          *
-         * <b>不是「抽取残字」的判定结果</b> —— 实测这批词里单字 0 条、也没有截断痕迹，
+         * 不是「抽取残字」的判定结果 —— 实测这批词里单字 0 条、也没有截断痕迹，
          * 主体是词表未收录的完整二字症状词（鼻塞、咽痛…）。归属词表侧，见
          * {@code StandardizationReportServiceImpl.unmatched(...)}。
          */

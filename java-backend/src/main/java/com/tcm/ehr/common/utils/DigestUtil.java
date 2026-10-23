@@ -12,7 +12,7 @@ import java.util.HexFormat;
  * （复核读时指纹）原各写一份「取 MessageDigest → digest → HexFormat → NoSuchAlgorithmException
  * 兜底」，收敛到此处一处实现（审查报告 §2.6）。
  *
- * 刻意<b>不</b>用 Spring 的 DigestUtils 统一：它只有 MD5 系列、没有 SHA-256
+ * 刻意不用 Spring 的 DigestUtils 统一：它只有 MD5 系列、没有 SHA-256
  * （javap 实证），覆盖不了复核指纹那一路。
  */
 public final class DigestUtil {

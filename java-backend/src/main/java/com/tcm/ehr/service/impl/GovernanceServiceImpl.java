@@ -67,7 +67,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 组织级「归一范围」来源（normalization.elementTypes）。
      *
-     * <b>字段注入而非构造参数</b>：GovernanceCleanContractTest / GovernanceCleanIdempotentTest
+     * 字段注入而非构造参数：GovernanceCleanContractTest / GovernanceCleanIdempotentTest
      * 直接用 4 参构造 {@code new GovernanceServiceImpl(norm, mapper, store, taskMapper)}，把本依赖加成
      * final 字段会改变构造签名、破坏它们。{@code required=false}：单测无此 bean 时退回出厂默认范围。
      */
@@ -104,7 +104,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 数据清洗五步流水线：去重 → 字段清理 → 空值规整 → 脏数据隔离 → 术语归一。
      *
-     * 只规整与标记，<b>不填充医生未书写的内容，也不删除任何病历</b>；各步的判断口径见方法体注释。
+     * 只规整与标记，不填充医生未书写的内容，也不删除任何病历；各步的判断口径见方法体注释。
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -122,7 +122,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 数据清洗（带进度回调，供异步任务上报进度 / 响应取消）。
      *
-     * <b>为什么用回调而不是把进度逻辑写进本方法</b>：清洗逻辑（分页、预热、去重、
+     * 为什么用回调而不是把进度逻辑写进本方法：清洗逻辑（分页、预热、去重、
      * 归一）已经调优过，不该为「异步」再改一遍；回调把「进度上报」与「取消判断」
      * 交给调用方（CleanBatchService），同步调用传 null 即退化为原行为。
      *
@@ -173,7 +173,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         for (Record r : records) {
             if (progress != null && (++processedCnt % 200 == 0) && !progress.test(processedCnt)) {
                 log.info("[清洗] 收到中止请求，已处理 {} 条，提前结束", processedCnt);
-                // 中止时 total 记为<b>实际处理数</b>而非查询总数：
+                // 中止时 total 记为实际处理数而非查询总数：
                 // 否则调用方（异步任务）会把 done 写成全量数，看起来像「跑完了才被取消」。
                 vo.setTotal(processedCnt);
                 break;
@@ -321,14 +321,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     }
 
     /**
-     * 清洗范围条件：只作用于「质控合格」病历，<b>无视</b>传入的分级。
+     * 清洗范围条件：只作用于「质控合格」病历，无视传入的分级。
      *
      * 设计口径是「对合格数据做清洗、归一，产出标准数据集」——待复核 / 无效既不归一、
      * 也不参与导出。调用方传了别的分级也一律按「合格」收窄：范围里若按「全部」扫，
      * 「清洗总病历」会是整库条数，远大于页面顶部「质控合格病历」卡，用户看到的就是
      * 「明明只有几千合格，却清洗了几万」。
      *
-     * 刻意<b>不</b>改动入参 filters：Controller 在 {@code clean()} 之后还要用它写
+     * 刻意不改动入参 filters：Controller 在 {@code clean()} 之后还要用它写
      * 操作日志（{@link RecordFilter#describe}），就地改分级会让日志范围与实际执行的不一致。
      * 故这里复制一份再覆盖分级。
      */
@@ -361,7 +361,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * ⚠️ wrapperFactory 每页调用一次：{@code QueryWrapper.and()} 是原地追加，
      * 复用同一份 wrapper 会让 WHERE 逐页累积。
      *
-     * <b>取完</b>定义为「取到空页」或「不满一页」——两者都表示没有下一页。
+     * 取完定义为「取到空页」或「不满一页」——两者都表示没有下一页。
      *
      * @param onPage 每取到一页就回调一次（**在该页任何一条被消费之前**）。
      *               P1-17 用它做「本页术语召回预热」：预热必须早于逐条归一，否则毫无意义；
@@ -450,15 +450,15 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 按页预热术语召回（P1-17 / T3）：把本页所有待归一原文按类型收集好，一类一次问完 ES。
      *
-     * <b>改的是什么</b>：清洗链路原先逐实体调 normalize，每个实体一次 ES 往返 ——
-     * 一页 1000 条病历、每条十几个实体，就是上万次往返。这里在<b>本页任何一条被归一之前</b>
+     * 改的是什么：清洗链路原先逐实体调 normalize，每个实体一次 ES 往返 ——
+     * 一页 1000 条病历、每条十几个实体，就是上万次往返。这里在本页任何一条被归一之前
      * 先批量问一次，随后逐条归一全部命中召回缓存。复用解析链路既有的
      * {@link EsTermNormalizer#prefetch}（内部走 _msearch），不新增批量查询接口。
      *
-     * <b>不改的是什么</b>：预热只写召回缓存、不参与判定。命中与否仍由三级规则与 Dice 阈值决定，
+     * 不改的是什么：预热只写召回缓存、不参与判定。命中与否仍由三级规则与 Dice 阈值决定，
      * 预取失败也不影响正确性（逐条归一照常走 ES）。
      *
-     * <b>只预热本组织归一范围内的类型</b>（normalization.elementTypes，出厂默认 9 类
+     * 只预热本组织归一范围内的类型（normalization.elementTypes，出厂默认 9 类
      * 全勾：疾病 / 证候 / 症状 / 中药 / 方剂 / 舌象 / 脉象 / 病因 / 治法；归一范围与计分范围是两个
      * 独立开关）。范围外的类型清洗链路对其不调 ES（见 {@link #normalizeEntityList}），预热没有意义。
      *
@@ -725,7 +725,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 标准数据集导出：只含质控合格病历，文本字段已就地标准化，并对手机号/身份证号脱敏。
      *
-     * <b>「标准数据集」的含义</b>：导出的不是库内原文的拷贝，而是把每条病历里
+     * 「标准数据集」的含义：导出的不是库内原文的拷贝，而是把每条病历里
      * 「被归一过的术语」在原文中就替换成标准词之后的版本（见 {@link #standardizeMap}）。
      * 这样一份导出件可以直接当训练/统计语料用，不必再对一遍词典。库内原文不受影响 ——
      * 本链路只读。
@@ -872,7 +872,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * 内存恒定一页；实现与 RecordKeyset 的锚点语义一致（{@code visit_time DESC, id ASC}
      * 全序），不漏行不重复。
      *
-     * <b>锚点取 SQL 返回的末条</b>（含被本页筛掉的行不适用——已无内存筛，每行都是命中）。
+     * 锚点取 SQL 返回的末条（含被本页筛掉的行不适用——已无内存筛，每行都是命中）。
      *
      * @param dto           导出/预览请求
      * @param batchConsumer 每批回调；回调内不得改批次内容
@@ -997,7 +997,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     // ------------------------------------------------------------------ 导出标准化
 
     /**
-     * 取一条病历的「归一前原文 → 标准词」替换对，按原词长度<b>降序</b>。
+     * 取一条病历的「归一前原文 → 标准词」替换对，按原词长度降序。
      *
      * 只用该病历自己的 structured_data：归一结果本来就是逐条产生的，
      * 别条病历抽到的术语在这条病历里没有对应的原文片段，硬套没有依据。
@@ -1064,7 +1064,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * 会被标准化的字段：医生手写的文本字段 —— 21 个原始字段里除编号 / 性别 / 年龄 /
      * 就诊次数 / 科室 / 工号 / 接诊时间之外的 13 个。
      *
-     * 刻意<b>不</b>做成「所有字符串字段都过一遍」：那样 department 这类短文本
+     * 刻意不做成「所有字符串字段都过一遍」：那样 department 这类短文本
      * 会被误伤 —— 例如术语「内科 → 中医内科」会把 {@code department="中医内科"} 替换成
      * 「中医中医内科」。漏替换只是少做一步，误替换是污染数据，两者不对等。
      *
@@ -1077,9 +1077,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             "followUp", "treatmentEffect");
 
     /**
-     * 把一条病历转成 Map 并对上述文本字段做就地标准化（<b>不改动入参 Record</b>）。
+     * 把一条病历转成 Map 并对上述文本字段做就地标准化（不改动入参 Record）。
      *
-     * 两步都只作用于导出的副本：① 术语替换（把归一过的原文换成标准词）；② <b>标点规整</b>
+     * 两步都只作用于导出的副本：① 术语替换（把归一过的原文换成标准词）；② 标点规整
      * （{@link TextUtil#normalizePunctuation}：合并重复标点、半角转全角、去标点两侧空白）。
      * 库里的病历原文一个字节都不动 —— 与清洗同理，这是「导出标准数据集」而非「改写病历」。
      *
@@ -1126,7 +1126,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /**
      * 按替换对做「受控」文本替换（E1~E3）。
      *
-     * <b>为什么不能再用 String.replace</b>：它对每次调用做全文替换，且不区分位置 ——
+     * 为什么不能再用 String.replace：它对每次调用做全文替换，且不区分位置 ——
      * 2026-10-18 实测一条病历里 {@code 血 → 血分证} 命中 17 处（把「血行不畅」「血块」「经血色暗红」
      * 全改成「血分证行不畅」「血分证块」）、{@code 有 → 有汗} 命中 11 处（「伴有腰酸痛」→「伴有汗腰酸痛」）。
      * 导出的标准数据集是要直接拿去分析/训练的，这种污染比"少替换一次"严重得多。

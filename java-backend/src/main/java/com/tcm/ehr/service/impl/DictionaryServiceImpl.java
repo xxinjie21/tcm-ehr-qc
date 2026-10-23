@@ -152,10 +152,10 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 由倒排表取候选词条下标（升序）。
      *
-     * 做法：对 kw 的每个<b>不同</b>字符取倒排表（该字符 → 含它的串编号，升序），
+     * 做法：对 kw 的每个不同字符取倒排表（该字符 → 含它的串编号，升序），
      * 逐次两两求交。任一字符没有倒排表 ⇒ 无任何串含它 ⇒ 直接空集。
      *
-     * 返回的是<b>串编号映射回词条下标</b>后的序列，可能含相邻重复（同一词条的标准词与多个别名
+     * 返回的是串编号映射回词条下标后的序列，可能含相邻重复（同一词条的标准词与多个别名
      * 都含同一字符），由调用方按相邻去重。
      */
     static int[] candidateEntries(IDictionaryTermStore.RecallIndex index, String kw) {
@@ -222,7 +222,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
      * scope 归一：只认 base / org，其余（含 null、空白、写错的值）
      * 一律落回 effective。
      *
-     * 为什么不抛异常：这是<b>读</b>接口，scope 写错时返回「生效词典」至少还是可用数据；
+     * 为什么不抛异常：这是读接口，scope 写错时返回「生效词典」至少还是可用数据；
      * 抛错会让词典页整页空白。真正需要拦的非法值在 Controller 侧按 4001 挡掉。
      */
     private static String normalizeScope(String scope) {

@@ -55,14 +55,14 @@ public class Record {
     /**
      * 是否人工修改过结构化数据（列表标记 / 清洗跳过判据）。
      *
-     * <b>数据库 STORED 生成列</b>：值由 structured_data._meta.manuallyEdited 派生
-     * （见 {@code data/2026-10-08-add-records-manually-edited.sql}），应用侧<b>只读不写</b> ——
+     * 数据库 STORED 生成列：值由 structured_data._meta.manuallyEdited 派生
+     * （见 {@code data/2026-10-08-add-records-manually-edited.sql}），应用侧只读不写 ——
      * insertStrategy/updateStrategy 都设为 NEVER，避免 MyBatis-Plus 把
      * 它写进 INSERT/UPDATE（MySQL 对生成列赋值会直接报 3105）。
      *
      * 为什么落列而不是继续解析 JSON：列表每行都要为读这一个布尔值解析一次 ~3.7KB JSON
      * （性能审查 P1-2#2，收益最大的一步）。落成生成列后与 _meta.manuallyEdited
-     * <b>严格同源</b>，六条写入路径（导入 / 单条新增 / 写回结构化数据 / 清洗归一 / NLP 重解析 /
+     * 严格同源，六条写入路径（导入 / 单条新增 / 写回结构化数据 / 清洗归一 / NLP 重解析 /
      * 复核）都无需各自维护。
      *
      * 语义参考实现仍是 {@link com.tcm.ehr.common.utils.StructuredDataMeta#isManuallyEdited}，
@@ -77,7 +77,7 @@ public class Record {
      *
      * 与 orgId 组成联合唯一键 uk_records_org_text_hash：
      * 同一份病历在同一组织内只能存一份，跨组织各存一份互不冲突。
-     * <b>存量行为 NULL</b>（不为老数据回填，见 migration-03 注）——
+     * 存量行为 NULL（不为老数据回填，见 migration-03 注）——
      * MySQL 唯一索引视多个 NULL 互不相等，故存量行不受此键约束。
      */
     private String textHash;

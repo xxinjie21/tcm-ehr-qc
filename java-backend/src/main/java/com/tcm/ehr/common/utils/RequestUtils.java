@@ -13,12 +13,12 @@ import org.springframework.web.context.request.RequestContextHolder;
  * §七 L1 已删除 {@code currentIp()}（不记操作 IP），随之删掉只为它服务的
  * {@code currentRequest()} 与两个 servlet import。
  *
- * <b>组信息刻意不进 JWT</b>（阶段2）：移人 / 转让组长 / 停用组必须<b>立即</b>生效，
+ * 组信息刻意不进 JWT（阶段2）：移人 / 转让组长 / 停用组必须立即生效，
  * 放进有效期 24h 的 token 里意味着最长要等一天才生效。故 JwtInterceptor
  * 每请求查一次 organization_members（走 {@code INDEX(user_id,is_primary)}）。
  *
- * ⚠️ <b>后台线程会拿到 "unknown" 而不是 null</b>：这些访问器读的是线程绑定的
- * RequestContextHolder。异步任务（批量重算 / 批量解析）必须在<b>提交线程</b>
+ * ⚠️ 后台线程会拿到 "unknown" 而不是 null：这些访问器读的是线程绑定的
+ * RequestContextHolder。异步任务（批量重算 / 批量解析）必须在提交线程
  * 捕获所需值再传给 worker，见 qc_task.role 快照。
  */
 public final class RequestUtils {
@@ -32,7 +32,7 @@ public final class RequestUtils {
     /**
      * 「不限组织」标记（批次 6）：管理员且 {@code auth.admin-can-view-data=true} 时为 true。
      *
-     * <b>为什么不能复用 orgId 为空来表示</b>：批次 4 之后 orgId 为空走 fail-closed
+     * 为什么不能复用 orgId 为空来表示：批次 4 之后 orgId 为空走 fail-closed
      * （查不到任何数据），拿它当「不限组织」会让开关一开就什么都看不到 ——
      * 与「看全部」正好相反，是个很难一眼看出的反向 bug。
      */
@@ -71,7 +71,7 @@ public final class RequestUtils {
     /**
      * 当前操作人所属课题组。
      *
-     * <b>无组时返回空串而不是 null</b>：调用方（RecordFilter）会把它当
+     * 无组时返回空串而不是 null：调用方（RecordFilter）会把它当
      * 「查不到数据」的判据，空串比 null 更不容易在下游被当成「未设置」而放过。
      */
     public static String currentOrgId() {
@@ -85,7 +85,7 @@ public final class RequestUtils {
     }
 
     /**
-     * 某一行的 org_id 是否与当前操作人同一个<b>组织域</b>。
+     * 某一行的 org_id 是否与当前操作人同一个组织域。
      *
      * 用于批任务详情 / 取消这类「按行判权」的地方。列表用的是
      * {@code org_id = currentOrgId()} 等值查询，判权若另用一套更严的口径，
@@ -93,16 +93,16 @@ public final class RequestUtils {
      * 他的任务 {@code org_id=''}，列表查 {@code =''} 能列出来，而判权要求
      * 「当前组织非空」恒判否，于是详情 404、取消报「任务不存在」。
      *
-     * <b>规则</b>：两边都空 = 同一个空组织域，放行；一边空一边非空 = 判否；
+     * 规则：两边都空 = 同一个空组织域，放行；一边空一边非空 = 判否；
      * 两边都非空 = 严格相等。
      *
-     * <b>为什么空对空要放行、而不是一律 fail-closed</b>：空组织不是「别人的组织」，
+     * 为什么空对空要放行、而不是一律 fail-closed：空组织不是「别人的组织」，
      * 放行不构成跨组织泄露（真正的组织仍要求严格相等，边界一点没松）；而这些任务
      * 本就列在列表里，界面理应能查看进度、能取消。反过来说，这类任务在 worker 侧
      * 按空组织 fail-closed 命中 0 条，最终落 INTERRUPTED，给它看详情也不会
      * 泄露任何他组数据。
      *
-     * <b>没有请求上下文一律判否</b>：{@link #currentOrgId()} 把「无上下文」和
+     * 没有请求上下文一律判否：{@link #currentOrgId()} 把「无上下文」和
      * 「无组织」都表达成空串，单看它无法区分；而这两个调用点（批任务详情 / 取消）
      * 只可能出现在请求线程上，那里 JwtInterceptor 必然已写入 ATTR_ORG_ID。
      * 因此「连上下文都没有」只可能是后台线程误用，按 fail-closed 拒掉。
@@ -124,12 +124,12 @@ public final class RequestUtils {
     }
 
     /**
-     * 取请求属性的<b>原始</b>值（不转字符串）。
+     * 取请求属性的原始值（不转字符串）。
      *
-     * ⚠️ 不能用 {@link #attr}：它是给「角色 / 用户名」这类<b>文本</b>属性用的，
+     * ⚠️ 不能用 {@link #attr}：它是给「角色 / 用户名」这类文本属性用的，
      * 会把值 String.valueOf 成字符串并把空值兜成 {@code "unknown"}。
      * 布尔标记那样取会得到 {@code "true"}/{@code "unknown"}，
-     * 再拿 {@code Boolean.TRUE.equals(...)} 比就<b>恒为 false</b> ——
+     * 再拿 {@code Boolean.TRUE.equals(...)} 比就恒为 false ——
      * 于是 {@code auth.admin-can-view-data} 开关静默失效，管理员被永久限定在
      * 自己所属组织里、看不到其它组织的数据（实测 1000 条只看得到 500 条）。
      *

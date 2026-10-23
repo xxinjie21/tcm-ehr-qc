@@ -26,9 +26,9 @@ import java.util.List;
  *
  * 权限分三层：
  * <ul>
- *   <li><b>我的组</b>：登录即可（无组也能看自己是待分配池还是审批中）；</li>
- *   <li><b>管理 / 审批</b>：仅管理员（{@link RequireRole}）；</li>
- *   <li><b>成员管理</b>：组长 + 路径 orgId 必须等于当前组
+ *   <li>我的组：登录即可（无组也能看自己是待分配池还是审批中）；</li>
+ *   <li>管理 / 审批：仅管理员（{@link RequireRole}）；</li>
+ *   <li>成员管理：组长 + 路径 orgId 必须等于当前组
  *       （{@link RequireOrgRole("owner")}，拦截器二次兜底）。</li>
  * </ul>
  *
@@ -66,7 +66,7 @@ public class OrgController {
      * 切换到指定组织（多组织）。
      *
      * 【权限：登录即可，服务层校验「是该成员 且 组织 active」】
-     * 注意：<b>不能</b>加 {@code @RequireOrgRole} —— 切换前 currentOrg 仍是旧组织，
+     * 注意：不能加 {@code @RequireOrgRole} —— 切换前 currentOrg 仍是旧组织，
      * 加了会被「路径机构 != 当前机构」拦掉，永远切不过去。
      */
     @PostMapping("/api/orgs/{id}/switch")
@@ -87,7 +87,7 @@ public class OrgController {
     /**
      * 自助创建组织（批次 6）。
      *
-     * 【权限：登录即可】创建者自动成为 owner。<b>只挂新路径</b>：这是新增能力，
+     * 【权限：登录即可】创建者自动成为 owner。只挂新路径：这是新增能力，
      * 旧路径下本来不存在「自助创建」，给两个名字只会让人以为旧路径也能调。
      */
     @PostMapping("/api/orgs")

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * keyset 锚定上一页末条的 {@code (visit_time, id)} 后只做区间扫描（配
  * idx_records_org_vt_id 后实测 4.9s → 0.2s）。
  *
- * <b>严格全序前提</b>：id 是唯一主键 → 组合键 {@code (visit_time, id)}
+ * 严格全序前提：id 是唯一主键 → 组合键 {@code (visit_time, id)}
  * 唯一，游标既不会漏行也不会重复。锚点取「上一页**末条**」且必含 id
  * （同 visit_time 有多条时只比 visit_time 会漏）。
  *

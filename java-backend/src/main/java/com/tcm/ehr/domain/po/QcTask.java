@@ -12,7 +12,7 @@ import lombok.EqualsAndHashCode;
  * 重启时把未完成任务标为 INTERRUPTED（不可续跑），与 nlp_task 同口径。
  * 公共字段见 {@link AbstractBatchTask}。
  *
- * ⚠️ {@link #role} 是<b>提交时的角色快照</b>，不是冗余：worker 跑在后台线程里，
+ * ⚠️ {@link #role} 是提交时的角色快照，不是冗余：worker 跑在后台线程里，
  * {@code RequestUtils.currentRole()} 读的是线程绑定的 RequestContextHolder，
  * 取到的是字符串 {@code "unknown"}（不是 null）。若拿它去 RecordFilter.build，
  * domainGrade 返回 null，数据域过滤会退化成「不过滤 = 全库」——

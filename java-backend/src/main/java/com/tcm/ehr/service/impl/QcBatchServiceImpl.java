@@ -52,26 +52,26 @@ import java.util.concurrent.TimeUnit;
 /**
  * 批量质控重算任务服务（§七 L5）。
  *
- * <b>为什么要异步</b>：原实现是同步的 —— 一个请求线程从头跑到尾，40000 条会把前端请求
+ * 为什么要异步：原实现是同步的 —— 一个请求线程从头跑到尾，40000 条会把前端请求
  * 挂到超时（前端超时 200s），还长时间占着一条 DB 连接。改成生产/消费后，提交即返回
  * taskId，页面轮询进度；单条处理逻辑复用 {@link QcServiceImpl#processOne}。
  *
- * <b>生产/消费</b>：{@link #queue} 存待跑任务 ID，固定 qc.batch.concurrency
+ * 生产/消费：{@link #queue} 存待跑任务 ID，固定 qc.batch.concurrency
  * （默认 1）个工作线程消费；任务与进度写 qc_task 表，故提交后可关页面、回来轮询。
  *
  * <ul>
- *   <li><b>角色快照（最关键）</b>：{@code RequestUtils.currentRole()} 读的是线程绑定的
+ *   <li>角色快照（最关键）：{@code RequestUtils.currentRole()} 读的是线程绑定的
  *   RequestContextHolder，worker 线程里取到的是字符串 {@code "unknown"}（不是 null）。
  *   若拿它去 RecordFilter.build，domainGrade 返回 null，数据域过滤会退化成
  *   「不过滤 = 全库」—— 表面跑通了，实际重算了用户看不见的病历。故提交线程把角色写进
  *   qc_task.role，worker 用捕获值重建过滤器。
  *   同理结尾的审计日志用 {@link OperationLogger#log(String, String, String, String, String)}
  *   显式回填操作人，否则会记成 {@code "unknown"}。</li>
- *   <li><b>防重不用 Redis 锁</b>：改为「表中是否已有 QUEUED/RUNNING」。原来的
+ *   <li>防重不用 Redis 锁：改为「表中是否已有 QUEUED/RUNNING」。原来的
  *   {@code tcm:task:batch} 是全局单键，任意管理员的提交会让其他人排队，TTL 900s 固定
  *   还会在长任务中途过期导致并发双跑；查表更准、也没有 TTL 问题。</li>
  *   <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 failure_truncated；</li>
- *   <li>取消：QUEUED 用<b>带 {@code status='QUEUED'} 条件</b>的更新落 CANCELLED，
+ *   <li>取消：QUEUED 用带 {@code status='QUEUED'} 条件的更新落 CANCELLED，
  *       RUNNING 置取消位、worker 在页边界退出；认领（{@link #runTask} 第 2 步）带同样的条件，
  *       因此取消不会被认领覆写、认领也不会把取消后的行重新拉起；</li>
  *   <li>重启：RUNNING/QUEUED 一律标 INTERRUPTED，可重跑。</li>
@@ -119,7 +119,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 已请求取消的任务 ID。
      *
-     * 存在内存里只为<b>当前进程内</b>判得快，但<b>不是权威</b>：多实例下另一个实例
+     * 存在内存里只为当前进程内判得快，但不是权威：多实例下另一个实例
      * 看不到它。权威是 qc_task.cancel_requested 列（批次 4 加的），
      * 见 {@link #isCancelRequested(String)}。
      */
@@ -226,7 +226,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 按筛选范围提交批量重算任务，异步入队后立即返回。
      *
-     * 筛选条件与<b>角色</b>都在提交线程冻结进 qc_task：worker 是后台线程，
+     * 筛选条件与角色都在提交线程冻结进 qc_task：worker 是后台线程，
      * 读不到 RequestContextHolder（见类注释「角色快照」）。
      *
      * @param dto 批量请求（filters），可为 null（表示不限）
@@ -366,7 +366,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
      * {@link RequestUtils#sameOrgScope}）：不含管理员特权，管理员也按组织过滤 ——
      * 批任务带失败明细（含 recordId），沿用「与病历访问同一口径」比另开一套规则更好维护。
      *
-     * 差别只在<b>空组织</b>：无组织用户的任务 {@code org_id=''}，
+     * 差别只在空组织：无组织用户的任务 {@code org_id=''}，
      * 与他的列表查询 {@code org_id=''} 对得上，因此判权放行；若这里判否，
      * 用户会在列表里看到任务、点进去却是「任务不存在」，取消也报「任务不存在」。
      * 真正的组织仍要求严格相等。
@@ -641,7 +641,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
      * 为什么必须查库：内存 cancelFlags 只有本进程可见，多实例下
      * 「A 实例点取消、B 实例在跑」会完全失效。
      *
-     * 查库失败按<b>未取消</b>处理：宁可多跑几条，也不要因为一次查询抖动就把长任务中断掉。
+     * 查库失败按未取消处理：宁可多跑几条，也不要因为一次查询抖动就把长任务中断掉。
      */
     private boolean isCancelRequested(String id) {
         try {
@@ -719,11 +719,11 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 任务收尾时的最终状态。
      *
-     * 停机（{@code running == false}）且<b>没跑完</b> → INTERRUPTED：不能声称「已完成」。
+     * 停机（{@code running == false}）且没跑完 → INTERRUPTED：不能声称「已完成」。
      * 这里必须自己判 running —— 执行循环只认 cancelFlags，不看 running，
      * 在途任务会在停机窗口里继续跑到取数循环自然结束。
      *
-     * 反过来也要留神：停机窗口里<b>恰好跑完</b>的（{@code done == total}）仍是
+     * 反过来也要留神：停机窗口里恰好跑完的（{@code done == total}）仍是
      * COMPLETED，别把真跑完的误标成中断。取消优先于中断。
      */
     static String endStatus(boolean running, boolean cancelled, Integer done, Integer total) {
@@ -767,7 +767,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
      * 任务就从「指定范围」静默退化成「全库扫描」—— 用户以为只跑了筛出来的几百条。
      *
      * 注意 {@code o == null} 不是失败：Jackson 把 null 序列化成字符 {@code "null"}，
-     * 读回时同样得到 {@code null}，语义是「不限范围」，这是<b>合法</b>路径
+     * 读回时同样得到 {@code null}，语义是「不限范围」，这是合法路径
      * （提交时不带 filters 就是全库），不要连它一起禁掉。
      */
     String writeJsonStrict(Object o) {
@@ -790,8 +790,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 还原任务落库时冻结的筛选条件。
      *
-     * ⚠️ <b>解析失败必须抛，不能退化成 null</b>：{@code null} 在下游表示「不限范围」，
-     * 解析失败若也返回 null，<b>指定范围的任务会静默变成全库重算</b>——
+     * ⚠️ 解析失败必须抛，不能退化成 null：{@code null} 在下游表示「不限范围」，
+     * 解析失败若也返回 null，指定范围的任务会静默变成全库重算——
      * 这是本组后果最重的一处（会改写全库评分）。提交侧已用 writeJsonStrict 保证写入合法，
      * 这里抛异常是「历史脏数据」的兜底：宁可任务失败可查，也不能默默扩大范围。
      *

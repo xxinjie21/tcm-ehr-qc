@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 /**
  * LLM 增强配置（前缀 llm）。
  *
- * 与 nlp.enabled 同一口径：<b>默认关闭</b>。关闭时
+ * 与 nlp.enabled 同一口径：默认关闭。关闭时
  * {@link com.tcm.ehr.common.utils.LlmClient} 不做任何模型装配，主流程全部走规则/模板兜底，
  * 并且不需要任何 api-key 即可正常启动。
  *
@@ -23,7 +23,7 @@ public class LlmProperties {
     /**
      * LLM 总开关。
      *
-     * 注意：这里只是<b>启动基线</b>，运行时会被 LlmConfigStore（页面上「导入 LLM」）覆盖。
+     * 注意：这里只是启动基线，运行时会被 LlmConfigStore（页面上「导入 LLM」）覆盖。
      */
     private boolean enabled = false;
 
@@ -46,7 +46,7 @@ public class LlmProperties {
     private int timeout = 60000;
 
     /**
-     * 分功能的局部开关：<b>启动基线默认全部开启</b>（只受总开关控制）。
+     * 分功能的局部开关：启动基线默认全部开启（只受总开关控制）。
      *
      * 关掉其中任意一项，该项 AI 能力回退规则/模板兜底，其余项不受影响 ——
      * 用户只想让解读走模型、而复核意见一律走规则时，不必把整个 LLM 关掉。

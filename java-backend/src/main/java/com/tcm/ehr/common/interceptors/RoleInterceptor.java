@@ -16,10 +16,10 @@ import java.util.stream.Collectors;
 
 /**
  * 角色校验：
- * 读取 JwtInterceptor 写入的 currentRole，与 {@link RequireRole} 声明的角色做<b>包含匹配</b>。
+ * 读取 JwtInterceptor 写入的 currentRole，与 {@link RequireRole} 声明的角色做包含匹配。
  *
  * <ul>
- *   <li>注册在 JwtInterceptor <b>之后</b>，进入本拦截器时 token 已校验通过、角色已就位；</li>
+ *   <li>注册在 JwtInterceptor 之后，进入本拦截器时 token 已校验通过、角色已就位；</li>
  *   <li>方法级注解优先，其次取类级注解（便于未来 qc/* 整类收紧）；</li>
  *   <li>未标注 {@code @RequireRole} 的接口一律放行（= 「登录即可」）；</li>
  *   <li>未命中 → HTTP 403 + {@code Result{code=403}}，不抛异常、不进业务层。</li>

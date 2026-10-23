@@ -24,15 +24,15 @@ import java.util.Map;
  * 服务未启动 / 调用异常 / {@code nlp.enabled=false} 时返回 {@code null}，
  * 由调用方降级为空 9 类（{@code modelAvailable=false}），不阻塞主流程。
  *
- * <b>HTTP 走 Spring {@link RestClient}</b>（《自研组件替换计划》#3）：原实现直接用
+ * HTTP 走 Spring {@link RestClient}（《自研组件替换计划》#3）：原实现直接用
  * java.net.http 手拼 HttpRequest/HttpResponse，属重复实现通用能力。
  * 传输层仍是 JDK 客户端（{@link JdkClientHttpRequestFactory}），这是 Spring Boot 在没有
  * httpclient5 时的默认选择，不是自研。
  *
- * <b>三条必须保留的行为</b>：① <b>HTTP/1.1</b> —— uvicorn 不认 h2c upgrade，
- * 用默认协议会先试 HTTP/2 再退回，白等一轮；② <b>两种超时</b> —— 抽取 30s、
+ * 三条必须保留的行为：① HTTP/1.1 —— uvicorn 不认 h2c upgrade，
+ * 用默认协议会先试 HTTP/2 再退回，白等一轮；② 两种超时 —— 抽取 30s、
  * 健康探测 2s，故建两个 RestClient（JDK 请求工厂的读超时是工厂级的，不能按请求改）；
- * ③ <b>绝不抛异常</b> —— 一律降级为 {@code null} / 探测失败，NLP 挂掉不能让主流程报错。
+ * ③ 绝不抛异常 —— 一律降级为 {@code null} / 探测失败，NLP 挂掉不能让主流程报错。
  *
  * 本机单实例即可：torch 推理是 CPU 密集型，同一台机器多起实例只是把同样的核拆着用、
  * 吞吐不增反而内存翻倍，也没有跨机故障转移可言。并发靠
