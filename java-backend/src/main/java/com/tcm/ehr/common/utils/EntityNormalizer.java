@@ -18,7 +18,7 @@ import java.util.function.Function;
  *
  * <p><b>与清洗链路的分工</b>：本类服务于<b>解析链路</b>（`POST /api/nlp/extract` 返回前即时归一），
  * 目的是让用户在解析页当场看到「原文 → 标准词」的对照，而不是等到清洗阶段才知道术语是否规范。
- * 清洗链路（{@code GovernanceServiceImpl.normalizeStructuredData}）仍保留<b>兜底补归一</b>——
+ * 清洗链路（GovernanceServiceImpl.normalizeStructuredData）仍保留<b>兜底补归一</b>——
  * 因为病历可能来自导入、手工新增等未经解析页的入口。</p>
  *
  * <p><b>为什么不会重复归一</b>：两处都只做「原文 → 标准词」的单向替换，标准词本身在词典中
@@ -43,17 +43,17 @@ public class EntityNormalizer {
     private final tools.jackson.databind.ObjectMapper objectMapper;
 
     /**
-     * 组织级「归一范围」来源（{@code normalization.elementTypes}）—— 哪些实体类型做词形归一。
+     * 组织级「归一范围」来源（normalization.elementTypes）—— 哪些实体类型做词形归一。
      *
      * <p><b>刻意用字段注入而非构造参数</b>：{@code @RequiredArgsConstructor} 会把新增的 final
-     * 字段加进构造签名，而 {@code EntityNormalizerMapTest} 等直接
+     * 字段加进构造签名，而 EntityNormalizerMapTest 等直接
      * {@code new EntityNormalizer(term, mapper)} 构造，加参数会破坏它们。
      * 标 {@code required=false}：单测无此 bean 时退回出厂默认范围（与旧行为一致）。</p>
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.tcm.ehr.common.config.QcRuleStore ruleStore;
 
-    /** 无 {@link #ruleStore}（单测直接 new）时的兜底归一范围，见 {@code QcRuleSet.DEFAULT_NORMALIZATION_TYPES} */
+    /** 无 {@link #ruleStore}（单测直接 new）时的兜底归一范围，见 QcRuleSet.DEFAULT_NORMALIZATION_TYPES */
     private static final java.util.Set<String> FALLBACK_NORM_SCOPE =
             java.util.Set.copyOf(com.tcm.ehr.common.config.QcRuleSet.DEFAULT_NORMALIZATION_TYPES);
 
@@ -96,7 +96,7 @@ public class EntityNormalizer {
      * 附录A 字段名 → 词典类型（唯一映射，解析链路与清洗链路共用，避免两处口径漂移）。
      *
      * <p>取自 {@link com.tcm.ehr.common.config.EntityTypes}：9 类实体现均有独立词典
-     * （病因自本批次起有 {@code causes.json}），故凡登记过的字段都返回其词典类型 key；
+     * （病因自本批次起有 causes.json），故凡登记过的字段都返回其词典类型 key；
      * 只有<b>未登记</b>的字段名返回 {@code null}。<b>是否真的归一</b>还取决于该类型是否在
      * 本组织「归一范围」内（见 {@link #normScope}），二者不是一回事。</p>
      *
@@ -114,9 +114,9 @@ public class EntityNormalizer {
      * 疾病与病因是两个不同的语义槽位，各自保留。</p>
      *
      * <p><b>保留哪一条</b>（依次比较，先满足者胜）：
-     * ① {@code sourceText} 更长优先——原文更完整（「嗳气频作」优于「嗳气」），
+     * ① sourceText 更长优先——原文更完整（「嗳气频作」优于「嗳气」），
      * 且「原文 → 标准词」的对照才看得见，否则归一结果看起来什么都没发生；
-     * ② 等长时 {@code normLevel} 更小优先（1 精确 &lt; 2 包含 &lt; 3 模糊 &lt; 未命中）；
+     * ② 等长时 normLevel 更小优先（1 精确 &lt; 2 包含 &lt; 3 模糊 &lt; 未命中）；
      * ③ 再相等时保留<b>先出现</b>的那条（{@link LinkedHashMap} 保序，重复键 put 不改位置）。</p>
      *
      * <p>代表条目<b>整条</b>保留自己的 confidence，不跨条取最大值——置信度描述的是它那条 span，
@@ -129,7 +129,7 @@ public class EntityNormalizer {
      * @param termOf 取「归一后标准词」；为空则该条不参与合并
      * @param sourceOf 取「归一前原文」，用于比较完整性
      * @param levelOf 取「命中层级」，可为 null（未命中）
-     * @return 去重后的新列表；{@code items} 为 null 或不足 2 条时原样返回
+     * @return 去重后的新列表；items 为 null 或不足 2 条时原样返回
      */
     public static <T> List<T> dedupByTerm(List<T> items,
                                           Function<T, String> termOf,
@@ -187,24 +187,24 @@ public class EntityNormalizer {
     }
 
     /**
-     * 组织级归一：按 {@code orgId} 限定的词典范围（基础层 + 该组织）召回。
+     * 组织级归一：按 orgId 限定的词典范围（基础层 + 该组织）召回。
      *
      * <p><b>批任务必须传任务行上的 orgId 快照</b>，不能走无参版：worker 线程没有
      * RequestContext，{@code currentOrgId()} 会拿到空串 → 静默只查基础层，
      * 组织自定义词条对批任务完全失效，而且不报错。</p>
      */
     /**
-     * 组织级归一（就地改 {@code structured_data} 的 Map 形态）。
+     * 组织级归一（就地改 structured_data 的 Map 形态）。
      *
      * <p><b>用途</b>：人工复核提交修正后写回前用。复核员<b>新输入</b>的词只带
-     * {@code content/name}，没有 {@code normLevel}；而 {@code QcScorer.countUnnormalized}
+     * {@code content/name}，没有 normLevel；而 QcScorer.countUnnormalized
      * 把「无 normLevel」算作未标准化 → <b>人工修正反而扣分</b>（weightEach=1、封顶 5）。
      * 这里在写回前跑一遍与模型抽取完全相同的归一，口径统一。</p>
      *
-     * <p><b>为什么不在 Map 与 VO 之间整体来回转换</b>：{@code NlpExtractVO} 里没有
-     * {@code _meta} / {@code modelAvailable} / {@code truncated}，整体转换会丢键，
+     * <p><b>为什么不在 Map 与 VO 之间整体来回转换</b>：NlpExtractVO 里没有
+     * _meta / modelAvailable / truncated，整体转换会丢键，
      * 也会给未赋值的属性写出 {@code null} 键（JSON 变胖）。所以这里只把 9 个实体列表
-     * 与 {@code herbs} 的归一结果<b>写回原 Map</b>，其余键原样保留。</p>
+     * 与 herbs 的归一结果<b>写回原 Map</b>，其余键原样保留。</p>
      *
      * @param data  structured_data 的 Map 形态（就地修改）
      * @param orgId 组织号
@@ -243,7 +243,7 @@ public class EntityNormalizer {
     }
 
     /**
-     * 把误放进 {@code symptoms} 的脉象/舌象实体挪到各自字段（<b>词典驱动，不看词形</b>）。
+     * 把误放进 symptoms 的脉象/舌象实体挪到各自字段（<b>词典驱动，不看词形</b>）。
 
     *
     * <p><b>归属约定（P2-11，2026-10-05）</b>：实体类型的<b>源头判定在抽取侧</b>（python-nlp 的抽取服务）；
@@ -258,7 +258,7 @@ public class EntityNormalizer {
      *
      * <p>顺序：先试脉象、未命中再试舌象（两次 ES 查询只在确有症状实体时才发生，
      * 且第二次靠短路避免无谓查询）。命中的实体带着原 content/sourceText 挪过去，
-     * 随后的 {@code normEntities} 会照常给它们打上 normLevel。</p>
+     * 随后的 normEntities 会照常给它们打上 normLevel。</p>
      */
     private void moveMisplacedPulseTongue(NlpExtractVO vo, String orgId) {
         if (vo == null || vo.getSymptoms() == null || vo.getSymptoms().isEmpty()) {
@@ -389,7 +389,7 @@ public class EntityNormalizer {
     }
 
     /**
-     * 把误放进 {@code diseases} 的其它类型实体路由到各自字段（词典驱动，2026-10-21）。
+     * 把误放进 diseases 的其它类型实体路由到各自字段（词典驱动，2026-10-21）。
      *
      * <p>实测依据（34154 份合格病历）：疾病字段 3864 条未归一里，<b>1567 条根本不是疾病名</b> ——
      * 937 条是六淫/病理因素（风湿 655 / 风寒 113 / 郁热 51 / 水饮 45 …），
@@ -506,7 +506,7 @@ public class EntityNormalizer {
     /**
      * 预取召回（批次12 · 12b）：在逐条归一**之前**，把本次要归一的术语按类型一次批量问 ES。
      *
-     * <p>不改判定、只预热：{@code EsTermNormalizer.prefetch} 走 {@code _msearch} 一次往返，
+     * <p>不改判定、只预热：EsTermNormalizer.prefetch 走 _msearch 一次往返，
      * 并把结果写进与单条 search 相同的缓存键，随后的逐条归一因此全部命中缓存。</p>
      *
      * <p>类型 key 由 structuredKey 反查 {@link com.tcm.ehr.common.config.EntityTypes} 得到 ——
@@ -684,8 +684,8 @@ public class EntityNormalizer {
      * （胆红 / 血清 / 潜血 / 转氨 …），但避开会误伤真药名的宽词根
      * （不用单独「胆」，否则「蛇胆陈皮」会被误杀；不用单独「桃」，否则「桃仁」遭殃）。</p>
      *
-     * <p><b>与 python 层的关系</b>：python 侧 {@code nlp_filters.py} 的
-     * {@code HERB_LAB_TERMS} / {@code HERB_ANATOMY} / {@code HERB_FOOD} 是同一批词。
+     * <p><b>与 python 层的关系</b>：python 侧 nlp_filters.py 的
+     * HERB_LAB_TERMS / HERB_ANATOMY / HERB_FOOD 是同一批词。
      * 这里重复一份是<b>刻意</b>的：python 侧要重抽才生效，而本层跑一次归一即可 ——
      * 两处判据等价、幂等（都只是删除同类噪声），重抽后双份生效也无害。</p>
      *
@@ -876,7 +876,7 @@ public class EntityNormalizer {
             if (TextUtil.isBlank(e.getSourceText())) {
                 e.setSourceText(raw);
             }
-            // 3.5 清掉上一轮归一写回的痕迹（2026-10-19）：{@code normLevel} 只可能由归一写入，
+            // 3.5 清掉上一轮归一写回的痕迹（2026-10-19）：normLevel 只可能由归一写入，
             //     content 与 sourceText 不一致时说明 content 就是上一轮写回的标准词（含拆解产物）。
             //     重跑必须**从原文重新判定** —— 否则旧映射原样保留，撤回一条误映射的规则改动
             //     在存量数据上永远看不见（实测：R8 撤回「质软→脉软」后计数一度零变化）。
@@ -966,15 +966,15 @@ public class EntityNormalizer {
      *
      * <p><b>处理顺序</b>：① 剔除截断项 → ② append 完整词 → ③ 再走一次
      * {@link #normalize}（由它统一填 level / source / code 并按标准词去重）。
-     * 刻意<b>不</b>在本方法里自己判命中层级：那是 {@code EsTermNormalizer.judge} 的职责，
+     * 刻意<b>不</b>在本方法里自己判命中层级：那是 EsTermNormalizer.judge 的职责，
      * 复制一份就会两处漂移。二次归一是幂等的（标准词本身是精确命中项）。</p>
      *
      * <p><b>截断项判据</b>：归一失败（无 normLevel）<b>且</b> content/name 是某个
-     * {@code scan} 命中词的<b>真子串</b>。刻意<b>不用</b>「长度为 1」这类启发式 ——
+     * scan 命中词的<b>真子串</b>。刻意<b>不用</b>「长度为 1」这类启发式 ——
      * 单字本身可能就是合法的标准词（如药名 "姜"），按长度砍会误删。</p>
      *
      * <p><b>异常触发</b>：只在该字段<b>确有未归一项</b>时才动手。全部已归一就完全不调
-     * {@code scan}，不给每次批量解析白加一次 ES 查询。</p>
+     * scan，不给每次批量解析白加一次 ES 查询。</p>
      *
      * @param vo           归一后的抽取结果，就地修改
      * @param prescription 原始处方列（可空）
@@ -1007,7 +1007,7 @@ public class EntityNormalizer {
         }
     }
 
-    /** 中药回补：目标字段是 {@code Herb.name}，原料是处方列 */
+    /** 中药回补：目标字段是 Herb.name，原料是处方列 */
     private boolean backfillHerbs(NlpExtractVO vo, String orgId, String prescription) {
         if (TextUtil.isBlank(prescription)) {
             return false;
@@ -1039,7 +1039,7 @@ public class EntityNormalizer {
         return true;
     }
 
-    /** 疾病回补：目标字段是 {@code Entity.content}，原料是中医诊断列 */
+    /** 疾病回补：目标字段是 Entity.content，原料是中医诊断列 */
     private boolean backfillDiseases(NlpExtractVO vo, String orgId, String tcmDiagnosis, String westernDiagnosis) {
         if (TextUtil.isBlank(tcmDiagnosis) && TextUtil.isBlank(westernDiagnosis)) {
             return false;
@@ -1080,13 +1080,13 @@ public class EntityNormalizer {
     }
 
     /**
-     * 证候回补：目标字段是 {@code Entity.content}，原料是辨证结论列（{@code pattern}）。
+     * 证候回补：目标字段是 Entity.content，原料是辨证结论列（pattern）。
      *
      * <p><b>为什么需要它</b>：证候只有模型一条来源（{@code python-nlp} 的规则兜底不含
      * patternList），实测 1000 条里 200 条模型漏抽 —— 而词典里那些词都在。
      * 中医诊断列有疾病回补、处方列有中药回补，辨证结论列同样该有。</p>
      *
-     * <p>用 {@code scan} 而不是按顿号裸切分：切分不查词典，会把「经络不通」这类
+     * <p>用 scan 而不是按顿号裸切分：切分不查词典，会把「经络不通」这类
      * 非标准词原样塞进 patternList，反而制造未归一项（统计模块曾有一份这样的局部兜底）。</p>
      */
     private boolean backfillPatterns(NlpExtractVO vo, String orgId, String pattern) {
@@ -1146,9 +1146,9 @@ public class EntityNormalizer {
 
     /** 归一目标值：优先 content，缺失时退回 sourceText（两者在模型侧同源） */
     /**
-     * 归一原文：优先 {@code sourceText}（抽取时的原文 span），无则退 {@code content}。
+     * 归一原文：优先 sourceText（抽取时的原文 span），无则退 content。
      *
-     * <p><b>为什么优先 sourceText</b>（2026-10-19）：{@code content} 可能是<b>上一轮归一写回的标准词</b>
+     * <p><b>为什么优先 sourceText</b>（2026-10-19）：content 可能是<b>上一轮归一写回的标准词</b>
      * ——「仅归一」就地重跑时，拿 content 再归一等于<b>自命中</b>：
      * 首轮的模糊命中（{@code 大便成形→便溏}）会在第二轮被固化成精确命中，原文里的组合短语
      * （{@code 右寸关缓滑}）也永远拆不出来（content 已成「右寸」）。以原文为准则两轮幂等，

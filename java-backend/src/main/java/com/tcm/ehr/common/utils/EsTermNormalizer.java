@@ -23,7 +23,7 @@ import java.util.Set;
  * 下推会改变既有阈值语义（如「咽喉痛」vs「咽痛」=0.8 命中、vs「腰部冷痛」=0.29 拒绝）。</p>
  *
  * <p><b>为什么没有内存兜底</b>（2026-09-23 用户决定）：原先 ES 未召回时会再对内存全量词典判一次
- * （{@code DictionaryStore}），本意是让「ES 漏召回」不至于漏判。但代价是<b>ES 的角色变得不可判定</b>：
+ * （DictionaryStore），本意是让「ES 漏召回」不至于漏判。但代价是<b>ES 的角色变得不可判定</b>：
  * 谁也不知道某次命中是 ES 给的还是兜底给的，ES 到底有没有在工作、需不需要维护，从外部看不出来；
  * 而 ES 挂掉时归一依然「有结果」，故障被静默掩盖。现在改成<b>ES 是唯一权威</b>：
  * 没召回就是未命中，ES 不可用则抛 {@link TermIndexUnavailableException} 让上层返回 503 ——
@@ -57,7 +57,7 @@ public class EsTermNormalizer {
     /**
      * level 是否落在「命中」区间（精确 ~ 模糊）。
      *
-     * <p>{@code EntityNormalizer} 有 3 处重复写 {@code level >= LEVEL_EXACT && level <= LEVEL_FUZZY}
+     * <p>EntityNormalizer 有 3 处重复写 {@code level >= LEVEL_EXACT && level <= LEVEL_FUZZY}
      * （其中 2 处取反判定「未命中」），收敛到此处一处，避免层级区间改动时漏改（审查报告 §2.11）。</p>
      */
     public static boolean isHit(int level) {
@@ -70,7 +70,7 @@ public class EsTermNormalizer {
      * 预热召回缓存（批次12 · 12b）：把一批术语一次问完 ES。
      *
      * <p>12b 的问题是「逐术语往返」：同一次解析里同一个术语会被反复归一，每次都发一次 ES 往返。
-     * 调用方在逐条归一**之前**调一次本方法，{@code searchBatch} 会用 {@code _msearch} 一次往返
+     * 调用方在逐条归一**之前**调一次本方法，searchBatch 会用 _msearch 一次往返
      * 查完这批术语，并**把结果写进与单条 search 完全相同的缓存键** ——
      * 于是随后的逐条归一全部命中缓存，不再逐个往返。</p>
      *
@@ -169,7 +169,7 @@ public class EsTermNormalizer {
     /**
      * 术语输入规整：trim → 合并重复标点 / 半角转全角 / 去标点两侧空白 → 去首尾标点。
      *
-     * <p>与 {@code GovernanceServiceImpl} 导出标准化共用 {@link TextUtil} 的同一套标点口径，
+     * <p>与 GovernanceServiceImpl 导出标准化共用 {@link TextUtil} 的同一套标点口径，
      * 保证「归一怎么对，导出的文本就怎么整」。纯标点（如「。。」）归一为空串，
      * 由调用方按未命中处理。</p>
      */
@@ -184,8 +184,8 @@ public class EsTermNormalizer {
      * ES 检索候选。**ES 不可用时直接抛出，不静默降级** —— 归一已改为以 ES 索引为唯一权威，
      * 静默返回空列表等于把「索引挂了」伪装成「词典没这个词」。
      *
-     * <p>这里 catch {@code Exception} 而<b>不是</b> {@code IOException}：ES 客户端连不上时
-     * 抛的是 {@code ElasticsearchException}（unchecked，内部包着 ExecutionException /
+     * <p>这里 catch Exception 而<b>不是</b> IOException：ES 客户端连不上时
+     * 抛的是 ElasticsearchException（unchecked，内部包着 ExecutionException /
      * ConnectException），按声明类型只抓 IOException 会漏掉它，异常就绕到这里冒到兜底处理器
      * 变成 500「系统异常」—— 实测踩过。索引查不动（无论什么原因）在语义上都等于索引不可用。</p>
      */
@@ -277,7 +277,7 @@ public class EsTermNormalizer {
      * 它们的组合都可枚举（脉位+脉质 / 舌质+苔质 / 症状并列 / 证候相兼），
      * 而「只有整串被完整覆盖才拆」这条闸门保证了不会滑向旧版「宽松子串」。</p>
      *
-     * @param type  实体类型 key（{@code pulse} / {@code tongue} / {@code symptom} / {@code pattern}）
+     * @param type  实体类型 key（pulse / tongue / symptom / pattern）
      * @param orgId 组织号；空串 = 只查基础层
      * @param term  未命中的原文
      * @return 拆出的标准词（按原文顺序、已去重）；不可拆时为空列表
@@ -376,7 +376,7 @@ public class EsTermNormalizer {
         return out;
     }
 
-    /** {@code std} 是否为本组织该类型的标准词：先看整串召回结果，再定点查一次（结果本地缓存）。 */
+    /** std 是否为本组织该类型的标准词：先看整串召回结果，再定点查一次（结果本地缓存）。 */
     private boolean isKnown(String type, String orgId, String std, Set<String> known,
                             java.util.Map<String, Boolean> cache) {
         Boolean c = cache.get(std);
@@ -557,7 +557,7 @@ public class EsTermNormalizer {
      * 把整串里每个 ≤{@link #PROBE_MAX_LEN} 字的子串定点查一次词典，命中即补进 surface。
      *
      * <p>整串召回走 IK 分词（{@code 阳明少阳风湿郁热} 未必召回「阳明」），而拆解要求每个部件都在
-     * surface 里。这里按位置逐段定点查（结果走 {@code RECALL_CACHE}），只在整串召回失败后发生。</p>
+     * surface 里。这里按位置逐段定点查（结果走 RECALL_CACHE），只在整串召回失败后发生。</p>
      */
     private java.util.Map<String, String> expandByProbe(String type, String orgId, String input,
                                                        java.util.Map<String, String> surface) {
@@ -673,7 +673,7 @@ public class EsTermNormalizer {
     /**
      * 扫描一段文本里命中的<b>全部</b>标准词（§九 9.2 第 ③ 步）。
      *
-     * <p>与 {@link #normalize} 的区别只在<b>二级·包含</b>这一层：{@code normalize} 多命中时
+     * <p>与 {@link #normalize} 的区别只在<b>二级·包含</b>这一层：normalize 多命中时
      * <b>取最短</b>（"胃痛" 优先于 "胃脘痛"），那是给「单个术语找标准词」用的；
      * 本方法要的是「这段文本里有哪几个已收录的标准词」，取最短会把
      * {@code "天麻10g，菊花10g"} 压成一条。故这里把二级判定换成 contains 谓词、
@@ -946,7 +946,7 @@ public class EsTermNormalizer {
     }
 
     /**
-     * 预置输入的 Dice：{@code inputDistinct} 已是去重后的输入字符集，其长度即 |A|。
+     * 预置输入的 Dice：inputDistinct 已是去重后的输入字符集，其长度即 |A|。
      *
      * <p>拆出来是为了让「一次归一里对全部候选复用同一份输入字符集」成为可能 ——
      * {@link #judge} 每轮只算一次，而不是每个候选重算一遍。口径与 {@link #dice} 完全相同。</p>
