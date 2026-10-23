@@ -1,5 +1,6 @@
 package com.tcm.ehr.common.cache;
 
+import com.tcm.ehr.common.utils.QcScorer;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RecordUtil;
 import com.tcm.ehr.common.utils.RedisKeys;
@@ -99,7 +100,14 @@ public class StatsCache {
     /** 白名单：日期必须是 yyyy-MM-dd；自由文本限字符集与长度；分级限枚举 */
     private static final Pattern DATE_RE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern TEXT_RE = Pattern.compile("[\\u4e00-\\u9fa5A-Za-z0-9_\\-（）()]{1,40}");
-    private static final Set<String> GRADES = Set.of("合格", "待复核", "无效");
+    /**
+     * 分级白名单（2026-10-23）：改为引用 {@link QcScorer} 的常量，不再自维护一份。
+     *
+     * <p>原先这里独立写死三个中文字面量，与 QcScorer 是两份「事实」—— 若分级取值调整，
+     * 缓存白名单会把新值判为非法而直接绕过缓存（静默降低命中率），且不会有人察觉。</p>
+     */
+    private static final Set<String> GRADES = Set.of(
+            QcScorer.GRADE_QUALIFIED, QcScorer.GRADE_PENDING, QcScorer.GRADE_INVALID);
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;

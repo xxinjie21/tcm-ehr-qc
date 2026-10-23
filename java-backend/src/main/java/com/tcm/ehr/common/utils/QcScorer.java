@@ -16,6 +16,19 @@ import java.util.Map;
  */
 public final class QcScorer {
 
+    /**
+     * 质控分级的三个取值（2026-10-23 收敛为单一事实源）。
+     *
+     * <p><b>为什么必须集中定义</b>：这三个字面量此前散落在 12 处 —— 本类赋值 4 处、
+     * {@code GovernanceServiceImpl} 5 处、{@code QcServiceImpl} 5 处、{@code ReviewServiceImpl} 2 处，
+     * 且 {@code StatsCache} 还自维护一份 {@code GRADES} 白名单。改一处漏十一处时
+     * <b>编译器完全不会报错</b>：{@code switch} 落到 default、导出条件一条都匹配不上、
+     * 待办列表变空 —— 属于静默数据错乱。故收敛到此，下游一律引用常量。</p>
+     */
+    public static final String GRADE_QUALIFIED = "合格";
+    public static final String GRADE_PENDING = "待复核";
+    public static final String GRADE_INVALID = "无效";
+
     private QcScorer() {
     }
 
@@ -128,13 +141,13 @@ public final class QcScorer {
         com.tcm.ehr.common.config.QcRuleSet.Thresholds th = rs.getThresholds();
         String grade;
         if (score < th.getInvalid()) {
-            grade = "无效";
+            grade = GRADE_INVALID;
         } else if (!conflicts.isEmpty()) {
-            grade = "待复核";
+            grade = GRADE_PENDING;
         } else if (score >= th.getReviewUpper()) {
-            grade = "合格";
+            grade = GRADE_QUALIFIED;
         } else {
-            grade = "待复核";
+            grade = GRADE_PENDING;
         }
 
         vo.setScore(score);
