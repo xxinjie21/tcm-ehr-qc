@@ -95,6 +95,15 @@ public class OrgController {
         return Result.ok("已创建，你是该组织所有者", orgService.createOrg(body, RequestUtils.currentUserId()));
     }
 
+    /**
+     * 修改组织基本信息（名称/用途等）。
+     *
+     * 【权限：仅管理员】只改展示信息，不影响成员与所有权。
+     *
+     * @param id   组织 ID
+     * @param body 待更新的字段
+     * @return 固定成功
+     */
     @RequireRole(roles = {"管理员"})
     @PutMapping({"/api/orgs/{id}", "/api/groups/{id}"})
     public Result<Void> updateOrg(@PathVariable String id, @Valid @RequestBody OrgDTOs.UpdateGroupRequest body) {
@@ -102,7 +111,11 @@ public class OrgController {
         return Result.ok("已更新", null);
     }
 
-    /** 归档（仅管理员，前提成员数为 0） */
+    /**
+     * 归档组织。
+     *
+     * 【权限：仅管理员】前提是成员数为 0；归档不是删除，历史数据保留。
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/orgs/{id}/archive")
     public Result<Void> archive(@PathVariable String id, @Valid @RequestBody OrgDTOs.ArchiveOrgRequest body) {
@@ -113,7 +126,7 @@ public class OrgController {
     /**
      * 改派所有者（仅管理员）：owner 账号丢失时的兜底。
      *
-     * <p>没有它，唯一能让组织脱离「无人可管」的方式是等原 owner 回来。</p>
+     * <p>【权限：仅管理员】没有它，唯一能让组织脱离「无人可管」的方式是等原 owner 回来。</p>
      */
     @RequireRole(roles = {"管理员"})
     @PostMapping("/api/orgs/{id}/reassign-owner")
@@ -133,6 +146,14 @@ public class OrgController {
         return Result.ok(orgService.searchUsers(keyword));
     }
 
+    /**
+     * 停用组织。
+     *
+     * 【权限：仅管理员】停用后成员登录会被拒绝，但数据保留、可再启用。
+     *
+     * @param id 组织 ID
+     * @return 固定成功
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping({"/api/orgs/{id}/stop", "/api/groups/{id}/stop"})
     public Result<Void> stop(@PathVariable String id) {
@@ -140,6 +161,14 @@ public class OrgController {
         return Result.ok("已停用", null);
     }
 
+    /**
+     * 恢复已停用的组织。
+     *
+     * 【权限：仅管理员】与 stop 互逆；对未停用的组织调用无副作用。
+     *
+     * @param id 组织 ID
+     * @return 固定成功
+     */
     @RequireRole(roles = {"管理员"})
     @PostMapping({"/api/orgs/{id}/activate", "/api/groups/{id}/activate"})
     public Result<Void> activate(@PathVariable String id) {
