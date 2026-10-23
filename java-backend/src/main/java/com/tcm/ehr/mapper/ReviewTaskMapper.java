@@ -6,6 +6,15 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
+/**
+ * 复核任务的数据访问。
+ *
+ * 幂等 upsert 依赖 review_tasks 的唯一键 uk_record_active（建在生成列 active_key 上），
+ * 由数据库唯一索引直接仲裁并发写入，替代先查后写的 check-then-act 模式。
+ *
+ * ⚠️ 修改该唯一键或 active_key 的生成表达式会让 upsert 语义失效，
+ * 并发下会重现「同一病历多条活跃任务」的重复问题。
+ */
 @Mapper
 public interface ReviewTaskMapper extends BaseMapper<ReviewTask> {
 

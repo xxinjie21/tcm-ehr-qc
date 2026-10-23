@@ -4,6 +4,15 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * 数据清洗请求参数。
+ *
+ * 支持两种圈定方式：recordIds 精确指定，或 filters 按范围筛选；前者优先。
+ * 把三种入参收在一个对象里，避免 Controller 摊开成多个参数。
+ *
+ * ⚠️ 清洗只作用于质控合格病历，filters 里的 grade 会被服务端强制收窄为「合格」，
+ * 传其他分级不会生效。
+ */
 @Data
 public class CleanDTO {
 

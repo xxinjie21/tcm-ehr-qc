@@ -2,6 +2,14 @@ package com.tcm.ehr.domain.vo;
 
 import lombok.Data;
 
+/**
+ * 看板总览指标。
+ *
+ * 五个数字同源同口径（同一批病历、同一时刻计算），供首页卡片直接渲染。
+ *
+ * ⚠️ sourceVersion 标识这批数字出自哪一版词典。换词表后数字会变，
+ * 跨版本的两组数字不可直接比较，需先对齐 sourceVersion。
+ */
 @Data
 public class OverviewVO {
 

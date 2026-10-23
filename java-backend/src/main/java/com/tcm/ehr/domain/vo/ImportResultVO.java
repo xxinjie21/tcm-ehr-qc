@@ -6,6 +6,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 词典导入的执行结果。
+ *
+ * 导入与归档是两个先后步骤：词条进库、索引重建属于导入，写归档版本属于随后的记账动作。
+ *
+ * ⚠️ archiveWarning 非空表示导入已生效、仅归档失败。此时不可让调用方重试导入，
+ * 否则会重复写入词条；正确处置是按告警提示补归档。
+ */
 @Data
 public class ImportResultVO {
 

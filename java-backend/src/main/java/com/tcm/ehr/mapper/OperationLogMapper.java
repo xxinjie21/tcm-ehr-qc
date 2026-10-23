@@ -8,6 +8,15 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
+/**
+ * 操作日志的数据访问。
+ *
+ * 除 BaseMapper 的通用 CRUD 外，额外提供按可见性三档过滤的列表查询：
+ * 管理员全部、组长本组、组员与无组仅自己。
+ *
+ * ⚠️ 可见性过滤写在手写 SQL 里，改操作日志表结构或字段名时必须同步此处，
+ * 否则过滤会静默失效并造成越权读取。
+ */
 @Mapper
 public interface OperationLogMapper extends BaseMapper<OperationLog> {
 
