@@ -108,12 +108,12 @@ public final class QcScorer {
             }
             if (miss > 0) {
                 // 分段扣分（2026-10-05 修）：原先 `Math.min(cap, miss * weightEach)` 在未归一数 ≥ cap 后
-        // 恒定扣 cap 分 —— 实测 51.6% 的病历都停在这一档，再糟也不多扣，「未归一」这一项
-        // 因此失去区分度（好病历与差病历同分）。改成：
-        //   前 cap 条：每条 weightEach 分（与原来一致，保护轻微未归一）
-        //   之后：每再满 cap 条，追加 weightEach × cap 分（即每满一档多扣一档）
-        // 口径写成注释里的公式，避免「看起来还在封顶」的误解；档位由既有 weightEach/cap 推导，
-        // 不新增配置项（前端规则表单与 openapi 无需改动）。
+                // 恒定扣 cap 分 —— 实测 51.6% 的病历都停在这一档，再糟也不多扣，「未归一」这一项
+                // 因此失去区分度（好病历与差病历同分）。改成：
+                //   前 cap 条：每条 weightEach 分（与原来一致，保护轻微未归一）
+                //   之后：每再满 cap 条，追加 weightEach × cap 分（即每满一档多扣一档）
+                // 口径写成注释里的公式，避免「看起来还在封顶」的误解；档位由既有 weightEach/cap 推导，
+                // 不新增配置项（前端规则表单与 openapi 无需改动）。
         int points = miss <= st.getCap()
                 ? miss * st.getWeightEach()
                 : st.getWeightEach() * (st.getCap() + (miss - st.getCap()) / st.getCap());

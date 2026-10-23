@@ -800,6 +800,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 continue;
             }
             c.setTotal(c.getTotal() + 1);
+            // 判据必须与 QcScorer.countUnnormalized 保持一致（当前都是「normLevel != null 即已归一」）。
+            // 质控扣分与报告展示是两套实现，若一方改动判空口径（如排除 LEVEL_FUZZY、把 0 当未命中），
+            // 用户就会看到「报告说未归一 N 条，扣分却按 M 条算」的矛盾。改动此处务必同步另一边。
             if (m.get("normLevel") != null) {
                 c.setNormalized(c.getNormalized() + 1);
             }
