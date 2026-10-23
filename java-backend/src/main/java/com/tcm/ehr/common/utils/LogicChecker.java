@@ -31,7 +31,7 @@ public final class LogicChecker {
         }
         // 2. 逐条规则独立判定，一条冲突记一项（便于前端逐条显示与扣分）
         for (QcRuleSet.ConsistencyRule rule : rules) {
-            // 规则自身配置不全（缺类型或缺值）→ 跳过，不能拿半条规则去判病历
+            // 3. 规则自身配置不全（缺类型或缺值）→ 跳过，不能拿半条规则去判病历
             if (rule.getTriggerType() == null || rule.getExpectType() == null
                     || rule.getTriggerValues() == null || rule.getTriggerValues().isEmpty()
                     || rule.getExpectValues() == null || rule.getExpectValues().isEmpty()) {
@@ -48,7 +48,7 @@ public final class LogicChecker {
             if (!hit) {
                 continue;
             }
-            // 期望类型没有记录 → 不适用（不误判）
+            // 5. 期望类型没有记录 → 不适用（不误判）
             if (expects.isEmpty()) {
                 continue;
             }
@@ -73,7 +73,7 @@ public final class LogicChecker {
         // 2. 逐项取文本：Map 取 content（缺则 name），非 Map 直接转字符串
         for (Object item : list) {
             if (item instanceof Map<?, ?> entity) {
-                // 实体文本取 content，抽取器对中药用 name，两个都兜一下
+                // 3. 实体文本取 content，抽取器对中药用 name，两个都兜一下
                 Object text = entity.get("content") != null ? entity.get("content") : entity.get("name");
                 if (text != null && !String.valueOf(text).isBlank()) {
                     out.add(String.valueOf(text).trim());

@@ -91,7 +91,7 @@ public final class QcScorer {
         // 4. 术语标准化
         com.tcm.ehr.common.config.QcRuleSet.Standardization st = rs.getStandardization();
         if (st.isEnabled() && data != null && !st.getElementTypes().isEmpty()) {
-            // 计分范围 = 质控勾选 ∩ 归一勾选：未纳入归一范围的类型，其实体本就不写 normLevel，
+            // 5. 计分范围 = 质控勾选 ∩ 归一勾选：未纳入归一范围的类型，其实体本就不写 normLevel，
             // 若仍计入扣分会恒判「未归一」而扣满（丢区分度的假信号）。见 QcRuleSet.Normalization。
             java.util.Set<String> normalized = normalizedTypesOf(rs);
             int miss = 0;
@@ -107,7 +107,7 @@ public final class QcScorer {
                 }
             }
             if (miss > 0) {
-                // 分段扣分（2026-10-05 修）：原先 `Math.min(cap, miss * weightEach)` 在未归一数 ≥ cap 后
+                // 6. 分段扣分（2026-10-05 修）：原先 `Math.min(cap, miss * weightEach)` 在未归一数 ≥ cap 后
                 // 恒定扣 cap 分 —— 实测 51.6% 的病历都停在这一档，再糟也不多扣，「未归一」这一项
                 // 因此失去区分度（好病历与差病历同分）。改成：
                 //   前 cap 条：每条 weightEach 分（与原来一致，保护轻微未归一）
@@ -117,7 +117,7 @@ public final class QcScorer {
         int points = miss <= st.getCap()
                 ? miss * st.getWeightEach()
                 : st.getWeightEach() * (st.getCap() + (miss - st.getCap()) / st.getCap());
-                // F2：把「miss 的构成」写进 reason（按类型明细），便于对账
+                // 7. F2：把「miss 的构成」写进 reason（按类型明细），便于对账
                 StringBuilder detail = new StringBuilder();
                 for (Map.Entry<String, Integer> e : byType.entrySet()) {
                     if (detail.length() > 0) {
@@ -214,7 +214,7 @@ public final class QcScorer {
             return true;
         }
         try {
-            // P2-1：走 RegexCache —— 表达式是配置常量，原先每条病历每条规则都现编译一次
+            // 3. P2-1：走 RegexCache —— 表达式是配置常量，原先每条病历每条规则都现编译一次
             return RegexCache.of(fr.getExpr()).matcher(v).matches();
         } catch (Exception e) {
             return true; // 表达式非法则该项不判，避免误伤
@@ -247,7 +247,7 @@ public final class QcScorer {
 
     /** 原始列取值（按 Record 属性名） */
     private static String rawValue(Record r, String field) {
-        // 取值与空白口径都在 RecordUtil.column 一处（批次14 收敛）：原先本类与
+        // 1. 取值与空白口径都在 RecordUtil.column 一处（批次14 收敛）：原先本类与
         // QcServiceImpl 各写一份 19 / 17 个 case 的 switch，而两边的取值与 trim
         // 逐字相同，差别只在明细那份少了 department、doctorId 两个 case。
         return RecordUtil.column(r, field);
@@ -255,7 +255,7 @@ public final class QcScorer {
 
     /** 术语类型 → 结构化 structuredKey；未登记的类型返回 null（不计未命中） */
     private static String keyOf(String type) {
-        // 计分范围完全由规则集的 standardization.elementTypes 决定（调用方已按它筛选）：
+        // 1. 计分范围完全由规则集的 standardization.elementTypes 决定（调用方已按它筛选）：
         // 这里只做「类型 → structuredKey」的映射，未登记类型返回 null。
         // 原实现另叠一道 EntityTypes.countsUnnormalized 过滤 —— 结果是前端即便勾上
         // 舌象/脉象/治法也照样不计分（双开关、勾了不生效）。已按「以规则配置为准」移除。
@@ -294,7 +294,7 @@ public final class QcScorer {
     }
 
     private static String reasonFor(com.tcm.ehr.common.config.QcRuleSet.Element el, boolean rawHas) {
-        // 两档给不同说法：用户要能分清「该写没写」和「写了没抽出来」
+        // 1. 两档给不同说法：用户要能分清「该写没写」和「写了没抽出来」
         if (rawHas) {
             return "结构化结果中无" + el.getName() + "（原始病历有记录，可能未被抽取）";
         }

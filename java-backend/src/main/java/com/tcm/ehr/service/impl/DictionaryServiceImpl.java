@@ -318,8 +318,8 @@ public class DictionaryServiceImpl implements IDictionaryService {
         //    原先此处先写一份 dictionary_backups 全量备份；该表已随批次 17 废弃
         //    （归档版本是「合并后」的快照而非「写前」备份），ES 重建失败的补偿
         //    直接用内存里的 previous 回退。
-        // 3. 落库（同一事务里更新内容版本，避免「词条换了、版本没换」而跳过重建）
-        // P1-9：行数上限 —— 在**落库前**兜住，并把「拆开导入」的下一步直接写给用户
+        // 落库（同一事务里更新内容版本，避免「词条换了、版本没换」而跳过重建）
+        // 5. P1-9：行数上限 —— 在**落库前**兜住，并把「拆开导入」的下一步直接写给用户
         if (entries.size() > MAX_ROWS) {
             throw new IllegalArgumentException(
                     "词条数 " + entries.size() + " 超过单次上限 " + MAX_ROWS + " 条，请拆分后分批导入");
@@ -327,7 +327,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         String contentVersion = termStore.replace(orgId, type, entries);
         // 5. 只重建「本组织」在 ES 里的文档；失败则退回库内容，绝不谎报已同步
         try {
-            // 跨实例互斥（批次16）：rebuild 是「删该组织文档 + bulk 灌入」两步，
+            // 6. 跨实例互斥（批次16）：rebuild 是「删该组织文档 + bulk 灌入」两步，
             // 两个实例同时做会交错成混合状态（一个删掉另一个刚灌的）。
             // 锁按「类型+组织」划分，不做全局单键；拿不到锁直接拒绝，不放行。
             // 等待 0 秒（P2-22）：导入是在线写路径，冲突时立刻回 409，
@@ -344,7 +344,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
                     });
             termStore.markIndexed(orgId, type, contentVersion);
         } catch (ConcurrentOperationException lockConflict) {
-            // 拿不到跨实例锁：ES 从未被本请求碰过，只需把库内容退回导入前。
+            // 7. 拿不到跨实例锁：ES 从未被本请求碰过，只需把库内容退回导入前。
             // 不得走 compensateFailedRebuild —— 那里不带锁就重建索引，会和持锁实例交错，
             // 正是这把锁要防的场景。原样抛出，由全局出口映射为 409 与可操作文案。
             log.warn("[词典] {} (org={}) 有并发重建正在进行，已退回库内容: {}",
@@ -357,7 +357,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
             }
             throw lockConflict;
         } catch (Exception e) {
-            // DB 已改而 ES 没跟上 → 归一结果与词典页会长期不一致。退回库内容并尽力恢复索引。
+            // 8. DB 已改而 ES 没跟上 → 归一结果与词典页会长期不一致。退回库内容并尽力恢复索引。
             log.error("[词典] {} (org={}) ES 重建失败，回退库内容并尝试恢复索引: {}",
                     type, orgId, e.getMessage());
             compensateFailedRebuild(type, orgId, previous, contentVersion);
@@ -398,7 +398,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         try {
             termStore.replace(orgId, type, previous);
         } catch (Exception e) {
-            // 库都退不回去就没必要再试索引，记日志交人工重新导入
+            // 2. 库都退不回去就没必要再试索引，记日志交人工重新导入
             log.error("[词典] {} (org={}) 回退失败，库与索引可能不一致，需重新导入修复: {}",
                     type, orgId, e.getMessage());
             return;
@@ -522,7 +522,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         // 1. 按行切分，空行与以「标准术语」开头的表头行都跳过
         for (String line : readTextAutoCharset(file).split("\r?\n")) {
             if (line.isBlank() || line.startsWith("标准术语")) continue;
-            // 最多切 2 段（标准术语 / 别名）；别名列内部请用、 或 ; 分隔，
+            // 2. 最多切 2 段（标准术语 / 别名）；别名列内部请用、 或 ; 分隔，
             // 用半角逗号会与列分隔符冲突
             String[] parts = line.split("[,\t]", 2);
             String[] arr = new String[2];
@@ -618,7 +618,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
     private Map<String, Object> reindexOne(String type, String orgId) throws IOException {
         List<TermEntry> entries = termStore.read(orgId, type);
         String version = termStore.contentVersion(entries);
-        // 走跨实例互斥：与其它实例的导入 / 启动对账互斥。
+        // 1. 走跨实例互斥：与其它实例的导入 / 启动对账互斥。
         // 等待 0 秒（P2-22）：这是 POST /api/dictionary/reindex 的在线路径，
         // 且外层会对多个 (type, org) 逐个重建 —— 每个都等 3 秒会成倍放大响应时间；
         // 拿不到锁的 (type, org) 由外层记进 failures，立即返回、可重试。
@@ -632,7 +632,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
                     }
                     return null;
                 });
-        // 灌成功才记已同步：失败就让它保持落后，下次启动对账还会再试
+        // 2. 灌成功才记已同步：失败就让它保持落后，下次启动对账还会再试
         termStore.markIndexed(orgId, type, version);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("type", type);
@@ -647,7 +647,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
         // 1. 别名取并集（LinkedHashSet 保序去重）
         Set<String> aliases = new LinkedHashSet<>(oldE.getAliases() == null ? List.of() : oldE.getAliases());
         if (newE.getAliases() != null) aliases.addAll(newE.getAliases());
-        // #5（2026-10-05）：合并也要剔除「标准词本身」—— 否则历史脏数据（或经合并不经过
+        // 2. #5（2026-10-05）：合并也要剔除「标准词本身」—— 否则历史脏数据（或经合并不经过
         // normalize 的路径）会一直留在库里，归一时自己命中自己；合并是每次导入都会走的地方，
         // 在这里清等于「下次导入该词条时自动修复」。
         String std = oldE.getStandardTerm();

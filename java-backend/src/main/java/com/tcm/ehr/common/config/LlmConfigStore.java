@@ -129,7 +129,7 @@ public class LlmConfigStore {
             try {
                 userMapper.insert(row);
             } catch (org.springframework.dao.DuplicateKeyException e) {
-                // B6：check-then-act 的窗口 —— 并发下两个请求都判定「没有行」并同时 insert，
+                // 1. B6：check-then-act 的窗口 —— 并发下两个请求都判定「没有行」并同时 insert，
                 // 一个撞主键。撞键说明行已被另一个请求建好，退化为更新，而不是给用户一个 500。
                 log.warn("[LLM] 用户 {} 的配置行并发创建撞主键，改为更新", userId);
                 UserLlmConfig fresh = userMapper.selectById(userId);
@@ -140,7 +140,7 @@ public class LlmConfigStore {
             }
         } else {
             if (!newKey && existing.getApiKey() != null) {
-                // 显式回填原密文：apiKey 传空 = 「不修改」。
+                // 2. 显式回填原密文：apiKey 传空 = 「不修改」。
                 // 刻意不依赖 MyBatis-Plus 对 null 字段「跳过」的默认策略 —— 那是隐式契约，
                 // 一旦字段策略调整或换成别的写法，用户的密钥就会被静默清空。
                 row.setApiKey(existing.getApiKey());
@@ -148,7 +148,7 @@ public class LlmConfigStore {
             userMapper.updateById(row);
         }
         perUser.invalidate(userId);
-        // 用户行变了，基线版本也要推进：versionFor 把两者拼在一起，不推进的话
+        // 3. 用户行变了，基线版本也要推进：versionFor 把两者拼在一起，不推进的话
         // 同秒内的两次保存会得到同一个版本串，缓存与 LlmClient 都不会重建
         Snapshot prev = snapshot;
         snapshot = new Snapshot(prev.config(), prev.version() + 1);
@@ -242,7 +242,7 @@ public class LlmConfigStore {
             return base;
         }
         // 2. 逐字段覆盖；类型不符或缺失时回落到基线值
-        // 3. apiKey 恒取基线（yml）——落盘文件里没有密钥，也不该有
+        // apiKey 恒取基线（yml）——落盘文件里没有密钥，也不该有
         return new LlmConfig(
                 m.get("enabled") instanceof Boolean b ? b : base.enabled(),
                 m.get("provider") != null ? String.valueOf(m.get("provider")) : base.provider(),
@@ -261,7 +261,7 @@ public class LlmConfigStore {
             if (path == null || path.isBlank()) {
                 return null;
             }
-            // 支持 classpath:（默认，随 jar 发布）与文件系统路径
+            // 1. 支持 classpath:（默认，随 jar 发布）与文件系统路径
             org.springframework.core.io.Resource res = path.startsWith("classpath:")
                     ? new org.springframework.core.io.ClassPathResource(path.substring("classpath:".length()))
                     : new org.springframework.core.io.FileSystemResource(Paths.get(path));

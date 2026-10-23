@@ -67,13 +67,13 @@ public class RateLimiter {
         String key = RedisKeys.PREFIX + "rl:" + scope + ":" + identity;
         try {
             RRateLimiter limiter = redisson.getRateLimiter(key);
-            // 顺序有意：先写配置（缺失才写，不重置额度），再补 TTL，最后取许可。
+            // 1. 顺序有意：先写配置（缺失才写，不重置额度），再补 TTL，最后取许可。
             // TTL 放在 acquire 之前，acquire 脚本才能读到正的 pttl 并把 TTL 传播给内部子 key。
             limiter.trySetRate(RateType.OVERALL, limit, window);
             limiter.expire(window);
             return limiter.tryAcquire();
         } catch (Exception e) {
-            // 见类注释：fail-open。限流不能成为「Redis 一抖全站 429」的原因。
+            // 2. 见类注释：fail-open。限流不能成为「Redis 一抖全站 429」的原因。
             log.warn("[限流] Redis 不可用，放行 scope={} id={}: {}", scope, identity, e.getMessage());
             return true;
         }

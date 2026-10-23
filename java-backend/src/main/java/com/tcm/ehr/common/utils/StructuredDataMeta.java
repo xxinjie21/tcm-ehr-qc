@@ -117,7 +117,7 @@ public final class StructuredDataMeta {
             data.put(META_KEY, metaOfManual(editedBy));
             return mapper.writeValueAsString(data);
         } catch (Exception e) {
-            // 打点失败不能丢数据：宁可没有人工修改标记
+            // 1. 打点失败不能丢数据：宁可没有人工修改标记
             return json;
         }
     }

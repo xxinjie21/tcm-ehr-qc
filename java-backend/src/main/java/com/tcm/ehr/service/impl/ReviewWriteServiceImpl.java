@@ -68,11 +68,11 @@ public class ReviewWriteServiceImpl implements IReviewWriteService {
         if (r == null) {
             throw new ResourceNotFoundException(1006, "病历不存在");
         }
-        // § 6.3 缺点 8：不能复核别组病历。写操作用 ForbiddenException
+        // 1. § 6.3 缺点 8：不能复核别组病历。写操作用 ForbiddenException
         if (!RecordFilter.canAccess(r)) {
             throw new ForbiddenException("无权复核该病历");
         }
-        // 已隔离（无效）的病历不许复核：复核会用当前数据重算，把「无效」翻回「合格」，
+        // 2. 已隔离（无效）的病历不许复核：复核会用当前数据重算，把「无效」翻回「合格」，
         // 等于一道越权之外的旁路把隔离结论撤销掉。隔离是终态，要改只能重新导入 / 清洗
         if ("无效".equals(r.getGrade())) {
             throw new ForbiddenException("该病历已被隔离（无效），不能复核");
@@ -81,7 +81,7 @@ public class ReviewWriteServiceImpl implements IReviewWriteService {
         List<ReviewTask> tasks = reviewTaskMapper.selectList(new QueryWrapper<ReviewTask>()
                 .eq("record_id", recordId).eq("is_obsolete", 0).eq("status", "pending"));
         if (tasks.isEmpty()) {
-            // 统一抛 ResourceNotFoundException：返回 null 会让 Controller 再造一个错误码，
+            // 3. 统一抛 ResourceNotFoundException：返回 null 会让 Controller 再造一个错误码，
             // 同一条"资源不存在"就有 1006/2003 两个说法，且 data 为 null
             throw new ResourceNotFoundException(1006, "复核记录不存在或状态已完结");
         }
@@ -148,7 +148,7 @@ public class ReviewWriteServiceImpl implements IReviewWriteService {
             reviewTaskMapper.updateById(task);
             result.setStatus("待复核");
         } else if ("无效".equals(sr.getGrade())) {
-            // 批量路径判无效时写 obsolete/is_obsolete=1，复核路径原来写 completed ——
+            // 9. 批量路径判无效时写 obsolete/is_obsolete=1，复核路径原来写 completed ——
             // 同一结论两条路径两种终态，按任务表统计复核工作量时口径不可比
             task.setScore(sr.getScore());
             task.setStatus("obsolete");
@@ -176,7 +176,7 @@ public class ReviewWriteServiceImpl implements IReviewWriteService {
     }
 
     private String issueType(ScoreResultVO vo) {
-        // 从重到轻取第一项：逻辑冲突 > 缺失字段 > 评分不达标
+        // 1. 从重到轻取第一项：逻辑冲突 > 缺失字段 > 评分不达标
         if (!vo.getLogicConflicts().isEmpty()) {
             return "逻辑冲突";
         }

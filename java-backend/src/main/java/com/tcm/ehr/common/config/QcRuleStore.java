@@ -86,7 +86,7 @@ public class QcRuleStore {
         if (row == null || row.getRulesJson() == null || row.getRulesJson().isBlank()) {
             return baseline();
         }
-        // 版本没变就复用上次解析好的规则集：批任务逐条调用 getFor，每次重新解析 rules_json
+        // 1. 版本没变就复用上次解析好的规则集：批任务逐条调用 getFor，每次重新解析 rules_json
         // 是纯浪费。版本串并入进程内计数器（本实例任何一次写入都会推进它），
         // 再并上 update_time 兜住「同秒内两处写」与「另一个实例改了库」。
         String v = version.get() + ":"
@@ -125,7 +125,7 @@ public class QcRuleStore {
      * 靠短 TTL 兜住跨实例变更，写路径主动删 key 保证本实例立即生效。
      */
     private QcRule rowFor(String orgId) {
-        // 命中（且未过期）直接返回；未命中或已过期才回源并写入。Caffeine 不会把过期条目返回，
+        // 1. 命中（且未过期）直接返回；未命中或已过期才回源并写入。Caffeine 不会把过期条目返回，
         // 与原先「读时比对 expiresAtMs」同一效果。
         return rowCache.get(orgId, k -> Optional.ofNullable(ruleMapper.selectById(k)))
                 .orElse(null);
@@ -154,7 +154,7 @@ public class QcRuleStore {
             throw new IllegalArgumentException("缺少组织上下文，无法保存质控规则");
         }
         QcRuleSet normalized = normalize(next);
-        // A8：写路径校验 format 规则的正则可编译。QcScorer 执行非法正则时是「静默放行」
+        // 1. A8：写路径校验 format 规则的正则可编译。QcScorer 执行非法正则时是「静默放行」
         // （该项不判），规则会静默失效且配置的人看不到原因 —— 存不进去比存进去不生效好。
         // 刻意不放进 normalize()：它同时被读路径 parseOrBaseline 调用，放那里会给每次读
         // 都加一遍正则编译，且存量非法规则会在读时被静默丢弃。
@@ -168,7 +168,7 @@ public class QcRuleStore {
         try {
             row.setRulesJson(mapper.writeValueAsString(normalized));
         } catch (Exception e) {
-            // 存不进去就不能当成保存成功：回 500 比「提示已保存、实际没存」好
+            // 2. 存不进去就不能当成保存成功：回 500 比「提示已保存、实际没存」好
             throw new IllegalStateException("质控规则序列化失败，未保存", e);
         }
         row.setUpdateTime(java.time.LocalDateTime.now().withNano(0));
@@ -176,7 +176,7 @@ public class QcRuleStore {
             try {
                 ruleMapper.insert(row);
             } catch (org.springframework.dao.DuplicateKeyException e) {
-                // B6：check-then-act 的窗口 —— 并发下两个请求都判定「该组织无行」并同时 insert，
+                // 3. B6：check-then-act 的窗口 —— 并发下两个请求都判定「该组织无行」并同时 insert，
                 // 一个撞主键。撞键说明行已被建好，退化为更新（内容以本次提交为准）。
                 log.warn("[质控规则] 组织 {} 的规则行并发创建撞主键，改为更新", orgId);
                 ruleMapper.updateById(row);
@@ -192,7 +192,7 @@ public class QcRuleStore {
     /** 恢复某组织的内置默认规则（删掉该组织那一行） */
     public QcRuleSet resetFor(String orgId) {
         if (orgId == null || orgId.isBlank()) {
-            // 无组织上下文没有可删的行：返回系统基线即可
+            // 1. 无组织上下文没有可删的行：返回系统基线即可
             return baseline();
         }
         ruleMapper.deleteById(orgId);
@@ -226,7 +226,7 @@ public class QcRuleStore {
     /** 写路径改完必须显式失效该组织的缓存：版本串里的 update_time 只到秒，同秒两次写会撞上 */
     private void invalidate(String orgId) {
         perOrg.invalidate(orgId);
-        // 行缓存也要清：否则本实例在 5s 内仍读到旧行（写后立即读是保存接口的常规路径）
+        // 1. 行缓存也要清：否则本实例在 5s 内仍读到旧行（写后立即读是保存接口的常规路径）
         rowCache.invalidate(orgId);
     }
 
@@ -278,7 +278,7 @@ public class QcRuleStore {
     private QcRuleSet normalize(QcRuleSet r) {
         // 1. 完整性要素为空 → 回填内置 6 要素
         // 26.10：告警先累积到局部列表，最后整体替换 volatile 字段，
-        // 避免并发 normalize 互相 clear/覆盖成半个列表（仅影响提示文案，但旧写法会丢告警）
+        // 2. 避免并发 normalize 互相 clear/覆盖成半个列表（仅影响提示文案，但旧写法会丢告警）
         List<String> w = new ArrayList<>();
         if (r.getCompleteness() == null || r.getCompleteness().getElements() == null
                 || r.getCompleteness().getElements().isEmpty()) {
@@ -289,7 +289,7 @@ public class QcRuleStore {
         if (r.getConsistency() == null) {
             r.setConsistency(new ArrayList<>());
         } else {
-            // 过滤旧格式/非法条目
+            // 3. 过滤旧格式/非法条目
             List<QcRuleSet.ConsistencyRule> valid = new ArrayList<>();
             for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
                 boolean ok = c.getTriggerType() != null && c.getExpectType() != null
@@ -314,7 +314,7 @@ public class QcRuleStore {
             r.getStandardization().setElementTypes(
                     new ArrayList<>(QcRuleSet.defaultStandardization().getElementTypes()));
         }
-        // 3b. 归一范围缺失 → 回默认 9 类（空列表是用户「一个都不勾」的合法选择，保留为空、不回填）。
+        // 5. 3b. 归一范围缺失 → 回默认 9 类（空列表是用户「一个都不勾」的合法选择，保留为空、不回填）。
         //     与 standardization 同法：老行没有 normalization 字段（新加），回填默认即维持旧行为。
         if (r.getNormalization() == null) {
             r.setNormalization(QcRuleSet.defaultNormalization());

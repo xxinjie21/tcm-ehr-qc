@@ -81,10 +81,10 @@ public class DistLock {
     public <T> T runLocked(String lockName, int waitSeconds, java.util.function.Supplier<T> body) {
         RLock lock = redisson.getLock(lockName);
         if (!tryLock(lock, lockName, waitSeconds)) {
-            // 绝不放行：并发进入临界区会让 ES 索引出现交错删除 + 灌入的混合状态
+            // 1. 绝不放行：并发进入临界区会让 ES 索引出现交错删除 + 灌入的混合状态
             throw new ConcurrentOperationException("有另一个相同操作正在进行，请稍后重试");
         }
-        // 事务内必须等提交/回滚后再放锁：若在 finally 里提前放锁，并发的
+        // 2. 事务内必须等提交/回滚后再放锁：若在 finally 里提前放锁，并发的
         // 「查重 + 插入」会读到尚未提交的空结果，防重形同虚设。
         boolean deferred = TransactionSynchronizationManager.isSynchronizationActive();
         if (deferred) {
@@ -117,7 +117,7 @@ public class DistLock {
             Thread.currentThread().interrupt();
             throw new ConcurrentOperationException("等待其它相同操作时被中断，请稍后重试");
         } catch (RuntimeException e) {
-            // Redis 连接失败 / 命令超时：这是依赖故障，不是「有人正在操作」。
+            // 1. Redis 连接失败 / 命令超时：这是依赖故障，不是「有人正在操作」。
             // 报 503 + code=1011（消息可展示），同样不放行 —— 没有锁就没有互斥。
             log.error("[互斥] 锁服务不可用 lock={}: {}", lockName, e.getMessage());
             throw new ServiceNotReadyException("互斥锁服务（Redis）不可用，请稍后重试");

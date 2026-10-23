@@ -239,7 +239,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         // 1. 在提交线程取操作人与角色（worker 拿不到，必须现在捕获）
         String operator = RequestUtils.currentUsername();
         String role = RequestUtils.currentRole();
-        // 数据域快照：阶段 2 后 RecordFilter 取的是 orgId 而不是 role
+        // 2. 数据域快照：阶段 2 后 RecordFilter 取的是 orgId 而不是 role
         String orgId = RequestUtils.currentOrgId();
 
         // 1.5 幂等（批次 5）：同一 request_key 的重放直接返回既有任务。
@@ -262,7 +262,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         //    批次 16.1：DistLock 用 Redisson 锁；它在事务内把放锁推迟到提交之后
         //    （否则并发的查重会读到未提交的空结果，防重形同虚设）。
         return distLock.runLocked(SUBMIT_LOCK, () -> {
-            // 防重按组织算：任务是组织级的，A 组排队不该挡住 B 组提交
+            // 5. 防重按组织算：任务是组织级的，A 组排队不该挡住 B 组提交
             Long active = taskMapper.selectCount(new QueryWrapper<QcTask>()
                     .eq("org_id", orgId)
                     .in("status", List.of(QcTask.QUEUED, QcTask.RUNNING)));
@@ -320,13 +320,13 @@ public class QcBatchServiceImpl implements IQcBatchService {
         t.setFailureList("[]");
         t.setFailureTruncated(false);
         t.setCreateTime(LocalDateTime.now().withNano(0));
-        // 批次5：幂等键落库（空白视同未提供，与前置检查同一口径）
+        // 3. 批次5：幂等键落库（空白视同未提供，与前置检查同一口径）
         String rk = dto == null ? null : dto.getRequestKey();
         t.setRequestKey(rk == null || rk.isBlank() ? null : rk.trim());
         try {
             taskMapper.insert(t);
         } catch (org.springframework.dao.DuplicateKeyException dup) {
-            // 并发同键：另一提交刚插入成功 ⇒ 查回那条任务返回，绝不重跑
+            // 4. 并发同键：另一提交刚插入成功 ⇒ 查回那条任务返回，绝不重跑
             QcTask existed = findTaskByRequestKey(orgId, t.getRequestKey());
             if (existed != null) {
                 log.info("[批重算] 并发同键：key={} 复用任务 {}", t.getRequestKey(), existed.getId());
@@ -338,7 +338,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         // 5. 入队后立即返回，由工作线程异步消费。
         //    批次 26.2：入队推迟到事务提交之后（行可见才投递），否则 worker 可能先于提交取到 id
         DistLock.afterCommit(() -> {
-            // 队满时落 FAILED，避免任务永远卡在 QUEUED。
+            // 6. 队满时落 FAILED，避免任务永远卡在 QUEUED。
             if (!queue.offer(t.getId())) {
                 log.error("[批重算] 任务队列已满（容量 {}），任务 {} 无法入队，直接落 FAILED",
                         QUEUE_CAPACITY, t.getId());
@@ -353,7 +353,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
     @Override
     public QcTaskVO get(String id) {
         QcTask t = taskMapper.selectById(id);
-        // 不属于本组织一律按「不存在」返回：读操作不区分「不存在」与「无权查看」
+        // 1. 不属于本组织一律按「不存在」返回：读操作不区分「不存在」与「无权查看」
         return t == null || !belongsToCurrentOrg(t) ? null : toVO(t, true);
     }
 
@@ -377,11 +377,11 @@ public class QcBatchServiceImpl implements IQcBatchService {
     public QcTaskVO cancel(String id) {
         QcTask t = taskMapper.selectById(id);
         if (t == null) {
-            // 抛 ResourceNotFoundException 而非 IllegalArgumentException：
+            // 1. 抛 ResourceNotFoundException 而非 IllegalArgumentException：
             // 「不存在」是 404，「参数非法」才是 400，两者语义不同
             throw new ResourceNotFoundException(1008, "任务不存在");
         }
-        // 写操作按「不许」报 403：不能把「存在但看不到」说成「不存在」
+        // 2. 写操作按「不许」报 403：不能把「存在但看不到」说成「不存在」
         if (!belongsToCurrentOrg(t)) {
             throw new ForbiddenException("无权操作该任务");
         }
@@ -401,10 +401,10 @@ public class QcBatchServiceImpl implements IQcBatchService {
             if (cancelled == 1) {
                 t.setStatus(QcTask.CANCELLED);
                 t.setFinishedAt(LocalDateTime.now().withNano(0));
-                // 内存取消位一并置：本实例 worker 可能刚认领成功、还没读到库里的终态
+                // 4. 内存取消位一并置：本实例 worker 可能刚认领成功、还没读到库里的终态
                 cancelFlags.add(id);
             } else {
-                // 受影响行数为 0：已被 worker 认领（或已进终态）。重读一次再决定走哪个分支
+                // 5. 受影响行数为 0：已被 worker 认领（或已进终态）。重读一次再决定走哪个分支
                 QcTask fresh = taskMapper.selectById(id);
                 if (fresh != null) {
                     t = fresh;
@@ -468,7 +468,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
 
     @Override
     public QcTasksVO list() {
-        // 只列本组织的任务：任务行带失败明细（含 recordId），跨组织可见等于泄露他组病历标识
+        // 1. 只列本组织的任务：任务行带失败明细（含 recordId），跨组织可见等于泄露他组病历标识
         // 多取一条精确判截断：恰好 LIST_LIMIT 条不算截断，LIST_LIMIT+1 条才是
         List<QcTask> tasks = taskMapper.selectList(new QueryWrapper<QcTask>()
                 .eq("org_id", RequestUtils.currentOrgId())
@@ -510,7 +510,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
                 .set("status", QcTask.RUNNING)
                 .set("started_at", startedAt));
         if (claimed != 1) {
-            // 认领落败 = 已被取消或已进终态，这条不该再跑；取消位同样要清（同上）
+            // 3. 认领落败 = 已被取消或已进终态，这条不该再跑；取消位同样要清（同上）
             cancelFlags.remove(id);
             return;
         }
@@ -521,12 +521,12 @@ public class QcBatchServiceImpl implements IQcBatchService {
         QcBatchResultVO result = new QcBatchResultVO();
         result.setTotal(t.getTotal() == null ? 0 : t.getTotal());
         Set<String> seenHash = new HashSet<>();
-        // 规则快照整批共用（避免逐条重复读取）。
+        // 5. 规则快照整批共用（避免逐条重复读取）。
         // 必须按任务行上的组织取：单条评分走的是 getFor(当前组织)，
         // 整批若用 get()（进程内基线）就会与单条结论分叉
         QcRuleSet rules = ruleStore.getFor(t.getOrgId());
         List<QcTaskVO.Failure> failures = new ArrayList<>();
-        // 需求3：完整失败记录 ID（不受 failure_list 500 条截断），供「仅重试失败」按完整集合重跑
+        // 6. 需求3：完整失败记录 ID（不受 failure_list 500 条截断），供「仅重试失败」按完整集合重跑
         List<String> failedIds = new ArrayList<>();
         boolean[] truncated = {false};
         int[] processed = {0};
@@ -534,12 +534,12 @@ public class QcBatchServiceImpl implements IQcBatchService {
         boolean failed = false;
         try {
             cancelled = run(id, t, result, seenHash, rules, failures, failedIds, truncated, processed);
-            // 质控重算完成后会改写 grade/qc_results（清洗与看板都读它）→ 统计缓存主动失效（B1）
+            // 7. 质控重算完成后会改写 grade/qc_results（清洗与看板都读它）→ 统计缓存主动失效（B1）
             if (!cancelled) {
                 StatsCacheInvalidator.invalidateStats();
             }
         } catch (Exception e) {
-            // 执行期异常必须落 FAILED。
+            // 8. 执行期异常必须落 FAILED。
             // 不能指望 workerLoop 的 markFailed：finally 会先把终态写成 COMPLETED，
             // 而 markFailed 见终态即 return，FAILED 就永远落不下来。
             failed = true;
@@ -551,7 +551,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
             t.setFinishedAt(LocalDateTime.now().withNano(0));
             t.setCurrentLabel(null);
             t.setDone(processed[0]);
-            // success 以「已尝试 - 失败」为准：原式用 total - failed，取消 / 中断提前退出时
+            // 10. success 以「已尝试 - 失败」为准：原式用 total - failed，取消 / 中断提前退出时
             // 会把没处理的记录也算成成功，出现 done=25 而 success=1000 的自相矛盾
             t.setSuccess(Math.max(0, processed[0] - result.getFailed()));
             t.setFailed(result.getFailed());
@@ -559,10 +559,10 @@ public class QcBatchServiceImpl implements IQcBatchService {
             t.setPendingReview(result.getPendingReview());
             t.setInvalid(result.getInvalid());
             t.setFailureList(writeJson(failures));
-            // 需求3：完整失败 ID 集合（不受 500 条截断），供「仅重试失败」
+            // 11. 需求3：完整失败 ID 集合（不受 500 条截断），供「仅重试失败」
             t.setFailedIds(writeJson(failedIds));
             t.setFailureTruncated(truncated[0]);
-            // 不把库里的取消位写回：t 是任务开始时的快照，updateById 会带上 cancel_requested=0，
+            // 12. 不把库里的取消位写回：t 是任务开始时的快照，updateById 会带上 cancel_requested=0，
             // 抹掉并发取消。置 null 后 MyBatis-Plus 的 NOT_NULL 策略会跳过该列。
             t.setCancelRequested(null);
             taskMapper.updateById(t);
@@ -643,7 +643,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
      */
     private boolean isCancelRequested(String id) {
         try {
-            // P2-5：只取 cancel_requested 一列。原先 selectById 会把整行读回来，其中
+            // 1. P2-5：只取 cancel_requested 一列。原先 selectById 会把整行读回来，其中
             // failure_list 是「最多 500 条失败明细」的大 JSON —— 而本方法每 PROGRESS_EVERY 条
             // 就要调一次，4 万条病历就是上千次「为读一个 int 把整行大 JSON 拉回来」。
             // ⚠️ 这里用 LambdaQueryWrapper 而不是 .select("cancel_requested")：本文件在
@@ -671,7 +671,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
         } catch (Exception e) {
             // 3. 失败累加并记明细；明细只留前 MAX_FAILURES 条，超出置截断标记
             result.setFailed(result.getFailed() + 1);
-            // 完整失败 ID 集合：供「仅重试失败」按完整集合重跑，不受 500 条截断
+            // 4. 完整失败 ID 集合：供「仅重试失败」按完整集合重跑，不受 500 条截断
             failedIds.add(r.getId());
             if (failures.size() < MAX_FAILURES) {
                 failures.add(new QcTaskVO.Failure(r.getId(), reasonOf(e)));

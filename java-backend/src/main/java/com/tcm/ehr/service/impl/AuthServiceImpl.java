@@ -19,7 +19,7 @@ import com.tcm.ehr.domain.vo.MenuNode;
 import com.tcm.ehr.mapper.OrgMemberMapper;
 import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.UserMapper;
-import com.tcm.ehr.service.OrgResolution;
+import com.tcm.ehr.domain.vo.OrgResolution;
 import com.tcm.ehr.service.IAuthService;
 import com.tcm.ehr.service.IOrgPermissionService;
 import com.tcm.ehr.service.IOrgService;
@@ -89,7 +89,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         List<MenuNode> out = new ArrayList<>();
         for (String t : titles) {
             if (DICT_TITLE.equals(t) && withDictImport) {
-                // 「术语批量导入」所有身份可见：默认去向是个人本地词典（不写后端），
+                // 1. 「术语批量导入」所有身份可见：默认去向是个人本地词典（不写后端），
                 // 管理员在同一页另有「直接生效」选项。故不再是管理员专属入口。
                 out.add(new MenuNode(DICT_TITLE, "/dictionary",
                         List.of(new MenuNode(DICT_IMPORT_TITLE, "/dictionary/import"))));
@@ -180,7 +180,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         try {
             baseMapper.insert(user);
         } catch (DuplicateKeyException e) {
-            // 并发注册竞态：两个请求同时通过上面的存在性检查，由 users.username 唯一索引兜底
+            // 5. 并发注册竞态：两个请求同时通过上面的存在性检查，由 users.username 唯一索引兜底
             throw new IllegalArgumentException("用户名已存在");
         }
 
@@ -209,7 +209,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         }
         // 1. 按用户名取用户
         User user = baseMapper.findByUsername(username);
-        // 不区分用户不存在与密码错误，避免泄露账号是否存在
+        // 3. 不区分用户不存在与密码错误，避免泄露账号是否存在
         if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
             recordLoginFailure(username);
             throw new BadCredentialsException("用户名或密码错误");
@@ -236,14 +236,14 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         // 4. 签发 JWT（组织**不**进 token），并按身份下发菜单
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole()));
-        // 用户名随登录下发：页面右上角要显示「这是谁」。只给 role 的话，
+        // 9. 用户名随登录下发：页面右上角要显示「这是谁」。只给 role 的话，
         // 两个管理员在页面上长得一模一样，操作出问题分不清是谁做的。
         vo.setUsername(user.getUsername());
         vo.setRole(user.getRole());
         vo.setOrgId(g.hasGroup() ? g.getOrgId() : "");
         vo.setOrgRole(g.hasGroup() ? g.getGroupRole() : null);
         vo.setStatus(user.getStatus());
-        // 词典 / 质控规则写授权位：**实时查库**，不用登录时的快照。
+        // 10. 词典 / 质控规则写授权位：**实时查库**，不用登录时的快照。
         // 原来这里写死 false（注释说「批次 4 的 DDL 落地前恒 false」），但 DDL 早已落地、
         // organization_members 上的两列也早已在用 —— 写死导致：
         //   ① 前端 canWriteDictionaryEntry 永远退化成「管理员或所有者」，成员授权功能形同失效；
@@ -264,7 +264,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      */
     private List<MenuNode> menusOf(User user, OrgResolution g) {
         if (RequestUtils.ROLE_ADMIN.equals(user.getRole())) {
-            // 管理员只要有生效组就给「我的组织」（与组员口径一致）：本组成员管理
+            // 1. 管理员只要有生效组就给「我的组织」（与组员口径一致）：本组成员管理
             // （拉人 / 移除 / 授权 / 转让）后端本就放行（@RequireOrgRole 只认组内 owner，
             // 不看系统角色），原先只在菜单层被 role 短路掉了，导致管理员拿不到入口、
             // 无法从 UI 看/管自己那一个组。无组的管理员维持 ADMIN_MENUS（无处可管）。
@@ -295,7 +295,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         }
         List<OrganizationMember> members = groupMemberMapper.selectList(
                 new QueryWrapper<OrganizationMember>().eq("user_id", userId));
-        // 一次批量取回全部组织（原为逐成员 selectById：1 + N 次查询 → 2 次）
+        // 1. 一次批量取回全部组织（原为逐成员 selectById：1 + N 次查询 → 2 次）
         List<String> orgIds = members.stream()
                 .map(OrganizationMember::getOrgId)
                 .filter(id -> id != null && !id.isBlank())
@@ -312,7 +312,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
 
     @Override
     public void logout(String userId) {
-        // 令牌版本 +1：该用户此前签发的所有令牌立即失效（含其它设备上的）
+        // 1. 令牌版本 +1：该用户此前签发的所有令牌立即失效（含其它设备上的）
         jwtUtil.revokeAll(userId);
     }
 
@@ -334,10 +334,10 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
             return;
         }
         try {
-            // 首次失败才设过期（脚本内判断 n == 1）：窗口从第一次失败开始滚，而不是每次失败都续命
+            // 1. 首次失败才设过期（脚本内判断 n == 1）：窗口从第一次失败开始滚，而不是每次失败都续命
             RedisLua.incrWithTtlOnFirst(redis, LOGIN_FAIL_KEY + username, lockTtl());
         } catch (Exception e) {
-            // Redis 不可用：不阻断登录。降级为「无锁定」，可用性优先。
+            // 2. Redis 不可用：不阻断登录。降级为「无锁定」，可用性优先。
             log.warn("[Auth] 记录登录失败计数失败 username={}: {}", username, e.getMessage());
         }
     }
@@ -391,14 +391,14 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
                 return 0;
             }
             Long ttl = redis.getExpire(key, java.util.concurrent.TimeUnit.SECONDS);
-            // getExpire 返回 -1=无过期、-2=key 不在；两种都按「锁到窗口结束」处理，
+            // 1. getExpire 返回 -1=无过期、-2=key 不在；两种都按「锁到窗口结束」处理，
             // 否则 Redis 里残留的计数会让账号被无限期锁死。
             if (ttl == null || ttl < 0) {
                 return loginLockMinutes * 60;
             }
             return ttl.intValue();
         } catch (Exception e) {
-            // B1：Redis 故障时按「未锁定」放行 —— 宁可让用户继续试密码，也不因缓存抖动把账号锁死。
+            // 2. B1：Redis 故障时按「未锁定」放行 —— 宁可让用户继续试密码，也不因缓存抖动把账号锁死。
             // 但必须留痕：静默吞掉会让「锁为什么没生效」变成查不出的问题（与同文件其它 Redis 降级分支同口径）。
             log.warn("[Auth] 读取登录失败锁定剩余时间失败，按未锁定处理: {}", e.getMessage());
             return 0;

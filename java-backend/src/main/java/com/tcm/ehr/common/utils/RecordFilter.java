@@ -80,13 +80,13 @@ public final class RecordFilter {
                 wrapper.eq("status", dto.getStatus().trim());
             }
             applyRange(wrapper, "visit_time", dto.getDateRange());
-            // 导入时间区间（records.create_time）：与就诊时间是两个独立维度，可同时生效取交集。
+            // 3. 导入时间区间（records.create_time）：与就诊时间是两个独立维度，可同时生效取交集。
             // 判据与上一条完全一致 —— 两端齐全才成立，含首尾两天（补 00:00:00 / 23:59:59）。
             applyRange(wrapper, "create_time", dto.getImportRange());
             // 3. 仅未解析：structured_data 为 SQL NULL（用 IS NULL —— 该列是 JSON 类型，不能与 '' 比较）
             andOnlyUnparsed(wrapper, dto.getOnlyUnparsed());
         }
-// 排序键必须是列表实际展示的那一列（visit_time 接诊时间）。
+// 5. 排序键必须是列表实际展示的那一列（visit_time 接诊时间）。
         // 原先按 create_time 排，但批量导入/灌库场景下 create_time 会大量同值 ——
         // 实测 500 条演示数据 create_time 只有 1 个不同值，排序完全失效、返回 UUID 序，
         // 对用户等于随机。visit_time 有真实分布（2019~2025），可走 idx_department_visit_time。
@@ -100,17 +100,17 @@ public final class RecordFilter {
             wrapper.orderByDesc("visit_time").orderByAsc("id");
         } else {
             String so = dto.getSortOrder() == null ? "" : dto.getSortOrder().trim();
-            // 方向：只认 asc / desc，其余（含空、含非法值）取该列默认方向
+            // 6. 方向：只认 asc / desc，其余（含空、含非法值）取该列默认方向
             boolean desc = "asc".equalsIgnoreCase(so) ? false
                     : ("desc".equalsIgnoreCase(so) ? true : !"registration_no".equals(sortCol));
-            // 次级键 id 与**索引扫描方向**一致（性能审查方案 B 同构）：
+            // 7. 次级键 id 与**索引扫描方向**一致（性能审查方案 B 同构）：
             //   score / visit_time 走 (org_id, <col> DESC, id ASC) 索引 →
             //   列 desc 正扫 = id ASC；列 asc 反扫 = id DESC。
             //   registration_no 走 (org_id, registration_no, id) 升序索引 →
             //   列 asc 正扫 = id ASC；列 desc 反扫 = id DESC。
             // 无论哪条路径，(列, id) 都是严格全序 —— 分页页边界不重不漏。
             boolean idAsc = "registration_no".equals(sortCol) ? !desc : desc;
-            // ⚠️ 显式用 orderByDesc/orderByAsc 而非 orderBy(boolean, String)：
+            // 8. ⚠️ 显式用 orderByDesc/orderByAsc 而非 orderBy(boolean, String)：
             // MP 里后者是 orderBy(boolean condition, R... columns) 的 varargs 重载，
             // boolean 会被当成 condition —— 传 false 时排序会整体不生效。
             if (desc) {
@@ -205,17 +205,17 @@ public final class RecordFilter {
         if (record == null) {
             return false;
         }
-        // 管理员「看全部」时不加组织条件，与 operatorScope 同一口径 ——
+        // 1. 管理员「看全部」时不加组织条件，与 operatorScope 同一口径 ——
         // 少了这一条，管理员在列表里看得到他组病历、点开详情却是 404（三处口径互斥）
         if (RequestUtils.viewAllOrgs()) {
             return record.getOrgId() != null;
         }
         String orgId = currentOrgId();
-        // 无组 → 一条也看不到（与 operatorScope 同一口径）
+        // 2. 无组 → 一条也看不到（与 operatorScope 同一口径）
         if (orgId == null || orgId.isBlank()) {
             return false;
         }
-        // 记录本身就无组（迁移未执行）→ 也看不到
+        // 3. 记录本身就无组（迁移未执行）→ 也看不到
         String recordOrgId = record.getOrgId();
         return recordOrgId != null && orgId.equals(recordOrgId.trim());
     }
@@ -314,7 +314,7 @@ public final class RecordFilter {
     }
 
     private static String text(Object o) {
-        // 空值直接返回 2. 空白与字面 "null" 归成 null（前端会传字符串 "null"）
+        // 1. 空值直接返回 2. 空白与字面 "null" 归成 null（前端会传字符串 "null"）
         if (o == null) {
             return null;
         }
@@ -436,7 +436,7 @@ public final class RecordFilter {
             andOnlyUnparsed(wrapper, filterDto.getOnlyUnparsed());
             andOnlyUncleaned(wrapper, filterDto.getOnlyUncleaned());
         }
-        // 与 SearchDTO 重载同一个排序键：本工具的两种入参不该给出不同顺序（审查报告 L8）。
+        // 7. 与 SearchDTO 重载同一个排序键：本工具的两种入参不该给出不同顺序（审查报告 L8）。
         // 注意 FiltersDTO 重载的调用方多是聚合 / 批处理 / 按范围删除，排序对它们无意义，
         // 代价是这些查询多一次按 visit_time 的排序（3.5 万条量级需留意 deleteByFilter 与 clean）。
         // 次级键 id 与 SearchDTO 重载同一理由：分页要稳定
@@ -464,7 +464,7 @@ public final class RecordFilter {
     }
 
     private static boolean notBlank(String value) {
-        // 判空口径统一走 TextUtil.isBlank（原为逐字重写一份 value != null && !value.isBlank()）
+        // 1. 判空口径统一走 TextUtil.isBlank（原为逐字重写一份 value != null && !value.isBlank()）
         return !TextUtil.isBlank(value);
     }
 }

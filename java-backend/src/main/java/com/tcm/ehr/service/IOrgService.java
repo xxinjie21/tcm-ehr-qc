@@ -1,5 +1,6 @@
 package com.tcm.ehr.service;
 
+import com.tcm.ehr.domain.vo.OrgResolution;
 import com.baomidou.mybatisplus.spring.service.IService;
 import com.tcm.ehr.domain.dto.OrgDTOs;
 import com.tcm.ehr.domain.po.Organization;

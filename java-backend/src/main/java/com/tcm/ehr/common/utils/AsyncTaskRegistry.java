@@ -140,7 +140,7 @@ public abstract class AsyncTaskRegistry<T> {
     public String submit(Supplier<T> work) {
         prune();
         String id = UUID.randomUUID().toString();
-        // **捕获值，而不是捕获请求上下文对象**。
+        // 1. **捕获值，而不是捕获请求上下文对象**。
         // 原实现把 RequestContextHolder 的整个 RequestAttributes 交给任务线程重绑，
         // 而该对象包装的是容器的请求对象 —— 请求结束后容器会回收并清空它；
         // 任务线程只要在提交后夹一次数据库往返就必然读到「未知」，
@@ -149,13 +149,13 @@ public abstract class AsyncTaskRegistry<T> {
         // 用户 / 组织 / 角色 / viewAll**标量**在提交线程固定下来，任务线程重建一个纯值上下文。
         String orgId = RequestUtils.currentOrgId();
         String userId = safeUserId();
-        // 角色有两个维度：系统角色（管理员/用户）与组织角色（owner/member），
+        // 2. 角色有两个维度：系统角色（管理员/用户）与组织角色（owner/member），
         // 任务线程读哪一个都不能退化成 null/unknown —— 一并捕获并在任务线程重建。
         // 无请求上下文时 RequestUtils.attr() 内部已整体兜住并返回 "unknown"，故直接用非 safe 版
         // （原 safeCurrentRole/safeCurrentOrgRole 的 catch 永不触发、返回值恒等，已删；审查报告 §2.5）
         String role = RequestUtils.currentRole();
         String orgRole = RequestUtils.currentOrgRole();
-        // 「不限组织」也必须捕获：它只在请求线程由 JwtInterceptor 置一次（见
+        // 3. 「不限组织」也必须捕获：它只在请求线程由 JwtInterceptor 置一次（见
         // RequestUtils.ATTR_VIEW_ALL_ORGS），任务线程是另一根线程，读不到就等于 false。
         // 漏了它，管理员发起的异步 AI 解读 / 复核会被按他所属的那一个组织过滤，
         // 对其它组织的病历恒返回「病历不存在」（多组织部署下才暴露）。
@@ -169,7 +169,7 @@ public abstract class AsyncTaskRegistry<T> {
         Task<T> running = new Task<>(orgId, userId, State.RUNNING, null, null,
                 System.currentTimeMillis());
         tasks.put(id, running);
-        // RUNNING 也要进共享层：否则另一实例在任务跑完前轮询会得到「不存在」而不是「还在跑」
+        // 4. RUNNING 也要进共享层：否则另一实例在任务跑完前轮询会得到「不存在」而不是「还在跑」
         sharedPut(id, running);
 
         try {
@@ -179,7 +179,7 @@ public abstract class AsyncTaskRegistry<T> {
                     T reply = work.get();
                     update(id, t -> t.with(State.DONE, reply, null));
                 } catch (Exception e) {
-                    // 失败也要留痕：前端要给出「可重试 + 明确原因」，不能只显示转圈
+                    // 5. 失败也要留痕：前端要给出「可重试 + 明确原因」，不能只显示转圈
                     String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                     log.warn("[异步任务] {} 失败：{}", id, msg);
                     update(id, t -> t.with(State.FAILED, null, msg));
@@ -188,7 +188,7 @@ public abstract class AsyncTaskRegistry<T> {
                 }
             });
         } catch (RejectedExecutionException rejected) {
-            // 队列已满（AI-2）：撤回刚登记的 RUNNING 项，否则前端轮询会永远看到「还在跑」
+            // 6. 队列已满（AI-2）：撤回刚登记的 RUNNING 项，否则前端轮询会永远看到「还在跑」
             tasks.remove(id);
             sharedDelete(id);
             log.warn("[异步任务] 任务池已满，拒绝任务 {}", id);
@@ -209,7 +209,7 @@ public abstract class AsyncTaskRegistry<T> {
         }
         Task<T> t = tasks.get(taskId);
         if (t == null) {
-            // 本地没有 → 可能是**另一个实例**提交的（R14/AI-28）。去共享层取一次，命中则回填一级缓存，
+            // 1. 本地没有 → 可能是**另一个实例**提交的（R14/AI-28）。去共享层取一次，命中则回填一级缓存，
             // 后续轮询不再打 Redis。
             t = sharedGet(taskId);
             if (t != null) {
@@ -224,7 +224,7 @@ public abstract class AsyncTaskRegistry<T> {
         }
         if (System.currentTimeMillis() - t.createdAtMs() > TASK_TIMEOUT_SECONDS * 1000
                 && t.state() == State.RUNNING) {
-            // 超时收敛：进程重启或线程被卡住时，RUNNING 不能永远挂着
+            // 2. 超时收敛：进程重启或线程被卡住时，RUNNING 不能永远挂着
             return new Snapshot<>(State.FAILED, null,
                     "生成超时（超过 " + TASK_TIMEOUT_SECONDS + " 秒），请重试");
         }
@@ -234,11 +234,11 @@ public abstract class AsyncTaskRegistry<T> {
     private void update(String id, UnaryOperator<Task<T>> f) {
         Task<T> cur = tasks.get(id);
         if (cur == null) {
-            // 登记项已被淘汰（或本实例重启过）：无从重建归属信息，保持原语义不做补偿
+            // 1. 登记项已被淘汰（或本实例重启过）：无从重建归属信息，保持原语义不做补偿
             return;
         }
         Task<T> next = f.apply(cur);
-        // 先写共享层、再更新一级缓存：让「另一实例读到的状态」永不落后于本实例，
+        // 2. 先写共享层、再更新一级缓存：让「另一实例读到的状态」永不落后于本实例，
         // 否则会出现「本实例已 DONE、别的实例仍读到 RUNNING」的无谓抖动。
         sharedPut(id, next);
         tasks.put(id, next);

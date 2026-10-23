@@ -2,7 +2,7 @@ package com.tcm.ehr.common.interceptors;
 
 import com.tcm.ehr.common.utils.JwtUtil;
 import com.tcm.ehr.common.utils.RequestUtils;
-import com.tcm.ehr.service.OrgResolution;
+import com.tcm.ehr.domain.vo.OrgResolution;
 import com.tcm.ehr.service.IOrgService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -59,7 +59,7 @@ public class JwtInterceptor implements HandlerInterceptor {
      */
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
-        // 放行预检请求
+        // 1. 放行预检请求
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
@@ -91,12 +91,12 @@ public class JwtInterceptor implements HandlerInterceptor {
         //     拿它表示「不限组织」会让开关一开就**什么都看不到**（与语义正好相反）。
         boolean adminSeesAll = RequestUtils.ROLE_ADMIN.equals(role) && adminCanViewData;
         if (RequestUtils.ROLE_ADMIN.equals(role) && !adminCanViewData) {
-            // 开关置 false：管理员收回可见范围，同样落回 fail-closed（什么都看不到）
+            // 7. 开关置 false：管理员收回可见范围，同样落回 fail-closed（什么都看不到）
             orgId = null;
         }
         request.setAttribute(RequestUtils.ATTR_ORG_ID, orgId == null ? "" : orgId);
         request.setAttribute(RequestUtils.ATTR_ORG_ROLE, g.hasGroup() ? g.getGroupRole() : null);
-        // 「不限组织」是独立标记，不能靠 orgId 空来表达（见 4.1）
+        // 8. 「不限组织」是独立标记，不能靠 orgId 空来表达（见 4.1）
         request.setAttribute(RequestUtils.ATTR_VIEW_ALL_ORGS, adminSeesAll);
         return true;
     }

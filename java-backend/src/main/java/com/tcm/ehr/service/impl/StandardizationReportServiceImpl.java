@@ -111,12 +111,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     private boolean isMisrouted(String content) {
         String core = stripPtQualifier(content);
-        // 黑名单在原字与剥前缀后都判：'左关节痛' 剥掉「左」后要能看到「关节」
+        // 1. 黑名单在原字与剥前缀后都判：'左关节痛' 剥掉「左」后要能看到「关节」
         if (startsWithAny(content, MISROUTED_EXCLUDE) || startsWithAny(core, MISROUTED_EXCLUDE)
                 || !startsWithAny(core, MISROUTED_PREFIX)) {
             return false;
         }
-        // 含非汉字的抽取噪声（实测「关尺>寸」这类夹了比较符号的）不当舌脉，
+        // 2. 含非汉字的抽取噪声（实测「关尺>寸」这类夹了比较符号的）不当舌脉，
         // 与抽取侧 _is_pulse_tongue 的汉字门同口径 —— 否则报告会把它算成错放，
         // 而抽取侧又不会去修，两边数字永远对不上。
         return content.chars().allMatch(ch -> ch >= 0x4e00 && ch <= 0x9fff);
@@ -239,7 +239,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     "抽取 " + c.getTotal() + " 条"));
         }
         StandardizationReportVO.UnmatchedBreakdown u = r.getUnmatched();
-        // 未归一构成：按<strong>责任方</strong>分列 —— 词表侧（补词表可改善）与抽取侧
+        // 1. 未归一构成：按<strong>责任方</strong>分列 —— 词表侧（补词表可改善）与抽取侧
         // （补词表无效，得改抽取边界）必须分开，否则「词表缺 N 条」会把抽取问题算进词表账。
         rows.add(List.of("未归一构成", "词表未收录", String.valueOf(u.getDictionaryGap()), "责任：词表"));
         rows.add(List.of("未归一构成", "问诊整句被当成症状", String.valueOf(u.getInquiryFragment()), "责任：抽取（该进 inquiry）"));
@@ -247,7 +247,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         rows.add(List.of("未归一构成", "脉/舌要素被当成症状", String.valueOf(u.getMisrouted()), "责任：抽取（该进脉象/舌象字段）"));
         rows.add(List.of("未归一构成", "脉诊手法/舌象碎片", String.valueOf(u.getMistypeMarker()), "责任：抽取（本不该成为实体）"));
         rows.add(List.of("未归一构成", "体征被当成症状", String.valueOf(u.getPhysicalSign()), "责任：抽取"));
-        // 措辞修正（2026-10-21）：原叫「抽取残词」是错的断言 —— 实测这 6542 条里单字 0 条、
+        // 2. 措辞修正（2026-10-21）：原叫「抽取残词」是错的断言 —— 实测这 6542 条里单字 0 条、
         // 与 sourceText 等长（无截断痕迹），主体是词表未收录的二字症状词与属性词，
         // 不是「抽取截断的残字」。按实测构成改名。
         rows.add(List.of("未归一构成", "二字未归一实体", String.valueOf(u.getFragment()), "需人工研判口径"));
@@ -260,7 +260,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 (rg.getStart() == null ? "不限" : rg.getStart()) + " ~ "
                         + (rg.getEnd() == null ? "不限" : rg.getEnd()),
                 "区间内 " + rg.getRecords() + " 条，排除 " + rg.getExcluded() + " 条"));
-        // 导入区间（2026-10-17 起报告默认按导入时间收窄）：CSV 必须体现这个维度，
+        // 3. 导入区间（2026-10-17 起报告默认按导入时间收窄）：CSV 必须体现这个维度，
         // 否则导出文件看不出这批数字是「今天导入的」还是全库的
         if (rg.getImportStart() != null && rg.getImportEnd() != null) {
             rows.add(List.of("区间", "导入区间", rg.getImportStart() + " ~ " + rg.getImportEnd(),
@@ -321,7 +321,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     @Override
     public StandardizationReportVO report(FiltersDTO filters) {
         FiltersDTO f = filters == null ? new FiltersDTO() : filters;
-        // ---- 缓存包装（报告页是全站最重的读接口：全量拉数据域 + 每条解析 2 次 JSON）----
+        // 1. ---- 缓存包装（报告页是全站最重的读接口：全量拉数据域 + 每条解析 2 次 JSON）----
         // ① 入参（department / dateRange / importRange / grade）全在白名单内 —— getOrLoadSwr 会再核一遍，
         //    白名单外（奇怪字符 / 超长）自动绕过缓存现算，保证 key 空间有界；
         // ② 时间范围 / 科室不变但换词典后数字会变 → 词典版本作 salt 拼进 key，换词表即换 key；
@@ -358,22 +358,22 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     /** 报告现算主体（不含缓存）。缓存包装见 {@link #report(FiltersDTO)}。 */
     private StandardizationReportVO computeReport(FiltersDTO f, ReportContext ctx) {
-        // 时间上下界必须同时给才生效，与 report(String, String) 及 StatsController 同一口径
+        // 1. 时间上下界必须同时给才生效，与 report(String, String) 及 StatsController 同一口径
         String start = rangeBound(f.getDateRange(), true);
         String end = rangeBound(f.getDateRange(), false);
-        // 导入时间（records.create_time）与接诊时间是两个独立维度，判据同样两端齐全；
+        // 2. 导入时间（records.create_time）与接诊时间是两个独立维度，判据同样两端齐全；
         // 区别在过滤位置：接诊时间留在 Java 侧（要算 excluded），导入时间下推到 SQL
         // （RecordFilter 的 create_time 条件，与病历列表 / Qc 页同一口径）。
         String importStart = rangeBound(f.getImportRange(), true);
         String importEnd = rangeBound(f.getImportRange(), false);
 
         StandardizationReportVO vo = new StandardizationReportVO();
-        // 生效词表一次读回（性能审查 P1-1：原 dictQuality / crossTypeDuplicates / coverage /
+        // 3. 生效词表一次读回（性能审查 P1-1：原 dictQuality / crossTypeDuplicates / coverage /
         // symptomTerms 各自逐类 readEffective，8 类 × 2 层 ≈ 32 条 SQL；现整趟 1 条）。
         Map<String, List<TermEntry>> dicts = termStore.readEffectiveAll(ctx.orgId());
         vo.setDictQuality(dictQuality(dicts));
         vo.setCrossTypeDuplicates(crossTypeDuplicates(dicts));
-        // 乙类：病历相关，必须先按数据域收窄，否则登录即可的接口会读到跨组织数据。
+        // 4. 乙类：病历相关，必须先按数据域收窄，否则登录即可的接口会读到跨组织数据。
         // A1/T2 + C1：这里**一次遍历、一次解析**，抽扁平中间结构（Row）向下传给各统计器。
         // 原实现里同一条 structured_data 被 7 处统计器各自解析一遍（4 万条 ≈ 28 万次 Jackson 解析），
         // 且 selectList 无列投影（21 TEXT + 2 JSON 全量进堆，4 万条约 45MB）。
@@ -382,7 +382,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         List<Row> rows = filterByVisitTime(all, start, end);
         vo.setRange(rangeOf(all, rows, start, end, importStart, importEnd));
         vo.setByMonth(byMonth(rows));
-        // 归一率类统计（coverage / unmatched / normalizable）**只看质控合格的病历**：
+        // 5. 归一率类统计（coverage / unmatched / normalizable）**只看质控合格的病历**：
         // 本页是「标准化质量报告」，衡量「进标准数据集的那批数据」的术语质量；
         // 待复核 / 无效病历本身数据就有问题（缺核心要素、逻辑冲突），算进分母会把
         // 「术语标准化质量」与「病历书写质量」混进同一根指标，用户无法据此判断该补词表还是修病历。
@@ -390,7 +390,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         // 分数分布 / qc 一致性 / 按月趋势仍用 rows —— 它们统计质控与数据本体，需全量。
         List<Row> qualified = qualifiedOnly(rows);
         vo.setCoverage(coverage(qualified, dicts));
-        // A2：词表只读一次，两个统计器共用同一份（原先各自 new HashSet<>(symptomTerms()) 一遍）
+        // 6. A2：词表只读一次，两个统计器共用同一份（原先各自 new HashSet<>(symptomTerms()) 一遍）
         Set<String> symptomDict = new HashSet<>(symptomTerms(dicts));
         vo.setUnmatched(unmatched(qualified, symptomDict));
         vo.setNormalizable(normalizableRate(qualified, symptomDict));
@@ -399,7 +399,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         vo.setDataset(datasetShape(qualified));
         vo.setDisclaimer(DISCLAIMER);
         vo.setGeneratedAt(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        // 批次14 · 对标 A5：数字的血缘 —— 本报告出自哪一版词典。
+        // 7. 批次14 · 对标 A5：数字的血缘 —— 本报告出自哪一版词典。
         // 与 generatedAt 配对：「按什么算的」+「什么时候算的」才是可追溯的；
         // 只给时间的话，换过词表后数字变了也说不清是哪一版造成的。
         vo.setSourceVersion(termStore.effectiveDictVersion(ctx.orgId()));
@@ -450,7 +450,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 那不是用户的意思；而如果只给一端就悄悄生效，用户看到记录数变少却找不到原因。
      */
     private List<Row> filterByVisitTime(List<Row> all, String start, String end) {
-        // 两个条件同时成立才过滤：早前写成「任一非空即过滤」，
+        // 1. 两个条件同时成立才过滤：早前写成「任一非空即过滤」，
         // 结果只给 start 时返回 131 条（应为全部 500），与注释和既有口径都不符
         if (!notBlankDate(start) || !notBlankDate(end)) {
             return all;
@@ -514,7 +514,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                                                      String start, String end,
                                                      String importStart, String importEnd) {
         StandardizationReportVO.TimeRange r = new StandardizationReportVO.TimeRange();
-        // 只有两端都给、过滤真正生效时才回显区间。
+        // 1. 只有两端都给、过滤真正生效时才回显区间。
         // 只给一端时过滤没生效，若还回显「2024-01-01 ~ 不限」，界面会显示成一个
         // 实际并未应用的区间，而记录数其实是全部 —— 那是自相矛盾的展示。
         // rangeBound 已保证「不齐即 null」，这里直接透传。
@@ -573,7 +573,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             }
             b.setSymptomRate(symTotal == 0 ? null : pct(symHit, symTotal));
 
-            // 计算月度评分统计（避免每月都重新跑整桶 scoreDistribution）
+            // 1. 计算月度评分统计（避免每月都重新跑整桶 scoreDistribution）
             int mCount = 0;
             int mCapped = 0;
             double mSum = 0.0;
@@ -597,13 +597,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     mMax = s;
                 }
             }
-            // avgScore 是基本类型 double：空桶给 0.0（与原 scoreDistribution 的默认一致），
+            // 2. avgScore 是基本类型 double：空桶给 0.0（与原 scoreDistribution 的默认一致），
             // 不能给 null —— 三元里混入 null 会把表达式提升成 Double，setAvgScore 拆箱即 NPE
             b.setAvgScore(mCount == 0 ? 0.0 : Math.round(mSum * 10.0 / mCount) / 10.0);
             b.setCapped(mCapped);
             out.add(b);
         }
-        // 「未知」永远排最后；其余按月份倒序（最近的在最前）
+        // 3. 「未知」永远排最后；其余按月份倒序（最近的在最前）
         out.sort(Comparator.comparing((StandardizationReportVO.MonthlyBucket b) -> b.getMonth())
                 .reversed());
         out.sort(Comparator.comparing(b -> "未知".equals(b.getMonth())));
@@ -642,7 +642,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             for (TermEntry e : entries) {
                 if (e.getAliases() != null && !e.getAliases().isEmpty()) {
                     aliased++;
-                    // 别名与标准词相同会在归一时自命中，属数据缺陷
+                    // 1. 别名与标准词相同会在归一时自命中，属数据缺陷
                     if (e.getAliases().contains(e.getStandardTerm())) {
                         selfAlias++;
                     }
@@ -690,14 +690,14 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * 传变量会让它一个都扫不到，守卫就形同虚设。
      */
     private List<Row> rowsInDomain(ReportContext ctx, FiltersDTO filters) {
-        // 性能审查 P0-1：这里**不要** ORDER BY —— 报告随后按 byMonth(TreeMap)/coverage 等
+        // 1. 性能审查 P0-1：这里**不要** ORDER BY —— 报告随后按 byMonth(TreeMap)/coverage 等
         // 与行序无关的方式重排，带排序只会让「导入时间范围」这类条件退化成全表读整行 + filesort
         // （buildForAggregate 与 build 共用同一段 WHERE 组装，只是不追加排序键）。
         // 数据域与「看全部」走 ctx 快照（而非现读 RequestContextHolder）—— 见 ReportContext：
         // 本方法可能在 SWR 的后台重算线程里执行，那里读不到请求上下文。
         QueryWrapper<Record> wrapper = RecordFilter.buildForAggregate(
                 ctx.domainOrgId(), filters, ctx.viewAllOrgs());
-        // grade 必须投影：归一率类统计要按「质控合格」收窄（见 computeReport 的 qualifiedOnly），
+        // 2. grade 必须投影：归一率类统计要按「质控合格」收窄（见 computeReport 的 qualifiedOnly），
         // 少了这一列 Row.grade 恒为 null，过滤后空集 —— 表现为报告归零。
         wrapper.select("id", "grade", "visit_time", "score", "update_time", "chief_complaint", "self_report", "structured_data", "qc_results");
         return toRows(recordMapper.selectList(wrapper));
@@ -744,7 +744,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     private List<StandardizationReportVO.TypeCoverage> coverage(List<Row> rows,
                                                                 Map<String, List<TermEntry>> dicts) {
         Map<String, StandardizationReportVO.TypeCoverage> byField = new LinkedHashMap<>();
-        // 只列有词典的类型：无词典的类型（如 cause）归一率恒为 0，画到图上就是一根没有意义的
+        // 1. 只列有词典的类型：无词典的类型（如 cause）归一率恒为 0，画到图上就是一根没有意义的
         // 空条（表现为「有病因却没有对应术语库」）。与 dictQuality() / crossTypeDuplicates()
         // 的过滤口径保持一致 —— 那两个方法本就有 if (!t.dict()) continue;
         for (EntityTypes.EntityType t : EntityTypes.all()) {
@@ -762,7 +762,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             }
             byField.values().forEach(c -> countEntities(c, row.structured.get(c.getField())));
         }
-        // 标出「解析早于词表建立」的类型：词表非空且抽到了实体，却一条都没归上。
+        // 2. 标出「解析早于词表建立」的类型：词表非空且抽到了实体，却一条都没归上。
         // 这一种补词表无效，只能重跑解析 —— 与真正的词表缺口必须分开说。
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             StandardizationReportVO.TypeCoverage c = byField.get(t.structuredKey());
@@ -772,7 +772,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             if (t.dict()) {
                 c.setTermCount(dicts.getOrDefault(t.key(), List.of()).size());
             }
-            // 加最小样本量门槛（2026-10-21）：判据原为「有词表 + 抽到实体 + 一条都没归一」，
+            // 3. 加最小样本量门槛（2026-10-21）：判据原为「有词表 + 抽到实体 + 一条都没归一」，
             // 但样本量极小时推断不成立 —— 实测治法只抽到 1 条实体（且是「治法后缓解」这种
             // 正则误匹配，本来就归不上），却判成「解析早于词表」，让用户以为白重跑了解析。
             // 低于门槛时不列为「陈旧」，前端按 total 展示「样本过少，暂不判定」。
@@ -792,7 +792,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 continue;
             }
             c.setTotal(c.getTotal() + 1);
-            // 判据必须与 QcScorer.countUnnormalized 保持一致（当前都是「normLevel != null 即已归一」）。
+            // 1. 判据必须与 QcScorer.countUnnormalized 保持一致（当前都是「normLevel != null 即已归一」）。
             // 质控扣分与报告展示是两套实现，若一方改动判空口径（如排除 LEVEL_FUZZY、把 0 当未命中），
             // 用户就会看到「报告说未归一 N 条，扣分却按 M 条算」的矛盾。改动此处务必同步另一边。
             if (m.get("normLevel") != null) {
@@ -811,15 +811,15 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     private StandardizationReportVO.UnmatchedBreakdown unmatched(List<Row> rows, Set<String> symptomDict) {
         StandardizationReportVO.UnmatchedBreakdown b = new StandardizationReportVO.UnmatchedBreakdown();
-        // 批次2：同一次遍历内累积「词表缺口」项的次数（键=实体原文），不额外扫库
+        // 1. 批次2：同一次遍历内累积「词表缺口」项的次数（键=实体原文），不额外扫库
         java.util.Map<String, Integer> gapCount = new java.util.LinkedHashMap<>();
-        // 2026-10-21：各抽取侧桶也累积 TOP 词 —— 本页定位是给开发人员，
+        // 2. 2026-10-21：各抽取侧桶也累积 TOP 词 —— 本页定位是给开发人员，
         // 只有「有 N 条」无从下手，必须给出「是哪 N 条」（改抽取规则要按词核对）。
         java.util.Map<String, Integer> inquiryTop = new java.util.LinkedHashMap<>();
         java.util.Map<String, Integer> processTop = new java.util.LinkedHashMap<>();
         java.util.Map<String, Integer> mistypeTop = new java.util.LinkedHashMap<>();
         java.util.Map<String, Integer> fragmentTop = new java.util.LinkedHashMap<>();
-        // G3：L2/L3 推断命中的实体（同一次遍历累积，键=原文，值=次数）
+        // 3. G3：L2/L3 推断命中的实体（同一次遍历累积，键=原文，值=次数）
         java.util.Map<String, Integer> inferred = new java.util.LinkedHashMap<>();
         for (Row row : rows) {
             for (Object item : row.symptoms) {
@@ -828,7 +828,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 }
                 Object levelObj = m.get("normLevel");
                 if (levelObj != null) {
-                    // G3：命中的实体不进「词表缺口」，但 L2（包含）/ L3（模糊）是推断出来的，
+                    // 4. G3：命中的实体不进「词表缺口」，但 L2（包含）/ L3（模糊）是推断出来的，
                     //     单列到 inferred 供人工确认 / 登记别名；L1 精确命中无需确认。
                     int level = (levelObj instanceof Number n) ? n.intValue() : 0;
                     if (level == com.tcm.ehr.common.utils.EsTermNormalizer.LEVEL_CONTAIN
@@ -848,7 +848,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     content = str(m.get("sourceText"));
                 }
                 b.setTotal(b.getTotal() + 1);
-                // 判定顺序（2026-10-21 修正，原实现有 bug）：
+                // 5. 判定顺序（2026-10-21 修正，原实现有 bug）：
                 // 语义判定必须全部前置，长度判定（<=2）放最后。
                 // 旧顺序把长度判定排在「脉诊手法/舌象碎片」之前，导致同一类词被劈成两桶：
                 // 「红点」(2 字) 进 fragment、「红点多」(3 字) 进 misrouted —— 于是
@@ -869,18 +869,18 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     mistypeTop.merge(content, 1, Integer::sum);
                 } else if (startsWithAny(content, INQUIRY_LEAD)
                         || containsAny(content, INQUIRY_MARKERS)) {
-                    // 问诊整句的正确去向是抽取侧的 inquiry 字段（十问子项），
+                    // 6. 问诊整句的正确去向是抽取侧的 inquiry 字段（十问子项），
                     // 补成症状标准词属错映射 —— 算进「词表缺口」会让报告声称
                     // 「词表缺 N 条」，而补词表根本解决不了这批。
                     b.setInquiryFragment(b.getInquiryFragment() + 1);
                     inquiryTop.merge(content, 1, Integer::sum);
                 } else if (startsWithAny(content, PROCESS_DESC_LEAD)) {
-                    // 病程 / 诱因是症状的修饰而非本体，没有独立标准词可补。
+                    // 7. 病程 / 诱因是症状的修饰而非本体，没有独立标准词可补。
                     // 判定在问诊之后 —— 「夜寐俯卧」这类同时含两类前缀的归问诊更准确。
                     b.setProcessDesc(b.getProcessDesc() + 1);
                     processTop.merge(content, 1, Integer::sum);
                 } else if (content.length() <= FRAGMENT_MAX_LEN) {
-                    // 长度 <= 2 的未归一实体。
+                    // 8. 长度 <= 2 的未归一实体。
                     // ⚠️ 这一桶**不是**「抽取截断的残字」—— 实测单字 0 条、全部 2 字，
                     //    且 content 与 sourceText 长度相等（无截断痕迹）。
                     // 实测构成：否定式与属性词（不痛/偏黄）、时间场景（凌晨）、
@@ -890,23 +890,23 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                     b.setFragment(b.getFragment() + 1);
                     fragmentTop.merge(content, 1, Integer::sum);
                 } else {
-                    // 其余：多为标准词但词表没有 → 词表侧（补词表即可改善）
+                    // 9. 其余：多为标准词但词表没有 → 词表侧（补词表即可改善）
                     b.setDictionaryGap(b.getDictionaryGap() + 1);
                     gapCount.merge(content, 1, Integer::sum);
                 }
             }
         }
-        // 批次2：按次数降序装入（LinkedHashMap 保序），前端直接渲染为可行动清单
+        // 10. 批次2：按次数降序装入（LinkedHashMap 保序），前端直接渲染为可行动清单
         gapCount.entrySet().stream()
                 .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
                 .limit(15)
                 .forEach(e -> b.getTop().put(e.getKey(), e.getValue()));
-        // 2026-10-21：四个抽取侧桶的 TOP15（开发人员据此核对抽取规则）
+        // 11. 2026-10-21：四个抽取侧桶的 TOP15（开发人员据此核对抽取规则）
         putTop(b.getInquiryFragmentTop(), inquiryTop);
         putTop(b.getProcessDescTop(), processTop);
         putTop(b.getMistypeMarkerTop(), mistypeTop);
         putTop(b.getFragmentTop(), fragmentTop);
-        // G3：推断命中同型降序装入（上限同 TopN），供「登记别名 / 人工确认」清单
+        // 12. G3：推断命中同型降序装入（上限同 TopN），供「登记别名 / 人工确认」清单
         inferred.entrySet().stream()
                 .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
                 .limit(15)
@@ -922,7 +922,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * （如 神疲乏力）是词表缺口本身，算进分母会把「补词表能改善多少」这个信号抹掉。
      */
     private StandardizationReportVO.NormalizableRate normalizableRate(List<Row> rows, Set<String> symptomDict) {
-        // ⚠️ 2026-10-21 口径修正（原实现恒 100%，无信息量）：
+        // 1. ⚠️ 2026-10-21 口径修正（原实现恒 100%，无信息量）：
         // 原分母 = 「在症状词表里」的实体 —— 而「在词表里」与「已归一」是同一件事，
         // 于是分子恒等于分母，该指标永远是 100%，既衡量不了改进也无法据此判断。
         // 原测试的意图是对的（「词表里没有的不该算归一失败」），但落在「排除不在词表的」
@@ -943,7 +943,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 if (content.isEmpty()) {
                     continue;
                 }
-                // 抽取缺陷（不该算症状）一律不进分母 —— 与 unmatched 的拆桶顺序保持一致
+                // 2. 抽取缺陷（不该算症状）一律不进分母 —— 与 unmatched 的拆桶顺序保持一致
                 if (containsAny(content, PHYSICAL_SIGN)
                         || isMisrouted(content)
                         || containsAny(content, MISTYPE_MARKERS)
@@ -992,7 +992,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
             if (row.score > d.getMax()) {
                 d.setMax(row.score);
             }
-            // 术语未标准化扣满 5 分（QcRuleSet 的 cap）即封顶
+            // 1. 术语未标准化扣满 5 分（QcRuleSet 的 cap）即封顶
             if (row.qc != null && deductionsCapped(row.qc)) {
                 d.setCapped(d.getCapped() + 1);
             }
@@ -1055,7 +1055,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         for (Row row : rows) {
             String chief = row.chiefComplaint;
             if (chief != null && !chief.isBlank()) {
-                // 主诉里的病程月数每条不同，去掉数字才能看出模板数。
+                // 1. 主诉里的病程月数每条不同，去掉数字才能看出模板数。
                 // 用 RegexCache 复用编译结果：这里对 4 万行逐行调用，String.replaceAll 每次都会
                 // 重新 Pattern.compile("\\d+")（P2-1 的有界备忘把它压成一次编译）。
                 chiefTemplates.add(RegexCache.of("\\d+").matcher(chief).replaceAll("N"));
@@ -1108,7 +1108,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         try {
             return objectMapper.readValue(json, Map.class);
         } catch (Exception e) {
-            // 单条脏数据不该让整份报告挂掉；计数上它会因为 parsed==null 被自然跳过
+            // 1. 单条脏数据不该让整份报告挂掉；计数上它会因为 parsed==null 被自然跳过
             log.debug("[报告] 解析 JSON 失败，跳过该条: {}", e.getMessage());
             return null;
         }

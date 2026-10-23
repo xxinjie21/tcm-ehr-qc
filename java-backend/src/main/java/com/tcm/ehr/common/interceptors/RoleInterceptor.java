@@ -37,11 +37,11 @@ public class RoleInterceptor implements HandlerInterceptor {
      */
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
-        // 放行预检请求（与 JwtInterceptor 一致：此时 request 属性尚未写入）
+        // 1. 放行预检请求（与 JwtInterceptor 一致：此时 request 属性尚未写入）
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
-        // 仅对控制器方法生效：静态资源等 handler 直接放行，避免误伤
+        // 2. 仅对控制器方法生效：静态资源等 handler 直接放行，避免误伤
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }

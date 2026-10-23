@@ -190,7 +190,7 @@ public class CleanBatchService implements ICleanBatchService {
         String orgId = RequestUtils.currentOrgId();
 
         return distLock.runLocked(SUBMIT_LOCK, () -> {
-            // 防重按组织算：A 组排队不该挡住 B 组提交
+            // 1. 防重按组织算：A 组排队不该挡住 B 组提交
             Long active = taskMapper.selectCount(new QueryWrapper<CleanTask>()
                     .eq("org_id", orgId)
                     .in("status", List.of(CleanTask.QUEUED, CleanTask.RUNNING)));
@@ -222,11 +222,11 @@ public class CleanBatchService implements ICleanBatchService {
         t.setFiltersJson(writeJson(filters));
         t.setCreateTime(LocalDateTime.now().withNano(0));
         taskMapper.insert(t);
-        // ⚠️ 必须在事务提交后才入队（与 QcBatchServiceImpl 同口径，用 DistLock.afterCommit）。
+        // 1. ⚠️ 必须在事务提交后才入队（与 QcBatchServiceImpl 同口径，用 DistLock.afterCommit）。
         // 在事务内 queue.offer 会让 worker 立刻 poll 到 id，但它去 selectById 时该行尚未提交
         // —— 读到 null，runTask 静默 return，任务永远停在 QUEUED（本 bug 的实际表现）。
         DistLock.afterCommit(() -> {
-            // 队满时不能静默丢 id —— 那样任务会永远停在 QUEUED、前端一直转圈。
+            // 2. 队满时不能静默丢 id —— 那样任务会永远停在 QUEUED、前端一直转圈。
             // 直接落 FAILED，让用户在任务列表里看到明确结局并能重试。
             if (!queue.offer(t.getId())) {
                 log.error("[清洗] 任务队列已满（容量 {}），任务 {} 无法入队，直接落 FAILED",
@@ -299,7 +299,7 @@ public class CleanBatchService implements ICleanBatchService {
             cancelFlags.remove(id);
             return;
         }
-        // 条件认领：只有还停在 QUEUED 才置 RUNNING（让路于并发到达的取消）
+        // 1. 条件认领：只有还停在 QUEUED 才置 RUNNING（让路于并发到达的取消）
         LocalDateTime startedAt = LocalDateTime.now().withNano(0);
         int claimed = taskMapper.update(null, new UpdateWrapper<CleanTask>()
                 .eq("id", id)
@@ -313,7 +313,7 @@ public class CleanBatchService implements ICleanBatchService {
         t.setStatus(CleanTask.RUNNING);
         t.setStartedAt(startedAt);
 
-        // clean() 会把「范围内总条数」写进来，供进度回调落库（否则前端算不出百分比）
+        // 2. clean() 会把「范围内总条数」写进来，供进度回调落库（否则前端算不出百分比）
         java.util.concurrent.atomic.AtomicInteger totalHolder = new java.util.concurrent.atomic.AtomicInteger(0);
         boolean cancelled = false;
         boolean failed = false;
@@ -322,19 +322,19 @@ public class CleanBatchService implements ICleanBatchService {
             FiltersDTO filters = readFilters(t.getFiltersJson());
             boolean skipNorm = t.getSkipNormalize() != null && t.getSkipNormalize() == 1;
             final String tid = id;
-            // ⚠️ worker 是后台线程，读不到 RequestContextHolder —— 而 clean() 内部多处调
+            // 3. ⚠️ worker 是后台线程，读不到 RequestContextHolder —— 而 clean() 内部多处调
             // RequestUtils.currentOrgId()（RecordFilter.build / 预热 / 词典元数据）。
             // 不绑定上下文时 currentOrgId() 取到 null，RecordFilter 退化成「查不到任何数据」，
             // 任务会「秒完成但处理 0 条」——本 bug 的实际表现。
             // 故用提交时冻结的 orgId 快照临时绑定一个请求上下文，执行完在 finally 清理；
             // 同时按用户要求把 role 也设为管理员口径（viewAllOrgs），与提交者视角一致。
             bindWorkerContext(t.getOrgId());
-            // 进度回调：每 200 条写一次进度；返回 false 表示已请求取消
+            // 4. 进度回调：每 200 条写一次进度；返回 false 表示已请求取消
             java.util.function.IntPredicate progress = done -> {
                 CleanTask upd = new CleanTask();
                 upd.setId(tid);
                 upd.setDone(done);
-                // ⚠️ total 由 clean() 通过 totalHolder 回填（见下方注释）：
+                // 5. ⚠️ total 由 clean() 通过 totalHolder 回填（见下方注释）：
                 // 提交时 total 未知（要扫库才算），若一直为 0，前端 percent = done/total
                 // 恒为 0，进度条永远不动 —— 用户看到的就是「进度条不变」。
                 if (totalHolder.get() > 0) {
@@ -357,7 +357,7 @@ public class CleanBatchService implements ICleanBatchService {
             upd.setFinishedAt(LocalDateTime.now().withNano(0));
             upd.setCurrentLabel(null);
             if (result != null) {
-                // clean() 中止时 total 已被改写为「实际处理数」（见 GovernanceServiceImpl），
+                // 6. clean() 中止时 total 已被改写为「实际处理数」（见 GovernanceServiceImpl），
                 // 正常跑完时它就是查询总数 —— 两种情况都对。
                 int done = result.getTotal();
                 upd.setDone(done);

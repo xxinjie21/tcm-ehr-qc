@@ -48,12 +48,12 @@ public final class RecordUtil {
             case "prescription" -> r.getPrescription();
             case "followUp" -> r.getFollowUp();
             case "treatmentEffect" -> r.getTreatmentEffect();
-            // 这两个 case 原先只有 QcScorer 那份有（本次收敛的由来）
+            // 1. 这两个 case 原先只有 QcScorer 那份有（本次收敛的由来）
             case "department" -> r.getDepartment();
             case "doctorId" -> r.getDoctorId();
             default -> null;
         };
-        // 空白视作无值，避免把空格当内容做存在性判断
+        // 2. 空白视作无值，避免把空格当内容做存在性判断
         return v == null || v.isBlank() ? null : v.trim();
     }
 
@@ -95,7 +95,7 @@ public final class RecordUtil {
         appendField(sb, r.getDepartment());
         appendField(sb, r.getDoctorId());
         appendField(sb, r.getVisitCount() == null ? null : String.valueOf(r.getVisitCount()));
-        // 接诊时间先截到秒再参与哈希：visit_time 列是 DATETIME（无小数秒），
+        // 1. 接诊时间先截到秒再参与哈希：visit_time 列是 DATETIME（无小数秒），
         // 直接 toString() 会把亚秒带上，于是「入库前算的哈希」与「从库读回重算的哈希」
         // 不相等 —— 去重预筛失效，还会撞唯一键
         appendField(sb, r.getVisitTime() == null ? null : r.getVisitTime().withNano(0).toString());

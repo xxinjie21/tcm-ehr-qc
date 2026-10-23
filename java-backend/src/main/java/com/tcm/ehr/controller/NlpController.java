@@ -65,7 +65,7 @@ public class NlpController {
      */
     @PostMapping("/extract")
     public ResponseEntity<Result<NlpExtractVO>> extract(@Valid @RequestBody NlpExtractDTO dto) {
-        // 取待抽取文本，为空回 400（其余情况一律降级）
+        // 1. 取待抽取文本，为空回 400（其余情况一律降级）
         String text = dto == null ? null : dto.text();
         if (text == null || text.isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "请输入待抽取文本"));
@@ -124,7 +124,7 @@ public class NlpController {
         NlpExtractVO vo = nlpClient.extract(text);
         // 2. 上游不可用 → 降级为空 9 类并标注原因，供页面显示降级横幅
         if (vo == null) {
-            // 具体原因见 PythonNlpClient 的启动/调用日志，这里只记规模与判定结果，便于对账
+            // 3. 具体原因见 PythonNlpClient 的启动/调用日志，这里只记规模与判定结果，便于对账
             String reason = nlpEnabled
                     ? NlpExtractVO.REASON_UNREACHABLE
                     : NlpExtractVO.REASON_DISABLED;
@@ -140,7 +140,7 @@ public class NlpController {
         }
         // 4. 术语归一
         EntityNormalizer.NormStat stat = entityNormalizer.normalize(vo);
-        // G2：把「因否定语境被拦下、没有归一」的累计条数取出来写进日志，
+        // 6. G2：把「因否定语境被拦下、没有归一」的累计条数取出来写进日志，
         //     让「归一率下降」能和「护栏拦了多少」对账（drain 后清零，属本次抽取的增量）。
         int negatedSkipped = entityNormalizer.drainNegatedSkip();
         log.debug("[NLP] 抽取完成并归一：命中 {} 条（精确 {} / 包含 {} / 模糊 {}），否定护栏拦下 {} 条",
@@ -216,7 +216,7 @@ public class NlpController {
      */
     @GetMapping("/extract/batch/{id}")
     public ResponseEntity<Result<NlpTaskVO>> batchStatus(@PathVariable String id) {
-        // 取任务；2. 不存在回 404（前端轮询时据此停止轮询）
+        // 1. 取任务；2. 不存在回 404（前端轮询时据此停止轮询）
         NlpTaskVO vo = nlpBatchService.get(id);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "任务不存在"));

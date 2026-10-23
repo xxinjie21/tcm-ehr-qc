@@ -120,13 +120,13 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
     public void rebuild(String type, String orgId, List<TermEntry> entries, String version) throws IOException {
         String index = indexName(type);
         String org = normalizeOrg(orgId);
-        // 词表要变了 ⇒ 先清召回缓存：否则重建完仍命中旧结果（见 RECALL_CACHE 注释）。
+        // 1. 词表要变了 ⇒ 先清召回缓存：否则重建完仍命中旧结果（见 RECALL_CACHE 注释）。
         // 放在最前面而不是最后：重建期间本来就有检索空窗（接口 javadoc 已声明调用方需容忍
         // index_not_found），此时缓存为空与「空窗」是同一状态，不会更糟；
         // 若放在最后，并发读有可能在清空之后又把旧结果写回来。
         clearRecallCache();
 
-        // ⚠️ 不能只判「索引存在」就复用：从旧版本升级时，索引是旧代码建的 ——
+        // 2. ⚠️ 不能只判「索引存在」就复用：从旧版本升级时，索引是旧代码建的 ——
         //    它的 mapping 里没有 org_id（或 org_id 被动态映射成了 text）。
         //    复用会导致两个后果，且都不报错：
         //      1) delete_by_query(org_id) 删不掉任何东西（旧文档没这个字段）；
@@ -151,13 +151,13 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
                     "properties", mappingProperties()));
             client.indices().create(create, RequestOptions.DEFAULT);
         } else {
-            // 先把该组织的旧文档删掉：不删整索引，避免误伤其它组织
+            // 3. 先把该组织的旧文档删掉：不删整索引，避免误伤其它组织
             try {
                 org.elasticsearch.client.Request r = new org.elasticsearch.client.Request("POST", index + "/_delete_by_query");
                 r.setJsonEntity("{\"query\":{\"term\":{\"org_id\":\"" + escapeJson(org) + "\"}}}");
                 client.getLowLevelClient().performRequest(r);
             } catch (Exception e) {
-                // 失败必须让整个重建失败：吞掉的话该组织的旧文档会留在索引里继续参与归一，
+                // 4. 失败必须让整个重建失败：吞掉的话该组织的旧文档会留在索引里继续参与归一，
                 // 而 indexed_version 照样会被记为最新 —— 词典里已删掉的词还在命中，且无任何信号
                 throw new IOException("清空该组织旧文档失败，已中止重建以免留下混合索引", e);
             }
@@ -185,14 +185,14 @@ doc.put("standard_term", e.getStandardTerm());
             return List.of();
         }
         String org = normalizeOrg(orgId);
-        // 同批 LRU（批次 12 · 12b）：同术语重复归一不再打 ES。命中即返回，缓存里存的是
+        // 1. 同批 LRU（批次 12 · 12b）：同术语重复归一不再打 ES。命中即返回，缓存里存的是
         // List.copyOf 的不可变副本 —— 否则调用方改了返回列表就把缓存内容也改了。
         String cacheKey = type + "|" + org + "|" + input;
         List<TermEntry> cached = RECALL_CACHE.getIfPresent(cacheKey);
         if (cached != null) {
             return cached;
         }
-        // _source 白名单必须与写入侧（bulk 的 doc.put）逐字段对齐
+        // 2. _source 白名单必须与写入侧（bulk 的 doc.put）逐字段对齐
         SearchSourceBuilder source = new SearchSourceBuilder()
                 .size(maxCandidates)
                 .query(recallQuery(org, input))
@@ -256,7 +256,7 @@ doc.put("standard_term", e.getStandardTerm());
                 }
             }
             out.put(asked.get(i), candidates);
-            // 顺手把结果写进同一份召回缓存（键与 search 完全一致）：这样调用方只要在循环前
+            // 3. 顺手把结果写进同一份召回缓存（键与 search 完全一致）：这样调用方只要在循环前
             // 用 searchBatch 预取一次，循环里的逐术语 normalize 就会全部命中缓存 ——
             // 既拿到了「批量」的收益，又不必改任何循环体的写法。
             RECALL_CACHE.put(type + "|" + org + "|" + asked.get(i), List.copyOf(candidates));
@@ -401,7 +401,7 @@ private TermEntry toEntry(Map<String, Object> src) {
     private String hashId(String orgId, String standardTerm) {
         String key = (orgId == null ? "" : orgId) + "|" + (standardTerm == null ? "" : standardTerm);
         try {
-            // 摘要口径收敛到 RecordUtil.md5Hex（《自研组件替换计划》#12）。
+            // 1. 摘要口径收敛到 RecordUtil.md5Hex（《自研组件替换计划》#12）。
             // 外层 try 仍必须留且必须接 RuntimeException：md5Hex 取不到 MD5 时抛的是
             // IllegalStateException（不是原来手写版的 NoSuchAlgorithmException），
             // 这里要把它降级成 hashCode —— 与 StatsCache.keyOf 退空串是两套有意的取舍，不能统一。

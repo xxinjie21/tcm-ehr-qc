@@ -83,7 +83,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         if (LlmConfig.PROVIDER_OPENAI.equals(cfg.provider()) && TextUtil.isBlank(cfg.apiKey())) {
             throw new IllegalArgumentException("选择 openai 通道时必须填写 API Key");
         }
-        // 探测固定为「启用」：用户点测试连接就是要验证这套参数能不能用
+        // 3. 探测固定为「启用」：用户点测试连接就是要验证这套参数能不能用
         LlmConfig probeCfg = new LlmConfig(true, cfg.provider(), cfg.baseUrl(), cfg.apiKey(),
                 cfg.model(), cfg.temperature(), Math.min(cfg.timeout(), PROBE_TIMEOUT_MS));
 
@@ -136,7 +136,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
         }
 
         // 4. 密钥单独走 resolveApiKey：回传的掩码不该被当成新密钥存下来
-        // 5. 三个功能开关同样「给了才改」：前端只提交用户拨过的那一个
+        // 三个功能开关同样「给了才改」：前端只提交用户拨过的那一个
         return new LlmConfig(enabled, normProvider,
                 dto.getBaseUrl() == null ? cur.baseUrl() : dto.getBaseUrl().trim(),
                 resolveApiKey(dto.getApiKey(), cur.apiKey()),

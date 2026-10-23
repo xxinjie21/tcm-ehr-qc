@@ -100,7 +100,7 @@ public class DictProposalServiceImpl implements IDictProposalService {
      * @param scope org（默认，本组自有词条）或 effective（基础层 ∪ 本组）
      */
     public List<TermEntry> exportBaseline(String orgId, String type, String scope) {
-        // 非法/缺省一律按 org：这是提案流程依赖的口径，改动它会让「整快照替换」
+        // 1. 非法/缺省一律按 org：这是提案流程依赖的口径，改动它会让「整快照替换」
         // 把基础层整份复制进组织层（组织层是叠加层，重复写入只会造成索引冗余）
         if (scope != null && IDictionaryTermStore.SCOPE_EFFECTIVE.equals(scope.trim())) {
             return termStore.readEffective(orgId, type);
@@ -238,7 +238,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         if (currentOrgId == null || currentOrgId.isBlank() || !proposalOrg.equals(currentOrgId)) {
             throw new ForbiddenException("无权审核其它课题组的提案");
         }
-        // 授权位按「主组织」查，故只在确认提案属于本组织之后才用它 ——
+        // 1. 授权位按「主组织」查，故只在确认提案属于本组织之后才用它 ——
         // 否则「在 A 组被授权」会等价于「可审 A 组以外的提案」
         if (!orgPermission.canWriteDictionary(RequestUtils.currentUserId())) {
             throw new ForbiddenException("需管理员、组织所有者或被授权成员才能审核提案");
@@ -277,7 +277,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
                 vo.getAdded().add(toMap(e));
             } else if (changed(base, e)) {
                 Map<String, Object> row = toMap(e);
-                // 带上旧值，前端才能显示「从 A 改成 B」
+                // 1. 带上旧值，前端才能显示「从 A 改成 B」
                 row.put("before", toMap(base));
                 vo.getModified().add(row);
             }
@@ -328,11 +328,11 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         if (p == null) {
             throw new BusinessException(4003, "提案不存在");
         }
-        // 权限与归属一起判（批次 6 工作项 4）：合并会整份替换目标组织的基线并重建其 ES 索引，
+        // 1. 权限与归属一起判（批次 6 工作项 4）：合并会整份替换目标组织的基线并重建其 ES 索引，
         // 属跨机构写。原实现只看调用方传来的 isOwner（恒为真），等于没判
         requireAuditable(p);
         if (!p.isPending()) {
-            // 重复提交审核：直接返回当前状态，不二次合并（否则会生成两份归档）
+            // 2. 重复提交审核：直接返回当前状态，不二次合并（否则会生成两份归档）
             throw new BusinessException(4003, "该提案已" + statusText(p.getStatus()) + "，不能重复审核");
         }
 
@@ -352,7 +352,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
             throw new BusinessException(4003, "提案快照已被清理，无法合并；请让提交者重新提交");
         }
 
-        // 合并走与导入/重建同一把跨实例锁：避免与并发导入交错出混合索引。
+        // 3. 合并走与导入/重建同一把跨实例锁：避免与并发导入交错出混合索引。
         // 等待 0 秒（P2-22）：审核合并在线触发，冲突立刻回 409，不让用户干等 3 秒。
         distLock.runLocked(DistLock.dictRebuildLock(p.getType(), p.getOrgId()),
                 DistLock.NO_WAIT, () -> {
@@ -362,9 +362,9 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-            // 灌成功才记已同步
+            // 4. 灌成功才记已同步
             termStore.markIndexed(p.getOrgId(), p.getType(), version);
-            // 归档取「合并后」的基线：传 replace 后的版本号无关，这里直接用 terms
+            // 5. 归档取「合并后」的基线：传 replace 后的版本号无关，这里直接用 terms
             archiveService.archive(p.getOrgId(), p.getType(), terms,
                     p.getId(), auditor, comment);
             return null;
@@ -471,7 +471,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
     /** 用新词条整体替换某提案的快照 */
     private void replaceSnapshot(String proposalId, List<TermEntry> terms) {
         termMapper.delete(new QueryWrapper<DictProposalTerm>().eq("proposal_id", proposalId));
-        // P2-8：先攒成列表再批量插入。快照是整份目标词典（疾病类上千条），
+        // 1. P2-8：先攒成列表再批量插入。快照是整份目标词典（疾病类上千条），
         // 逐条 insert 就是上千次往返；批写通道每 500 条 flush 一次。
         List<DictProposalTerm> batch = new ArrayList<>(terms.size());
         for (TermEntry e : terms) {

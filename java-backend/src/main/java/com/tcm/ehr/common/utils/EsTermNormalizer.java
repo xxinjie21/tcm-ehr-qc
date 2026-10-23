@@ -81,7 +81,7 @@ public class EsTermNormalizer {
         if (raws == null || raws.isEmpty()) {
             return;
         }
-        // 用与 normalize 逐字一致的 cleanTerm 规整后再预取：否则缓存键是「带标点的原文」，
+        // 1. 用与 normalize 逐字一致的 cleanTerm 规整后再预取：否则缓存键是「带标点的原文」，
         // 而 normalize 查的是「规整后的术语」，两者对不上 —— 预取白做，逐条又各自回源 ES。
         List<String> cleaned = new ArrayList<>(raws.size());
         for (String raw : raws) {
@@ -190,7 +190,7 @@ public class EsTermNormalizer {
      * 变成 500「系统异常」—— 实测踩过。索引查不动（无论什么原因）在语义上都等于索引不可用。
      */
     private List<TermEntry> recall(String type, String orgId, String input) {
-        // 检索失败必须抛出：静默返回空列表等于把「索引挂了」伪装成「词典没这个词」
+        // 1. 检索失败必须抛出：静默返回空列表等于把「索引挂了」伪装成「词典没这个词」
         try {
             return esTermIndexService.search(type, orgId == null ? "" : orgId, input, RECALL_SIZE);
         } catch (Exception e) {
@@ -305,7 +305,7 @@ public class EsTermNormalizer {
 
     /** 脉象：脉位 + 脉质，忽略程度修饰字与诊法短语，遇否定 / 减退字整体放弃。 */
     private List<NormalizeResult> decomposePulse(String orgId, String input) {
-        // 整串召回只作参考：它按 IK 分词，常召不回拆解所需的部件（「脉偏细」召不回「脉细」）。
+        // 1. 整串召回只作参考：它按 IK 分词，常召不回拆解所需的部件（「脉偏细」召不回「脉细」）。
         // 真正的判定走逐段定点查词（termNormalizer.normalize 对单术语必然精确召回），
         // 缓存复用 RECALL_CACHE 与本地 map，只在未命中的实体上发生。
         Set<String> known = new java.util.HashSet<>();
@@ -408,13 +408,13 @@ public class EsTermNormalizer {
 
     /** 舌象：整串由 ≥2 个词典项覆盖（允许略过程度修饰字），按原文顺序返回标准词。 */
     private List<NormalizeResult> decomposeTongue(String orgId, String input) {
-        // surface（标准词或别名）→ 标准词；单字词条不参与拆解（会把「红」拆成独立实体）
+        // 1. surface（标准词或别名）→ 标准词；单字词条不参与拆解（会把「红」拆成独立实体）
         java.util.Map<String, String> surface = surfaces(recall("tongue", orgId, input));
         List<String> seg = cover(input, 0, surface, new java.util.HashMap<>(), TONGUE_SKIP);
         if (seg == null) {
             return List.of();
         }
-        // 产出：跳过修饰字（空串标记）不算实体；至少要有一个词条落点
+        // 2. 产出：跳过修饰字（空串标记）不算实体；至少要有一个词条落点
         List<NormalizeResult> out = new ArrayList<>(seg.size());
         boolean skipped = false;
         for (String std : seg) {
@@ -424,7 +424,7 @@ public class EsTermNormalizer {
             }
             addUnique(out, new NormalizeResult(std, LEVEL_EXACT));
         }
-        // 「舌淡苔薄」这类整串由 ≥2 个词条覆盖才值得拆；
+        // 3. 「舌淡苔薄」这类整串由 ≥2 个词条覆盖才值得拆；
         // 「尖红较甚」只有 1 个词条、其余全是修饰字，也可安全归到「尖红」。
         // 单个词条且没有任何修饰字时说明整串本可精确命中，走到这里必然有残字，放弃。
         if (out.isEmpty() || (out.size() < 2 && !skipped)) {
@@ -445,7 +445,7 @@ public class EsTermNormalizer {
             }
         }
         List<TermEntry> entries = recall("symptom", orgId, input);
-        // ① 组合：整串覆盖
+        // 1. ① 组合：整串覆盖
         java.util.Map<String, String> surface = surfaces(entries);
         List<String> seg = cover(input, 0, surface, new java.util.HashMap<>(), "");
         if (seg != null) {
@@ -457,7 +457,7 @@ public class EsTermNormalizer {
                 return out;
             }
         }
-        // ② 语境前后缀：先试「前缀+后缀」，再单独试前缀 / 后缀
+        // 2. ② 语境前后缀：先试「前缀+后缀」，再单独试前缀 / 后缀
         String body = null;
         String afterPrefix = stripPrefix(input);
         if (afterPrefix != null) {
@@ -472,7 +472,7 @@ public class EsTermNormalizer {
         }
         String std = exactTerm(entries, body);
         if (std == null) {
-            // 整串召回同样可能漏掉剥完修饰后的部件（「晨起口干」召不回「口干」），定点补一次
+            // 3. 整串召回同样可能漏掉剥完修饰后的部件（「晨起口干」召不回「口干」），定点补一次
             NormalizeResult r = normalize("symptom", orgId, body);
             if (r.level() == LEVEL_EXACT) {
                 std = r.standardTerm();
@@ -500,7 +500,7 @@ public class EsTermNormalizer {
         java.util.Map<String, String> surface = surfaces(entries);
         List<String> seg = cover(input, 0, surface, new java.util.HashMap<>(), PATTERN_SKIP);
         if (seg == null) {
-            // 整串召回按 IK 分词，可能漏掉其中的部件 ⇒ 逐段定点补一次再试
+            // 1. 整串召回按 IK 分词，可能漏掉其中的部件 ⇒ 逐段定点补一次再试
             surface = expandByProbe("pattern", orgId, input, surface);
             seg = cover(input, 0, surface, new java.util.HashMap<>(), PATTERN_SKIP);
         }
@@ -700,7 +700,7 @@ public class EsTermNormalizer {
         if (text == null || text.isBlank()) {
             return out;
         }
-        // 与 normalize 同口径先规整标点：扫描的整段文本（处方/诊断）常常句尾带「。」或重复标点，
+        // 1. 与 normalize 同口径先规整标点：扫描的整段文本（处方/诊断）常常句尾带「。」或重复标点，
         // 规整后再比子串，命中口径与逐术语归一一致。
         String input = cleanTerm(text);
         if (input.isEmpty()) {
@@ -710,7 +710,7 @@ public class EsTermNormalizer {
         for (TermEntry e : recall(type, orgId, input)) {
             String std = e.getStandardTerm();
             if (std == null || std.isBlank() || std.equals(input)) {
-                // 与原文完全相同的不算「被截断的残词」，跳过
+                // 3. 与原文完全相同的不算「被截断的残词」，跳过
                 continue;
             }
             if (input.contains(std) || containsAnyAlias(e, input)) {
@@ -794,7 +794,7 @@ public class EsTermNormalizer {
             if (hasSubstringRelation(e, input)) {
                 continue;
             }
-            // 与输入仅差一个否定/减弱字（咽不痛/大便成形/食欲欠佳）语义正好相反，
+            // 6. 与输入仅差一个否定/减弱字（咽不痛/大便成形/食欲欠佳）语义正好相反，
             // Dice 仍可能 ≥0.8，模糊级必须否决；精确与包含级不受影响。
             double s = polarityOnlyDiff(input, e.getStandardTerm())
                     ? 0 : dicePrepared(inputDistinct, e.getStandardTerm());
@@ -831,14 +831,14 @@ public class EsTermNormalizer {
             if (a == null || a.isBlank()) {
                 continue;
             }
-            // R8：单字别名只参与**召回与精确命中**，不参与包含（2026-10-19）。
+            // 1. R8：单字别名只参与**召回与精确命中**，不参与包含（2026-10-19）。
             // 豆包补词引入了「脉软←软」「呕吐←吐/呕」「斑疹←斑/疹」这类单字别名，
             // 若允许包含，则任何含该字的 2 字串都会被吃掉：「质软」「软条」→ 脉软、
             // 「吐痰」「呕血」→ 呕吐、「湿疹」→ 斑疹。差额阈值（≤1）挡不住 1 字别名。
             if (a.codePointCount(0, a.length()) < 2) {
                 continue;
             }
-            // 别名只在这个方向上认：输入里出现了完整的别名片段（R4 禁掉的是反方向）
+            // 2. 别名只在这个方向上认：输入里出现了完整的别名片段（R4 禁掉的是反方向）
             if (input.contains(a) && inputLen - a.codePointCount(0, a.length()) <= containDelta) {
                 return true;
             }

@@ -30,14 +30,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
      * @param registry 拦截器注册表
      */
     public void addInterceptors(InterceptorRegistry registry) {
-        // 顺序即执行顺序：先鉴权（401），再校验角色（403）
+        // 1. 顺序即执行顺序：先鉴权（401），再校验角色（403）
         registry.addInterceptor(jwtInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(WHITELIST);
         registry.addInterceptor(roleInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(WHITELIST);
-        // 组内角色（组长）校验：在系统级角色之后执行
+        // 2. 组内角色（组长）校验：在系统级角色之后执行
         registry.addInterceptor(groupRoleInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(WHITELIST);

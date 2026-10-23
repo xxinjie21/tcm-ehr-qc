@@ -116,7 +116,7 @@ public class QcController {
      */
     @GetMapping("/score/batch/{id}")
     public ResponseEntity<Result<QcTaskVO>> scoreBatchStatus(@PathVariable String id) {
-        // 进度在表里；任务不存在与「任务被清理」同一表现
+        // 1. 进度在表里；任务不存在与「任务被清理」同一表现
         QcTaskVO vo = qcBatchService.get(id);
         if (vo == null) {
             return ResponseEntity.status(404).body(Result.error(404, "任务不存在"));
@@ -148,7 +148,7 @@ public class QcController {
      */
     @PostMapping("/score/batch/{id}/cancel")
     public Result<QcTaskVO> cancelScoreBatch(@PathVariable String id) {
-        // 不在 Controller 内 catch 拼错误体：任务不存在由 service 抛 ResourceNotFoundException，
+        // 1. 不在 Controller 内 catch 拼错误体：任务不存在由 service 抛 ResourceNotFoundException，
         // 统一交给 GlobalExceptionHandler 转 404（全仓唯一错误体出口）
         return Result.ok("已取消", qcBatchService.cancel(id));
     }

@@ -94,7 +94,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public EsTermNormalizer.NormalizeResult normalize(String type, String term) {
-        // 只收有独立词典的类型：没词典的类型归一了也没有权威结果可依
+        // 1. 只收有独立词典的类型：没词典的类型归一了也没有权威结果可依
         if (!com.tcm.ehr.common.config.EntityTypes.dictKeys().contains(type)) {
             throw new IllegalArgumentException("type 必须为有独立词典的类型");
         }
@@ -109,7 +109,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     @Transactional(rollbackFor = Exception.class)
     @Override
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters) {
-        // 旧签名保持行为不变（执行归一），内部委托新重载
+        // 1. 旧签名保持行为不变（执行归一），内部委托新重载
         return clean(recordIds, filters, false);
     }
 
@@ -131,49 +131,49 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     public CleanResultVO clean(List<String> recordIds, com.tcm.ehr.domain.dto.FiltersDTO filters,
                               boolean skipNormalize, java.util.function.IntPredicate progress,
                               java.util.function.IntConsumer totalSink) {
-        // 批次12 · 12c（第二步）：由「整批载入」改为**惰性分页**。
+        // 1. 批次12 · 12c（第二步）：由「整批载入」改为**惰性分页**。
         // 原实现把 3.5 万行一次读进内存，每行还带 1.3KB 的 structured_data（合计 43.8MB）——
         // 这是清洗的堆占用来源。下面保持 for-each 写法**一行不改**，只把数据源换成按页拉取。
         // P1-3：wrapper 改为「每页重建」的工厂 —— keyset 锚点必须追加到一份干净的条件上
         // （QueryWrapper.and() 是原地追加，复用同一份会逐页累积 WHERE）。
         java.util.function.Supplier<QueryWrapper<Record>> wrapperFactory = () -> {
             boolean byIds = recordIds != null && !recordIds.isEmpty();
-            // 清洗只作用于「质控合格」：按范围或按病历 ID，都在数据域之上叠加 grade=合格。
+            // 2. 清洗只作用于「质控合格」：按范围或按病历 ID，都在数据域之上叠加 grade=合格。
             // 按 ID 时不用范围条件（与原行为一致），只保留 ID 收窄。
             QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(),
                     qualifiedScope(byIds ? null : filters));
             return byIds ? wrapper.in("id", recordIds) : wrapper;
         };
-        // P1-17 / T3：本页的 structured_data 解析结果留档，供「预热」与「逐条清洗」共用 ——
+        // 3. P1-17 / T3：本页的 structured_data 解析结果留档，供「预热」与「逐条清洗」共用 ——
         // 预热要读同一份内容，不共用就得为预热再解析一遍（T16 的「只解析一次」不能因预热回退）。
         Map<String, Map<String, Object>> pageParsed = new HashMap<>();
         Iterable<Record> records = pagedRecords(wrapperFactory,
                 page -> prefetchPage(page, RequestUtils.currentOrgId(), pageParsed));
 
         CleanResultVO vo = new CleanResultVO();
-        // total 单独查一次：逐页再算总数是浪费。
+        // 4. total 单独查一次：逐页再算总数是浪费。
         // 注意 selectCount 返回 Long，不能 (int) 直接强转，须 intValue()。
         vo.setTotal(baseMapper.selectCount(wrapperFactory.get()).intValue());
-        // 把范围内总条数回填给调用方：异步任务要写进 clean_task.total，
+        // 5. 把范围内总条数回填给调用方：异步任务要写进 clean_task.total，
         // 否则 total 恒为 0，前端 percent = done/total 算不出真实百分比（进度条不动）。
         if (totalSink != null) {
             totalSink.accept(vo.getTotal());
         }
 
         Set<String> seenTextHash = new HashSet<>();
-        // T13：词典元数据一批只取一次（惰性 —— 本批没有任何归一需求时一次库都不查）。
+        // 6. T13：词典元数据一批只取一次（惰性 —— 本批没有任何归一需求时一次库都不查）。
         // 原先 normalizeStructuredData 逐条调 effectiveDictVersion / effectiveTermCount，
         // 每次又各自查库，4 万条就是约 16 万次 SQL；而 orgId 在整批内恒定，
         // 同一批也不该盖上两个不同的版本戳。
         DictMeta dictMeta = new DictMeta(termStore, RequestUtils.currentOrgId());
-        // 进度回调（异步任务用）：每处理 200 条回调一次，返回值 false = 请求中止。
+        // 7. 进度回调（异步任务用）：每处理 200 条回调一次，返回值 false = 请求中止。
         // 粒度取 200 而不是每条：回调要写库更新进度，逐条写会把清洗拖慢；
         // 200 条一页的粒度下，取消最迟在「当前页跑完」生效，用户感知足够快。
         int processedCnt = 0;
         for (Record r : records) {
             if (progress != null && (++processedCnt % 200 == 0) && !progress.test(processedCnt)) {
                 log.info("[清洗] 收到中止请求，已处理 {} 条，提前结束", processedCnt);
-                // 中止时 total 记为实际处理数而非查询总数：
+                // 8. 中止时 total 记为实际处理数而非查询总数：
                 // 否则调用方（异步任务）会把 done 写成全量数，看起来像「跑完了才被取消」。
                 vo.setTotal(processedCnt);
                 break;
@@ -181,7 +181,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             String status = r.getStatus();
             String grade = r.getGrade();
 
-            // 已隔离（invalid）的记录跳过：不再重复参与去重/清理统计
+            // 9. 已隔离（invalid）的记录跳过：不再重复参与去重/清理统计
             if ("invalid".equals(status)) {
                 continue;
             }
@@ -191,7 +191,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (!seenTextHash.add(textHash)) {
                 baseMapper.updateCleanFields(r.getId(), trim(r.getGender()), trim(r.getAge()),
                         trim(r.getPattern()), trim(r.getPrescription()), "invalid", QcScorer.GRADE_INVALID);
-                // 与下面「不可修复」分支同理：隔离必须同步作废待复核任务
+                // 11. 与下面「不可修复」分支同理：隔离必须同步作废待复核任务
                 reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
                 vo.setDeduped(vo.getDeduped() + 1);
                 continue;
@@ -223,7 +223,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             //    不再让「校验（readTree）」与「归一（readValue）」各解析同一份 JSON 一遍。
             //    structured == null 同时覆盖「没有 structured_data」与「有但解析不了」两种情形。
             boolean hasStructured = r.getStructuredData() != null && !r.getStructuredData().isBlank();
-            // P1-17：走本页留档的解析结果（预热时已解析过），不再解析第二遍
+            // 15. P1-17：走本页留档的解析结果（预热时已解析过），不再解析第二遍
             Map<String, Object> structured = hasStructured ? structuredOf(pageParsed, r) : null;
             boolean unrecoverable = (TextUtil.isBlank(r.getChiefComplaint()) && TextUtil.isBlank(r.getTcmDiagnosis())
                     && TextUtil.isBlank(r.getPresentIllness()) && TextUtil.isBlank(r.getSelfReport()))
@@ -233,17 +233,17 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 vo.setIsolated(vo.getIsolated() + 1);
                 status = "invalid";
                 grade = QcScorer.GRADE_INVALID;
-                // 隔离必须同步作废待复核任务：不作废的话它仍挂在复核页，
+                // 16. 隔离必须同步作废待复核任务：不作废的话它仍挂在复核页，
                 // 而复核会按当前数据重算，把「无效」翻回「合格」——隔离结论就被撤销了
                 reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
             }
 
             if (isolatedNow) {
-                // 只有真改了结论才写 status/grade；常规路径不碰这两列，
+                // 17. 只有真改了结论才写 status/grade；常规路径不碰这两列，
                 // 否则会把清洗开始时的旧快照盖到并发质控/复核的新结论上
                 baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, status, grade);
             } else if (repaired > 0) {
-                // 批次12 · 12c：**按需写**。
+                // 18. 批次12 · 12c：**按需写**。
                 // repaired 是「四个字段里 trim 后与原值不同」的个数；为 0 说明库里存的就是 trim 后的值，
                 // 这条 UPDATE 什么都不会改。原实现对每一行都发一次 UPDATE —— 3.5 万条实测 443 秒，
                 // 而返回体显示 cleared/deduped/isolated 全为 0，即绝大多数行本来就无需改动。
@@ -258,7 +258,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             r.setAge(age);
             r.setPattern(pattern);
             r.setPrescription(prescription);
-            // P2-3：四列都没变（repaired == 0）时 r 与进循环时逐字节相同 ⇒ 哈希必然相同，
+            // 20. P2-3：四列都没变（repaired == 0）时 r 与进循环时逐字节相同 ⇒ 哈希必然相同，
             // 直接用第 1 步那次的结果，不再重算一遍 MD5。
             // 「未改动 ⇒ 哈希不变」的前提已逐项核对：changed() 为假 ⟺ trim 后的值与库里的值
             // 完全相等（含「两者都是 null」），而 textHash 的 21 个字段里只有这四列在本循环被改写。
@@ -267,7 +267,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 try {
                     baseMapper.updateTextHash(r.getId(), freshHash);
                 } catch (DataIntegrityViolationException dup) {
-                    // 撞唯一键 = 该机构内已有一条内容相同的病历，与本方法开头的去重是同一结论
+                    // 21. 撞唯一键 = 该机构内已有一条内容相同的病历，与本方法开头的去重是同一结论
                     log.warn("[清洗] 病历 {} 回写 text_hash 撞唯一键，按重复处理并置为无效", r.getId());
                     baseMapper.updateCleanFields(r.getId(), gender, age, pattern, prescription, "invalid", QcScorer.GRADE_INVALID);
                     reviewTaskMapper.obsoleteActive(r.getId(), LocalDateTime.now().withNano(0));
@@ -283,7 +283,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             //    注意：合格但 structured_data 为空/空白的病历不在此列，它保持「待清洗」，
             //    因而不会被导出条件 governed=1 选中 —— 这是刻意的（没有结构化结果不算标准数据集）。
             // 5.5 跳过归一开关（skipNormalize）：仍标记已清洗，只是不做第 5 步的词形归一。
-            //     为什么要 markGoverned：不标记会让这批病历永远落在「待清洗」，
+            // 23. 为什么要 markGoverned：不标记会让这批病历永远落在「待清洗」，
             //     且被导出条件 governed=1 永久排除 —— 那是「没清洗」，不是「清洗了但跳过归一」。
             if (skipNormalize) {
                 if (QcScorer.GRADE_QUALIFIED.equals(grade) && structured != null) {
@@ -292,11 +292,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 continue;
             }
             if (QcScorer.GRADE_QUALIFIED.equals(grade) && structured != null) {
-                // 人工标记读标量列（性能审查 P1-2#2）：manually_edited 是 STORED 生成列，
+                // 23. 人工标记读标量列（性能审查 P1-2#2）：manually_edited 是 STORED 生成列，
                 // 与 _meta.manuallyEdited 同源，无需在这里再解析一遍 JSON
                 if (Boolean.TRUE.equals(r.getManuallyEdited())) {
                     vo.setManualSkipped(vo.getManualSkipped() + 1);
-                    // 人工修正过的按已清洗处理：它的 structured_data 已定案（方案 A 不重跑归一），
+                    // 24. 人工修正过的按已清洗处理：它的 structured_data 已定案（方案 A 不重跑归一），
                     // 不打标记会让它永远落在「待清洗」，并被导出条件 governed=1 永久排除
                     baseMapper.markGoverned(r.getId());
                 } else {
@@ -311,7 +311,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         }
         log.info("[清洗] 数据清洗完成: total={}, deduped={}, repaired={}, isolated={}, normalized={}",
                 vo.getTotal(), vo.getDeduped(), vo.getRepaired(), vo.getIsolated(), vo.getNormalized());
-        // 清洗改写了 structured_data / pattern / governed → 统计词频过期，主动失效（B1）。
+        // 25. 清洗改写了 structured_data / pattern / governed → 统计词频过期，主动失效（B1）。
         // W1：必须落在**事务提交之后** —— 本方法带 @Transactional，提交前清缓存会让并发读
         // 按「未提交的旧数据」现算并回填，事务提交后缓存就持着旧值直到 TTL 到期（最长 60s）。
         // afterCommit 在无活动事务时立即执行，故单测直调路径行为不变。
@@ -339,7 +339,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             scope.setDateRange(filters.getDateRange());
             scope.setIds(filters.getIds());
             scope.setOnlyUnparsed(filters.getOnlyUnparsed());
-            // 只清洗「没清洗过的」：清洗是数分钟级重活，而通常只有新增/新解析的病历需要清洗。
+            // 1. 只清洗「没清洗过的」：清洗是数分钟级重活，而通常只有新增/新解析的病历需要清洗。
             // 不加这一项时每次都在全范围重跑（本条件由调用方按需开启）。
             scope.setOnlyUncleaned(filters.getOnlyUncleaned());
         }
@@ -392,9 +392,9 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         exhausted = true;
                         return false;
                     }
-                    // P1-17：本页任何一条被消费之前先预热（解析留档 + 按类型批量问一次 ES）
+                    // 1. P1-17：本页任何一条被消费之前先预热（解析留档 + 按类型批量问一次 ES）
                     onPage.accept(rows);
-                    // 不满一页即到末尾：记下锚点后仍要把这一页发完
+                    // 2. 不满一页即到末尾：记下锚点后仍要把这一页发完
                     if (rows.size() < CLEAN_PAGE_SIZE) {
                         exhausted = true;
                     }
@@ -546,11 +546,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (json != null) {
                 baseMapper.updateStructuredData(r.getId(), json);
             } else {
-                // 序列化失败：跳过回写而不是写 null，避免把结构化数据整列清空
+                // 3. 序列化失败：跳过回写而不是写 null，避免把结构化数据整列清空
                 log.warn("[清洗] structuredData 序列化失败，跳过回写 recordId={}", r.getId());
             }
         } catch (JacksonException e) {
-            // 单条解析失败只记警告：一条脏数据不该中断整批清洗
+            // 4. 单条解析失败只记警告：一条脏数据不该中断整批清洗
             log.warn("[清洗] structuredData归一失败 recordId={}: {}", r.getId(), e.getMessage());
         }
         return stat;
@@ -573,18 +573,18 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /** 8 类 entity（content）逐类归一并做同标准词去重；stat 就地累加 */
     @SuppressWarnings("unchecked")
     private void normalizeEntityList(Map<String, Object> data, int[] stat) {
-        // 本组织归一范围：范围外的类型不做词形归一（仍走去重），与「无独立词典」同一处理
+        // 1. 本组织归一范围：范围外的类型不做词形归一（仍走去重），与「无独立词典」同一处理
         Set<String> scope = normScope();
         for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
                 "causeList", "treatmentList", "formulaList")) {
             if (!(data.get(key) instanceof List<?> list)) continue;
             String type = mapEntityType(key);
-            // 有词典、且在本组织归一范围内的才做词形归一；其余只走去重
+            // 2. 有词典、且在本组织归一范围内的才做词形归一；其余只走去重
             if (type != null && scope.contains(type)) {
                 for (Object item : list) {
                     if (!(item instanceof Map)) continue;
                     Map<String, Object> entity = (Map<String, Object>) item;
-                    // D1：归一的输入必须是**原文**（sourceText），不是上一次归一的结果（content）。
+                    // 3. D1：归一的输入必须是**原文**（sourceText），不是上一次归一的结果（content）。
                     // 实测：以 content 为输入会把「心悸」再归成「心悸手抖」、「知饥」再归成「知饥不食」——
                     // 非幂等，且第二次的结果比第一次更差。没有 sourceText（导入数据）才退回 content。
                     String raw = str(entity.get("sourceText"));
@@ -592,17 +592,17 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         raw = str(entity.get("content"));
                     }
                     if (raw == null || raw.isBlank()) continue;
-                    // 解析链路已有 sourceText 回填逻辑，这里保持一致的展示口径
+                    // 4. 解析链路已有 sourceText 回填逻辑，这里保持一致的展示口径
                     if (str(entity.get("sourceText")) == null) {
                         entity.put("sourceText", raw);
                     }
                     var result = termNormalizer.normalize(type, RequestUtils.currentOrgId(), raw);
-                    // D2：否定语境下的包含命中一律不归一（与解析链路共用 TermGuard 判据）
+                    // 5. D2：否定语境下的包含命中一律不归一（与解析链路共用 TermGuard 判据）
                     boolean hit = EsTermNormalizer.isHit(result.level())
                             && !(result.level() == EsTermNormalizer.LEVEL_CONTAIN
                                  && TermGuard.isNegatedContext(raw));
                     if (!hit) {
-                        // D4（Task 6 补丁）：未命中 / 被护栏拦下 → content 回填**原文**，并清掉可能残留的
+                        // 6. D4（Task 6 补丁）：未命中 / 被护栏拦下 → content 回填**原文**，并清掉可能残留的
                         // normLevel。content 只是归一的产物（D1）：库里旧的「标准词」若按现行规则已不再成立，
                         // 必须被原文覆盖，否则导出的「标准化对照」会拿一个失效映射去改正文 ——
                         // 实测残留映射造成 32 处坏替换（治疗→食疗、反复发作→流清涕…）。
@@ -610,7 +610,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         entity.remove("normLevel");
                         continue;
                     }
-                    // D3：命中就写 normLevel（质控据此认定「已标准化」）；
+                    // 7. D3：命中就写 normLevel（质控据此认定「已标准化」）；
                     //     报表的 normalized 计数只统计**词形确实变了**的那部分（语义不变）
                     boolean changed = !result.standardTerm().equals(String.valueOf(entity.get("content")));
                     if (changed) {
@@ -623,7 +623,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     }
                 }
             }
-            // 同标准词去重：口径与解析链路共用 EntityNormalizer.dedupByTerm
+            // 8. 同标准词去重：口径与解析链路共用 EntityNormalizer.dedupByTerm
             data.put(key, dedupStructuredList(list, "content"));
         }
     }
@@ -638,7 +638,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         for (Object item : list) {
             if (!(item instanceof Map)) continue;
             Map<String, Object> herb = (Map<String, Object>) item;
-            // D1：同实体，按原文（sourceText）归一，无 sourceText 才退回 name（幂等）
+            // 1. D1：同实体，按原文（sourceText）归一，无 sourceText 才退回 name（幂等）
             String raw = str(herb.get("sourceText"));
             if (raw == null || raw.isBlank()) {
                 raw = str(herb.get("name"));
@@ -647,18 +647,18 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             if (str(herb.get("sourceText")) == null) {
                 herb.put("sourceText", raw);
             }
-            // 中药不在归一范围 → 跳过归一，但仍做剂量单位规整与去重
+            // 2. 中药不在归一范围 → 跳过归一，但仍做剂量单位规整与去重
             if (herbOn) {
                 var result = termNormalizer.normalize("herb", RequestUtils.currentOrgId(), raw);
                 boolean hit = EsTermNormalizer.isHit(result.level())
                         && !(result.level() == EsTermNormalizer.LEVEL_CONTAIN
                              && TermGuard.isNegatedContext(raw));
                 if (!hit) {
-                    // D4：未命中 / 被拦下 → name 回填原文并清残留 normLevel（同 normalizeEntityList）
+                    // 3. D4：未命中 / 被拦下 → name 回填原文并清残留 normLevel（同 normalizeEntityList）
                     herb.put("name", raw);
                     herb.remove("normLevel");
                 } else {
-                    // D3：命中就写 normLevel；只有词形确实变了才计入 normalized 统计
+                    // 4. D3：命中就写 normLevel；只有词形确实变了才计入 normalized 统计
                     boolean changed = !result.standardTerm().equals(String.valueOf(herb.get("name")));
                     if (changed) {
                         herb.put("name", result.standardTerm());
@@ -703,7 +703,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 取 structuredData 实体里的字符串字段；非 Map 或字段缺失返回 null */
     private static String mapStr(Object item, String field) {
-        // 非 Map（脏数据）返回 null 2. 取字段值并转字符串
+        // 1. 非 Map（脏数据）返回 null 2. 取字段值并转字符串
         if (!(item instanceof Map<?, ?> m)) return null;
         Object v = m.get(field);
         return v == null ? null : String.valueOf(v);
@@ -711,7 +711,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
 
     /** 取 normLevel；非数字返回 null（未归一 / 未命中词典） */
     private static Integer mapLevel(Object item) {
-        // 非数字（未归一/脏数据）返回 null，让去重时按"层级未知"处理
+        // 1. 非数字（未归一/脏数据）返回 null，让去重时按"层级未知"处理
         if (!(item instanceof Map<?, ?> m)) return null;
         Object v = m.get("normLevel");
         return (v instanceof Number n) ? n.intValue() : null;
@@ -736,7 +736,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public ExportedFile export(ExportDTO dto) throws IOException {
-        // 性能审查 A7：不再 filterQualified 全量入堆，改 forEachQualified 边取边写，
+        // 1. 性能审查 A7：不再 filterQualified 全量入堆，改 forEachQualified 边取边写，
         // onces 内存恒定一页（1000）。JSON/CSV 两条路各自流式拼接。
         if ("json".equalsIgnoreCase(dto.getFormat())) {
             StringBuilder sb = new StringBuilder();
@@ -748,7 +748,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                         sb.append(',');
                     }
                     try {
-                        // 标准数据集：把这条病历里「被归一过」的术语在文本中就地换成标准词。
+                        // 2. 标准数据集：把这条病历里「被归一过」的术语在文本中就地换成标准词。
                         // 只改导出件，库里的原文一个字节都不动（本链路纯只读）。
                         sb.append(objectMapper.writeValueAsString(
                                 standardizeMap(r, effectivePairs(r, STANDARDIZABLE_FIELDS))));
@@ -758,14 +758,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 }
             });
             sb.append(']');
-            // 范围内无合格病历时返回 null，由 Controller 转 400 + code=2001
+            // 3. 范围内无合格病历时返回 null，由 Controller 转 400 + code=2001
             if (exported[0] == 0) {
                 return null;
             }
             return new ExportedFile("tcm_ehr_dataset_" + ts() + ".json",
                     mask(sb.toString()).getBytes(StandardCharsets.UTF_8));
         }
-        // CSV：流式拼行，再对字节打码（与旧实现同一脱敏口径）
+        // 4. CSV：流式拼行，再对字节打码（与旧实现同一脱敏口径）
         byte[] csv = toCsvStream(dto);
         if (csv == null) {
             return null;
@@ -786,7 +786,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // 1. 无证候筛选：走 SQL（COUNT 与 LIMIT 两条轻查询，不把全表读进内存）
         if (patternOf(dto) == null) {
             result.put("total", baseMapper.selectCount(qualifiedWrapper(dto)));
-            // LIMIT 只加在这里：导出要全量，预览只要 10 条
+            // 2. LIMIT 只加在这里：导出要全量，预览只要 10 条
             sample = baseMapper.selectList(qualifiedWrapper(dto).last("LIMIT " + PREVIEW_SAMPLE_SIZE));
         } else {
             // 2. 带证候筛选：证候在 JSON 里 SQL 筛不了；流式统计 total 与样本，
@@ -834,7 +834,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     @Override
     public Map<String, Object> governanceStats() {
-        // viewAllOrgs 一并下推：清洗页的「待清洗/已清洗」必须与 clean() 实际会处理的范围同域。
+        // 1. viewAllOrgs 一并下推：清洗页的「待清洗/已清洗」必须与 clean() 实际会处理的范围同域。
         // 性能审查 P1-6 / A5：拆成 All/Org 两条 SQL，Java 侧二选一；Org 分支 orgId 取
         // domainOrgId()（无组=哨兵值），fail-closed 不会统计到别组。
         return RequestUtils.viewAllOrgs()
@@ -882,7 +882,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         String cursorId = null;
         boolean firstPage = true;
         while (true) {
-            // 每页重建 wrapper：QueryWrapper.and() 原地追加，复用会把 WHERE 逐页累积；
+            // 1. 每页重建 wrapper：QueryWrapper.and() 原地追加，复用会把 WHERE 逐页累积；
             // qualifiedWrapper 含 grade=合格 & governed=1
             QueryWrapper<Record> wrapper = qualifiedWrapper(dto);
             if (!firstPage) {
@@ -913,7 +913,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     private static final Pattern ID_RE = Pattern.compile("(?<!\\d)\\d{17}[\\dXx](?!\\d)");
 
     private String mask(String s) {
-        // 两次替换的先后不能调换：先手机号后身份证，与改造前逐字节一致
+        // 1. 两次替换的先后不能调换：先手机号后身份证，与改造前逐字节一致
         return ID_RE.matcher(PHONE_RE.matcher(s).replaceAll("***")).replaceAll("***");
     }
 
@@ -970,7 +970,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      */
     private void appendCsvRow(ByteArrayOutputStream out, Record r, List<String> cols,
                               List<Map.Entry<String, String>> pairs) {
-        // T1：整实体 → Map 的转换**每行只做一次**。
+        // 1. T1：整实体 → Map 的转换**每行只做一次**。
         // 原先这句在下面的列循环体内，一行 22 列就要做 22 次整实体反射转换
         // （4 万行 → 数十万次反射 + 等量临时 Map，比每行转一次慢 20 倍以上）。
         // 转换结果与列名取值口径完全不变，故 CSV 内容逐字节一致。
@@ -979,14 +979,14 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         List<String> cells = new ArrayList<>();
         for (String col : cols) {
             Object v = row.get(col);
-            // visitTime格式规整：展示/导出统一为YYYY-MM-DD（文档9.5③格式规整）
+            // 2. visitTime格式规整：展示/导出统一为YYYY-MM-DD（文档9.5③格式规整）
             if ("visitTime".equals(col) && v != null) {
                 v = String.valueOf(v).substring(0, 10);
             }
             String s = v == null ? "" : String.valueOf(v).replace("\"", "\"\"").replace("\n", " ");
             cells.add("\"" + s + "\"");
         }
-        // 溯源列：本条病历的「归一前原文 → 标准词」对照；没有归一结果就是 {}。
+        // 3. 溯源列：本条病历的「归一前原文 → 标准词」对照；没有归一结果就是 {}。
         // 单独一列而不是每字段两列 —— 21 个字段里真正会被替换的通常只有少数几个，
         // 拆成 42 列会让表宽翻倍且绝大多数格子是空的。
         String trace = pairsJson(pairs).replace("\"", "\"\"").replace("\n", " ");
@@ -1017,7 +1017,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                     });
             collectReplacements(data, table);
         } catch (JacksonException e) {
-            // 单条脏数据不该让整份导出失败：这条不标准化（保持原文）即可
+            // 1. 单条脏数据不该让整份导出失败：这条不标准化（保持原文）即可
             log.warn("[导出] structured_data 解析失败，该条不做标准化 recordId={}: {}",
                     r.getId(), e.getMessage());
             return List.of();
@@ -1051,11 +1051,11 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             }
             String raw = trimmed(m.get("sourceText"));
             String std = trimmed(m.get(termField));
-            // 没有原文、没有标准词、或本来就一样（未命中词典）都不构成一次替换
+            // 1. 没有原文、没有标准词、或本来就一样（未命中词典）都不构成一次替换
             if (raw == null || std == null || raw.equals(std)) {
                 continue;
             }
-            // 同一原文被归一到两个不同标准词，说明该原文有歧义 —— 此时不替换比乱替换安全
+            // 2. 同一原文被归一到两个不同标准词，说明该原文有歧义 —— 此时不替换比乱替换安全
             table.putIfAbsent(raw, std);
         }
     }
@@ -1096,7 +1096,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
             Object v = row.get(field);
             if (v instanceof String s) {
                 String out = pairs.isEmpty() ? s : standardizeText(s, pairs);
-                // 无论有没有术语替换，标点都要规整（因此不能像原先那样在有 pairs 时才进这个循环）
+                // 1. 无论有没有术语替换，标点都要规整（因此不能像原先那样在有 pairs 时才进这个循环）
                 row.put(field, TextUtil.normalizePunctuation(out));
             }
         }
@@ -1147,7 +1147,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         if (usable.isEmpty()) {
             return s;
         }
-        // 按 key 长度降序：最长匹配优先（与原注释里的「柴胡桂枝汤」案例同因，但这次是位置级保证）
+        // 1. 按 key 长度降序：最长匹配优先（与原注释里的「柴胡桂枝汤」案例同因，但这次是位置级保证）
         usable.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
         StringBuilder out = new StringBuilder(s.length());
         int i = 0;
@@ -1163,7 +1163,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 out.append(s.charAt(i++));
                 continue;
             }
-            // 否定语境里的这一个落点不替换（否证句改了就成语义反转）
+            // 2. 否定语境里的这一个落点不替换（否证句改了就成语义反转）
             if (negatedBefore(s, i)) {
                 out.append(hit.getKey());
             } else {
@@ -1177,7 +1177,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     /** 位置 pos 之前、**同一分句内**是否有否定词（E3；否定不跨分句，见 {@link #NEG_STOP}） */
     private static boolean negatedBefore(String s, int pos) {
         String ctx = s.substring(Math.max(0, pos - NEG_WINDOW), pos);
-        // 截到最近一个分句界之后：否定词不跨分句作用（否则上句的「不/欠」会误伤本句术语）
+        // 1. 截到最近一个分句界之后：否定词不跨分句作用（否则上句的「不/欠」会误伤本句术语）
         int cut = -1;
         for (int i = ctx.length() - 1; i >= 0; i--) {
             if (NEG_STOP.indexOf(ctx.charAt(i)) >= 0) {
@@ -1193,7 +1193,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
                 return true;
             }
         }
-        // 「不X」：X 属保留尾字则是规范说法（不寐 / 食欲不振 / 大便不畅），不算否定
+        // 2. 「不X」：X 属保留尾字则是规范说法（不寐 / 食欲不振 / 大便不畅），不算否定
         int bu = ctx.indexOf('不');
         while (bu >= 0) {
             if (bu + 1 >= ctx.length() || NEG_KEEP_TAIL.indexOf(ctx.charAt(bu + 1)) < 0) {

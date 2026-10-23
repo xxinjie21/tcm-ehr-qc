@@ -164,9 +164,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         // 1. 载入原始病历
         Record raw = loadRaw(dto == null ? null : dto.getRecordId());
         // 2. 取请求内联的结构化数据
-        // 3. 两者都缺 → 参数错误，不落到空评分
+        // 两者都缺 → 参数错误，不落到空评分
         if (raw == null) {
-            // 文案只说用户看得懂的事：原来直接抛字段名 structuredData / recordId，
+            // 3. 文案只说用户看得懂的事：原来直接抛字段名 structuredData / recordId，
             // 这两个 key 只会出现在接口契约里，界面用户无从对应
             throw new IllegalArgumentException("请提供病历标识，或直接提交已抽取的结构化数据（两者至少给一项）");
         }
@@ -268,7 +268,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private LocalDateTime addWorkdays(LocalDateTime start, int days) {
         LocalDateTime d = start;
         int added = 0;
-        // 逐日推进，只在工作日计数；周末不消耗额度
+        // 1. 逐日推进，只在工作日计数；周末不消耗额度
         while (added < days) {
             d = d.plusDays(1);
             DayOfWeek w = d.getDayOfWeek();
@@ -326,7 +326,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         vo.setDescriptions(com.tcm.ehr.common.config.QcRuleDescriber.describe(ruleStore.getFor(RequestUtils.currentOrgId())));
         vo.setCatalogElements(com.tcm.ehr.common.config.QcRuleDescriber.catalogElements());
         vo.setCatalogFormats(com.tcm.ehr.common.config.QcRuleDescriber.catalogFormats());
-        // 一致性那行的摘要由规则数据拼装下发 —— 前端写死过一次「（证候 → 中药 / 舌象 / 脉象）」，
+        // 3. 一致性那行的摘要由规则数据拼装下发 —— 前端写死过一次「（证候 → 中药 / 舌象 / 脉象）」，
         // 而规则里没有舌象/脉象，改规则也不改文案
         vo.setConsistencySummary(com.tcm.ehr.common.config.QcRuleDescriber.consistencySummary(ruleStore.getFor(RequestUtils.currentOrgId())));
         return vo;
@@ -359,7 +359,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      */
     @Override
     public DeductionStatsVO deductionStats(FiltersDTO filters) {
-        // 性能审查：本接口每次进质控页都全库扫描；导入后未重算时回退子集=全库、退化到 4.9s。
+        // 1. 性能审查：本接口每次进质控页都全库扫描；导入后未重算时回退子集=全库、退化到 4.9s。
         // 加 60s 短 TTL 缓存（javadoc 早已点名此手段）；失效用 StatsCache 全局版本段，任一写入即作废。
         return statsCache.getOrLoad("deduction", filters, DEDUCTION_TTL,
                 () -> deductionStatsFromDb(filters), DeductionStatsVO.class);
@@ -386,14 +386,14 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         String cursorId = null;
         boolean firstPage = true;
         while (true) {
-            // ⚠️ 每页从 RecordFilter.build 重建 wrapper：QueryWrapper.and() 是原地追加，
+            // 4. ⚠️ 每页从 RecordFilter.build 重建 wrapper：QueryWrapper.and() 是原地追加，
             //   复用同一个实例会在 41 页后把 WHERE 条件累加成 40 多个（逐页越扫越慢、结果还错）。
             //   build() 已自带 ORDER BY visit_time DESC, id ASC（RecordFilter.java:315）。
             QueryWrapper<Record> pageWrapper = RecordFilter.build(RequestUtils.currentOrgId(), filters);
             // 3.1 主扫描只取 3 列（见方法注释的「两段式扫描」）
             pageWrapper.select("id", "grade", "qc_results");
             if (!firstPage) {
-                // keyset 条件：取 「上一页末条 (cursorVt, cursorId) 之后」的全序区间，
+                // 6. keyset 条件：取 「上一页末条 (cursorVt, cursorId) 之后」的全序区间，
                 //   并用 (visit_time, id) 双键避免「visit_time 相同跳过 / 重复」。
                 RecordKeyset.anchorAfter(pageWrapper, cursorVt, cursorId);
             }
@@ -451,7 +451,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         }
         items.sort((a, b) -> Integer.compare(b.getPoints(), a.getPoints()));
         vo.setByItem(new ArrayList<>(items.subList(0, Math.min(20, items.size()))));
-        // P5.2：明细被截断时告知前端，避免“为什么只看到 20 条”的隔屏疑问
+        // 15. P5.2：明细被截断时告知前端，避免“为什么只看到 20 条”的隔屏疑问
         vo.setItemsTruncated(items.size() > 20);
         // 7. 回填扫描条数、总分与等级分布
         vo.setScanned(scanned);
@@ -493,7 +493,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         try {
             return objectMapper.readValue(r.getQcResults(), ScoreResultVO.class);
         } catch (Exception e) {
-            // 落库格式异常则退回现算（走慢路径）；不抛是因为单条脏数据不该中断整批重算，
+            // 1. 落库格式异常则退回现算（走慢路径）；不抛是因为单条脏数据不该中断整批重算，
             // 但必须留痕：否则「脏数据有多少」在日志里完全不可见
             log.warn("[质控] 病历 {} 的 qc_results 解析失败，退回现算：{}", r.getId(), e.getMessage());
             return null;
@@ -511,7 +511,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         try {
             return QcScorer.score(asMap(null, r.getStructuredData()), r, false, ruleStore.getFor(RequestUtils.currentOrgId()));
         } catch (Exception e) {
-            // 现算失败：调用侧把该条当「算不出来」跳过。不抛，但必须留痕 ——
+            // 3. 现算失败：调用侧把该条当「算不出来」跳过。不抛，但必须留痕 ——
             // 静默 return null 会让「评分缺失」与「确实算不出」在上层完全无法区分
             log.warn("[质控] 病历 {} 现算评分失败，该条将不计分：{}", r.getId(), e.getMessage());
             return null;
@@ -559,13 +559,13 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 该结构化字段是否非空（要素"有记录"的判据之一） */
     private boolean structuredPresent(String key, Map<String, Object> data) {
-        // 只有「是列表且非空」才算要素有记录；空数组与缺键同义
+        // 1. 只有「是列表且非空」才算要素有记录；空数组与缺键同义
         return key != null && data != null && data.get(key) instanceof List<?> list && !list.isEmpty();
     }
 
     /** 原始列里任一回退字段有值（判"漏抽"：病历写了但没被抽出来） */
     private boolean rawPresent(List<String> fields, Record raw) {
-        // 任一回退字段有值就算「病历写了」——用于区分真缺失与漏抽
+        // 1. 任一回退字段有值就算「病历写了」——用于区分真缺失与漏抽
         if (raw == null || fields == null) {
             return false;
         }
@@ -588,7 +588,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
             return true;
         }
         try {
-            // P2-1：走 RegexCache —— 与 QcScorer.formatOk 同一份备忘，表达式是配置常量
+            // 3. P2-1：走 RegexCache —— 与 QcScorer.formatOk 同一份备忘，表达式是配置常量
             return com.tcm.ehr.common.utils.RegexCache.of(fr.getExpr()).matcher(v).matches();
         } catch (Exception e) {
             // 3. 规则自身写错（表达式非法）时放行：宁可漏判也不能给病历记错
@@ -598,7 +598,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
     /** 按字段名取原始列值（空白视作无值），字段名由规则集配置 */
     private String rawValue(Record r, String field) {
-        // 取值与空白口径都在 RecordUtil.column 一处（批次14 收敛）：原先本类与
+        // 1. 取值与空白口径都在 RecordUtil.column 一处（批次14 收敛）：原先本类与
         // QcScorer 各写一份 17 / 19 个 case 的 switch，取值与 trim 逐字相同，
         // 差别只在本类少了 department、doctorId 两个 case —— 规则引用这两个字段时
         // 这里会静默返回 null，看上去像"病历没填"。合并后两侧口径一致。

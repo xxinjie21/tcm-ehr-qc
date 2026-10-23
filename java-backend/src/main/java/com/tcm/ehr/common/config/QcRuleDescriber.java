@@ -31,13 +31,13 @@ public final class QcRuleDescriber {
         }
 
         // 2. 完整性：列出全部要素名 + 两档扣分
-        // 1. 完整性
+        // 完整性
         List<QcRuleSet.Element> elements = r.getCompleteness().getElements();
         List<String> names = new ArrayList<>();
         for (QcRuleSet.Element e : elements) {
             names.add(e.getName());
         }
-        // 扣分档位取自首个要素：出厂默认各要素同权重（见 QcRuleSet.defaults）。
+        // 3. 扣分档位取自首个要素：出厂默认各要素同权重（见 QcRuleSet.defaults）。
         // 原实现把 full/partial 写在循环里逐次覆盖，只留最后一个要素的值 —— 同权重下输出无差异，
         // 一旦按要素差异化权重就会给出错误文案（审查报告 §4.2）。
         int full = elements.isEmpty() ? 0 : elements.get(0).getWeightFull();
@@ -45,14 +45,14 @@ public final class QcRuleDescriber {
         out.add("病历应包含【" + String.join("、", names) + "】；完全缺失每项扣 " + full
                 + " 分，仅有原始记录（未结构化）每项扣 " + partial + " 分。");
 
-        // 格式。regex 类型一律输出 human-readable 的 hint，绝不输出正则本身 ——
+        // 4. 格式。regex 类型一律输出 human-readable 的 hint，绝不输出正则本身 ——
         // 这段话是给质控科业务用户看的，正则表达式属于实现细节（审查报告 H3）
-        // 3. 格式：每条规则出一句人话
+        // 格式：每条规则出一句人话
         List<String> fmts = new ArrayList<>();
         for (QcRuleSet.FormatRule f : r.getFormat()) {
             String label = f.getLabel() == null ? f.getField() : f.getLabel();
             String cond;
-            // 枚举规则列白名单；regex 优先用 hint，其次 reason
+            // 5. 枚举规则列白名单；regex 优先用 hint，其次 reason
             if ("enum".equalsIgnoreCase(f.getType())) {
                 cond = "须为 " + String.join("/", f.getValues());
             } else if (f.getHint() != null && !f.getHint().isBlank()) {
@@ -67,7 +67,7 @@ public final class QcRuleDescriber {
         }
 
         // 4. 一致性：每条规则一句（触发 → 期望 → 扣分）
-        // 2. 一致性
+        // 一致性
         for (QcRuleSet.ConsistencyRule c : r.getConsistency()) {
             if (c.getTriggerType() == null || c.getExpectType() == null) {
                 continue;
@@ -77,9 +77,9 @@ public final class QcRuleDescriber {
                     + " 之一；不符且该项有记录时记逻辑冲突（- " + c.getWeight() + " 分）。");
         }
 
-        // 标准化：元素类型存的是英文 key（disease/pattern/…），这里换成中文名再拼 ——
+        // 7. 标准化：元素类型存的是英文 key（disease/pattern/…），这里换成中文名再拼 ——
         // 同一条规则在配置弹窗里是中文、在说明里是英文 key，用户会怀疑哪个才算数（审查报告 H3）
-        // 5. 术语标准化：类型 key 换中文名
+        // 术语标准化：类型 key 换中文名
         QcRuleSet.Standardization st = r.getStandardization();
         boolean hasStdTypes = st.getElementTypes() != null && !st.getElementTypes().isEmpty();
         if (st.isEnabled() && hasStdTypes) {
@@ -92,14 +92,14 @@ public final class QcRuleDescriber {
                 + "再每满 " + st.getCap() + " 个追加一档（避免大量未归一时扣分触顶、分数失去区分度）。"
                 + "实际计分取本范围与「术语归一范围」的交集 —— 未开归一的类型不计分。");
         } else if (st.isEnabled()) {
-            // 启用了却没选任何类型：说明白，否则用户以为规则没生效
+            // 8. 启用了却没选任何类型：说明白，否则用户以为规则没生效
             out.add("术语标准化：已启用，但未勾选任何实体类型（不参与评分）。");
         } else {
-            // 关闭也要说明，否则用户以为漏配了规则
+            // 9. 关闭也要说明，否则用户以为漏配了规则
             out.add("术语标准化：已关闭（不参与评分）。");
         }
 
-        // 5b. 术语归一范围（与上面的「标准化扣分」是两个独立开关）：哪些类型做词形归一。
+        // 10. 5b. 术语归一范围（与上面的「标准化扣分」是两个独立开关）：哪些类型做词形归一。
         //     未列入的类型不做归一，其实体不写 normLevel，也就不参与上面的未归一计分。
         QcRuleSet.Normalization nz = r.getNormalization();
         boolean hasNormTypes = nz != null && nz.getElementTypes() != null && !nz.getElementTypes().isEmpty();
@@ -115,7 +115,7 @@ public final class QcRuleDescriber {
         }
 
         // 6. 重复与分级：两条固定说明
-        // 3. 重复
+        // 重复
         out.add("与其它病历内容完全重复的，扣 " + r.getDuplicateWeight() + " 分。");
 
         // 4. 分级
@@ -155,8 +155,8 @@ public final class QcRuleDescriber {
      * 前端据此筛出「术语标准化按哪几类计分」的下拉项。
      */
     public static List<QcRuleSet.Element> catalogElements() {
-        // 逐类转成可选项；带上 typeKey，配置弹窗提交时才知道对应哪个类型
-        // 1. 遍历 9 类实体，每类产出一个可勾选项（装配走 QcRuleSet.el，与默认规则同构）
+        // 1. 逐类转成可选项；带上 typeKey，配置弹窗提交时才知道对应哪个类型
+        // 遍历 9 类实体，每类产出一个可勾选项（装配走 QcRuleSet.el，与默认规则同构）
         List<QcRuleSet.Element> list = new ArrayList<>();
         for (EntityTypes.EntityType t : EntityTypes.all()) {
             QcRuleSet.Element e = QcRuleSet.el(t.label(), t.structuredKey(), t.fallback());
@@ -169,7 +169,7 @@ public final class QcRuleDescriber {
 
     /** 格式模板目录 */
     public static List<QcRuleSet.FormatRule> catalogFormats() {
-        // 两条固定模板：年龄（正则，带 hint）与性别（枚举）。
+        // 1. 两条固定模板：年龄（正则，带 hint）与性别（枚举）。
         // 正则/hint 取 QcRuleSet.AGE_PATTERN / AGE_HINT、性别白名单取 QcRuleSet.GENDER_VALUES
         // （均为唯一权威），不在此处另抄一份 —— 抄了就会与默认规则漂移（审查报告 §2.2）。
         List<QcRuleSet.FormatRule> list = new ArrayList<>();
@@ -180,7 +180,7 @@ public final class QcRuleDescriber {
     }
 
     private static String labelOf(String type) {
-        // 类型未登记就原样返回 key，不抛（文案层不该因脏数据中断）
+        // 1. 类型未登记就原样返回 key，不抛（文案层不该因脏数据中断）
         EntityTypes.EntityType t = EntityTypes.byKey(type);
         return t == null ? type : t.label();
     }

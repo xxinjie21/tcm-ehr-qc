@@ -54,7 +54,7 @@ public class LogServiceImpl implements ILogService {
         // 2. 固定顺序装 total / list，前端按 key 取
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", p.getTotal());
-        // 「所属组」列展示用：库里只有 org_id，这里解析成组织名
+        // 3. 「所属组」列展示用：库里只有 org_id，这里解析成组织名
         fillOrgNames(p.getRecords());
         result.put("list", p.getRecords());
         return result;
@@ -89,7 +89,7 @@ public class LogServiceImpl implements ILogService {
      */
     @Override
     public List<String> actions() {
-        // 成员不能从下拉看到别人的操作类型。
+        // 1. 成员不能从下拉看到别人的操作类型。
         // 三档可见范围见 buildWrapper；这里要单独传给硬编码 SQL（不能复用 wrapper）。
         String orgId = RequestUtils.currentOrgId();
         String operator = RequestUtils.currentUsername();
@@ -228,16 +228,16 @@ public class LogServiceImpl implements ILogService {
         String orgId = RequestUtils.currentOrgId();
         String self = RequestUtils.currentUsername();
         if (RequestUtils.isAdmin()) {
-            // 管理员：无条件（看全部）
+            // 2. 管理员：无条件（看全部）
         } else if (orgId != null && !orgId.isBlank()) {
             w.eq("org_id", orgId);
             if (OrganizationMember.ROLE_MEMBER.equals(RequestUtils.currentOrgRole())) {
-                // 成员：只看自己在本组织内的操作
+                // 3. 成员：只看自己在本组织内的操作
                 w.eq("operator", self);
             }
-            // 所有者：本组织全员操作
+            // 4. 所有者：本组织全员操作
         } else {
-            // 无组织：只能看自己
+            // 5. 无组织：只能看自己
             w.eq("operator", self);
         }
         // 2. 操作类型精确匹配

@@ -133,7 +133,7 @@ public class StatsCache {
     /** 本方法专用：缓存读 → 未命中/失败 → loader 现算并回填 */
     public StatsAllVO wordFreq(FiltersDTO filters, Supplier<StatsAllVO> loader) {
         String scope = scope();
-        // ① 白名单外的过滤条件不缓存（R3-②）：否则 key 空间无界、命中率趋零
+        // 1. ① 白名单外的过滤条件不缓存（R3-②）：否则 key 空间无界、命中率趋零
         if (!cacheable(filters)) {
             return loader.get();
         }
@@ -148,7 +148,7 @@ public class StatsCache {
                 return cached;
             }
         }
-        // ② 单飞（R3-③）：同一 key 失效瞬间只让一个请求现算
+        // 2. ② 单飞（R3-③）：同一 key 失效瞬间只让一个请求现算
         return loadSingleFlight(key, TTL_BASE, loader, StatsAllVO.class);
     }
 
@@ -232,11 +232,11 @@ public class StatsCache {
                 if (readQuietly(freshKey(key)) != null) {
                     return cached; // 新鲜：直接命中
                 }
-                // 陈旧（时间到期，数据未改）：先返回旧值，后台单飞重算，本请求不等
+                // 1. 陈旧（时间到期，数据未改）：先返回旧值，后台单飞重算，本请求不等
                 refreshAsync(key, baseTtl, loader, type);
                 return cached;
             }
-            // 反序列化失败（如类结构不兼容）→ 视同未命中，落到下面的阻塞现算
+            // 2. 反序列化失败（如类结构不兼容）→ 视同未命中，落到下面的阻塞现算
         }
         return loadSingleFlight(key, baseTtl, loader, type, true);
     }
@@ -272,7 +272,7 @@ public class StatsCache {
         try {
             leader = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", LOCK_TTL));
         } catch (Exception e) {
-            // Redis 不可用：不参与单飞，直接现算（缓存只是加速项，不能因此报错）
+            // 1. Redis 不可用：不参与单飞，直接现算（缓存只是加速项，不能因此报错）
             return loader.get();
         }
         if (leader) {
@@ -282,7 +282,7 @@ public class StatsCache {
                 deleteQuietly(lockKey);
             }
         }
-        // 跟随者：让出一点时间给领跑者算完，再读一次缓存；仍没有就自己算（不无限等待）
+        // 2. 跟随者：让出一点时间给领跑者算完，再读一次缓存；仍没有就自己算（不无限等待）
         try {
             Thread.sleep(FOLLOWER_WAIT_MS);
         } catch (InterruptedException e) {
@@ -321,14 +321,14 @@ public class StatsCache {
                     log.debug("[统计缓存] 后台重算完成 {} ms，key={}",
                             (System.nanoTime() - t0) / 1_000_000, key);
                 } catch (Exception e) {
-                    // 绝不能影响任何请求；旧值留到硬 TTL 到期再回落阻塞现算
+                    // 1. 绝不能影响任何请求；旧值留到硬 TTL 到期再回落阻塞现算
                     log.warn("[统计缓存] 后台重算失败（保留旧值，下次读再试）: {}", e.getMessage());
                 } finally {
                     deleteQuietly(lockKey);
                 }
             });
         } catch (Exception e) {
-            // 池满（DiscardPolicy）/ 已关闭：静默跳过，下次读再触发
+            // 2. 池满（DiscardPolicy）/ 已关闭：静默跳过，下次读再触发
             log.debug("[统计缓存] 后台重算任务被拒（池满/关闭），下次读再试: {}", e.getMessage());
         }
     }
@@ -342,7 +342,7 @@ public class StatsCache {
         T vo = loader.get();
         try {
             if (vo == null) {
-                // 空值缓存（R3-②）：区分「查过且为空」与「没查过」，避免同一空查询反复穿透。
+                // 1. 空值缓存（R3-②）：区分「查过且为空」与「没查过」，避免同一空查询反复穿透。
                 // SWR 下标记与值同寿命：空值不适用「先端旧空值」那套，过期就一起没。
                 redis.opsForValue().set(key, NULL_SENTINEL, NULL_TTL);
                 if (swr) {
@@ -493,7 +493,7 @@ public class StatsCache {
     }
 
     private String keyOf(String scope, long version, FiltersDTO filters) {
-        // 词频专用 key：{scope}:v{n}:all:{md5}（按数据域分片，命中率更高；与通用 kind 各走各的版本段）
+        // 1. 词频专用 key：{scope}:v{n}:all:{md5}（按数据域分片，命中率更高；与通用 kind 各走各的版本段）
         return KEY_PREFIX + scope + ":v" + version + ":all:" + digestOf(filters);
     }
 

@@ -122,7 +122,7 @@ public class DataInitializationListener implements ApplicationRunner {
                 }
                 log.warn("[ES] 探活返回 false（第 {} 次尝试）", attempt);
             } catch (Exception e) {
-                // 冷启动期最常见的就是这条：Connection is closed
+                // 1. 冷启动期最常见的就是这条：Connection is closed
                 log.warn("[ES] 连接失败（第 {} 次尝试）: {}", attempt, e.getMessage());
             }
             long remaining = deadline - System.currentTimeMillis();
@@ -236,7 +236,7 @@ public class DataInitializationListener implements ApplicationRunner {
 
     /** 单层对账：已同步且索引结构兼容才跳过（rebuild 是先删后灌，期内归一会 503） */
     private void reconcileLayer(String type, String orgId) throws java.io.IOException {
-        // 内容版本同步 ≠ 索引结构正确：从旧版本升级时索引可能是旧 mapping
+        // 1. 内容版本同步 ≠ 索引结构正确：从旧版本升级时索引可能是旧 mapping
         // （org_id 被动态映射成 text，空串基础层查不到 → 全库「未收录」）。
         // 只信 dictionary_versions 会跳过重建，坏索引就永远修不好。
         if (termStore.isSynced(orgId, type) && esTermIndexService.schemaCompatible(type)) {
@@ -247,7 +247,7 @@ public class DataInitializationListener implements ApplicationRunner {
             return;
         }
         String version = termStore.contentVersion(entries);
-        // 跨实例互斥（批次16）：多实例同时启动时，两个实例会同时判定「待重建」并
+        // 2. 跨实例互斥（批次16）：多实例同时启动时，两个实例会同时判定「待重建」并
         // 同时删/建同一索引，交错后索引内容可能是混合状态。
         // 这里按「类型+组织」加 Redisson 分布式锁（DistLock）；拿不到锁就让本次跳过（下一实例或下次
         // 启动会补上）—— 启动期抢不到锁不是错误，不该让启动失败。
@@ -265,14 +265,14 @@ public class DataInitializationListener implements ApplicationRunner {
             log.info("[词典] {} (org='{}') 重建被其它实例占用，本次跳过: {}", type, orgId, e.getMessage());
             return;
         } catch (ServiceNotReadyException e) {
-            // 启动期 Redis 不可用：与「抢不到锁」同口径 —— 跳过重建而不是让应用起不来。
+            // 3. 启动期 Redis 不可用：与「抢不到锁」同口径 —— 跳过重建而不是让应用起不来。
             // 这是 fail-closed 的唯一例外场景，但它同样没有在无锁状态下写索引，
             // 剩下的实例或下次启动会补上。
             log.warn("[词典] {} (org='{}') 重建跳过：锁服务不可用 -> {}",
                     type, orgId, e.getMessage());
             return;
         }
-        // 只有真灌成功才记已同步
+        // 4. 只有真灌成功才记已同步
         termStore.markIndexed(orgId, type, version);
         log.info("[词典] {} (org='{}') 重建索引，{} 条，版本 {}", type, orgId, entries.size(), version);
     }

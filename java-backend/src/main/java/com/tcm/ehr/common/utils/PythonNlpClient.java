@@ -135,7 +135,7 @@ public class PythonNlpClient {
             return mapper.readValue(response, NlpExtractVO.class);
         } catch (RestClientResponseException e) {
             int code = e.getStatusCode().value();
-            // 4xx 是请求本身的问题（如文本超长 422），重试也没用 —— 立即降级
+            // 2. 4xx 是请求本身的问题（如文本超长 422），重试也没用 —— 立即降级
             if (code >= 400 && code < 500) {
                 log.warn("[NLP] 调用失败: HTTP {}（{}），请求本身有问题，降级为空 9 类", code, url);
             } else {

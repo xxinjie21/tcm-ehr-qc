@@ -109,7 +109,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         List<Record> toInsert = new ArrayList<>();
         Map<String, String> regNoSource = new HashMap<>();
 
-        // 预取本批登记号对应的库内病历哈希，用于跨批去重（不必全表扫描）
+        // 4. 预取本批登记号对应的库内病历哈希，用于跨批去重（不必全表扫描）
         Set<String> batchRegNos = new HashSet<>();
 
         List<Object[]> parsedRows = new ArrayList<>(); // [Record, filename]
@@ -128,7 +128,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 7. 批量落库并回填成功数（P3.4 拆出 insertRecords）
         insertRecords(summary, toInsert);
 
-        // 导入后自动结构化解析（用户开关，默认关）：投后台批任务，导入本身不阻塞
+        // 9. 导入后自动结构化解析（用户开关，默认关）：投后台批任务，导入本身不阻塞
         String autoTaskId = null;
         if (autoExtract && !toInsert.isEmpty()) {
             try {
@@ -147,7 +147,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         vo.setAutoExtractTaskId(autoTaskId);
         log.info("[病历导入] task={} 文件={} 行={} 成功={} 失败={}",
                 taskId, files.length, summary.getTotal(), summary.getSuccess(), summary.getFailed());
-        // 导入写了 structured_data / pattern 等 → 统计词频已过期，主动失效（B1）
+        // 11. 导入写了 structured_data / pattern 等 → 统计词频已过期，主动失效（B1）
         if (summary.getSuccess() > 0) {
             StatsCacheInvalidator.invalidateStats();
         }
@@ -169,9 +169,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 continue;
             }
             r.setId(UUID.randomUUID().toString());
-            // 新建病历入组织（否则是无组织病历，导入者导完自己也看不到）
+            // 1. 新建病历入组织（否则是无组织病历，导入者导完自己也看不到）
             r.setOrgId(RequestUtils.currentOrgId());
-            // 去重兜底：写 text_hash 让 DB 的 uk_records_org_text_hash 生效。
+            // 2. 去重兜底：写 text_hash 让 DB 的 uk_records_org_text_hash 生效。
             // 不写的话该列恒 NULL，唯一键形同虚设（批次 4 随 DDL 一起补的代码路径）
             // P2-2：复用上面那次 textHash。两次调用之间只改了 id / orgId，而 textHash 的 21 个字段
             // （登记号 … 医生ID、就诊次数、接诊时间）**不含 id 与 orgId**，故结果必然相同；
@@ -187,7 +187,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (batchRegNos == null || batchRegNos.isEmpty()) {
             return existingHash;
         }
-        // § 6.3 缺点 12：查重必须限定本组。否则组 A 已有登记号 X，组 B 导入同号会被判为重复，
+        // 1. § 6.3 缺点 12：查重必须限定本组。否则组 A 已有登记号 X，组 B 导入同号会被判为重复，
         // 两个组无法使用相同登记号。
         List<Record> existing = baseMapper.selectList(
                 new QueryWrapper<Record>()
@@ -332,7 +332,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 5. 只回传新病历 ID
         CreateRecordVO vo = new CreateRecordVO();
         vo.setId(r.getId());
-        // 新增病历后统计词频过期 → 主动失效（B1）
+        // 8. 新增病历后统计词频过期 → 主动失效（B1）
         StatsCacheInvalidator.invalidateStats();
         return vo;
     }
@@ -354,7 +354,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (r == null) {
             return null;
         }
-        // § 6.3 缺点 4：查后校验组。无组 / 不属于当前组统一归“不存在”（404）：
+        // 2. § 6.3 缺点 4：查后校验组。无组 / 不属于当前组统一归“不存在”（404）：
         // 遏免“存在但看不到”被用作情报（可探测别组病历 ID）
         if (!RecordFilter.canAccess(r)) {
             return null;
@@ -387,7 +387,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         vo.setScore(r.getScore());
         vo.setGrade(r.getGrade());
         vo.setStatus(r.getStatus());
-        // 复核提交的乐观并发校验：读时算指纹，提交时比对（批次 25.15）
+        // 4. 复核提交的乐观并发校验：读时算指纹，提交时比对（批次 25.15）
         vo.setFingerprint(ReviewTaskUtil.fingerprint(r.getStructuredData(), r.getScore(), r.getGrade()));
         return vo;
     }
@@ -409,12 +409,12 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         if (r == null) {
             throw new IllegalArgumentException("病历不存在");
         }
-        // § 6.3 缺点 5：不能改别组病历。用 ForbiddenException而不是 404：
+        // 2. § 6.3 缺点 5：不能改别组病历。用 ForbiddenException而不是 404：
         // 这是写操作，攻击者看到的应是「不许」而不是「不存在」。
         if (!RecordFilter.canAccess(r)) {
             throw new ForbiddenException("无权修改该病历");
         }
-        // 原始 21 字段只读：显式携带原始字段即拒绝（由 GlobalExceptionHandler 统一转 400）
+        // 3. 原始 21 字段只读：显式携带原始字段即拒绝（由 GlobalExceptionHandler 统一转 400）
         if (body != null) {
             for (String key : body.keySet()) {
                 if (ORIGINAL_FIELDS.contains(key)) {
@@ -444,7 +444,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 termStore.effectiveDictVersion(RequestUtils.currentOrgId()),
                 termStore.effectiveTermCount(RequestUtils.currentOrgId()));
         baseMapper.updateStructuredData(recordId, json);
-        // 结构化数据 → 统计词频过期，主动失效（B1）
+        // 7. 结构化数据 → 统计词频过期，主动失效（B1）
         StatsCacheInvalidator.invalidateStats();
     }
 
@@ -458,11 +458,11 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     @Transactional(rollbackFor = Exception.class)
     @Override
     public DeleteRecordsVO deleteRecords(DeleteRecordsDTO dto) {
-        // 批次13 · 13.3：删除逻辑抽到 RecordDeleter（防误删守卫、数据域过滤、分块、外键顺序都在那边）。
+        // 1. 批次13 · 13.3：删除逻辑抽到 RecordDeleter（防误删守卫、数据域过滤、分块、外键顺序都在那边）。
         // 事务仍留在本方法上：加在被调用方或私有方法上不经过代理，等于没加。
         DeleteRecordsVO vo = deleter().deleteByIds(dto);
         if (vo.getDeletedCount() > 0) {
-            // W2：失效必须落在**事务提交之后**。本方法带 @Transactional，提交前清缓存会让
+            // 2. W2：失效必须落在**事务提交之后**。本方法带 @Transactional，提交前清缓存会让
             // 并发读按「删除前的旧数据」现算并回填，提交后统计就持着已删病历直到 TTL 到期
             // （最长 60s）—— 用户对「删了 4 万条图表数字没变」最敏感。
             // afterCommit 在无活动事务时立即执行，故单测直调路径行为不变。
@@ -494,12 +494,12 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
     @Transactional(rollbackFor = Exception.class, timeout = 60)
     @Override
     public DeleteRecordsVO deleteByFilter(FiltersDTO filters) {
-        // 性能审查 A4：整个游标分批删除在一个事务内（all-or-nothing）。timeout=60s 是防呆：
+        // 1. 性能审查 A4：整个游标分批删除在一个事务内（all-or-nothing）。timeout=60s 是防呆：
         // 4 万条删除 + 连带 review_tasks 的单事务，长于 innodb_lock_wait_timeout(默认50s) 就先被
         // 锁等待坑掉；超时只保护「误操作长时间锁表」，不是对条数的限制。
         DeleteRecordsVO vo = deleter().deleteByFilter(filters);
         if (vo.getDeletedCount() > 0) {
-            // W2：同上，失效移到事务提交之后
+            // 2. W2：同上，失效移到事务提交之后
             com.tcm.ehr.common.utils.DistLock.afterCommit(
                     com.tcm.ehr.common.cache.StatsCacheInvalidator::invalidateStats); // 范围删除 → 词频过期（B1）
         }
@@ -521,9 +521,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         // 1. 分页参数非法时回退为第 1 页 / 每页 20 条
         int page = dto != null && dto.getPage() != null && dto.getPage() > 0 ? dto.getPage() : 1;
         int size = dto != null && dto.getPageSize() != null && dto.getPageSize() > 0 ? dto.getPageSize() : 20;
-        // 数据域 → 用户筛选，取交集（统一走 RecordFilter，禁止手写 where）
+        // 2. 数据域 → 用户筛选，取交集（统一走 RecordFilter，禁止手写 where）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), dto);
-        // ⚠️ 列投影（性能审查 P1-2）：列表项只消费 id/grade/visitTime/gender/age/score/
+        // 3. ⚠️ 列投影（性能审查 P1-2）：列表项只消费 id/grade/visitTime/gender/age/score/
         //    summarize 三字段回退链（主诉→中医诊断→西医诊断）/manually_edited（人工标记列），
         //    其余 21 个 TEXT 列 + 2 个 JSON 列不拉进堆（每行省 ~5KB）。
         //    P1-2#2 落地后列表**彻底不再触碰 structured_data**：人工标记改读标量列
@@ -537,7 +537,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         SearchVO vo = new SearchVO();
         vo.setTotal(p.getTotal());
         for (Record r : p.getRecords()) {
-            // 人工标记读标量列（性能审查 P1-2#2）：列表不再为读这一个布尔值解析 ~3.7KB JSON
+            // 6. 人工标记读标量列（性能审查 P1-2#2）：列表不再为读这一个布尔值解析 ~3.7KB JSON
             boolean manual = Boolean.TRUE.equals(r.getManuallyEdited());
             vo.getRecords().add(new SearchVO.Item(r.getId(), summarize(r), r.getGrade(),
                     r.getVisitTime(), r.getGender(), r.getAge(), r.getScore(), manual));
@@ -553,9 +553,9 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
      */
     @Override
     public long countMatched(SearchDTO dto) {
-        // 数据域 + 用户筛选，统一走 RecordFilter（与 searchRecords 完全相同，禁止手写 where）
+        // 1. 数据域 + 用户筛选，统一走 RecordFilter（与 searchRecords 完全相同，禁止手写 where）
         QueryWrapper<Record> wrapper = RecordFilter.build(RequestUtils.currentOrgId(), dto);
-        // COUNT 不需要排序键：MySQL 对 `SELECT COUNT(*) ... ORDER BY` 直接忽略排序（聚合只出一行，
+        // 2. COUNT 不需要排序键：MySQL 对 `SELECT COUNT(*) ... ORDER BY` 直接忽略排序（聚合只出一行，
         // 不产生 filesort），故这里照用 build 不会多扫；不带 status 的等值条件也无额外代价。
         return baseMapper.selectCount(wrapper);
     }

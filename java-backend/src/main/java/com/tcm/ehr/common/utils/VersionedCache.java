@@ -47,7 +47,7 @@ public final class VersionedCache<V> {
      */
     public synchronized V get(String key, String version, Supplier<V> loader) {
         Entry<V> hit = map.get(key);
-        // 用 Objects.equals：两段式 put 存进来的条目没有版本串（null），
+        // 1. 用 Objects.equals：两段式 put 存进来的条目没有版本串（null），
         // 直接调 hit.version().equals(version) 会 NPE
         if (hit != null && Objects.equals(hit.version(), version)) {
             return hit.value();
@@ -92,7 +92,7 @@ public final class VersionedCache<V> {
     /** put 与 get 的公共写入路径：写入 + 逐出超额项 */
     private void putEntry(String key, V value, String version) {
         map.put(key, new Entry<>(value, version));
-        // 手动淘汰最久未用的一项：LinkedHashMap 只有覆写 removeEldestEntry 才会自动淘汰
+        // 1. 手动淘汰最久未用的一项：LinkedHashMap 只有覆写 removeEldestEntry 才会自动淘汰
         while (map.size() > maxSize) {
             Iterator<Map.Entry<String, Entry<V>>> it = map.entrySet().iterator();
             if (!it.hasNext()) {

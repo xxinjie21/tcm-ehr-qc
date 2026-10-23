@@ -108,7 +108,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
         if (own.isEmpty()) {
             return base;
         }
-        // 基础层 + 本组织：同一标准词以本组织为准（组织层是叠加，不是替换）。
+        // 1. 基础层 + 本组织：同一标准词以本组织为准（组织层是叠加，不是替换）。
         // 必须与 ES 侧的 org_id IN ('', 本组织) 同一口径 —— 原来「有自有层就不回落」
         // 会让词典页、报告与归一实际用到的不是同一份数据
         java.util.Map<String, TermEntry> merged = new java.util.LinkedHashMap<>();
@@ -161,7 +161,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             } else if (o.isEmpty()) {
                 out.put(type, new ArrayList<>(b));
             } else {
-                // 与 readEffective 同一合并口径：基础层先入，本组织同标准词覆盖
+                // 1. 与 readEffective 同一合并口径：基础层先入，本组织同标准词覆盖
                 java.util.Map<String, TermEntry> merged = new java.util.LinkedHashMap<>();
                 for (TermEntry e : b) {
                     merged.put(termKey(e), e);
@@ -291,7 +291,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      */
     public List<TermEntry> read(String orgId, String type) {
         String org = norm(orgId);
-        // 版本取 dictionary_versions.version —— 它是「内容哈希」，内容一变版本必变，
+        // 1. 版本取 dictionary_versions.version —— 它是「内容哈希」，内容一变版本必变，
         // 比时间戳可靠（不存在同秒撞版本的问题）；写入侧 replace 还会主动失效一次兜底。
         DictionaryVersion v = cachedVersion(org, type);
         String version = v == null || v.getVersion() == null ? "" : v.getVersion();
@@ -325,13 +325,13 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      */
     private void invalidateCachesAfterCommit(String org, String type) {
         Runnable invalidate = () -> {
-            // 主动失效：内容哈希相同（同一份内容重灌）时版本不变，但库里的行 ID 已经换了一批，
+            // 1. 主动失效：内容哈希相同（同一份内容重灌）时版本不变，但库里的行 ID 已经换了一批，
             // 缓存里那份 list 仍是可用的等价内容 —— 这里失效是为了让「重灌后立刻读」拿到新行
             termsCache.invalidate(org + "|" + type);
-            // 召回索引同源失效（P1-15）：它缓存的正是由 termsCache 那份词条建出来的倒排表，
+            // 2. 召回索引同源失效（P1-15）：它缓存的正是由 termsCache 那份词条建出来的倒排表，
             // 只失效词条不失效索引，会让「重灌后立刻召回」用着旧表去索引新词条
             recallIndexCache.invalidate(org + "|" + type);
-            // 版本缓存同样要失效（批次 12 · 12a）：否则重灌后紧接着的读会拿旧版本号
+            // 3. 版本缓存同样要失效（批次 12 · 12a）：否则重灌后紧接着的读会拿旧版本号
             invalidateVersionCache(org, type);
         };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -396,7 +396,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             row.setAliases(writeJson(e.getAliases()));
             batch.add(row);
         }
-        // P2-8：整层词条攒批插入，不再逐条 insert（疾病类上千条 = 上千次往返）。
+        // 2. P2-8：整层词条攒批插入，不再逐条 insert（疾病类上千条 = 上千次往返）。
         // 主键仍是上面显式生成的 UUID（IdType.INPUT），唯一键 uk_org_type_term 的冲突
         // 照常抛出、由本方法的 @Transactional 整体回滚 —— 与逐条写时同一原子性。
         BatchInsert.insert(sqlSessionFactory, DictionaryTermMapper.class, termMapper, batch);
@@ -404,7 +404,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
         //    因导入顺序不同算出两个版本」而白白触发一次 ES 全量重建
         String version = contentVersion(entries);
         upsertVersion(org, type, version);
-        // 失效推迟到提交后（批次 26.8）：在事务里提前失效，别的线程可能在词条行尚未提交时
+        // 4. 失效推迟到提交后（批次 26.8）：在事务里提前失效，别的线程可能在词条行尚未提交时
         // 就按旧版本回填缓存，随后一直读到旧内容；提交后再失效才能保证「提交即可见」。
         invalidateCachesAfterCommit(org, type);
         return version;
@@ -425,7 +425,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             v.setType(type);
             v.setVersion(indexedVersion);
         } else {
-            // 收敛修正：老分支只在 v != null 时写 indexed_version、不写 version，
+            // 1. 收敛修正：老分支只在 v != null 时写 indexed_version、不写 version，
             // 一旦「哈希公式变更 + 强制重建」就会 version≠indexed 常驻、每次启动重建。
             // 这里让 version 一并追平 —— 重建内容就该是当前版本，写同值无副作用。
             v.setVersion(indexedVersion);
@@ -480,7 +480,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
         if (isBase(orgId)) {
             return true;
         }
-        // 该组织有自定义词条时不必看基础层（没回落到它）
+        // 1. 该组织有自定义词条时不必看基础层（没回落到它）
         if (!read(orgId, type).isEmpty()) {
             return true;
         }
@@ -496,7 +496,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      * 每次导入都触发一次全量 ES 重建。
      */
     public String contentVersion(List<TermEntry> entries) {
-        // 哈希输入必须覆盖「归一判定真正用到的字段」：只哈希标准词的话，
+        // 1. 哈希输入必须覆盖「归一判定真正用到的字段」：只哈希标准词的话，
         // 只改别名不会换版本 —— 启动对账判「已同步」，归一继续用旧别名
         List<String> keys = new ArrayList<>(entries.size());
         for (TermEntry e : entries) {
@@ -515,7 +515,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             }
             return sb.toString();
         } catch (java.security.NoSuchAlgorithmException e) {
-            // SHA-256 不可用不该发生；退化成内容长度+首词，至少不抛异常中断启动
+            // 2. SHA-256 不可用不该发生；退化成内容长度+首词，至少不抛异常中断启动
             return "len" + keys.size() + "_" + (keys.isEmpty() ? "" : keys.get(0));
         }
     }
@@ -539,7 +539,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
         Map<String, String> own = org.isEmpty() ? Map.of() : versionsOf(org);
         StringBuilder sb = new StringBuilder();
         for (String type : EntityTypes.dictKeys()) {
-            // 本组织没配这一类就回退基础层 —— 与 readEffective 的回落口径保持一致
+            // 1. 本组织没配这一类就回退基础层 —— 与 readEffective 的回落口径保持一致
             String v = own.getOrDefault(type, base.get(type));
             if (v != null && !v.isBlank()) {
                 sb.append(type).append(':').append(v, 0, Math.min(8, v.length())).append(';');
@@ -615,7 +615,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
         if (findVersion(v.getOrgId(), v.getType()) == null) {
             versionMapper.insert(v);
         } else {
-            // ⚠️ 必须用显式条件更新，不能用 updateById：
+            // 1. ⚠️ 必须用显式条件更新，不能用 updateById：
             // dictionary_versions 是复合主键 (org_id, type)，实体上没有单一 @TableId，
             // updateById 在这种表上拼不出 WHERE，编译期不报错、运行即挂。
             versionMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<DictionaryVersion>()
@@ -625,7 +625,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
                     .set("indexed_version", v.getIndexedVersion())
                     .set("indexed_at", v.getIndexedAt()));
         }
-        // 版本行已变 ⇒ 版本缓存必须失效，否则写路径自己可能读到旧版本号（批次 12 · 12a）
+        // 2. 版本行已变 ⇒ 版本缓存必须失效，否则写路径自己可能读到旧版本号（批次 12 · 12a）
         invalidateVersionCache(v.getOrgId(), v.getType());
     }
 
@@ -644,7 +644,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
             List<String> list = objectMapper.readValue(json, List.class);
             return list == null ? new ArrayList<>() : new ArrayList<>(list);
         } catch (Exception e) {
-            // 别名坏掉不能拖垮整次读取：标准词还在，模糊召回退化为只匹标准词
+            // 1. 别名坏掉不能拖垮整次读取：标准词还在，模糊召回退化为只匹标准词
             log.warn("[词典] 别名字段解析失败，退化为空别名: {}", e.getMessage());
             return new ArrayList<>();
         }

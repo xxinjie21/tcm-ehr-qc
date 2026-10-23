@@ -76,7 +76,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
     @Transactional(rollbackFor = Exception.class)
     public Integer archive(String orgId, String type, List<TermEntry> entries,
                            String proposalId, String operator, String comment) {
-        // 空词典也要能归档：调用方可能拿到 null（该组织该类目一条词都没有的历史状态），
+        // 1. 空词典也要能归档：调用方可能拿到 null（该组织该类目一条词都没有的历史状态），
         // 若直接 entries.size()/for-each 就是空指针 —— 导入成功却报系统异常的另一种成因。
         if (entries == null) {
             entries = List.of();
@@ -104,7 +104,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
             t.setAliases(writeJson(e.getAliases()));
             batch.add(t);
         }
-        // P2-8：整份快照攒批插入，不再逐条 insert（疾病类上千条 = 上千次往返）
+        // 2. P2-8：整份快照攒批插入，不再逐条 insert（疾病类上千条 = 上千次往返）
         BatchInsert.insert(sqlSessionFactory, DictArchiveTermMapper.class, termMapper, batch);
 
         pruneSnapshots(org, type);
@@ -119,7 +119,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
         try {
             return ArchiveOutcome.ok(archive(orgId, type, entries, proposalId, operator, comment));
         } catch (Exception e) {
-            // 完整栈入日志：这条路径此前只回一个追踪码，排障时拿不到栈
+            // 1. 完整栈入日志：这条路径此前只回一个追踪码，排障时拿不到栈
             log.error("[词典] {} (org={}) 导入已成功，但归档版本生成失败：{}",
                     type, orgId, e.getMessage(), e);
             return ArchiveOutcome.failed("导入已成功，但归档版本生成失败：" + e.getMessage());
@@ -139,7 +139,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
                 new QueryWrapper<DictArchiveVersion>()
                         .eq("org_id", org).eq("type", type)
                         .orderByDesc("version_no"));
-        // P2-7：快照条数一次 GROUP BY 取回，不再在循环里逐条 selectCount
+        // 1. P2-7：快照条数一次 GROUP BY 取回，不再在循环里逐条 selectCount
         // （本方法对版本数没有上界，逐条查是「版本数」次往返）
         Map<String, Integer> countByVersion = snapshotCounts(
                 rows.stream().map(DictArchiveVersion::getId).toList());

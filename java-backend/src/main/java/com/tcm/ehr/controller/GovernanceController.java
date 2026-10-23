@@ -78,7 +78,7 @@ public class GovernanceController {
      */
     @PostMapping("/governance/clean")
     public Result<CleanResultVO> clean(@Valid @RequestBody CleanDTO dto) {
-        // 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
+        // 1. 跑清洗流水线 2. 留痕：把操作范围写清，事后才知道动了哪些病历
         CleanResultVO result = governanceService.clean(dto.getRecordIds(), dto.getFilters(),
                 Boolean.TRUE.equals(dto.getSkipNormalize()));
         operationLogger.log("数据清洗", RecordFilter.describe(dto == null ? null : dto.getFilters()), "共" + result.getTotal() + "条，去重" + result.getDeduped()
@@ -145,7 +145,7 @@ public class GovernanceController {
             // 2. 被拒也要留痕：谁在什么时候试图导出过
             operationLogger.log("数据集导出", RecordFilter.describe(dto == null ? null : dto.getFilters()),
                     "被拒：筛选范围内无合格病历");
-            // 错误体下沉：抛 BusinessException（code=2001 + 400），出口在 GlobalExceptionHandler
+            // 3. 错误体下沉：抛 BusinessException（code=2001 + 400），出口在 GlobalExceptionHandler
             throw new com.tcm.ehr.common.exception.BusinessException(2001,
                     "质控未通过，禁止导出数据集（筛选范围内无合格病历）");
         }

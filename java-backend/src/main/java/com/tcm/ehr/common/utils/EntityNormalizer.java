@@ -147,7 +147,7 @@ public class EntityNormalizer {
                 continue;
             }
             String term = termOf.apply(item);
-            // 术语为空：用唯一键占位，保证「不参与合并」而不是「全部并成一条」
+            // 3. 术语为空：用唯一键占位，保证「不参与合并」而不是「全部并成一条」
             String key = (term == null || term.isBlank()) ? "\u0000" + (blankSeq++) : term;
             T prev = kept.get(key);
             // 3. 同键时二选一：新来的更代表就替换，否则保留先出现的那条
@@ -218,12 +218,12 @@ public class EntityNormalizer {
         try {
             vo = objectMapper.convertValue(data, NlpExtractVO.class);
         } catch (IllegalArgumentException e) {
-            // 结构化数据形状异常就不归一：让复核继续走完，不因一条脏数据卡住复核员
+            // 1. 结构化数据形状异常就不归一：让复核继续走完，不因一条脏数据卡住复核员
             log.warn("[归一] 结构化数据转 VO 失败，跳过归一: {}", e.getMessage());
             return new NormStat(0, 0, 0, 0);
         }
         NormStat stat = normalize(vo, orgId);
-        // 回写成 Map 而不是直接塞 vo.getXxx()：后者会把 NlpExtractVO.Entity / Herb
+        // 2. 回写成 Map 而不是直接塞 vo.getXxx()：后者会把 NlpExtractVO.Entity / Herb
         // 这些**强类型对象**留在 Map 里，而方法约定是「键值仍与 structured_data 同构的 Map」。
         // 一旦有调用方接着读这个 Map（比如按 Map 取实体去比对），就会 ClassCastException。
         // 我的测试先踩了这个坑才定下来的。
@@ -236,7 +236,7 @@ public class EntityNormalizer {
         writeBack(data, "treatmentList", vo.getTreatmentList());
         writeBack(data, "formulaList", vo.getFormulaList());
         writeBack(data, "herbs", vo.getHerbs());
-        // inquiry（任务 8·方案 A）为「问诊子项」透传位：不参与上方任何归一/扣分，
+        // 3. inquiry（任务 8·方案 A）为「问诊子项」透传位：不参与上方任何归一/扣分，
         // 仅把抽取侧挪出的二便/睡眠/饮食/喜好/卧位/精神/面色整句原样保留进 structured_data。
         writeBack(data, "inquiry", vo.getInquiry());
         return stat;
@@ -272,12 +272,12 @@ public class EntityNormalizer {
             }
             String raw = rawOf(e.getContent(), e.getSourceText());
             if (raw != null && !raw.isBlank()) {
-                // 先判「它本身就是症状术语」→ 是就别动（避免把真症状挪走，也避免词典重叠时误判）
+                // 1. 先判「它本身就是症状术语」→ 是就别动（避免把真症状挪走，也避免词典重叠时误判）
                 if (hitsDictionary("symptom", orgId, raw)) {
                     kept.add(e);
                     continue;
                 }
-                // 兜底二：整串命中不了词典，但**能被脉象/舌象的拆解规则完整拆开**的，
+                // 2. 兜底二：整串命中不了词典，但**能被脉象/舌象的拆解规则完整拆开**的，
                 // 就是脉象/舌象内容被错放（「左略涩」→ 脉涩、「双上略浮下略沉」→ 脉浮+脉沉、
                 // 「红点满布」→ 舌红点）。拆解本身要求整串被词条覆盖，因此不会把真症状挪走；
                 // 挪过去后 normEntities 会照常拆出标准词，两边分子同时受益。
@@ -325,7 +325,7 @@ public class EntityNormalizer {
         dropped += dropIn(vo.getTongueList(), "tongue", orgId);
         dropped += dropIn(vo.getPulseList(), "pulse", orgId);
         dropped += dropIn(vo.getFormulaList(), "formula", orgId);
-        // 无词典的 3 类：没有可依据的词典，长度 1 一律按残词处理
+        // 1. 无词典的 3 类：没有可依据的词典，长度 1 一律按残词处理
         dropped += dropIn(vo.getCauseList(), null, orgId);
         dropped += dropIn(vo.getTreatmentList(), null, orgId);
         if (dropped > 0) {
@@ -358,7 +358,7 @@ public class EntityNormalizer {
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
             return r != null && EsTermNormalizer.isHit(r.level());
         } catch (Exception ex) {
-            // 词典/ES 不可用时**不挪**：宁可少归位，也不能凭猜把症状改成脉象
+            // 1. 词典/ES 不可用时**不挪**：宁可少归位，也不能凭猜把症状改成脉象
             log.warn("[归一] 归位判定失败（type={}）: {}", type, ex.getMessage());
             return false;
         }
@@ -432,7 +432,7 @@ public class EntityNormalizer {
             } else if (hitsExact("pattern", orgId, raw)) {
                 toPattern.add(e);
             } else {
-                // 无落点：可能是真词表缺口（如「尿频病」），留在 diseases 等待补词
+                // 1. 无落点：可能是真词表缺口（如「尿频病」），留在 diseases 等待补词
                 kept.add(e);
             }
         }
@@ -522,7 +522,7 @@ public class EntityNormalizer {
         collectRaws(byStructuredKey, "causeList", vo.getCauseList());
         collectRaws(byStructuredKey, "treatmentList", vo.getTreatmentList());
         collectRaws(byStructuredKey, "formulaList", vo.getFormulaList());
-        // 中药是另一种 VO 类型：归一目标是 name 而不是 content（与下方第 3 步同口径）
+        // 1. 中药是另一种 VO 类型：归一目标是 name 而不是 content（与下方第 3 步同口径）
         if (vo.getHerbs() != null) {
             for (NlpExtractVO.Herb h : vo.getHerbs()) {
                 String raw = rawOf(h.getName(), h.getSourceText());
@@ -534,7 +534,7 @@ public class EntityNormalizer {
         byStructuredKey.forEach((structuredKey, raws) -> {
             com.tcm.ehr.common.config.EntityTypes.EntityType t =
                     com.tcm.ehr.common.config.EntityTypes.dictTypeByStructuredKey(structuredKey);
-            // 只预热本组织归一范围内的类型：范围外的类型不会走归一，预热是白问一次 ES
+            // 2. 只预热本组织归一范围内的类型：范围外的类型不会走归一，预热是白问一次 ES
             if (t != null && scope.contains(t.key())) {
                 termNormalizer.prefetch(t.key(), orgId, new java.util.ArrayList<>(raws));
             }
@@ -615,13 +615,13 @@ public class EntityNormalizer {
             boolean herbOn = scope.contains("herb");
             for (NlpExtractVO.Herb herb : vo.getHerbs()) {
                 if (herb == null) continue;
-                // 中药以 name 为归一目标，sourceText 保留原文（模型侧 name 与 sourceText 同源）
+                // 10. 中药以 name 为归一目标，sourceText 保留原文（模型侧 name 与 sourceText 同源）
                 String raw = rawOf(herb.getName(), herb.getSourceText());
                 if (raw.isEmpty()) continue;
                 if (TextUtil.isBlank(herb.getSourceText())) {
                     herb.setSourceText(raw);
                 }
-                // 中药不在归一范围 → 只保留原文，不写 normLevel（同无词典处理）
+                // 11. 中药不在归一范围 → 只保留原文，不写 normLevel（同无词典处理）
                 if (!herbOn) {
                     continue;
                 }
@@ -799,7 +799,7 @@ public class EntityNormalizer {
         n += dropNoiseIn(vo.getSymptoms(), "symptom");
         n += dropNoiseIn(vo.getDiseases(), "disease");
         n += dropNoiseIn(vo.getTongueList(), "tongue");
-        // 2026-10-21 新增：脉象（手法 / 含标点残句）、方剂（处方头 / 剂型残片）、
+        // 1. 2026-10-21 新增：脉象（手法 / 含标点残句）、方剂（处方头 / 剂型残片）、
         // 中药（化验指标 / 含标点）—— 这几类此前完全没做噪声过滤，是未归一的主要来源之一。
         n += dropNoiseIn(vo.getPulseList(), "pulse");
         n += dropNoiseIn(vo.getFormulaList(), "formula");
@@ -833,7 +833,7 @@ public class EntityNormalizer {
         if (s == null || s.isEmpty()) {
             return false;
         }
-        // 2026-10-21 跨类型通用判定：这两类无论落在哪个字段都不该是实体。
+        // 1. 2026-10-21 跨类型通用判定：这两类无论落在哪个字段都不该是实体。
         // ① 含标点 / 引号 / 括号 —— 抽取把残句或整句带进来了；
         // ② 脉诊手法 / 舌象子要素 / 病程诱因 / 六经裸名 —— 都没有独立标准词可落点。
         if (hasPunct(s) || isExtractionArtifact(s)) {
@@ -851,7 +851,7 @@ public class EntityNormalizer {
             case "herb":
                 return isNonHerbTerm(s);
             case "pulse":
-                // 手法与标点已由上方通用判定覆盖，脉象无其它噪声形态
+                // 2. 手法与标点已由上方通用判定覆盖，脉象无其它噪声形态
                 return false;
             default:
                 return false;
@@ -894,8 +894,8 @@ public class EntityNormalizer {
             }
             EsTermNormalizer.NormalizeResult r = termNormalizer.normalize(type, orgId, raw);
             // 4. 未命中词典就保持原样，不写 normLevel。
-            //    4.1 组合短语（脉位+脉质 / 舌质+苔质）整串无法命中时，尝试拆成若干标准词；
-            //    包含命中同样尝试拆解：「脉细涩」按差额 1 会只归到「脉细」而丢掉「涩」，
+            // 3.4 组合短语（脉位+脉质 / 舌质+苔质）整串无法命中时，尝试拆成若干标准词；
+            // 7. 包含命中同样尝试拆解：「脉细涩」按差额 1 会只归到「脉细」而丢掉「涩」，
             //    完整拆成「脉细+脉涩」才是原文的语义。拆解要求整串被词典项完整覆盖，
             //    任一残字都整体放弃（见 EsTermNormalizer#decompose）。
             boolean negated = r.level() == EsTermNormalizer.LEVEL_CONTAIN && isNegated(raw);
@@ -917,7 +917,7 @@ public class EntityNormalizer {
                     }
                     continue;
                 }
-                // 拆不动：未命中就保持原样；包含命中则继续走下面的常规判定
+                // 7. 拆不动：未命中就保持原样；包含命中则继续走下面的常规判定
                 if (!EsTermNormalizer.isHit(r.level())) {
                     out.add(e);
                     continue;
@@ -938,7 +938,7 @@ public class EntityNormalizer {
             // 实测（35352 条真实病历）：拦住 4867 条否证/已愈句，干净命中 18874 条不受影响。
             if (r.level() == EsTermNormalizer.LEVEL_CONTAIN && isNegated(raw)) {
                 negatedSkip.incrementAndGet();
-                // 2026-10-19：否证句直接**不入库**（原先保留为「未归一实体」）。
+                // 9. 2026-10-19：否证句直接**不入库**（原先保留为「未归一实体」）。
                 // 保留等于把一个不存在的症状记进结构化数据，还让它以「未归一」计入分母 ——
                 // 既降低归一率又拉低质控分，等于对否证句倒扣分。语义上它不是一条发现。
                 continue;
@@ -1001,7 +1001,7 @@ public class EntityNormalizer {
         boolean touched = backfillHerbs(vo, orgId, prescription);
         touched |= backfillDiseases(vo, orgId, tcmDiagnosis, westernDiagnosis);
         touched |= backfillPatterns(vo, orgId, pattern);
-        // 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
+        // 1. 有回补就重跑一次归一：把新 append 的词按统一口径判层级、去重
         if (touched) {
             normalize(vo, orgId);
         }
@@ -1049,7 +1049,7 @@ public class EntityNormalizer {
         if (diseases != null && !diseases.isEmpty() && allNormalized(diseases, NlpExtractVO.Entity::getNormLevel)) {
             return false;
         }
-        // 疾病来源 = 中医诊断列 + 西医诊断列（质控 EntityTypes 的完整性来源即两列）
+        // 2. 疾病来源 = 中医诊断列 + 西医诊断列（质控 EntityTypes 的完整性来源即两列）
         // 两列都扫：西医诊断如 '睾丸炎' 也是疾病，之前漏扫导致该字段未命中
         Set<String> hits = new java.util.HashSet<>();
         if (!TextUtil.isBlank(tcmDiagnosis)) {

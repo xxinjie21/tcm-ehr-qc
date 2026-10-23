@@ -64,7 +64,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         if (dbStatus != null) {
             w.eq("status", dbStatus);
         }
-        // 批次9：worklist「只需我处理」= 已超期且仍待复核的任务（最该先做的那批）。
+        // 1. 批次9：worklist「只需我处理」= 已超期且仍待复核的任务（最该先做的那批）。
         // 过滤必须落在 SQL 层：前端过滤只作用于当前页。overdueOnly 优先于 status 入参。
         if (Boolean.TRUE.equals(overdueOnly)) {
             w.eq("status", dbStatus(QcScorer.GRADE_PENDING));
@@ -172,7 +172,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         // 4. 组装返回：总数与任务列表项（关联病历缺失的跳过，不占位）
         ReviewTasksVO vo = new ReviewTasksVO();
         vo.setTotal(pg.getTotal());
-        // P5.2：关联病历已删的任务会跳过，计数后告知前端。原先每行 selectById 是 N+1
+        // 5. P5.2：关联病历已删的任务会跳过，计数后告知前端。原先每行 selectById 是 N+1
         // （每页 20 条 → 21 次查询，且整行拉回 structured_data 大字段）；改为一次批量只取 id 集合。
         Set<String> existingIds = existingRecordIds(pg.getRecords());
         int skippedMissing = 0;
@@ -190,7 +190,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             rv.setCreateTime(t.getCreateTime());
             rv.setDeadlineTime(t.getDeadlineTime());
             rv.setOverdue(ReviewTaskUtil.isOverdue(t.getDeadlineTime()));
-            // P5.3：列表不再内联整份 structuredData（每行一份很胖），详情由 /raw/按需拉；
+            // 6. P5.3：列表不再内联整份 structuredData（每行一份很胖），详情由 /raw/按需拉；
             // 前端原本就以详情为准，列表份只是“列表数据可能滞后”的兜底，去掉不影响正确性
             vo.getTasks().add(rv);
         }
@@ -216,7 +216,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
             entityNormalizer.normalizeMap(dto.getCorrectedData(), RequestUtils.currentOrgId());
         }
         ReviewResultVO vo = reviewWriteService.review(recordId, dto);
-        // 复核会改写 correctedData（结构化数据）→ 统计词频过期，主动失效（B1）
+        // 1. 复核会改写 correctedData（结构化数据）→ 统计词频过期，主动失效（B1）
         StatsCacheInvalidator.invalidateStats();
         return vo;
     }

@@ -101,7 +101,7 @@ public class LlmSecretCipher {
         try {
             return encryptor.decrypt(cipherText);
         } catch (Exception e) {
-            // 解不开最常见的原因是换过加密密钥（或库里仍是旧实现的 Base64 密文）：告警一次，
+            // 1. 解不开最常见的原因是换过加密密钥（或库里仍是旧实现的 Base64 密文）：告警一次，
             // 按未配置处理让用户重填，而不是把异常抛给调用方。
             log.warn("[LLM] 密钥解密失败（可能更换过加密密钥），按「未配置密钥」处理：{}", e.getMessage());
             return "";

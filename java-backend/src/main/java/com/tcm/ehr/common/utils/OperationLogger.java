@@ -49,7 +49,7 @@ public class OperationLogger {
      * @param detail 操作明细，可为 null
      */
     public void log(String action, String target, String detail) {
-        // 从当前请求取操作人上下文（脱离 Web 请求时各字段为 "unknown"）
+        // 1. 从当前请求取操作人上下文（脱离 Web 请求时各字段为 "unknown"）
         log(action, target, detail, RequestUtils.currentUsername(), RequestUtils.currentRole());
     }
 
@@ -68,7 +68,7 @@ public class OperationLogger {
      * @param role     操作人角色
      */
     public void log(String action, String target, String detail, String operator, String role) {
-        // 同步任务（如导入 / 清洗）由本重载走请求线程，组从 RequestUtils 取；
+        // 1. 同步任务（如导入 / 清洗）由本重载走请求线程，组从 RequestUtils 取；
         // 异步任务（批量重算）用 6 参重载显式传组快照
         groupLog(action, target, detail, operator, role, RequestUtils.currentOrgId(), null, null);
     }
@@ -118,9 +118,9 @@ public class OperationLogger {
 
     private void groupLog(String action, String target, String detail, String operator, String role, String orgId,
                           String objectType, String objectId) {
-        // 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，不截断会让同一操作在不同出口相差 1 秒
+        // 1. 截断到秒：库列 DATETIME(0) 对小数秒是四舍五入，不截断会让同一操作在不同出口相差 1 秒
         LocalDateTime now = LocalDateTime.now().withNano(0);
-        // 对象标识成对使用：只有类型没 ID（或反之）一律视为没有对象，不写半截数据
+        // 2. 对象标识成对使用：只有类型没 ID（或反之）一律视为没有对象，不写半截数据
         boolean hasObject = objectType != null && !objectType.isBlank()
                 && objectId != null && !objectId.isBlank();
         insertDb(now, operator, role, action, target, detail,

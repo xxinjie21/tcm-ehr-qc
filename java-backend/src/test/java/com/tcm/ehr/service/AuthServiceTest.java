@@ -1,5 +1,6 @@
 package com.tcm.ehr.service;
 
+import com.tcm.ehr.domain.vo.OrgResolution;
 import com.tcm.ehr.common.exception.BadCredentialsException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.exception.UnauthorizedException;

@@ -77,7 +77,7 @@ public class AiController {
         if (!List.of("interpret", "review", "termsuggest").contains(kind)) {
             return ResponseEntity.badRequest().body(Result.error(400, "不支持的 AI 动作"));
         }
-        // 与同步接口同一套必填校验：缺参数当场 400，不丢进任务里让用户等一轮才知道。
+        // 1. 与同步接口同一套必填校验：缺参数当场 400，不丢进任务里让用户等一轮才知道。
         // termsuggest 不看病历，校验的是待规范词表；interpret / review 必填 recordId。
         if ("termsuggest".equals(kind)) {
             if (dto == null || dto.getTerms() == null || dto.getTerms().isEmpty()) {
@@ -86,7 +86,7 @@ public class AiController {
         } else if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }
-        // 限流放在真正的开销之前：参数非法（400）不计额度，避免「打错字」被算成滥用
+        // 2. 限流放在真正的开销之前：参数非法（400）不计额度，避免「打错字」被算成滥用
         guardAiRate();
         String taskId = aiAsyncTasks.submit(() -> {
             AiReplyVO r = switch (kind) {
@@ -95,7 +95,7 @@ public class AiController {
                 default -> aiService.review(dto);
             };
             if (r == null) {
-                // 同步路径这里回 404；异步路径只能把结论放进任务结果，所以显式失败，
+                // 3. 同步路径这里回 404；异步路径只能把结论放进任务结果，所以显式失败，
                 // 让前端显示「病历不存在」而不是一个空回复。
                 // termsuggest 恒不返回 null，故不会走到这里。
                 throw new IllegalArgumentException("病历不存在");
@@ -159,7 +159,7 @@ public class AiController {
      */
     @PostMapping("/review")
     public ResponseEntity<Result<AiReplyVO>> review(@Valid @RequestBody AiQueryDTO dto) {
-        // 必填校验 2. 病历不存在回 404
+        // 1. 必填校验 2. 病历不存在回 404
         if (dto == null || dto.getRecordId() == null || dto.getRecordId().isBlank()) {
             return ResponseEntity.badRequest().body(Result.error(400, "未指定病历"));
         }

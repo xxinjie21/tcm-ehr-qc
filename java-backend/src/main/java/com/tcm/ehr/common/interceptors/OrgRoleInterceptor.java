@@ -61,7 +61,7 @@ public class OrgRoleInterceptor implements HandlerInterceptor {
                 HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
         String pathGroupId = vars == null ? null : vars.get(required.pathVar());
         String currentOrgId = RequestUtils.currentOrgId();
-        // 取不到声明的变量时拒绝，而不是放行：取不到基本就是注解写的变量名与路由不一致，
+        // 3. 取不到声明的变量时拒绝，而不是放行：取不到基本就是注解写的变量名与路由不一致，
         // 放行等于把这项校验静默关掉 —— 本项缺陷的成因正是「取不到就跳过」
         if (pathGroupId == null || pathGroupId.isBlank()) {
             log.error("[组内角色] 注解声明的路径变量 {} 取不到值，请核对 RequireOrgRole.pathVar 与路由是否一致",

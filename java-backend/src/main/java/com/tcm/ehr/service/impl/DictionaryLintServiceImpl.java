@@ -76,7 +76,7 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
         lintTermShape(entries, vo);
         lintAliasSanity(entries, vo);
 
-        // 高频问题置顶：同一种毛病往往成片出现，先改一处能消掉一大片
+        // 1. 高频问题置顶：同一种毛病往往成片出现，先改一处能消掉一大片
         List<DictionaryLintVO.Issue> all = new ArrayList<>();
         all.addAll(vo.getErrors());
         all.addAll(vo.getWarnings());
@@ -223,7 +223,7 @@ public class DictionaryLintServiceImpl implements IDictionaryLintService {
                 aliasOwners.computeIfAbsent(alias, k -> new ArrayList<>()).add(trimmed(e.getStandardTerm()));
             }
         }
-        // 同一别名挂在多个标准词下是正常的（一个症状名可属多个证），只提示数量异常多的
+        // 1. 同一别名挂在多个标准词下是正常的（一个症状名可属多个证），只提示数量异常多的
         List<String> shared = new ArrayList<>();
         for (Map.Entry<String, List<String>> en : aliasOwners.entrySet()) {
             Set<String> owners = new LinkedHashSet<>(en.getValue());

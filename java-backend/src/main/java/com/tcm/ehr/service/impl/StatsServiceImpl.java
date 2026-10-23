@@ -86,7 +86,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public List<String> departments() {
-        // 性能审查 P1-6 / A5：拆成两条 SQL，Java 侧按 viewAllOrgs 二选一 ——
+        // 1. 性能审查 P1-6 / A5：拆成两条 SQL，Java 侧按 viewAllOrgs 二选一 ——
         // 原本的 WHERE (#{viewAll}=1 OR org_id=#{orgId}) 会让优化器难按 org_id 收窄。
         // Org 分支的 orgId 传 domainOrgId()（无组=哨兵值），fail-closed 不会查到别组科室。
         return RequestUtils.viewAllOrgs()
@@ -148,10 +148,10 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         //    ORDER BY 与 GROUP BY 不能共存（性能审查 P0-3#3）。
         QueryWrapper<Record> wrapper;
         if (dto.getRecordIds() != null && !dto.getRecordIds().isEmpty()) {
-            // 优先：按病历ID圈定；ID 由调用方给，数据域必须先叠加
+            // 2. 优先：按病历ID圈定；ID 由调用方给，数据域必须先叠加
             wrapper = RecordFilter.buildForAggregate(orgId, new FiltersDTO()).in("id", dto.getRecordIds());
         } else if (dto.getFilters() != null && !dto.getFilters().isEmpty()) {
-            // 次选：按筛选条件圈定
+            // 3. 次选：按筛选条件圈定
             wrapper = RecordFilter.buildForAggregate(orgId, toFilters(dto.getFilters()));
         } else {
             wrapper = RecordFilter.buildForAggregate(orgId, new FiltersDTO());
@@ -214,7 +214,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
      */
     @Override
     public StatsVO extra(FiltersDTO filters) {
-        // 看板扩展：全表 GROUP BY ×3 + 词典读取，每次进首页都现算。加 60s 短 TTL 缓存；
+        // 1. 看板扩展：全表 GROUP BY ×3 + 词典读取，每次进首页都现算。加 60s 短 TTL 缓存；
         // 失效用 StatsCache 的全局版本段 —— 任一写入即作废（见 StatsCache.getOrLoad）。
         return statsCache.getOrLoad("extra", filters, EXTRA_TTL,
                 () -> extraFromDb(filters), StatsVO.class);
@@ -222,7 +222,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
 
     /** 看板扩展现算主体（不含缓存）。缓存包装见 {@link #extra(FiltersDTO)}。 */
     private StatsVO extraFromDb(FiltersDTO filters) {
-        // P2-10：三块统计全部下推到 SQL 侧聚合。原实现是 recordsFor() 把命中病历（4 万行 ×
+        // 1. P2-10：三块统计全部下推到 SQL 侧聚合。原实现是 recordsFor() 把命中病历（4 万行 ×
         // 5 列投影）整份拉进堆，再对同一份 List 独立遍历三遍（月 / 科室 / 分数）。
         // 现在中间计数留在 DB，回传行数从「病历数」降到「月份数 / 科室数 / 分档数」。
         // 条件由 buildForAggregate 产出：只含 WHERE、**不含 ORDER BY**（与 GROUP BY 不能共存）。
@@ -233,7 +233,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         // 1. 质控趋势：按就诊月份聚合（升序，最多最近 12 个月）
         TreeMap<String, long[]> byMonth = new TreeMap<>();
         for (Map<String, Object> row : baseMapper.selectTrendByMonth(wrapper)) {
-            // 无接诊时间的行是 NULL 分组，与原实现「monthOf 返回 null 就 continue」同口径
+            // 3. 无接诊时间的行是 NULL 分组，与原实现「monthOf 返回 null 就 continue」同口径
             Object month = row.get("month");
             if (month == null) continue;
             long[] acc = byMonth.computeIfAbsent(month.toString(), k -> new long[3]);
@@ -242,7 +242,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
             acc[2] += num(row.get("pendingReview"));
         }
         List<Map.Entry<String, long[]>> months = new java.util.ArrayList<>(byMonth.entrySet());
-        // P5.2：超 12 个月会截断，告知前端（否则“为何只有最近 12 个月”无从判断）
+        // 4. P5.2：超 12 个月会截断，告知前端（否则“为何只有最近 12 个月”无从判断）
         vo.setTrendTruncated(months.size() > 12);
         if (months.size() > 12) {
             months = months.subList(months.size() - 12, months.size());
@@ -329,7 +329,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
                 vo.setFormulaStats(termFreq(wrapper, "$.formulaList[*]", "formula"));
                 vo.setHerbStats(termFreq(wrapper, "$.herbs[*]", "herb"));
             }
-            // 同理：原来把四个英文枚举值拼进报错，界面上直接显示给用户
+            // 2. 同理：原来把四个英文枚举值拼进报错，界面上直接显示给用户
             default -> throw new IllegalArgumentException("统计类型不合法，请选择：疾病 / 证型 / 症状 / 处方");
         }
         return vo;

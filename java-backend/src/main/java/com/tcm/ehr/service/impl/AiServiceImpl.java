@@ -78,7 +78,7 @@ public class AiServiceImpl implements IAiService {
         vo.setCoreMissing(core.full());
         vo.setCorePartial(core.partial());
         vo.setNormHits(normHits(data));
-        // 核心缺失只算一次，直接传给 keyHints —— 它要用的正是这份结果（P2-13）
+        // 2. 核心缺失只算一次，直接传给 keyHints —— 它要用的正是这份结果（P2-13）
         vo.setKeyHints(keyHints(data, r, core));
 
         String template = templateNarrative(vo, r);
@@ -123,7 +123,7 @@ public class AiServiceImpl implements IAiService {
                 vo.setSummary(s);
             }
         } catch (JacksonException e) {
-            // 模型没按 JSON 返回：原文即叙述，不出摘要
+            // 4. 模型没按 JSON 返回：原文即叙述，不出摘要
             log.debug("[AI] 解读返回非 JSON，按纯文本叙述处理");
             vo.setAnswer(raw.trim());
             vo.setSummary(null);
@@ -132,7 +132,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 解读 prompt：把规则结论 + 病历关键字段拼给模型，要求只回 JSON */
     private String interpretPrompt(AiReplyVO vo, Record r) {
-        // 先给规则结论，模型只做叙述加工，避免它自己下结论
+        // 1. 先给规则结论，模型只做叙述加工，避免它自己下结论
         StringBuilder sb = new StringBuilder("【规则预检结论】\n");
         sb.append("- 完整性：21 字段完整 ").append(vo.getCompleteness().getPresent())
                 .append(" 项，缺失：").append(join(vo.getCompleteness().getMissing())).append('\n');
@@ -233,7 +233,7 @@ public class AiServiceImpl implements IAiService {
      * 也分两档：真缺失 / 漏抽（原始病历有记录但未结构化）。
      */
     private QcScorer.Missing coreMissing(Map<String, Object> data, Record r) {
-        // 与质控页同口径：按当前组织取规则，不能用进程内基线 get()
+        // 1. 与质控页同口径：按当前组织取规则，不能用进程内基线 get()
         return QcScorer.missingElements(data, r, qcRuleStore.getFor(RequestUtils.currentOrgId()));
     }
 
@@ -248,7 +248,7 @@ public class AiServiceImpl implements IAiService {
                 Object lv = m.get("normLevel");
                 if (lv == null) continue;
                 int level = parseInt(lv);
-                // 用具名常量而非裸字面量：层级语义由 EsTermNormalizer 定义，
+                // 2. 用具名常量而非裸字面量：层级语义由 EsTermNormalizer 定义，
                 // 判定顺序若调整，这里跟着改常量即可，写死数字会静默错位
                 if (level == EsTermNormalizer.LEVEL_EXACT) n.setExact(n.getExact() + 1);
                 else if (level == EsTermNormalizer.LEVEL_CONTAIN) n.setContain(n.getContain() + 1);
@@ -347,7 +347,7 @@ public class AiServiceImpl implements IAiService {
 
     /** 复核 prompt：预检单 + 结构化要素，要求给出复核建议 */
     private String reviewPrompt(String precheck, Record r, Map<String, Object> data) {
-        // 先给规则预检单（判定地基），再给结构化要素供模型对照
+        // 1. 先给规则预检单（判定地基），再给结构化要素供模型对照
         StringBuilder sb = new StringBuilder("【规则预检单】\n").append(precheck).append('\n');
         sb.append("【结构化数据】\n")
                 .append("证候：").append(join(contents(data, "patternList"))).append('\n')
@@ -369,7 +369,7 @@ public class AiServiceImpl implements IAiService {
         if (r == null) {
             return null;
         }
-        // § 6.3 缺点 1：对任意组病历做 AI 解读 = 越权读取品质与隐私。
+        // 2. § 6.3 缺点 1：对任意组病历做 AI 解读 = 越权读取品质与隐私。
         // 不属于本组统一止 404（不控接 ForbiddenException说明存在）。
         if (!RecordFilter.canAccess(r)) {
             return null;
@@ -497,7 +497,7 @@ public class AiServiceImpl implements IAiService {
         // 2. 规则地基：从现有词表按字面相似度召回候选（这一步不依赖 LLM）
         //    P1-15：词条与它的字符倒排表一次取回（同源，不会出现「索引与词条对不上」）
         IDictionaryTermStore.RecallIndex index = termStore.recallIndex(RequestUtils.currentOrgId(), type);
-        // 暂存区按「一次建议请求」复用：待补词有 T 个，若每个都新分配一份标记数组，
+        // 3. 暂存区按「一次建议请求」复用：待补词有 T 个，若每个都新分配一份标记数组，
         // 国标全量（D≈3 万）下就是 T×30KB 的瞬时垃圾
         boolean[] marked = new boolean[index.entries().size()];
         List<Integer> candidates = new ArrayList<>();
@@ -717,7 +717,7 @@ public class AiServiceImpl implements IAiService {
                 }
                 out.add(s);
             }
-            // 数量对不上（模型漏项）不整体丢弃，但记一条日志便于排查
+            // 1. 数量对不上（模型漏项）不整体丢弃，但记一条日志便于排查
             if (out.size() != terms.size()) {
                 log.warn("[AI 补词建议] 模型返回 {} 条，输入 {} 条，按返回结果采用", out.size(), terms.size());
             }

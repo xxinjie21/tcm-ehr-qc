@@ -141,7 +141,7 @@ public final class RequestUtils {
             return RequestContextHolder.currentRequestAttributes()
                     .getAttribute(key, RequestAttributes.SCOPE_REQUEST);
         } catch (Exception e) {
-            // 无请求上下文（后台线程 / 单测）返回 null，由调用方按 false 处理
+            // 1. 无请求上下文（后台线程 / 单测）返回 null，由调用方按 false 处理
             return null;
         }
     }

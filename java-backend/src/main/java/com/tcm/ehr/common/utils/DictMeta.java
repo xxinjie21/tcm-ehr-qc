@@ -50,7 +50,7 @@ public final class DictMeta {
      */
     private synchronized void load() {
         if (!loaded) {
-            // 先算到局部变量再赋值：赋值顺序不影响正确性（都在锁内），但能保证
+            // 1. 先算到局部变量再赋值：赋值顺序不影响正确性（都在锁内），但能保证
             // 不会出现「version 已写、termCount 还是默认 0」被别的线程看到的中间态
             String v = store.effectiveDictVersion(orgId);
             int c = store.effectiveTermCount(orgId);

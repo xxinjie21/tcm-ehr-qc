@@ -132,13 +132,13 @@ public class JwtUtil {
     public Claims parseAndVerify(String token) {
         try {
             Claims claims = parseToken(token);
-            // 令牌版本与当前版本不一致 = 已被退出登录 / 改密码作废
+            // 1. 令牌版本与当前版本不一致 = 已被退出登录 / 改密码作废
             if (!versionMatches(claims.getSubject(), claims.get("ver"))) {
                 return null;
             }
             return claims;
         } catch (Exception e) {
-            // 过期 / 签名不符 / 格式非法一律视为不可用；由拦截器统一回 401
+            // 2. 过期 / 签名不符 / 格式非法一律视为不可用；由拦截器统一回 401
             return null;
         }
     }
@@ -181,14 +181,14 @@ public class JwtUtil {
     private void anchorVersion(String userId) {
         String key = VER_KEY + userId;
         try {
-            // ① key 已存在（作废过）：只续期，保持「key 比任何在飞的令牌活得久」
+            // 1. ① key 已存在（作废过）：只续期，保持「key 比任何在飞的令牌活得久」
             if (Boolean.TRUE.equals(redis.expire(key, versionTtl()))) {
                 return;
             }
-            // ② key 不存在（从未作废过）：落占位值 "0"，让计数有起点
+            // 2. ② key 不存在（从未作废过）：落占位值 "0"，让计数有起点
             redis.opsForValue().setIfAbsent(key, "0", versionTtl());
         } catch (Exception e) {
-            // 降级：不写占位不影响本次登录，校验仍按「无 key = 未作废」处理
+            // 3. 降级：不写占位不影响本次登录，校验仍按「无 key = 未作废」处理
             org.slf4j.LoggerFactory.getLogger(JwtUtil.class)
                     .debug("[Auth] 令牌版本号占位写入失败 userId={}: {}", userId, e.getMessage());
         }
@@ -230,13 +230,13 @@ public class JwtUtil {
     public void revokeAll(String userId) {
         try {
             String key = VER_KEY + userId;
-            // 1. 原子自增 + 续期（INCR + PEXPIRE 一段脚本）。key 不存在时 INCR 直接
-            //    建成 1，与原来的「null + 1」语义一致。
+            // 1. 原子自增 + 续期（INCR + PEXPIRE 一段脚本），key 不存在时 INCR 直接建成 1，
+            //    与原来的「null + 1」语义一致。
             // 2. TTL 与签发路径同口径（含抖动）：作废同样会把 key 的存活时间推到
             //    「覆盖此刻所有在飞的令牌」之后，批量登出时也不会一批 key 同时过期。
             RedisLua.incrWithTtl(redis, key, versionTtl());
         } catch (Exception e) {
-            // Redis 不可用时无法作废；令牌仍在有效期内可继续用。降级记录，不抛异常阻断登出。
+            // 3. Redis 不可用时无法作废；令牌仍在有效期内可继续用。降级记录，不抛异常阻断登出。
             org.slf4j.LoggerFactory.getLogger(JwtUtil.class)
                     .warn("[Auth] Redis 不可用，令牌作废失败 userId={}: {}", userId, e.getMessage());
         }

@@ -100,13 +100,13 @@ public final class ExcelRawStreamReader {
                 throw new IOException("Excel 读取失败：" + e.getMessage(), e);
             }
         } finally {
-            // 临时文件必须删：上传侧已有 50MB 体积闸门，但仍不该在磁盘上留残留。
+            // 1. 临时文件必须删：上传侧已有 50MB 体积闸门，但仍不该在磁盘上留残留。
             // 删除失败只吞掉 —— 它若抛出去会覆盖 try 中真实的读取异常，把「Excel 读取失败」
             // 报成「临时文件删除失败」，用户拿到的报错完全对不上原因。
             try {
                 Files.deleteIfExists(tmp);
             } catch (IOException ignored) {
-                // 临时目录不可写 / 文件被占用：留残留好过丢掉真实异常（本类无 logger）
+                // 2. 临时目录不可写 / 文件被占用：留残留好过丢掉真实异常（本类无 logger）
             }
         }
     }
@@ -155,7 +155,7 @@ public final class ExcelRawStreamReader {
         try {
             spf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         } catch (Exception ignored) {
-            // 该 JDK 实现不支持此特性：工作表 XML 不带 DOCTYPE，不阻断
+            // 1. 该 JDK 实现不支持此特性：工作表 XML 不带 DOCTYPE，不阻断
         }
         return spf.newSAXParser().getXMLReader();
     }

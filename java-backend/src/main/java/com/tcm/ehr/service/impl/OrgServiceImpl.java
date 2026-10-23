@@ -13,7 +13,7 @@ import com.tcm.ehr.domain.dto.OrgDTOs;
 import com.tcm.ehr.domain.vo.OrgVOs;
 import com.tcm.ehr.mapper.OrgMemberMapper;
 import com.tcm.ehr.mapper.OrgMapper;
-import com.tcm.ehr.service.OrgResolution;
+import com.tcm.ehr.domain.vo.OrgResolution;
 import com.tcm.ehr.service.IOrgService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +74,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         OrganizationMember m;
         try {
             m = memberMapper.findPrimaryActive(userId);
-            // 多组织回退：primary 组织被停用/缺失时，取该用户任一 active 成员组织，
+            // 1. 多组织回退：primary 组织被停用/缺失时，取该用户任一 active 成员组织，
             // 避免「一个组织被停用 → 用户看不到自己其它组织的数据」。只读，不写库。
             if (m == null) {
                 for (OrganizationMember om : memberMapper.selectList(
@@ -113,7 +113,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             if (g != null) {
                 vo.setOrg(toOrgInfo(g, false));
                 vo.setMyRole(m.getRole());
-                // 20：原始授权位（owner / 管理员由前端 getter 另行放行）
+                // 1. 20：原始授权位（owner / 管理员由前端 getter 另行放行）
                 vo.setCanWriteDictionary(Integer.valueOf(1).equals(m.getCanWriteDictionary()));
                 vo.setCanWriteQcRules(Integer.valueOf(1).equals(m.getCanWriteQcRules()));
             }
@@ -286,11 +286,11 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         try {
             baseMapper.insert(g);
         } catch (DuplicateKeyException e) {
-            // 并发同编码：上面的存在性检查与插入之间有窗口，由 uk 兜底
+            // 5. 并发同编码：上面的存在性检查与插入之间有窗口，由 uk 兜底
             throw new IllegalArgumentException("组织编码「" + code + "」已被占用，请换一个");
         }
 
-        // 多组织：创建者若已有 primary 组织，先把旧 primary 置 0，新组织置 1（自动切换）。
+        // 6. 多组织：创建者若已有 primary 组织，先把旧 primary 置 0，新组织置 1（自动切换）。
         // 保证「每用户至多一个 primary」——与 addMember / switchOrg / leave / remove 同口径。
         if (memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
                 .eq("user_id", creatorUserId).eq("is_primary", 1)) > 0) {
@@ -303,7 +303,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         owner.setOrgId(g.getId());
         owner.setUserId(creatorUserId);
         owner.setRole(OrganizationMember.ROLE_OWNER);
-        // 两个授权位显式置 0：不写会因 null 被 MyBatis-Plus 跳过而依赖 DB 默认值，
+        // 7. 两个授权位显式置 0：不写会因 null 被 MyBatis-Plus 跳过而依赖 DB 默认值，
         // 「新建所有者的授权状态」在代码里就读不出来，且默认值一改就静默变化
         owner.setCanWriteDictionary(0);
         owner.setCanWriteQcRules(0);
@@ -340,7 +340,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         }
         g.setStatus(Organization.STOPPED);
         baseMapper.updateById(g);
-        // 停用只挡登录（JwtInterceptor 的主组织解析已过滤 status='active'），数据保留
+        // 1. 停用只挡登录（JwtInterceptor 的主组织解析已过滤 status='active'），数据保留
     }
 
     @Override
@@ -351,7 +351,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         }
         g.setStatus(Organization.ACTIVE);
         baseMapper.updateById(g);
-        // 成员状态恢复为 active（此前登录被挡就是因为查不到 active 组织）
+        // 1. 成员状态恢复为 active（此前登录被挡就是因为查不到 active 组织）
         List<OrganizationMember> members = memberMapper.selectList(
                 new QueryWrapper<OrganizationMember>().eq("org_id", g.getId()));
         for (OrganizationMember m : members) {
@@ -419,7 +419,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         // 2. 新 owner：已在组织内则升权，不在则新建行
         OrganizationMember neu = memberOf(orgId, newOwnerUserId);
         if (neu == null) {
-            // 多组织：新成员若已有 primary 组织，先置旧为 0，本组织置 1（自动切换）。
+            // 3. 多组织：新成员若已有 primary 组织，先置旧为 0，本组织置 1（自动切换）。
             if (memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
                     .eq("user_id", newOwnerUserId).eq("is_primary", 1)) > 0) {
                 memberMapper.update(null, new UpdateWrapper<OrganizationMember>()
@@ -435,7 +435,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             neu.setRole(OrganizationMember.ROLE_OWNER);
             memberMapper.insert(neu);
         } else {
-            // 多组织：目标已有 primary 组织时先置旧为 0，本组织置 1（自动切换）。
+            // 4. 多组织：目标已有 primary 组织时先置旧为 0，本组织置 1（自动切换）。
             if (memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
                     .eq("user_id", newOwnerUserId).eq("is_primary", 1)) > 0) {
                 memberMapper.update(null, new UpdateWrapper<OrganizationMember>()
@@ -466,7 +466,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             throw new IllegalArgumentException("搜索关键词至少 2 个字符");
         }
         List<OrgVOs.UserBriefVO> out = new ArrayList<>();
-        // 只回 id + username：返回角色 / 状态 / 所属组织等于开了一个「全站用户名 + 组织归属」查询
+        // 1. 只回 id + username：返回角色 / 状态 / 所属组织等于开了一个「全站用户名 + 组织归属」查询
         for (User u : userMapper.selectList(new QueryWrapper<User>()
                 .like("username", kw)
                 .orderByAsc("username")
@@ -486,12 +486,12 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         requireOrg(orgId);
         requireOwnOrg(orgId);
         List<OrgVOs.MemberInfo> out = new ArrayList<>();
-        // owner 排前，便于前端直接看出所有者
+        // 1. owner 排前，便于前端直接看出所有者
         List<OrganizationMember> rows = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
                 .eq("org_id", orgId)
                 .orderByDesc("role").orderByAsc("create_time"));
-        // P2-7：用户名一次 IN 取回，不再在循环里逐条 selectById（N+1 → 2 次查询）。
-        // 1. 去重收集本组织出现过的 userId（LinkedHashSet 保序，便于排查）
+        // 2. P2-7：用户名一次 IN 取回，不再在循环里逐条 selectById（N+1 → 2 次查询）。
+        // 去重收集本组织出现过的 userId（LinkedHashSet 保序，便于排查）
         Set<String> userIds = new LinkedHashSet<>();
         for (OrganizationMember m : rows) {
             if (m.getUserId() != null) {
@@ -513,7 +513,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             mi.setUsername(u == null ? "(已注销)" : u.getUsername());
             mi.setRole(m.getRole());
             mi.setJoinTime(m.getCreateTime());
-            // 写授权位必须回带：前端开关的 model-value 依赖它，缺了开关永远显示未开启
+            // 5. 写授权位必须回带：前端开关的 model-value 依赖它，缺了开关永远显示未开启
             mi.setCanWriteDictionary(m.getCanWriteDictionary());
             mi.setCanWriteQcRules(m.getCanWriteQcRules());
             out.add(mi);
@@ -530,12 +530,12 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         if (u == null) {
             throw new ResourceNotFoundException(1006, "用户不存在");
         }
-        // 多组织：允许跨组织加入（一人可属于多个组织）。仅同组织重复由 uk_org_user 兜底。
+        // 1. 多组织：允许跨组织加入（一人可属于多个组织）。仅同组织重复由 uk_org_user 兜底。
         // 已停用账号不拉入：拉进来也登不了，只会让 owner 以为自己多了个人。
         if (User.STATUS_DISABLED.equals(u.getStatus())) {
             throw new IllegalArgumentException("该账号已被停用，无法拉入");
         }
-        // is_primary：该用户当前无 primary 时才置 1（成为其当前组织），否则 0。
+        // 2. is_primary：该用户当前无 primary 时才置 1（成为其当前组织），否则 0。
         // 保证「每用户至多一个 primary」——switch/create/leave/remove 全路径同口径。
         boolean hasPrimary = memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
                 .eq("user_id", userId).eq("is_primary", 1)) > 0;
@@ -546,7 +546,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         m.setRole(OrganizationMember.ROLE_MEMBER);
         m.setIsPrimary(hasPrimary ? 0 : 1);
         m.setCreateTime(LocalDateTime.now().withNano(0));
-        // uk_org_user 唯一索引兜底并发拉人：上面的存在性检查与插入之间有窗口
+        // 3. uk_org_user 唯一索引兜底并发拉人：上面的存在性检查与插入之间有窗口
         // （两个所有者同时拉同一人都会看到「无归属」）。不捕获的话异常直冒成 500，
         // 用户只会看到「系统异常」而不知道「该用户已被拉走」。
         try {
@@ -567,9 +567,9 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             throw new IllegalArgumentException("不能直接移除所有者，请先转让所有者");
         }
         memberMapper.deleteById(m.getId());
-        // 多组织：删的若本是 primary，把该用户另一条 active 成员提升为 primary（避免「无当前组织」）
+        // 1. 多组织：删的若本是 primary，把该用户另一条 active 成员提升为 primary（避免「无当前组织」）
         promotePrimaryIfRemoved(userId, m.getId());
-        // 被移出 / 主动退出组织后账号仍是 active：组织模型取代了「待分配池 / 审批中」，
+        // 2. 被移出 / 主动退出组织后账号仍是 active：组织模型取代了「待分配池 / 审批中」，
         // users.status 只剩 active/disabled 两个取值。无组织用户的可见范围由
         // RecordFilter 的 fail-closed 兜底（未加入组织时仅「LLM 配置」「创建组织」可用），
         // 不再用账号状态表达「没有归属」
@@ -582,7 +582,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         Organization g = requireOrg(orgId);
         requireOwnOrg(orgId);
         OrganizationMember newOwner = memberOf(orgId, newOwnerUserId);
-        // 原组长降为组员：两行必须同生共死（加了 @Transactional）
+        // 1. 原组长降为组员：两行必须同生共死（加了 @Transactional）
         List<OrganizationMember> owners = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
                 .eq("org_id", orgId).eq("role", OrganizationMember.ROLE_OWNER));
         if (owners.isEmpty()) {
@@ -596,7 +596,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         memberMapper.updateById(oldOwner);
         newOwner.setRole(OrganizationMember.ROLE_OWNER);
         memberMapper.updateById(newOwner);
-        // 冗余列同步（审计 2026-10-09）：权威仍是成员行的 role，但 organizations.owner_user_id
+        // 2. 冗余列同步（审计 2026-10-09）：权威仍是成员行的 role，但 organizations.owner_user_id
         // 必须同事务跟随，否则 reassignOwner 的「旧 owner」守卫会读到过期值。
         g.setOwnerUserId(newOwnerUserId);
         baseMapper.updateById(g);
@@ -610,14 +610,14 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         String userId = RequestUtils.currentUserId();
         OrganizationMember m = memberOf(orgId, userId);
         if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
-            // 组长不能直接退出：先数还有几个组员，没有继任者就拒绝（不产生孤儿组）
+            // 1. 组长不能直接退出：先数还有几个组员，没有继任者就拒绝（不产生孤儿组）
             long others = memberMapper.selectCount(new QueryWrapper<OrganizationMember>()
                     .eq("org_id", orgId)
                     .ne("user_id", userId));
             if (others == 0) {
                 throw new IllegalArgumentException("你是组长且组内无其他成员，无法退出");
             }
-            // 有其他人：按「队长离职须指定继任者」处理 —— 直接从剩余成员里选最早的升组长
+            // 2. 有其他人：按「队长离职须指定继任者」处理 —— 直接从剩余成员里选最早的升组长
             OrganizationMember successor = memberMapper.selectList(new QueryWrapper<OrganizationMember>()
                             .eq("org_id", orgId)
                             .ne("user_id", userId)
@@ -626,16 +626,16 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
                     .get(0);
             successor.setRole(OrganizationMember.ROLE_OWNER);
             memberMapper.updateById(successor);
-            // 冗余列必须同事务跟随（同 transferOwner / reassignignOwner 的口径）：
+            // 3. 冗余列必须同事务跟随（同 transferOwner / reassignignOwner 的口径）：
             // 漏了它，organizations.owner_user_id 仍指向已离组的人，
             // reassignOwner 的「该用户已经是本组织所有者」守卫会读到过期值而误判。
             g.setOwnerUserId(successor.getUserId());
             baseMapper.updateById(g);
         }
         memberMapper.deleteById(m.getId());
-        // 多组织：删的若本是 primary，把该用户另一条 active 成员提升为 primary（避免「无当前组织」）
+        // 4. 多组织：删的若本是 primary，把该用户另一条 active 成员提升为 primary（避免「无当前组织」）
         promotePrimaryIfRemoved(userId, m.getId());
-        // 被移出 / 主动退出组织后账号仍是 active：组织模型取代了「待分配池 / 审批中」，
+        // 5. 被移出 / 主动退出组织后账号仍是 active：组织模型取代了「待分配池 / 审批中」，
         // users.status 只剩 active/disabled 两个取值。无组织用户的可见范围由
         // RecordFilter 的 fail-closed 兜底（未加入组织时仅「LLM 配置」「创建组织」可用），
         // 不再用账号状态表达「没有归属」
@@ -661,7 +661,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
             throw new IllegalArgumentException("所有者本就拥有全部写权限，无需单独授权");
         }
-        // 两个都为空 = 什么都没改，直接返回，避免一次无意义的写库
+        // 1. 两个都为空 = 什么都没改，直接返回，避免一次无意义的写库
         if (canWriteDictionary == null && canWriteQcRules == null) {
             throw new IllegalArgumentException("未指定要修改的权限");
         }

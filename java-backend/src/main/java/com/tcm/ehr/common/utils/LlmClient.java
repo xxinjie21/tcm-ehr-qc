@@ -288,7 +288,7 @@ public class LlmClient {
                     TextUtil.isBlank(cfg.model()) ? "(通道默认)" : cfg.model());
             return new ResolvedClient(client, cfg);
         } catch (Exception e) {
-            // 装配失败记下「用户 + 当前版本」，本次配置下都降级（LLM 是增强项，不能带崩主流程）
+            // 6. 装配失败记下「用户 + 当前版本」，本次配置下都降级（LLM 是增强项，不能带崩主流程）
             failedKeys.put(userId, resolved.version());
             log.warn("[LLM] 装配失败，本次配置下降级（不影响主流程）：{}", e.getMessage());
             return new ResolvedClient(null, cfg);
@@ -315,8 +315,8 @@ public class LlmClient {
         // 1. 没配 base-url 就用本机默认
         String baseUrl = TextUtil.isBlank(cfg.baseUrl()) ? DEFAULT_OLLAMA_BASE_URL : cfg.baseUrl().trim();
 
-        // OllamaApi 默认不设超时，连不上时会一直挂着；必须显式给连接与读取超时
-        // 2. 显式设连接/读取超时
+        // 2. OllamaApi 默认不设超时，连不上时会一直挂着；必须显式给连接与读取超时
+        // 显式设连接/读取超时
         int timeout = cfg.timeout() > 0 ? cfg.timeout() : DEFAULT_TIMEOUT_MS;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(timeout));
@@ -373,7 +373,7 @@ public class LlmClient {
         if (cfg.temperature() != null) {
             chatOptions.temperature(cfg.temperature());
         }
-        // 同步与异步两个客户端都要给。OpenAiChatModel.build() 在缺异步客户端时会回退到
+        // 4. 同步与异步两个客户端都要给。OpenAiChatModel.build() 在缺异步客户端时会回退到
         // OpenAiSetup 按 spring.ai.openai.* 自行装配，而本项目该前缀已统一置 none，
         // 于是「api-key 明明填了」也会抛 At least one credential source must be specified
         // —— 即 openai 通道永远连不上，且错误信息把矛头指向凭据、极难定位。
