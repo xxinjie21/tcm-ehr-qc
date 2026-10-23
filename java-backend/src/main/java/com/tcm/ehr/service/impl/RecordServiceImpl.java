@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.cache.StatsCacheInvalidator;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
@@ -150,7 +151,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 taskId, files.length, summary.getTotal(), summary.getSuccess(), summary.getFailed());
         // 导入写了 structured_data / pattern 等 → 统计词频已过期，主动失效（B1）
         if (summary.getSuccess() > 0) {
-            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+            StatsCacheInvalidator.invalidateStats();
         }
         return vo;
     }
@@ -271,7 +272,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         dedupeAndCollect(parsedRows, existingHash, summary, toInsert);
         insertRecords(summary, toInsert);
         if (summary.getSuccess() > 0) {
-            com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+            StatsCacheInvalidator.invalidateStats();
         }
         log.info("[病历重传] 行={} 成功={} 失败={}", summary.getTotal(), summary.getSuccess(), summary.getFailed());
         return summary;
@@ -334,7 +335,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
         CreateRecordVO vo = new CreateRecordVO();
         vo.setId(r.getId());
         // 新增病历后统计词频过期 → 主动失效（B1）
-        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+        StatsCacheInvalidator.invalidateStats();
         return vo;
     }
 
@@ -446,7 +447,7 @@ public class RecordServiceImpl extends ServiceImpl<RecordMapper, Record> impleme
                 termStore.effectiveTermCount(RequestUtils.currentOrgId()));
         baseMapper.updateStructuredData(recordId, json);
         // 结构化数据 → 统计词频过期，主动失效（B1）
-        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+        StatsCacheInvalidator.invalidateStats();
     }
 
     /**

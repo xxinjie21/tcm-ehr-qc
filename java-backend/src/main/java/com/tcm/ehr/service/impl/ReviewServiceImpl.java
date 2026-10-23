@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.cache.StatsCacheInvalidator;
 import com.tcm.ehr.common.utils.QcScorer;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -218,7 +219,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         }
         ReviewResultVO vo = reviewWriteService.review(recordId, dto);
         // 复核会改写 correctedData（结构化数据）→ 统计词频过期，主动失效（B1）
-        com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+        StatsCacheInvalidator.invalidateStats();
         return vo;
     }
 

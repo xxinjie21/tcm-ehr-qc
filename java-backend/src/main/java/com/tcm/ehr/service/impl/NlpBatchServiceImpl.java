@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.cache.StatsCacheInvalidator;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -704,7 +705,7 @@ public class NlpBatchServiceImpl implements INlpBatchService {
                     : runByFilter(id, t, failures, failedIds, truncated, processed);
             // 批量解析改写 structured_data → 统计词频过期，主动失效（B1）
             if (!cancelled) {
-                com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+                StatsCacheInvalidator.invalidateStats();
             }
         } catch (Exception e) {
             // 执行期异常必须落 FAILED，且不能指望 workerLoop 的 markFailed：

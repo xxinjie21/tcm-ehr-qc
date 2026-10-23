@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.cache.StatsCacheInvalidator;
 import com.tcm.ehr.common.exception.BusinessException;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -537,7 +538,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
             cancelled = run(id, t, result, seenHash, rules, failures, failedIds, truncated, processed);
             // 质控重算完成后会改写 grade/qc_results（清洗与看板都读它）→ 统计缓存主动失效（B1）
             if (!cancelled) {
-                com.tcm.ehr.common.cache.StatsCacheInvalidator.invalidateStats();
+                StatsCacheInvalidator.invalidateStats();
             }
         } catch (Exception e) {
             // 执行期异常必须落 FAILED。
