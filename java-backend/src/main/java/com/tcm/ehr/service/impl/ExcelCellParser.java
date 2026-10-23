@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * Excel 单元格 → 值（批次 13 · 13.3 的第二个抽取对象）。
  *
  * <p><b>为什么抽它</b>：这一组（取文本 + 接诊时间解析）是「把一个单元格变成 Java 值」这一件事，
- * 与病历的业务逻辑无关，也不碰数据库。抽出来后 {@code RecordServiceImpl} 只负责业务编排。</p>
+ * 与病历的业务逻辑无关，也不碰数据库。抽出来后 RecordServiceImpl 只负责业务编排。</p>
  *
  * <p>核心是接诊时间的归一：导入源这一列是 14 位紧凑数字串（{@code 20221224090613}），
  * 单元格类型为数值、格式为 General —— 既不是日期格式、也不含分隔符。只按
@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * <li>中文年月日：{@code 2022年12月24日}</li>
  * <li>斜杠与点分隔：{@code 2022/12/24} / {@code 2022.12.24}</li>
  * <li>缺省部分：只到日补 {@code 00:00:00}，只到分补 {@code :00}</li>
- * <li>多余部分：ISO 的 {@code T} 换成空格，小数秒与时区后缀截掉</li>
+ * <li>多余部分：ISO 的 T 换成空格，小数秒与时区后缀截掉</li>
  * </ul>
  *
  * <p>认不出来的一律返回 null（而不是给一个「看起来合法」的时间）：宁可缺接诊时间，
@@ -38,7 +38,7 @@ final class ExcelCellParser {
 
     private static final Pattern COMPACT_DT = Pattern.compile("\\d{8}|\\d{12}|\\d{14}");
 
-    /** 连续空白 → 单个空格（P2-6：原先用 {@code String.replaceAll}，每次调用都重编译一遍） */
+    /** 连续空白 → 单个空格（P2-6：原先用 String.replaceAll，每次调用都重编译一遍） */
     private static final Pattern WS = Pattern.compile("\\s+");
 
     private ExcelCellParser() {

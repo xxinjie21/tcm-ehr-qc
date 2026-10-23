@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * 操作日志审计：分页查询、类型选项、导出。
- * §七 L3 已删 {@code purgeBefore}（日志只增不删）。
+ * §七 L3 已删 purgeBefore（日志只增不删）。
  */
 public interface ILogService {
 

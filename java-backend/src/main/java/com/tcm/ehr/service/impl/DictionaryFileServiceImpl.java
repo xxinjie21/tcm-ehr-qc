@@ -21,8 +21,8 @@ import java.util.List;
  * 词典文件**只读**服务：每类术语一个 JSON。
  *
  * <p>默认打包在 <b>classpath:{@code dictionaries/}</b>（随 jar 一起发布，服务器上无需另放文件）；
- * 需要外部目录时用 {@code dictionary.dir} 覆盖（可填 {@code classpath:xxx} 或文件系统路径）。
- * 词典真源已在 {@code dictionary_terms}，本文件仅用于基础层首次播种。</p>
+ * 需要外部目录时用 dictionary.dir 覆盖（可填 {@code classpath:xxx} 或文件系统路径）。
+ * 词典真源已在 dictionary_terms，本文件仅用于基础层首次播种。</p>
  */
 @Slf4j
 @Service

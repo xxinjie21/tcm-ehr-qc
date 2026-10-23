@@ -92,12 +92,12 @@ public class DictProposalServiceImpl implements IDictProposalService {
      * 导出某组织某类型的词条给前端存本地个人词典。
      *
      * <p>两种口径（scope）的区别见接口 javadoc，这里只强调一点：
-     * {@code org} 是<b>提案基线</b>（审核走整快照替换组织层），
-     * {@code effective} 是<b>生效词典</b>（供查看 / 导出 / 当编辑起点）。</p>
+     * org 是<b>提案基线</b>（审核走整快照替换组织层），
+     * effective 是<b>生效词典</b>（供查看 / 导出 / 当编辑起点）。</p>
      *
      * @param orgId 组织；"" = 基础层
      * @param type  术语类型
-     * @param scope {@code org}（默认，本组自有词条）或 {@code effective}（基础层 ∪ 本组）
+     * @param scope org（默认，本组自有词条）或 effective（基础层 ∪ 本组）
      */
     public List<TermEntry> exportBaseline(String orgId, String type, String scope) {
         // 非法/缺省一律按 org：这是提案流程依赖的口径，改动它会让「整快照替换」
@@ -221,7 +221,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
      * 为什么必须按提案自身的 org_id 判，而不是看调用方传来的 isOwner 布尔：isOwner 只说明
      * 「我在自己组织里是 owner」，对任何组织的 owner 都为真，与目标提案属于哪个组织无关
      * （2026-10-05 之前就是这么漏的）。批次 6 工作项 4 起另加授权位判定，
-     * 于是本方法与 {@code QcController.requireRuleWrite} 同一口径。
+     * 于是本方法与 QcController.requireRuleWrite 同一口径。
      *
      * @param p 提案行
      * @throws ForbiddenException 无权审核时抛出，消息按原因区分
@@ -436,8 +436,8 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
      * 查询路径专用的惰性清理：清理失败只降级为「本次不清理」，不能让列表查不出来。
      *
      * <p>与 {@link #purgeExpiredSnapshots()} 的差别只在错误处理。本方法是 {@code GET /api/dictionary/proposals}
-     * 的入口调用的，而清理（删 {@code dict_proposal_term} 里的过期快照行）是「顺手做」的附属动作 ——
-     * 它失败（DB 抖动、{@code purge_after} 脏值）不该把用户的提案列表整页打成 500。
+     * 的入口调用的，而清理（删 dict_proposal_term 里的过期快照行）是「顺手做」的附属动作 ——
+     * 它失败（DB 抖动、purge_after 脏值）不该把用户的提案列表整页打成 500。
      * 清理是幂等的，这次跳过，下次进列表会再试一次。</p>
      *
      * <p>提交路径（{@link #submit}）仍直调原方法、失败随事务回滚 —— 那是刻意保留的保守行为：
@@ -510,7 +510,7 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
 
     /**
      * 多条提案的快照行数（P2-7）：一次 {@code GROUP BY proposal_id} 取回，替代循环内逐条
-     * {@code selectCount}。列表最多 200 条，原先就是 200 次查询。
+     * selectCount。列表最多 200 条，原先就是 200 次查询。
      *
      * <p>结果里没有的提案 = 快照 0 行（被惰性清理过），调用方按 0 处理，与逐条查时一致。</p>
      */

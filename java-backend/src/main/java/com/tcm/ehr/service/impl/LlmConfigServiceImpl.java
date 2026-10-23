@@ -38,7 +38,7 @@ public class LlmConfigServiceImpl implements ILlmConfigService {
     /**
      * 读取当前生效配置。API Key 只回掩码，明文不出后端。
      *
-     * @return 配置视图对象，含 {@code available}（模型是否可用）
+     * @return 配置视图对象，含 available（模型是否可用）
      */
     @Override
     public LlmConfigVO get() {

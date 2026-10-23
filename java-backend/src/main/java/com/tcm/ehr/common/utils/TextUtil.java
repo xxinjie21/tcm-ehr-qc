@@ -3,7 +3,7 @@ package com.tcm.ehr.common.utils;
 /**
  * 文本小工具（阶段3 P3.2 去重收敛）。
  *
- * <p>{@link #stripCodeFence} 原在 {@code AiServiceImpl} 与 {@code DictionaryServiceImpl}
+ * <p>{@link #stripCodeFence} 原在 AiServiceImpl 与 DictionaryServiceImpl
  * 各有一份逐字相同的实现 —— 两份代码漂移后，剥错一边就会让整条链路静默解析失败。
  * 统一收敛到此处，两处调用点共用。</p>
  *

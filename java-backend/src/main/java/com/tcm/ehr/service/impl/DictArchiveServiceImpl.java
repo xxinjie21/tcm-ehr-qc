@@ -29,7 +29,7 @@ import java.util.Map;
  * 供历史查看与回滚。</p>
  *
  * <p><b>限额口径</b>：每 {@code (org_id, type)} 最多保留最近 5 份<b>快照</b>；
- * 超限时只删最老的 {@code dict_archive_term}，{@code dict_archive_version} 元信息
+ * 超限时只删最老的 dict_archive_term，dict_archive_version 元信息
  * <b>永久保留</b> —— 版本号连续性与「某次合并由谁做的」是审计链，删不得。
  * 被清理过快照的版本仍会出现在列表里（{@code snapshotPresent=false}），
  * 但不能再用于回滚。</p>
@@ -153,7 +153,7 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
 
     /**
      * 多个归档版本的快照行数（P2-7）：一次 {@code GROUP BY version_id} 取回，替代循环内
-     * 逐条 {@code selectCount}。
+     * 逐条 selectCount。
      *
      * <p>结果里没有的版本 = 快照 0 行（已被 5 份限额清理），调用方按 0 处理，
      * 与逐条查时「{@code snapshotPresent=false}」一致。</p>
@@ -216,8 +216,8 @@ public class DictArchiveServiceImpl implements IDictArchiveService {
     /**
      * 下一个版本号 = MAX(version_no) + 1；该 {@code (org_id, type)} 还没有归档时为 1。
      *
-     * <p><b>聚合列必须别名成 {@code version_no}</b>：结果集列名要能与实体属性对上
-     * （下划线转驼峰只认 {@code version_no} → {@code versionNo}）。换成对不上的别名，
+     * <p><b>聚合列必须别名成 version_no</b>：结果集列名要能与实体属性对上
+     * （下划线转驼峰只认 version_no → versionNo）。换成对不上的别名，
      * 映射后 {@code getVersionNo()} 恒为 null，每次归档都算出 1 ——
      * 第二次同类型归档必然撞 {@code uk_org_type_no (org_id, type, version_no)}。</p>
      *

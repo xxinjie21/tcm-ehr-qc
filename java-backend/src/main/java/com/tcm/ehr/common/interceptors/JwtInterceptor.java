@@ -22,13 +22,13 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p><b>组为什么不放进 JWT</b>：移出成员 / 转让组长 / 停用组必须<b>立即</b>生效，
  * 而 token 有效期是 24h。所以 {@code userId/username/role} 走 claim，
- * {@code orgId/groupRole} 每请求查 {@code organization_members}
+ * {@code orgId/groupRole} 每请求查 organization_members
  * （走 {@code INDEX(user_id,is_primary)}，本项目规模下开销可忽略）。</p>
  *
  * <p><b>代价与可用性耦合（必须知道）</b>：本类从「纯解析 JWT、不碰 DB」变成<b>每请求查库</b>。
  * DB 不可用时<b>不能抛异常</b> —— 那会让一次数据库抖动把全站打成 500（含登录与只读接口）。
  * 故 {@link IOrgService#resolvePrimaryOrg} 在 DB 故障时降级为「无组」，
- * 由 {@code RecordFilter} 的 fail-closed 兜住：用户看到空态，而不是报错，更不是越权。</p>
+ * 由 RecordFilter 的 fail-closed 兜住：用户看到空态，而不是报错，更不是越权。</p>
  */
 @Slf4j
 @Component

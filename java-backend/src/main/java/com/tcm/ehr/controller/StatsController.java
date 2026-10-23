@@ -47,9 +47,9 @@ public class StatsController {
      * （只用于验证词表建全与否，<b>不代表真实病历准确率</b>）。响应里的
      * disclaimer 会原样带到页面，禁止前端隐藏。</p>
      *
-     * <p>两个时间维度相互独立、可同时生效（取交集）：{@code start}/{@code end} 是
-     * <b>接诊时间</b>（visit_time，Java 侧过滤，{@code range.excluded} 口径由此而来）；
-     * {@code importStart}/{@code importEnd} 是<b>导入时间</b>（records.create_time，
+     * <p>两个时间维度相互独立、可同时生效（取交集）：start/end 是
+     * <b>接诊时间</b>（visit_time，Java 侧过滤，range.excluded 口径由此而来）；
+     * importStart/importEnd 是<b>导入时间</b>（records.create_time，
      * 下推 SQL）。页面默认按「今天导入」收窄，正是这一维度。</p>
      *
      * @param department  科室，空表示不限
@@ -184,7 +184,7 @@ public class StatsController {
     /**
      * GET 查询参数 → 统一的范围过滤对象（两个时间维度都需上下界同时存在）。
      *
-     * <p>与 {@code QcController.filters} 同构：接诊时间与导入时间是独立维度、可同时生效。
+     * <p>与 QcController.filters 同构：接诊时间与导入时间是独立维度、可同时生效。
      * overview / all / extra 不暴露导入时间，传 null 即「不限」（现状不变）。</p>
      */
     private FiltersDTO filters(String department, String start, String end, String grade,

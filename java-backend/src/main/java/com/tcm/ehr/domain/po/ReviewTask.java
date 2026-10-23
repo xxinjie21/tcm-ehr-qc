@@ -38,8 +38,8 @@ public class ReviewTask {
     private Integer isObsolete;
     /** 
      * 任务所属组。
-     * <p>写入时打标而不是查询期 JOIN：MyBatis-Plus 的 {@code QueryWrapper} 不便于 JOIN，
-     * 而 {@code listTasks} 是高频路径。</p>
+     * <p>写入时打标而不是查询期 JOIN：MyBatis-Plus 的 QueryWrapper 不便于 JOIN，
+     * 而 listTasks 是高频路径。</p>
      */
     private String orgId;
 }

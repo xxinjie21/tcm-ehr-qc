@@ -20,8 +20,8 @@ public final class QcScorer {
      * 质控分级的三个取值（2026-10-23 收敛为单一事实源）。
      *
      * <p><b>为什么必须集中定义</b>：这三个字面量此前散落在 12 处 —— 本类赋值 4 处、
-     * {@code GovernanceServiceImpl} 5 处、{@code QcServiceImpl} 5 处、{@code ReviewServiceImpl} 2 处，
-     * 且 {@code StatsCache} 还自维护一份 {@code GRADES} 白名单。改一处漏十一处时
+     * GovernanceServiceImpl 5 处、QcServiceImpl 5 处、ReviewServiceImpl 2 处，
+     * 且 StatsCache 还自维护一份 GRADES 白名单。改一处漏十一处时
      * <b>编译器完全不会报错</b>：{@code switch} 落到 default、导出条件一条都匹配不上、
      * 待办列表变空 —— 属于静默数据错乱。故收敛到此，下游一律引用常量。</p>
      */
@@ -170,7 +170,7 @@ public final class QcScorer {
     public record Missing(List<String> full, List<String> partial) {
     }
 
-    /** 按规则集判定核心要素缺失；{@code rules} 为 null 时用内置默认（与 score 一致） */
+    /** 按规则集判定核心要素缺失；rules 为 null 时用内置默认（与 score 一致） */
     public static Missing missingElements(Map<String, Object> data, Record rawRecord,
                                           com.tcm.ehr.common.config.QcRuleSet rules) {
         com.tcm.ehr.common.config.QcRuleSet rs =

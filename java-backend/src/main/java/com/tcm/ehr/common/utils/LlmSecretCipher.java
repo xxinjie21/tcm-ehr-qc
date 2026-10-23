@@ -17,13 +17,13 @@ import org.springframework.stereotype.Component;
  * 而不是悄悄解出一段垃圾明文。</p>
  *
  * <p><b>加解密交给 spring-security-crypto 的 {@link Encryptors}</b>（《自研组件替换计划》#2）：
- * 原实现手写 {@code javax.crypto} 的 IV 生成、拼接与 Base64 编解码，属重复实现通用能力。
+ * 原实现手写 javax.crypto 的 IV 生成、拼接与 Base64 编解码，属重复实现通用能力。
  * 现在用 {@code Encryptors.delux(password, salt)} —— AES-256-GCM，密钥由 password + salt
  * 经 PBKDF2 派生，密文为 {@code hex(IV‖密文‖tag)}（每次加密随机 IV）。</p>
  *
  * <p><b>配置形态随之改变（raw key → password + salt）</b>：
- * 口令取自环境变量 {@code TCM_LLM_ENC_KEY}（其次配置项 {@code llm.crypto-password}），
- * 盐取自 {@code TCM_LLM_ENC_SALT}（其次 {@code llm.crypto-salt}，为十六进制偶数长度）。
+ * 口令取自环境变量 TCM_LLM_ENC_KEY（其次配置项 {@code llm.crypto-password}），
+ * 盐取自 TCM_LLM_ENC_SALT（其次 {@code llm.crypto-salt}，为十六进制偶数长度）。
  * 口令不再要求「32 字节 Base64」，任意非空字符串均可。两者任一缺失或盐不是合法 hex 时
  * {@link #available()} 为 false —— <b>不阻塞启动</b>，只是无法解密已有密文（按「未配置密钥」处理）。</p>
  *

@@ -282,10 +282,10 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     }
 
     /**
-     * 该用户是否属于一个<b>已停用</b>的组织（状态为 {@code stopped}）。
+     * 该用户是否属于一个<b>已停用</b>的组织（状态为 stopped）。
      *
      * <p>⚠️ 不能简化成「有成员行但解析不到 active 组」——那会把
-     * <b>审批中的建组申请人</b>（状态 {@code pending}）误判成「组织已停用」而拒绝登录。
+     * <b>审批中的建组申请人</b>（状态 pending）误判成「组织已停用」而拒绝登录。
      * 申请人本就该能登录（进引导页看审批进度）。故这里显式只看
      * {@code organizations.status = 'stopped'}。</p>
      */
@@ -324,8 +324,8 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * <p>用 Redis INCR + 首次设置过期时间：进程内计数在多实例下会各算各的，
      * 挡不住并发爆破；Redis 是共享的。</p>
      *
-     * <p><b>P2-21：{@code INCR} 与 {@code EXPIRE} 必须原子</b>。原先两条命令分开发，
-     * 若 {@code INCR} 成功而 {@code EXPIRE} 失败（超时 / 连接断开 / 进程被杀），
+     * <p><b>P2-21：INCR 与 EXPIRE 必须原子</b>。原先两条命令分开发，
+     * 若 INCR 成功而 EXPIRE 失败（超时 / 连接断开 / 进程被杀），
      * 计数 key 就永久留在 Redis 里，该账号从此<b>无限期锁死</b>，且没有任何异常可查。
      * 现改为一段 Lua 脚本，两条命令在 Redis 端一次执行完（见 {@link RedisLua}）。</p>
      */
@@ -349,7 +349,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
      * 这批 key 会在同一秒集体消失，随后一批爆破请求又在同一秒重新开始计数。</p>
      *
      * <p>下限兜到 1 分钟：即使 {@code auth.login-lock-minutes} 被配成很小的值，
-     * 也不会算出 0 或负数而让 {@code PEXPIRE} 变成「立刻删除」（等于不锁定）。</p>
+     * 也不会算出 0 或负数而让 PEXPIRE 变成「立刻删除」（等于不锁定）。</p>
      */
     private Duration lockTtl() {
         int jitter = ThreadLocalRandom.current().nextInt(1, LOCK_TTL_JITTER_MINUTES + 1);

@@ -138,7 +138,7 @@ public class DictionaryServiceImpl implements IDictionaryService {
     /**
      * 原「包含匹配」判据（P2-9 后仍是最终裁决者，倒排只负责缩候选）。
      *
-     * <p>对 {@code standardTerm} 加了空判：词表里理论上是 NOT NULL，但索引侧已按「非空才登记」
+     * <p>对 standardTerm 加了空判：词表里理论上是 NOT NULL，但索引侧已按「非空才登记」
      * 处理，这里同步防御，避免一条脏数据让整页搜索 500。</p>
      */
     private static boolean matches(TermEntry e, String kw) {
@@ -219,8 +219,8 @@ public class DictionaryServiceImpl implements IDictionaryService {
     }
 
     /**
-     * scope 归一：只认 {@code base} / {@code org}，其余（含 null、空白、写错的值）
-     * 一律落回 {@code effective}。
+     * scope 归一：只认 base / org，其余（含 null、空白、写错的值）
+     * 一律落回 effective。
      *
      * <p>为什么不抛异常：这是<b>读</b>接口，scope 写错时返回「生效词典」至少还是可用数据；
      * 抛错会让词典页整页空白。真正需要拦的非法值在 Controller 侧按 4001 挡掉。</p>

@@ -25,19 +25,19 @@ import java.util.Map;
  * 由调用方降级为空 9 类（{@code modelAvailable=false}），不阻塞主流程。</p>
  *
  * <p><b>HTTP 走 Spring {@link RestClient}</b>（《自研组件替换计划》#3）：原实现直接用
- * {@code java.net.http} 手拼 {@code HttpRequest}/{@code HttpResponse}，属重复实现通用能力。
+ * java.net.http 手拼 HttpRequest/HttpResponse，属重复实现通用能力。
  * 传输层仍是 JDK 客户端（{@link JdkClientHttpRequestFactory}），这是 Spring Boot 在没有
  * httpclient5 时的默认选择，不是自研。</p>
  *
  * <p><b>三条必须保留的行为</b>：① <b>HTTP/1.1</b> —— uvicorn 不认 h2c upgrade，
  * 用默认协议会先试 HTTP/2 再退回，白等一轮；② <b>两种超时</b> —— 抽取 30s、
- * 健康探测 2s，故建两个 {@code RestClient}（JDK 请求工厂的读超时是工厂级的，不能按请求改）；
+ * 健康探测 2s，故建两个 RestClient（JDK 请求工厂的读超时是工厂级的，不能按请求改）；
  * ③ <b>绝不抛异常</b> —— 一律降级为 {@code null} / 探测失败，NLP 挂掉不能让主流程报错。</p>
  *
  * <p>本机单实例即可：torch 推理是 CPU 密集型，同一台机器多起实例只是把同样的核拆着用、
  * 吞吐不增反而内存翻倍，也没有跨机故障转移可言。并发靠
- * {@code nlp.batch.concurrency}（批量侧线程池）与 Python 侧的
- * {@code NLP_INFER_CONCURRENCY} 承担，不需要在此轮询分发。</p>
+ * nlp.batch.concurrency（批量侧线程池）与 Python 侧的
+ * NLP_INFER_CONCURRENCY 承担，不需要在此轮询分发。</p>
  */
 @Slf4j
 @Component
@@ -84,9 +84,9 @@ public class PythonNlpClient {
     /**
      * 启动时说清「抽取服务未启用」这件事。
      *
-     * <p>{@code nlp.enabled} 是 {@code @Value} 静态配置，启动时即已知，所以只在这里
+     * <p>nlp.enabled 是 {@code @Value} 静态配置，启动时即已知，所以只在这里
      * 打一次，不必每个请求重复刷屏。级别用 warn 而非 debug：这是配置事实，生产把
-     * {@code com.tcm.ehr} 调回 info 后仍应可见 —— 诊断信息不该随日志级别一起消失。</p>
+     * com.tcm.ehr 调回 info 后仍应可见 —— 诊断信息不该随日志级别一起消失。</p>
      */
     @PostConstruct
     public void reportOnStartup() {

@@ -12,7 +12,7 @@ import java.util.function.Function;
  * 组织内写权限查询实现。
  *
  * <p>判定口径：<b>管理员与组织所有者天然拥有</b>；member 看对应授权位。
- * 两个开关相互独立 —— 授权位是 {@code organization_members} 上的两列。</p>
+ * 两个开关相互独立 —— 授权位是 organization_members 上的两列。</p>
  *
  * <p>一次查询定论：不在「查一次授权位、又查一次成员行」里分两趟 ——
  * 两趟之间成员可能被移除，会出现「已判定有权限、实际已不在组织」的窗口。</p>

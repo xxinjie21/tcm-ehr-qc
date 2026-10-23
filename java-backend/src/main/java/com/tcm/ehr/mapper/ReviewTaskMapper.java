@@ -21,8 +21,8 @@ public interface ReviewTaskMapper extends BaseMapper<ReviewTask> {
     /**
      * 幂等 upsert：把该病历唯一一条未作废任务刷成「待复核 + 最新评分」。
      *
-     * <p><b>为什么必须是 SQL 语义</b>：批次 4 给 {@code review_tasks} 加了唯一键
-     * {@code uk_record_active}，它建在生成列 {@code active_key} 上 —— 只对「未作废」的行唯一
+     * <p><b>为什么必须是 SQL 语义</b>：批次 4 给 review_tasks 加了唯一键
+     * uk_record_active，它建在生成列 active_key 上 —— 只对「未作废」的行唯一
      * （作废行不参与，故同一病历可以留多条历史）。原先的
      * 「先 selectList 再 update/insert」是 check-then-act，两个并发线程都能查到空、
      * 都去 insert，其中一个撞唯一键 → 从「静默重复」变成「整批 500」。

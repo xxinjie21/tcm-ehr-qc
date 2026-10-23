@@ -6,12 +6,12 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 课题组。对应 {@code organizations} 表。
+ * 课题组。对应 organizations 表。
  *
- * <p>状态机（批次 6 起取消审核，只剩三态）：{@code active} ↔ {@code stopped}
- * （管理员停用，只挡登录、数据保留）→ {@code archived}（管理员手动，前提成员数为 0）。</p>
+ * <p>状态机（批次 6 起取消审核，只剩三态）：active ↔ stopped
+ * （管理员停用，只挡登录、数据保留）→ archived（管理员手动，前提成员数为 0）。</p>
  *
- * <p>{@code code} 有 UNIQUE 约束，被拒时改写为 {@code rej_<orgId>_<原code>} 释放编码，
+ * <p>code 有 UNIQUE 约束，被拒时改写为 {@code rej_<orgId>_<原code>} 释放编码，
  * 否则一次拒绝会让该编码被永久占死。</p>
  */
 @Data

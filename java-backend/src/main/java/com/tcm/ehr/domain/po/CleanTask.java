@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * 数据清洗任务。对应 {@code clean_task} 表。
+ * 数据清洗任务。对应 clean_task 表。
  *
  * <p><b>为什么由同步改异步</b>：原 {@code POST /api/governance/clean} 一个请求线程从头跑到尾，
  * 全库 3.4 万条须数分钟，前端只能挂到超时、且<b>无法停止</b>。改为后台任务后：

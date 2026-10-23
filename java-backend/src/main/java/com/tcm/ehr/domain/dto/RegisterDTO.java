@@ -40,7 +40,7 @@ public class RegisterDTO {
 
     @NotBlank(message = "请输入密码")
     /**
-     * 密码最短 6 位 —— 与前端 {@code Register.vue} 的 min=6 对齐。
+     * 密码最短 6 位 —— 与前端 Register.vue 的 min=6 对齐。
      * 上限 72 防超长输入拖慢 BCrypt（而非列宽约束；users.password 是 VARCHAR(255)，
      * BCrypt 散列本身恒为 60 字符）。
      */
@@ -50,8 +50,8 @@ public class RegisterDTO {
     /**
      * 可选：同时申请创建课题组。
      *
-     * <p><b>本段已过期并于 2026-10-05 校正</b>：现实现「注册即 {@code active}、无审核、无待分配池」。
-     * 组织由用户自助创建（创建者即 owner），不存在 {@code pending} 组与管理员审批；
+     * <p><b>本段已过期并于 2026-10-05 校正</b>：现实现「注册即 active、无审核、无待分配池」。
+     * 组织由用户自助创建（创建者即 owner），不存在 pending 组与管理员审批；
      * 历史遗留的「待分配池 / 首任组长审批」描述已不再适用。</p>
      */
     @Valid

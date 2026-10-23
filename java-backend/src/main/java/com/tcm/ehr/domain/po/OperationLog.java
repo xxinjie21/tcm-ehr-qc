@@ -9,10 +9,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 操作日志：审计页（{@code GET /api/logs}）的唯一数据源，读 {@code operation_log} 表做分页 / 筛选 / 导出。
+ * 操作日志：审计页（{@code GET /api/logs}）的唯一数据源，读 operation_log 表做分页 / 筛选 / 导出。
  * 字段与 database-init.sql 的 operation_log 表一一对应。
  *
- * <p><b>不记 IP</b>（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原先的 {@code ip} 列已从表中移除，
+ * <p><b>不记 IP</b>（PIPL 最小必要，消费方仅 2 处且都不依赖 IP）：原先的 ip 列已从表中移除，
  * 唯一权威建表脚本是 {@code database-init.sql}。</p>
  */
 @Data
@@ -30,7 +30,7 @@ public class OperationLog {
     /** 操作类型（数据清洗/数据集导出/词典导入/词典回滚/人工复核/批量重算） */
     private String action;
     /**
-     * 对象类型（对标 D3）：如 {@code record}。与 {@link #objectId} 成对使用。
+     * 对象类型（对标 D3）：如 record。与 {@link #objectId} 成对使用。
      *
      * <p>可为 null，且**批量操作应当为 null**：批量重算/数据清洗没有单一对象，
      * 给它编一个假对象只会让「按对象查历史」查出错误的结果。</p>

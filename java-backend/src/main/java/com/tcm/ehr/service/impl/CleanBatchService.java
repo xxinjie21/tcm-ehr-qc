@@ -178,8 +178,8 @@ public class CleanBatchService implements ICleanBatchService {
     /**
      * 提交清洗任务（异步入队，立即返回）。
      *
-     * <p>范围过滤与组织快照在提交线程冻结进 {@code clean_task}：worker 是后台线程，
-     * 读不到 {@code RequestContextHolder}。</p>
+     * <p>范围过滤与组织快照在提交线程冻结进 clean_task：worker 是后台线程，
+     * 读不到 RequestContextHolder。</p>
      */
     @Transactional(rollbackFor = Exception.class)
         @Override
@@ -377,8 +377,8 @@ public class CleanBatchService implements ICleanBatchService {
     /**
      * 为后台 worker 绑定请求上下文（orgId 用任务快照；role 按管理员口径）。
      *
-     * <p>用自实现的 {@code SimpleRequestAttributes} 而不是 Spring 的 Servlet 实现：
-     * 后者要真的 {@code HttpServletRequest}，而 mock 包只在测试 classpath 上。</p>
+     * <p>用自实现的 SimpleRequestAttributes 而不是 Spring 的 Servlet 实现：
+     * 后者要真的 HttpServletRequest，而 mock 包只在测试 classpath 上。</p>
      */
     private void bindWorkerContext(String orgId) {
         SimpleRequestAttributes attrs = new SimpleRequestAttributes();

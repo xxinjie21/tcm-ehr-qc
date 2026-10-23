@@ -7,7 +7,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/** 用户表 {@code users} */
+/** 用户表 users */
 @Data
 @TableName("users")
 public class User {

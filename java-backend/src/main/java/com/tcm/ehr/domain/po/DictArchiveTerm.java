@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 基线归档术语快照（{@code dict_archive_term}）。
+ * 基线归档术语快照（dict_archive_term）。
  *
  * <p>每组每 type 只保留最近 5 份；更早的快照被删除，但对应的
  * {@link DictArchiveVersion} 元信息永久保留。回滚只能基于<b>快照仍在</b>的版本。</p>

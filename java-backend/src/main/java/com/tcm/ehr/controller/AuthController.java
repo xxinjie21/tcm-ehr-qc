@@ -33,9 +33,9 @@ public class AuthController {
      * <p>【权限：匿名可访问】角色由后端固定为「用户」，不采信前端传入的角色；用户名重复、参数非法、
      * 课题组编码被占用时返回 400。</p>
      *
-     * <p><b>① 只注册</b> → 账号一律 {@code active}，无组织时登录后进入「我的组织」引导页。
+     * <p><b>① 只注册</b> → 账号一律 active，无组织时登录后进入「我的组织」引导页。
      * <b>② 同时创建组织</b> → 创建者即首任所有者，组织直接生效（批次 6 起取消审核，
-     * 已无 {@code pending} 中间态，也不再使用 has_pending_group 标记）。</p>
+     * 已无 pending 中间态，也不再使用 has_pending_group 标记）。</p>
      *
      * @param dto 用户名与密码；可选 createGroup（编码/名称/用途）
      * @return username / role / groupSubmitted（是否已创建组织）

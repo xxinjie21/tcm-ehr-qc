@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
  * <p>锁粒度按业务 key（如 dict:herb:org-A），不用全局单键 ——
  * 全局单键会让「A 组织导词典」与「B 组织跑质控」互相排队，明明毫无关系。</p>
  *
- * <p><b>为什么是 Redis/Redisson</b>：{@code synchronized} / {@code ReentrantLock} 在多实例下
- * <b>静默失效</b>（不报错、只是不互斥）；上一版用 MySQL 命名锁 {@code GET_LOCK}，
+ * <p><b>为什么是 Redis/Redisson</b>：synchronized / ReentrantLock 在多实例下
+ * <b>静默失效</b>（不报错、只是不互斥）；上一版用 MySQL 命名锁 GET_LOCK，
  * 那是「借 DB 的连接级锁」，语义与连接绑定、跨服务边界不好复用。Redisson 的 RLock 是
  * 所有实例共享的锁，且自带看门狗续期：不进事务的长临界区也不会因为固定 lease 突然过期。</p>
  *
@@ -129,7 +129,7 @@ public class DistLock {
      *
      * <p>看门狗停止续期后锁会自然过期（默认 30s），不该因放锁失败掩盖业务结果；
      * 也不能在未持有时硬调 {@code unlock()} —— 那会抛
-     * {@code IllegalMonitorStateException} 把一次成功的业务请求变成 500。</p>
+     * IllegalMonitorStateException 把一次成功的业务请求变成 500。</p>
      */
     private void unlockQuietly(RLock lock, String lockName) {
         try {

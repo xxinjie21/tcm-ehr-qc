@@ -19,9 +19,9 @@ public class SearchDTO {
     /** [开始日期, 结束日期]（yyyy-MM-dd） */
     private List<String> dateRange;
     /**
-     * [开始日期, 结束日期]（yyyy-MM-dd），按病历**导入时间**（{@code records.create_time}）过滤。
+     * [开始日期, 结束日期]（yyyy-MM-dd），按病历**导入时间**（records.create_time）过滤。
      *
-     * <p>与 {@link #dateRange}（接诊时间 {@code visit_time}）是两个独立维度，可同时生效、取交集。
+     * <p>与 {@link #dateRange}（接诊时间 visit_time）是两个独立维度，可同时生效、取交集。
      * 用途：刚导入一批数据后，直接筛出「今天导入的」来复核 / 解析 / 清洗，不必按接诊时间去猜。
      * 缺省或两端不齐时不生效（与 dateRange 同一判据）。</p>
      */
@@ -40,7 +40,7 @@ public class SearchDTO {
 
     /**
      * 排序列（B3 用户可排序 · 方案 b）。**值永远只进白名单映射**，绝不能拼进 SQL：
-     * 白名单见 {@code RecordFilter.SORT_WHITELIST}（score / visit_time / registration_no）。
+     * 白名单见 RecordFilter.SORT_WHITELIST（score / visit_time / registration_no）。
      * 任意其它值（含注入串）一律回落默认排序，不报错。
      */
     private String sortBy;
@@ -53,8 +53,8 @@ public class SearchDTO {
      * <p>不设上限时 {@code POST /api/records/search {"pageSize":1000000}} 一次拉全表，
      * 等同绕过导出权限（审查报告 M1）。</p>
      *
-     * <p>刻意<b>不</b>在 {@code PaginationInnerInterceptor} 上设全局 {@code setMaxLimit}：
-     * 那会把 {@code QcServiceImpl} 内部批处理的 {@code BATCH_PAGE_SIZE=1000} 也截到 500，
+     * <p>刻意<b>不</b>在 PaginationInnerInterceptor 上设全局 setMaxLimit：
+     * 那会把 QcServiceImpl 内部批处理的 {@code BATCH_PAGE_SIZE=1000} 也截到 500，
      * 而它的循环退出条件是 {@code records.size() < BATCH_PAGE_SIZE} —— 会恒真、
      * 让批量重算与扣分聚合静默只处理前 500 条。限制只加在「用户可传入」的这一处。</p>
      */

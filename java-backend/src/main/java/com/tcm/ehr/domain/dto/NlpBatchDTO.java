@@ -36,9 +36,9 @@ public class NlpBatchDTO {
     private String requestKey;
 
     /**
-     * 任务模式：{@code EXTRACT}（默认，实体抽取 + 归一）或 {@code NORMALIZE_ONLY}（仅归一，不调 NLP）。
+     * 任务模式：EXTRACT（默认，实体抽取 + 归一）或 NORMALIZE_ONLY（仅归一，不调 NLP）。
      *
-     * <p>由「仅归一」端点强制置 {@code NORMALIZE_ONLY}；普通解析端点留空即 {@code EXTRACT}。</p>
+     * <p>由「仅归一」端点强制置 NORMALIZE_ONLY；普通解析端点留空即 EXTRACT。</p>
      */
     private String mode;
 }

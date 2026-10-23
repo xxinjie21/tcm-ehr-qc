@@ -9,9 +9,9 @@ package com.tcm.ehr.common.utils;
  * {@code tcm:ehr:} 之后，{@code INFO keyspace} 里本项目的 key 一眼可辨，
  * 也不会与同一个 Redis 库里的其它应用撞名。</p>
  *
- * <p>换库（{@code spring.data.redis.database} 由 {@code 0} 改 {@code 1}）与本次前缀统一
- * 一并落地：{@code StringRedisTemplate} 与 {@code RedissonClient} 都读
- * {@code spring.data.redis.*}（见 {@code RedissonConfig}），一处配置改动即同时迁移
+ * <p>换库（spring.data.redis.database 由 {@code 0} 改 {@code 1}）与本次前缀统一
+ * 一并落地：StringRedisTemplate 与 RedissonClient 都读
+ * {@code spring.data.redis.*}（见 RedissonConfig），一处配置改动即同时迁移
  * 缓存与分布式锁，不需要在 yml 里维护第二份地址配置。</p>
  *
  * <p><b>所有 key 都必须以 {@link #PREFIX} 开头</b>：新增 key 请写

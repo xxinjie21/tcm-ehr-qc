@@ -10,8 +10,8 @@ import java.util.Map;
 /**
  * 范围扣分维度聚合：把范围内各病历的扣分明细按维度/明细汇总。
  *
- * <p>数据优先读 {@code records.qc_results}（已算过），缺失则按当前规则现算；
- * 扫描上限取 {@code QcServiceImpl.MAX_SCAN_RECORDS}（3000 条），超限 {@code truncated=true}。</p>
+ * <p>数据优先读 records.qc_results（已算过），缺失则按当前规则现算；
+ * 扫描上限取 QcServiceImpl.MAX_SCAN_RECORDS（3000 条），超限 {@code truncated=true}。</p>
  */
 @Data
 public class DeductionStatsVO {

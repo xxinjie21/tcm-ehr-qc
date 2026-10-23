@@ -263,7 +263,7 @@ public class AiServiceImpl implements IAiService {
     /**
      * 关键提示：常见空缺 + 核心要素缺失/漏抽。
      *
-     * <p>{@code core} 由调用方传入 —— 它与 {@code vo.coreMissing} 是同一份结果，
+     * <p>core 由调用方传入 —— 它与 vo.coreMissing 是同一份结果，
      * 本方法不再自己算一遍（P2-13）。</p>
      */
     private List<String> keyHints(Map<String, Object> data, Record r, QcScorer.Missing core) {
@@ -435,10 +435,10 @@ public class AiServiceImpl implements IAiService {
     }
 
     /**
-     * null 保持 null，其余按 {@code String.valueOf} 转字符串（<b>不 trim</b>）。
+     * null 保持 null，其余按 String.valueOf 转字符串（<b>不 trim</b>）。
      *
-     * <p>与 {@code GovernanceServiceImpl.toTrimmedOrNull}（会 trim、空串归 null）、
-     * {@code EsTermIndexServiceImpl.nullToEmpty}（null 变空串）是三种不同语义，
+     * <p>与 GovernanceServiceImpl.toTrimmedOrNull（会 trim、空串归 null）、
+     * EsTermIndexServiceImpl.nullToEmpty（null 变空串）是三种不同语义，
      * 所以名字各不相同 —— 原来三处都叫 {@code str(Object)}，光看调用点无法判断
      * 拿到的是 null 还是空串。</p>
      */
@@ -551,7 +551,7 @@ public class AiServiceImpl implements IAiService {
     }
 
     /**
-     * 召回主实现：{@code marked} / {@code candidates} 由调用方提供并复用（见 {@link #suggestTerms}）。
+     * 召回主实现：marked / candidates 由调用方提供并复用（见 {@link #suggestTerms}）。
      *
      * <p>复用它们是因为「一次建议请求要跑 T 个待补词」：国标全量（D≈3 万）下，
      * 每个词各分配一份标记数组就是 T×30KB 的瞬时垃圾，而每个词各扫一遍全表又是 T×D 次判断。
@@ -630,7 +630,7 @@ public class AiServiceImpl implements IAiService {
     }
 
     /**
-     * LLM 不可用时的兜底：把召回候选原样列出，action 一律 {@code unknown} 交给人工判断。
+     * LLM 不可用时的兜底：把召回候选原样列出，action 一律 unknown 交给人工判断。
      *
      * <p>刻意<b>不猜</b> action —— 猜错会让用户以为系统已经判过了，
      * 反而更容易把口语当成标准词录进去。</p>

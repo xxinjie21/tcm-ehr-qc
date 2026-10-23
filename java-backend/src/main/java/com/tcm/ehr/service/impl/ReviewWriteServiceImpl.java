@@ -56,7 +56,7 @@ public class ReviewWriteServiceImpl implements IReviewWriteService {
      * <p>三段写库必须同生共死，否则中途失败会出现「分数已回写、任务仍 pending」的对不上。</p>
      *
      * @param recordId 病历 ID
-     * @param dto      已由调用方在事务外归一的复核数据（{@code correctedData} 会被就地改写）
+     * @param dto      已由调用方在事务外归一的复核数据（correctedData 会被就地改写）
      * @return status=复核后状态；score=重算得分
      * @throws ResourceNotFoundException 病历或复核任务不存在
      * @throws ForbiddenException 无权复核该病历，或病历已被隔离

@@ -3,10 +3,10 @@ package com.tcm.ehr.common.utils;
 import com.tcm.ehr.service.IDictionaryTermStore;
 
 /**
- * 批级词典元数据：一次批处理里 {@code effectiveDictVersion} 与 {@code effectiveTermCount}
+ * 批级词典元数据：一次批处理里 effectiveDictVersion 与 effectiveTermCount
  * <b>只查一次库</b>。
  *
- * <p><b>为什么需要它</b>：{@code orgId} 在一批内恒定，同一批也不该盖上两个不同的版本戳；
+ * <p><b>为什么需要它</b>：orgId 在一批内恒定，同一批也不该盖上两个不同的版本戳；
  * 而逐条去取元数据会让 4 万条批处理发出十几万次 SQL（两条元数据 × 每条病历）。
  * 这类「同一问题在一处已解决、另一处漏掉」的重复出现，是把缓存收进这个共享组件的原因。</p>
  *
@@ -44,7 +44,7 @@ public final class DictMeta {
      * 惰性装载。
      *
      * <p><b>必须同步</b>：批解析已支持「一个任务内多线程并行处理病历」，多个线程会同时首次
-     * 进入这里。原先用普通字段 + {@code loaded} 标志，既没有 happens-before 保证
+     * 进入这里。原先用普通字段 + loaded 标志，既没有 happens-before 保证
      * （可能读到 {@code loaded == true} 而 {@code version == null}，把版本戳打成 null），
      * 也会并发发出重复查询。加锁一次同时解决「只查一次」与「值可见」。</p>
      */

@@ -36,8 +36,8 @@ import java.util.UUID;
  * <p>成员管理接口全部要求 owner 且有 {@code @RequireOrgRole("owner")} 拦截器兜底，
  * 本类内再校验一次「操作者是本组织所有者、目标行存在」的交错关系，双保险防越权。</p>
  *
- * <p>一人一组织的应用层约束：一个 {@code user_id} 只允许出现在一个<b>未归档</b>组织的
- * 成员表里（结构保留 {@code is_primary} 以便将来支持多组织而无需改表）。</p>
+ * <p>一人一组织的应用层约束：一个 user_id 只允许出现在一个<b>未归档</b>组织的
+ * 成员表里（结构保留 is_primary 以便将来支持多组织而无需改表）。</p>
  *
  * <p><b>防滥用</b>（自助创建放开后必须自己兜住）：创建配额 + 编码白名单 + 名称去重，
  * 见 {@link #createOrg}。</p>
@@ -393,7 +393,7 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
      * 改派所有者（仅管理员）：owner 账号丢失 / 人离职时的兜底。
      *
      * <p>没有它，唯一能让组织脱离「无人可管」状态的方式是等原 owner 回来 ——
-     * 管理员只能停用。{@code applications.owner_user_id} 与成员行的 owner
+     * 管理员只能停用。applications.owner_user_id 与成员行的 owner
      * <b>必须同事务改两处</b>，否则两者会指向不同的人。</p>
      */
     @Override

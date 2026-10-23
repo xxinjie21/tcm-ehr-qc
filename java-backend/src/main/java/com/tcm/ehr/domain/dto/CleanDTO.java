@@ -22,7 +22,7 @@ public class CleanDTO {
     /**
      * 范围过滤：科室/时间/证候；空=全部。
      *
-     * <p>清洗只作用于「质控合格」病历，{@code filters.grade} 会被忽略（即使传了别的分级，
+     * <p>清洗只作用于「质控合格」病历，filters.grade 会被忽略（即使传了别的分级，
      * 服务端也按「合格」收窄）——见 {@code GovernanceServiceImpl#qualifiedScope}。</p>
      */
     private FiltersDTO filters;

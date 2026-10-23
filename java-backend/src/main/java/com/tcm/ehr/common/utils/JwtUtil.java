@@ -20,10 +20,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p><b>令牌失效机制（批次 15）</b>：JWT 本身无状态、签发后 24h 内一直有效，
  * 改密码或退出登录都不会让已发出去的令牌立刻作废。这里给每个用户维护一个
  * <b>令牌版本号</b>（{@code tcm:ehr:auth:ver:{userId}}，存 Redis）：签发时把当前版本写进
- * 令牌的 {@code ver} claim，请求时比对——版本对不上即视为失效。</p>
+ * 令牌的 ver claim，请求时比对——版本对不上即视为失效。</p>
  *
  * <p>用版本号而不是「黑名单存 jti」：黑名单只增不减、Redis 内存无界；版本号
- * 每个用户只有一个整数，退出登录 / 改密码时 {@code INCR} 一次就作废该用户<b>全部</b>旧令牌。</p>
+ * 每个用户只有一个整数，退出登录 / 改密码时 INCR 一次就作废该用户<b>全部</b>旧令牌。</p>
  *
  * <p><b>可用性取舍（与 JwtInterceptor 对组织解析同一口径）</b>：Redis 不可用时
  * 校验降级为「只看签名与有效期」，不抛异常——一次 Redis 抖动不该把全站打成 500。</p>
@@ -57,8 +57,8 @@ public class JwtUtil {
     /**
      * 派生好的签名 Key 缓存。
      *
-     * <p>{@code secret} 由 {@code @Value} 注入后不再变化，而验签是每请求热路径 ——
-     * 每次重建都要重算一次字节数组并做长度校验，纯浪费。{@code volatile} 而非
+     * <p>secret 由 {@code @Value} 注入后不再变化，而验签是每请求热路径 ——
+     * 每次重建都要重算一次字节数组并做长度校验，纯浪费。volatile 而非
      * {@code @PostConstruct}：注入顺序与首次使用之间不必建立额外约定，懒初始化即可。</p>
      */
     private volatile Key cachedKey;
@@ -172,7 +172,7 @@ public class JwtUtil {
      *
      * <p><b>为什么已存在时只续 TTL、不写值</b>：写回「读到的值」会与并发的
      * {@link #revokeAll} 形成「后写覆盖前写」—— 登录线程读到 1、登出线程把版本置 2、
-     * 登录线程再把 1 写回去，作废就被无声撤销了。{@code EXPIRE} 只动存活时间、不动值，
+     * 登录线程再把 1 写回去，作废就被无声撤销了。EXPIRE 只动存活时间、不动值，
      * 不存在这个竞态。</p>
      *
      * <p>Redis 不可用时不抛异常：校验路径本就有「读不到 = 降级放行」的口径，

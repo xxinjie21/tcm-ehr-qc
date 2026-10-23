@@ -37,7 +37,7 @@ public interface IStandardizationReportService {
     /**
      * 按范围过滤生成报告（科室 / 就诊时间 / 证候）。
      *
-     * <p>未知字段（分级等）不影响口径；时间仍要求 {@code dateRange} 两端齐全才生效，
+     * <p>未知字段（分级等）不影响口径；时间仍要求 dateRange 两端齐全才生效，
      * 只给一端按「未给」处理，与 {@link #report(String, String)} 同一约定。甲类
      * （词典质量）字典全域、不随范围收窄，只有乙类（病历相关）按范围过滤。</p>
      *

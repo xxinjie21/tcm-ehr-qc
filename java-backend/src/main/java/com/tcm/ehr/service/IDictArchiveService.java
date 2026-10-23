@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * 基线归档（批次 17）的接口契约：每次基线被改动后存一份合并后的快照，供历史查看与回滚。
  *
- * <p>实现见 {@code com.tcm.ehr.service.impl.DictArchiveServiceImpl}。</p>
+ * <p>实现见 com.tcm.ehr.service.impl.DictArchiveServiceImpl。</p>
  */
 public interface IDictArchiveService {
 
@@ -32,7 +32,7 @@ public interface IDictArchiveService {
      * 归档只是随后的记账动作：失败若抛出去会把整个请求变成 500，让用户以为导入没成，
      * 实际已生效（重试还会再合并一次）。故由服务层兜住，原因写进响应体、栈入日志。</p>
      *
-     * @return 成功时 {@code versionNo} 非空、{@code warning} 为空；失败反之
+     * @return 成功时 versionNo 非空、warning 为空；失败反之
      */
     ArchiveOutcome archiveQuietly(String orgId, String type, List<TermEntry> entries,
                                   String proposalId, String operator, String comment);

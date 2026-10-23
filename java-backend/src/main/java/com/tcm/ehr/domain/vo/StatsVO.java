@@ -11,8 +11,8 @@ import java.util.Map;
  * 统计结果（按type填充对应字段）
  * disease -> statistics；pattern -> distribution；prescription -> formulaStats + herbStats。
  *
- * <p>.2 扩展（/api/stats/extra）：{@code trend} 按月合格率/待复核、
- * {@code departmentRates} 科室合格率、{@code scoreDistribution} 评分分布、{@code dictionary} 词典规模。</p>
+ * <p>.2 扩展（/api/stats/extra）：trend 按月合格率/待复核、
+ * departmentRates 科室合格率、scoreDistribution 评分分布、dictionary 词典规模。</p>
  */
 @Data
 public class StatsVO {

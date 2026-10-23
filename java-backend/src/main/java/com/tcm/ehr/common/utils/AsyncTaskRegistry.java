@@ -33,7 +33,7 @@ import java.util.function.UnaryOperator;
  * <p><b>三个必须做对的地方</b>：</p>
  * <ol>
  * <li><b>请求上下文要显式传播</b>：任务体内部会读 {@code RequestUtils.currentOrgId()}，
- *     而异步线程没有 {@code RequestContext}（与批任务 worker 同一个坑，代码里已有多处告诫）。
+ *     而异步线程没有 RequestContext（与批任务 worker 同一个坑，代码里已有多处告诫）。
  *     所以提交时捕获用户 / 组织 / 角色**标量**，在任务线程里重建纯值上下文、结束再清掉。</li>
  * <li><b>结果按归属隔离</b>：任务号是随机的，但不能只靠「猜不到」——登记项记住提交者的
  *     org 与 user，查询时校验；否则一个用户拿到任务号就能读到别人的结论。</li>
@@ -74,7 +74,7 @@ public abstract class AsyncTaskRegistry<T> {
      * <p>结果载荷存成 <b>JSON 字符串</b>而非内联对象：反序列化需要知道具体类型，
      * 而泛型在运行期被擦除 —— 由子类给出的 {@link #payloadType()} 决定读回什么类型。</p>
      *
-     * <p>时间用毫秒时间戳而非 {@code LocalDateTime}：共享层不依赖调用方的时区与
+     * <p>时间用毫秒时间戳而非 LocalDateTime：共享层不依赖调用方的时区与
      * JavaTime 序列化配置，少一处跨实例不一致的来源。</p>
      */
     private record TaskJson(String orgId, String userId, String state, String payloadJson,
@@ -93,7 +93,7 @@ public abstract class AsyncTaskRegistry<T> {
     /** 结果载荷类型，供跨实例反序列化 */
     private final Class<T> payloadType;
     /**
-     * 任务线程池：由 Spring 装配（见 {@code AsyncConfig}），有界队列 + AbortPolicy。
+     * 任务线程池：由 Spring 装配（见 AsyncConfig），有界队列 + AbortPolicy。
      *
      * <p>满载时由 {@link #submit} 转成 503 —— 若用无界队列则提交永不拒绝，前端 150s 放弃后
      * 任务还堆在队列里空转。</p>

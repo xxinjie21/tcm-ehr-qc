@@ -45,7 +45,7 @@ public class GovernanceController {
     /**
      * 把一个术语归一到标准写法。
      *
-     * <p>【权限：登录即可】未命中词典时原样返回；{@code type} 非法返回 400 + code=4001。</p>
+     * <p>【权限：登录即可】未命中词典时原样返回；type 非法返回 400 + code=4001。</p>
      *
      * @param dto type=术语类型；term=待归一术语
      * @return standardTerm=标准词（未命中时为原文）；level=命中层级（0=未命中）

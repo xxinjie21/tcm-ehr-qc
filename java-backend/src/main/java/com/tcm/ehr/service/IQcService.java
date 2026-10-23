@@ -19,8 +19,8 @@ import java.util.Set;
 /**
  * 质控服务：事前检查、逻辑一致性、单条评分，以及评分规则的维护与扣分聚合。
  *
- * <p>§七 L5：批量重算已从本接口移除（改为异步任务，见 {@code IQcBatchService}）。
- * 本接口保留 {@code processOne} 所需的单条处理能力，供 worker 复用。</p>
+ * <p>§七 L5：批量重算已从本接口移除（改为异步任务，见 IQcBatchService）。
+ * 本接口保留 processOne 所需的单条处理能力，供 worker 复用。</p>
  *
  * <p>评分口径由 {@link QcRuleSet} 决定，判定不经 LLM。</p>
  */

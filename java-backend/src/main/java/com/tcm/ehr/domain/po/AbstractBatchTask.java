@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 /**
  * 批量任务（NLP 批解析 / 质控批量重算）的公共状态常量与进度字段。
  *
- * <p>两张任务表结构同构（{@code nlp_task} / {@code qc_task}）：状态机与进度字段完全一致，
+ * <p>两张任务表结构同构（nlp_task / qc_task）：状态机与进度字段完全一致，
  * 只有质控多出的分级计数与角色快照留在各自子类。抽公共基类是为了让「状态口径」只有一处 ——
  * 否则给状态机加一档时，两个类很容易改漏一个。</p>
  */
@@ -33,9 +33,9 @@ public abstract class AbstractBatchTask {
     private String filtersJson;
     private String createdBy;
     /**
-     * 提交时所属组的快照，供后台 worker 重建 {@code RecordFilter}。
+     * 提交时所属组的快照，供后台 worker 重建 RecordFilter。
      *
-     * <p>不是冗余：worker 跑在后台线程，读不到 {@code RequestContextHolder}，
+     * <p>不是冗余：worker 跑在后台线程，读不到 RequestContextHolder，
      * 必须用快照值；否则数据域过滤会退化成「不过滤 = 全库」。</p>
      */
     private String orgId;

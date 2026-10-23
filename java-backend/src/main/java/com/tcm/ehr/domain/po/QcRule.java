@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 组织级质控规则（对应 {@code qc_rules} 表，{@code org_id} 为主键）。
+ * 组织级质控规则（对应 qc_rules 表，org_id 为主键）。
  *
  * <p>规则改成「每个组织一份」：该组织无记录时回退内置默认（{@code QcRuleSet.defaults()}），
  * 不落库 —— 避免给所有组织都写一份默认行。</p>

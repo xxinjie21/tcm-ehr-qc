@@ -6,13 +6,13 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * 摘要工具：{@code MessageDigest} → 小写十六进制串。
+ * 摘要工具：MessageDigest → 小写十六进制串。
  *
- * <p>{@link RecordUtil#md5Hex}（病历去重哈希）与 {@code ReviewTaskUtil.fingerprint}
+ * <p>{@link RecordUtil#md5Hex}（病历去重哈希）与 ReviewTaskUtil.fingerprint
  * （复核读时指纹）原各写一份「取 MessageDigest → digest → HexFormat → NoSuchAlgorithmException
  * 兜底」，收敛到此处一处实现（审查报告 §2.6）。</p>
  *
- * <p>刻意<b>不</b>用 Spring 的 {@code DigestUtils} 统一：它只有 MD5 系列、没有 SHA-256
+ * <p>刻意<b>不</b>用 Spring 的 DigestUtils 统一：它只有 MD5 系列、没有 SHA-256
  * （javap 实证），覆盖不了复核指纹那一路。</p>
  */
 public final class DigestUtil {

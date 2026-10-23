@@ -71,8 +71,8 @@ public class EsTermIndexServiceImpl implements IEsTermIndexService {
      * 「有界 + LRU 逐出」这件事全仓已有 owner，自己再写一份等于两套逐出口径。
      * 但**不能**直接换成 {@code VersionedCache.get(key, version, loader)} —— 那个方法把 loader
      * 放在锁里执行，而本类的装载是一次 ES 网络往返，放进锁里会把并发检索全部串行化（性能回退）。
-     * 所以用它的两段式接口：{@code getIfPresent}（锁内，只读）→ 未命中则在**锁外**查 ES →
-     * {@code put}（锁内，只写）。这与改造前 {@code Collections.synchronizedMap} 的行为一致：
+     * 所以用它的两段式接口：getIfPresent（锁内，只读）→ 未命中则在**锁外**查 ES →
+     * put（锁内，只写）。这与改造前 Collections.synchronizedMap 的行为一致：
      * 查 ES 始终在锁外。代价是并发同键可能各查一次（有意的取舍，见 getIfPresent 注释）。</p>
      *
      * <p>这里不需要版本串：失效是全量显式清空（{@link #clearRecallCache}，rebuild 时调用），

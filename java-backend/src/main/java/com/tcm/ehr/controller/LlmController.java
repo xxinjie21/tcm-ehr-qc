@@ -50,7 +50,7 @@ public class LlmController {
     /**
      * 保存<b>本人</b>的 LLM 配置并立即生效。
      *
-     * <p>【权限：登录即可】写的是 {@code user_llm_config} 里自己那一行，
+     * <p>【权限：登录即可】写的是 user_llm_config 里自己那一行，
      * 管理员也只改自己的 —— 配置是「每个用户一份」，不是系统级设置。
      * 密钥经 AES-256-GCM 加密落库，读取只回掩码。</p>
      *

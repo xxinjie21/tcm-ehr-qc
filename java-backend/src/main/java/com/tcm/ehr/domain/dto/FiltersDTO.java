@@ -15,7 +15,7 @@ public class FiltersDTO {
     /** [开始日期, 结束日期]（yyyy-MM-dd） */
     private List<String> dateRange;
     /**
-     * [开始日期, 结束日期]（yyyy-MM-dd），按病历**导入时间**（{@code records.create_time}）过滤。
+     * [开始日期, 结束日期]（yyyy-MM-dd），按病历**导入时间**（records.create_time）过滤。
      *
      * <p>与 {@link #dateRange}（接诊时间）相互独立，可同时生效、取交集；缺省或两端不齐时不生效。</p>
      */

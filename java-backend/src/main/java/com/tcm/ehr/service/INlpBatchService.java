@@ -58,7 +58,7 @@ public interface INlpBatchService {
     NlpTaskVO retryFailed(String id, String createdBy);
 
     /**
-     * 最近任务列表（最多 {@code limit} 条，超出时 {@code truncated = true}）。
+     * 最近任务列表（最多 limit 条，超出时 {@code truncated = true}）。
      *
      * @return 按提交时间倒序的包装体：任务列表 + 截断标记 + 上限条数
      */

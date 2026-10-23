@@ -20,7 +20,7 @@ import java.util.Set;
  *
  * <p>这一块是导入流程里「读表」的部分：建表头索引、校验必需列、逐行映射并记账、流式读 xlsx。
  * 它不含任何数据库或业务决策 —— 谁入库、入哪个组、怎么去重，仍由
- * {@code RecordServiceImpl} 决定。</p>
+ * RecordServiceImpl 决定。</p>
  *
  * <p>两条读法（POI 全量读 .xls/.xlsx 与 SAX 流式读 .xlsx）**共用**这里的列映射与记账逻辑，
  * 这是原代码刻意的设计，搬过来时一并保留：若各写一份，迟早出现「xlsx 导入少一列、xls 正常」
@@ -37,11 +37,11 @@ final class ExcelSheetImporter {
      * <p>为什么体积闸门不够：xlsx 是压缩包，50MB 完全可能是数百万行的纯文本表，
      * 而解析结果在 saveBatch 之前全部驻留内存。实测过 20 万行就会先撞 POI 的单记录上限，
      * 真实数据集 35355 份（计划 §9 的 27.11）则要能一次进来 —— 故取 50000，
-     * 与词典导入 {@code DictionaryServiceImpl.MAX_ROWS} 同口径。</p>
+     * 与词典导入 DictionaryServiceImpl.MAX_ROWS 同口径。</p>
      *
      * <p>注：HTTP 层 {@code spring.servlet.multipart.max-request-size=50MB} 已经把
      * 「20 × 50MB ≈ 1GB」这条输入路径封死，26.3 的真正边界是行数而非总字节；
-     * POI 自带的 {@code ZipSecureFile.minInflateRatio}（默认 0.01）已覆盖 zip 膨胀。</p>
+     * POI 自带的 ZipSecureFile.minInflateRatio（默认 0.01）已覆盖 zip 膨胀。</p>
      */
     static final int MAX_ROWS = 50000;
 
@@ -68,7 +68,7 @@ final class ExcelSheetImporter {
 
     /**
      * 解析一个文件：文件级问题（空 / 超限 / 后缀不符 / 缺表头 / 缺必需列）记失败并返回；
-     * 行级问题记失败明细；成功的行列进 {@code parsedRows} 并累积待查重登记号。
+     * 行级问题记失败明细；成功的行列进 parsedRows 并累积待查重登记号。
      *
      * <p>「接诊时间」有值却解析不出的行按<b>行级失败</b>处理、不入库（见 {@link #requireParsedVisitTime}）：
      * 该列是必需列，静默按 null 入库会让列表接诊时间列、就诊月份趋势、日期范围筛选、去重哈希

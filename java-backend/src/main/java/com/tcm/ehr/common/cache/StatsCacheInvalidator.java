@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * deleteRecords / deleteByFilter / clean / review / 批量任务完成共 9 个服务方法里，为它们各扩
  * 一个构造参数会让 11 个测试文件的构造代码一起动（且与缓存只有在“写”时才需要）。这里用
  * 进程内单例的静态委托，写方法只需一行 {@code StatsCacheInvalidator.invalidateStats()}，
- * 不引入构造链改动；单例持有者在 Spring 启动时注入，Redis 不可用时 {@code invalidate} 内部
+ * 不引入构造链改动；单例持有者在 Spring 启动时注入，Redis 不可用时 invalidate 内部
  * 已降级为「不失效，60s TTL 兜底」。</p>
  */
 @Component

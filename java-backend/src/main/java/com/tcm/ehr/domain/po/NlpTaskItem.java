@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 批量解析任务的一条待处理病历（批次 16 工作项 3）。
  *
- * <p>存在的理由：原先待处理 ID 集合只存在内存（{@code NlpBatchServiceImpl.idBatches}），
+ * <p>存在的理由：原先待处理 ID 集合只存在内存（NlpBatchServiceImpl.idBatches），
  * 进程重启即丢 —— 表现为「任务显示进行中，重启后再也不会推进」，取消与重试都拿不到那批 ID。
  * 落这张表让 ID 集合与进度一起存活。</p>
  *

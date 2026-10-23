@@ -31,7 +31,7 @@ import java.util.Map;
 /**
  * 病历数据：批量导入、单条新增、原始查看、修改、删除、多条件查询。
  *
- * <p>导入进度查询按 {@code LogController} 之外的审计链路处理；写操作统一记入操作日志。</p>
+ * <p>导入进度查询按 LogController 之外的审计链路处理；写操作统一记入操作日志。</p>
  */
 @RestController
 @RequiredArgsConstructor
@@ -65,7 +65,7 @@ public class RecordController {
      * 仅重传失败行。
      *
      * <p>【权限：登录即可】把（可能已编辑的）失败行按导入同一套口径重新入库，
-     * 免去重传整份文件。每行为「字段名 → 文本」，字段名与失败明细里的 {@code row} 一致。</p>
+     * 免去重传整份文件。每行为「字段名 → 文本」，字段名与失败明细里的 row 一致。</p>
      *
      * @param rows 失败行集合
      * @return summary=本轮成功/失败条数与失败明细
@@ -194,8 +194,8 @@ public class RecordController {
     /**
      * 只返回筛选范围内的病历总数。
      *
-     * <p>【权限：登录即可】与 {@link #search} 同一数据域 / 筛选口径，只 {@code COUNT} 不
-     * {@code SELECT} —— 供「只要 total」的调用替换 {@code pageSize=1}（后者会附带一次
+     * <p>【权限：登录即可】与 {@link #search} 同一数据域 / 筛选口径，只 COUNT 不
+     * SELECT —— 供「只要 total」的调用替换 {@code pageSize=1}（后者会附带一次
      * 全表排序，4 万行下是列表查询的主要成本，见性能审查 P1-5）。</p>
      *
      * @param dto 查询条件（page / pageSize 忽略）

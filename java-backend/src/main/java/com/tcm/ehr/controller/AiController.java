@@ -43,7 +43,7 @@ public class AiController {
      * <p><b>为什么只限 AI、不限登录与词典导入</b>：AI 链路是「登录即可」且<b>每次请求都可能
      * 产生一次真实的大模型调用（有成本）</b>，不限的话一个账号就能把额度打光。
      * 另两处刻意不加，避免同一件事做两遍：登录已有「连续失败 N 次锁定」的独立机制
-     * （{@code AuthServiceImpl}），再叠一层限流只是换个名字的同一个闸门；
+     * （AuthServiceImpl），再叠一层限流只是换个名字的同一个闸门；
      * 词典导入是管理员专属接口（{@code POST /api/dictionary/import}），不存在自助滥用面。</p>
      *
      * <p>限额取 60 次 / 5 分钟：AI 调用都由人手点击触发，正常使用远达不到；
@@ -53,7 +53,7 @@ public class AiController {
     private static final int AI_RATE_LIMIT = 60;
     private static final int AI_RATE_WINDOW_MINUTES = 5;
 
-    /** AI 限流闸门：超限抛 {@code RateLimitedException}，由全局异常出口转 HTTP 429 */
+    /** AI 限流闸门：超限抛 RateLimitedException，由全局异常出口转 HTTP 429 */
     private void guardAiRate() {
         rateLimiter.check("ai", RequestUtils.currentUserId(), AI_RATE_LIMIT,
                 Duration.ofMinutes(AI_RATE_WINDOW_MINUTES), "AI 请求过于频繁，请稍后再试");

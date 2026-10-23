@@ -32,8 +32,8 @@ public class NlpExtractVO {
     private List<Herb> herbs = new ArrayList<>();
     /**
      * 问诊子项（任务 8·方案 A）：二便 / 睡眠 / 饮食 / 喜好 / 卧位 / 精神 / 面色 的整句。
-     * <p>抽取侧（python-nlp）把这类从 {@code symptoms} 挪进来；本字段<b>不参与归一 / 质控 / 统计</b>，
-     * 在 {@code EntityNormalizer.normalizeMap} 里原样透传，只为保留临床信息不被误判为症状未归一。</p>
+     * <p>抽取侧（python-nlp）把这类从 symptoms 挪进来；本字段<b>不参与归一 / 质控 / 统计</b>，
+     * 在 EntityNormalizer.normalizeMap 里原样透传，只为保留临床信息不被误判为症状未归一。</p>
      */
     private List<Entity> inquiry = new ArrayList<>();
     private boolean modelAvailable;
@@ -52,7 +52,7 @@ public class NlpExtractVO {
      * 降级原因（{@link #REASON_DISABLED} / {@link #REASON_UNREACHABLE} / {@link #REASON_MODEL_MISSING}）；
      * 正常有产出时为 {@code null}。
      *
-     * <p>之前只下发一个 {@code modelAvailable} 布尔值，「功能没开」与「服务挂了」在前端
+     * <p>之前只下发一个 modelAvailable 布尔值，「功能没开」与「服务挂了」在前端
      * 无法区分，页面横幅只能写成「未开启，或抽取服务暂时不可用」，用户看不出该找谁、也不知道
      * 能不能自助解决。这里把判定结果显式下发，前端即可按原因给不同的结论与下一步。</p>
      */
@@ -64,8 +64,8 @@ public class NlpExtractVO {
     }
 
     /**
-     * 实体（结构同附录A Entity）。归一后 {@code content}=标准术语、{@code sourceText}=归一前原文，
-     * 两者构成「归一前后对照」；未命中词典时 {@code content} 保持原文、{@code normLevel} 为空。
+     * 实体（结构同附录A Entity）。归一后 content=标准术语、sourceText=归一前原文，
+     * 两者构成「归一前后对照」；未命中词典时 content 保持原文、normLevel 为空。
      */
     @Data
     public static class Entity {

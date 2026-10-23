@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>行为全部来自 {@link AsyncTaskRegistry}；本类只钉住三件事：共享层 key 前缀
  * {@code task:ai:}、结果载荷类型 {@link AiReplyVO}、以及 Spring 装配的线程池
- * {@code aiAsyncExecutor}（见 {@code AsyncConfig}）。</p>
+ * aiAsyncExecutor（见 AsyncConfig）。</p>
  *
  * <p>通用部分（请求上下文传播、跨实例共享、有界队列）见基类文档。</p>
  */

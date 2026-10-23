@@ -15,11 +15,11 @@ import java.time.LocalDateTime;
  *
  * <p>校验注解与 DB 列宽、质控规则对齐，避免「前端拦得住、直调 API 绕得过」：</p>
  * <ul>
- *   <li>就诊次数 {@code @Min(1)} —— 与前端 {@code Records.vue} 的 min=1 一致</li>
+ *   <li>就诊次数 {@code @Min(1)} —— 与前端 Records.vue 的 min=1 一致</li>
  *   <li>性别 {@code @Pattern} —— 白名单取 {@link QcRuleSet#GENDER_VALUES}（唯一权威）</li>
  *   <li>{@code @Size} 只加在 VARCHAR 列上，长度即 {@code database-init.sql} 的列宽：
  *       registration_no / outpatient_no / department / doctor_id = 50、age = 20。
- *       临床正文列（western_diagnosis … treatment_effect）是 {@code TEXT}，不限长度，不加约束。</li>
+ *       临床正文列（western_diagnosis … treatment_effect）是 TEXT，不限长度，不加约束。</li>
  * </ul>
  */
 @Data

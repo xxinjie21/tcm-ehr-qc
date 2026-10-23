@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 /**
  * 操作日志（文档必做2）：关键操作（清洗 / 导出 / 词典导入 / 词典回滚 / 人工复核 / 批量重算）
- * <b>只入库</b>，写 {@code operation_log} 表，是审计页 {@code GET /api/logs} 的唯一数据源。
+ * <b>只入库</b>，写 operation_log 表，是审计页 {@code GET /api/logs} 的唯一数据源。
  *
  * <p>§七 L2 起不再落文件：原「文件 + 库」双写已删，配置项 {@code log.operation-file}
  * 与 {@code logs/operation.log} 一并作废（{@code logs/} 目录此后后端零引用，
@@ -57,9 +57,9 @@ public class OperationLogger {
      * 记录一条关键操作，<b>操作人与角色由调用方指定</b>。
      *
      * <p>供后台线程（批量重算 / 批量解析等异步任务）使用：这些线程没有
-     * {@code RequestContextHolder} 上下文，{@link #log(String, String, String)} 会把操作人
+     * RequestContextHolder 上下文，{@link #log(String, String, String)} 会把操作人
      * 记成 {@code "unknown"}。异步任务应在<b>提交线程</b>捕获操作人与角色，
-     * 由 worker 线程回填 —— 与 {@code qc_task.role} 快照是同一个理由。</p>
+     * 由 worker 线程回填 —— 与 qc_task.role 快照是同一个理由。</p>
      *
      * @param action   操作类型
      * @param target   操作对象，可为 null
@@ -77,9 +77,9 @@ public class OperationLogger {
      * 记录一条关键操作，<b>操作人 / 角色 / 组由调用方指定</b>。
      *
      * <p>异步任务的收尾日志必须用它：worker 线程既拿不到 operator / role，
-     * 也拿不到 orgId（{@code RequestContextHolder} 不在该线程上）。
+     * 也拿不到 orgId（RequestContextHolder 不在该线程上）。
      * orgId 若在提交线程即时为空（提交线程尚未确定组织时），这里应传空串，这里应传空串，
-     * 落库的 {@code org_id} 即为 NULL —— 该操作永远只对操作人本人可见。</p>
+     * 落库的 org_id 即为 NULL —— 该操作永远只对操作人本人可见。</p>
      *
      * @param action   操作类型
      * @param target   操作对象，可为 null
@@ -95,7 +95,7 @@ public class OperationLogger {
     /**
      * 记录一条**对象级**操作（对标 D3「活动流 / 变更审计」）。
      *
-     * <p>为什么单独一个方法名而不是再加一个 {@code log} 重载：它的参数表
+     * <p>为什么单独一个方法名而不是再加一个 log 重载：它的参数表
      * （action/target/detail/objectType/objectId）与既有的
      * {@code log(action,target,detail,operator,role)} **同为 5 个 String** ——
      * 同名会直接撞签名，编译器不会给我们第二次机会。</p>
@@ -107,7 +107,7 @@ public class OperationLogger {
      * @param action     操作类型
      * @param target     操作对象文本，可为 null
      * @param detail     操作明细，可为 null
-     * @param objectType 对象类型，如 {@code record}
+     * @param objectType 对象类型，如 record
      * @param objectId   对象 ID；objectType 为空时本参数一并忽略（避免出现"有 ID 没类型"的半截数据）
      */
     public void logOnObject(String action, String target, String detail,

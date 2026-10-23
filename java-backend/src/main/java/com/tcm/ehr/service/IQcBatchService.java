@@ -7,10 +7,10 @@ import com.tcm.ehr.domain.vo.QcTasksVO;
 /**
  * 批量质控重算任务：提交、查询、取消、列表（§七 L5）。
  *
- * <p>生产/消费：任务 ID 进队列，固定 {@code qc.batch.concurrency}（默认 1）个工作线程消费；
- * 任务与进度写 {@code qc_task} 表，故提交后不占用请求线程、可关页面后回来轮询。</p>
+ * <p>生产/消费：任务 ID 进队列，固定 qc.batch.concurrency（默认 1）个工作线程消费；
+ * 任务与进度写 qc_task 表，故提交后不占用请求线程、可关页面后回来轮询。</p>
  *
- * <p>并发固定为 1 的理由：重算逐条写 {@code records}（评分字段 + review_tasks），
+ * <p>并发固定为 1 的理由：重算逐条写 records（评分字段 + review_tasks），
  * 是 DB 写密集型；与在线查询抢库只会让两边都变慢。</p>
  */
 public interface IQcBatchService {

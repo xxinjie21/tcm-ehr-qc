@@ -8,7 +8,7 @@ import java.util.List;
  * 登录响应。
  *
  * <p>组织信息随登录带出仅供<b>前端渲染</b>（菜单、引导页文案）。<b>鉴权不依赖它</b> ——
- * 服务端每次请求都由 {@code JwtInterceptor} 重新解析组织，客户端改 localStorage 没用。</p>
+ * 服务端每次请求都由 JwtInterceptor 重新解析组织，客户端改 localStorage 没用。</p>
  */
 @Data
 public class LoginVO {
@@ -29,7 +29,7 @@ public class LoginVO {
      * <p><b>为什么从平铺字符串列表升级为树</b>：「术语批量导入」是「术语词典」的子项，
      * 平铺列表表达不了父子关系，前端只能靠字符串猜顺序与归属。</p>
      *
-     * <p>父项与子项的可见性由 {@code AuthServiceImpl.menusOf} 决定：父项「术语词典」
+     * <p>父项与子项的可见性由 AuthServiceImpl.menusOf 决定：父项「术语词典」
      * 对所有能访问词典的人可见，子项「术语批量导入」<b>仅管理员</b>。</p>
      */
     private List<MenuNode> menus;

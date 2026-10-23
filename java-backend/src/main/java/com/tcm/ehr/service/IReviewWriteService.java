@@ -9,7 +9,7 @@ import com.tcm.ehr.domain.vo.ReviewResultVO;
  * <p>归一（ES 往返）在事务外，由调用方 {@code ReviewServiceImpl#review} 完成后进入本接口；
  * 本接口只承载事务内的读改写（权限、隔离、防丢更新指纹校验、三段写库）。</p>
  *
- * <p>实现见 {@code com.tcm.ehr.service.impl.ReviewWriteServiceImpl}。</p>
+ * <p>实现见 com.tcm.ehr.service.impl.ReviewWriteServiceImpl。</p>
  */
 public interface IReviewWriteService {
 

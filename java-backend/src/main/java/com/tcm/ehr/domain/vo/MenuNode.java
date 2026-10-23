@@ -6,10 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 菜单节点（登录响应 {@code menus} 树的元素，批次 17）。
+ * 菜单节点（登录响应 menus 树的元素，批次 17）。
  *
- * <p>父项没有 {@code children} 时就是叶子节点。前端 {@code MainLayout} 按
- * {@code children} 是否为空决定渲染成叶子项还是分组。</p>
+ * <p>父项没有 children 时就是叶子节点。前端 MainLayout 按
+ * children 是否为空决定渲染成叶子项还是分组。</p>
  */
 @Data
 public class MenuNode {

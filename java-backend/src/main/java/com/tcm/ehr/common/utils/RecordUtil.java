@@ -5,8 +5,8 @@ import com.tcm.ehr.domain.po.Record;
 /**
  * 病历公共工具。
  *
- * <p>原始文本去重哈希口径由数据清洗（{@code GovernanceServiceImpl}）与病历导入
- * （{@code RecordServiceImpl}）共用，避免两处各写一份导致去重标准漂移。</p>
+ * <p>原始文本去重哈希口径由数据清洗（GovernanceServiceImpl）与病历导入
+ * （RecordServiceImpl）共用，避免两处各写一份导致去重标准漂移。</p>
  */
 public final class RecordUtil {
 
@@ -16,7 +16,7 @@ public final class RecordUtil {
     /**
      * 按属性名取病历的列值（空白视作无值）。
      *
-     * <p>为什么放这里：质控评分（{@code QcScorer}）与质控明细（{@code QcServiceImpl}）
+     * <p>为什么放这里：质控评分（QcScorer）与质控明细（QcServiceImpl）
      * 各写了一份「属性名 → 列值」的 switch，映射同一个 Record，而两份**覆盖不同**：
      * 明细那份没有 department/doctorId 两个 case。规则里引用这两个字段时，明细侧会
      * 静默取到 null —— 看上去像"这条病历没填"，而不是"程序没认这个字段名"。

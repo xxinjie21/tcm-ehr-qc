@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 「多条命令必须原子完成」的 Redis Lua 脚本工具（P2-21）。
  *
- * <p><b>为什么必须原子</b>：{@code INCR} 与 {@code EXPIRE} 是两条独立命令，中间断掉
+ * <p><b>为什么必须原子</b>：INCR 与 EXPIRE 是两条独立命令，中间断掉
  * （客户端超时、连接被回收、进程被杀）就会留下一个<b>永不过期</b>的计数 key。
  * 登录失败计数正是这个形状 —— 一旦永久累积，该账号会被无限期锁死，
  * 只能人工清 key，而表面上完全看不出发生过什么。</p>
@@ -19,7 +19,7 @@ import java.util.List;
  * 与其它客户端的命令交错。</p>
  *
  * <p>本类当前只有两个使用者：登录失败计数（{@link #incrWithTtlOnFirst}）与
- * JWT 令牌版本号（{@link #incrWithTtl}）。接口限流已改用 Redisson {@code RRateLimiter}
+ * JWT 令牌版本号（{@link #incrWithTtl}）。接口限流已改用 Redisson RRateLimiter
  * （《自研组件替换计划》#1），不再经由本类。</p>
  */
 public final class RedisLua {

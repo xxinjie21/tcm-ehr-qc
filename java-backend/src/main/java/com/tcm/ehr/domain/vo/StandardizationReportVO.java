@@ -97,7 +97,7 @@ public class StandardizationReportVO {
          * 实际生效的导入时间起止（yyyy-MM-dd）；为空表示不限。
          *
          * <p>与 {@link #start}/{@link #end}（接诊时间）是两个独立维度，可同时生效、取交集。
-         * 导入时间过滤下推到 SQL（{@code records.create_time}），其排除量<b>不计入</b>
+         * 导入时间过滤下推到 SQL（records.create_time），其排除量<b>不计入</b>
          * {@link #excluded} —— excluded 只反映接诊时间过滤排除的条数。</p>
          */
         private String importStart;
@@ -242,7 +242,7 @@ private int termCount;
          * <p>2026-10-21 从 {@link #dictionaryGap} 拆出：这批词的<strong>正确去向是抽取侧的
          * inquiry 字段</strong>（十问子项），补成症状标准词属错映射 —— 把它们算进
          * 「词表缺口」会让报告声称「词表缺 N 条」，而实际补词表根本解决不了。
-         * 判定口径与 python-nlp 的 {@code _INQUIRY_LEAD} 同源（见 STANDARDIZATION_REPORT 的
+         * 判定口径与 python-nlp 的 _INQUIRY_LEAD 同源（见 STANDARDIZATION_REPORT 的
          * INQUIRY_LEAD 常量）。</p>
          */
         private int inquiryFragment;

@@ -7,7 +7,7 @@ import lombok.Data;
 
 
 /**
- * 提案术语快照（{@code dict_proposal_term}）。
+ * 提案术语快照（dict_proposal_term）。
  *
  * <p>存的是<b>提交时的完整目标词典</b>，不是「增量 diff」。这样审核时组长直接在快照上
  * 增删改即可，且合并天然是整快照替换（能支持删除），不需要再算一次差异。</p>

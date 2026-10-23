@@ -34,9 +34,9 @@ import java.util.Map;
  * NLP 接口：单条文本抽取 + 批量异步解析任务。
  *
  * <p>抽取转发到 Python 服务（:8001）。上游未启动、模型不可用或 {@code nlp.enabled=false} 时
- * 降级返回空 9 类并带 {@code unavailableReason}，不阻塞主流程。</p>
+ * 降级返回空 9 类并带 unavailableReason，不阻塞主流程。</p>
  *
- * <p>返回前统一做术语归一：{@code content}=标准词、{@code sourceText}=归一前原文，命中层级随实体返回；
+ * <p>返回前统一做术语归一：content=标准词、sourceText=归一前原文，命中层级随实体返回；
  * 无词典的舌象/脉象/病因/治法只保留原文。清洗链路仍保留一次兜底补归一，两者幂等不会重复计数。</p>
  */
 @Slf4j
@@ -187,7 +187,7 @@ public class NlpController {
      *
      * <p>用于「补词典后让新词生效」——抽取过一次的实体已落库，重跑归一即可命中新词，
      * 省掉整段实体抽取时间。与 {@link #submitBatch} 共用同一套任务、进度与失败清单，
-     * 仅任务模式不同（{@code NORMALIZE_ONLY}）。</p>
+     * 仅任务模式不同（NORMALIZE_ONLY）。</p>
      *
      * <p>【权限：登录即可】</p>
      *
@@ -255,7 +255,7 @@ public class NlpController {
     /**
      * 查询最近的批量解析任务。
      *
-     * <p>【权限：登录即可】最多返回 {@code limit} 条（默认 50），不含失败明细；
+     * <p>【权限：登录即可】最多返回 limit 条（默认 50），不含失败明细；
      * 真被截断时 {@code truncated = true}，页面据此说明「更早的任务已省略」。</p>
      *
      * @return 任务列表（按提交时间倒序）+ 截断标记 + 上限条数

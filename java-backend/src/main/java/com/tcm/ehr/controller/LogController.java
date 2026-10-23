@@ -20,7 +20,7 @@ import java.util.Map;
  * <p>§七 L3：归档清理（{@code POST /api/logs/purge}）已删 —— 日志只增不删，
  * 无界增长为已知未闭环项，清理只能由运维人工归档。</p>
  *
- * <p>数据源唯一：{@code operation_log} 表。§七 L2 起不再有文件副本，
+ * <p>数据源唯一：operation_log 表。§七 L2 起不再有文件副本，
  * 导出与查询都直接读库。</p>
  */
 @RestController
