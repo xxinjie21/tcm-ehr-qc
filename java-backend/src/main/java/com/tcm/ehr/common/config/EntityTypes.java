@@ -13,19 +13,19 @@ import java.util.Set;
  *
  * 唯一权威是 {@link #all()}：固定 9 类（对齐 NLP 可抽取的实体）。
  * 9 类均有独立词典（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法）——病因词典
- * （{@code causes.json}）与其余 8 类同时到位，故 {@code dictKeys()} 现为 9 类。
+ * （causes.json）与其余 8 类同时到位，故 {@code dictKeys()} 现为 9 类。
  * 不落盘、不做用户自定义——词典范围限定在 NLP 能提取的实体。
  *
- * <p>{@code dictKeys()} 的 9 类与 python-nlp 的 {@code LABEL_FIELD} 5 类都只是
- * {@code all()} 的过滤视图，不是并列清单：前者按 {@code dict} 标志筛（25.b 防漂移测试钉住），
+ * <p>{@code dictKeys()} 的 9 类与 python-nlp 的 LABEL_FIELD 5 类都只是
+ * {@code all()} 的过滤视图，不是并列清单：前者按 dict 标志筛（25.b 防漂移测试钉住），
  * 后者是模型能输出的 NER 标签集（病名/症状/证型/方剂/本草），维度不同、不要求等长。</p>
  *
  *
  * ⚠️ 两类范围都<b>不再</b>由本目录硬编码，全部交给组织级规则集（用户在「规则配置」里改）：
  * <ul>
- *   <li><b>归一范围</b>：{@code QcRuleSet.normalization.elementTypes} 决定哪些类型做词形归一
+ *   <li><b>归一范围</b>：QcRuleSet.normalization.elementTypes 决定哪些类型做词形归一
  *       （出厂默认 9 类，含病因 —— 但病因默认只归一、不计分）；</li>
- *   <li><b>扣分范围</b>：{@code QcRuleSet.standardization.elementTypes} 决定哪些类型计入
+ *   <li><b>扣分范围</b>：QcRuleSet.standardization.elementTypes 决定哪些类型计入
  *       「未归一扣分」（出厂默认 5 类），实际按它与归一范围<b>取交集</b>计分。</li>
  * </ul>
  * 本目录只声明类型元数据。
@@ -89,10 +89,10 @@ public final class EntityTypes {
      * 都新建一份集合（{@code all()} 在单次标准化报表里被调 4 次）。缓存为不可变视图，
      * 调用方一律只读。</p>
      *
-     * <p>{@code DICT_KEYS} 用 {@code unmodifiableSet(LinkedHashSet)} 而<b>不是</b>
-     * {@code Set.copyOf}：后者的迭代顺序未定义（按每次 JVM 启动的 SALT 打乱），会破坏
-     * 「顺序稳定」这条契约 —— {@code QcRuleSet.defaults()} 的 {@code elementTypes} 顺序
-     * 与 {@code EntityTypesDictionaryRegistrationTest} 都依赖它。</p>
+     * <p>DICT_KEYS 用 {@code unmodifiableSet(LinkedHashSet)} 而<b>不是</b>
+     * Set.copyOf：后者的迭代顺序未定义（按每次 JVM 启动的 SALT 打乱），会破坏
+     * 「顺序稳定」这条契约 —— {@code QcRuleSet.defaults()} 的 elementTypes 顺序
+     * 与 EntityTypesDictionaryRegistrationTest 都依赖它。</p>
      */
     private static final List<EntityType> ALL_VIEW;
     private static final Set<String> DICT_KEYS;
@@ -133,7 +133,7 @@ public final class EntityTypes {
      * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法，顺序稳定，共 9 类）。
      *
      * <p>这 9 类即「规则配置」弹窗里术语归一 / 术语标准化可勾选的范围；<b>实际生效范围</b>
-     * 由规则集的 {@code normalization.elementTypes}（归一）与 {@code standardization.elementTypes}
+     * 由规则集的 normalization.elementTypes（归一）与 standardization.elementTypes
      * （未归一扣分）决定。本方法给「可选项」，规则集给「已选项」。</p>
      */
     public static Set<String> dictKeys() {

@@ -11,12 +11,12 @@ import java.util.Map;
 /**
  * 结构化数据落库前的元信息打点。
  *
- * <p>在 {@code structured_data} JSON 顶层写入保留键 {@code _meta}，记录该份结构化数据
+ * <p>在 structured_data JSON 顶层写入保留键 _meta，记录该份结构化数据
  * <b>依据哪一版术语词典</b>产生，供前端展示"参照词典版本 xxx"（可追溯）。</p>
  *
- * <p><b>为什么安全</b>：所有下游消费者（{@code StatsServiceImpl} / {@code QcScorer}）都按
- * <b>指定 key</b> 取实体（如 {@code data.get("patternList")}），不遍历全 key，故 {@code _meta}
- * 不会被当成实体或词频统计进去；前端 {@code StructuredDataCard} 也按固定分区渲染。</p>
+ * <p><b>为什么安全</b>：所有下游消费者（StatsServiceImpl / QcScorer）都按
+ * <b>指定 key</b> 取实体（如 {@code data.get("patternList")}），不遍历全 key，故 _meta
+ * 不会被当成实体或词频统计进去；前端 StructuredDataCard 也按固定分区渲染。</p>
  */
 public final class StructuredDataMeta {
 
@@ -67,7 +67,7 @@ public final class StructuredDataMeta {
      *
      * <p>与 {@link #stamp(ObjectMapper, String, String, Integer)} 的差别只在入参形态：调用方
      * 已经持有解析结果时走这条，省掉「序列化 → 解析 → 再序列化」的一次完整往返。语义完全一致
-     * —— {@code dictVersion} 为空时同样不写 {@code _meta}，只把数据原样序列化回去。</p>
+     * —— dictVersion 为空时同样不写 _meta，只把数据原样序列化回去。</p>
      *
      * @param data          已解析的结构化数据顶层 Map
      * @param dictVersion   词典版本串；空则不打点
@@ -99,7 +99,7 @@ public final class StructuredDataMeta {
      * 这个标记就失去可信度；而它唯一的用途正是「评估模型准确率时排除人工补过的数据」，
      * 一旦可自报就等于没有。</p>
      *
-     * <p>与 {@link #stamp} 的区别：本方法<b>替换</b>整个 {@code _meta}（只留人工修改三要素），
+     * <p>与 {@link #stamp} 的区别：本方法<b>替换</b>整个 _meta（只留人工修改三要素），
      * 而 stamp 只写版本相关字段。人工修改后旧的版本戳本就失效（内容已被改），
      * 继续显示「依据某一版词典」是误导。</p>
      *

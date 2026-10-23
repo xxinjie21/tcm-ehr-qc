@@ -43,8 +43,8 @@ import java.util.Set;
  *
  * <ul>
  * <li>判定地基 = 规则引擎（QcScorer + LogicChecker），规则来自 {@link QcRuleStore}；</li>
- * <li>批量重算（§七 L5 起异步）：不在本类的请求线程里跑，改由 {@code QcBatchServiceImpl}
- * 以 {@code qc_task} 表 + 固定并发 1 的 worker 执行；本类只保留单条处理
+ * <li>批量重算（§七 L5 起异步）：不在本类的请求线程里跑，改由 QcBatchServiceImpl
+ * 以 qc_task 表 + 固定并发 1 的 worker 执行；本类只保留单条处理
  * {@link #processOne}，分页取数、进度落库、取消与防重都在那边。</li>
  * <li>review_tasks 幂等 upsert（查询过滤 is_obsolete=0）。</li>
  * </ul>
@@ -59,7 +59,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     private static final int REVIEW_DEADLINE_WORKDAYS = 7;
     /**
      * 扣分聚合的扫描上限：40000（目标数据集规模，实测 35355 条 × 1.13 KB/条 ≈ 40MB）。
-     * 触顶时置 {@code truncated} 标记 —— 这是「真的超过上限」，不再是无谓的 3000 硬顶。
+     * 触顶时置 truncated 标记 —— 这是「真的超过上限」，不再是无谓的 3000 硬顶。
      */
     private static final int MAX_SCAN_RECORDS = 40000;
     /** 回退子集的分批回查大小：只对「库内没有 qc_results」的记录做，故通常很小 */
@@ -79,9 +79,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 单条完整性 + 格式检查，只读、不落库。
      *
-     * <p>结构化数据取请求优先、病历回退（缺省时按 {@code recordId} 载入）；完整性元素在
+     * <p>结构化数据取请求优先、病历回退（缺省时按 recordId 载入）；完整性元素在
      * 「结构化字段缺失且原始字段回退也为空」时记入缺失清单，格式规则仅对已载入的原始病历逐条
-     * 校验。单条检查不做重复判定，{@code duplicate} 恒为 false。</p>
+     * 校验。单条检查不做重复判定，duplicate 恒为 false。</p>
      *
      * @param dto 检查请求（recordId + 可选 structuredData），可为 null
      * @return 缺失字段清单与格式错误清单
@@ -122,9 +122,9 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * 一致性（逻辑冲突）检查，只读。
      *
      * <p>把请求中的证型 / 治法 / 中药 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
-     * {@code dto} 为 null 时按空数据检查，结果视为无冲突。</p>
-     * <p>⚠️ 中药的 map key 必须是 {@code herbs}（= {@code EntityTypes} 里 herb 的 structuredKey），
-     * 写成 {@code herbList}（DTO 的属性名）会让「证候 → 中药」规则永远取不到值。</p>
+     * dto 为 null 时按空数据检查，结果视为无冲突。</p>
+     * <p>⚠️ 中药的 map key 必须是 herbs（= EntityTypes 里 herb 的 structuredKey），
+     * 写成 herbList（DTO 的属性名）会让「证候 → 中药」规则永远取不到值。</p>
      *
      * @param dto 含 patternList / treatmentList / formulaList / herbList 的检查请求，可为 null
      * @return 冲突清单及「是否一致」标志（冲突为空即一致）
@@ -153,7 +153,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 单条评分，只读（不写回 records，也不生成复核任务）。
      *
-     * <p>结构化数据取请求优先、病历回退；{@code structuredData} 与 {@code recordId} 至少提供
+     * <p>结构化数据取请求优先、病历回退；structuredData 与 recordId 至少提供
      * 其一。评分按当前规则执行，重复标志固定为 false。</p>
      *
      * @param dto 评分请求（recordId + 可选 structuredData），可为 null
@@ -179,14 +179,14 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 处理单条：现算评分 → 回写 records → 幂等 upsert 复核任务 → 计入分级统计。
      *
-     * <p>§七 L5：供异步 worker（{@code QcBatchServiceImpl}）复用本方法处理单条，
+     * <p>§七 L5：供异步 worker（QcBatchServiceImpl）复用本方法处理单条，
      * 避免在两个类里实现两份「现算 + 回写 + 复核任务」逻辑（两者口径一旦分岔就会让重算结果对不上）。</p>
      *
      * <p><b>为什么是 public</b>：Spring 基于代理的 {@code @Transactional} <b>只对 public 方法生效</b>。
      * 本方法原为包级可见，注解加在上面等于没加（编译通过、运行期静默不开事务）；
-     * 调用方是<b>另一个 Bean</b>（{@code QcBatchServiceImpl}），走的是代理，改 public 后才真正生效。</p>
+     * 调用方是<b>另一个 Bean</b>（QcBatchServiceImpl），走的是代理，改 public 后才真正生效。</p>
      *
-     * <p><b>事务边界</b>：本方法先写 {@code records} 再 upsert {@code review_tasks}，
+     * <p><b>事务边界</b>：本方法先写 records 再 upsert review_tasks，
      * 中途异常会留下「分数已写、复核任务未建」的脏状态，故整段包在一个事务里。
      * {@code rollbackFor = Exception.class} 必写：默认只回滚 RuntimeException，
      * 而本方法 {@code throws Exception}，漏了会静默不回滚。
@@ -228,7 +228,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * <p>作废而不是删除：历史复核轨迹要留，查询侧按 {@code is_obsolete=0} 过滤。</p>
      *
      * <p><b>为什么走 SQL 语义 upsert 而不再「先查后写」</b>（批次 4）：DB 侧已加
-     * {@code uk_record_active}（生成列，约束「一个病历至多一条活跃任务」）。
+     * uk_record_active（生成列，约束「一个病历至多一条活跃任务」）。
      * 原来的 {@code selectList → update / insert} 是 check-then-act，并发两个线程
      * 都能查到空、都去 insert，其中一个撞唯一键 → 从「静默重复」变成「整批 500」。
      * {@code INSERT ... ON DUPLICATE KEY UPDATE} 由唯一索引直接仲裁，没有这个窗口。</p>
@@ -339,19 +339,19 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * 扣分聚合统计，只读。
      *
      * <p>范围先经数据域过滤，按 1000 条/页扫描，最多扫描 {@value #MAX_SCAN_RECORDS} 条；
-     * 触顶时置 {@code truncated} 标记并停止。等级分布按 {@code grade} 列直接统计，
-     * 扣分数据优先读库内已存评分结果（{@code qc_results}），缺失则按当前规则现算，
+     * 触顶时置 truncated 标记并停止。等级分布按 grade 列直接统计，
+     * 扣分数据优先读库内已存评分结果（qc_results），缺失则按当前规则现算，
      * 再按扣分类型与「类型|条目」两级聚合次数和分值。明细按分值降序取前 20。</p>
      *
      * <p><b>两段式扫描（§七 L4）</b>：主扫描只 SELECT {@code id / grade / qc_results} 三列
-     * —— 原来的 {@code selectPage} 拉的是整行，含 {@code present_illness} /
-     * {@code chief_complaint} 等 TEXT 大字段，40000 条会把这些列全部拉进堆里。
-     * 只有「{@code qc_results} 为空」的记录才需要现算，而现算必须拿到
-     * {@code structured_data} + 19 个原始列（{@code QcScorer} 的回退要用），
+     * —— 原来的 selectPage 拉的是整行，含 present_illness /
+     * chief_complaint 等 TEXT 大字段，40000 条会把这些列全部拉进堆里。
+     * 只有「qc_results 为空」的记录才需要现算，而现算必须拿到
+     * structured_data + 19 个原始列（QcScorer 的回退要用），
      * 故这些 id 收集起来、分批回查整行再算（慢路径，重算后通常几乎为空集）。
      * ⚠️ 不可「只选 3 列就直接现算」—— 那样未评分记录会被误判为「要素全缺失」而扣满分。</p>
      *
-     * <p><b>已知边界</b>：导入后未重算时 {@code qc_results} 全为空 → 回退子集 = 全库，
+     * <p><b>已知边界</b>：导入后未重算时 qc_results 全为空 → 回退子集 = 全库，
      * 两段式退化为「全量回查」，收益归零（与改造前同慢）。重算后才几乎命中不到回退。
      * 若首屏仍慢，先跑一次重算（§七 L5），或给本接口加 60s Redis 缓存。</p>
      *
@@ -481,10 +481,10 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     }
 
     /**
-     * 快路径：只读库内已存的 {@code qc_results}；没有或解析失败返回 {@code null}（交慢路径现算）。
+     * 快路径：只读库内已存的 qc_results；没有或解析失败返回 {@code null}（交慢路径现算）。
      *
      * <p>单独拆出来是因为它<b>不需要任何原始列</b>，可以在「只 SELECT id/grade/qc_results」
-     * 的窄扫描里跑完；慢路径 {@link #scoreOf} 则依赖 {@code structured_data} 与 19 个原始列，
+     * 的窄扫描里跑完；慢路径 {@link #scoreOf} 则依赖 structured_data 与 19 个原始列，
      * 必须回查整行。</p>
      */
     private ScoreResultVO readStoredScore(Record r) {

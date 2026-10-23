@@ -7,13 +7,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 组织级词典存储的接口契约：词条落 {@code dictionary_terms}，版本对账落
- * {@code dictionary_versions}，导入前存档落 {@code dictionary_backups}。
+ * 组织级词典存储的接口契约：词条落 dictionary_terms，版本对账落
+ * dictionary_versions，导入前存档落 dictionary_backups。
  *
- * <p><b>组织维度语义</b>：{@code orgId} 为空串 {@code ""} = 基础层（全组织共享）。
+ * <p><b>组织维度语义</b>：orgId 为空串 {@code ""} = 基础层（全组织共享）。
  * 某组织没有自有词条时读到基础层，而不是读到空。</p>
  *
- * <p>实现见 {@code com.tcm.ehr.service.impl.DictionaryTermStoreImpl}。</p>
+ * <p>实现见 com.tcm.ehr.service.impl.DictionaryTermStoreImpl。</p>
  */
 public interface IDictionaryTermStore {
 
@@ -48,7 +48,7 @@ public interface IDictionaryTermStore {
     List<TermEntry> readEffective(String orgId, String type);
 
     /**
-     * 一次读回某组织「基础层 ∪ 本组织」生效的<b>全部类型</b>词条，按 {@code type} 分组。
+     * 一次读回某组织「基础层 ∪ 本组织」生效的<b>全部类型</b>词条，按 type 分组。
      *
      * <p>口径与逐类调用 {@link #readEffective} 逐位一致（同一标准词以本组织为准）。存在的意义是
      * 消除 N+1：报告/看板要 8 类 × (基础层 + 本组织) = 最多 16 次读，每次都带一次版本查询 +
@@ -90,7 +90,7 @@ public interface IDictionaryTermStore {
     /**
      * 术语建议召回用的字符倒排索引，连同它所索引的那份生效词条表。
      *
-     * <p><b>为什么两者必须一起给</b>：{@code postings} 里的值指向 {@code entries} 的串编号，
+     * <p><b>为什么两者必须一起给</b>：postings 里的值指向 entries 的串编号，
      * 分两次取（先取词条、再取索引）在词典刚好变更时会让两者对不上。一次取回就同源。</p>
      *
      * <p>用途是<b>把全表扫描缩成候选扫描</b>：召回门槛是「与原文重叠 ≥2 个字符」，
@@ -98,7 +98,7 @@ public interface IDictionaryTermStore {
      * 是入选的<b>必要条件</b>，据此取出的候选集是超集，结果集与全表扫描逐条一致。</p>
      *
      * @param entries     生效词条（基础层 ∪ 本组织，口径同 {@link #readEffective}）
-     * @param stringOwner 串编号 → 该串所属词条在 {@code entries} 中的下标
+     * @param stringOwner 串编号 → 该串所属词条在 entries 中的下标
      * @param postings    字符 → 含该字符的串编号（升序；同一字符在一个串里出现多次只登记一次）
      */
     record RecallIndex(List<TermEntry> entries, int[] stringOwner, Map<Character, int[]> postings) {
@@ -120,13 +120,13 @@ public interface IDictionaryTermStore {
      * <p>作用域与词典页的三档一一对应（{@link #SCOPE_BASE} / {@link #SCOPE_ORG} / 其余一律
      * {@link #SCOPE_EFFECTIVE}），口径与 {@link #read} / {@link #readEffective} 完全一致。</p>
      *
-     * <p><b>调用方必须拿 {@code entries()} 当词条真源</b>，不要再单独 {@code read} 一次：
-     * 索引里的串编号指向的就是 {@code entries} 的下标，分两次取在词典刚好变更时会对不上。</p>
+     * <p><b>调用方必须拿 {@code entries()} 当词条真源</b>，不要再单独 read 一次：
+     * 索引里的串编号指向的就是 entries 的下标，分两次取在词典刚好变更时会对不上。</p>
      *
-     * <p>与 {@link #recallIndex(String, String)} 共用同一个 {@code VersionedCache} 与同一套版本号
+     * <p>与 {@link #recallIndex(String, String)} 共用同一个 VersionedCache 与同一套版本号
      * （本组织哈希 + 基础层哈希），只是缓存键多一档作用域 —— 不新增失效通道。</p>
      *
-     * @param scope {@code base} = 仅基础层；{@code org} = 仅本组织；其余 = 基础层 ∪ 本组织
+     * @param scope base = 仅基础层；org = 仅本组织；其余 = 基础层 ∪ 本组织
      */
     RecallIndex recallIndex(String orgId, String type, String scope);
 }

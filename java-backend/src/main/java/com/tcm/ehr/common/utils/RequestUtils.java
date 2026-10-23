@@ -14,12 +14,12 @@ import org.springframework.web.context.request.RequestContextHolder;
  * {@code currentRequest()} 与两个 servlet import。</p>
  *
  * <p><b>组信息刻意不进 JWT</b>（阶段2）：移人 / 转让组长 / 停用组必须<b>立即</b>生效，
- * 放进有效期 24h 的 token 里意味着最长要等一天才生效。故 {@code JwtInterceptor}
- * 每请求查一次 {@code organization_members}（走 {@code INDEX(user_id,is_primary)}）。</p>
+ * 放进有效期 24h 的 token 里意味着最长要等一天才生效。故 JwtInterceptor
+ * 每请求查一次 organization_members（走 {@code INDEX(user_id,is_primary)}）。</p>
  *
  * <p>⚠️ <b>后台线程会拿到 "unknown" 而不是 null</b>：这些访问器读的是线程绑定的
- * {@code RequestContextHolder}。异步任务（批量重算 / 批量解析）必须在<b>提交线程</b>
- * 捕获所需值再传给 worker，见 {@code qc_task.role} 快照。</p>
+ * RequestContextHolder。异步任务（批量重算 / 批量解析）必须在<b>提交线程</b>
+ * 捕获所需值再传给 worker，见 qc_task.role 快照。</p>
  */
 public final class RequestUtils {
 
@@ -71,7 +71,7 @@ public final class RequestUtils {
     /**
      * 当前操作人所属课题组。
      *
-     * <p><b>无组时返回空串而不是 null</b>：调用方（{@code RecordFilter}）会把它当
+     * <p><b>无组时返回空串而不是 null</b>：调用方（RecordFilter）会把它当
      * 「查不到数据」的判据，空串比 null 更不容易在下游被当成「未设置」而放过。</p>
      */
     public static String currentOrgId() {
@@ -85,7 +85,7 @@ public final class RequestUtils {
     }
 
     /**
-     * 某一行的 {@code org_id} 是否与当前操作人同一个<b>组织域</b>。
+     * 某一行的 org_id 是否与当前操作人同一个<b>组织域</b>。
      *
      * <p>用于批任务详情 / 取消这类「按行判权」的地方。列表用的是
      * {@code org_id = currentOrgId()} 等值查询，判权若另用一套更严的口径，
@@ -99,12 +99,12 @@ public final class RequestUtils {
      * <p><b>为什么空对空要放行、而不是一律 fail-closed</b>：空组织不是「别人的组织」，
      * 放行不构成跨组织泄露（真正的组织仍要求严格相等，边界一点没松）；而这些任务
      * 本就列在列表里，界面理应能查看进度、能取消。反过来说，这类任务在 worker 侧
-     * 按空组织 fail-closed 命中 0 条，最终落 {@code INTERRUPTED}，给它看详情也不会
+     * 按空组织 fail-closed 命中 0 条，最终落 INTERRUPTED，给它看详情也不会
      * 泄露任何他组数据。</p>
      *
      * <p><b>没有请求上下文一律判否</b>：{@link #currentOrgId()} 把「无上下文」和
      * 「无组织」都表达成空串，单看它无法区分；而这两个调用点（批任务详情 / 取消）
-     * 只可能出现在请求线程上，那里 {@code JwtInterceptor} 必然已写入 {@code ATTR_ORG_ID}。
+     * 只可能出现在请求线程上，那里 JwtInterceptor 必然已写入 ATTR_ORG_ID。
      * 因此「连上下文都没有」只可能是后台线程误用，按 fail-closed 拒掉。</p>
      */
     public static boolean sameOrgScope(String rowOrgId) {
@@ -127,7 +127,7 @@ public final class RequestUtils {
      * 取请求属性的<b>原始</b>值（不转字符串）。
      *
      * <p>⚠️ 不能用 {@link #attr}：它是给「角色 / 用户名」这类<b>文本</b>属性用的，
-     * 会把值 {@code String.valueOf} 成字符串并把空值兜成 {@code "unknown"}。
+     * 会把值 String.valueOf 成字符串并把空值兜成 {@code "unknown"}。
      * 布尔标记那样取会得到 {@code "true"}/{@code "unknown"}，
      * 再拿 {@code Boolean.TRUE.equals(...)} 比就<b>恒为 false</b> ——
      * 于是 {@code auth.admin-can-view-data} 开关静默失效，管理员被永久限定在

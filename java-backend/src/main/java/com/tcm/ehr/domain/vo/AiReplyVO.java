@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * AI 结果（出参，对应 openapi AiReplyVO；interpret / chat / review 共享）。
  *
- * <p>规则出结论 + LLM 叙述；LLM 不可用时 {@code answer} 为模板/规则降级、{@code summary} 为 null，
+ * <p>规则出结论 + LLM 叙述；LLM 不可用时 answer 为模板/规则降级、summary 为 null，
  * 规则结论（completeness / coreMissing / normHits / keyHints）始终保留。</p>
  */
 @Data
@@ -50,7 +50,7 @@ public class AiReplyVO {
     /**
      * 术语补词建议（仅 termsuggest）；interpret / chat / review 时为 null。
      *
-     * <p>与 {@code completeness}、{@code normHits} 同样属于「按用途留空」的字段：
+     * <p>与 completeness、normHits 同样属于「按用途留空」的字段：
      * 本 VO 被多个端点共用，每个端点只填自己那几项。</p>
      */
     private List<TermSuggestion> termSuggestions;
@@ -96,10 +96,10 @@ public class AiReplyVO {
         /**
          * 建议动作：
          * <ul>
-         *   <li>{@code alias} —— 原文是某个已有标准词的口语/异名，挂为其别名；</li>
+         *   <li>alias —— 原文是某个已有标准词的口语/异名，挂为其别名；</li>
          *   <li>{@code new} —— 原文本身是规范术语但词表漏收，新建标准词；</li>
-         *   <li>{@code ignore} —— 抽取碎片或体征错放，不该进词表；</li>
-         *   <li>{@code unknown} —— LLM 不可用时的兜底，需人工判断。</li>
+         *   <li>ignore —— 抽取碎片或体征错放，不该进词表；</li>
+         *   <li>unknown —— LLM 不可用时的兜底，需人工判断。</li>
          * </ul>
          */
         private String action;
@@ -110,7 +110,7 @@ public class AiReplyVO {
         /** 建议一并录入的别名（可为空） */
         private List<String> aliases = new ArrayList<>();
 
-        /** 建议来源：{@code dict}=现有词表召回命中 / {@code model}=LLM 依据术语规范给出 */
+        /** 建议来源：dict=现有词表召回命中 / model=LLM 依据术语规范给出 */
         private String source;
 
         /** 判断依据，一句话，供人工复核 */

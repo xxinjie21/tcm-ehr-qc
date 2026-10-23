@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 质控规则存储：每组织一行（{@code qc_rules} 表），无行的组织回退内置默认；
+ * 质控规则存储：每组织一行（qc_rules 表），无行的组织回退内置默认；
  * 保存即生效，跨实例以 DB 为准。
  *
  * <p>兜底语义：组织无行 / 组织行解析失败 → 用内置默认；字段缺失 → 用默认补；
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  * （不允许"空标准"导致人人满分）。</p>
  *
  * <p>批次 25.a：原先的 {@code qc-rules.json} 文件兜底已删除 —— 该文件从来不存在
- * （{@code application.yml} 也没有配置项），写路径 {@code update()}/{@code reset()}
+ * （application.yml 也没有配置项），写路径 {@code update()}/{@code reset()}
  * 无生产调用方，规则权威自批次 17 起就是 DB。</p>
  */
 @Slf4j
@@ -47,8 +47,8 @@ public class QcRuleStore {
      * 组织规则行缓存（T14）：写后 5s 过期，写路径 {@link #invalidate} 主动失效。
      *
      * <p><b>值用 {@link Optional} 包一层</b>：Caffeine 不接受 null 值（映射函数返回 null 时不写缓存），
-     * 而「该组织没有行」是稳定事实、同样值得短缓存 —— 直接存 {@code QcRule} 会让无行组织退化成
-     * 每次 {@code selectById}（批量质控 4 万条 = 4 万次查询，正是 T14 要消掉的开销）。</p>
+     * 而「该组织没有行」是稳定事实、同样值得短缓存 —— 直接存 QcRule 会让无行组织退化成
+     * 每次 selectById（批量质控 4 万条 = 4 万次查询，正是 T14 要消掉的开销）。</p>
      *
      * <p><b>刻意不设 maximumSize</b>：键空间 = 组织数（很小）。加上界会引入当前没有的逐出，
      * 让本可命中的查询多打一次库，与「零行为改动」冲突。原实现也无上界。</p>
@@ -95,15 +95,15 @@ public class QcRuleStore {
     }
 
     /**
-     * 取<b>某个组织</b>参与「术语归一」的类型集合（{@code normalization.elementTypes}）。
+     * 取<b>某个组织</b>参与「术语归一」的类型集合（normalization.elementTypes）。
      *
-     * <p>归一执行链路（{@code EntityNormalizer} / {@code GovernanceServiceImpl}）据此判断
-     * 某类型要不要做词形归一；{@code QcScorer} 另用它把扣分范围收窄为「质控勾选 ∩ 归一勾选」。</p>
+     * <p>归一执行链路（EntityNormalizer / GovernanceServiceImpl）据此判断
+     * 某类型要不要做词形归一；QcScorer 另用它把扣分范围收窄为「质控勾选 ∩ 归一勾选」。</p>
      *
      * <p>规则行经 {@link #getFor(String)} 解析时已被 {@link #normalize(QcRuleSet)} 回填默认，
      * 故这里只在极端情形（外部直接构造出缺字段的规则集）兜底。</p>
      *
-     * @param orgId 组织 ID；空值回退系统基线（默认 8 类）
+     * @param orgId 组织 ID；空值回退系统基线（默认 9 类）
      * @return 类型 key 集合；<b>空集表示该组织选择「全部不归一」</b>
      */
     public java.util.Set<String> normalizationTypes(String orgId) {
@@ -118,10 +118,10 @@ public class QcRuleStore {
     /**
      * 取组织规则行，5 秒内复用同一行（T14）。
      *
-     * <p>只缓存解析结果是不够的：版本串要由行本身（{@code update_time}）算出来，
-     * 所以每次 {@code getFor} 仍要 {@code selectById} —— 批量质控 / 批解析逐条调用时
+     * <p>只缓存解析结果是不够的：版本串要由行本身（update_time）算出来，
+     * 所以每次 getFor 仍要 selectById —— 批量质控 / 批解析逐条调用时
      * 4 万条就是 4 万次查询。这里给「行」加一层短 TTL，与
-     * {@code DictionaryTermStoreImpl} 的 {@code cachedVersion} 同一范式：
+     * DictionaryTermStoreImpl 的 cachedVersion 同一范式：
      * 靠短 TTL 兜住跨实例变更，写路径<b>主动删 key</b> 保证本实例立即生效。</p>
      */
     private QcRule rowFor(String orgId) {
@@ -204,7 +204,7 @@ public class QcRuleStore {
     /**
      * 系统基线规则。
      *
-     * <p><b>不为 null 兜底</b>：{@code current} 只在 {@code init()}（{@code @PostConstruct}）里赋值，
+     * <p><b>不为 null 兜底</b>：current 只在 {@code init()}（{@code @PostConstruct}）里赋值，
      * 容器尚未完成启动或单测直接 new 时它仍是 null。直接把 null 传下去，
      * 会让归一/评分链路在「规则还没加载」时踩 NPE。</p>
      */
@@ -239,12 +239,12 @@ public class QcRuleStore {
     /**
      * 校验 format 规则里的正则可编译（A8）。
      *
-     * <p><b>为什么要拦</b>：{@code QcScorer.formatOk} 对编译失败的正则是 catch 后
+     * <p><b>为什么要拦</b>：QcScorer.formatOk 对编译失败的正则是 catch 后
      * 「该项不判」—— 规则静默失效，界面上没有任何提示，配置的人以为生效了。
      * 写路径直接拒绝（全局处理器映射 <b>400</b>），当场告诉他是哪条规则写错了。</p>
      *
      * <p><b>只校验 type=regex 且 expr 非空白</b>：{@code type=enum} 走白名单不看 expr；
-     * {@code expr} 为空表示「该项不判」，是合法配置（{@code formatOk} 里同样先返回 true）。</p>
+     * expr 为空表示「该项不判」，是合法配置（formatOk 里同样先返回 true）。</p>
      *
      * <p><b>不做</b>正则超时 / 回溯上限：「合法但灾难性回溯」的正则编译是能过的，
      * 要拦得换引擎（如 RE2J），属新增依赖与算法替换。写入者已是管理员 / owner 高信任档。</p>
@@ -314,7 +314,7 @@ public class QcRuleStore {
             r.getStandardization().setElementTypes(
                     new ArrayList<>(QcRuleSet.defaultStandardization().getElementTypes()));
         }
-        // 3b. 归一范围缺失 → 回默认 8 类（空列表是用户「一个都不勾」的合法选择，保留为空、不回填）。
+        // 3b. 归一范围缺失 → 回默认 9 类（空列表是用户「一个都不勾」的合法选择，保留为空、不回填）。
         //     与 standardization 同法：老行没有 normalization 字段（新加），回填默认即维持旧行为。
         if (r.getNormalization() == null) {
             r.setNormalization(QcRuleSet.defaultNormalization());

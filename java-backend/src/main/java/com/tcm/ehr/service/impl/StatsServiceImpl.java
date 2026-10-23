@@ -64,10 +64,10 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 允许下推到 SQL 的实体数组路径白名单。
      *
-     * <p>{@code RecordMapper.selectTermFreq} 的路径用 MyBatis {@code ${}} 做文本替换
-     * （MySQL 的 {@code JSON_TABLE} 要求路径是字面量，不能用绑定参数），所以这里必须挡一道：
+     * <p>RecordMapper.selectTermFreq 的路径用 MyBatis {@code ${}} 做文本替换
+     * （MySQL 的 JSON_TABLE 要求路径是字面量，不能用绑定参数），所以这里必须挡一道：
      * 任何非本类常量的取值都直接拒绝，杜绝外部输入进入 SQL 文本。
-     * 证候走 {@code selectPatternFreq}（多一段兜底逻辑），不在此列。</p>
+     * 证候走 selectPatternFreq（多一段兜底逻辑），不在此列。</p>
      */
     private static final Set<String> ALLOWED_JSON_PATHS = Set.of(
             "$.diseases[*]", "$.symptoms[*]", "$.formulaList[*]", "$.herbs[*]");
@@ -314,7 +314,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     /**
      * 按类型统计词频 Top10（性能审查 P0-3#3）：**全部在 SQL 侧聚合**，只把 TopN 带回 JVM。
      *
-     * <p>原实现把命中病历整体物化进堆、再逐条解析 {@code structured_data} 后在 Java 里计数；
+     * <p>原实现把命中病历整体物化进堆、再逐条解析 structured_data 后在 Java 里计数；
      * 现在中间计数留在 DB。口径不变：中药 / 方剂不回退原始列，证候在结构化缺失时回退
      * （见 {@link com.tcm.ehr.mapper.RecordMapper#selectPatternFreq}）。</p>
      */
@@ -336,7 +336,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     /**
-     * 单类实体词频 TopN：一条 SQL 出结果（{@code JSON_TABLE} 展开 + {@code GROUP BY}）。
+     * 单类实体词频 TopN：一条 SQL 出结果（JSON_TABLE 展开 + {@code GROUP BY}）。
      *
      * @param jsonPath structured_data 里的数组路径；用 MyBatis {@code ${}} 进 SQL 文本，
      *                 故必须命中 {@link #ALLOWED_JSON_PATHS} 白名单，杜绝外部输入
@@ -348,7 +348,7 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return toTop(baseMapper.selectTermFreq(wrapper, jsonPath, TOP_N), keyName);
     }
 
-    /** 证候词频 TopN：结构化 {@code patternList} 为主，缺失时由 SQL 侧回退切分原始 {@code pattern} 列 */
+    /** 证候词频 TopN：结构化 patternList 为主，缺失时由 SQL 侧回退切分原始 pattern 列 */
     private List<Map<String, Object>> patternFreq(QueryWrapper<Record> wrapper) {
         return toTop(baseMapper.selectPatternFreq(wrapper, TOP_N), "pattern");
     }
@@ -373,14 +373,14 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return out;
     }
 
-    /** 把词频列表装成「按类型统计」档（{@code statistics}）—— 契约形状与改前一致 */
+    /** 把词频列表装成「按类型统计」档（statistics）—— 契约形状与改前一致 */
     private static StatsVO statisticsOf(List<Map<String, Object>> rows) {
         StatsVO vo = new StatsVO();
         vo.setStatistics(rows);
         return vo;
     }
 
-    /** 把词频列表装成「证候分布」档（{@code distribution}） */
+    /** 把词频列表装成「证候分布」档（distribution） */
     private static StatsVO distributionOf(List<Map<String, Object>> rows) {
         StatsVO vo = new StatsVO();
         vo.setDistribution(rows);
@@ -388,10 +388,10 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
     }
 
     /**
-     * SQL 聚合结果（{@code term} / {@code cnt}）→ 契约形态 {@code {键名: 词, count: 次数}}。
+     * SQL 聚合结果（term / cnt）→ 契约形态 {@code {键名: 词, count: 次数}}。
      *
-     * <p>契约不能改：{@code StatsVO} 的三个列表字段与前端图表都按这个形状读。
-     * {@code cnt} 由 {@code COUNT(*)} 回来是 Long，这里收敛成 int —— 与改前的
+     * <p>契约不能改：StatsVO 的三个列表字段与前端图表都按这个形状读。
+     * cnt 由 {@code COUNT(*)} 回来是 Long，这里收敛成 int —— 与改前的
      * {@code Map<String,Integer>} 一致，避免同一接口在两种实现下给出不同类型。</p>
      */
     private static List<Map<String, Object>> toTop(List<Map<String, Object>> rows, String keyName) {

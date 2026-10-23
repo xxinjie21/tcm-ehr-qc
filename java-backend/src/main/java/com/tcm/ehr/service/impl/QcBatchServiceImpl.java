@@ -56,25 +56,25 @@ import java.util.concurrent.TimeUnit;
  * 挂到超时（前端超时 200s），还长时间占着一条 DB 连接。改成生产/消费后，提交即返回
  * taskId，页面轮询进度；单条处理逻辑复用 {@link QcServiceImpl#processOne}。</p>
  *
- * <p><b>生产/消费</b>：{@link #queue} 存待跑任务 ID，固定 {@code qc.batch.concurrency}
- * （默认 1）个工作线程消费；任务与进度写 {@code qc_task} 表，故提交后可关页面、回来轮询。</p>
+ * <p><b>生产/消费</b>：{@link #queue} 存待跑任务 ID，固定 qc.batch.concurrency
+ * （默认 1）个工作线程消费；任务与进度写 qc_task 表，故提交后可关页面、回来轮询。</p>
  *
  * <ul>
  *   <li><b>角色快照（最关键）</b>：{@code RequestUtils.currentRole()} 读的是线程绑定的
- *   {@code RequestContextHolder}，worker 线程里取到的是字符串 {@code "unknown"}（不是 null）。
- *   若拿它去 {@code RecordFilter.build}，{@code domainGrade} 返回 null，数据域过滤会退化成
+ *   RequestContextHolder，worker 线程里取到的是字符串 {@code "unknown"}（不是 null）。
+ *   若拿它去 RecordFilter.build，domainGrade 返回 null，数据域过滤会退化成
  *   「不过滤 = 全库」—— 表面跑通了，实际重算了用户看不见的病历。故提交线程把角色写进
- *   {@code qc_task.role}，worker 用捕获值重建过滤器。
+ *   qc_task.role，worker 用捕获值重建过滤器。
  *   同理结尾的审计日志用 {@link OperationLogger#log(String, String, String, String, String)}
  *   显式回填操作人，否则会记成 {@code "unknown"}。</li>
  *   <li><b>防重不用 Redis 锁</b>：改为「表中是否已有 QUEUED/RUNNING」。原来的
  *   {@code tcm:task:batch} 是全局单键，任意管理员的提交会让其他人排队，TTL 900s 固定
  *   还会在长任务中途过期导致并发双跑；查表更准、也没有 TTL 问题。</li>
- *   <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 {@code failure_truncated}；</li>
- *   <li>取消：QUEUED 用<b>带 {@code status='QUEUED'} 条件</b>的更新落 {@code CANCELLED}，
+ *   <li>失败清单仅存前 {@value #MAX_FAILURES} 条，超出置 failure_truncated；</li>
+ *   <li>取消：QUEUED 用<b>带 {@code status='QUEUED'} 条件</b>的更新落 CANCELLED，
  *       RUNNING 置取消位、worker 在页边界退出；认领（{@link #runTask} 第 2 步）带同样的条件，
  *       因此取消不会被认领覆写、认领也不会把取消后的行重新拉起；</li>
- *   <li>重启：{@code RUNNING}/{@code QUEUED} 一律标 {@code INTERRUPTED}，可重跑。</li>
+ *   <li>重启：RUNNING/QUEUED 一律标 INTERRUPTED，可重跑。</li>
  * </ul>
  */
 @Slf4j
@@ -120,7 +120,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
      * 已请求取消的任务 ID。
      *
      * <p>存在内存里只为<b>当前进程内</b>判得快，但<b>不是权威</b>：多实例下另一个实例
-     * 看不到它。权威是 {@code qc_task.cancel_requested} 列（批次 4 加的），
+     * 看不到它。权威是 qc_task.cancel_requested 列（批次 4 加的），
      * 见 {@link #isCancelRequested(String)}。</p>
      */
     private final Set<String> cancelFlags = ConcurrentHashMap.newKeySet();
@@ -226,8 +226,8 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 按筛选范围提交批量重算任务，异步入队后立即返回。
      *
-     * <p>筛选条件与<b>角色</b>都在提交线程冻结进 {@code qc_task}：worker 是后台线程，
-     * 读不到 {@code RequestContextHolder}（见类注释「角色快照」）。</p>
+     * <p>筛选条件与<b>角色</b>都在提交线程冻结进 qc_task：worker 是后台线程，
+     * 读不到 RequestContextHolder（见类注释「角色快照」）。</p>
      *
      * @param dto 批量请求（filters），可为 null（表示不限）
      * @return 新任务的进度视图（无失败明细）
@@ -429,7 +429,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 仅重试失败：读原任务的完整失败记录 ID，按同一范围重新提交一个只含这批 ID 的任务。
      *
-     * <p>复用 {@link #submit}（沿用幂等/防重/执行路径）；范围用 {@code filters.ids} 收窄到失败集合，
+     * <p>复用 {@link #submit}（沿用幂等/防重/执行路径）；范围用 filters.ids 收窄到失败集合，
      * 数据域仍由 {@link RecordFilter} 兜住（不越权）。</p>
      */
     @Override
@@ -638,7 +638,7 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 读 DB 判「是否已请求取消」。
      *
-     * <p>为什么必须查库：内存 {@code cancelFlags} 只有本进程可见，多实例下
+     * <p>为什么必须查库：内存 cancelFlags 只有本进程可见，多实例下
      * 「A 实例点取消、B 实例在跑」会完全失效。</p>
      *
      * <p>查库失败按<b>未取消</b>处理：宁可多跑几条，也不要因为一次查询抖动就把长任务中断掉。</p>
@@ -719,12 +719,12 @@ public class QcBatchServiceImpl implements IQcBatchService {
     /**
      * 任务收尾时的最终状态。
      *
-     * <p>停机（{@code running == false}）且<b>没跑完</b> → {@code INTERRUPTED}：不能声称「已完成」。
-     * 这里必须自己判 {@code running} —— 执行循环只认 {@code cancelFlags}，不看 running，
+     * <p>停机（{@code running == false}）且<b>没跑完</b> → INTERRUPTED：不能声称「已完成」。
+     * 这里必须自己判 running —— 执行循环只认 cancelFlags，不看 running，
      * 在途任务会在停机窗口里继续跑到取数循环自然结束。</p>
      *
      * <p>反过来也要留神：停机窗口里<b>恰好跑完</b>的（{@code done == total}）仍是
-     * {@code COMPLETED}，别把真跑完的误标成中断。取消优先于中断。</p>
+     * COMPLETED，别把真跑完的误标成中断。取消优先于中断。</p>
      */
     static String endStatus(boolean running, boolean cancelled, Integer done, Integer total) {
         boolean unfinished = done != null && total != null && done < total;

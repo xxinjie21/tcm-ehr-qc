@@ -29,15 +29,15 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 组织级词典存储：词条落 {@code dictionary_terms}，版本对账落 {@code dictionary_versions}，
- * 导入前存档落 {@code dictionary_backups}。
+ * 组织级词典存储：词条落 dictionary_terms，版本对账落 dictionary_versions，
+ * 导入前存档落 dictionary_backups。
  *
- * <p><b>组织维度语义</b>：{@code orgId} 为空串 {@code ""} = <b>基础层</b>（全组织共享）。
+ * <p><b>组织维度语义</b>：orgId 为空串 {@code ""} = <b>基础层</b>（全组织共享）。
  * 某组织没有自有词条时<b>读到基础层</b>，而不是读到空 —— 空会让归一把该组织的所有术语
  * 判成「词典里没有」，分数全塌。</p>
  *
- * <p><b>为什么版本号入表</b>：ES 的 {@code _meta.version} 是索引级的，分不清组织。
- * 灌完 ES 只更新 {@code dictionary_versions.indexed_version}，没灌成功就不动它 ——
+ * <p><b>为什么版本号入表</b>：ES 的 _meta.version 是索引级的，分不清组织。
+ * 灌完 ES 只更新 dictionary_versions.indexed_version，没灌成功就不动它 ——
  * 这样「DB 已改、ES 没跟上」在启动对账时能被真实地看见，而不是被一个索引级标记掩盖。</p>
  */
 @Slf4j
@@ -53,7 +53,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 召回索引缓存（P1-15 / S1）：键 {@code org|type}，版本 = 「本组织内容哈希 + 基础层内容哈希」。
      *
-     * <p>与 {@code termsCache} 同一套版本号，因此失效走的是同一条通道（写路径主动失效 +
+     * <p>与 termsCache 同一套版本号，因此失效走的是同一条通道（写路径主动失效 +
      * 版本比对），没有新增任何失效机制。基础层变更会改变版本串的前半段，
      * 于是所有组织的索引一并自然失效。</p>
      */
@@ -75,11 +75,11 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 版本号缓存（批次 12 · 12a）：键 {@code org|type}，TTL 5 秒 + 写路径主动失效。
      *
-     * <p>为什么值得缓存：{@code read} 每次都要查一次 {@code dictionary_versions} 才知道词条缓存是否
-     * 失效，而 {@code readEffective} 要读两层 ⇒ 一次读就是 <b>2 次</b>版本查询；NLP 归一按记录反复
+     * <p>为什么值得缓存：read 每次都要查一次 dictionary_versions 才知道词条缓存是否
+     * 失效，而 readEffective 要读两层 ⇒ 一次读就是 <b>2 次</b>版本查询；NLP 归一按记录反复
      * 调它，同一份版本号被查了成百上千次 —— 这正是 12a 说的「每条查 4 次词典元数据」。</p>
      *
-     * <p><b>不脏读的做法</b>：① 写路径（{@link #replace} 与 {@code saveVersion}）主动失效 ⇒
+     * <p><b>不脏读的做法</b>：① 写路径（{@link #replace} 与 saveVersion）主动失效 ⇒
      * 本实例内的改动立即生效；② 仍留 5 秒 TTL，覆盖「别的实例改了词表」的情况 ——
      * 跨实例最多迟 5 秒。词表改动不是高频操作，5 秒的可感延迟远小于「每条记录查一次库」的代价。</p>
      */
@@ -234,7 +234,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
     /**
      * 由词条表建字符倒排索引。
      *
-     * <p>登记范围是「标准词 + 各别名」—— 与 {@code overlap} 的比对范围一致（一个词条的多串取最大），
+     * <p>登记范围是「标准词 + 各别名」—— 与 overlap 的比对范围一致（一个词条的多串取最大），
      * 少登记任何一串都会让本该入选的词条漏掉。空串 / null 不登记（它们与任何原文的交集都是 0）。</p>
      *
      * <p>每个串的编号按「词条序 → 串序」递增分配，因此各字符的倒排表天然按下标升序，
@@ -302,7 +302,7 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      * 取版本号，带 5 秒 TTL 的缓存（批次 12 · 12a）。
      *
      * <p>写路径会主动失效 ⇒ 本实例内的改动立即生效；跨实例最多迟 {@link #VERSION_CACHE_TTL_MS}。
-     * 「版本行不存在」（null）也会被缓存：那种行随后会被 {@code upsertVersion} 写入并失效缓存。</p>
+     * 「版本行不存在」（null）也会被缓存：那种行随后会被 upsertVersion 写入并失效缓存。</p>
      */
     private DictionaryVersion cachedVersion(String org, String type) {
         String key = org + "|" + type;
@@ -320,8 +320,8 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      * 提交后让两层缓存失效（批次 26.8）。
      *
      * <p>在事务内提前失效，别的线程可能在词条行尚未提交时就按旧版本回填缓存，
-     * 之后一直读到旧内容；推迟到 {@code afterCommit} 才能保证「提交即可见」。
-     * 无活动事务时（单测直调 {@code replace}）立即失效。</p>
+     * 之后一直读到旧内容；推迟到 afterCommit 才能保证「提交即可见」。
+     * 无活动事务时（单测直调 replace）立即失效。</p>
      */
     private void invalidateCachesAfterCommit(String org, String type) {
         Runnable invalidate = () -> {
@@ -524,10 +524,10 @@ public class DictionaryTermStoreImpl implements IDictionaryTermStore {
      * 该组织归一<b>实际用到</b>的词典状态摘要：5 类词典各自「本组织 → 基础层」的有效版本。
      *
      * <p><b>为什么不能用文件哈希</b>（原 {@code currentVersion()}）：词典源在批次 8b 已从文件
-     * 改成这张表，文件哈希从此<b>冻结不变</b> —— 库里 500 条记录的 {@code dictVersion}
+     * 改成这张表，文件哈希从此<b>冻结不变</b> —— 库里 500 条记录的 dictVersion
      * 全都是同一个值，既无法区分、也<b>不代表真正用的那版词典</b>。</p>
      *
-     * <p>实现上只读 {@code dictionary_versions}（每 (org,type) 一行），
+     * <p>实现上只读 dictionary_versions（每 (org,type) 一行），
      * 是两次轻查询；不重读词条 —— 词条量大（pattern 类两千多条）时重读会拖慢批量解析。</p>
      *
      * @param orgId 组织号；空串/null 视为基础层

@@ -15,16 +15,16 @@ import java.util.Map;
 /**
  * LLM 配置存储：<b>系统基线</b> + <b>每人一份私有配置</b>。
  *
- * <p><b>基线</b>：启动时以 {@link LlmProperties}（{@code application.yml} 的 {@code llm} 段）为准，
+ * <p><b>基线</b>：启动时以 {@link LlmProperties}（application.yml 的 llm 段）为准，
  * 再用可选的 {@code classpath:llm-config.json}（若打包了）覆盖非密钥字段 —— 只读，不回写。</p>
  *
- * <p><b>私有配置</b>：{@code user_llm_config} 每人一行，密钥经
+ * <p><b>私有配置</b>：user_llm_config 每人一行，密钥经
  * {@link LlmSecretCipher} 以 AES-256-GCM 加密落库；用户没配则回落到基线。</p>
  *
  * <p>⚠️ <b>保存个人配置绝不回写全局文件</b>：那等于把一个人的密钥变成所有人的默认值。</p>
  *
- * <p>版本机制：{@link #versionFor(String)} 供 {@code LlmClient} 判断是否需要重建客户端，
- * 版本变化即丢弃已装配的 {@code ChatClient}，实现「保存即生效、无需重启」。</p>
+ * <p>版本机制：{@link #versionFor(String)} 供 LlmClient 判断是否需要重建客户端，
+ * 版本变化即丢弃已装配的 ChatClient，实现「保存即生效、无需重启」。</p>
  */
 @Slf4j
 @Component
@@ -75,8 +75,8 @@ public class LlmConfigStore {
     /**
      * 「生效配置 + 配置版本串」的组合（AI-1）。
      *
-     * <p>{@code LlmClient} 原先分别调 {@link #getFor} 与 {@link #versionFor}，各自
-     * {@code selectById} 一次 —— 缓存只省掉了逐字段合并，没省 DB 往返。本方法一次查询
+     * <p>LlmClient 原先分别调 {@link #getFor} 与 {@link #versionFor}，各自
+     * selectById 一次 —— 缓存只省掉了逐字段合并，没省 DB 往返。本方法一次查询
      * 同时给出两者，调用方不必为同一用户查两次库。</p>
      */
     public record Resolved(LlmConfig config, String version) {
@@ -171,7 +171,7 @@ public class LlmConfigStore {
      * 配置就跟着变。若版本串里只有用户行、没有基线版本，无自有配置的用户会一直命中
      * 旧缓存，表现为「改了却不生效」—— 且很难一眼看出。</p>
      *
-     * <p>只用 {@code update_time} 也不够：它精度到秒，同一秒内改两次会漏判成「没变」。
+     * <p>只用 update_time 也不够：它精度到秒，同一秒内改两次会漏判成「没变」。
      * 故并入各字段值 + 密文长度兜底。</p>
      */
     private String versionOf(UserLlmConfig row) {

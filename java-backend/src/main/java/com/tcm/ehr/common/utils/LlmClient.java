@@ -38,14 +38,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p><b>三条硬约束</b>（与《开发指南与待办》「二、开发规范 · 后端」一致）：</p>
  * <ol>
- * <li><b>不阻塞启动</b>：{@code ChatClient} 懒构造，首次调用才装配；配置缺失或非法只降级，
+ * <li><b>不阻塞启动</b>：ChatClient 懒构造，首次调用才装配；配置缺失或非法只降级，
  * 绝不抛到启动期。Spring AI 的 {@code OpenAi*AutoConfiguration} 在缺 api-key 时会急切校验凭据、
- * 让整个上下文启动失败，故 {@code spring.ai.model.*} 已统一置 {@code none}，模型改由本类自行构造。</li>
+ * 让整个上下文启动失败，故 {@code spring.ai.model.*} 已统一置 none，模型改由本类自行构造。</li>
  * <li><b>不泄漏底层异常</b>：调用异常统一捕获 → 记 WARN → 返回 {@code null}，
  * 由调用方回退规则/模板兜底。<b>唯一例外是 {@link #probe}</b>——连通性探测的目的就是报出失败原因，
  * 由调用方负责脱敏后再返回给用户。</li>
- * <li><b>配置可变</b>：生效参数来自 {@link LlmConfigStore} 而非直接读 {@code application.yml}，
- * 存储的版本号变化时会丢弃旧 {@code ChatClient} 并按新参数重建，实现「保存即生效、无需重启」。</li>
+ * <li><b>配置可变</b>：生效参数来自 {@link LlmConfigStore} 而非直接读 application.yml，
+ * 存储的版本号变化时会丢弃旧 ChatClient 并按新参数重建，实现「保存即生效、无需重启」。</li>
  * </ol>
  */
 @Slf4j
@@ -58,7 +58,7 @@ public class LlmClient {
     /** 连通性探测用提示词：只求最小往返，不要模型长篇输出 */
     private static final String PROBE_PROMPT = "ping";
 
-    /** 未配置超时时的兜底值（与 {@code llm.timeout} 默认值一致，批次15 · 15.2 起为 20s 级） */
+    /** 未配置超时时的兜底值（与 llm.timeout 默认值一致，批次15 · 15.2 起为 20s 级） */
     private static final int DEFAULT_TIMEOUT_MS = 20000;
 
     /**
@@ -74,20 +74,20 @@ public class LlmClient {
     /**
      * 已装配的客户端缓存：key = {@code userId|版本}。
      *
-     * <p><b>为什么按用户缓存</b>：配置改成「每人一份」后，单个 {@code ChatClient}
+     * <p><b>为什么按用户缓存</b>：配置改成「每人一份」后，单个 ChatClient
      * 复用就会让 A 的请求发到 B 的通道上 —— 配置与客户端必须成对。</p>
      *
-     * <p><b>为什么设上限</b>：每个 {@code ChatClient} 内部持有 HTTP 客户端与连接池，
+     * <p><b>为什么设上限</b>：每个 ChatClient 内部持有 HTTP 客户端与连接池，
      * 按用户无限增长等于把内存泄漏进来。</p>
      *
      * <p><b>为什么用 {@link VersionedCache} 而不是自己继承 LinkedHashMap</b>（批次14 审核）：
      * ①「有界 + LRU 逐出」这件事全仓已有 owner，再写一份就是两套逐出口径；
      * ②**更要紧的是线程安全** —— {@code resolve()} 跑在请求线程上，而
-     * {@code LinkedHashMap(accessOrder=true)} 的 {@code get} 会改动内部访问序链表，
+     * {@code LinkedHashMap(accessOrder=true)} 的 get 会改动内部访问序链表，
      * 并发 get/put 不加锁可能丢项、甚至死循环。VersionedCache 的读写都是 synchronized。</p>
      *
      * <p>键里已经带了配置版本（{@code userId|版本}），所以不需要版本比对那一套，用它的两段式接口：
-     * {@code getIfPresent} → <b>锁外</b>装配 → {@code put}。装配必须在锁外，
+     * getIfPresent → <b>锁外</b>装配 → put。装配必须在锁外，
      * 因为 {@code ChatClient.builder(...).build()} 会建 HTTP 连接池，是慢操作。</p>
      */
     private static final int CLIENT_CACHE_MAX = 20;
@@ -116,7 +116,7 @@ public class LlmClient {
     /**
      * 单轮对话，并按<b>这个 AI 功能自己的开关</b>门控。
      *
-     * <p>{@code feature} 传 {@code null} 表示不关心功能维度（如探测、未归类的调用），
+     * <p>feature 传 {@code null} 表示不关心功能维度（如探测、未归类的调用），
      * 只判「LLM 整体是否可用」。</p>
      *
      * <p>该功能被单独关掉时同样返回 {@code null} —— 调用方本就有「LLM 不可用就走规则」的
@@ -246,7 +246,7 @@ public class LlmClient {
     }
 
     /**
-     * 取当前生效的 {@code ChatClient}；配置版本变化时按新参数重建。
+     * 取当前生效的 ChatClient；配置版本变化时按新参数重建。
      *
      * @return 可用客户端；未启用或装配失败返回 {@code null}
      */
@@ -258,7 +258,7 @@ public class LlmClient {
      * 解析当前用户的客户端，并带出生效配置。
      *
      * <p>AI-1：配置与版本由 {@link LlmConfigStore#resolveFor} <b>一次查询</b>同时给出 ——
-     * 原来 {@code getFor} 与 {@code versionFor} 各查一次 {@code user_llm_config}，
+     * 原来 getFor 与 versionFor 各查一次 user_llm_config，
      * 每请求多一次 DB 往返。</p>
      */
     private ResolvedClient resolveDetailed() {

@@ -24,10 +24,10 @@ public interface IDictionaryService {
      * @param page    页码，从 1 开始；{@code <= 0} 表示不分页、返回全部命中
      * @param size    每页条数，仅 {@code page > 0} 时生效
      * @param scope   词典作用域，取值见 {@link IDictionaryTermStore}：
-     *                {@code effective}（默认，基础层∪本组织）/ {@code base}（仅系统默认）
-     *                / {@code org}（仅本组自有）。<b>输入联想与下拉必须用 {@code effective}</b>，
+     *                effective（默认，基础层∪本组织）/ base（仅系统默认）
+     *                / org（仅本组自有）。<b>输入联想与下拉必须用 effective</b>，
      *                否则会选到归一里不生效的词
-     * @return 视图含 {@code terms}（词条列表）与 {@code total}（命中总数）
+     * @return 视图含 terms（词条列表）与 total（命中总数）
      * @throws IOException 词典读取失败
      */
     Map<String, Object> searchTerms(String type, String keyword, int page, int size, String scope)
@@ -97,14 +97,14 @@ public interface IDictionaryService {
     /**
      * 强制重建当前组织某一类词典的 ES 索引（不落库、不改词条）。
      *
-     * <p>用于「库里词条是对的、但索引落后」的自愈：ES 重建失败时 {@code indexed_version}
+     * <p>用于「库里词条是对的、但索引落后」的自愈：ES 重建失败时 indexed_version
      * 不会被更新，启动对账下次会补；这个接口让它不必重启就能立刻补。</p>
      *
      * <p>只重建<b>当前组织这一层</b>。基础层或别的组织若也落后，重建它们会让那一层
      * 同时进入空窗（归一 503），不该由一次手动操作顺带触发。</p>
      *
      * @param type 术语类型
-     * @return 视图含 {@code type} / {@code orgId} / {@code entries} / {@code version}
+     * @return 视图含 type / orgId / entries / version
      * @throws IOException ES 重建失败
      */
     /**
@@ -116,8 +116,8 @@ public interface IDictionaryService {
      *
      * @param type 术语类型；空 = 全部类型
      * @param org  组织号；空 = 当前组织；{@code *} = 词典里出现过的全部组织
-     * @return 汇总：{@code pairs} / {@code entries} / {@code results} / {@code failures}；
-     *         单个 (type, org) 的失败不中断整批，列进 {@code failures}
+     * @return 汇总：pairs / entries / results / failures；
+     *         单个 (type, org) 的失败不中断整批，列进 failures
      * @throws IOException 仅当参数解析本身出错（单点失败已收进 failures）
      */
     Map<String, Object> reindex(String type, String org) throws IOException;

@@ -10,8 +10,8 @@ import java.util.List;
  *
  * <p>索引与检索放在同一处，字段名与映射只有一份权威。</p>
  *
- * <p><b>组织级</b>：文档带 {@code org_id}（空串 {@code ""} = 基础层）。同一个
- * {@code (type, org_id)} 的词条写到同一索引内，用 {@code org_id} 过滤来避免跨组织串词。
+ * <p><b>组织级</b>：文档带 org_id（空串 {@code ""} = 基础层）。同一个
+ * {@code (type, org_id)} 的词条写到同一索引内，用 org_id 过滤来避免跨组织串词。
  * 这是「ES 是归一唯一权威」的组织隔离闭环。</p>
  */
 public interface IEsTermIndexService {
@@ -35,10 +35,10 @@ public interface IEsTermIndexService {
     /**
      * 索引的映射是否与当前代码兼容。
      *
-     * <p>判据：{@code org_id} 必须是 {@code keyword}。索引不存在、或 org_id 被动态映射成
-     * {@code text}（旧版本升级会这样）都返回 {@code false}。</p>
+     * <p>判据：org_id 必须是 keyword。索引不存在、或 org_id 被动态映射成
+     * text（旧版本升级会这样）都返回 {@code false}。</p>
      *
-     * <p><b>为什么启动对账要用它</b>：{@code dictionary_versions} 只记「内容版本对不对得上」，
+     * <p><b>为什么启动对账要用它</b>：dictionary_versions 只记「内容版本对不对得上」，
      * 记不了「索引结构对不对」。旧版本升级后内容版本可能已标为同步，但索引结构是坏的 ——
      * 只信版本号会跳过重建，坏索引就永远修不好（实测：全库归一「未收录」）。</p>
      *
@@ -51,7 +51,7 @@ public interface IEsTermIndexService {
     /**
      * 全量重建某组织（或基础层）的词条索引。
      *
-     * <p>重建期间有检索空窗，调用方需容忍 {@code index_not_found}；归一接口据此回 503。
+     * <p>重建期间有检索空窗，调用方需容忍 index_not_found；归一接口据此回 503。
      * 启动时先比对 {@link #indexedVersion(String, String)}，一致就不重建。</p>
      *
      * @param type    术语类型
@@ -98,7 +98,7 @@ public interface IEsTermIndexService {
     /**
      * 批量召回（批次 12 · 12b）：一次 ES 往返查多个术语。
      *
-     * <p>用 ES 的 {@code _msearch} 而不是手写 {@code bool.should}：msearch 的每个子查询与
+     * <p>用 ES 的 _msearch 而不是手写 bool.should：msearch 的每个子查询与
      * {@link #search} 逐字相同、响应按提交顺序返回，因此<b>结果与逐个查逐条一致</b>是结构上成立的，
      * 而不是靠对账；手写 should 则无法把命中归属回输入。</p>
      *

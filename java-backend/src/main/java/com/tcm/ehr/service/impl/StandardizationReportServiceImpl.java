@@ -93,7 +93,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      *   <li><b>脉下</b> —— 脉位下方的部位描述（左脉下有一囊肿），是症状不是脉象。</li>
      * </ul>
      * <p>误判会把真症状判成「不可归一」：症状归一率虚高、错放数虚高，
-     * 两边都是假信号。口径与 Python 侧 {@code _PT_BLACKLIST} 完全一致。</p>
+     * 两边都是假信号。口径与 Python 侧 _PT_BLACKLIST 完全一致。</p>
      */
     private static final String[] MISROUTED_EXCLUDE = {"关节", "尺肤", "苔藓", "尖锐", "脉下"};
     /**
@@ -102,14 +102,14 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      *
      * <p>只剥<b>一个</b>字符：既覆盖上述写法，又不会把「两手手指略自温」
      * 「左侧肩颈痠痛」这类症状误判成错放（剥掉首字后仍不以舌脉专名开头）。
-     * 口径与 Python 侧 {@code _PT_QUALIFIERS} / 工具脚本同源。</p>
+     * 口径与 Python 侧 _PT_QUALIFIERS / 工具脚本同源。</p>
      */
     private static final String[] MISROUTED_QUALIFIER = {"左", "右", "双", "两"};
 
     /**
      * 该未归一症状实体是否是「脉象/舌象要素错放进了症状」。
      *
-     * <p>与抽取侧 {@code _is_pulse_tongue} 同口径（都不限字数），
+     * <p>与抽取侧 _is_pulse_tongue 同口径（都不限字数），
      * 只多一层保险：抽取侧靠第二字是否汉字挡噪声，统计侧靠
      * {@link #MISROUTED_EXCLUDE} 挡首字撞车的症状域真词。</p>
      */
@@ -313,9 +313,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * <p>两个时间维度的过滤位置不同、各有理由：</p>
      * <ul>
      *   <li><b>接诊时间</b>（dateRange）留在 Java 侧（{@link #filterByVisitTime}），
-     *       因为 {@code range.excluded}（「已排除 N 条区间外数据」）要的是
+     *       因为 range.excluded（「已排除 N 条区间外数据」）要的是
      *       「范围内但因时间被排除的条数」，只有「先取范围全集、再按时间筛」两步才能算出来；</li>
-     *   <li><b>导入时间</b>（importRange）下推到 SQL（{@code records.create_time}），
+     *   <li><b>导入时间</b>（importRange）下推到 SQL（records.create_time），
      *       与病历列表 / Qc 页同一口径；它的排除量不进 excluded（那本是接诊时间的语义），
      *       回显走 {@code range.importStart/importEnd}。</li>
      * </ul>
@@ -350,13 +350,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 报告现算所需的请求上下文快照（在<b>请求线程</b>捕获）。
      *
-     * <p>SWR 的陈旧分支会在后台线程重算，那里读不到 {@code RequestContextHolder}
-     * （{@code RequestUtils} 一律返回 {@code "unknown"}、{@code RecordFilter} fail-closed）。
+     * <p>SWR 的陈旧分支会在后台线程重算，那里读不到 RequestContextHolder
+     * （RequestUtils 一律返回 {@code "unknown"}、RecordFilter fail-closed）。
      * 把三个取值定死在请求线程，现算体就与线程无关。做法与本项目批任务的
-     * {@code qc_task.role} / {@code org_id} 快照一致。</p>
+     * qc_task.role / org_id 快照一致。</p>
      *
      * @param orgId       当前组织（读词表用）
-     * @param domainOrgId 数据域落在 {@code org_id} 列上的取值（无组 → 不可能值哨兵）
+     * @param domainOrgId 数据域落在 org_id 列上的取值（无组 → 不可能值哨兵）
      * @param viewAllOrgs 管理员「看全部」标记（true 时不加组织条件）
      */
     private record ReportContext(String orgId, String domainOrgId, boolean viewAllOrgs) {
@@ -413,13 +413,13 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /**
-     * 报告行的扁平中间结构（A1/T2）：每条病历的 {@code structured_data} 与 {@code qc_results}
+     * 报告行的扁平中间结构（A1/T2）：每条病历的 structured_data 与 qc_results
      * <b>各只解析一次</b>，各统计器共用这一份。
      *
      * <p>刻意<b>不</b>建 {@code Map<recordId, Map<String,Object>>} 那种请求内解析缓存 ——
      * 那只是把同一份解析结果换个容器多存一遍，省不掉解析，还多一次哈希查找。</p>
      *
-     * <p>{@code symptoms} 缺失时归一成空列表，调用方无需再判空。</p>
+     * <p>symptoms 缺失时归一成空列表，调用方无需再判空。</p>
      */
     static final class Row {
         final LocalDateTime visitTime;
@@ -503,9 +503,9 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
 
     /**
      * 复制一份去掉**接诊时间**区间的范围：该维度由 Java 侧过滤（要算 excluded），
-     * 不能与 SQL 重复；导入时间（{@code importRange}）刻意保留 —— 它下推到
-     * {@code RecordFilter} 的 {@code create_time} 条件，与病历列表 / Qc 页同口径。
-     * 证候（{@code pattern}）刻意<b>不</b>复制 —— 见 {@link #report(FiltersDTO)} 的说明。
+     * 不能与 SQL 重复；导入时间（importRange）刻意保留 —— 它下推到
+     * RecordFilter 的 create_time 条件，与病历列表 / Qc 页同口径。
+     * 证候（pattern）刻意<b>不</b>复制 —— 见 {@link #report(FiltersDTO)} 的说明。
      */
     private FiltersDTO withoutVisitRange(FiltersDTO f) {
         FiltersDTO copy = new FiltersDTO();
@@ -688,12 +688,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /**
      * 数据域内的病历（管理员看全部，其余只看本组织），带列投影（C1）。
      *
-     * <p>没有投影时 {@code selectList} 会把 {@code records} 全部列拉回来 —— 21 个 TEXT + 2 个 JSON，
-     * 4 万条约 45MB 常驻堆。这里只取本报告真正读到的 8 列（含主键 {@code id}）；
-     * {@code present_illness} 等大 TEXT、以及本报告不消费的 {@code pattern} / {@code department} 一律不要。</p>
+     * <p>没有投影时 selectList 会把 records 全部列拉回来 —— 21 个 TEXT + 2 个 JSON，
+     * 4 万条约 45MB 常驻堆。这里只取本报告真正读到的 8 列（含主键 id）；
+     * present_illness 等大 TEXT、以及本报告不消费的 pattern / department 一律不要。</p>
      *
      * <p>⚠️ 列名写错只会在运行期报 {@code Unknown column}，测试全绿 ——
-     * 故下面这行 {@code .select(...)} 的字面量已纳入 {@code RecordColumnNameGuardTest} 守卫，
+     * 故下面这行 {@code .select(...)} 的字面量已纳入 RecordColumnNameGuardTest 守卫，
      * 且刻意内联书写（不传数组变量）：守卫按源码里的引号 token 逐个比对真实列清单，
      * 传变量会让它一个都扫不到，守卫就形同虚设。</p>
      */
@@ -712,7 +712,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /**
-     * 病历 → 报告行（A1/T2 的解析入口）：每条只解析一次 {@code structured_data} 与 {@code qc_results}。
+     * 病历 → 报告行（A1/T2 的解析入口）：每条只解析一次 structured_data 与 qc_results。
      *
      * <p>包级可见是为了让「解析一次」能被测试直接钉住 —— 生产路径与测试走同一个入口，
      * 不会出现「测试测的是一套、线上跑的是另一套」。</p>

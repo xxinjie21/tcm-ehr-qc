@@ -25,17 +25,17 @@ import java.util.List;
 /**
  * Excel 流式读的<b>第二档</b>：保留单元格的「类型 + 原始值」，而不是只给格式化文本。
  *
- * <p><b>为什么必须有这一档</b>：{@code DataFormatter} 会把大数写成科学计数法。实测证据：
+ * <p><b>为什么必须有这一档</b>：DataFormatter 会把大数写成科学计数法。实测证据：
  * 病历导入「接诊时间」列的真实来源是 14 位紧凑数字串（{@code 20221224090613}，类型数值、
- * 格式 General），格式化后变成 {@code 2.02212E+13}，过不了 {@code normalizeDateTime}，
+ * 格式 General），格式化后变成 {@code 2.02212E+13}，过不了 normalizeDateTime，
  * 接诊时间会<b>整列静默变 null</b>（列表接诊时间列 / 就诊月份趋势 / 日期范围筛选 / 去重哈希
  * 一起退化 —— 2026-09-28 的事故形态）。</p>
  *
- * <p>做法：自己走 sheet XML 的事件流（不再经过 {@code XSSFSheetXMLHandler}）——
- * 从 {@code <c>} 取 {@code r}（列引用）与 {@code s}（样式索引），从 {@code <v>} 取<b>原始值</b>，
+ * <p>做法：自己走 sheet XML 的事件流（不再经过 XSSFSheetXMLHandler）——
+ * 从 {@code <c>} 取 r（列引用）与 s（样式索引），从 {@code <v>} 取<b>原始值</b>，
  * 共享字符串按索引回表解析；样式索引回表判断是否日期格式。于是每个单元格同时给出
  * 「原始值」与「能不能当日期用」，调用方按列语义自己决定怎么取，与既有 POI 全量读的
- * {@code cellText} / {@code parseDateTime} 口径一致。</p>
+ * cellText / parseDateTime 口径一致。</p>
  */
 public final class ExcelRawStreamReader {
 
@@ -57,12 +57,12 @@ public final class ExcelRawStreamReader {
                           LocalDateTime dateTime) {
     }
 
-    /** 逐行回调：{@code rowNum} 为 <b>0 基</b>行号（与既有 POI 全量读的 {@code cellText} 同一口径） */
+    /** 逐行回调：rowNum 为 <b>0 基</b>行号（与既有 POI 全量读的 cellText 同一口径） */
     public interface RowHandler {
         void row(int rowNum, List<RawCell> cells);
     }
 
-    /** 只关心前 {@code cols} 列文本时的逐行回调：{@code cells} 定长，空位为 null */
+    /** 只关心前 cols 列文本时的逐行回调：cells 定长，空位为 null */
     public interface TextRowHandler {
         void row(int rowNum, String[] cells);
     }
@@ -71,11 +71,11 @@ public final class ExcelRawStreamReader {
      * 流式读第一个工作表（只支持 .xlsx；.xls 无事件式 API）。
      *
      * <p><b>为什么要先落临时文件</b>：{@code OPCPackage.open(InputStream)} 走的是
-     * {@code ZipInputStreamZipEntrySource}，其内部 {@code ZipArchiveFakeEntry} 会把 zip 条目
+     * ZipInputStreamZipEntrySource，其内部 ZipArchiveFakeEntry 会把 zip 条目
      * <b>整条读进内存</b> —— 既带来 POI 的「单记录 1 亿字节」上限（实测 20 万行即撞：
      * {@code RecordFormatException: Tried to read data but the maximum length for this record type
      * is 100,000,000}），又让 SAX 流式<b>根本没机会生效</b>（还没走到 sheet 解析就被拒）。
-     * 换成 {@code OPCPackage.open(File)} 走 {@code FileZipEntrySource}，才是真正的边读边解析。</p>
+     * 换成 {@code OPCPackage.open(File)} 走 FileZipEntrySource，才是真正的边读边解析。</p>
      */
     public static void forEachXlsxRow(InputStream in, RowHandler handler) throws IOException {
         Path tmp = Files.createTempFile("xlsx-stream-", ".xlsx");
@@ -112,13 +112,13 @@ public final class ExcelRawStreamReader {
     }
 
     /**
-     * 便捷重载：只取前 {@code cols} 列的<b>文本</b>（词典导入这类纯文本表用）。
+     * 便捷重载：只取前 cols 列的<b>文本</b>（词典导入这类纯文本表用）。
      *
-     * <p>取值口径与既有 POI 全量读的 {@code cellText} 一致：字符串给原文并 trim、
+     * <p>取值口径与既有 POI 全量读的 cellText 一致：字符串给原文并 trim、
      * 数值给「整数不带 .0」的十进制串、布尔 / 错误 / 空单元格给 null；缺的列补 null，
-     * 返回数组长度恒为 {@code cols}。</p>
+     * 返回数组长度恒为 cols。</p>
      *
-     * <p>与已删除的格式化文本读取器的差别：这里不过 {@code DataFormatter}，
+     * <p>与已删除的格式化文本读取器的差别：这里不过 DataFormatter，
      * 大数不会变成科学计数法 —— 这正是把两档合并成本类的理由。</p>
      */
     public static void forEachXlsxRow(InputStream in, int cols, TextRowHandler handler) throws IOException {

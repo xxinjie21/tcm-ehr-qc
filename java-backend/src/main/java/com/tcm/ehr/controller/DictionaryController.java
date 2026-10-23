@@ -87,7 +87,7 @@ public class DictionaryController {
     /**
      * 词典写门槛：管理员 / 组织所有者 / 被授权成员（批次 6 工作项 4）。
      *
-     * 与 {@code QcController.requireRuleWrite} 同构：不做成注解，因为它要查 DB 里的
+     * 与 QcController.requireRuleWrite 同构：不做成注解，因为它要查 DB 里的
      * organization_members.can_write_dictionary，注解只能看 JWT 里的 role。
      *
      * ⚠️ 基础层（org_id=''）不在此列 —— 它影响所有组织，只允许管理员直写，见 /import。
@@ -108,8 +108,8 @@ public class DictionaryController {
      * 【权限：登录即可】按标准词与别名模糊匹配。type 必填（缺失会被 Spring 拦成
      * 400「缺少必填参数：type」）；不传 page 返回全部命中，传 page 则分页。
      *
-     * @param scope 词典作用域（前端滑动按钮）：{@code effective} 默认=基础层∪本组织；
-     *              {@code base}=仅系统默认词典；{@code org}=仅本组自有词条。
+     * @param scope 词典作用域（前端滑动按钮）：effective 默认=基础层∪本组织；
+     *              base=仅系统默认词典；org=仅本组自有词条。
      *              <b>输入联想 / 质控下拉不要传 base/org</b> —— 那会给出归一里不生效的词
      */
     @GetMapping("/terms")
@@ -139,8 +139,8 @@ public class DictionaryController {
      *
      * （本地词典不会自动同步回小组基线）。
      *
-     * @param scope {@code org}（默认）= 本组自有词条，这是<b>提案基线</b>（审核走整快照替换组织层）；
-     *              {@code effective} = 基础层 ∪ 本组织，即<b>生效词典</b>。
+     * @param scope org（默认）= 本组自有词条，这是<b>提案基线</b>（审核走整快照替换组织层）；
+     *              effective = 基础层 ∪ 本组织，即<b>生效词典</b>。
      *              两者不是同一个东西，别混用 —— 详见 {@link IDictProposalService#exportBaseline}
      */
     @GetMapping("/baseline/export")
@@ -329,12 +329,12 @@ public class DictionaryController {
  * 提案与当前基线的差异（实时计算，不落表）。
  *
  * <p>【权限】管理员一律可看；基础层提案（{@code org_id=''}）语义上属于全站，按
- * {@code org_id} 等值比较时任何组织都「不等于」它，故单独归入「仅管理员」；
+ * org_id 等值比较时任何组织都「不等于」它，故单独归入「仅管理员」；
  * 其余要求<b>提案自身的 org_id 等于当前组织</b>，且调用者是提交者本人或该组织的组长。</p>
  *
  * <p>⚠️ 只看 {@code isOrgOwner()} 是不够的：它只说明「我在<b>我自己</b>的组织里是组长」，
  * 与目标提案属于哪个组织无关 —— 那样任一组织的组长拿任意提案号就能读到别组的词条快照
- * （2026-10-05 之前审核路径就是这么漏的，见 {@code DictProposalServiceImpl.requireAuditable}；
+ * （2026-10-05 之前审核路径就是这么漏的，见 DictProposalServiceImpl.requireAuditable；
  * diff 是漏网的第三处，2026-10-13 补上）。</p>
  *
  * <p>⚠️ 比对对象必须是 username，不是 userId：submit_user_id 列存的是
@@ -361,7 +361,7 @@ public class DictionaryController {
      * 能否查看某条提案的差异：管理员一律可看；其余要求提案属于当前组织，
      * 且调用者是提交者本人或当前组织的组长。
      *
-     * <p>与 {@code DictProposalServiceImpl.requireAuditable} 的归属判定同一口径，
+     * <p>与 DictProposalServiceImpl.requireAuditable 的归属判定同一口径，
      * 只是把「能否写」换成「能否读」。单独抽方法是为了让边界在测试里可被逐条钉住。</p>
      */
     private boolean canViewProposalDiff(DictProposal p) {

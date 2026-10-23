@@ -80,17 +80,17 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
      * 把范围过滤落到<b>关联病历</b>上：用 {@code record_id IN (SELECT id FROM records WHERE …)}
      * 收窄任务集合，列表与统计共用同一段组装。
      *
-     * <p>为什么是子查询而不是 JOIN：{@code review_tasks} 本身没有科室 / 接诊时间 /
-     * 导入时间列（表见 {@code ReviewTask}），任务的范围只能由关联病历的字段定义；
-     * 而 {@code listTasks} 是高频路径，MyBatis-Plus 的 {@code QueryWrapper} 不便 JOIN，
+     * <p>为什么是子查询而不是 JOIN：review_tasks 本身没有科室 / 接诊时间 /
+     * 导入时间列（表见 ReviewTask），任务的范围只能由关联病历的字段定义；
+     * 而 listTasks 是高频路径，MyBatis-Plus 的 QueryWrapper 不便 JOIN，
      * 子查询让「范围」与「状态 / 数据域」仍在同一个 wrapper 里，口径只有一处。</p>
      *
-     * <p><b>子查询里不再叠加 org 条件</b>：数据域由 {@code review_tasks.org_id} 那层
-     * 负责（管理员看全部时不加），在子查询里再按 {@code records.org_id} 过滤会把
-     * {@code viewAllOrgs} 旁路抵消掉 —— 管理员就会漏看别组导入病历产生的任务。</p>
+     * <p><b>子查询里不再叠加 org 条件</b>：数据域由 review_tasks.org_id 那层
+     * 负责（管理员看全部时不加），在子查询里再按 records.org_id 过滤会把
+     * viewAllOrgs 旁路抵消掉 —— 管理员就会漏看别组导入病历产生的任务。</p>
      *
-     * <p>时间口径与 {@code RecordFilter.applyRange} 逐字相同：两端齐全才生效，
-     * 补 00:00:00 / 23:59:59 保证含首尾两天；department 经 {@code apply} 的
+     * <p>时间口径与 RecordFilter.applyRange 逐字相同：两端齐全才生效，
+     * 补 00:00:00 / 23:59:59 保证含首尾两天；department 经 apply 的
      * {@code {n}} 占位符走参数绑定，不拼字符串（用户输入）。</p>
      */
     private void applyRecordScope(QueryWrapper<ReviewTask> w, FiltersDTO scope) {
@@ -203,13 +203,13 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     /**
      * 人工复核入口（批次 26.4 / 26.e 定案 A）。
      *
-     * <p>归一先于事务：{@code normalizeMap} 要走 ES，若和写库同处一个 {@code @Transactional}，
+     * <p>归一先于事务：normalizeMap 要走 ES，若和写库同处一个 {@code @Transactional}，
      * ES 一慢就会一直占着数据库连接。这里在事务外归一，失败即抛（ES 不可用 → 503）
      * 且一个字节都没写 —— 与原先版本「整单回滚」的用户可见语义一致。
      * 事务内的校验与三段写库见 {@link IReviewWriteService#review}。</p>
      *
-     * <p>归一是为了复核员新输入的词带上 {@code normLevel}：不加的话
-     * {@code QcScorer.countUnnormalized} 会把「无 normLevel」算作未标准化，
+     * <p>归一是为了复核员新输入的词带上 normLevel：不加的话
+     * QcScorer.countUnnormalized 会把「无 normLevel」算作未标准化，
      * 结果是人工修正反而扣分。</p>
      */
     @Override

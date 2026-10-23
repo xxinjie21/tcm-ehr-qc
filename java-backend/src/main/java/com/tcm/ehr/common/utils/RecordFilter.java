@@ -15,20 +15,20 @@ import java.util.Map;
  * <p>所有病历读取（查询 / 原始查看 / 后续图谱等）统一走本工具，禁止在业务方法中手写 where，
  * 避免口径漂移与"筛选条件绕过数据域"的越权。</p>
  *
- * <p><b>数据域 = 课题组（阶段 2）</b>：原本用 {@code grade}（质控结论）当权限维度，现已改为
- * {@code org_id = 当前用户的主组}。{@code grade} 从此只做业务筛选（供应商可选），
+ * <p><b>数据域 = 课题组（阶段 2）</b>：原本用 grade（质控结论）当权限维度，现已改为
+ * {@code org_id = 当前用户的主组}。grade 从此只做业务筛选（供应商可选），
  * 不再影响任何一个人能看到哪些数据。</p>
  *
  * <p>原设计的两个后果正是本次改造的动机：复核通过一份病历后会
  * <b>立刻失去访问它的权限</b>；一次批量重算会<b>批量翻转可见性</b>。</p>
  *
- * <p>⚠️ <b>fail-closed 是本类最关键的一行</b>：{@code orgId} 为空时必须生成<b>返回空集</b>的查询，
+ * <p>⚠️ <b>fail-closed 是本类最关键的一行</b>：orgId 为空时必须生成<b>返回空集</b>的查询，
  * 而不能不加条件 —— 不加条件 = 看到全库 = 最严重的越权。</p>
  */
 public final class RecordFilter {
 
     /**
-     * fail-closed 用的不可能值、与 {@code records.id} 的 UUID 不可能相等。
+     * fail-closed 用的不可能值、与 records.id 的 UUID 不可能相等。
      * 它不是"这个 id 不存在"的东西，而是一个<b>不可能被任何导入数据命中</b>的值。
      */
     private static final String NO_GROUP_SENTINEL = "\u0000__no_group__";
@@ -40,7 +40,7 @@ public final class RecordFilter {
      * 按主组取数据域上下文（就是 {@link #currentOrgId()} 的别名）。
      *
      * <p>为什么不直接用 {@code RequestUtils.currentOrgId()}：这里需要能被单测直接接窗口
-     * 动态传入 orgId（{@code RecordIsolationTest} 就是这么做的），而不是固定读线程上下文。</p>
+     * 动态传入 orgId（RecordIsolationTest 就是这么做的），而不是固定读线程上下文。</p>
      */
     public static String currentOrgId() {
         return RequestUtils.currentOrgId();
@@ -149,7 +149,7 @@ public final class RecordFilter {
     /**
      * 仅未解析过滤：{@code structured_data IS NULL}（缺省/为 false 不加条件）。
      *
-     * <p>列类型是 MySQL {@code JSON}，<b>不能</b>写成 {@code structured_data = ''}（会触发
+     * <p>列类型是 MySQL JSON，<b>不能</b>写成 {@code structured_data = ''}（会触发
      * “Invalid JSON text”，且空串在 JSON 列里本就存不进去）。已解析的记录该列必为一段合法 JSON，
      * 故「未解析 ⇔ IS NULL」。</p>
      */
@@ -163,7 +163,7 @@ public final class RecordFilter {
      * 仅未清洗：{@code governed = 0}。
      *
      * <p>清洗是数分钟级的重活，但通常只有新增/新解析的病历需要清洗；
-     * 不加本条件每次都在全范围重跑。{@code governed} 由清洗完成时置 1（含「跳过归一」那类）。</p>
+     * 不加本条件每次都在全范围重跑。governed 由清洗完成时置 1（含「跳过归一」那类）。</p>
      */
     private static void andOnlyUncleaned(QueryWrapper<Record> wrapper, Boolean onlyUncleaned) {
         if (Boolean.TRUE.equals(onlyUncleaned)) {
@@ -197,7 +197,7 @@ public final class RecordFilter {
     /**
      * 查询前的越权自检：当前用户是否能看这条病历。
      *
-     * <p>用于 {@code selectById} 类“查后校验”的路径（它们不能用 wrapper）。</p>
+     * <p>用于 selectById 类“查后校验”的路径（它们不能用 wrapper）。</p>
      *
      * @return true = 可访问；false = 不可访问（调用方应返回 404，不泄露"存在但看不到"）
      */
@@ -251,12 +251,12 @@ public final class RecordFilter {
     }
 
     /**
-     * 把范围条件拼成审计用的一行，给 {@code OperationLog.target} 用。
+     * 把范围条件拼成审计用的一行，给 OperationLog.target 用。
      *
      * <p>批量操作（数据清洗 / 数据集导出被拒 / 批量解析 / 批量重算）原来一律传 {@code null}，
      * 日志页「操作对象」列恒空，事后追责看不出那次操作动了哪个范围（审查报告 M4）。</p>
      *
-     * @param filters {@link FiltersDTO}，或 stats 契约里的 {@code Map}（两种都要支持：
+     * @param filters {@link FiltersDTO}，或 stats 契约里的 Map（两种都要支持：
      * 导出走 Map、其余走 DTO）
      * @return 如「科室＝中医内科 · 分级＝待复核 · 2026-09-01 至 2026-09-30」；无条件时返回「全部病历」
      */
@@ -323,7 +323,7 @@ public final class RecordFilter {
     }
 
     /**
-     * 数据域落在 {@code org_id} 列上的取值（即当前主组）。
+     * 数据域落在 org_id 列上的取值（即当前主组）。
      *
      * <p>给 QueryWrapper 表达不了的聚合 SQL 用 —— Mapper 里以
      * {@code WHERE (#{orgId} IS NULL OR org_id = #{orgId})} 落地。
@@ -356,7 +356,7 @@ public final class RecordFilter {
     /**
      * 聚合专用：只出 WHERE 口径，**不追加排序键**。
      *
-     * <p>为什么单独开一个入口：看板词频已下沉到 SQL 侧（{@code JSON_TABLE} + {@code GROUP BY}，
+     * <p>为什么单独开一个入口：看板词频已下沉到 SQL 侧（JSON_TABLE + {@code GROUP BY}，
      * 性能审查 P0-3#3），而 {@code ORDER BY} 与 {@code GROUP BY} 在同一层不能共存 ——
      * 排序条件留在 wrapper 里会让 {@code ${ew.customSqlSegment}} 拼出非法 SQL。</p>
      *
@@ -376,7 +376,7 @@ public final class RecordFilter {
      *
      * <p>与 2 参重载的唯一差别是「看全部」由调用方显式传入，而不是现读
      * {@link RequestUtils#viewAllOrgs()}。原因同 {@link #buildWithinOrg}：后台线程里
-     * {@code viewAllOrgs()} 恒为 false（读不到 {@code RequestContextHolder}），
+     * {@code viewAllOrgs()} 恒为 false（读不到 RequestContextHolder），
      * 若在后台按它构建条件，管理员视角的数据域会悄悄退化成「只看本组」，算出错误结果。
      * 故调用方必须在<b>提交线程</b>把该标记捕获下来，再交给后台重算。</p>
      */
@@ -450,10 +450,10 @@ public final class RecordFilter {
     /**
      * 时间区间条件：两端齐全才生效（缺一端当没给），补全时分秒保证含首尾两天。
      *
-     * <p>{@code visit_time}（接诊时间）与 {@code create_time}（导入时间）两个维度的判据逐字相同、
+     * <p>visit_time（接诊时间）与 create_time（导入时间）两个维度的判据逐字相同、
      * 只是列名不同，两条 build 路径原本各写两遍，收敛到此处（审查报告 §2.4）。</p>
      *
-     * @param column 目标列名（{@code visit_time} / {@code create_time}）
+     * @param column 目标列名（visit_time / create_time）
      * @param range  [开始日期, 结束日期]（yyyy-MM-dd），可为 null
      */
     private static void applyRange(QueryWrapper<Record> wrapper, String column, List<String> range) {
