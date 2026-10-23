@@ -184,6 +184,15 @@ public class OrgController {
         return Result.ok(orgService.members(id));
     }
 
+    /**
+     * 把用户加入本组织。
+     *
+     * 【权限：所有者（本组织）】只接受已存在的用户；重复加入无副作用。
+     *
+     * @param id   组织 ID
+     * @param body 待加入的用户 ID
+     * @return 固定成功
+     */
     @RequireOrgRole(value = "owner", pathVar = "id")
     @PostMapping({"/api/orgs/{id}/members", "/api/groups/{id}/members"})
     public Result<Void> addMember(@PathVariable String id, @Valid @RequestBody OrgDTOs.AddMemberRequest body) {
@@ -191,6 +200,15 @@ public class OrgController {
         return Result.ok("已加入", null);
     }
 
+    /**
+     * 把成员移出本组织。
+     *
+     * 【权限：所有者（本组织）】移除会写审计日志；对不存在的成员调用无副作用。
+     *
+     * @param id     组织 ID
+     * @param userId 待移除的用户 ID
+     * @return 固定成功
+     */
     @RequireOrgRole(value = "owner", pathVar = "id")
     @DeleteMapping({"/api/orgs/{id}/members/{userId}", "/api/groups/{id}/members/{userId}"})
     public Result<Void> removeMember(@PathVariable String id, @PathVariable String userId) {
@@ -199,6 +217,16 @@ public class OrgController {
         return Result.ok("已移除", null);
     }
 
+    /**
+     * 把所有者身份转让给指定成员。
+     *
+     * 【权限：所有者（本组织）】转让后原 owner 降为普通成员；新 owner 必须已是本组织成员。
+     *
+     * @param id     组织 ID
+     * @param userId 当前操作用户 ID（路径参数，仅用于路由）
+     * @param body   新所有者用户 ID
+     * @return 固定成功
+     */
     @RequireOrgRole(value = "owner", pathVar = "id")
     @PutMapping({"/api/orgs/{id}/members/{userId}/transfer-owner", "/api/groups/{id}/members/{userId}/transfer-owner"})
     public Result<Void> transferOwner(@PathVariable String id, @PathVariable String userId,
@@ -225,6 +253,14 @@ public class OrgController {
         return Result.ok("权限已更新", null);
     }
 
+    /**
+     * 退出本组织。
+     *
+     * 【权限：所有者（本组织）】所有者退出前须先转让所有权，否则组织会陷入无人可管。
+     *
+     * @param id 组织 ID
+     * @return 固定成功
+     */
     @RequireOrgRole(value = "owner", pathVar = "id")
     @PostMapping({"/api/orgs/{id}/leave", "/api/groups/{id}/leave"})
     public Result<Void> leave(@PathVariable String id) {
