@@ -204,8 +204,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
         // 3. 回写评分字段与 qc_results（留档可溯源）
         String status = switch (vo.getGrade()) {
-            case "合格" -> "completed";
-            case "待复核" -> "reviewing";
+            case QcScorer.GRADE_QUALIFIED -> "completed";
+            case QcScorer.GRADE_PENDING -> "reviewing";
             default -> "invalid";
         };
         baseMapper.updateScoreFields(r.getId(), vo.getScore(), vo.getGrade(), status,
@@ -216,8 +216,8 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
 
         // 5. 计入分级统计
         switch (vo.getGrade()) {
-            case "合格" -> result.setQualified(result.getQualified() + 1);
-            case "待复核" -> result.setPendingReview(result.getPendingReview() + 1);
+            case QcScorer.GRADE_QUALIFIED -> result.setQualified(result.getQualified() + 1);
+            case QcScorer.GRADE_PENDING -> result.setPendingReview(result.getPendingReview() + 1);
             default -> result.setInvalid(result.getInvalid() + 1);
         }
     }
@@ -237,7 +237,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      */
     private void upsertReviewTask(Record r, ScoreResultVO vo) {
         LocalDateTime now = LocalDateTime.now().withNano(0);
-        if ("待复核".equals(vo.getGrade())) {
+        if (QcScorer.GRADE_PENDING.equals(vo.getGrade())) {
             // 1. 原子 upsert：已有活跃行就刷新，没有就新建。
             //    时限在 Java 侧按「N 个工作日（跳周末）」算好再传：原先写死在 SQL 里
             //    用 INTERVAL 7 DAY，是自然日，与 DDL 注释、seed 脚本、设计文档的

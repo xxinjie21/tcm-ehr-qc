@@ -1,5 +1,6 @@
 package com.tcm.ehr.service.impl;
 
+import com.tcm.ehr.common.utils.QcScorer;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
@@ -67,7 +68,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         // 批次9：worklist「只需我处理」= 已超期且仍待复核的任务（最该先做的那批）。
         // 过滤必须落在 SQL 层：前端过滤只作用于当前页。overdueOnly 优先于 status 入参。
         if (Boolean.TRUE.equals(overdueOnly)) {
-            w.eq("status", dbStatus("待复核"));
+            w.eq("status", dbStatus(QcScorer.GRADE_PENDING));
             w.lt("deadline_time", LocalDateTime.now());
         }
         applyRecordScope(w, scope);
@@ -131,9 +132,9 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
     @Override
     public ReviewStatsVO countStats(FiltersDTO scope) {
         ReviewStatsVO vo = new ReviewStatsVO();
-        vo.setPending(countOf("待复核", false, scope));
+        vo.setPending(countOf(QcScorer.GRADE_PENDING, false, scope));
         vo.setDone(countOf("已完成", false, scope));
-        vo.setOverdue(countOf("待复核", true, scope));
+        vo.setOverdue(countOf(QcScorer.GRADE_PENDING, true, scope));
         return vo;
     }
 
@@ -248,7 +249,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewTaskMapper, ReviewTask>
         }
         // 2. 中英文都收：页面传中文、历史数据是英文，两种都要归一到库里的值
         return switch (status) {
-            case "待复核", "pending" -> "pending";
+            case QcScorer.GRADE_PENDING, "pending" -> "pending";
             case "已完成", "completed" -> "completed";
             default -> status;
         };
