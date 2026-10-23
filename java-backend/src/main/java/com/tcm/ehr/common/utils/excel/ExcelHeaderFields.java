@@ -1,4 +1,4 @@
-package com.tcm.ehr.service.impl;
+package com.tcm.ehr.common.utils.excel;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -14,10 +14,10 @@ import java.util.Map;
  * 「证型 → pattern（兼容旧表头）」这一条是有意的：同一字段在历史表里有两种列名，
  * 不兼容的话旧数据会整列读不到。
  */
-final class ExcelHeaderFields {
+public final class ExcelHeaderFields {
 
     /** 构建期填充、完成后不可变（与 EntityTypes 同做法） */
-    static final Map<String, String> MAP;
+    public static final Map<String, String> MAP;
 
     static {
         Map<String, String> header = new LinkedHashMap<>();

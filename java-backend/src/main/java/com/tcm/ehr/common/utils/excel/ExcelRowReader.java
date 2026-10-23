@@ -1,4 +1,4 @@
-package com.tcm.ehr.service.impl;
+package com.tcm.ehr.common.utils.excel;
 
 import com.tcm.ehr.common.utils.ExcelRawStreamReader;
 import com.tcm.ehr.common.utils.TextUtil;
@@ -16,13 +16,13 @@ import java.util.Map;
  * 两条路径的取值口径必须一致（字符串 trim、数值整数不带 .0、日期按类型或文本解析）。
  * 若各写一份映射，迟早出现「xlsx 导入少一列、xls 正常」这类只在某种格式下复现的问题。
  */
-final class ExcelRowReader {
+public final class ExcelRowReader {
 
     private ExcelRowReader() {
     }
 
     /** 一行怎么取值：按列号取文本 / 取接诊时间 */
-    interface RowAccess {
+    public interface RowAccess {
         /** 按列号取文本（与 {@link ExcelCellParser#cellText} 同口径） */
         String text(int col);
 
@@ -31,7 +31,7 @@ final class ExcelRowReader {
     }
 
     /** POI 行适配器 */
-    static RowAccess of(Row row) {
+    public static RowAccess of(Row row) {
         return new RowAccess() {
             @Override
             public String text(int col) {
@@ -46,7 +46,7 @@ final class ExcelRowReader {
     }
 
     /** 流式行适配器：RawCell 同时带原始值与「是不是日期」，日期列因此不会退化成文本 */
-    static RowAccess of(List<ExcelRawStreamReader.RawCell> cells) {
+    public static RowAccess of(List<ExcelRawStreamReader.RawCell> cells) {
         // P2-6：列号 → 单元格 一次遍历建成。原先每次取值都线性扫一遍 cells，
         // 一行 21 列、每列最多取两次（text + dateTime）≈ 二十多次线性扫描/行 ——
         // 4 万行就是近百万次扫描。列号可任意（空列会被跳过），故按 Map 存而不是按数组下标。

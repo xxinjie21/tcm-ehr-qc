@@ -1,4 +1,4 @@
-package com.tcm.ehr.service.impl;
+package com.tcm.ehr.common.utils.excel;
 
 import com.tcm.ehr.common.utils.TextUtil;
 import org.apache.poi.ss.usermodel.Cell;
@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  * 认不出来的一律返回 null（而不是给一个「看起来合法」的时间）：宁可缺接诊时间，
  * 也不要让整行导入失败，更不要把错误时间写进病历。
  */
-final class ExcelCellParser {
+public final class ExcelCellParser {
 
     /** 与 normalizeDateTime 的输出同形；断言归一结果必须能被它解析，否则等于白归一 */
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -49,12 +49,12 @@ final class ExcelCellParser {
      * 与搬家前的写法**逐字等价**（包括「解析失败抛异常」这一点），
      * 而不是换成「返回 null」的版本，那会悄悄改掉调用方的错误处理。
      */
-    static DateTimeFormatter formatter() {
+    public static DateTimeFormatter formatter() {
         return DT;
     }
 
     /** 接诊时间：支持 Excel 日期数值、紧凑数字串与常见字符串格式；认不出来给 null */
-    static LocalDateTime parseDateTime(Cell cell) {
+    public static LocalDateTime parseDateTime(Cell cell) {
         // 1. 空单元格给 null
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             return null;
@@ -78,7 +78,7 @@ final class ExcelCellParser {
     }
 
     /** 把「接诊时间」单元格文本归一为 {@code yyyy-MM-dd HH:mm:ss}（详见类注释） */
-    static String normalizeDateTime(String raw) {
+    public static String normalizeDateTime(String raw) {
         // 1. 去首尾空白、ISO 的 T 换空格、连续空白压成一个
         String s = WS.matcher(raw.trim().replace('T', ' ')).replaceAll(" ");
         // 2. 纯数字紧凑串：8 位到日 / 12 位到分 / 14 位到秒
@@ -124,7 +124,7 @@ final class ExcelCellParser {
      * 词典导入原本自己写了一份，两份在 BOOLEAN（这里给 "true"/"false"，那份落 default 给 null）
      * 与 FORMULA 上不一致 —— 同一个 .xlsx 从不同页面导入会读出不同的文本。
      */
-    static String cellText(Cell cell) {
+    public static String cellText(Cell cell) {
         // 1. 空单元格给 null
         if (cell == null) {
             return null;

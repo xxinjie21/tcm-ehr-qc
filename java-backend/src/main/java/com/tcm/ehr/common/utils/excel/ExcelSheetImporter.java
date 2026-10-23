@@ -1,4 +1,4 @@
-package com.tcm.ehr.service.impl;
+package com.tcm.ehr.common.utils.excel;
 
 import com.tcm.ehr.common.utils.ExcelRawStreamReader;
 import com.tcm.ehr.common.utils.TextUtil;
@@ -26,7 +26,7 @@ import java.util.Set;
  * 这是原代码刻意的设计，搬过来时一并保留：若各写一份，迟早出现「xlsx 导入少一列、xls 正常」
  * 这类只在某种格式下复现的问题。
  */
-final class ExcelSheetImporter {
+public final class ExcelSheetImporter {
 
     /** 单文件上限；放在这里而不是服务类里，因为它属于「读文件」这件事本身 */
     static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
@@ -43,7 +43,7 @@ final class ExcelSheetImporter {
      * 「20 × 50MB ≈ 1GB」这条输入路径封死，26.3 的真正边界是行数而非总字节；
      * POI 自带的 ZipSecureFile.minInflateRatio（默认 0.01）已覆盖 zip 膨胀。
      */
-    static final int MAX_ROWS = 50000;
+    public static final int MAX_ROWS = 50000;
 
     /**
      * 是否已达行数上限；到达即记一条**文件级**失败并返回 true。
@@ -53,7 +53,7 @@ final class ExcelSheetImporter {
      * 与「文件为空 / 单文件超过 50MB」同类；也绝不静默截断 —— 静默截断会让用户
      * 以为整份文件都进来了。
      */
-    static boolean rowLimitReached(ImportSummaryVO summary, String filename) {
+    public static boolean rowLimitReached(ImportSummaryVO summary, String filename) {
         if (summary.getTotal() < MAX_ROWS) {
             return false;
         }
@@ -79,7 +79,7 @@ final class ExcelSheetImporter {
      * 其余（{@code .xls}）走 POI 全量读。两条路径共用 {@link ExcelRowReader} 与
      * {@link #processRow}，所以列映射口径一致。
      */
-    static void importFile(MultipartFile file, ImportSummaryVO summary, List<Object[]> parsedRows,
+    public static void importFile(MultipartFile file, ImportSummaryVO summary, List<Object[]> parsedRows,
                            Set<String> batchRegNos) {
         String filename = file.getOriginalFilename() == null ? "未命名文件" : file.getOriginalFilename();
         if (file.isEmpty()) {
@@ -293,7 +293,7 @@ final class ExcelSheetImporter {
      * @param rawVisit 该行「接诊时间」列的原文本（可为空）
      * @throws IllegalArgumentException 有原值但解析失败时抛出
      */
-    static void requireParsedVisitTime(Record r, String rawVisit) {
+    public static void requireParsedVisitTime(Record r, String rawVisit) {
         if (r.getVisitTime() == null && !TextUtil.isBlank(rawVisit)) {
             throw new IllegalArgumentException("接诊时间无法解析：「" + rawVisit.trim() + "」");
         }
@@ -336,7 +336,7 @@ final class ExcelSheetImporter {
      *
      * 与 {@link #mapRow} 同一套字段口径，只是数据源从 Excel 行换成前端回传的键值表。
      */
-    static Record fromFields(Map<String, String> f) {
+    public static Record fromFields(Map<String, String> f) {
         Record r = new Record();
         r.setRegistrationNo(f.get("registrationNo"));
         r.setOutpatientNo(f.get("outpatientNo"));
