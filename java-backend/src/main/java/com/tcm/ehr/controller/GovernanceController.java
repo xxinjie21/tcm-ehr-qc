@@ -89,7 +89,7 @@ public class GovernanceController {
     /**
      * 提交数据清洗任务（异步）。
      *
-     * <p>提交即返回任务 ID，进度走 {@code GET /api/governance/clean/batch/{id}}，
+     * <p>【权限：登录即可】提交即返回任务 ID，进度走 {@code GET /api/governance/clean/batch/{id}}，
      * 取消走 {@code POST /api/governance/clean/batch/{id}/cancel}。
      * 相比同步接口：可看真实进度、可中途停止、关页面不影响执行。</p>
      *
@@ -100,7 +100,14 @@ public class GovernanceController {
         return Result.ok("已提交，后台清洗中", cleanBatchService.submit(dto));
     }
 
-    /** 查清洗任务进度 */
+    /**
+     * 查清洗任务进度。
+     *
+     * 【权限：登录即可】只读，不改变任务状态；任务不存在时返回空体而非 404。
+     *
+     * @param id 清洗任务 ID
+     * @return 任务的 done/total/success/failed 与当前状态
+     */
     @GetMapping("/governance/clean/batch/{id}")
     public Result<CleanTaskVO> cleanBatchStatus(@PathVariable String id) {
         return Result.ok(cleanBatchService.status(id));
@@ -115,7 +122,7 @@ public class GovernanceController {
     /**
      * 请求取消清洗任务。
      *
-     * <p>只发取消信号，终态由执行方落 —— 见 {@code CleanBatchService#cancel} 的注释。</p>
+     * <p>【权限：登录即可】只发取消信号，终态由执行方落 —— 见 {@code CleanBatchService#cancel} 的注释。</p>
      */
     @PostMapping("/governance/clean/batch/{id}/cancel")
     public Result<CleanTaskVO> cancelCleanBatch(@PathVariable String id) {
