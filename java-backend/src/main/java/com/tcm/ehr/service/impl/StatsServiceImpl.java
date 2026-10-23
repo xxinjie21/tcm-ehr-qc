@@ -36,8 +36,21 @@ import java.util.TreeMap;
 @RequiredArgsConstructor
 public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implements IStatsService {
 
-    /** 评分分布桶（固定顺序） */
-    private static final List<String> SCORE_BUCKETS = List.of("90+", "80-89", "70-79", "60-69", "60以下");
+    /**
+     * 评分分布桶：降序固定顺序，最后一项为兜底桶（低于所有阈值时落入）。
+     *
+     * 注意：桶名即前端分布图轴标签，改动需同步前端；长度必须恒为 BUCKET_MIN 长度 + 1。
+     */
+    private static final List<String> SCORE_BUCKETS =
+            List.of("90+", "80-89", "70-79", "60-69", "60以下");
+
+    /**
+     * 各分桶的分数下限，降序排列，与 SCORE_BUCKETS 的前 N 项一一对应。
+     *
+     * 约束：BUCKET_MIN.length 必须等于 SCORE_BUCKETS.size() - 1（最后一项是兜底桶，无下限）。
+     * 与 SCORE_BUCKETS 拆开维护会失去这条约束的编译期保护，故两者必须相邻定义、同步修改。
+     */
+    private static final int[] BUCKET_MIN = {90, 80, 70, 60};
 
     /** 词频 TopN */
     private static final int TOP_N = 10;
@@ -401,14 +414,19 @@ public class StatsServiceImpl extends ServiceImpl<RecordMapper, Record> implemen
         return total == 0 ? 0.0 : Math.round(part * 1000.0 / total) / 10.0;
     }
 
-    /** 评分落入哪个分桶（前端分布图按固定顺序展示） */
+    /**
+     * 评分落入哪个分桶。
+     *
+     * 按 BUCKET_MIN 降序匹配：命中第 i 个阈值即取 SCORE_BUCKETS 第 i 项；
+     * 全部未命中则落最后一项（兜底桶）。
+     */
     private static String bucketOf(int score) {
-        // 1. 从高到低匹配，前端按固定桶顺序画分布图
-        if (score >= 90) return "90+";
-        if (score >= 80) return "80-89";
-        if (score >= 70) return "70-79";
-        if (score >= 60) return "60-69";
-        return "60以下";
+        for (int i = 0; i < BUCKET_MIN.length; i++) {
+            if (score >= BUCKET_MIN[i]) {
+                return SCORE_BUCKETS.get(i);
+            }
+        }
+        return SCORE_BUCKETS.get(SCORE_BUCKETS.size() - 1);
     }
 
     /** 本请求的组织数据域：管理员 = null（不限），其余身份 = 当前组织 ID */
