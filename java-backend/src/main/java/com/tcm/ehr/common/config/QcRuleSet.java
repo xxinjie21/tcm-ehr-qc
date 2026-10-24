@@ -71,7 +71,7 @@ public class QcRuleSet {
      * 兜底范围共用这一份，避免三处各写一张清单造成漂移。
      */
     public static final List<String> DEFAULT_NORMALIZATION_TYPES = List.of(
-            "disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse", "cause", "treatment");
+            "disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse", "cause");
 
     private Completeness completeness = new Completeness();
     private List<FormatRule> format = new ArrayList<>();
@@ -152,7 +152,7 @@ public class QcRuleSet {
     @Data
     public static class Standardization {
         private boolean enabled = true;
-        /** 术语类型：disease/pattern/symptom/herb/formula/tongue/pulse/cause/treatment */
+        /** 术语类型：disease/pattern/symptom/herb/formula/tongue/pulse/cause */
         private List<String> elementTypes = new ArrayList<>();
         /** 每个未命中词典的实体扣分 */
         private int weightEach = 1;

@@ -11,7 +11,7 @@ import java.util.Set;
  * 实体类型目录：结构化解析 / 术语词典 / 质控规则 三模块的单一来源。
  *
  * 唯一权威是 {@link #all()}：固定 9 类（对齐 NLP 可抽取的实体）。
- * 9 类均有独立词典（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法）——病因词典
+ * 8 类均有独立词典（疾病/证候/症状/中药/方剂/舌象/脉象/病因）——病因词典
  * （causes.json）与其余 8 类同时到位，故 {@code dictKeys()} 现为 9 类。
  * 不落盘、不做用户自定义——词典范围限定在 NLP 能提取的实体。
  *
@@ -29,8 +29,8 @@ import java.util.Set;
 public final class EntityTypes {
 
     /**
-     * @param key           类型标识（disease/pattern/symptom/herb/formula/tongue/pulse/cause/treatment）
-     * @param label         中文名（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法）
+     * @param key           类型标识（disease/pattern/symptom/herb/formula/tongue/pulse/cause）
+     * @param label         中文名（疾病/证候/症状/中药/方剂/舌象/脉象/病因）
      * @param structuredKey structured_data 中的字段名（diseases/patternList/…）
      * @param dict          是否有独立术语词典（可归一）
      * @param fileName      词典文件名（无词典为 null）
@@ -42,11 +42,11 @@ public final class EntityTypes {
     }
 
     // rawFields = 该类型的「专属原文来源列」。空列表不等于「抽不出来」：
-    // 模型是对 NlpTextComposer 拼出的**整段文本**做 NER，只要方剂/治法的字样出现在
+    // 模型是对 NlpTextComposer 拼出的**整段文本**做 NER，只要方剂的字样出现在
     // 任一已拼入的列里，模型的「方剂」标签仍会命中（python-nlp 的 LABEL_FIELD 有此标签）。
     // 空列表只表示「没有哪一列是专门给它准备的」——所以下面这两个别当成坏配置去补源：
     // 本数据集 prescription 列是纯中药清单（无方剂名）、也没有「治以…」文本，
-    // 方剂/治法恒空是数据如此，不是接线问题。
+    // 方剂恒空是数据如此，不是接线问题。
     private static final List<EntityType> ALL = List.of(
             new EntityType("disease", "疾病", "diseases", true, "diseases.json",
                     List.of("tcmDiagnosis", "westernDiagnosis"), 1),
@@ -58,7 +58,7 @@ public final class EntityTypes {
                     List.of("prescription"), 4),
             new EntityType("formula", "方剂", "formulaList", true, "formulas.json",
                     List.of(), 5),
-            // 舌象/脉象/治法自批次 20 起有词典（此前 dict=false）：
+            // 舌象/脉象自批次 20 起有词典（此前 dict=false）：
             // 子要素先由 python-nlp 按标点分段抽成独立段（舌质/舌苔/齿痕/裂纹、
             // 脉位与脉象分开），再归一；抽不到或词表未收录的段保留原文。
             // 是否把这三类计入「未归一扣分」由规则集的 standardization.elementTypes 决定
@@ -68,9 +68,7 @@ public final class EntityTypes {
             new EntityType("pulse", "脉象", "pulseList", true, "pulses.json",
                     List.of("pulse"), 7),
             new EntityType("cause", "病因", "causeList", true, "causes.json",
-                    List.of(), 8),
-            new EntityType("treatment", "治法", "treatmentList", true, "treatments.json",
-                    List.of(), 9)
+                    List.of(), 8)
     );
 
     // P5.4：构建期用临时可变表，构建完即包成 unmodifiable 后赋给 final 字段，
@@ -126,7 +124,7 @@ public final class EntityTypes {
     }
 
     /**
-     * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/病因/治法，顺序稳定，共 9 类）。
+     * 有词典的类型 key 集合（疾病/证候/症状/中药/方剂/舌象/脉象/病因，顺序稳定，共 8 类）。
      *
      * 这 9 类即「规则配置」弹窗里术语归一 / 术语标准化可勾选的范围；实际生效范围
      * 由规则集的 normalization.elementTypes（归一）与 standardization.elementTypes

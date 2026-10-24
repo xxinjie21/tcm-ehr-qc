@@ -22,7 +22,7 @@ import static org.mockito.Mockito.mock;
  * 术语归一的「范围」口径：
  *
  * <ul>
- *   <li>出厂默认范围 = 9 类（含病因；病因只归一、不计分）；</li>
+ *   <li>出厂默认范围 = 8 类（含病因；病因只归一、不计分）；</li>
  *   <li>{@link QcRuleStore} 无行时回退默认（不回退成 null / 空）；</li>
  *   <li>{@code QcScorer} 的未归一扣分范围 = 质控勾选 ∩ 归一勾选（未开归一的类型不计）。</li>
  * </ul>
@@ -39,14 +39,13 @@ class NormalizationScopeTest {
     }
 
     @Test
-    @DisplayName("出厂默认归一范围是 9 类，且含病因")
+    @DisplayName("出厂默认归一范围是 8 类，且含病因")
     void defaultNormalizationIncludesCause() {
         QcRuleSet r = QcRuleSet.defaults();
         assertNotNull(r.getNormalization(), "defaults() 必须带 normalization 块");
         Set<String> types = Set.copyOf(r.getNormalization().getElementTypes());
-        assertEquals(9, types.size());
+        assertEquals(8, types.size());
         assertTrue(types.contains("disease"));
-        assertTrue(types.contains("treatment"));
         assertTrue(types.contains("cause"),
                 "病因词典（causes.json）已建全，默认纳入归一范围");
     }
@@ -74,7 +73,7 @@ class NormalizationScopeTest {
         QcRuleSet r = QcRuleSet.defaults();
         // 归一范围里移除病因（模拟用户取消勾选），此时即便质控勾了病因也不计分
         r.getNormalization().setElementTypes(new ArrayList<>(
-                List.of("disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse", "treatment")));
+                List.of("disease", "pattern", "symptom", "herb", "formula", "tongue", "pulse")));
         r.getStandardization().setElementTypes(new ArrayList<>(List.of("symptom", "cause")));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("symptoms", List.of(ent("腰酸痛", null)));

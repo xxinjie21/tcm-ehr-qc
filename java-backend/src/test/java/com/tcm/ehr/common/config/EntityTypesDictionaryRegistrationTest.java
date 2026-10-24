@@ -27,12 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  *
  * 要守住三件事：① 舌象/脉象/治法/病因确实有词典且文件名对得上磁盘；② 目录自身仍然自洽
- * （key/structuredKey 不重复、顺序稳定）；③ 9 类均有词典（{@code dictKeys()} 是派生视图）。
+ * （key/structuredKey 不重复、顺序稳定）；③ 8 类均有词典（{@code dictKeys()} 是派生视图）。
  */
 class EntityTypesDictionaryRegistrationTest {
 
     /** 批次 20 新增词典的三个类型 */
-    private static final List<String> NEW_DICT_TYPES = List.of("tongue", "pulse", "treatment");
+    private static final List<String> NEW_DICT_TYPES = List.of("tongue", "pulse");
 
     @Test
     @DisplayName("舌象/脉象/治法已标记为有词典，且文件名非空")
@@ -51,7 +51,6 @@ class EntityTypesDictionaryRegistrationTest {
     void fileNamesMatchKeys() {
         assertEquals("tongues.json", EntityTypes.fileNameOf("tongue"));
         assertEquals("pulses.json", EntityTypes.fileNameOf("pulse"));
-        assertEquals("treatments.json", EntityTypes.fileNameOf("treatment"));
         assertEquals("causes.json", EntityTypes.fileNameOf("cause"));
     }
 
@@ -70,7 +69,6 @@ class EntityTypesDictionaryRegistrationTest {
         // EntityNormalizer.dictionaryType 就是走这条反查；查不到则舌脉不会走归一
         assertEquals("tongue", EntityTypes.dictTypeByStructuredKey("tongueList").key());
         assertEquals("pulse", EntityTypes.dictTypeByStructuredKey("pulseList").key());
-        assertEquals("treatment", EntityTypes.dictTypeByStructuredKey("treatmentList").key());
     }
 
     @Test
@@ -85,10 +83,10 @@ class EntityTypesDictionaryRegistrationTest {
     }
 
     @Test
-    @DisplayName("实体类型仍是 9 类，且 9 类均有词典（病因已补上）")
+    @DisplayName("实体类型仍是 8 类，且 8 类均有词典（治法无抽取通路已移除）")
     void stillNineTypes() {
-        assertEquals(9, EntityTypes.all().size());
-        assertEquals(9, EntityTypes.dictKeys().size(), "9 类均有词典（病因已补）");
+        assertEquals(8, EntityTypes.all().size());
+        assertEquals(8, EntityTypes.dictKeys().size(), "8 类均有词典（治法已移除）");
     }
 
     @Test

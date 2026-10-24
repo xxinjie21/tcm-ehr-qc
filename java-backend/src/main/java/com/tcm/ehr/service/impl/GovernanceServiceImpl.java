@@ -576,7 +576,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
         // 1. 本组织归一范围：范围外的类型不做词形归一（仍走去重），与「无独立词典」同一处理
         Set<String> scope = normScope();
         for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
-                "causeList", "treatmentList", "formulaList")) {
+                "causeList", "formulaList")) {
             if (!(data.get(key) instanceof List<?> list)) continue;
             String type = mapEntityType(key);
             // 2. 有词典、且在本组织归一范围内的才做词形归一；其余只走去重
@@ -1034,7 +1034,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
     @SuppressWarnings("unchecked")
     private static void collectReplacements(Map<String, Object> data, Map<String, String> table) {
         for (String key : List.of("diseases", "symptoms", "tongueList", "pulseList", "patternList",
-                "causeList", "treatmentList", "formulaList")) {
+                "causeList", "formulaList")) {
             collectPairs(data.get(key), "content", table);
         }
         collectPairs(data.get("herbs"), "name", table);

@@ -41,7 +41,7 @@ public class AiServiceImpl implements IAiService {
     /** structuredData 的 9 类实体（含 herbs） */
     private static final List<String> LIST_KEYS = List.of(
             "diseases", "symptoms", "tongueList", "pulseList", "patternList",
-            "causeList", "treatmentList", "formulaList", "herbs");
+            "causeList", "formulaList", "herbs");
 
     /** 病历只读表：按统一口径命名为 baseMapper（附录 A.1 #21） */
     private final RecordMapper baseMapper;

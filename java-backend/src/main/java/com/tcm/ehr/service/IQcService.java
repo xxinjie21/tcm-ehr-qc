@@ -37,7 +37,7 @@ public interface IQcService extends IService<Record> {
     /**
      * 逻辑一致性检查。
      *
-     * @param dto patternList/treatmentList/formulaList 待判定要素
+     * @param dto patternList/formulaList 待判定要素
      * @return conflicts=冲突描述；consistent=是否无冲突
      */
     LogicCheckVO checkLogic(LogicCheckDTO dto);

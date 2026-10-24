@@ -68,7 +68,7 @@ public class QcController {
      *
      * 【权限：登录即可】按当前规则表判定，规则未覆盖的要素不判冲突。
      *
-     * @param dto patternList/treatmentList/formulaList 待判定的要素
+     * @param dto patternList/formulaList 待判定的要素
      * @return conflicts=冲突描述；consistent=是否无冲突
      */
     @PostMapping("/check/logic")

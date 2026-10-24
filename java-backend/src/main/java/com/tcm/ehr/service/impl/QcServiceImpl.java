@@ -125,7 +125,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
      * ⚠️ 中药的 map key 必须是 herbs（= EntityTypes 里 herb 的 structuredKey），
      * 写成 herbList（DTO 的属性名）会让「证候 → 中药」规则永远取不到值。
      *
-     * @param dto 含 patternList / treatmentList / formulaList / herbList 的检查请求，可为 null
+     * @param dto 含 patternList / formulaList / herbList 的检查请求，可为 null
      * @return 冲突清单及「是否一致」标志（冲突为空即一致）
      */
     @Override
@@ -134,7 +134,6 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
         Map<String, Object> data = new java.util.LinkedHashMap<>();
         if (dto != null) {
             data.put("patternList", dto.getPatternList());
-            data.put("treatmentList", dto.getTreatmentList());
             data.put("formulaList", dto.getFormulaList());
             data.put("herbs", dto.getHerbList());
         }

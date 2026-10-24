@@ -233,7 +233,6 @@ public class EntityNormalizer {
         writeBack(data, "pulseList", vo.getPulseList());
         writeBack(data, "patternList", vo.getPatternList());
         writeBack(data, "causeList", vo.getCauseList());
-        writeBack(data, "treatmentList", vo.getTreatmentList());
         writeBack(data, "formulaList", vo.getFormulaList());
         writeBack(data, "herbs", vo.getHerbs());
         // 3. inquiry（任务 8·方案 A）为「问诊子项」透传位：不参与上方任何归一/扣分，
@@ -520,7 +519,6 @@ public class EntityNormalizer {
         collectRaws(byStructuredKey, "pulseList", vo.getPulseList());
         collectRaws(byStructuredKey, "patternList", vo.getPatternList());
         collectRaws(byStructuredKey, "causeList", vo.getCauseList());
-        collectRaws(byStructuredKey, "treatmentList", vo.getTreatmentList());
         collectRaws(byStructuredKey, "formulaList", vo.getFormulaList());
         // 1. 中药是另一种 VO 类型：归一目标是 name 而不是 content（与下方第 3 步同口径）
         if (vo.getHerbs() != null) {
@@ -604,7 +602,6 @@ public class EntityNormalizer {
         vo.setPulseList(normEntities(vo.getPulseList(), "pulseList", stat, orgId, scope));
         vo.setPatternList(normEntities(vo.getPatternList(), "patternList", stat, orgId, scope));
         vo.setCauseList(normEntities(vo.getCauseList(), "causeList", stat, orgId, scope));
-        vo.setTreatmentList(normEntities(vo.getTreatmentList(), "treatmentList", stat, orgId, scope));
         vo.setFormulaList(normEntities(vo.getFormulaList(), "formulaList", stat, orgId, scope));
 
         // 3. 中药单独处理：归一目标是 name 而不是 content
