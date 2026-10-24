@@ -52,8 +52,7 @@ class LoginFailureLockTest {
         ops = mock(ValueOperations.class);
         when(redis.opsForValue()).thenReturn(ops);
         authService = new AuthServiceImpl(mock(JwtUtil.class), mock(OrgMapper.class),
-                mock(OrgMemberMapper.class), mock(IOrgService.class),
-                mock(IOrgPermissionService.class), redis);
+                mock(OrgMemberMapper.class), mock(IOrgService.class), redis);
         ReflectionTestUtils.setField(authService, "loginMaxFail", 5);
         ReflectionTestUtils.setField(authService, "loginLockMinutes", 15);
     }

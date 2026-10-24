@@ -235,23 +235,6 @@ public class OrgController {
     }
 
     /**
-     * 授予 / 回收成员的两个写开关（批次 6）。
-     *
-     * 【权限：所有者（本组织）】两个开关独立，null 表示「这一位不改」。
-     */
-    @RequireOrgRole(value = "owner", pathVar = "id")
-    @PutMapping({"/api/orgs/{id}/members/{userId}/permissions",
-                 "/api/groups/{id}/members/{userId}/permissions"})
-    public Result<Void> setPermissions(@PathVariable String id, @PathVariable String userId,
-                                      @Valid @RequestBody OrgDTOs.SetPermissionsRequest body) {
-        orgService.setPermissions(id, userId, body.getCanWriteDictionary(), body.getCanWriteQcRules());
-        operationLogger.log("权限变更", id,
-                "成员 " + userId + " 词典写 " + switchFlag(body.getCanWriteDictionary())
-                        + "、质控规则写 " + switchFlag(body.getCanWriteQcRules()));
-        return Result.ok("权限已更新", null);
-    }
-
-    /**
      * 退出本组织。
      *
      * 【权限：所有者（本组织）】所有者退出前须先转让所有权，否则组织会陷入无人可管。
@@ -266,8 +249,4 @@ public class OrgController {
         return Result.ok("已退出组织", null);
     }
 
-    /** 权限开关的审计措辞：null 表示「这一位不改」，不能写成「关」 */
-    private static String switchFlag(Boolean v) {
-        return v == null ? "不变" : (v ? "开" : "关");
-    }
 }

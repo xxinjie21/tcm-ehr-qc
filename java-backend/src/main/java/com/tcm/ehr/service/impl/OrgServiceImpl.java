@@ -514,8 +514,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
             mi.setRole(m.getRole());
             mi.setJoinTime(m.getCreateTime());
             // 5. 写授权位必须回带：前端开关的 model-value 依赖它，缺了开关永远显示未开启
-            mi.setCanWriteDictionary(m.getCanWriteDictionary());
-            mi.setCanWriteQcRules(m.getCanWriteQcRules());
             out.add(mi);
         }
         return out;
@@ -640,38 +638,6 @@ public class OrgServiceImpl extends ServiceImpl<OrgMapper, Organization>
         // RecordFilter 的 fail-closed 兜底（未加入组织时仅「LLM 配置」「创建组织」可用），
         // 不再用账号状态表达「没有归属」
         updateUserStatus(userId, User.STATUS_ACTIVE);
-    }
-
-    /**
-     * 授予 / 回收成员的两个写开关（批次 6）。
-     *
-     * 两个开关独立：owner 可以只给「词典写」或只给「质控规则写」。
-     * 参数为 {@code Boolean} 且可空 —— null 表示「这一位不改」，
-     * 否则前端只提交其中一个开关就会把另一个误清零。
-     *
-     * 不能给 owner 自己授权：owner 本来就能写，授权位只对 member 有意义。
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void setPermissions(String orgId, String userId,
-                              Boolean canWriteDictionary, Boolean canWriteQcRules) {
-        requireOrg(orgId);
-        requireOwnOrg(orgId);
-        OrganizationMember m = memberOf(orgId, userId);
-        if (OrganizationMember.ROLE_OWNER.equals(m.getRole())) {
-            throw new IllegalArgumentException("所有者本就拥有全部写权限，无需单独授权");
-        }
-        // 1. 两个都为空 = 什么都没改，直接返回，避免一次无意义的写库
-        if (canWriteDictionary == null && canWriteQcRules == null) {
-            throw new IllegalArgumentException("未指定要修改的权限");
-        }
-        if (canWriteDictionary != null) {
-            m.setCanWriteDictionary(canWriteDictionary ? 1 : 0);
-        }
-        if (canWriteQcRules != null) {
-            m.setCanWriteQcRules(canWriteQcRules ? 1 : 0);
-        }
-        memberMapper.updateById(m);
     }
 
     // ---------------------------------------------------------- 辅助

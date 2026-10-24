@@ -62,21 +62,4 @@ class OrgControllerAuditTest {
                 "日志必须记下新所有者，实际：" + detail.getValue());
     }
 
-    @Test
-    @DisplayName("权限变更留审计日志，且区分「改成关」与「这一位不改」（28.2）")
-    void setPermissionsWritesAuditLog() {
-        OrgDTOs.SetPermissionsRequest body = new OrgDTOs.SetPermissionsRequest();
-        body.setCanWriteDictionary(true);
-        body.setCanWriteQcRules(null);   // null = 这一位不改
-
-        controller.setPermissions("org-A", "u-3", body);
-
-        verify(orgService).setPermissions("org-A", "u-3", true, null);
-        ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
-        verify(operationLogger).log(eq("权限变更"), eq("org-A"), detail.capture());
-        String text = detail.getValue();
-        assertTrue(text.contains("u-3"), "日志必须能定位到成员，实际：" + text);
-        assertTrue(text.contains("开"), "授予的开关要记成开，实际：" + text);
-        assertTrue(text.contains("不变"), "null 是「不改」而不是「关」，实际：" + text);
-    }
 }

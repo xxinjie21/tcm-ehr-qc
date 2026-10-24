@@ -25,7 +25,7 @@ public interface OrgMemberMapper extends BaseMapper<OrganizationMember> {
      * {@code @Select} 的话每请求就是一次全表扫。
      *
      * 两个写授权位不能漏（can_write_dictionary / can_write_qc_rules）：
-     * OrgPermissionServiceImpl 读的正是返回对象的这两个字段。漏取时它们恒为
+     * （成员级授权位已移除，本查询只需返回成员行本身）
      * {@code null}，判定退化成 {@code Integer.valueOf(1).equals(null)} = {@code false} ——
      * 表现为「库里给组员开了写权限、登录返回的却是 {@code false}」，而且不报错、只是静默失效。
      *

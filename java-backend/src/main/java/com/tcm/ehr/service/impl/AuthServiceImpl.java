@@ -21,7 +21,7 @@ import com.tcm.ehr.mapper.OrgMapper;
 import com.tcm.ehr.mapper.UserMapper;
 import com.tcm.ehr.domain.vo.OrgResolution;
 import com.tcm.ehr.service.IAuthService;
-import com.tcm.ehr.service.IOrgPermissionService;
+// 成员级授权位已移除
 import com.tcm.ehr.service.IOrgService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +55,7 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
     private final OrgMapper groupMapper;
     private final OrgMemberMapper groupMemberMapper;
     private final IOrgService orgService;
-    private final IOrgPermissionService orgPermission;
+    // （权限判定直接走 RequestUtils.isAdmin/isOrgOwner）
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
 
@@ -248,9 +248,10 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         // organization_members 上的两列也早已在用 —— 写死导致：
         //   ① 前端 canWriteDictionaryEntry 永远退化成「管理员或所有者」，成员授权功能形同失效；
         //   ② 与 QcController 的实时判定不一致：后端放行、前端却不显示入口。
-        // 与 QcController:241 走同一个 OrgPermissionService，口径只此一处。
-        vo.setCanWriteDictionary(orgPermission.canWriteDictionary(user.getId()));
-        vo.setCanWriteQcRules(orgPermission.canWriteQcRules(user.getId()));
+        // 与 QcController.requireRuleWrite / DictionaryController.requireDictWrite 同一判据。
+        boolean canWrite = RequestUtils.isAdmin() || RequestUtils.isOrgOwner();
+        vo.setCanWriteDictionary(canWrite);
+        vo.setCanWriteQcRules(canWrite);
         vo.setMenus(menusOf(user, g));
         return vo;
     }

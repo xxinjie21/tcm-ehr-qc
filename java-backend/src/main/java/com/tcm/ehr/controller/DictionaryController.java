@@ -61,7 +61,7 @@ public class DictionaryController {
     private final com.tcm.ehr.service.IDictionaryLintService lintService;
     private final OperationLogger operationLogger;
     /** 词典写门槛要查 DB 里的成员授权位（注解只能看 JWT 里的 role），故不用注解 */
-    private final com.tcm.ehr.service.IOrgPermissionService orgPermission;
+    // 组织级授权位已移除：词典写权限 = 管理员 或 组织所有者
 
     /**
      * 校验术语类型，非法返回 null（调用方据此回 4001）。
@@ -93,10 +93,10 @@ public class DictionaryController {
      * ⚠️ 基础层（org_id=''）不在此列 —— 它影响所有组织，只允许管理员直写，见 /import。
      */
     private void requireDictWrite() {
-        if (RequestUtils.isAdmin() || orgPermission.canWriteDictionary(RequestUtils.currentUserId())) {
+        if (RequestUtils.isAdmin() || RequestUtils.isOrgOwner()) {
             return;
         }
-        throw new ForbiddenException("无权修改本组织的词典（需管理员、组织所有者或被授权成员）");
+        throw new ForbiddenException("无权修改本组织的词典（需管理员或组织所有者）");
     }
 
     // ================================================================ 查询

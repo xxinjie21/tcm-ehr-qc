@@ -295,44 +295,6 @@ class OrgServiceTest {
     }
 
     /** 两个开关独立：只传一个，另一位保持不变（null = 不改） */
-    @Test
-    void setPermissionsOnlyTouchesProvidedFlag() {
-        bindOwnerOfG1();
-        OrganizationMember m = member("m1", "g1", "u-m", OrganizationMember.ROLE_MEMBER);
-        m.setCanWriteDictionary(0);
-        m.setCanWriteQcRules(1);
-        when(memberMapper.selectOne(any())).thenReturn(m);
-
-        service.setPermissions("g1", "u-m", true, null);
-
-        ArgumentCaptor<OrganizationMember> cap = ArgumentCaptor.forClass(OrganizationMember.class);
-        verify(memberMapper).updateById(cap.capture());
-        assertEquals(1, cap.getValue().getCanWriteDictionary(), "被指定的一位应更新");
-        assertEquals(1, cap.getValue().getCanWriteQcRules(), "未指定的一位必须原样保留");
-    }
-
-    /** 不能给 owner 授权：owner 本就拥有全部写权限 */
-    @Test
-    void setPermissionsRejectsOwner() {
-        bindOwnerOfG1();
-        when(memberMapper.selectOne(any()))
-                .thenReturn(member("m1", "g1", "u-owner", OrganizationMember.ROLE_OWNER));
-
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> service.setPermissions("g1", "u-owner", true, true));
-        assertTrue(e.getMessage().contains("所有者"), e.getMessage());
-    }
-
-    /** 两个都没给 → 拒绝（一次无意义的写库） */
-    @Test
-    void setPermissionsRejectsEmptyRequest() {
-        bindOwnerOfG1();
-        when(memberMapper.selectOne(any()))
-                .thenReturn(member("m1", "g1", "u-m", OrganizationMember.ROLE_MEMBER));
-
-        assertThrows(IllegalArgumentException.class,
-                () -> service.setPermissions("g1", "u-m", null, null));
-    }
 
     /** 跨组织：路径机构 ≠ 自己所属机构 → 403（服务层兜底，与 OrgRoleInterceptor 同口径） */
     @Test
@@ -343,7 +305,6 @@ class OrgServiceTest {
         assertThrows(ForbiddenException.class, () -> service.addMember("g2", "u-x"));
         assertThrows(ForbiddenException.class, () -> service.removeMember("g2", "u-x"));
         assertThrows(ForbiddenException.class, () -> service.transferOwner("g2", "u-x"));
-        assertThrows(ForbiddenException.class, () -> service.setPermissions("g2", "u-x", true, null));
         assertThrows(ForbiddenException.class, () -> service.leave("g2"));
     }
 
@@ -374,9 +335,6 @@ class OrgServiceTest {
         List<OrgVOs.MemberInfo> out = service.members("g1");
 
         assertEquals(3, out.size(), "成员条数不变");
-        // 写授权位必须回带，否则前端开关 model-value 永远是 false（永远显示未开启）
-        assertEquals(1, out.get(1).getCanWriteDictionary(), "成员词典写授权应回带给前端");
-        assertEquals(0, out.get(1).getCanWriteQcRules(), "成员质控规则写授权应回带给前端");
         assertEquals("owner1", out.get(0).getUsername());
         assertEquals("bob", out.get(1).getUsername());
         assertEquals("(已注销)", out.get(2).getUsername(), "IN 查不回来的账号仍给「(已注销)」");

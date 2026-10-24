@@ -32,7 +32,7 @@ public class OrganizationMember {
      * 词典写授权位（批次 4 加列）：1=可写导入/回滚。
      *
      * 只对 {@code role=member} 有意义 —— 管理员与所有者本来就能写，
-     * 不依赖这一位（见 IOrgService.setPermissions）。
+     * 成员级授权位（canWrite*）已废弃：写权限口径改为「管理员 或 组织所有者」。字段保留仅为兼容既有表结构。
      */
     private Integer canWriteDictionary;
 

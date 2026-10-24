@@ -40,8 +40,8 @@ public class LoginVO {
     private String orgRole;
     /** 账号状态：active / disabled */
     private String status;
-    /** 词典写授权位（成员级；管理员/所有者不依赖此位） */
+    /** 能否写词典：= 管理员 或 组织所有者（成员级授权位已移除，此值仅供前端控制按钮显隐） */
     private boolean canWriteDictionary;
-    /** 质控规则写授权位（成员级；管理员/所有者不依赖此位） */
+    /** 能否写质控规则：同 {@link #canWriteDictionary} */
     private boolean canWriteQcRules;
 }

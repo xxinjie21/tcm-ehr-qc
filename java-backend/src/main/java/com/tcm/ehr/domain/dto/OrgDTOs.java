@@ -50,19 +50,6 @@ public final class OrgDTOs {
         private String purpose;
     }
 
-    /**
-     * 授权/回收成员的写权限（批次 6）。
-     *
-     * 两个开关独立：owner 可以只给「词典写」或只给「质控规则写」。
-     * 字段为 {@code Boolean}（可空）—— null 表示「不改这一位」，
-     * 否则前端只提交其中一个开关就会把另一个误清零。
-     */
-    @Data
-    public static class SetPermissionsRequest {
-        private Boolean canWriteDictionary;
-        private Boolean canWriteQcRules;
-    }
-
     /** owner 按用户名搜索后拉人 */
     @Data
     public static class AddMemberRequest {

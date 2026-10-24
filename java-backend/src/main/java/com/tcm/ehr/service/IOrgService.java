@@ -80,9 +80,6 @@ public interface IOrgService extends IService<Organization> {
     /** PUT /api/orgs/{id}/members/{userId}/transfer-owner —— 转让所有者（原子两行） */
     void transferOwner(String orgId, String newOwnerUserId);
 
-    /** PUT /api/orgs/{id}/members/{userId}/permissions —— 授予 / 回收成员的两个写开关 */
-    void setPermissions(String orgId, String userId, Boolean canWriteDictionary, Boolean canWriteQcRules);
-
     /** POST /api/orgs/{id}/leave —— 退出（owner 须先指定继任者） */
     void leave(String orgId);
 }

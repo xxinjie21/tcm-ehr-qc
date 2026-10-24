@@ -60,11 +60,6 @@ export function searchUsers(keyword) {
   return request.get('/orgs/users', { params: { keyword } })
 }
 
-// 授予 / 回收成员的两个写开关（null = 该位不改）
-export function setPermissions(orgId, userId, body) {
-  return request.put(`/orgs/${orgId}/members/${userId}/permissions`, body)
-}
-
 // 归档组织（仅管理员，前提成员数为 0）
 export function archiveOrg(id, reason) {
   return request.post(`/orgs/${id}/archive`, { reason })

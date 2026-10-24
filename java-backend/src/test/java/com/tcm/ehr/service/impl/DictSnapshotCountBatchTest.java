@@ -91,7 +91,7 @@ class DictSnapshotCountBatchTest {
         // 直接 new：SqlSessionFactory 未装配 → 走逐条写退化路径，本测试只关心读取侧的计数
         archiveSvc = new DictArchiveServiceImpl(versionMapper, archiveTermMapper, new ObjectMapper());
         proposalService = new DictProposalServiceImpl(proposalMapper, proposalTermMapper, termStore,
-                archiveService, esIndexService, new ObjectMapper(), null, null);
+                archiveService, esIndexService, new ObjectMapper(), null);
     }
 
     @Test

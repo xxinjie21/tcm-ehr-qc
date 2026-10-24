@@ -5,7 +5,7 @@ import com.tcm.ehr.common.annotation.RequireRole;
 import com.tcm.ehr.common.config.QcRuleSet;
 import com.tcm.ehr.common.exception.ForbiddenException;
 import com.tcm.ehr.common.utils.RequestUtils;
-import com.tcm.ehr.service.IOrgPermissionService;
+// 组织级授权位已移除
 import com.tcm.ehr.common.domain.Result;
 import com.tcm.ehr.domain.dto.FiltersDTO;
 import com.tcm.ehr.domain.dto.LogicCheckDTO;
@@ -47,7 +47,7 @@ public class QcController {
 
     private final IQcService qcService;
     /** 组织内写权限（管理员 / 所有者 / 被授权成员） */
-    private final IOrgPermissionService orgPermission;
+    // 组织级授权位已移除：规则写权限 = 管理员 或 组织所有者
     private final IQcBatchService qcBatchService;
 
     /**
@@ -257,16 +257,16 @@ public class QcController {
     }
 
     /**
-     * 质控规则写门槛：管理员 / 组织所有者 / 被授权成员。
+     * 质控规则写门槛：管理员 / 组织所有者。
      *
-     * 不做成注解是因为它要查 DB 里的成员授权位（不是只看 JWT 里的 role），
+     * 不做成注解是因为它要判断组内角色（owner），注解只能看 JWT 里的系统级 role，
      * 与 {@code @RequireRole} 的能力不同。
      */
     private void requireRuleWrite() {
-        String userId = RequestUtils.currentUserId();
-        if (RequestUtils.isAdmin() || orgPermission.canWriteQcRules(userId)) {
+        // 权限判定只看系统角色与组内 owner
+        if (RequestUtils.isAdmin() || RequestUtils.isOrgOwner()) {
             return;
         }
-        throw new ForbiddenException("无权修改本组织的质控规则（需管理员、组织所有者或被授权成员）");
+        throw new ForbiddenException("无权修改本组织的质控规则（需管理员或组织所有者）");
     }
 }

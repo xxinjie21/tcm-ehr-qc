@@ -24,9 +24,9 @@ public final class OrgVOs {
         /** owner=所有者 / member=成员 / null=无组织 */
         private String myRole;
         /**
-         * 当前成员的词典写授权位（成员级；管理员 / 所有者天然拥有，见前端 getter）。
+         * 当前成员能否写词典：= 管理员 或 组织所有者（成员级授权位已移除）。
          *
-         * 28.20：登录快照会过期（owner 改权限 / 移除成员后本机 localStorage 仍是旧的），
+         * 登录快照会过期（角色变更后本机 localStorage 仍是旧的），
          * 前端进主框架时据此接口重取一次，刷新后即生效。
          */
         private boolean canWriteDictionary;
@@ -53,10 +53,6 @@ public final class OrgVOs {
         private String username;
         private String role;
         private LocalDateTime joinTime;
-        /** 词典写授权：1=已授权 / 0=未授权（前端按 {@code === 1} 渲染开关，缺了它开关永远不亮） */
-        private Integer canWriteDictionary;
-        /** 质控规则写授权：1=已授权 / 0=未授权 */
-        private Integer canWriteQcRules;
     }
 
 

@@ -73,7 +73,7 @@ public class DictProposalServiceImpl implements IDictProposalService {
     private final ObjectMapper objectMapper;
     private final DistLock distLock;
     /** 词典写权限（批次 6 工作项 4）：授权位在 organization_members 里，不能只看 JWT 的 role */
-    private final com.tcm.ehr.service.IOrgPermissionService orgPermission;
+    // 组织级授权位已移除：审核权限 = 管理员 或 组织所有者
 
     /**
      * 批写通道（P2-8）。可选装配：单测直接 {@code new} 时为 {@code null} → 退化为逐条写，
@@ -240,8 +240,8 @@ public List<DictProposalVO> list(DictProposalDTOs.ProposalQuery query) {
         }
         // 1. 授权位按「主组织」查，故只在确认提案属于本组织之后才用它 ——
         // 否则「在 A 组被授权」会等价于「可审 A 组以外的提案」
-        if (!orgPermission.canWriteDictionary(RequestUtils.currentUserId())) {
-            throw new ForbiddenException("需管理员、组织所有者或被授权成员才能审核提案");
+        if (!RequestUtils.isAdmin() && !RequestUtils.isOrgOwner()) {
+            throw new ForbiddenException("需管理员或组织所有者才能审核提案");
         }
     }
 

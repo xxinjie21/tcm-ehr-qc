@@ -51,7 +51,6 @@ class AuthServiceTest {
     private IOrgService groupService;
     private JwtUtil jwtUtil;
     private AuthServiceImpl authService;
-    private com.tcm.ehr.service.IOrgPermissionService orgPermission;
 
     @BeforeEach
     void setUp() {
@@ -67,10 +66,11 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(jwtUtil, "secret",
                 "tcm-ehr-qc-jwt-secret-key-2026-course-design");
         ReflectionTestUtils.setField(jwtUtil, "expireHours", 24L);
-        orgPermission = org.mockito.Mockito.mock(
-                com.tcm.ehr.service.IOrgPermissionService.class);
+        // 成员级授权位已移除（原 orgPermission mock）
+        Object orgPermission = null; // 占位
+
         authService = new AuthServiceImpl(jwtUtil, groupMapper, groupMemberMapper, groupService,
-                orgPermission, redis);
+                redis);
         // 登录失败计数读 Redis：默认「无记录」（未锁定）
         Mockito.when(valueOps.get(Mockito.anyString())).thenReturn(null);
         ReflectionTestUtils.setField(authService, "loginMaxFail", 5);

@@ -8,7 +8,7 @@ import com.tcm.ehr.domain.dto.DictProposalDTOs;
 import com.tcm.ehr.domain.po.DictProposal;
 import com.tcm.ehr.domain.po.TermEntry;
 import com.tcm.ehr.domain.vo.DictProposalDiffVO;
-import com.tcm.ehr.service.IOrgPermissionService;
+// 成员级授权位已移除，测试不再需要该依赖
 import com.tcm.ehr.mapper.DictProposalMapper;
 import com.tcm.ehr.mapper.DictProposalTermMapper;
 import com.tcm.ehr.service.impl.DictProposalServiceImpl;
@@ -55,8 +55,6 @@ class DictProposalServiceImplTest {
     private IDictArchiveService archiveService;
     private IEsTermIndexService esIndexService;
     private DistLock distLock;
-    /** 批次 6 工作项 4 起 audit 会消费词典写授权位，故本类要能控制它的返回值 */
-    private IOrgPermissionService orgPermission;
     private IDictProposalService svc;
 
     @BeforeEach
@@ -77,10 +75,8 @@ class DictProposalServiceImplTest {
         });
 
         when(termStore.replace(anyString(), anyString(), any())).thenReturn("v-new");
-        orgPermission = mock(IOrgPermissionService.class);
         svc = new DictProposalServiceImpl(proposalMapper, termMapper, termStore,
-                archiveService, esIndexService, new tools.jackson.databind.ObjectMapper(), distLock,
-                orgPermission);
+                archiveService, esIndexService, new tools.jackson.databind.ObjectMapper(), distLock);
         // 默认按管理员绑定：audit 现在会按提案自身的 org_id 判归属，管理员可审任意提案
         bindAdmin();
     }
@@ -368,20 +364,18 @@ class DictProposalServiceImplTest {
     }
 
     @Test
-    @DisplayName("批次 6 工作项 4：本组织提案的审核看 can_write_dictionary —— 授权位为真才放行")
-    void auditConsumesDictionaryWriteFlag() {
-        bindOwnerOfOrgA();
+    @DisplayName("成员级授权位已移除：审核权限只看「管理员 或 组织所有者」")
+    void auditRequiresAdminOrOwner() {
+        // 1) 非 owner 且非管理员的普通成员 → 403
+        bind("用户", "org-A", "member");
         when(proposalMapper.selectById("p1")).thenReturn(proposal(DictProposal.PENDING));
-        snapshotContains("甘草");
-        when(termStore.read(anyString(), anyString())).thenReturn(List.of());
-
-        // 1) 授权位为假（含「非 owner 且未授权」的成员）→ 403
-        when(orgPermission.canWriteDictionary("u-1")).thenReturn(false);
         assertThrows(ForbiddenException.class, () -> svc.audit("p1", true, null, "u-1"));
         verify(termStore, never()).replace(anyString(), anyString(), any());
 
-        // 2) 授权位为真 → 放行到合并
-        when(orgPermission.canWriteDictionary("u-1")).thenReturn(true);
+        // 2) 组织所有者 → 放行到合并（不再依赖任何授权位）
+        bindOwnerOfOrgA();
+        snapshotContains("甘草");
+        when(termStore.read(anyString(), anyString())).thenReturn(List.of());
         assertDoesNotThrow(() -> svc.audit("p1", true, null, "u-1"));
         verify(termStore).replace(eq("org-A"), eq("herb"), any());
     }
