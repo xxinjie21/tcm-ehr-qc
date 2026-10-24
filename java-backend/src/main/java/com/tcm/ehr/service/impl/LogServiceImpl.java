@@ -132,28 +132,6 @@ public class LogServiceImpl implements ILogService {
         return csvBytes(listForExport(action, keyword, operator, startTime, endTime));
     }
 
-    /**
-     * 取某操作人最近的若干条日志。
-     *
-     * 当前无消费方（原供「AI 助手」理解上下文，该功能已移除）；保留供日志页「按操作人查」扩展。
-     *
-     * @param operator 操作人
-     * @param limit 最多返回条数
-     * @return 按时间倒序的日志列表；入参非法时返回空列表
-     */
-    @Override
-    public List<OperationLog> listRecentByOperator(String operator, int limit) {
-        // 1. 入参缺失直接返回空，避免拼出无意义的查询
-        if (operator == null || operator.isBlank() || limit <= 0) {
-            return List.of();
-        }
-        // 2. 按时间倒序取前 limit 条
-        QueryWrapper<OperationLog> w = new QueryWrapper<OperationLog>()
-                .eq("operator", operator)
-                .orderByDesc("log_time")
-                .last("LIMIT " + limit);
-        return baseMapper.selectList(w);
-    }
 
     /** 生成带 UTF-8 BOM 的 CSV 字节（Excel 正确识别中文） */
     private byte[] csvBytes(List<OperationLog> rows) {

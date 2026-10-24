@@ -6,11 +6,6 @@ export function aiInterpret(data) {
   return request.post('/ai/interpret', data)
 }
 
-// AI 复核预检意见：基于规则预检单生成复核建议
-export function aiReview(data) {
-  return request.post('/ai/review', data)
-}
-
 // ---- 异步（批次 15 · 15.1）----
 // 同步接口那条路会让请求线程等 LLM 几十秒。异步路：提交拿任务号，再轮询结果。
 // 好处不只是「不占线程」：提交后请求线程立即释放、LLM 在后台跑，页面不必卡着等。

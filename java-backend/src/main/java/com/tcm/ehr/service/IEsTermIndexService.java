@@ -114,9 +114,6 @@ public interface IEsTermIndexService {
     java.util.Map<String, List<TermEntry>> searchBatch(String type, String orgId, List<String> inputs,
                                                        int maxCandidates) throws IOException;
 
-    /** 累计已发出的 ES 检索请求数（批次 12 · 12b 的「请求数下降」打点；重启后归零） */
-    long searchRequestCount();
-
     /** 向后兼容：默认只查基础层（逐步淘汰） */
     default List<TermEntry> search(String type, String input, int maxCandidates) throws IOException {
         return search(type, "", input, maxCandidates);

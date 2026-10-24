@@ -209,10 +209,6 @@ doc.put("standard_term", e.getStandardTerm());
         return immutable;
     }
 
-    /** 累计 ES 检索请求数（批次 12 · 12b 打点）：单条 search = +1，批量 msearch 整批 = +1 */
-    private static final java.util.concurrent.atomic.AtomicLong SEARCH_REQUESTS =
-            new java.util.concurrent.atomic.AtomicLong();
-
     @Override
     public java.util.Map<String, List<TermEntry>> searchBatch(String type, String orgId, List<String> inputs,
                                                               int maxCandidates) throws IOException {
@@ -245,7 +241,6 @@ doc.put("standard_term", e.getStandardTerm());
                     .fetchSource(new String[]{"standard_term", "aliases", "org_id"}, null);
             req.add(new SearchRequest(indexName(type)).source(source));
         }
-        SEARCH_REQUESTS.addAndGet(1);
         org.elasticsearch.action.search.MultiSearchResponse resp = client.msearch(req, RequestOptions.DEFAULT);
         org.elasticsearch.action.search.MultiSearchResponse.Item[] items = resp.getResponses();
         for (int i = 0; i < asked.size(); i++) {
@@ -263,11 +258,6 @@ doc.put("standard_term", e.getStandardTerm());
         }
         log.debug("[ES] {} 批量召回 {} 个术语（1 次 msearch，org_id='{}'）", indexName(type), asked.size(), org);
         return out;
-    }
-
-    @Override
-    public long searchRequestCount() {
-        return SEARCH_REQUESTS.get();
     }
 
     @Override

@@ -1,11 +1,6 @@
 import request from '@/utils/request'
 import { pollAsyncTask } from '@/utils/asyncPoll'
 
-// NLP 实体抽取（转发 Python 服务，模型推理可能较慢，超时放宽）
-export function extractNlp(data) {
-  return request.post('/nlp/extract', data, { timeout: 60000 })
-}
-
 // 单条抽取（异步，AI-18）：提交拿任务号，再轮询结果。
 // 同步接口会把请求线程占住最长 30 秒（Python 转发 + ES 归一），异步后请求线程只做提交与查询。
 export function submitNlpExtractAsync(data) {
