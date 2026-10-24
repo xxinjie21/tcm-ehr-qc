@@ -35,8 +35,8 @@
         <el-button type="primary" size="small" :loading="rerunning" @click="rerunAll">
           立即重跑归一与质控
         </el-button>
-        <router-link class="rh-link" to="/standardization-report">查看质量报告</router-link>
-        <!-- 与「查看质量报告」并排：导入完这一页的任务就结束了，用户要么去看结果，
+        <router-link class="rh-link" to="/dashboard">查看首页质量概览</router-link>
+        <!-- 与「查看首页质量概览」并排：导入完这一页的任务就结束了，用户要么去看结果，
              要么回词典确认新词条 —— 两条出口都给，别让人靠侧边栏自己找路 -->
         <router-link class="rh-link" :to="backPath">{{ backLabel }}</router-link>
         <!-- 「稍后再说」：与左侧两条出口的区别是「什么都不做」，所以给它一个真按钮，

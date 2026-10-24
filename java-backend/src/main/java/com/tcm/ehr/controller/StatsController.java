@@ -70,34 +70,6 @@ public class StatsController {
                 filters(department, start, end, null, importStart, importEnd)));
     }
 
-    /**
-     * 导出标准化质量报告 CSV（批次 28 · 28.23）。
-     *
-     * 【权限：登录即可 + 数据域】与页面同源同域。改由后端生成并与另外两条导出
-     * （数据集 / 日志）一样返回文件流，前端不再自行拼 CSV。参数语义与报告接口一致，
-     * 含导入时间维度（页面默认值会一并带入导出文件）。
-     *
-     * @param department  科室，空表示不限
-     * @param start       接诊时间起（yyyy-MM-dd），空表示不限
-     * @param end         接诊时间止（yyyy-MM-dd），空表示不限
-     * @param importStart 导入时间起（yyyy-MM-dd），与 importEnd 同时给才生效
-     * @param importEnd   导入时间止（yyyy-MM-dd），空表示不限
-     * @return CSV 文件流（UTF-8 BOM，Excel 可直接打开）
-     */
-    @GetMapping("/standardization-report/export")
-    public ResponseEntity<byte[]> standardizationReportExport(
-            @RequestParam(required = false) String department,
-            @RequestParam(required = false) String start,
-            @RequestParam(required = false) String end,
-            @RequestParam(required = false) String importStart,
-            @RequestParam(required = false) String importEnd) {
-        byte[] content = reportService.reportCsv(
-                filters(department, start, end, null, importStart, importEnd));
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=standardization-report.csv")
-                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
-                .body(content);
-    }
 
     /**
      * 首页指标卡。

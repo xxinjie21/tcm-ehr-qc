@@ -145,17 +145,15 @@ class AuthServiceTest {
         assertNotNull(vo.getToken());
         assertEquals("管理员", vo.getRole());
         // 阶段2：管理员菜单 = 原 8 项 + 「组织管理」= 9 项；有生效组时再给「我的组织」= 10 项
-        // （含词典子项计 11）。管理员只要有组就看得到「我的组织」（与组员口径一致），
+        // （批次 28 起「标准化质量报告」并入首页，不再单列菜单）。管理员只要有组就看得到「我的组织」（与组员口径一致），
         // 该页对管理员/成员是只读视图，写动作仍由后端 @RequireOrgRole 把关。
         List<MenuNode> menus = vo.getMenus();
-        assertEquals(11, menus.size(), menus.toString());
+        assertEquals(10, menus.size(), menus.toString());
         assertTrue(titlesOf(menus).contains("组织管理"));
         assertTrue(titlesOf(menus).contains("我的组织"), menus.toString());
         assertTrue(titlesOf(menus).contains("人工复核"));
         assertTrue(titlesOf(menus).contains("清洗与导出"));
         assertFalse(titlesOf(menus).contains("数据清洗"));
-        // 批次 24 新增：标准化质量报告只读，登录即可，三档菜单都该有
-        assertTrue(titlesOf(menus).contains("标准化质量报告"), menus.toString());
         // 管理员额外能看到「术语词典」的子项「术语批量导入」
         assertTrue(childTitlesOf(menus, "术语词典").contains("术语批量导入"),
                 menus.toString());
@@ -181,8 +179,8 @@ class AuthServiceTest {
         LoginVO vo = authService.login("admin", "123456");
 
         assertEquals("管理员", vo.getRole());
-        // ADMIN_MENUS 10 项 + 「我的组织」= 11
-        assertEquals(11, vo.getMenus().size(), vo.getMenus().toString());
+        // ADMIN_MENUS 9 项 + 「我的组织」= 10（批次 28 起「标准化质量报告」并入首页，不再单列菜单）
+        assertEquals(10, vo.getMenus().size(), vo.getMenus().toString());
         assertTrue(titlesOf(vo.getMenus()).contains("组织管理"), vo.getMenus().toString());
         assertTrue(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
     }
@@ -197,8 +195,8 @@ class AuthServiceTest {
         LoginVO vo = authService.login("admin", "123456");
 
         assertEquals("管理员", vo.getRole());
-        // ADMIN_MENUS 10 项，无「我的组织」
-        assertEquals(10, vo.getMenus().size(), vo.getMenus().toString());
+        // ADMIN_MENUS 9 项，无「我的组织」
+        assertEquals(9, vo.getMenus().size(), vo.getMenus().toString());
         assertTrue(titlesOf(vo.getMenus()).contains("组织管理"), vo.getMenus().toString());
         assertFalse(titlesOf(vo.getMenus()).contains("我的组织"), vo.getMenus().toString());
     }

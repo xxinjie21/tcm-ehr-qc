@@ -71,6 +71,18 @@
           note="分级「合格」的病历占比" clickable @click="drill('合格')" />
         <StatCard label="无效数据" :value="overview.invalidCount" tone="red" icon="invalid"
           note="质控判定无有效内容" clickable @click="drill('无效')" />
+        <!-- 术语标准化两张卡（批次 28 由独立报告页并入）：分母是实体数，与上方合格率不同。
+             note 里点明口径，两串数字并排时不至于被读成同一个率。 -->
+        <StatCard label="术语归一率" :value="symRate" tone="green" suffix="%" icon="rate"
+          :note="symRate === null ? '当前范围无抽取实体' : '抽到的实体映射到标准术语的占比'" />
+        <StatCard
+          :label="worstField ? `覆盖最低：${worstField.label}` : '覆盖最低字段'"
+          :value="worstField ? Math.round((worstField.normalized / worstField.total) * 1000) / 10 : null"
+          :tone="worstField && worstField.normalized / worstField.total < 0.9 ? 'ochre' : 'green'"
+          suffix="%"
+          icon="rate"
+          :note="worstField ? `已归一 ${worstField.normalized} / 共 ${worstField.total} 个实体` : '当前范围无数据'"
+        />
       </div>
 
       <!-- 只有「待复核」与其余数字口径不同（卡片随筛选、它恒全量），不点明会让用户
@@ -95,6 +107,30 @@
         <!-- L1：两条线都完全无波动时给一行文字结论，替代「图是平的」这个纯视觉信息；
              月份数取实际展示条数，数据不足 12 个月时不谎称「近 12 个月」 -->
         <p v-if="trendFlat" class="trend-flat">近 {{ (extra.trend || []).length }} 个月无波动</p>
+      </PanelCard>
+
+      <!-- 术语标准化覆盖（批次 28 由独立报告页并入）：默认收起 ——
+           首页的主结论是质控结果，术语覆盖是第二层；默认展开会让首屏多出一屏高度。
+           想看的人点一下即有，图本身复用原报告页的 StandardizationCharts。 -->
+      <PanelCard class="mb">
+        <template #title>
+          <span>术语标准化覆盖</span>
+          <el-button text type="primary" size="small" @click="showCoverage = !showCoverage">
+            {{ showCoverage ? '收起' : '展开' }}
+          </el-button>
+        </template>
+        <template v-if="showCoverage">
+          <StandardizationCharts
+            :coverage="report?.coverage || []"
+            :unmatched="report?.unmatched || {}"
+            :loading="loading"
+            :error="false"
+            :range-label="chartRangeLabel"
+          />
+        </template>
+        <p v-else class="cov-hint">
+          按字段展示归一率与未归因构成；归一率口径见上方指标卡脚注。
+        </p>
       </PanelCard>
 
       <div class="grid-2 mb">
@@ -148,7 +184,8 @@ import PanelCard from '@/components/PanelCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { CHART } from '@/utils/chartTheme'
 
-import { getOverview, getExtraStats } from '@/api/stats'
+import { getOverview, getExtraStats, getStandardizationReport } from '@/api/stats'
+import StandardizationCharts from '@/components/StandardizationCharts.vue'
 import { governanceStats } from '@/api/governance'
 import { useUserStore } from '@/stores/user'
 
@@ -206,6 +243,8 @@ const overview = ref({
 // 待清洗数：仅管理员可读，非管理员恒为 0（卡片置灰）
 const govern = reactive({ pendingGovern: 0 })
 const extra = ref({ trend: [], departmentRates: [], scoreDistribution: [] })
+// 术语标准化报告（原独立页，批次 28 并入首页）：coverage=各字段覆盖率，unmatched=未归一口径
+const report = ref(null)
 
 // ECharts 实例：惰性创建、按需重建（见 renderTrend / renderDist）
 const trendRef = ref(null)
@@ -215,6 +254,31 @@ let distChart = null
 
 // 评分分布全为 0 时不画图（否则是一根空柱）
 const hasScores = computed(() => (extra.value.scoreDistribution || []).some((b) => b.count > 0))
+
+// ===== 术语标准化 KPI（批次 28 由独立报告页并入首页）=====
+// 归一率 = 已归一实体数 / 抽到实体数，按字段汇总（分母是实体数，不是病历数）——
+// 与上方「质控合格率」分母不同，故脚注必须点明，否则会被误读成同一个率。
+const symRate = computed(() => {
+  const cov = report.value?.coverage || []
+  const t2 = cov.reduce((a, c) => a + (c.total || 0), 0)
+  const n = cov.reduce((a, c) => a + (c.normalized || 0), 0)
+  return t2 ? Math.round((n / t2) * 1000) / 10 : null
+})
+
+// 覆盖最低字段：只在实际抽到过实体的字段里找（total > 0），
+// 没抽到实体的字段不参与排名 —— 它们不是「覆盖低」，是「没有数据」。
+const worstField = computed(() => {
+  const cov = (report.value?.coverage || []).filter((c) => (c.total || 0) > 0)
+  if (!cov.length) return null
+  return cov.reduce((w, c) => ((c.normalized / c.total) < (w.normalized / w.total) ? c : w))
+})
+
+// 图表区的范围口径标签：与页首筛选一致
+const chartRangeLabel = computed(() => {
+  const d = filter.dateRange
+  if (d?.length === 2) return `${d[0]} ~ ${d[1]}`
+  return filter.department || ''
+})
 
 // 图表的文本替代：给屏幕阅读器与无法看图的环境提供关键结论
 const trendLabel = computed(() => {
@@ -368,13 +432,23 @@ const loadAll = async () => {
     const govTask = userStore.role === '管理员'
       ? governanceStats().catch(() => ({ data: { pendingGovern: 0 } }))
       : Promise.resolve(null)
-    const [ov, ex, gc] = await Promise.all([getOverview(params()), getExtraStats(params()), govTask])
+    const [ov, ex, gc, rp] = await Promise.all([
+      getOverview(params()),
+      getExtraStats(params()),
+      govTask,
+      // 术语标准化报告：与其余三块并行，失败不影响看板其余部分
+      // （catch 成 null，图表区按「无数据」处理，不当成整页失败）
+      getStandardizationReport(params()).catch(() => null)
+    ])
     // 3. 分别回填指标卡与图表数据；清洗统计失败/非管理员不影响其余看板
     overview.value = ov.data
     extra.value = ex.data
     if (gc) {
       govern.pendingGovern = gc.data?.pendingGovern ?? 0
     }
+    report.value = rp?.data ?? null
+    // 报告接口单独失败不当成整页失败：看板其余三块仍是有效结论，
+    // 只在术语区给一句「未取到」，避免用户以为合格率那些数字也不可信。
   } catch {
     // 拦截器已提示；标记失败态，空态区据此给出重试入口
     failed.value = true
