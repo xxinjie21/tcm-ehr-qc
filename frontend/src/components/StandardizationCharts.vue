@@ -44,9 +44,9 @@
 
       <div class="sc-cell">
         <div class="sc-hd">
-          未归一实体 TOP10
+          未归一高频词
           <!-- P2-4：空态不再渲染「TOP0」 -->
-          <span v-if="!loading && !error && topBars.length" class="sc-sub">未归一实体 TOP{{ topBars.length }}（按出现次数）</span>
+          <span v-if="!loading && !error && topBars.length" class="sc-sub">TOP{{ topBars.length }}（按出现次数）· 需研判</span>
         </div>
         <div v-if="loading" class="sc-skel" aria-label="图表加载中" />
         <div v-else-if="error" class="sc-fail">
@@ -65,7 +65,11 @@
     </div>
     <p class="sc-note">
       「未归一」= 抽到了实体但词表里没有对应标准词，其中词表没收录的部分就是
-      <b>词表缺口</b>（补词表可改善其中一部分）。
+      <b>词表缺口</b>。
+      <br />
+      ⚠️ 右侧高频词<b>仅供参考，不可直接批量录入词典</b>：里面混有描述性短语（如「晨尿偏黄」）、
+      解剖部位（如「咽后壁」）、跨类术语（如「外感风寒」其实是病因/证候）以及抽取错位产生的词。
+      判断某个词能否登记为标准词，需要医学专业判断，机器过滤无法穷举。
     </p>
   </PanelCard>
 </template>

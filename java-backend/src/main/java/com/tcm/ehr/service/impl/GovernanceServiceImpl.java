@@ -459,7 +459,7 @@ public class GovernanceServiceImpl extends ServiceImpl<RecordMapper, Record> imp
      * 预取失败也不影响正确性（逐条归一照常走 ES）。
      *
      * 只预热本组织归一范围内的类型（normalization.elementTypes，出厂默认 9 类
-     * 全勾：疾病 / 证候 / 症状 / 中药 / 方剂 / 舌象 / 脉象 / 病因 / 治法；归一范围与计分范围是两个
+     * 全勾：疾病 / 证候 / 症状 / 中药 / 方剂 / 舌象 / 脉象 / 病因；归一范围与计分范围是两个
      * 独立开关）。范围外的类型清洗链路对其不调 ES（见 {@link #normalizeEntityList}），预热没有意义。
      *
      * 预热粒度是「一页」而非整批：召回缓存本身有容量上限（RECALL_CACHE_MAX），

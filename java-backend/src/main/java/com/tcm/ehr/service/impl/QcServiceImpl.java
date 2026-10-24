@@ -119,7 +119,7 @@ public class QcServiceImpl extends ServiceImpl<RecordMapper, Record> implements 
     /**
      * 一致性（逻辑冲突）检查，只读。
      *
-     * 把请求中的证型 / 治法 / 中药 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
+     * 把请求中的证型 / 中药 / 方剂列表交给 {@link LogicChecker}，按当前一致性规则求冲突项；
      * dto 为 null 时按空数据检查，结果视为无冲突。
      *
      * ⚠️ 中药的 map key 必须是 herbs（= EntityTypes 里 herb 的 structuredKey），

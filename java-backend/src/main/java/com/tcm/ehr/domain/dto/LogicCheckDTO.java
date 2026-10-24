@@ -12,7 +12,6 @@ import java.util.Map;
 public class LogicCheckDTO {
 
     private List<Map<String, Object>> patternList;
-    private List<Map<String, Object>> treatmentList;
     private List<Map<String, Object>> formulaList;
     private List<Map<String, Object>> herbList;
 }

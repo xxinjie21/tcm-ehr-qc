@@ -324,9 +324,8 @@ public class EntityNormalizer {
         dropped += dropIn(vo.getTongueList(), "tongue", orgId);
         dropped += dropIn(vo.getPulseList(), "pulse", orgId);
         dropped += dropIn(vo.getFormulaList(), "formula", orgId);
-        // 1. 无词典的 3 类：没有可依据的词典，长度 1 一律按残词处理
+        // 1. 无词典的类型：没有可依据的词典，长度 1 一律按残词处理
         dropped += dropIn(vo.getCauseList(), null, orgId);
-        dropped += dropIn(vo.getTreatmentList(), null, orgId);
         if (dropped > 0) {
             log.info("[归一] 丢弃单字残词 {} 条（长度为 1 且不在词典里）", dropped);
         }
@@ -861,7 +860,7 @@ public class EntityNormalizer {
         if (entities == null) {
             return null;
         }
-        // 2. 该字段对应哪类词典（舌/脉/病因/治法返回 null 已不成立：9 类均有词典，
+        // 2. 该字段对应哪类词典（9 类均有词典
         //    现返回的是字典类型 key；未纳入归一范围的类型由下方 scope 判定跳过）
         String type = dictionaryType(fieldKey);
         // 3. 逐个实体归一。拆解会一拆多，故另建结果表（不在遍历中改原表）

@@ -258,7 +258,7 @@ public final class QcScorer {
         // 1. 计分范围完全由规则集的 standardization.elementTypes 决定（调用方已按它筛选）：
         // 这里只做「类型 → structuredKey」的映射，未登记类型返回 null。
         // 原实现另叠一道 EntityTypes.countsUnnormalized 过滤 —— 结果是前端即便勾上
-        // 舌象/脉象/治法也照样不计分（双开关、勾了不生效）。已按「以规则配置为准」移除。
+        // 舌象/脉象也照样不计分（双开关、勾了不生效）。已按「以规则配置为准」移除。
         com.tcm.ehr.common.config.EntityTypes.EntityType t =
                 com.tcm.ehr.common.config.EntityTypes.byKey(type);
         return t != null ? t.structuredKey() : null;

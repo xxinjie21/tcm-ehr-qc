@@ -184,6 +184,34 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      */
     private static final String[] INQUIRY_MARKERS = {"饮水", "饮食", "精力", "体力", "控制", "习惯性"};
 
+    /**
+     * 程度 / 否定 / 方位修饰词：含这些的未归一实体多半是**描述性短语**而非可登记的标准词。
+     *
+     * 典型噪声（实测 top 前排）：晨尿偏黄 59 / 晨尿略黄 58 / 右较左有力 43 / 按之不痛 40 ——
+     * 它们长度 > 2，逃过了 FRAGMENT_MAX_LEN 的长度桶，直接进了「词表缺口」，
+     * 于是占据「最该先补的词」前排，但**补进词典是错映射**：
+     * 把「偏黄」收成标准词，会命中所有含该子串的实体。
+     *
+     * ⚠️ 只在**展示清单**（unmatched.top）里过滤，**不影响 dictionaryGap 计数** ——
+     * 那些实体确实是「未归一」，数字要如实；只是不该被推荐成「该补的词」。
+     *
+     * 阈值取 4 字以上才过滤：不寐 / 矢气 / 口干 这类 2~3 字正经症状词不受影响。
+     */
+    private static final char[] QUALIFIER_CHARS = {'偏', '略', '较', '尚', '欠'};
+
+    /** 该词是否适合作为「可补进词典的标准词」候选（仅用于展示，不参与计数） */
+    private static boolean looksLikeStandardTerm(String s) {
+        if (s == null || s.length() < 4) {
+            return true;
+        }
+        for (char c : QUALIFIER_CHARS) {
+            if (s.indexOf(c) >= 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** 有意保留在页面上的声明，防止报告被当成科研级准确率引用 */
     private static final String DISCLAIMER =
             "本报告基于现有数据的实测统计。乙类（数据集覆盖度）只用于验证词表是否建全，"
@@ -824,8 +852,12 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
                 }
             }
         }
-        // 10. 批次2：按次数降序装入（LinkedHashMap 保序），前端直接渲染为可行动清单
+        // 10. 批次2：按次数降序装入（LinkedHashMap 保序），前端直接渲染为可行动清单。
+        //     2026-10-25：展示前再过滤一道 —— 含程度/方位修饰的短语（晨尿偏黄、右较左有力）
+        //     虽然确实是「未归一」，但补进词典属错映射，不该占「最该先补」的前排。
+        //     过滤只作用于展示清单，dictionaryGap 计数保持完整（数字要如实）。
         gapCount.entrySet().stream()
+                .filter(e -> looksLikeStandardTerm(e.getKey()))
                 .sorted((x, y) -> Integer.compare(y.getValue(), x.getValue()))
                 .limit(15)
                 .forEach(e -> b.getTop().put(e.getKey(), e.getValue()));

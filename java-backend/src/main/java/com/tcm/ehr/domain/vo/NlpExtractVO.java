@@ -18,7 +18,7 @@ public class NlpExtractVO {
     /** 降级原因：开关已开但抽取服务连不上（未启动 / 中途停止 / 返回非 200 / 调用异常） */
     public static final String REASON_UNREACHABLE = "SERVICE_UNREACHABLE";
 
-    /** 降级原因：服务在跑但模型未加载，本次仅规则兜底（舌象 / 脉象 / 病因 / 治法） */
+    /** 降级原因：服务在跑但模型未加载，本次仅规则兜底（舌象 / 脉象 / 病因） */
     public static final String REASON_MODEL_MISSING = "MODEL_MISSING";
 
     private List<Entity> diseases = new ArrayList<>();
@@ -27,7 +27,6 @@ public class NlpExtractVO {
     private List<Entity> pulseList = new ArrayList<>();
     private List<Entity> patternList = new ArrayList<>();
     private List<Entity> causeList = new ArrayList<>();
-    private List<Entity> treatmentList = new ArrayList<>();
     private List<Entity> formulaList = new ArrayList<>();
     private List<Herb> herbs = new ArrayList<>();
     /**
@@ -44,7 +43,7 @@ public class NlpExtractVO {
      *
      * 截断时模型只看得到前 510 个 token，尾部实体静默丢失而响应照样说
      * {@code modelAvailable=true} —— 调用方无从判断「结果不完整」。
-     * 规则兜底（舌象 / 脉象 / 病因 / 治法）始终用全文，所以这个标记只说明
+     * 规则兜底（舌象 / 脉象 / 病因）始终用全文，所以这个标记只说明
      * 模型那条路没看全。（审查报告 L11）
      */
     private boolean truncated;
