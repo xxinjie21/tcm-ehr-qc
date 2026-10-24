@@ -243,13 +243,12 @@ public class AuthServiceImpl extends ServiceImpl<UserMapper, User> implements IA
         vo.setOrgId(g.hasGroup() ? g.getOrgId() : "");
         vo.setOrgRole(g.hasGroup() ? g.getGroupRole() : null);
         vo.setStatus(user.getStatus());
-        // 10. 词典 / 质控规则写授权位：**实时查库**，不用登录时的快照。
-        // 原来这里写死 false（注释说「批次 4 的 DDL 落地前恒 false」），但 DDL 早已落地、
-        // organization_members 上的两列也早已在用 —— 写死导致：
-        //   ① 前端 canWriteDictionaryEntry 永远退化成「管理员或所有者」，成员授权功能形同失效；
-        //   ② 与 QcController 的实时判定不一致：后端放行、前端却不显示入口。
-        // 与 QcController.requireRuleWrite / DictionaryController.requireDictWrite 同一判据。
-        boolean canWrite = RequestUtils.isAdmin() || RequestUtils.isOrgOwner();
+        // 10. 词典 / 质控规则写权限：成员级授权位已移除，口径收敛为「管理员 或 组织所有者」。
+        // ⚠️ 这里必须直接用 user.getRole() / g.getGroupRole() 判断，**不能**用
+        //    RequestUtils.isAdmin() / isOrgOwner() —— 那两个读的是 request 属性，
+        //    而登录请求不经过 JwtInterceptor，属性尚未建立，会恒判为 false。
+        boolean canWrite = RequestUtils.ROLE_ADMIN.equals(user.getRole())
+                || RequestUtils.ORG_ROLE_OWNER.equals(g.getGroupRole());
         vo.setCanWriteDictionary(canWrite);
         vo.setCanWriteQcRules(canWrite);
         vo.setMenus(menusOf(user, g));
