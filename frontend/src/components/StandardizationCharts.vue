@@ -101,7 +101,9 @@ const emit = defineEmits(['retry'])
 // 左图标签虽短也用同一个值 —— A3 要求两图 x=0 起点完全对齐。
 // grid.bottom 预留 x 轴名称（nameGap 30，名称上下再留余量）。
 const CHART_BASE = {
-  grid: { left: 104, right: 40, top: 10, bottom: 40, containLabel: false },
+  // bottom 72：x 轴名称 nameGap=30（名称到轴的距离）+ 轴标签约 20px +
+  // 名称文字 13px + 呼吸位。原先 40 不够，底部「归一率（%）」「出现次数（次）」会被裁掉。
+  grid: { left: 104, right: 56, top: 10, bottom: 72, containLabel: false },
   axisFontSize: 13,
   labelColor: CHART.labelStrong,
   labelFontSize: 13,
@@ -198,14 +200,17 @@ const renderCov = () => {
     grid: CHART_BASE.grid,
     xAxis: {
       type: 'value',
-      max: 100,
+      // 110 而非 100：数据标签 position:'right' 画在柱尾外侧，
+      // max=100 时 100% 那根柱（如病因）的标签会被右边距裁掉。
+      max: 110,
       // P0-1：两图都显式给出 x 轴名称与单位
       name: '归一率（%）',
       nameLocation: 'middle',
       nameGap: 30,
       axisLine: { lineStyle: { color: CHART.axisLine } },
+      // 刻度与网格线仍只到 100（真正的最大值），110 只用于给标签留白
       splitLine: { lineStyle: { color: CHART.splitLine } },
-      axisLabel: { fontSize: CHART_BASE.axisFontSize }
+      axisLabel: { fontSize: CHART_BASE.axisFontSize, formatter: (v) => (v > 100 ? '' : v) }
     },
     yAxis: {
       type: 'category',
@@ -254,6 +259,9 @@ const renderTop = () => {
       name: '出现次数（次）',
       nameLocation: 'middle',
       nameGap: 30,
+      // 给最大柱留 15% 右侧空间：数据标签 position:'right' 画在柱尾外侧，
+      // 不留白时最高那根柱的标签会贴边甚至被裁掉。
+      max: (v) => Math.ceil(v.max * 1.15),
       axisLine: { lineStyle: { color: CHART.axisLine } },
       splitLine: { lineStyle: { color: CHART.splitLine } },
       axisLabel: { fontSize: CHART_BASE.axisFontSize }
@@ -327,11 +335,11 @@ onBeforeUnmount(() => {
 }
 .sc-hd { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
 .sc-sub { margin-left: var(--sp-2); font-size: var(--fs-xs); color: var(--text-sub-strong); font-weight: 400; }
-.sc-chart { width: 100%; height: 260px; margin-top: var(--sp-2); }
+.sc-chart { width: 100%; height: 320px; margin-top: var(--sp-2); }
 /* P0-6：加载态与图表同高同框，数据到达后不产生布局跳动 */
 .sc-skel {
   width: 100%;
-  height: 260px;
+  height: 320px;
   margin-top: var(--sp-2);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -343,7 +351,7 @@ onBeforeUnmount(() => {
   gap: var(--sp-3);
   align-items: center;
   justify-content: center;
-  height: 260px;
+  height: 320px;
   margin-top: var(--sp-2);
   border: 1px dashed var(--line);
   border-radius: 6px;
@@ -371,6 +379,6 @@ onBeforeUnmount(() => {
 .sc-note b { color: var(--ink); }
 /* P2-7：窄视口（≤1100px）图表塌为单列后，降高防止页面纵向溢出过长 */
 @media (max-width: 1100px) {
-  .sc-chart, .sc-skel, .sc-fail { height: 220px; }
+  .sc-chart, .sc-skel, .sc-fail { height: 280px; }
 }
 </style>
