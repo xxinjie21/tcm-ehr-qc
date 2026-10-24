@@ -121,6 +121,13 @@ const rowBarWidth = (chart, rowCount) => {
   return Math.round(rowH * CHART_BASE.barRatio * 10) / 10
 }
 
+// 归一率统一格式化：保留 1 位小数。
+// 原先用 Math.round(rate*100) —— 99.7% 会被四舍五入成「100%」，
+// 与后端实际值不符，看起来像这一类已完全归一。中药 99.7%、脉象 96.9%
+// 这类接近满值但有缺口的情况尤其容易误导。
+// 100% 只在真正 100.0 时出现（如病因 26666/26666）。
+const fmtRate = (rate) => `${(rate * 100).toFixed(1)}%`
+
 // ---- 图一：各类型归一率（P0-1 方案A：单一百分比条） ----
 // 只画抽到过实体的类型（total > 0）：方剂这类样本极少的类型画出来只占位，
 // 且样本为 1 时归一率恒 0%，会被误读成「这一类全错了」。
@@ -151,7 +158,7 @@ const topBars = computed(() =>
 // 图的文本替代：屏幕阅读器与「无法看图」的环境靠它理解图的内容
 const covLabel = computed(() =>
   '各类术语归一率条形图：' + covBars.value
-    .map((c) => `${c.label} 归一率 ${Math.round(c.rate * 100)}%（已归一 ${c.normalized} / 抽取 ${c.total}）`)
+    .map((c) => `${c.label} 归一率 ${fmtRate(c.rate)}（已归一 ${c.normalized} / 抽取 ${c.total}）`)
     .join('；')
 )
 const topLabel = computed(() =>
@@ -184,7 +191,7 @@ const renderCov = () => {
         const miss = r.total - r.normalized
         // 与右图默认浮层同为「词 / 值」两段结构；抽取、已归一、未归一的绝对数
         // 从图上移入这里 —— 条长只编码归一率（P0-1），口径一个字没改
-        return `${r.label}<br/>${ps[0].marker}归一率 ${Math.round(r.rate * 100)}%`
+        return `${r.label}<br/>${ps[0].marker}归一率 ${fmtRate(r.rate)}`
           + `（已归一 ${r.normalized} / 抽取 ${r.total}，未归一 ${miss}）`
       }
     },
@@ -216,9 +223,10 @@ const renderCov = () => {
         label: {
           show: true, position: 'right', color: CHART_BASE.labelColor,
           fontSize: CHART_BASE.labelFontSize, fontWeight: 600,
-          formatter: (p) => `${Math.round(rows[p.dataIndex].rate * 100)}%`
+          formatter: (p) => fmtRate(rows[p.dataIndex].rate)
         },
-        data: rows.map((r) => Math.round(r.rate * 100))
+        // 条长按真实百分比（保留 1 位小数），避免 99.7% 被画成满格
+data: rows.map((r) => Number((r.rate * 100).toFixed(1)))
       }
     ]
   })
