@@ -196,7 +196,7 @@ const FIELD_BY_ITEM = {
  * 核心要素的 structuredData 键集合。
  *
  * <p>对照区据此区分两类字段：<b>核心要素</b>（参与「核心字段缺失」扣分）无论空不空都要显示，
- * 因为「缺失（抽取为空）」正是提示复核员去补；<b>非核心</b>（治法 / 方剂 / 病因）只做展示，
+ * 因为「缺失（抽取为空）」正是提示复核员去补；<b>非核心</b>（方剂 / 病因）只做展示，
  * 空的时候渲染出来只会让人以为病历缺项，而那是补不了的假象 —— 例如本数据集里
  * {@code prescription} 列是纯中药清单、没有方剂名，方剂永远抽不出来。</p>
  */
@@ -205,11 +205,10 @@ const CORE_KEYS = new Set(Object.values(FIELD_BY_ITEM))
 /**
  * 对照区的字段（功能设计附录A 的 9 类实体）。
  * termType 指向词典类型；9 类实体现均有独立词典（病因自本批次起有 causes.json），
- * 故治法/病因此处也用词典候选输入框（termType 留给未建词典的类型用空串回退普通输入框）。
+ * 故病因此处也用词典候选输入框（termType 留给未建词典的类型用空串回退普通输入框）。
  */
 const COMPARE_FIELDS = [
   { key: 'patternList', label: '证候', termType: 'pattern' },
-  { key: 'treatmentList', label: '治法', termType: 'treatment' },
   { key: 'formulaList', label: '方剂', termType: 'formula' },
   { key: 'tongueList', label: '舌象', termType: 'symptom' },
   { key: 'pulseList', label: '脉象', termType: 'symptom' },

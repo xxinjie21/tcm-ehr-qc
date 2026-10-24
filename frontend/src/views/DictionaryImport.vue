@@ -417,8 +417,7 @@ const TYPES = [
   { value: 'formula', label: '方剂' },
   { value: 'tongue', label: '舌象' },
   { value: 'pulse', label: '脉象' },
-  { value: 'cause', label: '病因' },
-  { value: 'treatment', label: '治法' }
+  { value: 'cause', label: '病因' }
 ]
 const typeLabel = (v) => (TYPES.find((t) => t.value === v) || {}).label || v
 

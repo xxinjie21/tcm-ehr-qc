@@ -916,7 +916,6 @@ ALIAS_MAPS = {
     "pulses": PULSE_ALIASES,
     "symptoms": SYMPTOM_ALIASES,
     "tongues": TONGUE_ALIASES,
-    "treatments": TREATMENT_ALIASES,
     "formulas": FORMULA_ALIASES,
     "diseases": DISEASE_ALIASES,
 }
@@ -1488,6 +1487,6 @@ def enrich(name):
           f"cleaned={stats['cleaned']} empty_aliases={empty_after}")
 
 if __name__ == "__main__":
-    for n in ["diseases", "patterns", "pulses", "symptoms", "tongues", "treatments", "formulas", "herbs"]:
+    for n in ["diseases", "patterns", "pulses", "symptoms", "tongues", "formulas", "herbs"]:
         enrich(n)
     print("Done. Output: *.enriched.json")

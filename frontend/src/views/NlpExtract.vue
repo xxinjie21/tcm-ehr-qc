@@ -85,7 +85,7 @@
         </template>
         <template v-else>
           抽取服务在跑，但<b>模型没有加载成功</b>，现在抽取只有规则兜底
-          （舌象、脉象、病因、治法），识别出的要素会明显偏少。
+          （舌象、脉象、病因），识别出的要素会明显偏少。
         </template>
       </span>
       <!-- 探测结论是「此刻」的：服务恢复了但页面还是旧结论时，用户需要能手动再问一次 -->
@@ -136,7 +136,7 @@
             </template>
             <template v-else-if="emptyReason === 'MODEL_MISSING'">
               <b>本次只识别出很少的要素</b> —— 抽取服务已经启动，但<b>模型没有加载成功</b>，
-              这次只跑了规则兜底（舌象、脉象、病因、治法）。这不是「术语归一」没执行：
+              这次只跑了规则兜底（舌象、脉象、病因）。这不是「术语归一」没执行：
               <b>归一一直在跑</b>。请联系系统管理员检查抽取服务的模型文件。
             </template>
             <template v-else-if="emptyReason === 'UNKNOWN'">
@@ -620,7 +620,7 @@ const runExtract = async () => {
  */
 const ENTITY_KEYS = [
   'diseases', 'symptoms', 'tongueList', 'pulseList', 'patternList',
-  'causeList', 'treatmentList', 'formulaList', 'herbs'
+  'causeList', 'formulaList', 'herbs'
 ]
 // 抽取结果是否「无产出」：9 类实体全为空即视为空；结果本身为 null 时不判空，交给空态展示
 const resultEmpty = computed(() => {

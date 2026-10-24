@@ -262,7 +262,8 @@ const proposalRef = ref(null)
  * 这就是批次 12 工作项 8「TDZ 调序」要防的那类问题。</p>
  */
 // 术语类型的显示名；键名必须与后端 type 参数一致（EntityTypes 的 key）。
-// 批次 20 起新增舌象/脉象/治法，本批次新增病因 —— 后端均已建词典，此处同步暴露入口。
+// 批次 20 起新增舌象/脉象，本批次新增病因 —— 后端均已建词典，此处同步暴露入口。
+// 治法已移除（批次 28）：NLP 无该标签，永远抽不到，词典入口一并下线。
 const TYPE_LABELS = {
   disease: '疾病',
   pattern: '证候',
@@ -272,7 +273,6 @@ const TYPE_LABELS = {
   tongue: '舌象',
   pulse: '脉象',
   cause: '病因',
-  treatment: '治法'
 }
 
 /** 术语类型选项（页头 radio-group 的数据源） */

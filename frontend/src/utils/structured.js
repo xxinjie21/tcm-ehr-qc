@@ -5,15 +5,15 @@
  * 各写一份必然漂移（改了这边忘了那边），所以统一放这里。</p>
  *
  * <p><b>dict 的口径与后端 {@code EntityTypes}（dict=true）对齐</b>：
- * 疾病 / 症状 / 证候 / 方剂 / 中药 / 舌象 / 脉象 / 病因 / 治法 九类均有独立词典
- * （舌象 / 脉象 / 治法自批次 20 起、病因自本批次起有词典）。</p>
+ * 疾病 / 症状 / 证候 / 方剂 / 中药 / 舌象 / 脉象 / 病因 八类均有独立词典
+ * （舌象 / 脉象自批次 20 起、病因自本批次起有词典）。</p>
  *
  * <p><b>「有词典」≠「参与归一」</b>：是否归一由组织级规则集的 {@code normalization.elementTypes}
  * 决定（见 {@link DEFAULT_NORMALIZED_SECTIONS}）；此处 dict 只表示「有没有词典」，判断某分区
  * 是否参与归一请用 {@link isNormalizedSection}。</p>
  */
 
-// 9 类实体分区（顺序即页面展示顺序）
+// 8 类实体分区（顺序即页面展示顺序）；治法已移除：NLP 无该标签，永远抽不到
 export const ENTITY_SECTIONS = [
   { key: 'diseases', label: '疾病', dict: true },
   { key: 'symptoms', label: '症状', dict: true },
@@ -21,7 +21,6 @@ export const ENTITY_SECTIONS = [
   { key: 'pulseList', label: '脉象', dict: true },
   { key: 'patternList', label: '证候', dict: true },
   { key: 'causeList', label: '病因', dict: true },
-  { key: 'treatmentList', label: '治法', dict: true },
   { key: 'formulaList', label: '方剂', dict: true },
   { key: 'herbs', label: '中药', dict: true }
 ]
@@ -29,7 +28,7 @@ export const ENTITY_SECTIONS = [
 /**
  * 默认参与「归一」的分区键（结构化字段名）。
  *
- * <p>与后端 {@code QcRuleSet.DEFAULT_NORMALIZATION_TYPES}（9 类，含病因）对齐。
+ * <p>与后端 {@code QcRuleSet.DEFAULT_NORMALIZATION_TYPES}（8 类，含病因）对齐。
  * 归一执行由后端按组织级规则集决定；前端按此默认值把「未参与归一」的类型排除在
  * 归一率统计之外（否则其实体无 normLevel，会被误算成「未命中」）。</p>
  *
@@ -38,7 +37,7 @@ export const ENTITY_SECTIONS = [
  */
 export const DEFAULT_NORMALIZED_SECTIONS = new Set([
   'diseases', 'symptoms', 'tongueList', 'pulseList',
-  'patternList', 'causeList', 'treatmentList', 'formulaList', 'herbs'
+  'patternList', 'causeList', 'formulaList', 'herbs'
 ])
 
 /** 该分区是否默认参与归一（无词典或未纳入默认范围者返回 false） */

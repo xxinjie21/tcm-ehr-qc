@@ -118,7 +118,8 @@ const rowBarWidth = (chart, rowCount) => {
 }
 
 // ---- 图一：各类型归一率（P0-1 方案A：单一百分比条） ----
-// 只画抽到过实体的类型（total > 0）：方剂、治法这类没数据的类型画出来只会占位。
+// 只画抽到过实体的类型（total > 0）：方剂这类样本极少的类型画出来只占位，
+// 且样本为 1 时归一率恒 0%，会被误读成「这一类全错了」。
 const covBars = computed(() =>
   (props.coverage || [])
     .filter((c) => c.total > 0)

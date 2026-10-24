@@ -193,8 +193,7 @@ const TYPE_LABELS = {
   formula: '方剂',
   tongue: '舌象',
   pulse: '脉象',
-  cause: '病因',
-  treatment: '治法'
+  cause: '病因'
 }
 const TYPE_OPTIONS = Object.keys(TYPE_LABELS).map((v) => ({ value: v, label: TYPE_LABELS[v] }))
 
