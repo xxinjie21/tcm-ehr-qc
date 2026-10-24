@@ -113,7 +113,7 @@
            首页的主结论是质控结果，术语覆盖是第二层；默认展开会让首屏多出一屏高度。
            想看的人点一下即有，图本身复用原报告页的 StandardizationCharts。 -->
       <PanelCard class="mb">
-        <template #title>
+        <template #header>
           <span>术语标准化覆盖</span>
           <el-button text type="primary" size="small" @click="showCoverage = !showCoverage">
             {{ showCoverage ? '收起' : '展开' }}
@@ -129,7 +129,7 @@
           />
         </template>
         <p v-else class="cov-hint">
-          按字段展示归一率与未归因构成；归一率口径见上方指标卡脚注。
+          展开可见 9 类术语的归一率对比，以及未归一实体中频次最高的具体词。
         </p>
       </PanelCard>
 
@@ -245,6 +245,8 @@ const govern = reactive({ pendingGovern: 0 })
 const extra = ref({ trend: [], departmentRates: [], scoreDistribution: [] })
 // 术语标准化报告（原独立页，批次 28 并入首页）：coverage=各字段覆盖率，unmatched=未归一口径
 const report = ref(null)
+// 术语标准化覆盖图：默认收起（首页主结论是质控结果，术语覆盖是第二层）
+const showCoverage = ref(false)
 
 // ECharts 实例：惰性创建、按需重建（见 renderTrend / renderDist）
 const trendRef = ref(null)
@@ -705,6 +707,12 @@ onBeforeUnmount(() => {
   font-size: var(--fs-xs);
   line-height: 1.6;
   color: var(--text-sub-strong);
+}
+.cov-hint {
+  margin: 0;
+  color: var(--ink-mid);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
 }
 .stats-note b { color: var(--ink); }
 /* 对标 A5：指标卡下方的血缘行。刻意做得比正文轻 —— 它是下钻入口，不该和指标抢注意力 */

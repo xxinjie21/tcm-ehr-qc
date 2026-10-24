@@ -44,7 +44,7 @@
 
       <div class="sc-cell">
         <div class="sc-hd">
-          最该先补的词
+          未归一实体 TOP10
           <!-- P2-4：空态不再渲染「TOP0」 -->
           <span v-if="!loading && !error && topBars.length" class="sc-sub">未归一实体 TOP{{ topBars.length }}（按出现次数）</span>
         </div>
@@ -65,7 +65,7 @@
     </div>
     <p class="sc-note">
       「未归一」= 抽到了实体但词表里没有对应标准词，其中词表没收录的部分就是
-      <b>词表缺口</b>（补词表能直接解决）。逐月对比与完整明细见下方。
+      <b>词表缺口</b>（补词表可改善其中一部分）。
     </p>
   </PanelCard>
 </template>
