@@ -36,6 +36,8 @@
 | **P0-2** 词频 `JSON_TABLE` 全表解析 / 报告页命中行全量物化 + 双 JSON 解析 | ⏳ 待办（缓存仅缓解暖路径） | 词频接口前端暂未调用；报告页命中行物化未动（暖路径已 38ms）。根治需物化 `record_terms` 表 + 报告聚合下沉（见 §2 P0-2） |
 | **P1-5 / P2-科室** 看板趋势 + 科室聚合全表扫 | ✅ 已实施 | 新增覆盖索引 `idx_records_org_agg(org_id, visit_time, department, grade)`（`V8__add_records_agg_index.sql` + `database-init.sql`）。`EXPLAIN ANALYZE`：两聚合由 `Table scan`（各 ~2.3s）→ `Covering index scan`（趋势 2306→50ms、科室 2287→16ms）。真实库 `/stats/extra` 冷路径 **5243→370ms**。根因是行宽 `avg_row_length≈12KB`、整表 ≈290MB，**不是**临时表 |
 | **阶段 3** 聚合页短 TTL 缓存（报告 / 看板 / 扣分分布） | ✅ 已实施 | `StatsCache` 泛化 `getOrLoad` + 全局 kind 版本；报告 180s（salt=词典版本）、看板扩展 60s、扣分分布 60s。实测 extra 5243→54ms、report 5890→56ms、deduction 278→26ms；写路径失效实测通过。详见《缓存场景审查与改造方案》§十一 |
+| **报告冷路径**：缓冲池 128MB→1GB + 解析并行（2026-10-28） | ✅ 已实施 | 见 §6：冷读 **6.2s → 2.3s**（缓冲池 6.2→3.3s；`toRows` 按记录并行 −26%）。口径与测试全绿，数字与旧版逐项一致 |
+| **报告预热 + 缓存视角修复**（2026-10-28） | ✅ 已实施 | 见 §6.4 / §6.5：通用统计 key 补视角段（堵跨组织串数据）；启动后与每次写后自动预热「看全部」报告；`StatsController` 空白参数归一，让首屏请求命中预热 key。实测首页报告请求 **4994ms → 46ms**、写后首读 21ms，数字不变 |
 
 **本轮验收**：`mvn test` 全量 **566/566 通过**（含新增 `readEffectiveAll` 合并口径测试 + `StatsCache.getOrLoad` 命中/失效/salt/白名单）；真实库 `EXPLAIN` 已确认 `status` 两路径命中新索引；真实库实测暖路径 extra 5243→54ms / report 5890→56ms / deduction 278→26ms，写后失效实测通过。
 
@@ -234,3 +236,118 @@ Sort: visit_time DESC, id
 2. 范围查询链路（`RangeFilter.vue` → `/records/search` → `RecordFilter.build` → 索引）。
 3. 看板/报告（`StatsServiceImpl`、`StandardizationReportServiceImpl`、`/stats/*`）。
 4. 索引与谓词（`database-init.sql` + Flyway V2–V6 + `schema-h2.sql`，含漂移核对）。
+
+---
+
+## 6. 报告冷路径二次优化（2026-10-28）
+
+> 上下文：§0.1 的缓存把报告**暖路径**压到 56ms（`StatsCache` SWR）；本节处理**冷路径** ——
+> 进程刚起 / 刚写入后第一次读 / Redis 冷。真实库基线：`records` 34182 行，
+> `structured_data` 110.3MB + `qc_results` 11.4MB，HTTP 冷读 ≈ **6.2s**（128MB 缓冲池）。
+> 前端同步把报告拆成独立 loading（主看板不再等它），本节只谈后端。
+
+### 6.1 先量：冷路径到底花在哪
+
+| 阶段 | 耗时 | 度量方式 |
+|---|---|---|
+| MySQL 取 9 列全量（≈122MB） | **1.8s** | 独立 JDBC 程序，同一条投影 SQL |
+| `toRows` JSON 解析（Jackson） | 0.55s（顺序）/ **0.20s（并行）** | 同上，进程内计时，32 核 |
+| 其余（MyBatis 行映射、8 类聚合、VO 序列化、Redis 写、HTTP） | ≈0.85s | 总时长与上两项的差额 |
+| 其中 GC 暂停 | 0.16s / 7 次 | JFR `jfr view gc-pauses` |
+
+结论：**取数占六成、解析占两成**。SQL 侧已无索引可用（条件只落在 `grade` / `org_id` 上，
+`structured_data` 是 TEXT 且要全量读到），真正的地板是「把 122MB JSON 搬进 JVM」，其次才是解析它。
+
+### 6.2 改动一：`innodb_buffer_pool_size` 128MB → 1GB（实例参数）
+
+默认 128MB 缓冲池装不下 322MB 的 `records`，每次全表扫都真读磁盘：
+
+| 度量 | 128MB（默认） | 1GB |
+|---|---|---|
+| `SELECT SUM(LENGTH(...))` 全表 | 3.55s | **0.52s** |
+| 全表取 9 列（CLI，含管道开销） | 4.9–5.2s | 1.9–2.8s |
+| `/stats/standardization-report` 冷读 | 6.2s | **3.3s** |
+
+- 落盘方式：`SET PERSIST innodb_buffer_pool_size = 1073741824;` —— 写入数据卷里的
+  `mysqld-auto.cnf`，容器重启/重建（沿用 `windows_mysql-data` 卷）都保留；
+  `SELECT * FROM performance_schema.persisted_variables` 可核。
+- 为什么不用 `my.cnf` / `docker-compose`：仓库里没有容器编排文件（`start-all.bat` 只探端口、不建容器），
+  改 `my.cnf` 需要重建容器，收益与风险不成比例。
+- 回退：`SET PERSIST innodb_buffer_pool_size = 134217728;`
+- ⚠️ `windows_mysql-data` 卷被删除后该设置丢失，需重跑一次。
+
+### 6.3 改动二：`toRows` 按记录并行解析
+
+- 落点：`StandardizationReportServiceImpl.toRows`（≥512 行走并行，小数据域仍走顺序）
+- 依据：记录之间完全独立；`ObjectMapper` / `log` 线程安全；`Collectors.toList()` 按源序归并
+  （行序被 `rangeOf` 的首末接诊时间依赖，不能赌）
+- 实测（同一份代码，仅 8080=旧 / 8081=新，两边都 `-XX:TieredStopAtLevel=1`，各 3 次冷读）：
+
+| | 旧 | 新 |
+|---|---|---|
+| 冷读均值 | 3075ms | **2271ms（-26%）** |
+
+- 口径核验：新旧两版 `coverage[0].total=33238`、`unmatched.total=78241` 完全一致 —— 只是变快，数字没动。
+- 回归：`mvn test` 全绿，新增「并行解析与入参同序、两条 JSON 都真被解析」用例。
+
+**合计**：冷读 6.2s → 2.3s（-63%），暖读 56ms 不变；再加 §6.5 的预热后，**管理员日常见到的
+「起服务后 / 写完后第一次读」≈ 0**（预热已回填），只有带筛选或组员视角仍是冷算。
+
+### 6.4 改动三：通用统计缓存 key 补上「视角」段（前置修复）
+
+为什么必须先做：通用 kind 的 key 原为 `{kind}:v{全局版本}:{md5(筛选)}[:{salt}]`，**不含视角** ——
+「管理员看全部」与「组员只看本组」在同一组织下算出**同一条 key**，谁先算，另一方就命中谁的结果。
+单组织部署（本库只有 `grp-default-2026`）两者数据恰好相同，所以一直没暴露；但预热会主动往 key 里写
+「看全部」的结果，等于把一个潜在串数据变成常态，故先补视角再做预热。
+
+- 落点：`StatsCache.viewScope(boolean, String)`（`ALL` / 组标识 / `NONE`）、`cacheKey(kind, viewScope, ...)`、
+  新的 7 参 `getOrLoadSwr(kind, keyParams, salt, viewScope, ...)`；报告侧由 `ReportContext` 快照算出视角传入，
+  与 `invalidateForWrite()` 的 `scope()` / `ALL` / `GLOBAL` 三段版本号口径一致。
+- 新 key 形状：`tcm:ehr:cache:stats:report:v{n}:ALL:{md5}:{salt}`；词频 `wordFreq` 本来就是
+  `{scope}:v{n}:all:{md5}`，未动。
+- 代价：所有通用统计 key 变一次（等价于一次全量失效），无数据风险。
+- 测试：`StatsCacheTest` 新增「两视角不共用 key」「预热视角显式传入后管理员请求能命中同一把 key」
+  「预热值不会被组员命中」。
+
+### 6.5 改动四：启动预热 + 写后预热（把冷算藏到没人看的时候）
+
+冷算 2.3s 只发生在两个时刻：进程刚起、写入后第一次读。两者都能提前算掉。
+
+- `service.impl.ReportWarmup`（新组件）：`ApplicationReadyEvent` 后预热一次；
+  挂在 `StatsCacheInvalidator.invalidateStats()` 的钩子上，任何写操作失效缓存后自动预热
+  —— 挂在失效这一个口子上，是因为「失效了没预热 = 读者照旧阻塞」而「预热了没失效 = 旧版本写新值」，
+  两者必须同源，不能指望 9 个写方法各自记得调。
+- 约束：单线程守护池、队列 1、`DiscardPolicy`（一次导入会连续触发多次失效，不允许堆任务抢库）；
+  预热失败只记一条 warn，绝不影响写入或读路径（读路径最多回到现算）。
+- 视角：**只预热「看全部」**（`orgId=""` + `viewAllOrgs=true`，基础层词表版本与真实请求的 salt 逐字相同）；
+  `auth.admin-can-view-data=false` 时不存在该视角，直接不预热。
+- ⚠️ 上线实测发现的一个坑（已修）：预热用的是空 `FiltersDTO`（全 null），而前端清空筛选后发的是
+  `department=&start=&end=`（空串），缓存 key 是 DTO 的 JSON 摘要 —— `{"department":""}` 与 `{}`
+  是两把 key，于是首屏报告仍走 5s 冷算。修法：`StatsController.filters` 把空白参数归一成 null
+  （语义与 `RecordFilter` 的 `notBlank` 判定一致），并加 `StatsControllerFiltersTest` 钉住
+  「空串与 null 摘要相同」。副作用：overview / extra 的 key 也一次性变化（等价一次失效），无数据风险。
+- 实测（真实库，backend 重启后）：
+  - 启动 23s 时 `report:v22:ALL:...:fresh` 已由预热写好；
+  - 首页实测：报告请求 **46ms**（归一前同一请求 4994ms）、overview 66ms、extra 55ms，页面数字 88.8% / 56.6% 不变；
+  - 通过 API 新增 1 条病历 → 版本号 22→23，3s 内 `report:v23:ALL:...` 自动回填，报告首读 **21ms**；
+  - 删掉该病历 → 24，再次自动回填，首读 **17ms**，库内已无残留（`COUNT=0`）；
+  - 全程 `coverage[0].total=33238` / `unmatched.total=78241` 与预热前逐项一致。
+
+**边界（没做到的部分，如实记录）**：
+
+| 场景 | 是否受益 |
+|---|---|
+| 起服务后管理员第一次看报告 | ✅ 已预热 |
+| 写入后管理员第一次看报告 | ✅ 写后自动预热 |
+| 带日期 / 科室筛选的首次读 | ❌ 组合无界，不预热，仍为冷算 ≈2.3s |
+| 组内成员视角首次读 | ❌ 只预热「看全部」，成员按自己的组冷算 |
+| `admin-can-view-data=false` | ❌ 无「看全部」视角，预热整体关闭 |
+
+### 6.6 没做的（与理由）
+
+| 候选 | 收益 | 不做 / 暂缓的理由 |
+|---|---|---|
+| 聚合下沉 `record_terms` 物化表 | 直接省掉 110MB 搬运（-1.8s） | 需挂到归一化/清洗/复核/导入全部写路径的失效钩子，属结构性改造，见 §2 P0-2，另立批次 |
+| 流式取数 + 边取边解析 | 再省 ≈0.5s | MyBatis `ResultHandler` 流式 + 生产者/消费者队列，收益 20%、复杂度与出错面明显上升 |
+| 把 `qc_results` 拆成二次查询（仅合格行） | ≈0.15s | 只占 9%，多一条 SQL 与一次 join 语义，不划算 |
+

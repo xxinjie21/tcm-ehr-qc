@@ -45,4 +45,17 @@ public interface IStandardizationReportService {
      * @return 同上
      */
     StandardizationReportVO report(FiltersDTO filters);
+
+    /**
+     * 预热：以「管理员看全部」视角现算一次默认范围报告并回填缓存（2026-10-28）。
+     *
+     * <p>报告冷算约 2.3s（全量取 122MB JSON + 解析），而它只在两种时刻发生：
+     * 进程刚起、写入后第一次读。两者都能提前算掉，让用户不必站在那 2.3s 里。
+     * 由 {@code ReportWarmup} 在启动完成后、以及任何写操作失效缓存后异步调用。</p>
+     *
+     * <p>⚠️ 口径：<b>看全部</b>（不是当前用户视角）—— 后台线程没有请求上下文，
+     * 只能定死视角；也绝不能替组内成员预热，否则会把别组数据写进他们的 key。
+     * 实现只依赖本方法自己的参数，不读 {@code RequestUtils}。</p>
+     */
+    void warmUpAllView();
 }

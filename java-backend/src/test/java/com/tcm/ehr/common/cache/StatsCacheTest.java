@@ -254,6 +254,72 @@ class StatsCacheTest {
         assertTrue(second.contains(":v1:all:"), "失效后落在 v1：" + second);
     }
 
+    // ------------------------------------------------------------ 视角隔离（2026-10-28）
+
+    @Test
+    @DisplayName("视角进 key：「看全部」与「只看本组」不得共用一条缓存（否则谁先算谁决定另一方看到什么）")
+    void getOrLoadIsolatesViewScopes() {
+        AtomicInteger calls = new AtomicInteger();
+        java.util.function.Supplier<StatsVO> loader = () -> { calls.incrementAndGet(); return new StatsVO(); };
+
+        // 组员视角（setUp 里的上下文：currentOrgId=org-b1-1、非 admin）
+        cache.getOrLoad("report", null, Duration.ofSeconds(180), loader, StatsVO.class);
+        // 管理员视角（viewAllOrgs=true）
+        MockHttpServletRequest adminReq = contextReq();
+        adminReq.setAttribute("viewAllOrgs", Boolean.TRUE);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(adminReq));
+        cache.getOrLoad("report", null, Duration.ofSeconds(180), loader, StatsVO.class);
+
+        assertEquals(2, calls.get(),
+                "两个视角必须各算一次：共用 key 时组员会读到「看全部」的结果（跨组织泄露）");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+        verify(ops, org.mockito.Mockito.times(2)).set(key.capture(), anyString(), any(Duration.class));
+        assertTrue(key.getAllValues().get(0).contains(":" + ORG + ":"), "组员视角 key 带组标识");
+        assertTrue(key.getAllValues().get(1).contains(":ALL:"), "管理员视角 key 带 ALL");
+    }
+
+    @Test
+    @DisplayName("预热视角显式传入：后台线程（无上下文）写 ALL，管理员请求能直接命中同一把 key")
+    void explicitAllScopeMatchesAdminRequestKey() {
+        AtomicInteger calls = new AtomicInteger();
+        java.util.function.Supplier<StatsVO> loader = () -> { calls.incrementAndGet(); return new StatsVO(); };
+
+        // 预热：后台线程无请求上下文，视角由调用方显式给 ALL（不给就退化成 NONE，白算）
+        RequestContextHolder.resetRequestAttributes();
+        cache.getOrLoadSwr("report", null, "dict-v1", "ALL", Duration.ofSeconds(180),
+                loader, StatsVO.class);
+
+        // 管理员真实请求：viewAllOrgs=true ⇒ 走 6 参重载，内部 scope() = ALL
+        MockHttpServletRequest adminReq = contextReq();
+        adminReq.setAttribute("viewAllOrgs", Boolean.TRUE);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(adminReq));
+        cache.getOrLoadSwr("report", null, "dict-v1", Duration.ofSeconds(180),
+                loader, StatsVO.class);
+
+        assertEquals(1, calls.get(),
+                "预热写进去的 key 必须正好是管理员请求会读的那把，否则预热等于白算");
+    }
+
+    @Test
+    @DisplayName("预热不串组员：ALL 视角的预热结果不会被组员请求命中")
+    void warmUpAllScopeNotServedToMember() {
+        AtomicInteger calls = new AtomicInteger();
+        java.util.function.Supplier<StatsVO> loader = () -> { calls.incrementAndGet(); return new StatsVO(); };
+
+        RequestContextHolder.resetRequestAttributes();
+        cache.getOrLoadSwr("report", null, "dict-v1", "ALL", Duration.ofSeconds(180),
+                loader, StatsVO.class);
+        // setUp 的组员上下文
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(contextReq()));
+        cache.getOrLoadSwr("report", null, "dict-v1", Duration.ofSeconds(180),
+                loader, StatsVO.class);
+
+        assertEquals(2, calls.get(),
+                "组员必须按自己的组算：命中 ALL 的预热值就是拿到了别组数据");
+    }
+
     // ------------------------------------------------------------ SWR（报告用：秒回旧值 + 后台重算）
 
     /** 用 trendTruncated 当「本次算的是哪一版」的标记：false/true 代表两次不同结果 */

@@ -158,13 +158,20 @@ public class StatsController {
      *
      * 与 QcController.filters 同构：接诊时间与导入时间是独立维度、可同时生效。
      * overview / all / extra 不暴露导入时间，传 null 即「不限」（现状不变）。
+     *
+     * <p>包内可见（而非 private）只为单测能钉住「空白参数与空 DTO 摘要相同」这条缓存 key 口径；
+     * 无实例状态，纯函数。</p>
      */
-    private FiltersDTO filters(String department, String start, String end, String grade,
-                               String importStart, String importEnd) {
+    static FiltersDTO filters(String department, String start, String end, String grade,
+                              String importStart, String importEnd) {
         // 1. 两个标量条件直接搬
+        //    空白归一成 null：语义上「没填」和「填了空串」等价（RecordFilter 用 notBlank 判），
+        //    但对缓存 key 不等价 —— key 是 FiltersDTO 的 JSON 摘要，`{"department":""}` 与 `{}`
+        //    是两把 key。前端清空筛选后发的正是 `department=`，不归一就会让「默认范围」请求
+        //    永远命不中预热写好的那把 key（预热用的是空 DTO），白算一次全表。
         FiltersDTO f = new FiltersDTO();
-        f.setDepartment(department);
-        f.setGrade(grade);
+        f.setDepartment(blankToNull(department));
+        f.setGrade(blankToNull(grade));
         // 2. 时间要上下界同时存在才生效：只给一端会被当成"从某时到最新"，那不是用户的意思
         if (start != null && !start.isBlank() && end != null && !end.isBlank()) {
             List<String> range = new ArrayList<>(2);
@@ -181,5 +188,10 @@ public class StatsController {
             f.setImportRange(importRange);
         }
         return f;
+    }
+
+    /** 空白 → null：把「没填」与「清空后传空串」归一成同一个缓存 key（见 {@link #filters}） */
+    private static String blankToNull(String v) {
+        return v == null || v.isBlank() ? null : v;
     }
 }

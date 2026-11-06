@@ -34,7 +34,8 @@ import java.util.regex.Pattern;
  * 扣分分布（deduction）等聚合用，版本号走全局段（见该方法）。
  *
  * 失效用版本号前缀，不用 KEYS（R3-③ / W3）：数据 key 形如
- * {@code tcm:ehr:cache:stats:{scope}:v{n}:...}（词频）或 {@code tcm:ehr:cache:stats:{kind}:v{n}:...}（通用），
+ * {@code tcm:ehr:cache:stats:{scope}:v{n}:...}（词频）或
+ * {@code tcm:ehr:cache:stats:{kind}:v{n}:{视角}:...}（通用，视角见 {@link #viewScope}），
  * 失效只把 {@code tcm:ehr:cache:stats:ver:{seg}} 自增。
  * 这同时解决三件事 —— ① 不再有 O(N) 全库扫描 + Redis 单线程阻塞（生产禁用级）；
  * ② key 空间不再靠通配删除清理；③ 「读-回填」竞态自然消失：并发读按旧版本算出的值会写回
@@ -69,6 +70,10 @@ public class StatsCache {
      * 作用域与「数据实际所属 org」无关，故管理员写入落别组也不会漏失效（见 {@link #getOrLoad}）。
      */
     private static final String GLOBAL_SCOPE = "GLOBAL";
+    /** 视角作用域段：管理员「看全部」 */
+    private static final String ALL_SCOPE = "ALL";
+    /** 视角作用域段：无组（fail-closed，查不到任何数据） */
+    private static final String NO_GROUP_SCOPE = "NONE";
     /** 单飞锁 key 前缀 */
     private static final String LOCK_PREFIX = RedisKeys.PREFIX + "cache:stats:lock:";
 
@@ -186,7 +191,7 @@ public class StatsCache {
         if (keyParams instanceof FiltersDTO f && !cacheable(f)) {
             return loader.get();
         }
-        String key = cacheKey(kind, keyParams, salt);
+        String key = cacheKey(kind, scope(), keyParams, salt);
         String json = readQuietly(key);
         if (json != null) {
             if (NULL_SENTINEL.equals(json)) {
@@ -220,10 +225,26 @@ public class StatsCache {
      */
     public <T> T getOrLoadSwr(String kind, Object keyParams, String salt, Duration baseTtl,
                               Supplier<T> loader, Class<T> type) {
+        return getOrLoadSwr(kind, keyParams, salt, scope(), baseTtl, loader, type);
+    }
+
+    /**
+     * 同 {@link #getOrLoadSwr(String, Object, String, Duration, Supplier, Class)}，但**视角段显式给定**。
+     *
+     * <p>给「后台预热」用：预热跑在没有请求上下文的后台线程上，若仍由本类内部取
+     * {@link #scope()}，会退化成 {@code NONE} —— 写进去的 key 没有任何真实请求会读
+     * （白算一次 3 万条全表扫），还会让「无上下文」看起来像一个正常数据域。
+     * 故视角由调用方从请求线程快照下来再传进来，与本项目「后台线程必须显式传上下文」
+     * 的一贯做法一致（见 {@code RecordFilter.buildForAggregate} 与 ReportContext）。</p>
+     *
+     * @param viewScope 视角段，取值见 {@link #viewScope(boolean, String)}
+     */
+    public <T> T getOrLoadSwr(String kind, Object keyParams, String salt, String viewScope,
+                              Duration baseTtl, Supplier<T> loader, Class<T> type) {
         if (keyParams instanceof FiltersDTO f && !cacheable(f)) {
             return loader.get();
         }
-        String key = cacheKey(kind, keyParams, salt);
+        String key = cacheKey(kind, viewScope, keyParams, salt);
         String json = readQuietly(key);
         if (json != null) {
             boolean sentinel = NULL_SENTINEL.equals(json);
@@ -241,9 +262,10 @@ public class StatsCache {
         return loadSingleFlight(key, baseTtl, loader, type, true);
     }
 
-    /** 统计缓存 key：{@code {前缀}{kind}:v{全局版本}:{参数摘要}[:{salt}]} */
-    private String cacheKey(String kind, Object keyParams, String salt) {
-        return KEY_PREFIX + kind + ":v" + currentVersion(GLOBAL_SCOPE) + ":" + digestOf(keyParams)
+    /** 通用统计缓存 key：{@code {前缀}{kind}:v{全局版本}:{视角}:{参数摘要}[:{salt}]} */
+    private String cacheKey(String kind, String viewScope, Object keyParams, String salt) {
+        return KEY_PREFIX + kind + ":v" + currentVersion(GLOBAL_SCOPE) + ":" + viewScope
+                + ":" + digestOf(keyParams)
                 + (salt == null || salt.isBlank() ? "" : ":" + salt);
     }
 
@@ -254,7 +276,7 @@ public class StatsCache {
     /** 使「当前数据域 + ALL + 全局」三个版本号立即失效（任一写入都调它） */
     public void invalidateForWrite() {
         bumpVersion(scope());
-        bumpVersion("ALL");
+        bumpVersion(ALL_SCOPE);
         bumpVersion(GLOBAL_SCOPE);
     }
 
@@ -439,16 +461,35 @@ public class StatsCache {
         return KEY_PREFIX + VERSION_SEGMENT + scope;
     }
 
-    /** 作用域：管理员「看全部」→ ALL；其余按数据域 orgId（无组=哨兵 → 归一成 NONE） */
+    /**
+     * 视角作用域段（**必须进 key**）：{@code ALL} / 组标识 / {@code NONE}。
+     *
+     * <p>2026-10-28：通用 kind 的 key 原先只有「kind + 全局版本 + 参数摘要 + 词典版本」，
+     * 没有视角 —— 「管理员看全部」与「组员只看本组」在同一个组织下算出<b>同一个 key</b>，
+     * 谁先算，另一方就命中谁的结果。单组织部署下两者数据恰好相同，所以一直没暴露；
+     * 但只要多一个组织（或后台预热按 ALL 视角写缓存），就会把别组数据端给组员。
+     * 故这里与 {@link #wordFreq} 的 {@code {scope}:v{n}} 口径对齐，把视角并入 key。</p>
+     *
+     * <p>⚠️ 同一份视角口径必须同时用于**失效**与**命中**：失效走
+     * {@code ver:{当前域}} / {@code ver:ALL} / {@code ver:GLOBAL} 三个版本号，
+     * 命中的 key 里带视角段，两者不冲突（版本号是全局推进，key 由视角分片）。</p>
+     *
+     * @param viewAllOrgs 是否「不限组织」（管理员且 {@code auth.admin-can-view-data=true}）
+     * @param domainOrgId 数据域落在 org_id 列上的取值（无组时为哨兵，可空）
+     */
+    public static String viewScope(boolean viewAllOrgs, String domainOrgId) {
+        if (viewAllOrgs) {
+            return ALL_SCOPE;
+        }
+        if (domainOrgId == null || domainOrgId.isBlank()) {
+            return NO_GROUP_SCOPE;
+        }
+        return normalizeScope(domainOrgId);
+    }
+
+    /** 当前请求的视角段；后台线程（无请求上下文）恒为 {@code NONE} */
     private static String scope() {
-        if (RequestUtils.viewAllOrgs()) {
-            return "ALL";
-        }
-        String org = RecordFilter.domainOrgId();
-        if (org == null || org.isBlank()) {
-            return "NONE";
-        }
-        return normalizeScope(org);
+        return viewScope(RequestUtils.viewAllOrgs(), RecordFilter.domainOrgId());
     }
 
     /**

@@ -42,7 +42,10 @@ import static org.mockito.Mockito.when;
 class StandardizationReportServiceImplTest {
 
     private RecordMapper recordMapper;
+    private StatsCache statsCache;
     private StandardizationReportServiceImpl svc;
+    /** 缓存 loader 的实际产物（stub 直通时记下），供预热用例断言「真的算了数」 */
+    private Object lastCachedValue;
 
     @BeforeEach
     void setUp() {
@@ -53,9 +56,14 @@ class StandardizationReportServiceImplTest {
         when(termStore.readEffectiveAll(any())).thenReturn(Map.of());
         // 直通 StatsCache：getOrLoadSwr 直接调 loader（绕过 Redis），让本测试聚焦报告计算逻辑
         // （报告走 SWR 变体：陈旧时后台重算，这里同步直通，验证的仍是同一份现算体）
-        StatsCache statsCache = mock(StatsCache.class);
-        when(statsCache.getOrLoadSwr(any(), any(), any(), any(), any(), any()))
-                .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(4)).get());
+        // 参数位置：kind, keyParams, salt, viewScope, baseTtl, loader, type ⇒ loader 在下标 5
+        statsCache = mock(StatsCache.class);
+        when(statsCache.getOrLoadSwr(any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    Object value = ((java.util.function.Supplier<?>) inv.getArgument(5)).get();
+                    lastCachedValue = value;
+                    return value;
+                });
         svc = new StandardizationReportServiceImpl(recordMapper, termStore,
                 new tools.jackson.databind.ObjectMapper(), statsCache);
 
@@ -249,6 +257,35 @@ class StandardizationReportServiceImplTest {
         return captor.getValue().getCustomSqlSegment();
     }
 
+    // ------------------------------------------------------------ 预热（2026-10-28）
+
+    /**
+     * 预热跑在后台线程：那里没有 RequestContextHolder。这条断言守住两件事 ——
+     * ① 落 key 的视角必须是「ALL」（写成本地视角就是替组员算，跨组织会串数据）；
+     * ② 无上下文时不能 fallback 成 fail-closed 的空集（否则预热会把一份空报告写进缓存，
+     * 比不预热更糟：用户看到的是 0）。
+     */
+    @Test
+    @DisplayName("预热：按「看全部」视角落 key，且无请求上下文也照常算出全量数字")
+    void warmUpAllViewUsesAllScopeWithoutRequestContext() {
+        givenRecords("{\"symptoms\":[" + entity("发热", "发热", true) + "]}");
+        // 模拟后台线程：JwtInterceptor 不在这条线程上，RequestUtils 一律读到 "unknown"
+        RequestContextHolder.resetRequestAttributes();
+
+        svc.warmUpAllView();
+
+        ArgumentCaptor<String> scope = ArgumentCaptor.forClass(String.class);
+        verify(statsCache).getOrLoadSwr(any(), any(), any(), scope.capture(), any(), any(), any());
+        assertEquals("ALL", scope.getValue(),
+                "预热的 key 视角只能是 ALL —— 真实请求的视角段由 StatsCache#viewScope 同源产生");
+        assertFalse(capturedSql().contains("org_id"),
+                "无请求上下文时不得拼出 org_id 条件：那会 fail-closed 成空集，回填出一份 0 报告");
+        StandardizationReportVO vo = (StandardizationReportVO) lastCachedValue;
+        int total = vo.getCoverage().stream()
+                .mapToInt(StandardizationReportVO.TypeCoverage::getTotal).sum();
+        assertEquals(1, total, "预热必须真的算出全量数据（不是空报告）");
+    }
+
     @Test
     @DisplayName("导入区间生效：条件下推到 SQL（create_time），并回显到 range")
     void importRangePushedToSqlAndEchoed() {
@@ -400,6 +437,46 @@ class StandardizationReportServiceImplTest {
         assertEquals(3, s.getRecordCount());
         assertEquals(2, s.getChiefComplaintTemplates(),
                 "病程月数不同不算不同模板，单位不同才算");
+    }
+
+    // ------------------------------------------------------------ 解析成行（并行）
+
+    /**
+     * 2026-10-28：{@code toRows} 在 ≥512 行时改走并行解析，此行数门槛的意义是
+     * 「大表收益、小表不做无谓调度」。
+     *
+     * <p>并行最怕的不是慢，而是<b>错位</b>：行序一旦和入参不一致，rangeOf 取的首末接诊时间、
+     * 以及任何依赖行序的下游都会静默给出错误结论。故这里逐行钉住「第 i 行 == 第 i 条记录」，
+     * 同时确认 structured_data / qc_results 都被解析了（并行路径不能只是把 null 塞进去）。</p>
+     */
+    @Test
+    @DisplayName("并行解析（≥512 行）与入参同序，且两条 JSON 都真被解析")
+    void parallelParseKeepsRowOrder() {
+        int n = 600; // > PARALLEL_PARSE_MIN
+        List<Record> records = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            Record r = new Record();
+            r.setId("p" + i);
+            r.setChiefComplaint("主诉" + i);
+            r.setGrade("合格");
+            r.setStructuredData("{\"symptoms\":[{\"content\":\"症状" + i + "\"}]}");
+            r.setQcResults("{\"score\":" + i + "}");
+            records.add(r);
+        }
+
+        List<StandardizationReportServiceImpl.Row> rows = svc.toRows(records);
+
+        assertEquals(n, rows.size(), "并行解析不能丢行/多行");
+        for (int i = 0; i < n; i++) {
+            StandardizationReportServiceImpl.Row row = rows.get(i);
+            assertEquals("p" + i, records.get(i).getId());
+            assertEquals("主诉" + i, row.chiefComplaint, "第 " + i + " 行错位（并行归并没保序）");
+            assertNotNull(row.structured, "第 " + i + " 行 structured_data 未解析");
+            assertEquals("症状" + i,
+                    ((Map<?, ?>) row.symptoms.get(0)).get("content"),
+                    "第 " + i + " 行解析到的不是自己那条 JSON");
+            assertEquals(i, ((Number) row.qc.get("score")).intValue(), "qc_results 也须解析");
+        }
     }
 
     @Test

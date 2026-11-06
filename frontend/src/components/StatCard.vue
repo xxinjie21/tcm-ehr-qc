@@ -13,7 +13,7 @@
          宽屏栅格会把卡片拉到 500px+，原竖排时标签右侧 ~80% 全空；
          两端锚定后空白落在数字与标签之间的「呼吸位」，右缘由标签收口。 -->
     <div class="row">
-      <div class="num">{{ display }}<small v-if="suffix">{{ suffix }}</small></div>
+      <div class="num">{{ display }}<small v-if="suffix && !loading && value != null && value !== ''">{{ suffix }}</small></div>
       <div class="lbl">
         <!-- 未传 icon 时不渲染空占位（DictionaryImport 等调用方不传 icon，避免多出 14px 空隙） -->
         <span v-if="iconSvg" class="ico" v-html="iconSvg" />
@@ -33,14 +33,18 @@ import { computed } from 'vue'
 // 指标卡片：大数字贴左 + 「图标+标签」贴右 + 可选口径说明；tone 决定数字配色（green / ochre / red）
 const props = defineProps({
   label: { type: String, required: true },
-  value: { type: [Number, String], required: true },
+  // 允许 null：部分指标在「尚未取到 / 无数据」时没有值，由 display 统一渲染成「—」，
+  // 不能填 0 —— 0 是本页真实会出现的数字（如无效数据），两者必须有别。
+  value: { type: [Number, String], default: null },
   tone: { type: String, default: '' },
   suffix: { type: String, default: '' },
   icon: { type: String, default: '' },
   /** 是否可点击下钻（对标 E3）。true 时整卡可点、可 Tab 聚焦、支持 Enter/Space */
   clickable: { type: Boolean, default: false },
   /** V1：口径说明（--fs-xs 一行）。只允许传页面已有数据/文案，不许编造业务数字 */
-  note: { type: String, default: '' }
+  note: { type: String, default: '' },
+  /** 数据未就绪：数字与后缀一起显示「—」，避免加载期间露出 0 / 空串 */
+  loading: { type: Boolean, default: false }
 })
 
 // 细线单色图标（内联SVG，24 viewBox，stroke=currentColor）
@@ -58,10 +62,12 @@ const iconSvg = computed(() => {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`
 })
 
-// 数字加千分位便于阅读；字符串值（如已格式化过的比例）原样展示
-const display = computed(() =>
-  typeof props.value === 'number' ? props.value.toLocaleString() : props.value
-)
+// 数字加千分位便于阅读；字符串值（如已格式化过的比例）原样展示。
+// 加载中 / 无值统一显示「—」：既不是 0（会被读成真实统计），也不是空白（看着像渲染失败）。
+const display = computed(() => {
+  if (props.loading || props.value == null || props.value === '') return '—'
+  return typeof props.value === 'number' ? props.value.toLocaleString() : props.value
+})
 </script>
 
 <style scoped>

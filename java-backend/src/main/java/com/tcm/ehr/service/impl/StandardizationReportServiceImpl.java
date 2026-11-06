@@ -1,6 +1,7 @@
 package com.tcm.ehr.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tcm.ehr.common.cache.StatsCache;
 import com.tcm.ehr.common.config.EntityTypes;
 import com.tcm.ehr.common.utils.RecordFilter;
 import com.tcm.ehr.common.utils.RegexCache;
@@ -28,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 标准化质量报告实现（批次 24）。
@@ -222,7 +224,7 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     /** 与 StatsServiceImpl 同一个注入实例，不另建 —— 每次 new ObjectMapper 会有可观的初始化开销 */
     private final tools.jackson.databind.ObjectMapper objectMapper;
     /** 报告缓存（性能审查：报告是全站最重的读接口，进页即全量拉数据域 + 每条解析 2 次 JSON） */
-    private final com.tcm.ehr.common.cache.StatsCache statsCache;
+    private final StatsCache statsCache;
 
     /** 报告缓存基准 TTL：比看板长（变更更稀、计算更重），仍带 ±10s 抖动 */
     private static final java.time.Duration REPORT_TTL = java.time.Duration.ofSeconds(180);
@@ -292,9 +294,35 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         //    会算出错误（甚至空）的报告并回填缓存。见 ReportContext。
         ReportContext ctx = new ReportContext(
                 RequestUtils.currentOrgId(), RecordFilter.domainOrgId(), RequestUtils.viewAllOrgs());
+        return reportWithContext(f, ctx);
+    }
+
+    /**
+     * 现算 / 读缓存的共用入口：**请求上下文显式传入**（请求线程捕获的快照，或预热定的视角）。
+     *
+     * <p>抽出来的原因（2026-10-28）：预热跑在后台线程上，没有 {@code RequestContextHolder}，
+     * 若沿用 {@code report(FiltersDTO)} 那条「现读上下文」的路径，会 fail-closed 算出空报告
+     * —— 然后把空报告回填到缓存里，比慢更糟。故两条路径共用同一个现算体，
+     * 差别只在这个 ctx 从哪来。</p>
+     */
+    private StandardizationReportVO reportWithContext(FiltersDTO f, ReportContext ctx) {
         String dictVersion = termStore.effectiveDictVersion(ctx.orgId());
-        return statsCache.getOrLoadSwr("report", f, dictVersion, REPORT_TTL,
+        // 视角段必须与失效/命中同源（看全部 → ALL，组内 → 组标识）：
+        // 少了它，预热写进去的「看全部」结果会被组内成员直接命中（见 StatsCache#viewScope）。
+        String viewScope = StatsCache.viewScope(ctx.viewAllOrgs(), ctx.domainOrgId());
+        return statsCache.getOrLoadSwr("report", f, dictVersion, viewScope, REPORT_TTL,
                 () -> computeReport(f, ctx), StandardizationReportVO.class);
+    }
+
+    /**
+     * 预热：以「看全部 + 基础词表」现算一次默认范围报告并回填缓存（详见 {@link ReportContext#allView()}）。
+     *
+     * <p>调用方是后台线程（启动后 / 写操作失效后），本方法不读请求上下文，
+     * 故无需（也不能）依赖 {@code RequestUtils}。</p>
+     */
+    @Override
+    public void warmUpAllView() {
+        reportWithContext(new FiltersDTO(), ReportContext.allView());
     }
 
     /**
@@ -310,6 +338,23 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
      * @param viewAllOrgs 管理员「看全部」标记（true 时不加组织条件）
      */
     private record ReportContext(String orgId, String domainOrgId, boolean viewAllOrgs) {
+
+        /**
+         * 预热视角（2026-10-28）：**看全部 + 基础词表**。
+         *
+         * <p>为什么是「看全部」：预热是替用户提前算，算出来的 key 必须正好是用户下次
+         * 会读的那把 —— 首页看板/报告页的主力账号是管理员，其视角就是 ALL。
+         * 组内成员的视角是各自的组（key 里带组标识），本方法不越权替他们算：
+         * 一旦按 ALL 的数据回填到组视角 key，就是跨组织泄露。</p>
+         *
+         * <p>为什么 orgId 给空串：{@code effectiveDictVersion("")} 取的是<b>基础层</b>词表版本
+         * ——本部署 9102 条词条与 8 类版本全在基础层（{@code dictionary_versions.org_id = ''}），
+         * 故与任何真实请求算出的 salt 逐字相同。将来某组织有了自定义词典，其 salt 会不同，
+         * 预热只是落在一个没人读的 key 上（多算一次，不会写错数）。</p>
+         */
+        static ReportContext allView() {
+            return new ReportContext("", "", true);
+        }
     }
 
     /** 报告现算主体（不含缓存）。缓存包装见 {@link #report(FiltersDTO)}。 */
@@ -660,12 +705,6 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
     }
 
     /**
-     * 病历 → 报告行（A1/T2 的解析入口）：每条只解析一次 structured_data 与 qc_results。
-     *
-     * 包级可见是为了让「解析一次」能被测试直接钉住 —— 生产路径与测试走同一个入口，
-     * 不会出现「测试测的是一套、线上跑的是另一套」。
-     */
-    /**
      * 只保留质控合格的病历（用于归一率类统计）。grade 为 null（未质控）也排除 ——
      * 它们还没进入标准化数据集。
      */
@@ -679,12 +718,42 @@ public class StandardizationReportServiceImpl implements IStandardizationReportS
         return out;
     }
 
+    /**
+     * 并行解析的行数门槛。低于它不走并行：任务调度/合并的开销会盖过收益，
+     * 而小数据域（按科室收窄后常常只有几十上百条）本来就快。
+     */
+    private static final int PARALLEL_PARSE_MIN = 512;
+
+    /**
+     * 病历 → 报告行（A1/T2 的解析入口）：每条只解析一次 structured_data 与 qc_results。
+     *
+     * <p>2026-10-28：解析改为「按记录并行」。实测全量 3.4 万条时 Jackson 解析
+     * （110MB structured_data + 11MB qc_results）约占冷算的三成，而记录之间完全独立 ——
+     * 这是本方法里唯一可并行、且不需要改任何统计口径的地方（SQL 侧全表扫描已是地板，
+     * 见 docs/superpowers/specs/2026-10-17-report-swr-cache-design.md）。</p>
+     *
+     * <p>① 保序：{@code Collectors.toList()} 按源列表顺序归并，与原先的 for 循环逐行同序
+     * （下游 byMonth/coverage 不依赖行序，但 rangeOf 取首末时间要看顺序，不能赌）。
+     * ② 并行粒度取「记录」而非「批次」：单条约 3KB，3 万+ 个任务足以让
+     * ForkJoinPool 自己均衡，不必手工分片。
+     * ③ ObjectMapper / log 都是线程安全的，{@link #parseJson} 无需额外同步。</p>
+     *
+     * <p>包级可见是为了让「解析一次」能被测试直接钉住 —— 生产路径与测试走同一个入口，
+     * 不会出现「测试测的是一套、线上跑的是另一套」。</p>
+     */
     List<Row> toRows(List<Record> records) {
-        List<Row> rows = new ArrayList<>(records.size());
-        for (Record r : records) {
-            rows.add(new Row(r, parseJson(r.getStructuredData()), parseJson(r.getQcResults())));
+        if (records.size() < PARALLEL_PARSE_MIN) {
+            List<Row> rows = new ArrayList<>(records.size());
+            for (Record r : records) {
+                rows.add(toRow(r));
+            }
+            return rows;
         }
-        return rows;
+        return records.parallelStream().map(this::toRow).collect(Collectors.toList());
+    }
+
+    private Row toRow(Record r) {
+        return new Row(r, parseJson(r.getStructuredData()), parseJson(r.getQcResults()));
     }
 
     /**

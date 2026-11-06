@@ -73,15 +73,18 @@
           note="质控判定无有效内容" clickable @click="drill('无效')" />
         <!-- 术语标准化两张卡（批次 28 由独立报告页并入）：分母是实体数，与上方合格率不同。
              note 里点明口径，两串数字并排时不至于被读成同一个率。 -->
-        <StatCard label="术语归一率" :value="symRate" tone="green" suffix="%" icon="rate"
-          :note="symRate === null ? '当前范围无抽取实体' : '抽到的实体映射到标准术语的占比'" />
+        <StatCard label="术语归一率" :value="symRate" :loading="reportLoading" tone="green" suffix="%" icon="rate"
+          :note="reportLoading ? '术语报告加载中…'
+            : symRate === null ? '当前范围无抽取实体' : '抽到的实体映射到标准术语的占比'" />
         <StatCard
           :label="worstField ? `覆盖最低：${worstField.label}` : '覆盖最低字段'"
           :value="worstField ? Math.round((worstField.normalized / worstField.total) * 1000) / 10 : null"
+          :loading="reportLoading"
           :tone="worstField && worstField.normalized / worstField.total < 0.9 ? 'ochre' : 'green'"
           suffix="%"
           icon="rate"
-          :note="worstField ? `已归一 ${worstField.normalized} / 共 ${worstField.total} 个实体` : '当前范围无数据'"
+          :note="reportLoading ? '术语报告加载中…'
+            : worstField ? `已归一 ${worstField.normalized} / 共 ${worstField.total} 个实体` : '当前范围无数据'"
         />
       </div>
 
@@ -123,7 +126,7 @@
           <StandardizationCharts
             :coverage="report?.coverage || []"
             :unmatched="report?.unmatched || {}"
-            :loading="loading"
+            :loading="reportLoading"
             :error="false"
             :range-label="chartRangeLabel"
           />
@@ -228,6 +231,10 @@ const go = (path, menuTitle) => {
 // 原先是 start/end 两个单日期字段（StatsFilter 的私有口径）。
 const filter = reactive({ department: '', dateRange: null })
 const loading = ref(false)
+// 术语报告单独加载态：它是全站最重的读接口（冷算实测 ~6s），不能与指标卡/图表共用
+// 主 loading —— 那会让 40ms 就返回的指标卡与两张图一直显示骨架屏，直到 6s 后才一起出现。
+// 初值 true：页面挂载后由 loadAll 发起请求，首帧就应显示「加载中」而不是「无数据」。
+const reportLoading = ref(true)
 // P2-9 数据新鲜度：页面读取时刻（诚实、不依赖后端字段、不猜加载函数内部）
 const loadedAt = ref(new Date().toLocaleString())
 // 区分「加载失败」与「确实为空」
@@ -400,7 +407,9 @@ const renderDist = () => {
         ).join('<br/>')
       }
     },
-    grid: { left: 40, right: 16, top: 16, bottom: 28 },
+    // left 40→56：全量口径下 Y 轴刻度会到「25,000」（五位 + 千分位），40px 装不下，刻度会被画布左边界裁成
+    // 「5,000 / 3,000 …」这样的残字（2026-10-28 截图实测）。
+    grid: { left: 56, right: 16, top: 16, bottom: 28 },
     // F6：两条轴 axisLabel 补 13（原轴标签走 ECharts 默认字号，未随令牌上移）
     xAxis: { type: 'category', data: d.map((b) => b.bucket), axisLine: { lineStyle: { color: CHART.axisLine } }, axisLabel: { fontSize: 13 } },
     yAxis: { type: 'value', axisLabel: { fontSize: 13 }, splitLine: { lineStyle: { color: CHART.splitLine } } },
@@ -424,40 +433,60 @@ const params = () => ({
   pattern: ''
 })
 
+// 每次加载的序号：连点「查询」/重置时，旧请求晚到只丢结果，不回填、也不提前收尾
+let loadSeq = 0
+
+// 术语报告独立加载（不阻塞主内容）。
+// 它是全站最重的读接口（冷算实测 ~6s），失败只让 2 张术语卡与折叠面板退化为「无数据」，
+// 不影响主看板其余三块 —— 与并入首页时「报告单独失败不整页失败」的口径一致。
+const loadReport = async (seq) => {
+  reportLoading.value = true
+  try {
+    const rp = await getStandardizationReport(params())
+    if (seq === loadSeq) report.value = rp?.data ?? null
+  } catch {
+    if (seq === loadSeq) report.value = null
+  } finally {
+    if (seq === loadSeq) reportLoading.value = false
+  }
+}
+
 // 看板只拉主线口径：指标卡走 /stats/overview（轻量），趋势/分布走 /stats/extra
 const loadAll = async () => {
   // 1. 置加载态并清掉上一次的失败标记
+  const seq = ++loadSeq
   loading.value = true
   failed.value = false
+  // 2. 术语报告先发起、不 await —— 主内容返回即可渲染
+  //   （实测 extra 238ms 返回，但整页曾因等报告而 6.1s 才出图）
+  loadReport(seq)
   try {
-    // 2. 并行拉取指标卡 / 图表数据（带筛选）与清洗统计，三块互不依赖（P4.6）
+    // 3. 并行拉取指标卡 / 图表数据（带筛选）与清洗统计，三块互不依赖（P4.6）
     const govTask = userStore.role === '管理员'
       ? governanceStats().catch(() => ({ data: { pendingGovern: 0 } }))
       : Promise.resolve(null)
-    const [ov, ex, gc, rp] = await Promise.all([
+    const [ov, ex, gc] = await Promise.all([
       getOverview(params()),
       getExtraStats(params()),
-      govTask,
-      // 术语标准化报告：与其余三块并行，失败不影响看板其余部分
-      // （catch 成 null，图表区按「无数据」处理，不当成整页失败）
-      getStandardizationReport(params()).catch(() => null)
+      govTask
     ])
-    // 3. 分别回填指标卡与图表数据；清洗统计失败/非管理员不影响其余看板
+    // 4. 旧请求（用户已再次查询）晚到：丢弃，避免把上一组筛选的数字盖到新筛选上
+    if (seq !== loadSeq) return
+    // 5. 分别回填指标卡与图表数据；清洗统计失败/非管理员不影响其余看板
     overview.value = ov.data
     extra.value = ex.data
     if (gc) {
       govern.pendingGovern = gc.data?.pendingGovern ?? 0
     }
-    report.value = rp?.data ?? null
-    // 报告接口单独失败不当成整页失败：看板其余三块仍是有效结论，
-    // 只在术语区给一句「未取到」，避免用户以为合格率那些数字也不可信。
   } catch {
     // 拦截器已提示；标记失败态，空态区据此给出重试入口
-    failed.value = true
+    if (seq === loadSeq) failed.value = true
   } finally {
-    // 5. 收尾：重画两张图并复位加载态
+    // 6. 收尾：重画两张图并复位加载态
     // 等 DOM 更新（空态换成图表容器）后再初始化 ECharts，否则拿不到 ref
+    if (seq !== loadSeq) return
     await nextTick()
+    if (seq !== loadSeq) return
     renderTrend()
     renderDist()
     loading.value = false
