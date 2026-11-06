@@ -1,3 +1,29 @@
+-- =====================================================================
+-- 部署说明（本文件 = 唯一建库脚本）
+-- ---------------------------------------------------------------------
+-- 【全新部署】只执行本文件即可，不必手工执行 db/migration/V2~V9：
+--   mysql -u root -p --default-character-set=utf8mb4 < database-init.sql
+--   文件首部的 SET NAMES utf8mb4 保证客户端未指定字符集时中文也不乱码。
+--
+-- 【本文件即 Flyway V2~V9 全部迁移后的终态】，逐项对应：
+--   V2 nlp_task.mode / nlp_task.failed_ids / qc_task.failed_ids
+--   V3 user_llm_config.interpret_enabled / review_enabled / term_suggest_enabled
+--      （同批加入的 chat_enabled 已被 V6 删除，本文件不含该列，不是遗漏）
+--   V4 idx_records_vt_desc_id 取代 idx_records_visit_time
+--   V5 idx_records_org_ct_id        V6 删除 user_llm_config.chat_enabled
+--   V7 idx_records_org_status_vt / idx_records_status_vt
+--   V8 idx_records_org_agg          V9 clean_task 表
+--   MySQL 9.4 实测：单独执行本文件 与「本文件 + V2~V9」的结构快照 0 差异。
+--
+-- 【应用启动】spring.flyway baseline-version=1，以本文件建的库为基线接管；
+--   V2~V9 都是 information_schema 守卫的幂等脚本，新库上空操作，不会重复改表。
+--
+-- 【旧库升级】CREATE TABLE IF NOT EXISTS 不变更已存在的表结构，
+--   请勿用本文件升级旧库 —— 由应用启动时的 Flyway 自动完成。
+--   本文件可重复执行（建表幂等 + INSERT IGNORE）。
+-- =====================================================================
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS tcm_ehr
   DEFAULT CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
@@ -255,7 +281,7 @@ CREATE TABLE IF NOT EXISTS clean_task (
   filters_json TEXT COMMENT '筛选范围(JSON)',
   request_key VARCHAR(64) NULL COMMENT '幂等键',
   created_by VARCHAR(50) COMMENT '提交人用户名',
-  org_id VARCHAR(36) COMMENT '提交时所属组织快照，供 worker 重建 RecordFilter',
+  org_id VARCHAR(36) COMMENT '提交时所属组织快照，供 worker 重建 RecordFilter（数据域）',
   failure_list JSON COMMENT '失败清单(仅存前500条)',
   failed_ids JSON NULL COMMENT '完整失败记录ID集合',
   failure_truncated TINYINT NOT NULL DEFAULT 0 COMMENT '失败清单是否被截断',
@@ -276,7 +302,7 @@ CREATE TABLE IF NOT EXISTS clean_task (
 
 CREATE TABLE IF NOT EXISTS dictionary_terms (
   id VARCHAR(36) PRIMARY KEY,
-  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层（不用 NULL，见注 1）",
+  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT '空串=系统基础层（不用 NULL，见注 1）',
   type VARCHAR(20) NOT NULL COMMENT 'disease/pattern/symptom/herb/formula/tongue/pulse/treatment（见 EntityTypes.dictKeys，共 8 类）',
   standard_term VARCHAR(200) NOT NULL,
   aliases JSON,
@@ -288,7 +314,7 @@ CREATE TABLE IF NOT EXISTS dictionary_terms (
 
 CREATE TABLE IF NOT EXISTS dict_proposal (
   id VARCHAR(36) PRIMARY KEY,
-  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层",
+  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT '空串=系统基础层',
   type VARCHAR(20) NOT NULL,
   submit_user_id VARCHAR(50) NOT NULL COMMENT '提交人用户名（登录 username，非 user.id）',
   status VARCHAR(16) NOT NULL COMMENT 'pending/approved/rejected',
@@ -311,7 +337,7 @@ CREATE TABLE IF NOT EXISTS dict_proposal_term (
 
 CREATE TABLE IF NOT EXISTS dict_archive_version (
   id VARCHAR(36) PRIMARY KEY,
-  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层，与组织层独立计数",
+  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT '空串=系统基础层，与组织层独立计数',
   type VARCHAR(20) NOT NULL,
   version_no INT NOT NULL COMMENT '组内递增版本号',
   proposal_id VARCHAR(36) COMMENT '来源提案；管理员直写导入时为 NULL',
@@ -330,7 +356,7 @@ CREATE TABLE IF NOT EXISTS dict_archive_term (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='基线归档术语快照（每组每 type 仅留最近 5 份）';
 
 CREATE TABLE IF NOT EXISTS dictionary_versions (
-  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT "''=系统基础层",
+  org_id VARCHAR(36) NOT NULL DEFAULT '' COMMENT '空串=系统基础层',
   type VARCHAR(20) NOT NULL COMMENT 'disease/pattern/symptom/herb/formula/tongue/pulse/treatment（见 EntityTypes.dictKeys，共 8 类）',
   version VARCHAR(32) NOT NULL COMMENT 'DB 侧内容版本：该 (org,type) 词条内容的 SHA-256 前 32 位十六进制',
   indexed_version VARCHAR(32) NULL COMMENT 'ES 侧已灌入的版本；NULL 或 <> version 即「待重建」',
