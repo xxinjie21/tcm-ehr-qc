@@ -1,69 +1,112 @@
 # 中医电子病历智能结构化与数据质量控制系统
 
-## 项目简介
-
-面向中医电子病历的智能结构化与数据质量控制系统，实现从原始非结构化病历到高质量标准化数据集的全流程自动化处理。
-
-## 业务流程
+面向中医电子病历的结构化与数据质量控制系统。主链路：
 
 ```
-Excel导入（去重、格式规整）
-    ↓
-NLP实体抽取（hwtcmner 模型 + 正则补充舌象/脉象/病因/治法）
-    ↓
-术语标准化（ES国标映射）
-    ↓
-质控检查（缺失/格式/查重）+ 质控评分（相对评分，满分100）
-    ↓
-分级路由：
-├─ ≥90分且无严重问题 → 合格 ──────────→ 导出
-├─ 60~89分或轻微冲突 → 人工复核队列 ──→ 修正后重新评分
-│                                          ├─ 合格 → 导出
-│                                          └─ 仍不合格 → 脏数据隔离
-└─ <60分或严重逻辑错误 → 无效脏数据 → 隔离归档（禁止导出）
+Excel 导入（去重、格式规整）
+  → NLP 实体抽取（python-nlp，hwtcmner + 规则兜底）
+  → 术语归一（ES 召回 + Java 判定）
+  → 质控评分（完整性 / 逻辑 / 格式 / 标准化 / 重复）
+  → 分级（≥90 合格 · 60~89 待复核 · <60 或真缺失≥3 无效）
+  → 人工复核 / 清洗导出
 ```
 
-## 技术栈
+## 快速开始
 
-| 层次 | 技术 | 说明 |
-|------|------|------|
-| 前端 | Vue.js 3 + Element Plus | SPA单页应用 |
-| 后端 | Spring Boot（Java） | RESTful API、业务逻辑 |
-| NLP抽取 | Python FastAPI + transformers（hwtcmner） | 独立服务 :8001，Java `PythonNlpClient` 转发；模型缺失降级为规则兜底 |
-| 数据库 | MySQL | 5张核心表（users / records / review_tasks / operation_log / nlp_task） |
-| 搜索引擎 | Elasticsearch | 术语归一查询 |
-| 文件存储 | JSON文件 | 术语库配置 |
+### 1. 环境
 
-## 项目结构
+| 组件 | 版本 |
+|---|---|
+| JDK | 17+（编译目标 17） |
+| Maven | 3.9+ |
+| Node.js | 18+ |
+| Python | 3.11+（依赖见 `python-nlp/requirements.txt`） |
+| MySQL | 8.x（库名 `tcm_ehr`） |
+| Redis | 5+（本项目用 db1） |
+| Elasticsearch | 7.17.x + IK 分词插件 |
+
+### 2. 建库 —— 只需执行一个 SQL 文件
+
+```bash
+mysql -u root -p --default-character-set=utf8mb4 < database-init.sql
+```
+
+该文件包含全部表、索引与种子账号，首行 `SET NAMES utf8mb4` 保证中文不乱码。
+应用启动时 Flyway 以 baseline v1 自动接管，`java-backend/src/main/resources/db/migration/V2~V9`
+在新库上全是幂等空操作，**无需手工执行**。
+
+⚠️ 本文件使用 `CREATE TABLE IF NOT EXISTS`，**不能用于旧库升级**；升级由 Flyway 完成。
+改表结构时必须同时改 `database-init.sql`（新库）与新增 `V{n}__*.sql`（存量库）。
+
+### 3. 配置
+
+编辑 `java-backend/src/main/resources/application.yml`：
+
+- 数据源 / Redis 连接按本机修改；`DB_USERNAME`、`DB_PASSWORD`、`REDIS_PASSWORD` 可用环境变量覆盖。
+- `spring.ai.model.*` 六项须保持 `none`，否则缺 api-key 时启动失败。
+- `llm.enabled` 默认 `false`（仅启动基线）；`nlp.enabled` 默认 `true`，开启前先起 :8001。
+- 词典运行时来源为 `classpath:dictionaries/*.json`（`java-backend/src/main/resources/dictionaries/`），
+  启动时按内容版本重播基础层并重建 ES 索引；改完词典重启即生效。
+
+### 4. 启动（先起 MySQL / Redis / ES，再依次起三个服务，各占一个终端）
+
+```bash
+# 后端 :8080
+cd java-backend && mvn spring-boot:run
+
+# 前端 :3000（Vite 代理 /api → 8080）
+cd frontend && npm install && npm run dev
+
+# NLP :8001
+cd python-nlp && .venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8001
+```
+
+`python-nlp/model/` 需含 `hwtcmner` 权重；缺失时服务自动降级为规则兜底（`/health` 返回 `modelAvailable=false`）。
+仓库不含 `start-all.bat` 之类的本机启动脚本，请按上述命令在各自环境启动。
+
+### 5. 演示数据
+
+- 数据：`docs/电子病历精简脱敏数据_500行.xlsx`，通过「病历导入」上传。
+- 账号：`admin / 123456`（管理员，默认组织 owner）、`auditor / 123456`（普通成员，有词典与质控规则写权限）、
+  `zhangsan / 123456`、`lisi / 123456`。
+- ⚠️ 500 行文本互不相同，但「主诉 + 辨证结论」仅约 120 个组合 / 10 类疾病。
+  统计请按临床模板口径，不要按行数推算增幅。
+
+### 6. 回归
+
+```bash
+cd java-backend && mvn test
+cd frontend && node node_modules/vite/bin/vite.js build
+python-nlp/.venv/Scripts/python.exe python-nlp/run_tests.py
+```
+
+## 目录结构
 
 ```
 tcm-ehr-qc/
-├── docs/                          # 设计文档
-├── java-backend/                  # Java后端（Spring Boot）
-├── frontend/                      # Vue.js前端
-├── python-nlp/                    # NLP 抽取服务（FastAPI，:8001）
-├── data/
-│   ├── dictionaries/              # 术语库配置
-│   └── qc-rules.json              # 质控规则运行时覆盖（可选，缺失用内置默认）
-├── tools/
-│   └── convert-standard-pdf.py    # 标准 PDF → 词典 JSON 的离线转换脚本
-├── logs/                          # 运行日志与审计归档（不入库）
-├── database-init.sql              # 建库建表 + 种子数据（DDL 唯一权威）
-├── .gitignore
-├── LICENSE
-└── README.md
+├── database-init.sql            # 建库唯一权威（单文件部署）
+├── docs/                        # 需求 / 设计 / 契约 / 开发指南 / 演示数据
+├── frontend/                    # Vue3 + Vite6 + Element Plus（:3000）
+├── java-backend/                # Spring Boot 4.1.1 + Spring AI 2.0.1（:8080）
+│   └── src/main/resources/
+│       ├── db/migration/        # Flyway V2~V9（存量库升级）
+│       └── dictionaries/        # 8 本术语词典（运行时真源）
+├── python-nlp/                  # FastAPI NLP 服务（:8001）
+└── tools/                       # 离线校验脚本
 ```
 
-## 接口数量
+## 权威文件
 
-- Java后端：50个接口（Spring Boot :8080；openapi 46 路径 / 50 操作）
-- 总计：50个接口
-- 契约基准：`docs/中医电子病历智能结构化与数据质量控制系统-openapi.yaml`（接口增删先改该文件 → 此处数量随之同步）
+| 内容 | 文件 |
+|---|---|
+| 建库 DDL 与种子数据 | `database-init.sql` |
+| 接口契约 | `docs/中医电子病历智能结构化与数据质量控制系统-openapi.yaml` |
+| 需求 / 功能 / 设计 | `docs/需求分析报告.md` · `docs/功能设计文档.md` · `docs/项目设计文档.md` |
+| 开发规范、技术决策与已知问题 | `docs/开发指南.md` |
+| 质控规则与评分 | `docs/质控规则与评分标准.md` · `docs/质控分级口径.md` |
+| 权限五档 | `docs/角色与权限矩阵.md` |
+| structuredData 结构 | `docs/功能设计文档.md` 附录 A |
+| 演示数据 | `docs/电子病历精简脱敏数据_500行.xlsx` |
 
-## 核心算法
-
-- NLP实体抽取：Python FastAPI 服务（`transformers` 加载 hwtcmner + 正则兜底舌象/脉象/病因/治法），Java 转发；服务/模型不可用降级为空 9 类
-- 质控评分：相对评分（基于病历自身缺陷项扣分），满分100分，缺失-15，逻辑冲突-10，格式-5
-- 诊疗逻辑校验：固定规则表（3 条证候-治法/方剂 + 2 条舌脉；未覆盖证候不判冲突）
-- 术语归一：Elasticsearch索引匹配，精确-包含-模糊
-- 数据清洗：去重（21字段固定顺序拼接 + MD5；字段顺序见 `RecordUtil.textHash` 类注释，变更需回归去重）、格式规整、脏数据隔离
+接手前请先读 `docs/开发指南.md` 最后一章「技术决策与已知问题」——其中列出了
+契约差异、回归闸门现状与注释规范回退等需要优先处理的事项。
